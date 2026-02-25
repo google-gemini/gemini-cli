@@ -130,6 +130,18 @@ export interface SettingsSchema {
 export type MemoryImportFormat = 'tree' | 'flat';
 export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
 
+const pathArraySetting = (label: string, description: string): SettingDefinition => ({
+  type: 'array',
+  label,
+  category: 'Advanced',
+  requiresRestart: true,
+  default: [] as string[],
+  description,
+  showInDialog: false,
+  items: { type: 'string' },
+  mergeStrategy: MergeStrategy.UNION,
+});
+
 /**
  * The canonical schema for all settings.
  * The structure of this object defines the structure of the `Settings` type.
@@ -152,17 +164,15 @@ const SETTINGS_SCHEMA = {
     },
   },
 
-  policyPaths: {
-    type: 'array',
-    label: 'Policy Paths',
-    category: 'Advanced',
-    requiresRestart: true,
-    default: [] as string[],
-    description: 'Additional policy files or directories to load.',
-    showInDialog: false,
-    items: { type: 'string' },
-    mergeStrategy: MergeStrategy.UNION,
-  },
+  policyPaths: pathArraySetting(
+    'Policy Paths',
+    'Additional policy files or directories to load.',
+  ),
+
+  adminPolicyPaths: pathArraySetting(
+    'Admin Policy Paths',
+    'Additional admin policy files or directories to load.',
+  ),
 
   general: {
     type: 'object',

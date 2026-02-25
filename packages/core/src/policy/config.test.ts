@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 
 import nodePath from 'node:path';
+import * as fs from 'node:fs/promises';
 
 import type { PolicySettings } from './types.js';
 import { ApprovalMode, PolicyDecision, InProcessCheckerType } from './types.js';
@@ -1191,5 +1192,70 @@ modes = ["plan"]
     expect(subagentRule?.priority).toBeCloseTo(3.1, 5);
 
     vi.doUnmock('node:fs/promises');
+  });
+
+  it('should deduplicate security warnings when called multiple times', async () => {
+    const actualFs =
+      await vi.importActual<typeof import('node:fs/promises')>(
+        'node:fs/promises',
+      );
+
+    const systemPoliciesDir = nodePath.resolve(
+      '/tmp/gemini-cli-test/system/policies',
+    );
+
+    vi.doMock('node:fs/promises', () => ({
+      ...actualFs,
+      default: {
+        ...actualFs,
+        readdir: vi.fn(async (path) => {
+          if (nodePath.resolve(path.toString()) === systemPoliciesDir) {
+            return ['policy.toml'];
+          }
+          return [];
+        }),
+      },
+      readdir: vi.fn(async (path) => {
+        if (nodePath.resolve(path.toString()) === systemPoliciesDir) {
+          return ['policy.toml'];
+        }
+        return [];
+      }),
+    }));
+
+    vi.resetModules();
+
+    const { coreEvents } = await import('../utils/events.js');
+    const { Storage } = await import('../config/storage.js');
+    const { createPolicyEngineConfig, clearEmittedPolicyWarnings } =
+      await import('./config.js');
+
+    clearEmittedPolicyWarnings();
+    const feedbackSpy = vi
+      .spyOn(coreEvents, 'emitFeedback')
+      .mockImplementation(() => {});
+
+    vi.spyOn(Storage, 'getSystemPoliciesDir').mockReturnValue(
+      systemPoliciesDir,
+    );
+
+    const settings: PolicySettings = {
+      adminPolicyPaths: ['/tmp/other/admin/policies'],
+    };
+
+    // First call: Should emit warning
+    await createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
+    expect(feedbackSpy).toHaveBeenCalledWith(
+      'warning',
+      expect.stringContaining('Ignoring --admin-policy'),
+    );
+    const callCountAfterFirst = feedbackSpy.mock.calls.length;
+
+    // Second call: Should NOT emit warning again
+    await createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
+    expect(feedbackSpy.mock.calls.length).toBe(callCountAfterFirst);
+
+    vi.doUnmock('node:fs/promises');
+    feedbackSpy.mockRestore();
   });
 });

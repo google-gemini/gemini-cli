@@ -37,6 +37,26 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 export const DEFAULT_CORE_POLICIES_DIR = path.join(__dirname, 'policies');
 
+// Cache to prevent duplicate warnings in the same process
+const emittedWarnings = new Set<string>();
+
+/**
+ * Emits a warning feedback event only once per process.
+ */
+function emitWarningOnce(message: string): void {
+  if (!emittedWarnings.has(message)) {
+    coreEvents.emitFeedback('warning', message);
+    emittedWarnings.add(message);
+  }
+}
+
+/**
+ * Clears the emitted warnings cache. Used primarily for tests.
+ */
+export function clearEmittedPolicyWarnings(): void {
+  emittedWarnings.clear();
+}
+
 // Policy tier constants for priority calculation
 export const DEFAULT_POLICY_TIER = 1;
 export const WORKSPACE_POLICY_TIER = 2;
@@ -65,71 +85,70 @@ export const ALLOWED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.1;
  * @param policyPaths Optional user-provided policy paths (from --policy flag).
  *   When provided, these replace the default user policies directory.
  * @param workspacePoliciesDir Optional path to a directory containing workspace policies.
+ * @param adminPolicyPaths Optional admin-provided policy paths (from --admin-policy flag).
+ *   When provided, these supplement the default system policies directory.
  */
 export function getPolicyDirectories(
   defaultPoliciesDir?: string,
   policyPaths?: string[],
   workspacePoliciesDir?: string,
+  adminPolicyPaths?: string[],
 ): string[] {
-  const dirs = [];
+  return [
+    // Admin tier (highest priority)
+    Storage.getSystemPoliciesDir(),
+    ...(adminPolicyPaths ?? []),
 
-  // Admin tier (highest priority)
-  dirs.push(Storage.getSystemPoliciesDir());
+    // User tier (second highest priority)
+    ...(policyPaths ?? [Storage.getUserPoliciesDir()]),
 
-  // User tier (second highest priority)
-  if (policyPaths && policyPaths.length > 0) {
-    dirs.push(...policyPaths);
-  } else {
-    dirs.push(Storage.getUserPoliciesDir());
-  }
+    // Workspace Tier (third highest)
+    workspacePoliciesDir,
 
-  // Workspace Tier (third highest)
-  if (workspacePoliciesDir) {
-    dirs.push(workspacePoliciesDir);
-  }
-
-  // Default tier (lowest priority)
-  dirs.push(defaultPoliciesDir ?? DEFAULT_CORE_POLICIES_DIR);
-
-  return dirs;
+    // Default tier (lowest priority)
+    defaultPoliciesDir ?? DEFAULT_CORE_POLICIES_DIR,
+  ].filter((dir): dir is string => !!dir);
 }
 
 /**
- * Determines the policy tier (1=default, 2=user, 3=workspace, 4=admin) for a given directory.
+ * Determines the policy tier (1=default, 2=workspace, 3=user, 4=admin) for a given directory.
  * This is used by the TOML loader to assign priority bands.
  */
 export function getPolicyTier(
   dir: string,
-  defaultPoliciesDir?: string,
-  workspacePoliciesDir?: string,
+  context: {
+    defaultPoliciesDir?: string;
+    workspacePoliciesDir?: string;
+    adminPolicyPaths?: Set<string>;
+    systemPoliciesDir: string;
+    userPoliciesDir: string;
+  },
 ): number {
-  const USER_POLICIES_DIR = Storage.getUserPoliciesDir();
-  const ADMIN_POLICIES_DIR = Storage.getSystemPoliciesDir();
-
   const normalizedDir = path.resolve(dir);
-  const normalizedUser = path.resolve(USER_POLICIES_DIR);
-  const normalizedAdmin = path.resolve(ADMIN_POLICIES_DIR);
 
+  if (normalizedDir === context.systemPoliciesDir) {
+    return ADMIN_POLICY_TIER;
+  }
+  if (context.adminPolicyPaths?.has(normalizedDir)) {
+    return ADMIN_POLICY_TIER;
+  }
+  if (normalizedDir === context.userPoliciesDir) {
+    return USER_POLICY_TIER;
+  }
   if (
-    defaultPoliciesDir &&
-    normalizedDir === path.resolve(defaultPoliciesDir)
+    context.workspacePoliciesDir &&
+    normalizedDir === path.resolve(context.workspacePoliciesDir)
+  ) {
+    return WORKSPACE_POLICY_TIER;
+  }
+  if (
+    context.defaultPoliciesDir &&
+    normalizedDir === path.resolve(context.defaultPoliciesDir)
   ) {
     return DEFAULT_POLICY_TIER;
   }
   if (normalizedDir === path.resolve(DEFAULT_CORE_POLICIES_DIR)) {
     return DEFAULT_POLICY_TIER;
-  }
-  if (normalizedDir === normalizedUser) {
-    return USER_POLICY_TIER;
-  }
-  if (
-    workspacePoliciesDir &&
-    normalizedDir === path.resolve(workspacePoliciesDir)
-  ) {
-    return WORKSPACE_POLICY_TIER;
-  }
-  if (normalizedDir === normalizedAdmin) {
-    return ADMIN_POLICY_TIER;
   }
 
   return DEFAULT_POLICY_TIER;
@@ -157,9 +176,8 @@ export function formatPolicyError(error: PolicyFileError): string {
  */
 async function filterSecurePolicyDirectories(
   dirs: string[],
+  systemPoliciesDir: string,
 ): Promise<string[]> {
-  const systemPoliciesDir = path.resolve(Storage.getSystemPoliciesDir());
-
   const results = await Promise.all(
     dirs.map(async (dir) => {
       // Only check security for system policies
@@ -167,7 +185,7 @@ async function filterSecurePolicyDirectories(
         const { secure, reason } = await isDirectorySecure(dir);
         if (!secure) {
           const msg = `Security Warning: Skipping system policies from ${dir}: ${reason}`;
-          coreEvents.emitFeedback('warning', msg);
+          emitWarningOnce(msg);
           return null;
         }
       }
@@ -183,16 +201,54 @@ export async function createPolicyEngineConfig(
   approvalMode: ApprovalMode,
   defaultPoliciesDir?: string,
 ): Promise<PolicyEngineConfig> {
+  const systemPoliciesDir = path.resolve(Storage.getSystemPoliciesDir());
+  const userPoliciesDir = path.resolve(Storage.getUserPoliciesDir());
+  let adminPolicyPaths = settings.adminPolicyPaths;
+
+  // Security: Ignore supplemental admin policies if the system directory already contains policies.
+  // This prevents flag-based overrides when a central system policy is established.
+  if (adminPolicyPaths?.length) {
+    try {
+      const files = await fs.readdir(systemPoliciesDir);
+      if (files.some((f) => f.endsWith('.toml'))) {
+        const msg = `Security Warning: Ignoring --admin-policy because system policies are already defined in ${systemPoliciesDir}`;
+        emitWarningOnce(msg);
+        adminPolicyPaths = undefined;
+      }
+    } catch (e) {
+      if (!isNodeError(e) || e.code !== 'ENOENT') {
+        debugLogger.warn(
+          `Failed to check system policies in ${systemPoliciesDir}`,
+          e,
+        );
+      }
+    }
+  }
+
   const policyDirs = getPolicyDirectories(
     defaultPoliciesDir,
     settings.policyPaths,
     settings.workspacePoliciesDir,
+    adminPolicyPaths,
   );
-  const securePolicyDirs = await filterSecurePolicyDirectories(policyDirs);
+  const securePolicyDirs = await filterSecurePolicyDirectories(
+    policyDirs,
+    systemPoliciesDir,
+  );
 
-  const normalizedAdminPoliciesDir = path.resolve(
-    Storage.getSystemPoliciesDir(),
-  );
+  const tierContext = {
+    defaultPoliciesDir,
+    workspacePoliciesDir: settings.workspacePoliciesDir,
+    adminPolicyPaths: adminPolicyPaths
+      ? new Set(adminPolicyPaths.map((p) => path.resolve(p)))
+      : undefined,
+    systemPoliciesDir,
+    userPoliciesDir,
+  };
+
+  const userProvidedPaths = settings.policyPaths
+    ? new Set(settings.policyPaths.map((p) => path.resolve(p)))
+    : new Set<string>();
 
   // Load policies from TOML files
   const {
@@ -200,23 +256,12 @@ export async function createPolicyEngineConfig(
     checkers: tomlCheckers,
     errors,
   } = await loadPoliciesFromToml(securePolicyDirs, (p) => {
-    const tier = getPolicyTier(
-      p,
-      defaultPoliciesDir,
-      settings.workspacePoliciesDir,
-    );
+    const normalizedPath = path.resolve(p);
+    const tier = getPolicyTier(normalizedPath, tierContext);
 
-    // If it's a user-provided path that isn't already categorized as ADMIN,
-    // treat it as USER tier.
-    if (
-      settings.policyPaths?.some(
-        (userPath) => path.resolve(userPath) === path.resolve(p),
-      )
-    ) {
-      const normalizedPath = path.resolve(p);
-      if (normalizedPath !== normalizedAdminPoliciesDir) {
-        return USER_POLICY_TIER;
-      }
+    // If it's a user-provided path that isn't already categorized as ADMIN, treat it as USER tier.
+    if (userProvidedPaths.has(normalizedPath) && tier !== ADMIN_POLICY_TIER) {
+      return USER_POLICY_TIER;
     }
 
     return tier;

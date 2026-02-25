@@ -60,6 +60,15 @@ const mockSessionStats: SessionStatsState = {
 };
 
 describe('<Footer />', () => {
+  beforeEach(() => {
+    vi.stubEnv('SANDBOX', '');
+    vi.stubEnv('SEATBELT_PROFILE', '');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('renders the component', async () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <Footer />,
