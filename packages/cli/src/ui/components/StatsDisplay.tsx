@@ -395,6 +395,8 @@ interface StatsDisplayProps {
   tier?: string;
   currentModel?: string;
   quotaStats?: QuotaStats;
+  /** G1 AI Credits balance, null if not eligible */
+  creditBalance?: number | null;
 }
 
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({
@@ -407,6 +409,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   tier,
   currentModel,
   quotaStats,
+  creditBalance,
 }) => {
   const { stats } = useSessionStats();
   const { metrics } = stats;
@@ -486,6 +489,17 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         {showUserIdentity && tier && (
           <StatRow title="Tier:">
             <Text color={theme.text.primary}>{tier}</Text>
+          </StatRow>
+        )}
+        {showUserIdentity && creditBalance != null && creditBalance >= 0 && (
+          <StatRow title="Google AI Credits:">
+            <Text
+              color={
+                creditBalance > 0 ? theme.text.primary : theme.text.secondary
+              }
+            >
+              {creditBalance.toLocaleString()}
+            </Text>
           </StatRow>
         )}
         <StatRow title="Tool Calls:">
