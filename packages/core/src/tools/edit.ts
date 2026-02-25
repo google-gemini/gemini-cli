@@ -947,25 +947,12 @@ class EditToolInvocation
       }
 
       const totalLength = countNewlines(finalContent) + 1;
-      const metadataParts = [];
-      if (editData.matchRanges && editData.matchRanges.length > 0) {
-        if (editData.matchRanges.length === 1) {
-          metadataParts.push(
-            `start_line: ${editData.matchRanges[0].start}, end_line: ${editData.matchRanges[0].end}`,
-          );
-        } else {
-          const ranges = editData.matchRanges
-            .map((r) => `${r.start}-${r.end}`)
-            .join(', ');
-          metadataParts.push(`ranges: ${ranges}`);
-        }
-      }
-      metadataParts.push(`file_length: ${totalLength}`);
+      const metadataStr = formatEditMetadata(editData.matchRanges, totalLength);
 
       const llmSuccessMessageParts = [
         editData.isNewFile
           ? `Created new file: ${this.params.file_path} with provided content. [file_length: ${totalLength}]`
-          : `Successfully modified file: ${this.params.file_path}. [${metadataParts.join(', ')}]`,
+          : `Successfully modified file: ${this.params.file_path}. ${metadataStr}`,
       ];
 
       // Return a diff of the file before and after the write so that the agent
@@ -1178,15 +1165,39 @@ function applyIndentation(
   });
 }
 
+function formatRanges(
+  matchRanges: Array<{ start: number; end: number }>,
+): string {
+  return matchRanges
+    .map((r) => (r.start === r.end ? `${r.start}` : `${r.start}-${r.end}`))
+    .join(', ');
+}
+
+function formatEditMetadata(
+  matchRanges: Array<{ start: number; end: number }> | undefined,
+  totalLength: number,
+): string {
+  const metadataParts = [];
+  if (matchRanges && matchRanges.length > 0) {
+    if (matchRanges.length === 1) {
+      metadataParts.push(
+        `start_line: ${matchRanges[0].start}, end_line: ${matchRanges[0].end}`,
+      );
+    } else {
+      metadataParts.push(`ranges: ${formatRanges(matchRanges)}`);
+    }
+  }
+  metadataParts.push(`file_length: ${totalLength}`);
+  return `[${metadataParts.join(', ')}]`;
+}
+
 function getFuzzyMatchFeedback(editData: CalculatedEdit): string | null {
   if (
     editData.strategy === 'fuzzy' &&
     editData.matchRanges &&
     editData.matchRanges.length > 0
   ) {
-    const ranges = editData.matchRanges
-      .map((r) => (r.start === r.end ? `${r.start}` : `${r.start}-${r.end}`))
-      .join(', ');
+    const ranges = formatRanges(editData.matchRanges);
     return `Applied fuzzy match at line${editData.matchRanges.length > 1 ? 's' : ''} ${ranges}.`;
   }
   return null;
