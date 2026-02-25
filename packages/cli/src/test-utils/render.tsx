@@ -664,6 +664,16 @@ export const renderWithProviders = (
     });
   }
 
+  // Also update config so useAlternateBuffer hook (which reads from Config) gets the correct value.
+  let finalConfig = config;
+  if (useAlternateBuffer !== undefined) {
+    finalConfig = makeFakeConfig({
+      targetDir: os.tmpdir(),
+      enableEventDrivenScheduler: true,
+      useAlternateBuffer,
+    });
+  }
+
   const mainAreaWidth = terminalWidth;
 
   const finalUiState = {
@@ -692,7 +702,7 @@ export const renderWithProviders = (
 
   const renderResult = render(
     <AppContext.Provider value={appState}>
-      <ConfigContext.Provider value={config}>
+      <ConfigContext.Provider value={finalConfig}>
         <SettingsContext.Provider value={finalSettings}>
           <UIStateContext.Provider value={finalUiState}>
             <VimModeProvider settings={finalSettings}>
@@ -704,7 +714,7 @@ export const renderWithProviders = (
                     <UIActionsContext.Provider value={finalUIActions}>
                       <OverflowProvider>
                         <ToolActionsProvider
-                          config={config}
+                          config={finalConfig}
                           toolCalls={allToolCalls}
                         >
                           <AskUserActionsProvider
