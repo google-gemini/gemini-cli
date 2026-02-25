@@ -1,14 +1,9 @@
 /**
  * @license
- * Copyrimport type { AnsiOutput } from '../../utils/terminalSerializer.js';
-import type { SendMessageResult } from './a2a-client-manager.js';
-import {
-  A2AAgentError,
-  AgentCardNotFoundError,
-  AgentCardAuthError,
-  AgentAuthConfigMissingError,
-} from './a2a-errors.js';oogle LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * @license
  */
 
 import type {
@@ -31,12 +26,7 @@ import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { SendMessageResult } from './a2a-client-manager.js';
-import {
-  A2AAgentError,
-  AgentCardNotFoundError,
-  AgentCardAuthError,
-  AgentAuthConfigMissingError,
-} from './a2a-errors.js';
+import { A2AAgentError } from './a2a-errors.js';
 
 /**
  * Authentication handler implementation using Google Application Default Credentials (ADC).
@@ -238,37 +228,16 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
    * a generic message for unknown errors.
    */
   private formatExecutionError(error: unknown): string {
-    if (error instanceof AgentCardNotFoundError) {
-      return (
-        `Remote agent "${this.definition.name}" could not be reached: ` +
-        `The agent card URL returned 404 Not Found.\n` +
-        `  URL: ${this.definition.agentCardUrl}\n` +
-        `  Verify the agent_card_url is correct and the server is running.`
-      );
-    }
-
-    if (error instanceof AgentCardAuthError) {
-      return (
-        `Authentication failed for remote agent "${this.definition.name}" ` +
-        `(HTTP ${error.statusCode}).\n` +
-        `  URL: ${this.definition.agentCardUrl}\n` +
-        `  Ensure your auth configuration is correct and credentials are valid.`
-      );
-    }
-
-    if (error instanceof AgentAuthConfigMissingError) {
-      return (
-        `Remote agent "${this.definition.name}" requires authentication ` +
-        `that is not configured.\n` +
-        `  Required: ${error.requiredAuth}\n` +
-        `  Add an "auth" section to your agent definition.`
-      );
-    }
-
+    // Most A2A-specific errors already include a human-friendly
+    // `userMessage` on the A2AAgentError base class. Rely on that
+    // generic handler to avoid duplicating similar messages for
+    // specific subclasses, which improves maintainability.
     if (error instanceof A2AAgentError) {
       return error.userMessage;
     }
 
-    return `Error calling remote agent "${this.definition.name}": ${error instanceof Error ? error.message : String(error)}`;
+    return `Error calling remote agent "${this.definition.name}": ${
+      error instanceof Error ? error.message : String(error)
+    }`;
   }
 }
