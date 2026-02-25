@@ -64,6 +64,7 @@ import type { RetryAvailabilityContext } from '../utils/retry.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import type { LlmRole } from '../telemetry/types.js';
+import { AuthType } from './contentGenerator.js';
 
 const MAX_TURNS = 100;
 
@@ -539,11 +540,15 @@ export class GeminiClient {
       return this.currentSequenceModel;
     }
 
+    const useCustomToolModel =
+      this.config.getContentGeneratorConfig()?.authType === AuthType.USE_GEMINI;
+
     // Availability logic: The configured model is the source of truth,
     // including any permanent fallbacks (config.setModel) or manual overrides.
     return resolveModel(
       this.config.getActiveModel(),
       this.config.getGemini31LaunchedSync?.() ?? false,
+      useCustomToolModel,
     );
   }
 

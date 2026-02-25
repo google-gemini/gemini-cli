@@ -62,6 +62,11 @@ export function resolveModel(
       }
       return PREVIEW_GEMINI_MODEL;
     }
+    case PREVIEW_GEMINI_3_1_MODEL: {
+      return useCustomToolModel
+        ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
+        : PREVIEW_GEMINI_3_1_MODEL;
+    }
     case DEFAULT_GEMINI_MODEL_AUTO: {
       return DEFAULT_GEMINI_MODEL;
     }
