@@ -141,15 +141,34 @@ describe('useShellCompletion utilities', () => {
       const result = getTokenAtCursor('git sta', 7);
       expect(result?.isFirstToken).toBe(false);
     });
+
+    it('should handle cursor in whitespace between tokens', () => {
+      const result = getTokenAtCursor('git  status', 4);
+      expect(result).toEqual({
+        token: '',
+        start: 4,
+        end: 4,
+        isFirstToken: false,
+        tokens: ['git', '', 'status'],
+        cursorIndex: 1,
+        commandToken: 'git',
+      });
+    });
   });
 
   describe('escapeShellPath', () => {
+    const isWin = process.platform === 'win32';
+
     it('should escape spaces', () => {
-      expect(escapeShellPath('my file.txt')).toBe('my\\ file.txt');
+      expect(escapeShellPath('my file.txt')).toBe(
+        isWin ? 'my file.txt' : 'my\\ file.txt',
+      );
     });
 
     it('should escape parentheses', () => {
-      expect(escapeShellPath('file (copy).txt')).toBe('file\\ \\(copy\\).txt');
+      expect(escapeShellPath('file (copy).txt')).toBe(
+        isWin ? 'file (copy).txt' : 'file\\ \\(copy\\).txt',
+      );
     });
 
     it('should not escape normal characters', () => {
@@ -157,10 +176,17 @@ describe('useShellCompletion utilities', () => {
     });
 
     it('should escape tabs, newlines, carriage returns, and backslashes', () => {
-      expect(escapeShellPath('a\tb')).toBe('a\\\tb');
-      expect(escapeShellPath('a\nb')).toBe('a\\\nb');
-      expect(escapeShellPath('a\rb')).toBe('a\\\rb');
-      expect(escapeShellPath('a\\b')).toBe('a\\\\b');
+      if (isWin) {
+        expect(escapeShellPath('a\tb')).toBe('a\tb');
+        expect(escapeShellPath('a\nb')).toBe('a\nb');
+        expect(escapeShellPath('a\rb')).toBe('a\rb');
+        expect(escapeShellPath('a\\b')).toBe('a\\b');
+      } else {
+        expect(escapeShellPath('a\tb')).toBe('a\\\tb');
+        expect(escapeShellPath('a\nb')).toBe('a\\\nb');
+        expect(escapeShellPath('a\rb')).toBe('a\\\rb');
+        expect(escapeShellPath('a\\b')).toBe('a\\\\b');
+      }
     });
 
     it('should handle empty string', () => {
@@ -327,6 +353,7 @@ describe('useShellCompletion utilities', () => {
     });
 
     it('should escape special characters in results', async () => {
+      const isWin = process.platform === 'win32';
       const structure: FileSystemStructure = {
         'my file.txt': '',
       };
@@ -334,7 +361,7 @@ describe('useShellCompletion utilities', () => {
 
       const results = await resolvePathCompletions('my', tmpDir);
       expect(results).toHaveLength(1);
-      expect(results[0].value).toBe('my\\ file.txt');
+      expect(results[0].value).toBe(isWin ? 'my file.txt' : 'my\\ file.txt');
     });
 
     it('should sort directories before files', async () => {
