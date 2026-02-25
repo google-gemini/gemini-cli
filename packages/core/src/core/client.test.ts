@@ -1218,9 +1218,9 @@ ${JSON.stringify(
       // Assert
       expect(finalResult).toBeInstanceOf(Turn);
 
-      // If infinite loop protection is working, checkNextSpeaker should be called many times
-      // but stop at MAX_TURNS (100). Since each recursive call should trigger checkNextSpeaker,
-      // we expect it to be called multiple times before hitting the limit
+      // The MAX_CONSECUTIVE_CONTINUATIONS guard fires before MAX_TURNS is reached.
+      // checkNextSpeaker should be called at most MAX_CONSECUTIVE_CONTINUATIONS + 1 times
+      // (the +1 is the call that actually triggers the guard).
       expect(mockCheckNextSpeaker).toHaveBeenCalled();
 
       // The stream should produce events and eventually terminate
@@ -1350,6 +1350,122 @@ ${JSON.stringify(
       // the loop should stop at MAX_TURNS (100)
       expect(callCount).toBeLessThanOrEqual(100); // Should not exceed MAX_TURNS
       expect(eventCount).toBeLessThanOrEqual(200); // Should have reasonable number of events
+    });
+
+    it('should yield LoopDetected after MAX_CONSECUTIVE_CONTINUATIONS checkNextSpeaker continuations', async () => {
+      // Arrange – checkNextSpeaker always says the model should keep talking.
+      const { checkNextSpeaker } = await import(
+        '../utils/nextSpeakerChecker.js'
+      );
+      const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
+      mockCheckNextSpeaker.mockResolvedValue({
+        next_speaker: 'model',
+        reasoning: 'Test case - keep going',
+      });
+
+      const mockStream = (async function* () {
+        yield { type: GeminiEventType.Content, value: 'still going...' };
+        yield {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: undefined },
+        };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn().mockReturnValue(0),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const signal = new AbortController().signal;
+      const stream = client.sendMessageStream(
+        [{ text: 'Go!' }],
+        signal,
+        'prompt-consecutive-continuation',
+      );
+
+      const events: Array<{ type: string }> = [];
+      for await (const event of stream) {
+        events.push(event);
+        if (events.length > 500) {
+          throw new Error('Runaway loop – guard did not fire');
+        }
+      }
+
+      // The guard must have fired a LoopDetected event.
+      const loopEvents = events.filter(
+        (e) => e.type === GeminiEventType.LoopDetected,
+      );
+      expect(loopEvents.length).toBeGreaterThanOrEqual(1);
+
+      // checkNextSpeaker should have been called at most MAX_CONSECUTIVE_CONTINUATIONS + 1
+      // times (one more call triggers the guard).
+      expect(mockCheckNextSpeaker.mock.calls.length).toBeLessThanOrEqual(11);
+    });
+
+    it('should reset consecutive continuation counter when model makes a tool call', async () => {
+      // Arrange: first turn makes a tool call (resets counter), second turn
+      // triggers checkNextSpeaker with next_speaker='user' so there is no loop.
+      const { checkNextSpeaker } = await import(
+        '../utils/nextSpeakerChecker.js'
+      );
+      const mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
+      mockCheckNextSpeaker.mockResolvedValue({
+        next_speaker: 'user',
+        reasoning: 'Done',
+      });
+
+      // Stream with a pending tool call so the continuation counter is reset.
+      const mockStreamWithTool = (async function* () {
+        yield { type: GeminiEventType.Content, value: 'calling tool' };
+        yield {
+          type: GeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'c1',
+            name: 'some_tool',
+            args: {},
+            isClientInitiated: false,
+            prompt_id: 'prompt-tool-reset',
+          },
+        };
+        yield {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: undefined },
+        };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStreamWithTool);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn().mockReturnValue(0),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const signal = new AbortController().signal;
+      const stream = client.sendMessageStream(
+        [{ text: 'Use a tool please' }],
+        signal,
+        'prompt-tool-reset',
+      );
+
+      const events: Array<{ type: string }> = [];
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      // A tool-call turn must NOT produce a LoopDetected event.
+      const loopEvents = events.filter(
+        (e) => e.type === GeminiEventType.LoopDetected,
+      );
+      expect(loopEvents.length).toBe(0);
+
+      // The consecutive continuation counter should have been reset to 0.
+      expect(client['consecutiveContinuations']).toBe(0);
     });
 
     it('should yield ContextWindowWillOverflow when the context window is about to overflow', async () => {
