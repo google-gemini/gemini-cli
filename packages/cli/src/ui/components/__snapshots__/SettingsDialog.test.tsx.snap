@@ -126,7 +126,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │▼                                                                                               │
+│    Enable automatic session cleanup                                                              │
+│                                                                                                  │
+│  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
 │  ● User Settings                                                                                 │
