@@ -103,4 +103,4 @@ You can extend Gemini CLI with custom tools by configuring
 
 - Learn how to [Set up an MCP server](../tools/mcp-server.md).
 - Explore [Agent Skills](../cli/skills.md) for specialized expertise.
-- See the [Command reference](../cli/commands.md) for slash commands.
+- See the [Command reference](./commands.md) for slash commands.
