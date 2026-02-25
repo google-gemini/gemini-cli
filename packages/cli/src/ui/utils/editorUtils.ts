@@ -42,11 +42,26 @@ export async function openFileInEditor(
 
   if (!command) {
     command = process.env['VISUAL'] ?? process.env['EDITOR'];
+    if (command) {
+      const lowerCommand = command.toLowerCase();
+      const isGui = ['code', 'cursor', 'subl', 'zed', 'atom'].some((gui) =>
+        lowerCommand.includes(gui),
+      );
+      if (
+        isGui &&
+        !lowerCommand.includes('--wait') &&
+        !lowerCommand.includes('-w')
+      ) {
+        args.unshift(lowerCommand.includes('subl') ? '-w' : '--wait');
+      }
+    }
   }
 
   if (!command) {
     command = process.platform === 'win32' ? 'notepad' : 'vi';
   }
+
+  const [executable = '', ...initialArgs] = command.split(' ');
 
   // Determine if we should use sync or async based on the command/editor type.
   // If we have a preferredEditorType, we can check if it's a terminal editor.
@@ -54,13 +69,13 @@ export async function openFileInEditor(
   const terminalEditors = ['vi', 'vim', 'nvim', 'emacs', 'hx', 'nano'];
   const isTerminal = preferredEditorType
     ? isTerminalEditor(preferredEditorType)
-    : terminalEditors.some((te) => command?.includes(te));
+    : terminalEditors.some((te) => executable.toLowerCase().includes(te));
 
   if (
     isTerminal &&
-    (command.includes('vi') ||
-      command.includes('vim') ||
-      command.includes('nvim'))
+    (executable.includes('vi') ||
+      executable.includes('vim') ||
+      executable.includes('nvim'))
   ) {
     // Pass -i NONE to prevent E138 'Can't write viminfo file' errors in restricted environments.
     args.unshift('-i', 'NONE');
@@ -70,10 +85,6 @@ export async function openFileInEditor(
   setRawMode?.(false);
 
   try {
-    const commandParts = command.split(' ');
-    const executable = commandParts[0];
-    const initialArgs = commandParts.slice(1);
-
     if (isTerminal) {
       const result = spawnSync(executable, [...initialArgs, ...args], {
         stdio: 'inherit',
