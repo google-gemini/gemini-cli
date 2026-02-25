@@ -5,17 +5,17 @@
  */
 
 import { describe, expect } from 'vitest';
-import { ApprovalMode, PlanComplexity } from '@google/gemini-cli-core';
+import { ApprovalMode, PlanLevel } from '@google/gemini-cli-core';
 import { evalTest } from './test-helper.js';
 import {
   assertModelHasOutput,
   checkModelOutputContent,
 } from './test-helper.js';
 
-function hasComplexity(expected: PlanComplexity): (args: string) => boolean {
+function hasLevel(expected: PlanLevel): (args: string) => boolean {
   return (args: string) => {
     try {
-      return JSON.parse(args).complexity === expected;
+      return JSON.parse(args).level === expected;
     } catch {
       return false;
     }
@@ -180,7 +180,7 @@ describe('plan_mode', () => {
   // --- Complexity selection evals ---
 
   evalTest('USUALLY_PASSES', {
-    name: 'should select minimal complexity for a single-file rename',
+    name: 'should select minimal level for a single-file rename',
     approvalMode: ApprovalMode.DEFAULT,
     params: {
       settings,
@@ -195,17 +195,17 @@ describe('plan_mode', () => {
       const wasCalled = await rig.waitForToolCall(
         'enter_plan_mode',
         undefined,
-        hasComplexity(PlanComplexity.MINIMAL),
+        hasLevel(PlanLevel.MINIMAL),
       );
       expect(
         wasCalled,
-        `Expected enter_plan_mode with complexity="${PlanComplexity.MINIMAL}"`,
+        `Expected enter_plan_mode with level="${PlanLevel.MINIMAL}"`,
       ).toBe(true);
     },
   });
 
   evalTest('USUALLY_PASSES', {
-    name: 'should select standard complexity for a typical feature',
+    name: 'should select standard level for a typical feature',
     approvalMode: ApprovalMode.DEFAULT,
     params: {
       settings,
@@ -221,17 +221,17 @@ describe('plan_mode', () => {
       const wasCalled = await rig.waitForToolCall(
         'enter_plan_mode',
         undefined,
-        hasComplexity(PlanComplexity.STANDARD),
+        hasLevel(PlanLevel.STANDARD),
       );
       expect(
         wasCalled,
-        `Expected enter_plan_mode with complexity="${PlanComplexity.STANDARD}"`,
+        `Expected enter_plan_mode with level="${PlanLevel.STANDARD}"`,
       ).toBe(true);
     },
   });
 
   evalTest('USUALLY_PASSES', {
-    name: 'should select thorough complexity for an architectural redesign',
+    name: 'should select thorough level for an architectural redesign',
     approvalMode: ApprovalMode.DEFAULT,
     params: {
       settings,
@@ -254,11 +254,11 @@ describe('plan_mode', () => {
       const wasCalled = await rig.waitForToolCall(
         'enter_plan_mode',
         undefined,
-        hasComplexity(PlanComplexity.THOROUGH),
+        hasLevel(PlanLevel.THOROUGH),
       );
       expect(
         wasCalled,
-        `Expected enter_plan_mode with complexity="${PlanComplexity.THOROUGH}"`,
+        `Expected enter_plan_mode with level="${PlanLevel.THOROUGH}"`,
       ).toBe(true);
     },
   });

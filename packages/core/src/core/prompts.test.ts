@@ -24,7 +24,7 @@ import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
 } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
-import { PlanComplexity } from '../plan/types.js';
+import { PlanLevel } from '../plan/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import type { AnyDeclarativeTool } from '../tools/tools.js';
 import type { CallableTool } from '@google/genai';
@@ -114,7 +114,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       }),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
-      getPlanComplexity: vi.fn().mockReturnValue(PlanComplexity.STANDARD),
+      getPlanLevel: vi.fn().mockReturnValue(PlanLevel.STANDARD),
     } as unknown as Config;
   });
 

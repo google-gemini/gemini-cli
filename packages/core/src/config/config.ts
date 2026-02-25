@@ -107,7 +107,7 @@ import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
-import { PlanComplexity } from '../plan/types.js';
+import { PlanLevel } from '../plan/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type {
   UserTierId,
@@ -745,7 +745,7 @@ export class Config {
   private lastModeSwitchTime: number = performance.now();
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
-  private planComplexity: PlanComplexity = PlanComplexity.STANDARD;
+  private planLevel: PlanLevel = PlanLevel.STANDARD;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -1897,7 +1897,7 @@ export class Config {
       (currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO);
 
     if (isExitingPlanMode) {
-      this.planComplexity = PlanComplexity.STANDARD;
+      this.planLevel = PlanLevel.STANDARD;
     }
 
     if (isPlanModeTransition || isYoloModeTransition) {
@@ -2179,12 +2179,12 @@ export class Config {
     this.approvedPlanPath = path;
   }
 
-  getPlanComplexity(): PlanComplexity {
-    return this.planComplexity;
+  getPlanLevel(): PlanLevel {
+    return this.planLevel;
   }
 
-  setPlanComplexity(complexity: PlanComplexity): void {
-    this.planComplexity = complexity;
+  setPlanLevel(level: PlanLevel): void {
+    this.planLevel = level;
   }
 
   isAgentsEnabled(): boolean {

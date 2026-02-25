@@ -11,7 +11,7 @@ import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ApprovalMode } from '../policy/types.js';
-import { PlanComplexity } from '../plan/types.js';
+import { PlanLevel } from '../plan/types.js';
 
 describe('EnterPlanModeTool', () => {
   let tool: EnterPlanModeTool;
@@ -24,7 +24,7 @@ describe('EnterPlanModeTool', () => {
 
     mockConfig = {
       setApprovalMode: vi.fn(),
-      setPlanComplexity: vi.fn(),
+      setPlanLevel: vi.fn(),
       setApprovedPlanPath: vi.fn(),
       storage: {
         getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
@@ -106,40 +106,38 @@ describe('EnterPlanModeTool', () => {
   describe('execute', () => {
     it.each([
       {
-        name: 'default complexity',
+        name: 'default level',
         params: {},
-        expectedComplexity: PlanComplexity.STANDARD,
+        expectedLevel: PlanLevel.STANDARD,
         expectedLlmContent: 'Switching to Plan mode (standard).',
         expectedDisplay: 'Switching to Plan mode (standard)',
       },
       {
-        name: 'thorough complexity',
-        params: { complexity: PlanComplexity.THOROUGH },
-        expectedComplexity: PlanComplexity.THOROUGH,
+        name: 'thorough level',
+        params: { level: PlanLevel.THOROUGH },
+        expectedLevel: PlanLevel.THOROUGH,
         expectedLlmContent: 'Switching to Plan mode (thorough).',
         expectedDisplay: 'Switching to Plan mode (thorough)',
       },
       {
-        name: 'minimal complexity with reason',
-        params: { reason: 'Quick rename', complexity: PlanComplexity.MINIMAL },
-        expectedComplexity: PlanComplexity.MINIMAL,
+        name: 'minimal level with reason',
+        params: { reason: 'Quick rename', level: PlanLevel.MINIMAL },
+        expectedLevel: PlanLevel.MINIMAL,
         expectedLlmContent: 'Switching to Plan mode (minimal).',
         expectedDisplay: 'Switching to Plan mode (minimal): Quick rename',
       },
     ])(
-      'should set complexity and return correct message ($name)',
+      'should set level and return correct message ($name)',
       async ({
         params,
-        expectedComplexity,
+        expectedLevel,
         expectedLlmContent,
         expectedDisplay,
       }) => {
         const invocation = tool.build(params);
         const result = await invocation.execute(new AbortController().signal);
 
-        expect(mockConfig.setPlanComplexity).toHaveBeenCalledWith(
-          expectedComplexity,
-        );
+        expect(mockConfig.setPlanLevel).toHaveBeenCalledWith(expectedLevel);
         expect(mockConfig.setApprovedPlanPath).toHaveBeenCalledWith(undefined);
         expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
           ApprovalMode.PLAN,
@@ -197,10 +195,10 @@ describe('EnterPlanModeTool', () => {
         expected: 'Initiating Plan Mode (standard)',
       },
       {
-        name: 'with reason and complexity',
+        name: 'with reason and level',
         params: {
           reason: 'Redesign auth',
-          complexity: PlanComplexity.THOROUGH,
+          level: PlanLevel.THOROUGH,
         },
         expected: 'Redesign auth (thorough)',
       },
@@ -221,9 +219,9 @@ describe('EnterPlanModeTool', () => {
       expect(result).toBeNull();
     });
 
-    it('should allow valid complexity param', () => {
+    it('should allow valid level param', () => {
       const result = tool.validateToolParams({
-        complexity: PlanComplexity.THOROUGH,
+        level: PlanLevel.THOROUGH,
       });
       expect(result).toBeNull();
     });
