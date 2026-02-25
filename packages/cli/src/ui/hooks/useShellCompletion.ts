@@ -182,6 +182,60 @@ export async function scanPathExecutables(
   const seen = new Set<string>();
   const executables: string[] = [];
 
+  // Add Windows shell built-ins
+  if (isWindows) {
+    const builtins = [
+      'assoc',
+      'break',
+      'call',
+      'cd',
+      'chcp',
+      'chdir',
+      'cls',
+      'color',
+      'copy',
+      'date',
+      'del',
+      'dir',
+      'echo',
+      'endlocal',
+      'erase',
+      'exit',
+      'for',
+      'ftype',
+      'goto',
+      'if',
+      'md',
+      'mkdir',
+      'mklink',
+      'move',
+      'path',
+      'pause',
+      'popd',
+      'prompt',
+      'pushd',
+      'rd',
+      'rem',
+      'ren',
+      'rename',
+      'rmdir',
+      'set',
+      'setlocal',
+      'shift',
+      'start',
+      'time',
+      'title',
+      'type',
+      'ver',
+      'verify',
+      'vol',
+    ];
+    for (const builtin of builtins) {
+      seen.add(builtin);
+      executables.push(builtin);
+    }
+  }
+
   const dirResults = await Promise.all(
     dirs.map(async (dir) => {
       if (signal?.aborted) return [];
