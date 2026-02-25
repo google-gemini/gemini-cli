@@ -1,9 +1,8 @@
 ---
 name: string-reviewer
 description: >
-  Help contributors adhere to project UX writing standards for strings. Use 
-  when creating components, reviewing pull requests, or when explicitly 
-  asked to review text.
+  Use this skill when asked to review text and user-facing strings within the codebase. It ensures that these strings follow rules on clarity,
+  usefulness, brevity and style.
 ---
 
 # String Reviewer
