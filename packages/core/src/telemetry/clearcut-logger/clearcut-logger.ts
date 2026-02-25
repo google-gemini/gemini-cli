@@ -115,6 +115,8 @@ export enum EventNames {
   TOOL_OUTPUT_MASKING = 'tool_output_masking',
   KEYCHAIN_AVAILABILITY = 'keychain_availability',
   TOKEN_STORAGE_INITIALIZATION = 'token_storage_initialization',
+  CONSECA_POLICY_GENERATION = 'conseca_policy_generation',
+  CONSECA_VERDICT = 'conseca_verdict',
 }
 
 export interface LogResponse {
@@ -843,6 +845,40 @@ export class ClearcutLogger {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_API_RESPONSE_TOOL_TOKEN_COUNT,
         value: JSON.stringify(event.usage.tool_token_count),
+      },
+      // Context breakdown fields are only populated on turn-ending responses
+      // (when the user gets back control), not during intermediate tool-use
+      // loops. Values still grow across turns as conversation history
+      // accumulates, so downstream consumers should use the last event per
+      // session (MAX) rather than summing across events.
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_SYSTEM_INSTRUCTIONS,
+        value: JSON.stringify(
+          event.usage.context_breakdown?.system_instructions ?? 0,
+        ),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_DEFINITIONS,
+        value: JSON.stringify(
+          event.usage.context_breakdown?.tool_definitions ?? 0,
+        ),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_HISTORY,
+        value: JSON.stringify(event.usage.context_breakdown?.history ?? 0),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_CALLS,
+        value: JSON.stringify(event.usage.context_breakdown?.tool_calls ?? {}),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_MCP_SERVERS,
+        value: JSON.stringify(event.usage.context_breakdown?.mcp_servers ?? 0),
       },
     ];
 

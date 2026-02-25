@@ -393,9 +393,11 @@ export const render = (
       exitOnCtrlC: false,
       patchConsole: false,
       onRender: (metrics: RenderMetrics) => {
-        if (isInkRenderMetrics(metrics)) {
-          stdout.onRender(metrics.staticOutput ?? '', metrics.output);
-        }
+        const output = isInkRenderMetrics(metrics) ? metrics.output : '...';
+        const staticOutput = isInkRenderMetrics(metrics)
+          ? (metrics.staticOutput ?? '')
+          : '';
+        stdout.onRender(staticOutput, output);
       },
     });
   });
