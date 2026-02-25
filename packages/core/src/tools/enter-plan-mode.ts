@@ -16,11 +16,13 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { Config } from '../config/config.js';
 import { ENTER_PLAN_MODE_TOOL_NAME } from './tool-names.js';
 import { ApprovalMode } from '../policy/types.js';
+import { PlanComplexity } from '../plan/types.js';
 import { ENTER_PLAN_MODE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 
 export interface EnterPlanModeParams {
   reason?: string;
+  complexity?: PlanComplexity;
 }
 
 export class EnterPlanModeTool extends BaseDeclarativeTool<
@@ -56,6 +58,18 @@ export class EnterPlanModeTool extends BaseDeclarativeTool<
     );
   }
 
+  protected override validateToolParamValues(
+    params: EnterPlanModeParams,
+  ): string | null {
+    if (
+      params.complexity &&
+      !Object.values(PlanComplexity).includes(params.complexity)
+    ) {
+      return `Invalid complexity "${params.complexity}". Must be one of: ${Object.values(PlanComplexity).join(', ')}.`;
+    }
+    return null;
+  }
+
   override getSchema(modelId?: string) {
     return resolveToolDeclaration(ENTER_PLAN_MODE_DEFINITION, modelId);
   }
@@ -78,7 +92,9 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return this.params.reason || 'Initiating Plan Mode';
+    const reason = this.params.reason || 'Initiating Plan Mode';
+    const complexity = this.params.complexity || PlanComplexity.STANDARD;
+    return `${reason} (${complexity})`;
   }
 
   override async shouldConfirmExecute(
@@ -118,13 +134,16 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
       };
     }
 
+    const complexity = this.params.complexity || PlanComplexity.STANDARD;
+    this.config.setPlanComplexity(complexity);
+    this.config.setApprovedPlanPath(undefined);
     this.config.setApprovalMode(ApprovalMode.PLAN);
 
     return {
-      llmContent: 'Switching to Plan mode.',
+      llmContent: `Switching to Plan mode (${complexity}).`,
       returnDisplay: this.params.reason
-        ? `Switching to Plan mode: ${this.params.reason}`
-        : 'Switching to Plan mode',
+        ? `Switching to Plan mode (${complexity}): ${this.params.reason}`
+        : `Switching to Plan mode (${complexity})`,
     };
   }
 }

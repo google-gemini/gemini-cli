@@ -6,7 +6,10 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PromptProvider } from './promptProvider.js';
+import { renderPlanningWorkflow } from './snippets.js';
 import type { Config } from '../config/config.js';
+import type { PlanningWorkflowOptions } from './snippets.js';
+import { PlanComplexity } from '../plan/types.js';
 import {
   getAllGeminiMdFilenames,
   DEFAULT_CONTEXT_FILENAME,
@@ -56,6 +59,7 @@ describe('PromptProvider', () => {
       }),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn(),
+      getPlanComplexity: vi.fn().mockReturnValue(PlanComplexity.STANDARD),
     } as unknown as Config;
   });
 
@@ -175,5 +179,117 @@ describe('PromptProvider', () => {
       );
       expect(prompt).toContain('/tmp/project-temp/plans/');
     });
+  });
+});
+
+describe('renderPlanningWorkflow', () => {
+  const baseOptions: PlanningWorkflowOptions = {
+    planModeToolsList: '<tool>read_file</tool>',
+    plansDir: '/tmp/plans',
+    complexity: PlanComplexity.STANDARD,
+  };
+
+  it('should return empty string when options are undefined', () => {
+    expect(renderPlanningWorkflow(undefined)).toBe('');
+  });
+
+  it.each([
+    {
+      name: 'minimal',
+      complexity: PlanComplexity.MINIMAL,
+      expectedSections: ['# Changes', '# Verification'],
+      unexpectedSections: [
+        '# Objective',
+        '# Alternatives Considered',
+        '# Proposed Solution',
+      ],
+      expectedSteps: ['**Explore:**', '**Draft:**', '**Approval:**'],
+      unexpectedSteps: ['**Consult:**'],
+    },
+    {
+      name: 'standard',
+      complexity: PlanComplexity.STANDARD,
+      expectedSections: [
+        '# Objective',
+        '# Implementation Plan',
+        '# Verification',
+      ],
+      unexpectedSections: [
+        '# Alternatives Considered',
+        '# Migration & Rollback',
+      ],
+      expectedSteps: [
+        '**Explore & Analyze:**',
+        '**Consult:**',
+        '**Draft:**',
+        '**Review & Approval:**',
+      ],
+      unexpectedSteps: [],
+    },
+    {
+      name: 'thorough',
+      complexity: PlanComplexity.THOROUGH,
+      expectedSections: [
+        '# Background & Motivation',
+        '# Scope & Impact',
+        '# Proposed Solution',
+        '# Alternatives Considered',
+        '# Implementation Plan',
+        '# Migration & Rollback',
+        '# Verification',
+      ],
+      unexpectedSections: [],
+      expectedSteps: [
+        '**Deep Exploration:**',
+        '**Alternatives Considered:**',
+        '**Consult:**',
+        '**Draft:**',
+        '**Review & Approval:**',
+      ],
+      unexpectedSteps: [],
+    },
+  ])(
+    '$name complexity: correct plan structure and workflow',
+    ({
+      complexity,
+      expectedSections,
+      unexpectedSections,
+      expectedSteps,
+      unexpectedSteps,
+    }) => {
+      const result = renderPlanningWorkflow({
+        ...baseOptions,
+        complexity,
+      });
+
+      expect(result).toContain(`Plan (${complexity})`);
+      for (const section of expectedSections) {
+        expect(result).toContain(section);
+      }
+      for (const section of unexpectedSections) {
+        expect(result).not.toContain(section);
+      }
+      for (const step of expectedSteps) {
+        expect(result).toContain(step);
+      }
+      for (const step of unexpectedSteps) {
+        expect(result).not.toContain(step);
+      }
+
+      // All complexities should include adaptive escalation
+      expect(result).toContain('## Adaptive Complexity');
+      expect(result).toContain('**Auto-detection:**');
+      expect(result).toContain('**Escalation:**');
+    },
+  );
+
+  it('should include approved plan section when path is provided', () => {
+    const result = renderPlanningWorkflow({
+      ...baseOptions,
+      approvedPlanPath: '/tmp/plans/my-plan.md',
+    });
+
+    expect(result).toContain('## Approved Plan');
+    expect(result).toContain('/tmp/plans/my-plan.md');
   });
 });

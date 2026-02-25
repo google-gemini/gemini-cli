@@ -11,6 +11,7 @@ import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ApprovalMode } from '../policy/types.js';
+import { PlanComplexity } from '../plan/types.js';
 
 describe('EnterPlanModeTool', () => {
   let tool: EnterPlanModeTool;
@@ -23,6 +24,8 @@ describe('EnterPlanModeTool', () => {
 
     mockConfig = {
       setApprovalMode: vi.fn(),
+      setPlanComplexity: vi.fn(),
+      setApprovedPlanPath: vi.fn(),
       storage: {
         getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
       } as unknown as Config['storage'],
@@ -101,17 +104,50 @@ describe('EnterPlanModeTool', () => {
   });
 
   describe('execute', () => {
-    it('should set approval mode to PLAN and return message', async () => {
-      const invocation = tool.build({});
+    it.each([
+      {
+        name: 'default complexity',
+        params: {},
+        expectedComplexity: PlanComplexity.STANDARD,
+        expectedLlmContent: 'Switching to Plan mode (standard).',
+        expectedDisplay: 'Switching to Plan mode (standard)',
+      },
+      {
+        name: 'thorough complexity',
+        params: { complexity: PlanComplexity.THOROUGH },
+        expectedComplexity: PlanComplexity.THOROUGH,
+        expectedLlmContent: 'Switching to Plan mode (thorough).',
+        expectedDisplay: 'Switching to Plan mode (thorough)',
+      },
+      {
+        name: 'minimal complexity with reason',
+        params: { reason: 'Quick rename', complexity: PlanComplexity.MINIMAL },
+        expectedComplexity: PlanComplexity.MINIMAL,
+        expectedLlmContent: 'Switching to Plan mode (minimal).',
+        expectedDisplay: 'Switching to Plan mode (minimal): Quick rename',
+      },
+    ])(
+      'should set complexity and return correct message ($name)',
+      async ({
+        params,
+        expectedComplexity,
+        expectedLlmContent,
+        expectedDisplay,
+      }) => {
+        const invocation = tool.build(params);
+        const result = await invocation.execute(new AbortController().signal);
 
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
-        ApprovalMode.PLAN,
-      );
-      expect(result.llmContent).toContain('Switching to Plan mode');
-      expect(result.returnDisplay).toBe('Switching to Plan mode');
-    });
+        expect(mockConfig.setPlanComplexity).toHaveBeenCalledWith(
+          expectedComplexity,
+        );
+        expect(mockConfig.setApprovedPlanPath).toHaveBeenCalledWith(undefined);
+        expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
+          ApprovalMode.PLAN,
+        );
+        expect(result.llmContent).toBe(expectedLlmContent);
+        expect(result.returnDisplay).toBe(expectedDisplay);
+      },
+    );
 
     it('should include optional reason in output display but not in llmContent', async () => {
       const reason = 'Design new database schema';
@@ -119,10 +155,7 @@ describe('EnterPlanModeTool', () => {
 
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
-        ApprovalMode.PLAN,
-      );
-      expect(result.llmContent).toBe('Switching to Plan mode.');
+      expect(result.llmContent).toBe('Switching to Plan mode (standard).');
       expect(result.llmContent).not.toContain(reason);
       expect(result.returnDisplay).toContain(reason);
     });
@@ -156,6 +189,27 @@ describe('EnterPlanModeTool', () => {
     });
   });
 
+  describe('getDescription', () => {
+    it.each([
+      {
+        name: 'default',
+        params: {},
+        expected: 'Initiating Plan Mode (standard)',
+      },
+      {
+        name: 'with reason and complexity',
+        params: {
+          reason: 'Redesign auth',
+          complexity: PlanComplexity.THOROUGH,
+        },
+        expected: 'Redesign auth (thorough)',
+      },
+    ])('$name', ({ params, expected }) => {
+      const invocation = tool.build(params);
+      expect(invocation.getDescription()).toBe(expected);
+    });
+  });
+
   describe('validateToolParams', () => {
     it('should allow empty params', () => {
       const result = tool.validateToolParams({});
@@ -164,6 +218,13 @@ describe('EnterPlanModeTool', () => {
 
     it('should allow reason param', () => {
       const result = tool.validateToolParams({ reason: 'test' });
+      expect(result).toBeNull();
+    });
+
+    it('should allow valid complexity param', () => {
+      const result = tool.validateToolParams({
+        complexity: PlanComplexity.THOROUGH,
+      });
       expect(result).toBeNull();
     });
   });

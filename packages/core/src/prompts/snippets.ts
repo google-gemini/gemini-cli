@@ -20,6 +20,7 @@ import {
 } from '../tools/tool-names.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
+import { PlanComplexity } from '../plan/types.js';
 
 // --- Options Structs ---
 
@@ -73,6 +74,7 @@ export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
   approvedPlanPath?: string;
+  complexity: PlanComplexity;
 }
 
 export interface AgentSkillOptions {
@@ -458,10 +460,12 @@ export function renderPlanningWorkflow(
   options?: PlanningWorkflowOptions,
 ): string {
   if (!options) return '';
-  return `
-# Active Approval Mode: Plan
+  const complexity = options.complexity;
 
-You are operating in **Plan Mode**. Your goal is to produce a detailed implementation plan in \`${options.plansDir}/\` and get user approval before editing source code.
+  return `
+# Active Approval Mode: Plan (${complexity})
+
+You are operating in **Plan Mode**. Your goal is to produce an implementation plan in \`${options.plansDir}/\` and get user approval before editing source code.
 
 ## Available Tools
 The following tools are available in Plan Mode:
@@ -470,37 +474,116 @@ ${options.planModeToolsList}
 </available_tools>
 
 ## Rules
-1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`${options.plansDir}/\`. If the user asks you to modify source code directly, you MUST explain that you are in Plan Mode and must first create a detailed plan in the plans directory and get approval before any source code changes can be made.
+1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`${options.plansDir}/\`. If the user asks you to modify source code directly, you MUST explain that you are in Plan Mode and must first create a plan and get approval.
 2. **Write Constraint:** ${formatToolName(WRITE_FILE_TOOL_NAME)} and ${formatToolName(EDIT_TOOL_NAME)} may ONLY be used to write .md plan files to \`${options.plansDir}/\`. They cannot modify source code.
-3. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use ${formatToolName(ASK_USER_TOOL_NAME)} to clarify. Otherwise, explore the codebase and write the draft in one fluid motion.
+3. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use ${formatToolName(ASK_USER_TOOL_NAME)} to clarify.
 4. **Inquiries and Directives:** Distinguish between Inquiries and Directives to minimize unnecessary planning.
-   - **Inquiries:** If the request is an **Inquiry** (e.g., "How does X work?"), use read-only tools to explore and answer directly in your chat response. DO NOT create a plan or call ${formatToolName(
-     EXIT_PLAN_MODE_TOOL_NAME,
-   )}.
-   - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below to create and approve a plan.
-5. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames (e.g., \`feature-x.md\`).
-6. **Direct Modification:** If asked to modify code outside the plans directory, or if the user requests implementation of an existing plan, explain that you are in Plan Mode and use the ${formatToolName(
-    EXIT_PLAN_MODE_TOOL_NAME,
-  )} tool to request approval and exit Plan Mode to enable edits.
+   - **Inquiries:** If the request is an **Inquiry** (e.g., "How does X work?"), answer directly. DO NOT create a plan.
+   - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below.
+5. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames.
+6. **Direct Modification:** If asked to modify code, explain you are in Plan Mode and use ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} to request approval.
 
 ## Required Plan Structure
-When writing the plan file, you MUST include the following structure:
-  # Objective
-  (A concise summary of what needs to be built or fixed)
-  # Key Files & Context
-  (List the specific files that will be modified, including helpful context like function signatures or code snippets)
-  # Implementation Steps
-  (Iterative development steps, e.g., "1. Implement X in [File]", "2. Verify with test Y")
-  # Verification & Testing
-  (Specific unit tests, manual checks, or build commands to verify success)
+${renderPlanStructure(complexity)}
 
 ## Workflow
-1. **Explore & Analyze:** Analyze requirements and use search/read tools to explore the codebase. For complex tasks, identify at least two viable implementation approaches.
-2. **Consult:** Present a concise summary of the identified approaches (including pros/cons and your recommendation) to the user via ${formatToolName(ASK_USER_TOOL_NAME)} and wait for their selection. For simple or canonical tasks, you may skip this and proceed to drafting.
-3. **Draft:** Write the detailed implementation plan for the selected approach to the plans directory using ${formatToolName(WRITE_FILE_TOOL_NAME)}.
-4. **Review & Approval:** Present a brief summary of the drafted plan in your chat response and concurrently call the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to formally request approval. If rejected, iterate.
+${renderPlanWorkflow(complexity)}
+
+${renderAdaptiveEscalation()}
 
 ${renderApprovedPlanSection(options.approvedPlanPath)}`.trim();
+}
+
+function renderPlanStructure(complexity: PlanComplexity): string {
+  switch (complexity) {
+    case PlanComplexity.MINIMAL:
+      return `When writing the plan file, use this concise format:
+  # Changes
+  (Bullet list of specific changes with file paths)
+  # Verification
+  (How to verify the changes work — test command or manual check)`;
+
+    case PlanComplexity.STANDARD:
+      return `When writing the plan file, you MUST include:
+  # Objective
+  (A concise summary of what needs to be built or fixed)
+  # Implementation Plan
+  (Files that will be modified with relevant context, then iterative development steps, e.g., "1. Implement X in [File]", "2. Verify with test Y")
+  # Verification
+  (Specific unit tests, manual checks, or build commands to verify success)`;
+
+    case PlanComplexity.THOROUGH:
+      return `When writing the plan file, you MUST include ALL of these sections:
+  # Background & Motivation
+  (What needs to change and why — the problem or opportunity driving this work)
+  # Scope & Impact
+  (Which modules/services are affected, blast radius, downstream dependencies)
+  # Proposed Solution
+  (Detailed description of the recommended approach and rationale for choosing it)
+  # Alternatives Considered
+  (At least two other viable approaches with pros, cons, and tradeoffs for each)
+  # Implementation Plan
+  (List ALL files that will be modified or created with relevant context, then development steps broken into phases with verification checkpoints between phases)
+  # Verification
+  (Unit tests, integration tests, manual checks, and build commands to verify success)
+  # Migration & Rollback
+  (If applicable: how to migrate existing data/state, and how to roll back if something goes wrong)`;
+    default: {
+      const _exhaustive: never = complexity;
+      return _exhaustive;
+    }
+  }
+}
+
+function renderPlanWorkflow(complexity: PlanComplexity): string {
+  switch (complexity) {
+    case PlanComplexity.MINIMAL:
+      return `1. **Explore:** Quickly read the relevant files to confirm the change is straightforward.
+2. **Draft:** Write the plan to the plans directory.
+3. **Approval:** Call ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} to request approval.`;
+
+    case PlanComplexity.STANDARD:
+      return `1. **Explore & Analyze:** Analyze requirements and use search/read tools to explore the codebase. For multi-approach tasks, identify at least two viable implementation approaches.
+2. **Consult:** Present a concise summary of identified approaches (including pros/cons and your recommendation) to the user via ${formatToolName(ASK_USER_TOOL_NAME)} and wait for their selection.
+3. **Draft:** Write the detailed implementation plan to the plans directory.
+4. **Review & Approval:** Present a brief summary and call ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} to request approval. If rejected, iterate.`;
+
+    case PlanComplexity.THOROUGH:
+      return `1. **Deep Exploration:** Systematically map all affected modules. Trace data flow, identify dependencies, and read all relevant files. Document assumptions.
+2. **Alternatives Considered:** Identify at least two viable approaches. For each, analyze: complexity, risk, performance impact, and maintenance burden.
+3. **Consult:** Present the alternatives with your recommendation to the user via ${formatToolName(ASK_USER_TOOL_NAME)}. Wait for their decision before drafting.
+4. **Draft:** Write the comprehensive implementation plan covering all required sections to the plans directory.
+5. **Review & Approval:** Present a summary and call ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} to request approval. If rejected, iterate.`;
+    default: {
+      const _exhaustive: never = complexity;
+      return _exhaustive;
+    }
+  }
+}
+
+const COMPLEXITY_CRITERIA = {
+  minimal:
+    'Single-purpose changes to 1-3 files where the fix is obvious (e.g., rename a variable, fix a typo, update a config value, add a simple test).',
+  standard:
+    'Self-contained features or refactors within one module (e.g., add a new API endpoint, refactor a class, implement a UI component).',
+  thorough:
+    'Changes that span multiple modules, require design decisions, or could break existing behavior (e.g., redesign auth system, migrate database schema, add a new tool/plugin system, change a public API contract, refactor shared utilities used across the codebase).',
+  preferThorough:
+    'When in doubt between standard and thorough, prefer thorough — it is better to over-plan than to miss critical dependencies.',
+};
+
+function renderAdaptiveEscalation(): string {
+  return `## Adaptive Complexity
+**Auto-detection:** If the current complexity level was not explicitly chosen (e.g., you started in Plan Mode from a CLI flag), assess the task complexity from the user's request:
+- **minimal:** ${COMPLEXITY_CRITERIA.minimal}
+- **standard:** ${COMPLEXITY_CRITERIA.standard}
+- **thorough:** ${COMPLEXITY_CRITERIA.thorough}
+${COMPLEXITY_CRITERIA.preferThorough}
+
+**Escalation:** If during exploration you discover the task is more complex than initially assessed (e.g., affects more files than expected, requires cross-module changes, or has non-obvious dependencies), escalate your plan complexity:
+- **minimal → standard:** Add Objective and Implementation Plan sections. Consider consulting the user on approach.
+- **standard → thorough:** Add Scope & Impact, Alternatives Considered, and Migration & Rollback sections. You MUST consult the user on approach before drafting.
+Inform the user when escalating.`;
 }
 
 function renderApprovedPlanSection(approvedPlanPath?: string): string {
@@ -541,7 +624,12 @@ function mandateContinueWork(interactive: boolean): string {
 function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
   let suggestion = '';
   if (options.enableEnterPlanModeTool) {
-    suggestion = ` If the request is ambiguous, broad in scope, or involves creating a new feature/application, you MUST use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to design your approach before making changes. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.`;
+    suggestion = ` When the task requires planning, use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool with the appropriate complexity:
+- complexity="minimal": ${COMPLEXITY_CRITERIA.minimal}
+- complexity="standard": ${COMPLEXITY_CRITERIA.standard}
+- complexity="thorough": ${COMPLEXITY_CRITERIA.thorough}
+${COMPLEXITY_CRITERIA.preferThorough}
+Do NOT use Plan Mode for answering questions or simple inquiries.`;
   }
 
   const searchTools: string[] = [];

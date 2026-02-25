@@ -107,6 +107,7 @@ import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
+import { PlanComplexity } from '../plan/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type {
   UserTierId,
@@ -744,6 +745,7 @@ export class Config {
   private lastModeSwitchTime: number = performance.now();
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
+  private planComplexity: PlanComplexity = PlanComplexity.STANDARD;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -1885,12 +1887,18 @@ export class Config {
 
     this.policyEngine.setApprovalMode(mode);
 
-    const isPlanModeTransition =
-      currentMode !== mode &&
-      (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
+    const isExitingPlanMode =
+      currentMode === ApprovalMode.PLAN && mode !== ApprovalMode.PLAN;
+    const isEnteringPlanMode =
+      currentMode !== ApprovalMode.PLAN && mode === ApprovalMode.PLAN;
+    const isPlanModeTransition = isExitingPlanMode || isEnteringPlanMode;
     const isYoloModeTransition =
       currentMode !== mode &&
       (currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO);
+
+    if (isExitingPlanMode) {
+      this.planComplexity = PlanComplexity.STANDARD;
+    }
 
     if (isPlanModeTransition || isYoloModeTransition) {
       this.syncPlanModeTools();
@@ -2169,6 +2177,14 @@ export class Config {
 
   setApprovedPlanPath(path: string | undefined): void {
     this.approvedPlanPath = path;
+  }
+
+  getPlanComplexity(): PlanComplexity {
+    return this.planComplexity;
+  }
+
+  setPlanComplexity(complexity: PlanComplexity): void {
+    this.planComplexity = complexity;
   }
 
   isAgentsEnabled(): boolean {

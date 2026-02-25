@@ -80,18 +80,20 @@ manually during a session.
 
 ### Planning Workflow
 
-1.  **Explore & Analyze:** Analyze requirements and use read-only tools to map
-    the codebase and validate assumptions. For complex tasks, identify at least
-    two viable implementation approaches.
-2.  **Consult:** Present a summary of the identified approaches via [`ask_user`]
-    to obtain a selection. For simple or canonical tasks, this step may be
-    skipped.
-3.  **Draft:** Once an approach is selected, write a detailed implementation
-    plan to the plans directory.
-4.  **Review & Approval:** Use the [`exit_plan_mode`] tool to present the plan
-    and formally request approval.
-    - **Approve:** Exit Plan Mode and start implementation.
-    - **Iterate:** Provide feedback to refine the plan.
+The planning workflow adapts its depth based on a `complexity` parameter
+(`minimal`, `standard`, `thorough`) passed to [`enter_plan_mode`]. The model
+selects the appropriate level automatically, or you can request one explicitly
+(e.g., "plan a thorough redesign of the auth system"). The default is
+**standard**.
+
+| Complexity   | Use case                                         | Plan sections                                                                                                                                | Workflow                                                                     |
+| ------------ | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **Minimal**  | Small, targeted changes (1–3 files, clear scope) | Changes, Verification                                                                                                                        | Explore, Draft, Approval                                                     |
+| **Standard** | Typical features or moderate refactoring         | Objective, Implementation Plan, Verification                                                                                                 | Explore & Analyze, Consult, Draft, Review & Approval                         |
+| **Thorough** | Architectural or cross-cutting changes           | Background & Motivation, Scope & Impact, Proposed Solution, Alternatives Considered, Implementation Plan, Verification, Migration & Rollback | Deep Exploration, Alternatives Considered, Consult, Draft, Review & Approval |
+
+If during exploration the model discovers the task is more complex than
+initially assessed, it escalates the plan depth and informs you.
 
 For more complex or specialized planning tasks, you can
 [customize the planning workflow with skills](#customizing-planning-with-skills).

@@ -168,6 +168,7 @@ export class PromptProvider {
             planModeToolsList,
             plansDir: config.storage.getPlansDir(),
             approvedPlanPath: config.getApprovedPlanPath(),
+            complexity: config.getPlanComplexity(),
           }),
           isPlanMode,
         ),
