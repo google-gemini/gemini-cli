@@ -193,95 +193,19 @@ describe('renderPlanningWorkflow', () => {
     expect(renderPlanningWorkflow(undefined)).toBe('');
   });
 
-  it.each([
-    {
-      name: 'minimal',
-      complexity: PlanComplexity.MINIMAL,
-      expectedSections: ['# Changes', '# Verification'],
-      unexpectedSections: [
-        '# Objective',
-        '# Alternatives Considered',
-        '# Proposed Solution',
-      ],
-      expectedSteps: ['**Explore:**', '**Draft:**', '**Approval:**'],
-      unexpectedSteps: ['**Consult:**'],
-    },
-    {
-      name: 'standard',
-      complexity: PlanComplexity.STANDARD,
-      expectedSections: [
-        '# Objective',
-        '# Implementation Plan',
-        '# Verification',
-      ],
-      unexpectedSections: [
-        '# Alternatives Considered',
-        '# Migration & Rollback',
-      ],
-      expectedSteps: [
-        '**Explore & Analyze:**',
-        '**Consult:**',
-        '**Draft:**',
-        '**Review & Approval:**',
-      ],
-      unexpectedSteps: [],
-    },
-    {
-      name: 'thorough',
+  it('should render the full planning workflow with standard assignment', () => {
+    const result = renderPlanningWorkflow(baseOptions);
+    expect(result).toContain('**Target Level:** **standard**');
+    expect(result).toMatchSnapshot();
+  });
+
+  it('should update active assignment based on complexity', () => {
+    const result = renderPlanningWorkflow({
+      ...baseOptions,
       complexity: PlanComplexity.THOROUGH,
-      expectedSections: [
-        '# Background & Motivation',
-        '# Scope & Impact',
-        '# Proposed Solution',
-        '# Alternatives Considered',
-        '# Implementation Plan',
-        '# Migration & Rollback',
-        '# Verification',
-      ],
-      unexpectedSections: [],
-      expectedSteps: [
-        '**Deep Exploration:**',
-        '**Alternatives Considered:**',
-        '**Consult:**',
-        '**Draft:**',
-        '**Review & Approval:**',
-      ],
-      unexpectedSteps: [],
-    },
-  ])(
-    '$name complexity: correct plan structure and workflow',
-    ({
-      complexity,
-      expectedSections,
-      unexpectedSections,
-      expectedSteps,
-      unexpectedSteps,
-    }) => {
-      const result = renderPlanningWorkflow({
-        ...baseOptions,
-        complexity,
-      });
-
-      expect(result).toContain(`Plan (${complexity})`);
-      for (const section of expectedSections) {
-        expect(result).toContain(section);
-      }
-      for (const section of unexpectedSections) {
-        expect(result).not.toContain(section);
-      }
-      for (const step of expectedSteps) {
-        expect(result).toContain(step);
-      }
-      for (const step of unexpectedSteps) {
-        expect(result).not.toContain(step);
-      }
-
-      // All complexities should include adaptive escalation
-      expect(result).toContain('## Adaptive Complexity');
-      expect(result).toContain('**Auto-detection:**');
-      expect(result).toContain('**Escalation:**');
-    },
-  );
+    });
+    expect(result).toContain('**Target Level:** **thorough**');
+  });
 
   it('should include approved plan section when path is provided', () => {
     const result = renderPlanningWorkflow({
