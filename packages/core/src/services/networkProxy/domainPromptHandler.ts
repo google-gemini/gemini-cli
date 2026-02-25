@@ -8,11 +8,8 @@ import type { NetworkProxyManager } from './networkProxyManager.js';
 import { DomainFilterAction } from './types.js';
 
 /**
- * Callback type for asking the user whether to allow or deny a domain.
- *
- * The implementation should present the domain to the user and return
- * their decision. This decouples the proxy layer from any specific UI
- * framework (CLI readline, Ink, VS Code, etc.).
+ * Prompt callback for asking the user whether to allow or deny a domain.
+ * Implementation is UI-agnostic (CLI readline, Ink, VS Code, etc.).
  */
 export type DomainPromptCallback = (
   hostname: string,
@@ -25,15 +22,6 @@ export type DomainPromptCallback = (
  * and defaultAction is 'prompt'), it emits a 'domainCheck' event. This handler
  * intercepts that event, calls the provided prompt callback to get the user's
  * decision, and relays the answer back to the proxy.
- *
- * Usage:
- *   const handler = new DomainPromptHandler(proxyManager, async (host) => {
- *     // Show prompt to user, return their decision
- *     return DomainFilterAction.ALLOW;
- *   });
- *   handler.attach();
- *   // ... later
- *   handler.detach();
  */
 export class DomainPromptHandler {
   private attached = false;

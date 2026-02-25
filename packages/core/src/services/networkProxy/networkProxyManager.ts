@@ -19,11 +19,8 @@ import type {
 import { DEFAULT_NETWORK_PROXY_CONFIG } from './types.js';
 
 /**
- * Central manager for the network proxy system.
- *
  * Coordinates the HTTP and SOCKS5 proxy servers, traffic logging,
- * and domain check events. Provides a single entry point for the
- * rest of the application to interact with the proxy layer.
+ * and domain check events.
  *
  * Events:
  * - 'connection': Fired for every proxied connection.
@@ -52,7 +49,6 @@ export class NetworkProxyManager extends EventEmitter {
 
   /**
    * Starts both proxy servers and wires up event forwarding.
-   * Returns the bound addresses.
    */
   async start(): Promise<ProxyServerAddresses> {
     if (this.running) {
@@ -111,9 +107,6 @@ export class NetworkProxyManager extends EventEmitter {
     this.emit('stopped');
   }
 
-  /**
-   * Returns the current addresses of the running proxy servers.
-   */
   getAddresses(): ProxyServerAddresses {
     return {
       httpProxy: this.httpProxy
@@ -125,9 +118,6 @@ export class NetworkProxyManager extends EventEmitter {
     };
   }
 
-  /**
-   * Returns a snapshot of the proxy system's status.
-   */
   getStatus(): ProxyStatus {
     const httpCount = this.httpProxy?.getConnectionCount() ?? 0;
     const socksCount = this.socksProxy?.getConnectionCount() ?? 0;
@@ -142,16 +132,10 @@ export class NetworkProxyManager extends EventEmitter {
     };
   }
 
-  /**
-   * Returns the traffic logger for querying connection history.
-   */
   getTrafficLogger(): TrafficLogger {
     return this.trafficLogger;
   }
 
-  /**
-   * Returns the current proxy configuration.
-   */
   getConfig(): Readonly<NetworkProxyConfig> {
     return this.config;
   }

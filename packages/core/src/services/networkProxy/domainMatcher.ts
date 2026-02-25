@@ -20,7 +20,6 @@ export function matchesDomainPattern(pattern: string, hostname: string): boolean
   const normalizedPattern = pattern.toLowerCase().trim();
   const normalizedHost = hostname.toLowerCase().trim();
 
-  // Full wildcard
   if (normalizedPattern === '*') {
     return true;
   }
@@ -32,7 +31,6 @@ export function matchesDomainPattern(pattern: string, hostname: string): boolean
     return normalizedHost === suffix || normalizedHost.endsWith('.' + suffix);
   }
 
-  // Exact match
   return normalizedHost === normalizedPattern;
 }
 
@@ -85,7 +83,6 @@ export function extractHostname(target: string): string {
     return target;
   }
 
-  // Full URL
   try {
     return new URL(target).hostname;
   } catch {

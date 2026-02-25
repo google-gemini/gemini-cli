@@ -34,13 +34,9 @@ const REP_COMMAND_NOT_SUPPORTED = 0x07;
 const REP_ADDRESS_TYPE_NOT_SUPPORTED = 0x08;
 
 export interface SocksProxyOptions {
-  /** Port to listen on. 0 = auto-assign. */
   port: number;
-  /** Hostname to bind to. Defaults to '127.0.0.1'. */
   host?: string;
-  /** Domain filtering rules. */
   rules: DomainRule[];
-  /** Default action when no rule matches. */
   defaultAction: DomainFilterAction;
 }
 
@@ -251,7 +247,6 @@ export class SocksProxy extends EventEmitter {
         return;
     }
 
-    // Evaluate domain filtering
     const action = await this.resolveAction(hostname);
 
     const record: ProxyConnectionRecord = {

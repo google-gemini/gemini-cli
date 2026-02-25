@@ -16,13 +16,9 @@ import type {
 import { DomainFilterAction } from './types.js';
 
 export interface HttpProxyOptions {
-  /** Port to listen on. 0 = auto-assign. */
   port: number;
-  /** Hostname to bind to. Defaults to '127.0.0.1'. */
   host?: string;
-  /** Domain filtering rules. */
   rules: DomainRule[];
-  /** Default action when no rule matches. */
   defaultAction: DomainFilterAction;
 }
 
@@ -53,7 +49,6 @@ export class HttpProxy extends EventEmitter {
 
   /**
    * Starts the HTTP proxy server.
-   * Returns a promise that resolves once the server is listening.
    */
   async start(): Promise<number> {
     return new Promise((resolve, reject) => {
@@ -236,7 +231,6 @@ export class HttpProxy extends EventEmitter {
 
     this.emit('connection', record);
 
-    // Forward the request
     const proxyReq = http.request(
       {
         hostname,

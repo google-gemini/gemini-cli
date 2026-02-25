@@ -9,7 +9,7 @@ import type { ProxyConnectionRecord } from './types.js';
 /**
  * In-memory traffic logger for proxy connections.
  *
- * Keeps a bounded ring buffer of connection records for auditing.
+ * Keeps a bounded list of connection records for auditing.
  * Logging is opt-in and controlled by user settings. No data is
  * persisted to disk or sent externally — records live only in memory
  * for the duration of the session.
