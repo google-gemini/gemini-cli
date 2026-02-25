@@ -24,7 +24,7 @@ import {
   type ScheduledToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
-import type { ApprovalMode , ApprovalMode } from '../policy/types.js';
+import type { ApprovalMode } from '../policy/types.js';
 import { PolicyDecision } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
