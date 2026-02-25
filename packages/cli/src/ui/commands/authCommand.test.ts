@@ -9,6 +9,7 @@ import { authCommand } from './authCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { SettingScope } from '../../config/settings.js';
+import type { Config } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual('@google/gemini-cli-core');
@@ -121,7 +122,7 @@ describe('authCommand', () => {
 
     it('should handle missing config gracefully', async () => {
       const logoutCommand = authCommand.subCommands?.[1];
-      mockContext.services.config = null;
+      mockContext.services.config = {} as unknown as Config;
 
       const result = await logoutCommand!.action!(mockContext, '');
 
