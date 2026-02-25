@@ -1018,9 +1018,10 @@ describe('Composer', () => {
         streamingState: StreamingState.Idle,
       });
 
-      const { lastFrame } = await renderComposer(uiState);
+      const { lastFrame, unmount } = await renderComposer(uiState);
 
       expect(lastFrame()).toContain('ShortcutsHelp');
+      unmount();
     });
 
     it('hides shortcuts help while streaming', async () => {
@@ -1029,9 +1030,10 @@ describe('Composer', () => {
         streamingState: StreamingState.Responding,
       });
 
-      const { lastFrame } = await renderComposer(uiState);
+      const { lastFrame, unmount } = await renderComposer(uiState);
 
       expect(lastFrame()).not.toContain('ShortcutsHelp');
+      unmount();
     });
 
     it('hides shortcuts help when action is required', async () => {
@@ -1044,9 +1046,10 @@ describe('Composer', () => {
         ),
       });
 
-      const { lastFrame } = await renderComposer(uiState);
+      const { lastFrame, unmount } = await renderComposer(uiState);
 
       expect(lastFrame()).not.toContain('ShortcutsHelp');
+      unmount();
     });
   });
 
