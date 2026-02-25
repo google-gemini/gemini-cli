@@ -27,6 +27,7 @@ implementation. It allows you to:
     - [Example: Allow git commands in Plan Mode](#example-allow-git-commands-in-plan-mode)
     - [Example: Enable research subagents in Plan Mode](#example-enable-research-subagents-in-plan-mode)
   - [Custom Plan Directory and Policies](#custom-plan-directory-and-policies)
+- [Automatic Model Routing](#automatic-model-routing)
 
 ## Enabling Plan Mode
 
@@ -143,13 +144,27 @@ based on the task description.
 
 ### Customizing Policies
 
-Plan Mode is designed to be read-only by default to ensure safety during the
-research phase. However, you may occasionally need to allow specific tools to
-assist in your planning.
+Plan Mode's default tool restrictions are managed by the [policy engine] and
+defined in the built-in [`plan.toml`] file. The built-in policy (Tier 1)
+enforces the read-only state, but you can customize these rules by creating your
+own policies in your `~/.gemini/policies/` directory (Tier 2).
 
-Because user policies (Tier 2) have a higher base priority than built-in
-policies (Tier 1), you can override Plan Mode's default restrictions by creating
-a rule in your `~/.gemini/policies/` directory.
+#### Example: Automatically approve read-only MCP tools
+
+By default, read-only MCP tools require user confirmation in Plan Mode. You can
+use `toolAnnotations` and the `mcpName` wildcard to customize this behavior for
+your specific environment.
+
+`~/.gemini/policies/mcp-read-only.toml`
+
+```toml
+[[rule]]
+mcpName = "*"
+toolAnnotations = { readOnlyHint = true }
+decision = "allow"
+priority = 100
+modes = ["plan"]
+```
 
 #### Example: Allow git commands in Plan Mode
 
@@ -228,6 +243,32 @@ modes = ["plan"]
 argsPattern = "\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\""
 ```
 
+## Automatic Model Routing
+
+When using an [**auto model**], Gemini CLI automatically optimizes [**model
+routing**] based on the current phase of your task:
+
+1.  **Planning Phase:** While in Plan Mode, the CLI routes requests to a
+    high-reasoning **Pro** model to ensure robust architectural decisions and
+    high-quality plans.
+2.  **Implementation Phase:** Once a plan is approved and you exit Plan Mode,
+    the CLI detects the existence of the approved plan and automatically
+    switches to a high-speed **Flash** model. This provides a faster, more
+    responsive experience during the implementation of the plan.
+
+This behavior is enabled by default to provide the best balance of quality and
+performance. You can disable this automatic switching in your settings:
+
+```json
+{
+  "general": {
+    "plan": {
+      "modelRouting": false
+    }
+  }
+}
+```
+
 [`list_directory`]: /docs/tools/file-system.md#1-list_directory-readfolder
 [`read_file`]: /docs/tools/file-system.md#2-read_file-readfile
 [`grep_search`]: /docs/tools/file-system.md#5-grep_search-searchtext
@@ -243,3 +284,7 @@ argsPattern = "\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+plans[\\\\/]+[\\w-
 [`exit_plan_mode`]: /docs/tools/planning.md#2-exit_plan_mode-exitplanmode
 [`ask_user`]: /docs/tools/ask-user.md
 [YOLO mode]: /docs/reference/configuration.md#command-line-arguments
+[`plan.toml`]:
+  https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/policy/policies/plan.toml
+[auto model]: /docs/reference/configuration.md#model-settings
+[model routing]: /docs/cli/telemetry.md#model-routing
