@@ -69,76 +69,68 @@ export async function openFileInEditor(
   const wasRaw = stdin?.isRaw ?? false;
   setRawMode?.(false);
 
-  const cleanup = (status: number | null) => {
+  try {
+    if (isTerminal) {
+      const result = spawnSync(command, args, {
+        stdio: 'inherit',
+        shell: process.platform === 'win32',
+      });
+      if (result.error) {
+        coreEvents.emitFeedback(
+          'error',
+          '[editorUtils] external terminal editor error',
+          result.error,
+        );
+        throw result.error;
+      }
+      if (typeof result.status === 'number' && result.status !== 0) {
+        const err = new Error(
+          `External editor exited with status ${result.status}`,
+        );
+        coreEvents.emitFeedback(
+          'error',
+          '[editorUtils] external editor error',
+          err,
+        );
+        throw err;
+      }
+    } else {
+      await new Promise<void>((resolve, reject) => {
+        const child = spawn(command, args, {
+          stdio: 'inherit',
+          shell: process.platform === 'win32',
+        });
+
+        child.on('error', (err) => {
+          coreEvents.emitFeedback(
+            'error',
+            '[editorUtils] external editor spawn error',
+            err,
+          );
+          reject(err);
+        });
+
+        child.on('close', (status) => {
+          if (typeof status === 'number' && status !== 0) {
+            const err = new Error(
+              `External editor exited with status ${status}`,
+            );
+            coreEvents.emitFeedback(
+              'error',
+              '[editorUtils] external editor error',
+              err,
+            );
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+    }
+  } finally {
     if (wasRaw) {
       setRawMode?.(true);
     }
     coreEvents.emit(CoreEvent.ExternalEditorClosed);
-
-    if (typeof status === 'number' && status !== 0) {
-      const err = new Error(`External editor exited with status ${status}`);
-      coreEvents.emitFeedback(
-        'error',
-        '[editorUtils] external editor error',
-        err,
-      );
-      return err;
-    }
-    return null;
-  };
-
-  if (isTerminal) {
-    try {
-      const { status, error } = spawnSync(command, args, {
-        stdio: 'inherit',
-        shell: process.platform === 'win32',
-      });
-      if (error) {
-        throw error;
-      }
-      const err = cleanup(status);
-      if (err) throw err;
-      return;
-    } catch (err) {
-      if (wasRaw) {
-        setRawMode?.(true);
-      }
-      coreEvents.emit(CoreEvent.ExternalEditorClosed);
-      coreEvents.emitFeedback(
-        'error',
-        '[editorUtils] external terminal editor error',
-        err,
-      );
-      throw err;
-    }
   }
-
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      stdio: 'inherit',
-      shell: process.platform === 'win32',
-    });
-
-    child.on('error', (err) => {
-      if (wasRaw) {
-        setRawMode?.(true);
-      }
-      coreEvents.emit(CoreEvent.ExternalEditorClosed);
-      coreEvents.emitFeedback(
-        'error',
-        '[editorUtils] external editor spawn error',
-        err,
-      );
-      reject(err);
-    });
-
-    child.on('close', (status) => {
-      const err = cleanup(status);
-      if (err) {
-        reject(err);
-      } else {
-        resolve();
-      }
-    });
-  });
 }

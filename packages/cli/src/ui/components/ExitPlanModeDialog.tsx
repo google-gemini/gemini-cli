@@ -149,12 +149,13 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   const config = useConfig();
   const { stdin, setRawMode } = useStdin();
   const planState = usePlanContent(planPath, config);
+  const { refresh } = planState;
   const [showLoading, setShowLoading] = useState(false);
 
   const handleOpenEditor = useCallback(async () => {
     await openFileInEditor(planPath, stdin, setRawMode, getPreferredEditor());
-    planState.refresh();
-  }, [planPath, stdin, setRawMode, getPreferredEditor, planState]);
+    refresh();
+  }, [planPath, stdin, setRawMode, getPreferredEditor, refresh]);
 
   useKeypress(
     (key) => {
