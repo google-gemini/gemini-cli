@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { resolveWorkspacePolicyState } from './policy.js';
-import { writeToStderr } from '@google/gemini-cli-core';
+import { debugLogger } from '@google/gemini-cli-core';
 
 // Mock debugLogger to avoid noise in test output
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -54,7 +54,6 @@ describe('resolveWorkspacePolicyState', () => {
     const result = await resolveWorkspacePolicyState({
       cwd: workspaceDir,
       trustedFolder: false,
-      interactive: true,
     });
 
     expect(result).toEqual({
@@ -68,28 +67,18 @@ describe('resolveWorkspacePolicyState', () => {
     fs.mkdirSync(policiesDir, { recursive: true });
     fs.writeFileSync(path.join(policiesDir, 'policy.toml'), 'rules = []');
 
-    // First call to establish integrity (interactive accept)
+    // First call will now auto-accept
     const firstResult = await resolveWorkspacePolicyState({
       cwd: workspaceDir,
       trustedFolder: true,
-      interactive: true,
     });
-    expect(firstResult.policyUpdateConfirmationRequest).toBeDefined();
+    expect(firstResult.workspacePoliciesDir).toBe(policiesDir);
+    expect(firstResult.policyUpdateConfirmationRequest).toBeUndefined();
 
-    // Establish integrity manually as if accepted
-    const { PolicyIntegrityManager } = await import('@google/gemini-cli-core');
-    const integrityManager = new PolicyIntegrityManager();
-    await integrityManager.acceptIntegrity(
-      'workspace',
-      workspaceDir,
-      firstResult.policyUpdateConfirmationRequest!.newHash,
-    );
-
-    // Second call should match
+    // Second call should also match
     const result = await resolveWorkspacePolicyState({
       cwd: workspaceDir,
       trustedFolder: true,
-      interactive: true,
     });
 
     expect(result.workspacePoliciesDir).toBe(policiesDir);
@@ -100,30 +89,26 @@ describe('resolveWorkspacePolicyState', () => {
     const result = await resolveWorkspacePolicyState({
       cwd: workspaceDir,
       trustedFolder: true,
-      interactive: true,
     });
 
     expect(result.workspacePoliciesDir).toBeUndefined();
     expect(result.policyUpdateConfirmationRequest).toBeUndefined();
   });
 
-  it('should return confirmation request if changed in interactive mode', async () => {
+  it('should auto-accept if changed in interactive mode', async () => {
     fs.mkdirSync(policiesDir, { recursive: true });
     fs.writeFileSync(path.join(policiesDir, 'policy.toml'), 'rules = []');
 
     const result = await resolveWorkspacePolicyState({
       cwd: workspaceDir,
       trustedFolder: true,
-      interactive: true,
     });
 
-    expect(result.workspacePoliciesDir).toBeUndefined();
-    expect(result.policyUpdateConfirmationRequest).toEqual({
-      scope: 'workspace',
-      identifier: workspaceDir,
-      policyDir: policiesDir,
-      newHash: expect.any(String),
-    });
+    expect(result.workspacePoliciesDir).toBe(policiesDir);
+    expect(result.policyUpdateConfirmationRequest).toBeUndefined();
+    expect(debugLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Automatically accepting and loading'),
+    );
   });
 
   it('should warn and auto-accept if changed in non-interactive mode', async () => {
@@ -133,12 +118,11 @@ describe('resolveWorkspacePolicyState', () => {
     const result = await resolveWorkspacePolicyState({
       cwd: workspaceDir,
       trustedFolder: true,
-      interactive: false,
     });
 
     expect(result.workspacePoliciesDir).toBe(policiesDir);
     expect(result.policyUpdateConfirmationRequest).toBeUndefined();
-    expect(writeToStderr).toHaveBeenCalledWith(
+    expect(debugLogger.warn).toHaveBeenCalledWith(
       expect.stringContaining('Automatically accepting and loading'),
     );
   });
@@ -152,7 +136,6 @@ describe('resolveWorkspacePolicyState', () => {
     const result = await resolveWorkspacePolicyState({
       cwd: tempDir,
       trustedFolder: true,
-      interactive: true,
     });
 
     expect(result.workspacePoliciesDir).toBeUndefined();
@@ -176,9 +159,7 @@ describe('resolveWorkspacePolicyState', () => {
       const result = await resolveWorkspacePolicyState({
         cwd: symlinkDir,
         trustedFolder: true,
-        interactive: true,
       });
-
       expect(result.workspacePoliciesDir).toBeUndefined();
       expect(result.policyUpdateConfirmationRequest).toBeUndefined();
     } finally {

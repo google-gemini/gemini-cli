@@ -699,7 +699,6 @@ export async function loadCliConfig(
     await resolveWorkspacePolicyState({
       cwd,
       trustedFolder,
-      interactive,
     });
 
   const policyEngineConfig = await createPolicyEngineConfig(

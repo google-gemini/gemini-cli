@@ -16,7 +16,7 @@ import {
   IntegrityStatus,
   Storage,
   type PolicyUpdateConfirmationRequest,
-  writeToStderr,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import { type Settings } from './settings.js';
 
@@ -57,14 +57,14 @@ export interface WorkspacePolicyState {
 export async function resolveWorkspacePolicyState(options: {
   cwd: string;
   trustedFolder: boolean;
-  interactive: boolean;
 }): Promise<WorkspacePolicyState> {
-  const { cwd, trustedFolder, interactive } = options;
+  const { cwd, trustedFolder } = options;
 
   let workspacePoliciesDir: string | undefined;
-  let policyUpdateConfirmationRequest:
+  // TODO: Restore policyUpdateConfirmationRequest when re-enabling interactive policy acceptance.
+  const policyUpdateConfirmationRequest:
     | PolicyUpdateConfirmationRequest
-    | undefined;
+    | undefined = undefined;
 
   if (trustedFolder) {
     const storage = new Storage(cwd);
@@ -91,25 +91,20 @@ export async function resolveWorkspacePolicyState(options: {
     ) {
       // No workspace policies found
       workspacePoliciesDir = undefined;
-    } else if (interactive) {
-      // Policies changed or are new, and we are in interactive mode
-      policyUpdateConfirmationRequest = {
-        scope: 'workspace',
-        identifier: cwd,
-        policyDir: potentialWorkspacePoliciesDir,
-        newHash: integrityResult.hash,
-      };
     } else {
-      // Non-interactive mode: warn and automatically accept/load
+      // Policies changed or are new.
+      // Automatically accept and load for now to reduce friction.
+      // We keep the infrastructure (PolicyUpdateConfirmationRequest etc.)
+      // but bypass the interactive dialog.
       await integrityManager.acceptIntegrity(
         'workspace',
         cwd,
         integrityResult.hash,
       );
       workspacePoliciesDir = potentialWorkspacePoliciesDir;
-      // debugLogger.warn here doesn't show up in the terminal. It is showing up only in debug mode on the debug console
-      writeToStderr(
-        'WARNING: Workspace policies changed or are new. Automatically accepting and loading them in non-interactive mode.\n',
+
+      debugLogger.warn(
+        'Workspace policies changed or are new. Automatically accepting and loading them.',
       );
     }
   }

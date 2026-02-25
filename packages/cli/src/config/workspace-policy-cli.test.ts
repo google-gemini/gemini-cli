@@ -164,7 +164,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
     );
   });
 
-  it('should set policyUpdateConfirmationRequest if integrity MISMATCH in interactive mode', async () => {
+  it('should automatically accept if integrity MISMATCH in interactive mode', async () => {
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
       isTrusted: true,
       source: 'file',
@@ -186,24 +186,23 @@ describe('Workspace-Level Policy CLI Integration', () => {
       cwd: MOCK_CWD,
     });
 
-    expect(config.getPolicyUpdateConfirmationRequest()).toEqual({
-      scope: 'workspace',
-      identifier: MOCK_CWD,
-      policyDir: expect.stringContaining(path.join('.gemini', 'policies')),
-      newHash: 'new-hash',
-    });
-    // In interactive mode without accept flag, it waits for user confirmation (handled by UI),
-    // so it currently DOES NOT pass the directory to createPolicyEngineConfig yet.
-    // The UI will handle the confirmation and reload/update.
+    expect(config.getPolicyUpdateConfirmationRequest()).toBeUndefined();
+    expect(mockAcceptIntegrity).toHaveBeenCalledWith(
+      'workspace',
+      MOCK_CWD,
+      'new-hash',
+    );
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspacePoliciesDir: undefined,
+        workspacePoliciesDir: expect.stringContaining(
+          path.join('.gemini', 'policies'),
+        ),
       }),
       expect.anything(),
     );
   });
 
-  it('should set policyUpdateConfirmationRequest if integrity is NEW with files (first time seen) in interactive mode', async () => {
+  it('should automatically accept if integrity is NEW with files (first time seen) in interactive mode', async () => {
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
       isTrusted: true,
       source: 'file',
@@ -222,16 +221,18 @@ describe('Workspace-Level Policy CLI Integration', () => {
       cwd: MOCK_CWD,
     });
 
-    expect(config.getPolicyUpdateConfirmationRequest()).toEqual({
-      scope: 'workspace',
-      identifier: MOCK_CWD,
-      policyDir: expect.stringContaining(path.join('.gemini', 'policies')),
-      newHash: 'new-hash',
-    });
+    expect(config.getPolicyUpdateConfirmationRequest()).toBeUndefined();
+    expect(mockAcceptIntegrity).toHaveBeenCalledWith(
+      'workspace',
+      MOCK_CWD,
+      'new-hash',
+    );
 
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspacePoliciesDir: undefined,
+        workspacePoliciesDir: expect.stringContaining(
+          path.join('.gemini', 'policies'),
+        ),
       }),
       expect.anything(),
     );
