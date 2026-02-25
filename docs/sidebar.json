@@ -17,6 +17,10 @@
           {
             "label": "Gemini 3 on Gemini CLI",
             "slug": "docs/get-started/gemini-3"
+          },
+          {
+            "label": "WSL setup (Windows)",
+            "slug": "docs/get-started/wsl-setup-To-run-Window"
           }
         ]
       },
