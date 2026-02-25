@@ -2675,6 +2675,11 @@ describe('AppContainer State Management', () => {
       isAlternateMode = false,
       childHandler?: Mock,
     ) => {
+      // Mock config.getUseAlternateBuffer to match the test mode
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(
+        isAlternateMode,
+      );
+
       // Update settings for this test run
       const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const testSettings = {
@@ -3364,6 +3369,9 @@ describe('AppContainer State Management', () => {
       );
       vi.mocked(checkPermissions).mockResolvedValue([]);
 
+      // Mock config.getUseAlternateBuffer for alternate buffer mode
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
+
       let unmount: () => void;
       await act(async () => {
         unmount = renderAppContainer({
@@ -3595,6 +3603,9 @@ describe('AppContainer State Management', () => {
           },
         },
       } as unknown as LoadedSettings;
+
+      // Mock config.getUseAlternateBuffer for alternate buffer mode
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
 
       let unmount: () => void;
       await act(async () => {

@@ -145,7 +145,6 @@ import { useSessionResume } from './hooks/useSessionResume.js';
 import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
 import { useSessionRetentionCheck } from './hooks/useSessionRetentionCheck.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
-import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
@@ -228,7 +227,7 @@ export const AppContainer = (props: AppContainerProps) => {
   });
 
   useMemoryMonitor(historyManager);
-  const isAlternateBuffer = useAlternateBuffer();
+  const isAlternateBuffer = config.getUseAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
   const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
@@ -567,7 +566,10 @@ export const AppContainer = (props: AppContainerProps) => {
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();
 
-  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, settings);
+  const mainAreaWidth = calculateMainAreaWidth(
+    terminalWidth,
+    isAlternateBuffer,
+  );
   // Derive widths for InputPrompt using shared helper
   const { inputWidth, suggestionsWidth } = useMemo(() => {
     const { inputWidth, suggestionsWidth } =
