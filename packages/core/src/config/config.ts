@@ -126,6 +126,11 @@ import { UserHintService } from './userHintService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
 
+import { CheckerRunner } from '../safety/checker-runner.js';
+import { ContextBuilder } from '../safety/context-builder.js';
+import { CheckerRegistry } from '../safety/registry.js';
+import { ConsecaSafetyChecker } from '../safety/conseca/conseca.js';
+
 export interface AccessibilitySettings {
   /** @deprecated Use ui.loadingPhrases instead. */
   enableLoadingPhrases?: boolean;
@@ -142,6 +147,7 @@ export interface SummarizeToolOutputSettings {
 
 export interface PlanSettings {
   directory?: string;
+  modelRouting?: boolean;
 }
 
 export interface TelemetrySettings {
@@ -187,6 +193,10 @@ export interface AgentRunConfig {
   maxTurns?: number;
 }
 
+/**
+ * Override configuration for a specific agent.
+ * Generic fields (modelConfig, runConfig, enabled) are standard across all agents.
+ */
 export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
@@ -195,6 +205,7 @@ export interface AgentOverride {
 
 export interface AgentSettings {
   overrides?: Record<string, AgentOverride>;
+  browser?: BrowserAgentCustomConfig;
 }
 
 export interface CustomTheme {
@@ -249,6 +260,30 @@ export interface CustomTheme {
 }
 
 /**
+ * Browser agent custom configuration.
+ * Used in agents.browser
+ *
+ * IMPORTANT: Keep in sync with the browser settings schema in
+ * packages/cli/src/config/settingsSchema.ts (agents.browser.properties).
+ */
+export interface BrowserAgentCustomConfig {
+  /**
+   * Session mode:
+   * - 'persistent': Launch Chrome with a persistent profile at ~/.cache/chrome-devtools-mcp/ (default)
+   * - 'isolated': Launch Chrome with a temporary profile, cleaned up after session
+   * - 'existing': Attach to an already-running Chrome instance (requires remote debugging
+   *   enabled at chrome://inspect/#remote-debugging)
+   */
+  sessionMode?: 'isolated' | 'persistent' | 'existing';
+  /** Run browser in headless mode. Default: false */
+  headless?: boolean;
+  /** Path to Chrome profile directory for session persistence. */
+  profilePath?: string;
+  /** Model override for the visual agent. */
+  visualModel?: string;
+}
+
+/**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
  * around on the config object though Core does not use this information
@@ -285,6 +320,7 @@ export interface ExtensionInstallMetadata {
   allowPreRelease?: boolean;
 }
 
+import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import type { FileFilteringOptions } from './constants.js';
 import {
   DEFAULT_FILE_FILTERING_OPTIONS,
@@ -460,16 +496,17 @@ export interface ConfigParameters {
   skipNextSpeakerCheck?: boolean;
   shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
-  enablePromptCompletion?: boolean;
   truncateToolOutputThreshold?: number;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
+  directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
+  maxAttempts?: number;
   enableShellOutputEfficiency?: boolean;
   shellToolInactivityTimeout?: number;
   fakeResponses?: string;
@@ -505,6 +542,7 @@ export interface ConfigParameters {
     adminSkillsEnabled?: boolean;
     agents?: AgentSettings;
   }>;
+  enableConseca?: boolean;
 }
 
 export class Config {
@@ -532,6 +570,7 @@ export class Config {
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
+  readonly enableConseca: boolean;
 
   private readonly coreTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
@@ -573,7 +612,8 @@ export class Config {
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
   private readonly disableLoopDetection: boolean;
-  private hasAccessToPreviewModel: boolean = false;
+  // null = unknown (quota not fetched); true = has access; false = definitively no access
+  private hasAccessToPreviewModel: boolean | null = null;
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
@@ -627,13 +667,13 @@ export class Config {
   readonly interactive: boolean;
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
+  private readonly directWebFetch: boolean;
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private readonly useBackgroundColor: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
-  private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
   private compressionTruncationCounter = 0;
   private initialized = false;
@@ -650,6 +690,7 @@ export class Config {
   private readonly outputSettings: OutputSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
+  private readonly maxAttempts: number;
   private readonly enableShellOutputEfficiency: boolean;
   private readonly shellToolInactivityTimeout: number;
   readonly fakeResponses?: string;
@@ -688,12 +729,13 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
-  private lastModeSwitchTime: number = Date.now();
+  private lastModeSwitchTime: number = performance.now();
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
 
@@ -777,6 +819,7 @@ export class Config {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
+    this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
@@ -821,6 +864,7 @@ export class Config {
     this.interactive = params.interactive ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
+    this.directWebFetch = params.directWebFetch ?? false;
     this.useRipgrep = params.useRipgrep ?? true;
     this.useBackgroundColor = params.useBackgroundColor ?? true;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
@@ -855,16 +899,37 @@ export class Config {
 
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
-    this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
-    this.policyEngine = new PolicyEngine({
-      ...params.policyEngineConfig,
-      approvalMode:
-        params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+    this.enableConseca = params.enableConseca ?? false;
+
+    // Initialize Safety Infrastructure
+    const contextBuilder = new ContextBuilder(this);
+    const checkersPath = this.targetDir;
+    // The checkersPath  is used to resolve external checkers. Since we do not have any external checkers currently, it is set to the targetDir.
+    const checkerRegistry = new CheckerRegistry(checkersPath);
+    const checkerRunner = new CheckerRunner(contextBuilder, checkerRegistry, {
+      checkersPath,
+      timeout: 30000, // 30 seconds to allow for LLM-based checkers
     });
     this.policyUpdateConfirmationRequest =
       params.policyUpdateConfirmationRequest;
+
+    this.policyEngine = new PolicyEngine(
+      {
+        ...params.policyEngineConfig,
+        approvalMode:
+          params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+      },
+      checkerRunner,
+    );
+
+    // Register Conseca if enabled
+    if (this.enableConseca) {
+      debugLogger.log('[SAFETY] Registering Conseca Safety Checker');
+      ConsecaSafetyChecker.getInstance().setConfig(this);
+    }
+
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
@@ -872,6 +937,10 @@ export class Config {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
+    this.maxAttempts = Math.min(
+      params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+      DEFAULT_MAX_ATTEMPTS,
+    );
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
@@ -1047,7 +1116,7 @@ export class Config {
     return this.contentGenerator;
   }
 
-  async refreshAuth(authMethod: AuthType) {
+  async refreshAuth(authMethod: AuthType, apiKey?: string) {
     // Reset availability service when switching auth
     this.modelAvailabilityService.reset();
 
@@ -1073,6 +1142,7 @@ export class Config {
     const newContentGeneratorConfig = await createContentGeneratorConfig(
       this,
       authMethod,
+      apiKey,
     );
     this.contentGenerator = await createContentGenerator(
       newContentGeneratorConfig,
@@ -1106,8 +1176,9 @@ export class Config {
       this.setHasAccessToPreviewModel(true);
     }
 
-    // Update model if user no longer has access to the preview model
-    if (!this.hasAccessToPreviewModel && isPreviewModel(this.model)) {
+    // Only reset when we have explicit "no access" (hasAccessToPreviewModel === false).
+    // When null (quota not fetched) or true, we preserve the saved model.
+    if (isPreviewModel(this.model) && this.hasAccessToPreviewModel === false) {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
     }
 
@@ -1444,10 +1515,10 @@ export class Config {
   }
 
   getHasAccessToPreviewModel(): boolean {
-    return this.hasAccessToPreviewModel;
+    return this.hasAccessToPreviewModel !== false;
   }
 
-  setHasAccessToPreviewModel(hasAccess: boolean): void {
+  setHasAccessToPreviewModel(hasAccess: boolean | null): void {
     this.hasAccessToPreviewModel = hasAccess;
   }
 
@@ -1490,7 +1561,8 @@ export class Config {
       }
 
       const hasAccess =
-        quota.buckets?.some((b) => b.modelId === PREVIEW_GEMINI_MODEL) ?? false;
+        quota.buckets?.some((b) => b.modelId && isPreviewModel(b.modelId)) ??
+        false;
       this.setHasAccessToPreviewModel(hasAccess);
       return quota;
     } catch (e) {
@@ -1548,7 +1620,10 @@ export class Config {
    *
    * May change over time.
    */
-  getExcludeTools(): Set<string> | undefined {
+  getExcludeTools(
+    toolMetadata?: Map<string, Record<string, unknown>>,
+    allToolNames?: Set<string>,
+  ): Set<string> | undefined {
     // Right now this is present for backward compatibility with settings.json exclude
     const excludeToolsSet = new Set([...(this.excludeTools ?? [])]);
     for (const extension of this.getExtensionLoader().getExtensions()) {
@@ -1560,7 +1635,10 @@ export class Config {
       }
     }
 
-    const policyExclusions = this.policyEngine.getExcludedTools();
+    const policyExclusions = this.policyEngine.getExcludedTools(
+      toolMetadata,
+      allToolNames,
+    );
     for (const tool of policyExclusions) {
       excludeToolsSet.add(tool);
     }
@@ -1788,12 +1866,11 @@ export class Config {
 
     const currentMode = this.getApprovalMode();
     if (currentMode !== mode) {
-      this.logCurrentModeDuration(this.getApprovalMode());
+      this.logCurrentModeDuration(currentMode);
       logApprovalModeSwitch(
         this,
         new ApprovalModeSwitchEvent(currentMode, mode),
       );
-      this.lastModeSwitchTime = Date.now();
     }
 
     this.policyEngine.setApprovalMode(mode);
@@ -1856,12 +1933,15 @@ export class Config {
    * Logs the duration of the current approval mode.
    */
   logCurrentModeDuration(mode: ApprovalMode): void {
-    const now = Date.now();
+    const now = performance.now();
     const duration = now - this.lastModeSwitchTime;
-    logApprovalModeDuration(
-      this,
-      new ApprovalModeDurationEvent(mode, duration),
-    );
+    if (duration > 0) {
+      logApprovalModeDuration(
+        this,
+        new ApprovalModeDurationEvent(mode, duration),
+      );
+    }
+    this.lastModeSwitchTime = now;
   }
 
   isYoloModeDisabled(): boolean {
@@ -2073,6 +2153,10 @@ export class Config {
     return this.approvedPlanPath;
   }
 
+  getDirectWebFetch(): boolean {
+    return this.directWebFetch;
+  }
+
   setApprovedPlanPath(path: string | undefined): void {
     this.approvedPlanPath = path;
   }
@@ -2226,6 +2310,10 @@ export class Config {
     await this.ensureExperimentsLoaded();
 
     return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
+  }
+
+  async getPlanModeRoutingEnabled(): Promise<boolean> {
+    return this.planModeRoutingEnabled;
   }
 
   async getNumericalRoutingEnabled(): Promise<boolean> {
@@ -2396,6 +2484,10 @@ export class Config {
     return this.retryFetchErrors;
   }
 
+  getMaxAttempts(): number {
+    return this.maxAttempts;
+  }
+
   getEnableShellOutputEfficiency(): boolean {
     return this.enableShellOutputEfficiency;
   }
@@ -2423,10 +2515,6 @@ export class Config {
   }
   getScreenReader(): boolean {
     return this.accessibility.screenReader ?? false;
-  }
-
-  getEnablePromptCompletion(): boolean {
-    return this.enablePromptCompletion;
   }
 
   getTruncateToolOutputThreshold(): number {
@@ -2478,6 +2566,38 @@ export class Config {
 
   getEnableHooksUI(): boolean {
     return this.enableHooksUI;
+  }
+
+  /**
+   * Get override settings for a specific agent.
+   * Reads from agents.overrides.<agentName>.
+   */
+  getAgentOverride(agentName: string): AgentOverride | undefined {
+    return this.getAgentsSettings()?.overrides?.[agentName];
+  }
+
+  /**
+   * Get browser agent configuration.
+   * Combines generic AgentOverride fields with browser-specific customConfig.
+   * This is the canonical way to access browser agent settings.
+   */
+  getBrowserAgentConfig(): {
+    enabled: boolean;
+    model?: string;
+    customConfig: BrowserAgentCustomConfig;
+  } {
+    const override = this.getAgentOverride('browser_agent');
+    const customConfig = this.getAgentsSettings()?.browser ?? {};
+    return {
+      enabled: override?.enabled ?? false,
+      model: override?.modelConfig?.model,
+      customConfig: {
+        sessionMode: customConfig.sessionMode ?? 'persistent',
+        headless: customConfig.headless ?? false,
+        profilePath: customConfig.profilePath,
+        visualModel: customConfig.visualModel,
+      },
+    };
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
