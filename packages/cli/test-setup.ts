@@ -8,6 +8,11 @@ import { vi, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
 import { coreEvents } from '@google/gemini-cli-core';
 
+// Unset CI environment variable so that ink renders dynamically as it does in a real terminal
+if (process.env.CI !== undefined) {
+  delete process.env.CI;
+}
+
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
 // Increase max listeners to avoid warnings in large test suites

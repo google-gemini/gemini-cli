@@ -21,7 +21,7 @@ import { FileOperation } from '../telemetry/metrics.js';
 import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
-import { READ_FILE_TOOL_NAME } from './tool-names.js';
+import { READ_FILE_TOOL_NAME, READ_FILE_DISPLAY_NAME } from './tool-names.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import {
   isPreviewModel,
@@ -145,7 +145,7 @@ ${result.llmContent}`;
         llmContent = `
 IMPORTANT: The file content has been truncated.
 Status: Showing lines ${start}-${end} of ${total} total lines.
-Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call.
+Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use start_line: ${end + 1}.
 
 --- FILE CONTENT (truncated) ---
 ${result.llmContent}`;
@@ -197,7 +197,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
   ) {
     super(
       ReadFileTool.Name,
-      'ReadFile',
+      READ_FILE_DISPLAY_NAME,
       READ_FILE_DEFINITION.base.description!,
       Kind.Read,
       READ_FILE_DEFINITION.base.parametersJsonSchema,

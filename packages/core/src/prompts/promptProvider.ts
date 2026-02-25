@@ -22,14 +22,13 @@ import {
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import {
-  PLAN_MODE_TOOLS,
   WRITE_TODOS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
 } from '../tools/tool-names.js';
-import { resolveModel, isPreviewModel } from '../config/models.js';
+import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 
@@ -58,31 +57,26 @@ export class PromptProvider {
     const enabledToolNames = new Set(toolNames);
     const approvedPlanPath = config.getApprovedPlanPath();
 
-    const desiredModel = resolveModel(config.getActiveModel());
-    const isGemini3 = isPreviewModel(desiredModel);
-    const activeSnippets = isGemini3 ? snippets : legacySnippets;
+    const desiredModel = resolveModel(
+      config.getActiveModel(),
+      config.getGemini31LaunchedSync?.() ?? false,
+    );
+    const isModernModel = supportsModernFeatures(desiredModel);
+    const activeSnippets = isModernModel ? snippets : legacySnippets;
     const contextFilenames = getAllGeminiMdFilenames();
 
     // --- Context Gathering ---
-    let planModeToolsList = PLAN_MODE_TOOLS.filter((t) =>
-      enabledToolNames.has(t),
-    )
-      .map((t) => `- \`${t}\``)
-      .join('\n');
-
-    // Add read-only MCP tools to the list
+    let planModeToolsList = '';
     if (isPlanMode) {
       const allTools = config.getToolRegistry().getAllTools();
-      const readOnlyMcpTools = allTools.filter(
-        (t): t is DiscoveredMCPTool =>
-          t instanceof DiscoveredMCPTool && !!t.isReadOnly,
-      );
-      if (readOnlyMcpTools.length > 0) {
-        const mcpToolsList = readOnlyMcpTools
-          .map((t) => `- \`${t.name}\` (${t.serverName})`)
-          .join('\n');
-        planModeToolsList += `\n${mcpToolsList}`;
-      }
+      planModeToolsList = allTools
+        .map((t) => {
+          if (t instanceof DiscoveredMCPTool) {
+            return `  <tool>\`${t.name}\` (${t.serverName})</tool>`;
+          }
+          return `  <tool>\`${t.name}\`</tool>`;
+        })
+        .join('\n');
     }
 
     let basePrompt: string;
@@ -108,7 +102,7 @@ export class PromptProvider {
         basePrompt,
         config,
         skillsPrompt,
-        isGemini3,
+        isModernModel,
       );
     } else {
       // --- Standard Composition ---
@@ -125,7 +119,6 @@ export class PromptProvider {
         })),
         coreMandates: this.withSection('coreMandates', () => ({
           interactive: interactiveMode,
-          isGemini3,
           hasSkills: skills.length > 0,
           hasHierarchicalMemory,
           contextFilenames,
@@ -173,7 +166,7 @@ export class PromptProvider {
           'planningWorkflow',
           () => ({
             planModeToolsList,
-            plansDir: config.storage.getProjectTempPlansDir(),
+            plansDir: config.storage.getPlansDir(),
             approvedPlanPath: config.getApprovedPlanPath(),
           }),
           isPlanMode,
@@ -182,7 +175,7 @@ export class PromptProvider {
           'operationalGuidelines',
           () => ({
             interactive: interactiveMode,
-            isGemini3,
+            isGemini3: isModernModel,
             enableShellEfficiency: config.getEnableShellOutputEfficiency(),
             interactiveShellEnabled: config.isInteractiveShellEnabled(),
           }),
@@ -198,17 +191,14 @@ export class PromptProvider {
           () => ({ interactive: interactiveMode }),
           isGitRepository(process.cwd()) ? true : false,
         ),
-        finalReminder: isGemini3
+        finalReminder: isModernModel
           ? undefined
           : this.withSection('finalReminder', () => ({
               readFileToolName: READ_FILE_TOOL_NAME,
             })),
-      } as snippets.SystemPromptOptions;
+      };
 
-      const getCoreSystemPrompt = activeSnippets.getCoreSystemPrompt as (
-        options: snippets.SystemPromptOptions,
-      ) => string;
-      basePrompt = getCoreSystemPrompt(options);
+      basePrompt = activeSnippets.getCoreSystemPrompt(options);
     }
 
     // --- Finalization (Shell) ---
@@ -232,9 +222,12 @@ export class PromptProvider {
   }
 
   getCompressionPrompt(config: Config): string {
-    const desiredModel = resolveModel(config.getActiveModel());
-    const isGemini3 = isPreviewModel(desiredModel);
-    const activeSnippets = isGemini3 ? snippets : legacySnippets;
+    const desiredModel = resolveModel(
+      config.getActiveModel(),
+      config.getGemini31LaunchedSync?.() ?? false,
+    );
+    const isModernModel = supportsModernFeatures(desiredModel);
+    const activeSnippets = isModernModel ? snippets : legacySnippets;
     return activeSnippets.getCompressionPrompt();
   }
 

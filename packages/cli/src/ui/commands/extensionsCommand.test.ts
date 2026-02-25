@@ -290,7 +290,7 @@ describe('extensionsCommand', () => {
 
     it('should inform user if there are no extensions to update with --all', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([]);
           }
@@ -306,7 +306,7 @@ describe('extensionsCommand', () => {
 
     it('should call setPendingItem and addItem in a finally block on success', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([
               {
@@ -357,7 +357,7 @@ describe('extensionsCommand', () => {
 
     it('should update a single extension by name', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([
               {
@@ -382,7 +382,7 @@ describe('extensionsCommand', () => {
 
     it('should update multiple extensions by name', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([
               {

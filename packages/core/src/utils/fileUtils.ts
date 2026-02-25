@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import type { PartUnion } from '@google/genai';
-// eslint-disable-next-line import/no-internal-modules
+ 
 import mime from 'mime/lite';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
@@ -399,7 +399,7 @@ export interface ProcessedFileReadResult {
  * Reads and processes a single file, handling text, images, and PDFs.
  * @param filePath Absolute path to the file.
  * @param rootDirectory Absolute path to the project root for relative path display.
- * @param _fileSystemService Placeholder for backward compatibility.
+ * @param _fileSystemService Currently unused in this function; kept for signature stability.
  * @param startLine Optional 1-based line number to start reading from.
  * @param endLine Optional 1-based line number to end reading at (inclusive).
  * @returns ProcessedFileReadResult object.
@@ -407,8 +407,7 @@ export interface ProcessedFileReadResult {
 export async function processSingleFileContent(
   filePath: string,
   rootDirectory: string,
-  // TODO: remove unused vars from other areas
-  _fileSystemService?: FileSystemService,
+  _fileSystemService: FileSystemService,
   startLine?: number,
   endLine?: number,
 ): Promise<ProcessedFileReadResult> {
@@ -480,10 +479,13 @@ export async function processSingleFileContent(
         let sliceEnd = originalLineCount;
 
         if (startLine !== undefined || endLine !== undefined) {
-          sliceStart = startLine ? Math.max(0, startLine - 1) : 0;
+          sliceStart = startLine ? startLine - 1 : 0;
           sliceEnd = endLine
             ? Math.min(endLine, originalLineCount)
-            : originalLineCount;
+            : Math.min(
+                sliceStart + DEFAULT_MAX_LINES_TEXT_FILE,
+                originalLineCount,
+              );
         } else {
           sliceEnd = Math.min(DEFAULT_MAX_LINES_TEXT_FILE, originalLineCount);
         }

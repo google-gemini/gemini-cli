@@ -4,22 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useToolScheduler } from './useToolScheduler.js';
 import {
   MessageBusType,
-  ToolConfirmationOutcome,
   Scheduler,
   type Config,
   type MessageBus,
+  type ExecutingToolCall,
   type CompletedToolCall,
-  type ToolCallConfirmationDetails,
   type ToolCallsUpdateMessage,
   type AnyDeclarativeTool,
   type AnyToolInvocation,
   ROOT_SCHEDULER_ID,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 
@@ -100,7 +100,7 @@ describe('useToolScheduler', () => {
     );
 
     const mockToolCall = {
-      status: 'executing' as const,
+      status: CoreToolCallStatus.Executing as const,
       request: {
         callId: 'call-1',
         name: 'test_tool',
@@ -111,7 +111,7 @@ describe('useToolScheduler', () => {
       tool: createMockTool(),
       invocation: createMockInvocation(),
       liveOutput: 'Loading...',
-    };
+    } as ExecutingToolCall;
 
     act(() => {
       void mockMessageBus.publish({
@@ -126,125 +126,9 @@ describe('useToolScheduler', () => {
     // Expect Core Object structure, not Display Object
     expect(toolCalls[0]).toMatchObject({
       request: { callId: 'call-1', name: 'test_tool' },
-      status: 'executing', // Core status
+      status: CoreToolCallStatus.Executing,
       liveOutput: 'Loading...',
       responseSubmittedToGemini: false,
-    });
-  });
-
-  it('injects onConfirm callback for awaiting_approval tools (Adapter Pattern)', async () => {
-    const { result } = renderHook(() =>
-      useToolScheduler(
-        vi.fn().mockResolvedValue(undefined),
-        mockConfig,
-        () => undefined,
-      ),
-    );
-
-    const mockToolCall = {
-      status: 'awaiting_approval' as const,
-      request: {
-        callId: 'call-1',
-        name: 'test_tool',
-        args: {},
-        isClientInitiated: false,
-        prompt_id: 'p1',
-      },
-      tool: createMockTool(),
-      invocation: createMockInvocation({
-        getDescription: () => 'Confirming test tool',
-      }),
-      confirmationDetails: { type: 'info', title: 'Confirm', prompt: 'Sure?' },
-      correlationId: 'corr-123',
-    };
-
-    act(() => {
-      void mockMessageBus.publish({
-        type: MessageBusType.TOOL_CALLS_UPDATE,
-        toolCalls: [mockToolCall],
-        schedulerId: ROOT_SCHEDULER_ID,
-      } as ToolCallsUpdateMessage);
-    });
-
-    const [toolCalls] = result.current;
-    const call = toolCalls[0];
-    if (call.status !== 'awaiting_approval') {
-      throw new Error('Expected status to be awaiting_approval');
-    }
-    const confirmationDetails =
-      call.confirmationDetails as ToolCallConfirmationDetails;
-
-    expect(confirmationDetails).toBeDefined();
-    expect(typeof confirmationDetails.onConfirm).toBe('function');
-
-    // Test that onConfirm publishes to MessageBus
-    const publishSpy = vi.spyOn(mockMessageBus, 'publish');
-    await confirmationDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
-
-    expect(publishSpy).toHaveBeenCalledWith({
-      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      correlationId: 'corr-123',
-      confirmed: true,
-      requiresUserConfirmation: false,
-      outcome: ToolConfirmationOutcome.ProceedOnce,
-      payload: undefined,
-    });
-  });
-
-  it('injects onConfirm with payload (Inline Edit support)', async () => {
-    const { result } = renderHook(() =>
-      useToolScheduler(
-        vi.fn().mockResolvedValue(undefined),
-        mockConfig,
-        () => undefined,
-      ),
-    );
-
-    const mockToolCall = {
-      status: 'awaiting_approval' as const,
-      request: {
-        callId: 'call-1',
-        name: 'test_tool',
-        args: {},
-        isClientInitiated: false,
-        prompt_id: 'p1',
-      },
-      tool: createMockTool(),
-      invocation: createMockInvocation(),
-      confirmationDetails: { type: 'edit', title: 'Edit', filePath: 'test.ts' },
-      correlationId: 'corr-edit',
-    };
-
-    act(() => {
-      void mockMessageBus.publish({
-        type: MessageBusType.TOOL_CALLS_UPDATE,
-        toolCalls: [mockToolCall],
-        schedulerId: ROOT_SCHEDULER_ID,
-      } as ToolCallsUpdateMessage);
-    });
-
-    const [toolCalls] = result.current;
-    const call = toolCalls[0];
-    if (call.status !== 'awaiting_approval') {
-      throw new Error('Expected awaiting_approval');
-    }
-    const confirmationDetails =
-      call.confirmationDetails as ToolCallConfirmationDetails;
-
-    const publishSpy = vi.spyOn(mockMessageBus, 'publish');
-    const mockPayload = { newContent: 'updated code' };
-    await confirmationDetails.onConfirm(
-      ToolConfirmationOutcome.ProceedOnce,
-      mockPayload,
-    );
-
-    expect(publishSpy).toHaveBeenCalledWith({
-      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      correlationId: 'corr-edit',
-      confirmed: true,
-      requiresUserConfirmation: false,
-      outcome: ToolConfirmationOutcome.ProceedOnce,
-      payload: mockPayload,
     });
   });
 
@@ -258,7 +142,7 @@ describe('useToolScheduler', () => {
     );
 
     const mockToolCall = {
-      status: 'success' as const,
+      status: CoreToolCallStatus.Success as const,
       request: {
         callId: 'call-1',
         name: 'test',
@@ -324,7 +208,7 @@ describe('useToolScheduler', () => {
         type: MessageBusType.TOOL_CALLS_UPDATE,
         toolCalls: [
           {
-            status: 'executing' as const,
+            status: CoreToolCallStatus.Executing as const,
             request: {
               callId: 'call-1',
               name: 'test',
@@ -370,7 +254,7 @@ describe('useToolScheduler', () => {
     const onComplete = vi.fn().mockResolvedValue(undefined);
 
     const completedToolCall = {
-      status: 'success' as const,
+      status: CoreToolCallStatus.Success as const,
       request: {
         callId: 'call-1',
         name: 'test',
@@ -434,7 +318,7 @@ describe('useToolScheduler', () => {
     );
 
     const callRoot = {
-      status: 'success' as const,
+      status: CoreToolCallStatus.Success as const,
       request: {
         callId: 'call-root',
         name: 'test',
@@ -508,7 +392,7 @@ describe('useToolScheduler', () => {
     act(() => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
-        toolCalls: [{ ...callRoot, status: 'executing' }],
+        toolCalls: [{ ...callRoot, status: CoreToolCallStatus.Executing }],
         schedulerId: ROOT_SCHEDULER_ID,
       } as ToolCallsUpdateMessage);
     });
@@ -517,9 +401,67 @@ describe('useToolScheduler', () => {
     expect(toolCalls).toHaveLength(2);
     expect(
       toolCalls.find((t) => t.request.callId === 'call-root')?.status,
-    ).toBe('executing');
+    ).toBe(CoreToolCallStatus.Executing);
     expect(
       toolCalls.find((t) => t.request.callId === 'call-sub')?.schedulerId,
     ).toBe('subagent-1');
+  });
+
+  it('adapts success/error status to executing when a tail call is present', () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() =>
+      useToolScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
+
+    const startTime = Date.now();
+    vi.advanceTimersByTime(1000);
+
+    const mockToolCall = {
+      status: CoreToolCallStatus.Success as const,
+      request: {
+        callId: 'call-1',
+        name: 'test_tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: createMockTool(),
+      invocation: createMockInvocation(),
+      response: {
+        callId: 'call-1',
+        resultDisplay: 'OK',
+        responseParts: [],
+        error: undefined,
+        errorType: undefined,
+      },
+      tailToolCallRequest: {
+        name: 'tail_tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: '123',
+      },
+    };
+
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [mockToolCall],
+        schedulerId: ROOT_SCHEDULER_ID,
+      } as ToolCallsUpdateMessage);
+    });
+
+    const [toolCalls, , , , , lastOutputTime] = result.current;
+
+    // Check if status has been adapted to 'executing'
+    expect(toolCalls[0].status).toBe(CoreToolCallStatus.Executing);
+
+    // Check if lastOutputTime was updated due to the transitional state
+    expect(lastOutputTime).toBeGreaterThan(startTime);
+
+    vi.useRealTimers();
   });
 });

@@ -6,21 +6,19 @@
 
 import {
   type Config,
-  type MessageBus,
   type ToolCallRequestInfo,
   type ToolCall,
   type CompletedToolCall,
-  type ToolConfirmationPayload,
   MessageBusType,
-  ToolConfirmationOutcome,
+  ROOT_SCHEDULER_ID,
   Scheduler,
   type EditorType,
   type ToolCallsUpdateMessage,
-  ROOT_SCHEDULER_ID,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 
-// Re-exporting types compatible with legacy hook expectations
+// Re-exporting types compatible with hook expectations
 export type ScheduleFn = (
   request: ToolCallRequestInfo | ToolCallRequestInfo[],
   signal: AbortSignal,
@@ -107,16 +105,27 @@ export function useToolScheduler(
     [config, messageBus],
   );
 
+  useEffect(() => () => scheduler.dispose(), [scheduler]);
+
   const internalAdaptToolCalls = useCallback(
     (coreCalls: ToolCall[], prevTracked: TrackedToolCall[]) =>
-      adaptToolCalls(coreCalls, prevTracked, messageBus),
-    [messageBus],
+      adaptToolCalls(coreCalls, prevTracked),
+    [],
   );
 
   useEffect(() => {
     const handler = (event: ToolCallsUpdateMessage) => {
       // Update output timer for UI spinners (Side Effect)
-      if (event.toolCalls.some((tc) => tc.status === 'executing')) {
+      const hasExecuting = event.toolCalls.some(
+        (tc) =>
+          tc.status === CoreToolCallStatus.Executing ||
+          ((tc.status === CoreToolCallStatus.Success ||
+            tc.status === CoreToolCallStatus.Error) &&
+            'tailToolCallRequest' in tc &&
+            tc.tailToolCallRequest != null),
+      );
+
+      if (hasExecuting) {
         setLastToolOutputTime(Date.now());
       }
 
@@ -227,12 +236,11 @@ export function useToolScheduler(
 }
 
 /**
- * ADAPTER: Merges UI metadata (submitted flag) and injects legacy callbacks.
+ * ADAPTER: Merges UI metadata (submitted flag).
  */
 function adaptToolCalls(
   coreCalls: ToolCall[],
   prevTracked: TrackedToolCall[],
-  messageBus: MessageBus,
 ): TrackedToolCall[] {
   const prevMap = new Map(prevTracked.map((t) => [t.request.callId, t]));
 
@@ -240,37 +248,23 @@ function adaptToolCalls(
     const prev = prevMap.get(coreCall.request.callId);
     const responseSubmittedToGemini = prev?.responseSubmittedToGemini ?? false;
 
-    // Inject onConfirm adapter for tools awaiting approval.
-    // The Core provides data-only (serializable) confirmationDetails. We must
-    // inject the legacy callback function that proxies responses back to the
-    // MessageBus.
-    if (coreCall.status === 'awaiting_approval' && coreCall.correlationId) {
-      const correlationId = coreCall.correlationId;
-      return {
-        ...coreCall,
-        confirmationDetails: {
-          ...coreCall.confirmationDetails,
-          onConfirm: async (
-            outcome: ToolConfirmationOutcome,
-            payload?: ToolConfirmationPayload,
-          ) => {
-            await messageBus.publish({
-              type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-              correlationId,
-              confirmed: outcome !== ToolConfirmationOutcome.Cancel,
-              requiresUserConfirmation: false,
-              outcome,
-              payload,
-            });
-          },
-        },
-        responseSubmittedToGemini,
-      };
+    let status = coreCall.status;
+    // If a tool call has completed but scheduled a tail call, it is in a transitional
+    // state. Force the UI to render it as "executing".
+    if (
+      (status === CoreToolCallStatus.Success ||
+        status === CoreToolCallStatus.Error) &&
+      'tailToolCallRequest' in coreCall &&
+      coreCall.tailToolCallRequest != null
+    ) {
+      status = CoreToolCallStatus.Executing;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return {
       ...coreCall,
+      status,
       responseSubmittedToGemini,
-    };
+    } as TrackedToolCall;
   });
 }

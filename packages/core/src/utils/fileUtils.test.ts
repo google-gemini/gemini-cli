@@ -20,7 +20,7 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-// eslint-disable-next-line import/no-internal-modules
+ 
 import mime from 'mime/lite';
 
 import {
@@ -930,7 +930,7 @@ describe('fileUtils', () => {
       expect(result.returnDisplay).toContain('Path is a directory');
     });
 
-    it('should paginate text files correctly (start_line and end_line)', async () => {
+    it('should paginate text files correctly (startLine and endLine)', async () => {
       const lines = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`);
       actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
 
@@ -940,7 +940,7 @@ describe('fileUtils', () => {
         new StandardFileSystemService(),
         6,
         10,
-      ); // Read lines 6-10
+      ); // Read lines 6-10 (1-based)
       const expectedContent = lines.slice(5, 10).join('\n');
 
       expect(result.llmContent).toBe(expectedContent);
@@ -991,7 +991,7 @@ describe('fileUtils', () => {
       expect(result.linesShown).toEqual([11, 20]);
     });
 
-    it('should handle limit exceeding file length', async () => {
+    it('should handle endLine exceeding file length', async () => {
       const lines = ['Line 1', 'Line 2'];
       actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
 
@@ -999,7 +999,7 @@ describe('fileUtils', () => {
         testTextFilePath,
         tempRootDir,
         new StandardFileSystemService(),
-        0,
+        1,
         10,
       );
       const expectedContent = lines.join('\n');
@@ -1035,21 +1035,22 @@ describe('fileUtils', () => {
       expect(result.isTruncated).toBe(true);
     });
 
-    it('should truncate when line count exceeds the limit', async () => {
-      const lines = Array.from({ length: 11 }, (_, i) => `Line ${i + 1}`);
+    it('should truncate when line count exceeds the default limit', async () => {
+      const lines = Array.from({ length: 2500 }, (_, i) => `Line ${i + 1}`);
       actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
 
-      // Read 5 lines, but there are 11 total
+      // No ranges provided, should use default limit (2000)
       const result = await processSingleFileContent(
         testTextFilePath,
         tempRootDir,
         new StandardFileSystemService(),
-        0,
-        5,
       );
 
       expect(result.isTruncated).toBe(true);
-      expect(result.returnDisplay).toBe('Read lines 1-5 of 11 from test.txt');
+      expect(result.returnDisplay).toBe(
+        'Read lines 1-2000 of 2500 from test.txt',
+      );
+      expect(result.linesShown).toEqual([1, 2000]);
     });
 
     it('should truncate when a line length exceeds the character limit', async () => {
@@ -1063,7 +1064,7 @@ describe('fileUtils', () => {
         testTextFilePath,
         tempRootDir,
         new StandardFileSystemService(),
-        0,
+        1,
         11,
       );
 
@@ -1089,7 +1090,7 @@ describe('fileUtils', () => {
         testTextFilePath,
         tempRootDir,
         new StandardFileSystemService(),
-        0,
+        1,
         10,
       );
       expect(result.isTruncated).toBe(true);

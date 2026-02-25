@@ -187,7 +187,7 @@ describe('ReadFileTool', () => {
   });
 
   describe('getDescription', () => {
-    it('should return relative path without limit/offset', () => {
+    it('should return relative path without ranges', () => {
       const subDir = path.join(tempRootDir, 'sub', 'dir');
       const params: ReadFileToolParams = {
         file_path: path.join(subDir, 'file.txt'),
@@ -623,6 +623,10 @@ describe('ReadFileTool', () => {
       const schema = tool.getSchema();
       expect(schema.name).toBe(ReadFileTool.Name);
       expect(schema.description).toMatchSnapshot();
+      expect(
+        (schema.parametersJsonSchema as { properties: Record<string, unknown> })
+          .properties,
+      ).not.toHaveProperty('offset');
     });
 
     it('should return the schema from the resolver when modelId is provided', () => {
