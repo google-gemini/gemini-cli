@@ -59,10 +59,11 @@ describe('policy.ts', () => {
       expect(mockPolicyEngine.check).toHaveBeenCalledWith(
         { name: 'test-tool', args: {} },
         undefined,
+        undefined,
       );
     });
 
-    it('should pass serverName for MCP tools', async () => {
+    it('should pass serverName and toolAnnotations for MCP tools', async () => {
       const mockPolicyEngine = {
         check: vi.fn().mockResolvedValue({ decision: PolicyDecision.ALLOW }),
       } as unknown as Mocked<PolicyEngine>;
@@ -73,6 +74,7 @@ describe('policy.ts', () => {
 
       const mcpTool = Object.create(DiscoveredMCPTool.prototype);
       mcpTool.serverName = 'my-server';
+      mcpTool._toolAnnotations = { readOnlyHint: true };
 
       const toolCall = {
         request: { name: 'mcp-tool', args: {} },
@@ -83,6 +85,7 @@ describe('policy.ts', () => {
       expect(mockPolicyEngine.check).toHaveBeenCalledWith(
         { name: 'mcp-tool', args: {} },
         'my-server',
+        { readOnlyHint: true },
       );
     });
 
