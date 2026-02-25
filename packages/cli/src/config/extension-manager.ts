@@ -438,6 +438,19 @@ Would you like to attempt to install via "git clone" instead?`,
           extensionIdentifier.toLowerCase(),
     );
     if (!extension) {
+      const extensionDir = path.join(
+        ExtensionStorage.getUserExtensionsDir(),
+        extensionIdentifier,
+      );
+      if (fs.existsSync(extensionDir)) {
+        await fs.promises.rm(extensionDir, { recursive: true, force: true });
+        this.extensionEnablementManager.remove(extensionIdentifier);
+        coreEvents.emitFeedback(
+          'info',
+          `Uninstalled broken extension '${extensionIdentifier}'.`,
+        );
+        return;
+      }
       throw new Error(`Extension not found.`);
     }
     await this.unloadExtension(extension);
@@ -515,25 +528,24 @@ Would you like to attempt to install via "git clone" instead?`,
     extensionDir: string,
   ): Promise<GeminiCLIExtension | null> {
     this.loadedExtensions ??= [];
-    if (!fs.statSync(extensionDir).isDirectory()) {
-      return null;
-    }
-
-    const installMetadata = loadInstallMetadata(extensionDir);
     let effectiveExtensionPath = extensionDir;
-    if (
-      (installMetadata?.type === 'git' ||
-        installMetadata?.type === 'github-release') &&
-      this.settings.security.blockGitExtensions
-    ) {
-      return null;
-    }
-
-    if (installMetadata?.type === 'link') {
-      effectiveExtensionPath = installMetadata.source;
-    }
-
     try {
+      if (!fs.statSync(extensionDir).isDirectory()) {
+        return null;
+      }
+
+      const installMetadata = loadInstallMetadata(extensionDir);
+      if (
+        (installMetadata?.type === 'git' ||
+          installMetadata?.type === 'github-release') &&
+        this.settings.security.blockGitExtensions
+      ) {
+        return null;
+      }
+
+      if (installMetadata?.type === 'link') {
+        effectiveExtensionPath = installMetadata.source;
+      }
       let config = await this.loadExtensionConfig(effectiveExtensionPath);
       if (
         this.getExtensions().find((extension) => extension.name === config.name)

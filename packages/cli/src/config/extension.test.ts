@@ -1769,6 +1769,39 @@ ${INSTALL_WARNING_MESSAGE}`,
   });
 
   describe('uninstallExtension', () => {
+    it('should uninstall a broken extension without crashing', async () => {
+      const badExtDir = path.join(userExtensionsDir, 'broken-ext');
+      fs.mkdirSync(badExtDir);
+      // Malformed JSON to simulate a broken extension
+      fs.writeFileSync(
+        path.join(badExtDir, EXTENSIONS_CONFIG_FILENAME),
+        '{ "name": "broken-ext"',
+      );
+
+      // Attempt to load extensions. The broken one should be skipped.
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      await extensionManager.loadExtensions();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `Warning: Skipping extension in ${badExtDir}: Failed to load extension config from ${badExtDir}/gemini-extension.json`,
+        ),
+      );
+      consoleErrorSpy.mockRestore();
+
+      // Ensure no extensions were loaded
+      expect(extensionManager.getExtensions()).toHaveLength(0);
+
+      // Attempt to uninstall the broken extension by its name.
+      await expect(
+        extensionManager.uninstallExtension('broken-ext', false),
+      ).resolves.toBeUndefined(); // Should resolve, not throw an error
+
+      // Verify the directory is removed
+      expect(fs.existsSync(badExtDir)).toBe(false);
+    });
+
     it('should uninstall an extension by name', async () => {
       const sourceExtDir = createExtension({
         extensionsDir: userExtensionsDir,
