@@ -897,7 +897,7 @@ describe('SettingsDialog', () => {
       // Should not show restart prompt initially
       await waitFor(() => {
         expect(lastFrame()).not.toContain(
-          'To see changes, Gemini CLI must be restarted',
+          'Changes that require a restart have been modified',
         );
       });
 
@@ -1333,7 +1333,7 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         expect(lastFrame()).toContain(
-          'To see changes, Gemini CLI must be restarted',
+          'Changes that require a restart have been modified',
         );
       });
 
@@ -1380,7 +1380,7 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         expect(lastFrame()).toContain(
-          'To see changes, Gemini CLI must be restarted',
+          'Changes that require a restart have been modified',
         );
       });
 
