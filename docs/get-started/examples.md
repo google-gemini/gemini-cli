@@ -1,12 +1,17 @@
 # Gemini CLI examples
 
-Not sure where to get started with Gemini CLI? This document covers examples on
-how to use Gemini CLI for a variety of tasks.
+Gemini CLI helps you automate common engineering tasks by combining AI reasoning
+with local system tools. This document provides examples of how to use the CLI
+for file management, code analysis, and data transformation.
 
-**Note:** Results are examples intended to showcase potential use cases. Your
-results may vary.
+> **Note:** These examples demonstrate potential capabilities. Your actual
+> results can vary based on the model used and your project environment.
 
 ## Rename your photographs based on content
+
+You can use Gemini CLI to automate file management tasks that require visual
+analysis. In this example, Gemini CLI renames images based on their actual
+subject matter.
 
 Scenario: You have a folder containing the following files:
 
@@ -22,9 +27,9 @@ Give Gemini the following prompt:
 Rename the photos in my "photos" directory based on their contents.
 ```
 
-Result: Gemini will ask for permission to rename your files.
+Result: Gemini asks for permission to rename your files.
 
-Select **Allow once** and your files will be renamed:
+Select **Allow once** and your files are renamed:
 
 ```bash
 photos/yellow_flowers.png
@@ -33,6 +38,9 @@ photos/green_android_robot.png
 ```
 
 ## Explain a repository by reading its code
+
+Gemini CLI is effective for rapid codebase exploration. The following example
+shows how to ask Gemini CLI to fetch, analyze, and summarize a remote project.
 
 Scenario: You want to understand how a popular open-source utility works by
 inspecting its code, not just its README.
@@ -43,15 +51,14 @@ Give Gemini CLI the following prompt:
 Clone the 'chalk' repository from https://github.com/chalk/chalk, read its key source files, and explain how it works.
 ```
 
-Result: Gemini will perform a sequence of actions to answer your request.
+Result: Gemini performs a sequence of actions to answer your request.
 
-1.  First, it will ask for permission to run `git clone` to download the
-    repository.
-2.  Next, it will find the important source files and ask for permission to read
+1.  First, it asks for permission to run `git clone` to download the repository.
+2.  Next, it finds the important source files and asks for permission to read
     them.
-3.  Finally, after analyzing the code, it will provide a summary.
+3.  Finally, after analyzing the code, it provides a summary.
 
-Gemini CLI will return an explanation based on the actual source code:
+Gemini CLI returns an explanation based on the actual source code:
 
 ```markdown
 The `chalk` library is a popular npm package for styling terminal output with
@@ -74,25 +81,11 @@ colors. After analyzing the source code, here's how it works:
 
 ## Combine two spreadsheets into one spreadsheet
 
+Gemini CLI can process and transform data across multiple files. Use this
+capability to merge reports or reformat data sets without manual copying.
+
 Scenario: You have two .csv files: `Revenue - 2023.csv` and
-`Revenue - 2024.csv`. Each file contains monthly revenue figures, like so:
-
-```csv
-January,0
-February,0
-March,0
-April,900
-May,1000
-June,1000
-July,1200
-August,1800
-September,2000
-October,2400
-November,3400
-December,2100
-```
-
-You want to combine these two .csv files into a single .csv file.
+`Revenue - 2024.csv`. Each file contains monthly revenue figures.
 
 Give Gemini CLI the following prompt:
 
@@ -100,9 +93,8 @@ Give Gemini CLI the following prompt:
 Combine the two .csv files into a single .csv file, with each year a different column.
 ```
 
-Result: Gemini CLI will read each file and then ask for permission to write a
-new file. Provide your permission and Gemini CLI will provide the following
-.csv:
+Result: Gemini CLI reads each file and then asks for permission to write a new
+file. Provide your permission and Gemini CLI provides the combined data:
 
 ```csv
 Month,2023,2024
@@ -122,6 +114,10 @@ December,2100,9000
 
 ## Run unit tests
 
+Gemini CLI can generate boilerplate code and tests based on your existing
+implementation. This example demonstrates how to request code coverage for a
+JavaScript component.
+
 Scenario: You've written a simple login page. You wish to write unit tests to
 ensure that your login page has code coverage.
 
@@ -131,89 +127,13 @@ Give Gemini CLI the following prompt:
 Write unit tests for Login.js.
 ```
 
-Result: Gemini CLI will ask for permission to write a new file and create a test
-for your login page
+Result: Gemini CLI asks for permission to write a new file and creates a test
+for your login page.
 
-```javascript
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react';
-import Login from './Login';
+## Next steps
 
-// Mock the API call for login
-jest.mock('./api', () => ({
-  login: jest.fn(),
-}));
-
-describe('Login component', () => {
-  it('renders the login form correctly', () => {
-    const { getByLabelText, getByText } = render(<Login />);
-
-    expect(getByLabelText('Username')).toBeInTheDocument();
-    expect(getByLabelText('Password')).toBeInTheDocument();
-    expect(getByText('Login')).toBeInTheDocument();
-  });
-
-  it('shows an error message with invalid credentials', async () => {
-    const { getByLabelText, getByText, findByText } = render(<Login />);
-    const usernameInput = getByLabelText('Username');
-    const passwordInput = getByLabelText('Password');
-    const loginButton = getByText('Login');
-
-    // Mock the API to return an error
-    require('./api').login.mockRejectedValue(new Error('Invalid credentials'));
-
-    fireEvent.change(usernameInput, { target: { value: 'testuser' } });
-    fireEvent.change(passwordInput, { target: { value: 'wrongpassword' } });
-    fireEvent.click(loginButton);
-
-    const errorMessage = await findByText('Invalid credentials');
-    expect(errorMessage).toBeInTheDocument();
-  });
-
-  it('logs in successfully with valid credentials', async () => {
-    const onLoginSuccess = jest.fn();
-    const { getByLabelText, getByText } = render(
-      <Login onLoginSuccess={onLoginSuccess} />,
-    );
-    const usernameInput = getByLabelText('Username');
-    const passwordInput = getByLabelText('Password');
-    const loginButton = getByText('Login');
-
-    // Mock the API to return a success message
-    require('./api').login.mockResolvedValue({ success: true });
-
-    fireEvent.change(usernameInput, { target: { value: 'testuser' } });
-    fireEvent.change(passwordInput, { target: { value: 'correctpassword' } });
-    fireEvent.click(loginButton);
-
-    await waitFor(() => {
-      expect(onLoginSuccess).toHaveBeenCalled();
-    });
-  });
-
-  it('disables the submit button while submitting', async () => {
-    const { getByLabelText, getByText } = render(<Login />);
-    const usernameInput = getByLabelText('Username');
-    const passwordInput = getByLabelText('Password');
-    const loginButton = getByText('Login');
-
-    // Mock the API to have a delay
-    require('./api').login.mockImplementation(
-      () =>
-        new Promise((resolve) =>
-          setTimeout(() => resolve({ success: true }), 1000),
-        ),
-    );
-
-    fireEvent.change(usernameInput, { target: { value: 'testuser' } });
-    fireEvent.change(passwordInput, { target: { value: 'correctpassword' } });
-    fireEvent.click(loginButton);
-
-    expect(loginButton).toBeDisabled();
-
-    await waitFor(() => {
-      expect(loginButton).not.toBeDisabled();
-    });
-  });
-});
-```
+- Follow the [File management](../cli/tutorials/file-management.md) guide to
+  start working with your codebase.
+- Follow the [Quickstart](./index.md) to start your first session.
+- See the [Cheatsheet](../cli/cli-reference.md) for a quick reference of
+  available commands.

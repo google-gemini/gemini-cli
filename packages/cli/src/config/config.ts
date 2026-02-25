@@ -56,7 +56,10 @@ import { resolvePath } from '../utils/resolvePath.js';
 import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import { createPolicyEngineConfig } from './policy.js';
+import {
+  createPolicyEngineConfig,
+  resolveWorkspacePolicyState,
+} from './policy.js';
 import { ExtensionManager } from './extension-manager.js';
 import { McpServerEnablementManager } from './mcp/mcpServerEnablement.js';
 import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
@@ -75,6 +78,7 @@ export interface CliArgs {
 
   yolo: boolean | undefined;
   approvalMode: string | undefined;
+  policy: string[] | undefined;
   allowedMcpServerNames: string[] | undefined;
   allowedTools: string[] | undefined;
   experimentalAcp: boolean | undefined;
@@ -158,6 +162,21 @@ export async function parseArguments(
           description:
             'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools), plan (read-only mode)',
         })
+        .option('policy', {
+          type: 'array',
+          string: true,
+          nargs: 1,
+          description:
+            'Additional policy files or directories to load (comma-separated or multiple --policy)',
+          coerce: (policies: string[]) =>
+            // Handle comma-separated values
+            policies.flatMap((p) =>
+              p
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean),
+            ),
+        })
         .option('experimental-acp', {
           type: 'boolean',
           description: 'Starts the agent in ACP mode',
@@ -177,7 +196,8 @@ export async function parseArguments(
           type: 'array',
           string: true,
           nargs: 1,
-          description: 'Tools that are allowed to run without confirmation',
+          description:
+            '[DEPRECATED: Use Policy Engine instead See https://geminicli.com/docs/core/policy-engine] Tools that are allowed to run without confirmation',
           coerce: (tools: string[]) =>
             // Handle comma-separated values
             tools.flatMap((tool) => tool.split(',').map((t) => t.trim())),
@@ -437,6 +457,7 @@ export async function loadCliConfig(
   }
 
   const memoryImportFormat = settings.context?.importFormat || 'tree';
+  const includeDirectoryTree = settings.context?.includeDirectoryTree ?? true;
 
   const ideMode = settings.ide?.enabled ?? false;
 
@@ -445,7 +466,11 @@ export async function loadCliConfig(
     process.env['VITEST'] === 'true'
       ? false
       : (settings.security?.folderTrust?.enabled ?? false);
-  const trustedFolder = isWorkspaceTrusted(settings, cwd)?.isTrusted ?? false;
+  const trustedFolder =
+    isWorkspaceTrusted(settings, cwd, undefined, {
+      prompt: argv.prompt,
+      query: argv.query,
+    })?.isTrusted ?? false;
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
@@ -533,11 +558,13 @@ export async function loadCliConfig(
         break;
       case 'plan':
         if (!(settings.experimental?.plan ?? false)) {
-          throw new Error(
-            'Approval mode "plan" is only available when experimental.plan is enabled.',
+          debugLogger.warn(
+            'Approval mode "plan" is only available when experimental.plan is enabled. Falling back to "default".',
           );
+          approvalMode = ApprovalMode.DEFAULT;
+        } else {
+          approvalMode = ApprovalMode.PLAN;
         }
-        approvalMode = ApprovalMode.PLAN;
         break;
       case 'default':
         approvalMode = ApprovalMode.DEFAULT;
@@ -602,8 +629,7 @@ export async function loadCliConfig(
   const interactive =
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
-    (!isHeadlessMode({ prompt: argv.prompt }) &&
-      !argv.query &&
+    (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
       !argv.isCommand);
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
@@ -666,11 +692,20 @@ export async function loadCliConfig(
       ...settings.mcp,
       allowed: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
     },
+    policyPaths: argv.policy,
   };
+
+  const { workspacePoliciesDir, policyUpdateConfirmationRequest } =
+    await resolveWorkspacePolicyState({
+      cwd,
+      trustedFolder,
+      interactive,
+    });
 
   const policyEngineConfig = await createPolicyEngineConfig(
     effectiveSettings,
     approvalMode,
+    workspacePoliciesDir,
   );
   policyEngineConfig.nonInteractive = !interactive;
 
@@ -724,6 +759,7 @@ export async function loadCliConfig(
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     targetDir: cwd,
+    includeDirectoryTree,
     includeDirectories,
     loadMemoryFromIncludeDirectories:
       settings.context?.loadMemoryFromIncludeDirectories || false,
@@ -733,6 +769,7 @@ export async function loadCliConfig(
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
+    policyUpdateConfirmationRequest,
     excludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
@@ -789,10 +826,13 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
+    directWebFetch: settings.experimental?.directWebFetch,
+    planSettings: settings.general?.plan,
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
+    modelSteering: settings.experimental?.modelSteering,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
@@ -809,7 +849,6 @@ export async function loadCliConfig(
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
-    enablePromptCompletion: settings.general?.enablePromptCompletion,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
@@ -820,6 +859,7 @@ export async function loadCliConfig(
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
+    maxAttempts: settings.general?.maxAttempts,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     rawOutput: argv.rawOutput,
@@ -839,6 +879,7 @@ export async function loadCliConfig(
         agents: refreshedSettings.merged.agents,
       };
     },
+    enableConseca: settings.security?.enableConseca,
   });
 }
 

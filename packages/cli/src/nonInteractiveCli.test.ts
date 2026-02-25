@@ -20,6 +20,7 @@ import {
   uiTelemetryService,
   FatalInputError,
   CoreEvent,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
@@ -327,7 +328,7 @@ describe('runNonInteractive', () => {
     const toolResponse: Part[] = [{ text: 'Tool response' }];
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: {
           callId: 'tool-1',
           name: 'testTool',
@@ -403,7 +404,7 @@ describe('runNonInteractive', () => {
     // 2. Mock the execution of the tools. We just need them to succeed.
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: toolCallEvent.value, // This is generic enough for both calls
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -469,7 +470,7 @@ describe('runNonInteractive', () => {
     };
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: {
           callId: 'tool-1',
           name: 'errorTool',
@@ -573,7 +574,7 @@ describe('runNonInteractive', () => {
     };
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: {
           callId: 'tool-1',
           name: 'nonexistentTool',
@@ -748,7 +749,7 @@ describe('runNonInteractive', () => {
     const toolResponse: Part[] = [{ text: 'Tool executed successfully' }];
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: {
           callId: 'tool-1',
           name: 'testTool',
@@ -1344,7 +1345,7 @@ describe('runNonInteractive', () => {
     const toolResponse: Part[] = [{ text: 'file.txt' }];
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: {
           callId: 'tool-shell-1',
           name: 'ShellTool',
@@ -1543,7 +1544,7 @@ describe('runNonInteractive', () => {
 
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: toolCallEvent.value,
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -1735,7 +1736,7 @@ describe('runNonInteractive', () => {
     };
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: toolCallEvent.value,
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -1818,7 +1819,7 @@ describe('runNonInteractive', () => {
     // Mock tool execution returning STOP_EXECUTION
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: toolCallEvent.value,
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -1880,7 +1881,7 @@ describe('runNonInteractive', () => {
 
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: toolCallEvent.value,
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -1944,7 +1945,7 @@ describe('runNonInteractive', () => {
 
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: toolCallEvent.value,
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -2187,7 +2188,7 @@ describe('runNonInteractive', () => {
       // Mock the scheduler to return a cancelled status
       mockSchedulerSchedule.mockResolvedValue([
         {
-          status: 'cancelled',
+          status: CoreToolCallStatus.Cancelled,
           request: toolCallEvent.value,
           tool: {} as AnyDeclarativeTool,
           invocation: {} as AnyToolInvocation,

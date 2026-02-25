@@ -78,10 +78,12 @@ export const getLatestGitHubRelease = async (
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const releaseTag = (await response.json()).tag_name;
     if (!releaseTag) {
       throw new Error(`Response did not include tag_name field`);
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return releaseTag;
   } catch (_error) {
     debugLogger.debug(

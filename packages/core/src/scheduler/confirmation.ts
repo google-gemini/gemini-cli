@@ -17,7 +17,11 @@ import {
   type ToolConfirmationPayload,
   type ToolCallConfirmationDetails,
 } from '../tools/tools.js';
-import type { ValidatingToolCall, WaitingToolCall } from './types.js';
+import {
+  type ValidatingToolCall,
+  type WaitingToolCall,
+  CoreToolCallStatus,
+} from './types.js';
 import type { Config } from '../config/config.js';
 import type { SchedulerStateManager } from './state-manager.js';
 import type { ToolModificationHandler } from './tool-modifier.js';
@@ -55,7 +59,7 @@ export interface ResolutionResult {
  * @param correlationId The correlationId to match.
  * @param signal An AbortSignal to cancel the wait and cleanup listeners.
  */
-export async function awaitConfirmation(
+async function awaitConfirmation(
   messageBus: MessageBus,
   correlationId: string,
   signal: AbortSignal,
@@ -145,7 +149,7 @@ export async function resolveConfirmation(
     const ideConfirmation =
       'ideConfirmation' in details ? details.ideConfirmation : undefined;
 
-    state.updateStatus(callId, 'awaiting_approval', {
+    state.updateStatus(callId, CoreToolCallStatus.AwaitingApproval, {
       confirmationDetails: serializableDetails,
       correlationId,
     });

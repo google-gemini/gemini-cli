@@ -13,6 +13,7 @@ import type {
   ConversationRecord,
 } from '@google/gemini-cli-core';
 import {
+  CoreToolCallStatus,
   AuthType,
   logToolCall,
   convertToFunctionResponse,
@@ -34,11 +35,19 @@ import {
   startupProfiler,
   Kind,
   partListUnionToString,
+  LlmRole,
+  ApprovalMode,
+  getVersion,
+  convertSessionToClientHistory,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
 import { getAcpErrorMessage } from './acpErrors.js';
 import { Readable, Writable } from 'node:stream';
+
+function hasMeta(obj: unknown): obj is { _meta?: Record<string, unknown> } {
+  return typeof obj === 'object' && obj !== null && '_meta' in obj;
+}
 import type { Content, Part, FunctionCall } from '@google/genai';
 import type { LoadedSettings } from '../config/settings.js';
 import { SettingScope, loadSettings } from '../config/settings.js';
@@ -50,10 +59,7 @@ import { randomUUID } from 'node:crypto';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
 import { runExitCleanup } from '../utils/cleanup.js';
-import {
-  SessionSelector,
-  convertSessionToHistoryFormats,
-} from '../utils/sessionUtils.js';
+import { SessionSelector } from '../utils/sessionUtils.js';
 
 export async function runZedIntegration(
   config: Config,
@@ -80,6 +86,7 @@ export async function runZedIntegration(
 export class GeminiAgent {
   private sessions: Map<string, Session> = new Map();
   private clientCapabilities: acp.ClientCapabilities | undefined;
+  private apiKey: string | undefined;
 
   constructor(
     private config: Config,
@@ -96,24 +103,35 @@ export class GeminiAgent {
       {
         id: AuthType.LOGIN_WITH_GOOGLE,
         name: 'Log in with Google',
-        description: null,
+        description: 'Log in with your Google account',
       },
       {
         id: AuthType.USE_GEMINI,
-        name: 'Use Gemini API key',
-        description:
-          'Requires setting the `GEMINI_API_KEY` environment variable',
+        name: 'Gemini API key',
+        description: 'Use an API key with Gemini Developer API',
+        _meta: {
+          'api-key': {
+            provider: 'google',
+          },
+        },
       },
       {
         id: AuthType.USE_VERTEX_AI,
         name: 'Vertex AI',
-        description: null,
+        description: 'Use an API key with Vertex AI GenAI API',
       },
     ];
 
+    await this.config.initialize();
+    const version = await getVersion();
     return {
       protocolVersion: acp.PROTOCOL_VERSION,
       authMethods,
+      agentInfo: {
+        name: 'gemini-cli',
+        title: 'Gemini CLI',
+        version,
+      },
       agentCapabilities: {
         loadSession: true,
         promptCapabilities: {
@@ -129,7 +147,8 @@ export class GeminiAgent {
     };
   }
 
-  async authenticate({ methodId }: acp.AuthenticateRequest): Promise<void> {
+  async authenticate(req: acp.AuthenticateRequest): Promise<void> {
+    const { methodId } = req;
     const method = z.nativeEnum(AuthType).parse(methodId);
     const selectedAuthType = this.settings.merged.security.auth.selectedType;
 
@@ -137,17 +156,21 @@ export class GeminiAgent {
     if (selectedAuthType && selectedAuthType !== method) {
       await clearCachedCredentialFile();
     }
+    // Check for api-key in _meta
+    const meta = hasMeta(req) ? req._meta : undefined;
+    const apiKey =
+      typeof meta?.['api-key'] === 'string' ? meta['api-key'] : undefined;
 
     // Refresh auth with the requested method
     // This will reuse existing credentials if they're valid,
     // or perform new authentication if needed
     try {
-      await this.config.refreshAuth(method);
+      if (apiKey) {
+        this.apiKey = apiKey;
+      }
+      await this.config.refreshAuth(method, apiKey ?? this.apiKey);
     } catch (e) {
-      throw new acp.RequestError(
-        getErrorStatus(e) || 401,
-        getAcpErrorMessage(e),
-      );
+      throw new acp.RequestError(-32000, getAcpErrorMessage(e));
     }
     this.settings.setValue(
       SettingScope.User,
@@ -175,7 +198,7 @@ export class GeminiAgent {
     let isAuthenticated = false;
     let authErrorMessage = '';
     try {
-      await config.refreshAuth(authType);
+      await config.refreshAuth(authType, this.apiKey);
       isAuthenticated = true;
 
       // Extra validation for Gemini API key
@@ -197,7 +220,7 @@ export class GeminiAgent {
 
     if (!isAuthenticated) {
       throw new acp.RequestError(
-        401,
+        -32000,
         authErrorMessage || 'Authentication required.',
       );
     }
@@ -222,6 +245,10 @@ export class GeminiAgent {
 
     return {
       sessionId,
+      modes: {
+        availableModes: buildAvailableModes(config.isPlanEnabled()),
+        currentModeId: config.getApprovalMode(),
+      },
     };
   }
 
@@ -250,9 +277,7 @@ export class GeminiAgent {
       config.setFileSystemService(acpFileSystemService);
     }
 
-    const { clientHistory } = convertSessionToHistoryFormats(
-      sessionData.messages,
-    );
+    const clientHistory = convertSessionToClientHistory(sessionData.messages);
 
     const geminiClient = config.getGeminiClient();
     await geminiClient.initialize();
@@ -273,7 +298,12 @@ export class GeminiAgent {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     session.streamHistory(sessionData.messages);
 
-    return {};
+    return {
+      modes: {
+        availableModes: buildAvailableModes(config.isPlanEnabled()),
+        currentModeId: config.getApprovalMode(),
+      },
+    };
   }
 
   private async initializeSessionConfig(
@@ -293,7 +323,7 @@ export class GeminiAgent {
     // This satisfies the security requirement to verify the user before executing
     // potentially unsafe server definitions.
     try {
-      await config.refreshAuth(selectedAuthType);
+      await config.refreshAuth(selectedAuthType, this.apiKey);
     } catch (e) {
       debugLogger.error(`Authentication failed: ${e}`);
       throw acp.RequestError.authRequired();
@@ -374,6 +404,16 @@ export class GeminiAgent {
     }
     return session.prompt(params);
   }
+
+  async setSessionMode(
+    params: acp.SetSessionModeRequest,
+  ): Promise<acp.SetSessionModeResponse> {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${params.sessionId}`);
+    }
+    return session.setMode(params.modeId);
+  }
 }
 
 export class Session {
@@ -393,6 +433,17 @@ export class Session {
 
     this.pendingPrompt.abort();
     this.pendingPrompt = null;
+  }
+
+  setMode(modeId: acp.SessionModeId): acp.SetSessionModeResponse {
+    const availableModes = buildAvailableModes(this.config.isPlanEnabled());
+    const mode = availableModes.find((m) => m.id === modeId);
+    if (!mode) {
+      throw new Error(`Invalid or unavailable mode: ${modeId}`);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    this.config.setApprovalMode(mode.id as ApprovalMode);
+    return {};
   }
 
   async streamHistory(messages: ConversationRecord['messages']): Promise<void> {
@@ -451,7 +502,10 @@ export class Session {
             await this.sendUpdate({
               sessionUpdate: 'tool_call',
               toolCallId: toolCall.id,
-              status: toolCall.status === 'success' ? 'completed' : 'failed',
+              status:
+                toolCall.status === CoreToolCallStatus.Success
+                  ? 'completed'
+                  : 'failed',
               title: toolCall.displayName || toolCall.name,
               content: toolCallContent,
               kind: tool ? toAcpToolKind(tool.kind) : 'other',
@@ -477,24 +531,28 @@ export class Session {
     while (nextMessage !== null) {
       if (pendingSend.signal.aborted) {
         chat.addHistory(nextMessage);
-        return { stopReason: 'cancelled' };
+        return { stopReason: CoreToolCallStatus.Cancelled };
       }
 
       const functionCalls: FunctionCall[] = [];
 
       try {
-        const model = resolveModel(this.config.getModel());
+        const model = resolveModel(
+          this.config.getModel(),
+          (await this.config.getGemini31Launched?.()) ?? false,
+        );
         const responseStream = await chat.sendMessageStream(
           { model },
           nextMessage?.parts ?? [],
           promptId,
           pendingSend.signal,
+          LlmRole.MAIN,
         );
         nextMessage = null;
 
         for await (const resp of responseStream) {
           if (pendingSend.signal.aborted) {
-            return { stopReason: 'cancelled' };
+            return { stopReason: CoreToolCallStatus.Cancelled };
           }
 
           if (
@@ -529,7 +587,7 @@ export class Session {
         }
 
         if (pendingSend.signal.aborted) {
-          return { stopReason: 'cancelled' };
+          return { stopReason: CoreToolCallStatus.Cancelled };
         }
       } catch (error) {
         if (getErrorStatus(error) === 429) {
@@ -543,7 +601,7 @@ export class Session {
           pendingSend.signal.aborted ||
           (error instanceof Error && error.name === 'AbortError')
         ) {
-          return { stopReason: 'cancelled' };
+          return { stopReason: CoreToolCallStatus.Cancelled };
         }
 
         throw new acp.RequestError(
@@ -645,6 +703,13 @@ export class Session {
             path: confirmationDetails.fileName,
             oldText: confirmationDetails.originalContent,
             newText: confirmationDetails.newContent,
+            _meta: {
+              kind: !confirmationDetails.originalContent
+                ? 'add'
+                : confirmationDetails.newContent === ''
+                  ? 'delete'
+                  : 'modify',
+            },
           });
         }
 
@@ -661,9 +726,10 @@ export class Session {
           },
         };
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const output = await this.connection.requestPermission(params);
         const outcome =
-          output.outcome.outcome === 'cancelled'
+          output.outcome.outcome === CoreToolCallStatus.Cancelled
             ? ToolConfirmationOutcome.Cancel
             : z
                 .nativeEnum(ToolConfirmationOutcome)
@@ -728,7 +794,7 @@ export class Session {
 
       this.chat.recordCompletedToolCalls(this.config.getActiveModel(), [
         {
-          status: 'success',
+          status: CoreToolCallStatus.Success,
           request: {
             callId,
             name: fc.name,
@@ -773,7 +839,7 @@ export class Session {
 
       this.chat.recordCompletedToolCalls(this.config.getActiveModel(), [
         {
-          status: 'error',
+          status: CoreToolCallStatus.Error,
           request: {
             callId,
             name: fc.name,
@@ -1165,6 +1231,13 @@ function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
           path: toolResult.returnDisplay.fileName,
           oldText: toolResult.returnDisplay.originalContent,
           newText: toolResult.returnDisplay.newContent,
+          _meta: {
+            kind: !toolResult.returnDisplay.originalContent
+              ? 'add'
+              : toolResult.returnDisplay.newContent === ''
+                ? 'delete'
+                : 'modify',
+          },
         };
       }
       return null;
@@ -1253,16 +1326,48 @@ function toAcpToolKind(kind: Kind): acp.ToolKind {
   switch (kind) {
     case Kind.Read:
     case Kind.Edit:
+    case Kind.Execute:
+    case Kind.Search:
     case Kind.Delete:
     case Kind.Move:
-    case Kind.Search:
-    case Kind.Execute:
     case Kind.Think:
     case Kind.Fetch:
+    case Kind.SwitchMode:
     case Kind.Other:
       return kind as acp.ToolKind;
+    case Kind.Plan:
     case Kind.Communicate:
     default:
       return 'other';
   }
+}
+
+function buildAvailableModes(isPlanEnabled: boolean): acp.SessionMode[] {
+  const modes: acp.SessionMode[] = [
+    {
+      id: ApprovalMode.DEFAULT,
+      name: 'Default',
+      description: 'Prompts for approval',
+    },
+    {
+      id: ApprovalMode.AUTO_EDIT,
+      name: 'Auto Edit',
+      description: 'Auto-approves edit tools',
+    },
+    {
+      id: ApprovalMode.YOLO,
+      name: 'YOLO',
+      description: 'Auto-approves all tools',
+    },
+  ];
+
+  if (isPlanEnabled) {
+    modes.push({
+      id: ApprovalMode.PLAN,
+      name: 'Plan',
+      description: 'Read-only mode',
+    });
+  }
+
+  return modes;
 }

@@ -38,6 +38,37 @@ folder, a dialog will automatically appear, prompting you to make a choice:
 Your choice is saved in a central file (`~/.gemini/trustedFolders.json`), so you
 will only be asked once per folder.
 
+## Understanding folder contents: The discovery phase
+
+Before you make a choice, the Gemini CLI performs a **discovery phase** to scan
+the folder for potential configurations. This information is displayed in the
+trust dialog to help you make an informed decision.
+
+The discovery UI lists the following categories of items found in the project:
+
+- **Commands**: Custom `.toml` command definitions that add new functionality.
+- **MCP Servers**: Configured Model Context Protocol servers that the CLI will
+  attempt to connect to.
+- **Hooks**: System or custom hooks that can intercept and modify CLI behavior.
+- **Skills**: Local agent skills that provide specialized capabilities.
+- **Setting overrides**: Any project-specific configurations that override your
+  global user settings.
+
+### Security warnings and errors
+
+The trust dialog also highlights critical information that requires your
+attention:
+
+- **Security Warnings**: The CLI will explicitly flag potentially dangerous
+  settings, such as auto-approving certain tools or disabling the security
+  sandbox.
+- **Discovery Errors**: If the CLI encounters issues while scanning the folder
+  (e.g., a malformed `settings.json` file), these errors will be displayed
+  prominently.
+
+By reviewing these details, you can ensure that you only grant trust to projects
+that you know are safe.
+
 ## Why trust matters: The impact of an untrusted workspace
 
 When a folder is **untrusted**, the Gemini CLI runs in a restricted "safe mode"

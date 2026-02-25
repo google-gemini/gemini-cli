@@ -20,6 +20,7 @@ import {
   ApprovalMode,
   parseAndFormatApiError,
   ToolConfirmationOutcome,
+  MessageBusType,
   promptIdContext,
   tokenLimit,
   debugLogger,
@@ -32,6 +33,10 @@ import {
   ValidationRequiredError,
   coreEvents,
   CoreEvent,
+  CoreToolCallStatus,
+  buildUserSteeringHintPrompt,
+  generateSteeringAckMessage,
+  getPlanModeExitMessage,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -53,11 +58,12 @@ import type {
   HistoryItemThinking,
   HistoryItemWithoutId,
   HistoryItemToolGroup,
+  HistoryItemInfo,
   IndividualToolCallDisplay,
   SlashCommandProcessorResult,
   HistoryItemModel,
 } from '../types.js';
-import { StreamingState, MessageType, ToolCallStatus } from '../types.js';
+import { StreamingState, MessageType } from '../types.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
@@ -76,6 +82,8 @@ import {
   type TrackedWaitingToolCall,
   type TrackedExecutingToolCall,
 } from './useToolScheduler.js';
+import { theme } from '../semantic-colors.js';
+import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
@@ -125,16 +133,18 @@ function calculateStreamingState(
   isResponding: boolean,
   toolCalls: TrackedToolCall[],
 ): StreamingState {
-  if (toolCalls.some((tc) => tc.status === 'awaiting_approval')) {
+  if (
+    toolCalls.some((tc) => tc.status === CoreToolCallStatus.AwaitingApproval)
+  ) {
     return StreamingState.WaitingForConfirmation;
   }
 
   const isAnyToolActive = toolCalls.some((tc) => {
     // These statuses indicate active processing
     if (
-      tc.status === 'executing' ||
-      tc.status === 'scheduled' ||
-      tc.status === 'validating'
+      tc.status === CoreToolCallStatus.Executing ||
+      tc.status === CoreToolCallStatus.Scheduled ||
+      tc.status === CoreToolCallStatus.Validating
     ) {
       return true;
     }
@@ -142,9 +152,9 @@ function calculateStreamingState(
     // Terminal statuses (success, error, cancelled) still count as "Responding"
     // if the result hasn't been submitted back to Gemini yet.
     if (
-      tc.status === 'success' ||
-      tc.status === 'error' ||
-      tc.status === 'cancelled'
+      tc.status === CoreToolCallStatus.Success ||
+      tc.status === CoreToolCallStatus.Error ||
+      tc.status === CoreToolCallStatus.Cancelled
     ) {
       return !(tc as TrackedCompletedToolCall | TrackedCancelledToolCall)
         .responseSubmittedToGemini;
@@ -185,6 +195,7 @@ export const useGeminiStream = (
   terminalWidth: number,
   terminalHeight: number,
   isShellFocused?: boolean,
+  consumeUserHint?: () => string | null,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
@@ -193,6 +204,9 @@ export const useGeminiStream = (
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
+  const previousApprovalModeRef = useRef<ApprovalMode>(
+    config.getApprovalMode(),
+  );
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [thought, thoughtRef, setThought] =
     useStateAndRef<ThoughtSummary | null>(null);
@@ -246,6 +260,8 @@ export const useGeminiStream = (
             mapTrackedToolCallsToDisplay(toolsToPush as TrackedToolCall[], {
               borderTop: isFirstToolInGroupRef.current,
               borderBottom: true,
+              borderColor: theme.border.default,
+              borderDimColor: false,
             }),
           );
         }
@@ -284,6 +300,45 @@ export const useGeminiStream = (
     },
     config,
     getPreferredEditor,
+  );
+
+  const activeToolPtyId = useMemo(() => {
+    const executingShellTool = toolCalls.find(
+      (tc) =>
+        tc.status === 'executing' && tc.request.name === 'run_shell_command',
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return (executingShellTool as TrackedExecutingToolCall | undefined)?.pid;
+  }, [toolCalls]);
+
+  const onExec = useCallback(async (done: Promise<void>) => {
+    setIsResponding(true);
+    await done;
+    setIsResponding(false);
+  }, []);
+
+  const {
+    handleShellCommand,
+    activeShellPtyId,
+    lastShellOutputTime,
+    backgroundShellCount,
+    isBackgroundShellVisible,
+    toggleBackgroundShell,
+    backgroundCurrentShell,
+    registerBackgroundShell,
+    dismissBackgroundShell,
+    backgroundShells,
+  } = useShellCommandProcessor(
+    addItem,
+    setPendingHistoryItem,
+    onExec,
+    onDebugMessage,
+    config,
+    geminiClient,
+    setShellInputFocused,
+    terminalWidth,
+    terminalHeight,
+    activeToolPtyId,
   );
 
   const streamingState = useMemo(
@@ -343,6 +398,13 @@ export const useGeminiStream = (
         const historyItem = mapTrackedToolCallsToDisplay(tc, {
           borderTop: isFirst,
           borderBottom: isLastInBatch,
+          ...getToolGroupBorderAppearance(
+            { type: 'tool_group', tools: toolCalls },
+            activeShellPtyId,
+            !!isShellFocused,
+            [],
+            backgroundShells,
+          ),
         });
         addItem(historyItem);
         isFirst = false;
@@ -358,6 +420,9 @@ export const useGeminiStream = (
     setPushedToolCallIds,
     setIsFirstToolInGroup,
     addItem,
+    activeShellPtyId,
+    isShellFocused,
+    backgroundShells,
   ]);
 
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
@@ -367,11 +432,20 @@ export const useGeminiStream = (
 
     const items: HistoryItemWithoutId[] = [];
 
+    const appearance = getToolGroupBorderAppearance(
+      { type: 'tool_group', tools: toolCalls },
+      activeShellPtyId,
+      !!isShellFocused,
+      [],
+      backgroundShells,
+    );
+
     if (remainingTools.length > 0) {
       items.push(
         mapTrackedToolCallsToDisplay(remainingTools, {
           borderTop: pushedToolCallIds.size === 0,
           borderBottom: false, // Stay open to connect with the slice below
+          ...appearance,
         }),
       );
     }
@@ -419,20 +493,18 @@ export const useGeminiStream = (
         tools: [] as IndividualToolCallDisplay[],
         borderTop: false,
         borderBottom: true,
+        ...appearance,
       });
     }
 
     return items;
-  }, [toolCalls, pushedToolCallIds]);
-
-  const activeToolPtyId = useMemo(() => {
-    const executingShellTool = toolCalls.find(
-      (tc) =>
-        tc.status === 'executing' && tc.request.name === 'run_shell_command',
-    );
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (executingShellTool as TrackedExecutingToolCall | undefined)?.pid;
-  }, [toolCalls]);
+  }, [
+    toolCalls,
+    pushedToolCallIds,
+    activeShellPtyId,
+    isShellFocused,
+    backgroundShells,
+  ]);
 
   const lastQueryRef = useRef<PartListUnion | null>(null);
   const lastPromptIdRef = useRef<string | null>(null);
@@ -443,36 +515,6 @@ export const useGeminiStream = (
   ] = useState<{
     onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
   } | null>(null);
-
-  const onExec = useCallback(async (done: Promise<void>) => {
-    setIsResponding(true);
-    await done;
-    setIsResponding(false);
-  }, []);
-
-  const {
-    handleShellCommand,
-    activeShellPtyId,
-    lastShellOutputTime,
-    backgroundShellCount,
-    isBackgroundShellVisible,
-    toggleBackgroundShell,
-    backgroundCurrentShell,
-    registerBackgroundShell,
-    dismissBackgroundShell,
-    backgroundShells,
-  } = useShellCommandProcessor(
-    addItem,
-    setPendingHistoryItem,
-    onExec,
-    onDebugMessage,
-    config,
-    geminiClient,
-    setShellInputFocused,
-    terminalWidth,
-    terminalHeight,
-    activeToolPtyId,
-  );
 
   const activePtyId = activeShellPtyId || activeToolPtyId;
 
@@ -561,7 +603,7 @@ export const useGeminiStream = (
           if (tool.name === SHELL_COMMAND_NAME) {
             return {
               ...tool,
-              status: ToolCallStatus.Canceled,
+              status: CoreToolCallStatus.Cancelled,
               resultDisplay: tool.resultDisplay,
             };
           }
@@ -785,16 +827,18 @@ export const useGeminiStream = (
         // broken up so that there are more "statically" rendered.
         const beforeText = newGeminiMessageBuffer.substring(0, splitPoint);
         const afterText = newGeminiMessageBuffer.substring(splitPoint);
-        addItem(
-          {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            type: pendingHistoryItemRef.current?.type as
-              | 'gemini'
-              | 'gemini_content',
-            text: beforeText,
-          },
-          userMessageTimestamp,
-        );
+        if (beforeText.length > 0) {
+          addItem(
+            {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              type: pendingHistoryItemRef.current?.type as
+                | 'gemini'
+                | 'gemini_content',
+              text: beforeText,
+            },
+            userMessageTimestamp,
+          );
+        }
         setPendingHistoryItem({ type: 'gemini_content', text: afterText });
         newGeminiMessageBuffer = afterText;
       }
@@ -829,12 +873,14 @@ export const useGeminiStream = (
         if (pendingHistoryItemRef.current.type === 'tool_group') {
           const updatedTools = pendingHistoryItemRef.current.tools.map(
             (tool) =>
-              tool.status === ToolCallStatus.Pending ||
-              tool.status === ToolCallStatus.Confirming ||
-              tool.status === ToolCallStatus.Executing
-                ? { ...tool, status: ToolCallStatus.Canceled }
+              tool.status === CoreToolCallStatus.Validating ||
+              tool.status === CoreToolCallStatus.Scheduled ||
+              tool.status === CoreToolCallStatus.AwaitingApproval ||
+              tool.status === CoreToolCallStatus.Executing
+                ? { ...tool, status: CoreToolCallStatus.Cancelled }
                 : tool,
           );
+
           const pendingItem: HistoryItemToolGroup = {
             ...pendingHistoryItemRef.current,
             tools: updatedTools,
@@ -925,6 +971,10 @@ export const useGeminiStream = (
           'Response stopped due to prohibited image content.',
         [FinishReason.NO_IMAGE]:
           'Response stopped because no image was generated.',
+        [FinishReason.IMAGE_RECITATION]:
+          'Response stopped due to image recitation policy.',
+        [FinishReason.IMAGE_OTHER]:
+          'Response stopped due to other image-related reasons.',
       };
 
       const message = finishReasonMessages[finishReason];
@@ -1389,6 +1439,34 @@ export const useGeminiStream = (
 
   const handleApprovalModeChange = useCallback(
     async (newApprovalMode: ApprovalMode) => {
+      if (
+        previousApprovalModeRef.current === ApprovalMode.PLAN &&
+        newApprovalMode !== ApprovalMode.PLAN &&
+        streamingState === StreamingState.Idle
+      ) {
+        if (geminiClient) {
+          try {
+            await geminiClient.addHistory({
+              role: 'user',
+              parts: [
+                {
+                  text: getPlanModeExitMessage(newApprovalMode, true),
+                },
+              ],
+            });
+          } catch (error) {
+            onDebugMessage(
+              `Failed to notify model of Plan Mode exit: ${getErrorMessage(error)}`,
+            );
+            addItem({
+              type: MessageType.ERROR,
+              text: 'Failed to update the model about exiting Plan Mode. The model might be out of sync. Please consider restarting the session if you see unexpected behavior.',
+            });
+          }
+        }
+      }
+      previousApprovalModeRef.current = newApprovalMode;
+
       // Auto-approve pending tool calls when switching to auto-approval modes
       if (
         newApprovalMode === ApprovalMode.YOLO ||
@@ -1408,10 +1486,15 @@ export const useGeminiStream = (
 
         // Process pending tool calls sequentially to reduce UI chaos
         for (const call of awaitingApprovalCalls) {
-          const details = call.confirmationDetails;
-          if (details && 'onConfirm' in details) {
+          if (call.correlationId) {
             try {
-              await details.onConfirm(ToolConfirmationOutcome.ProceedOnce);
+              await config.getMessageBus().publish({
+                type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+                correlationId: call.correlationId,
+                confirmed: true,
+                requiresUserConfirmation: false,
+                outcome: ToolConfirmationOutcome.ProceedOnce,
+              });
             } catch (error) {
               debugLogger.warn(
                 `Failed to auto-approve tool call ${call.request.callId}:`,
@@ -1422,7 +1505,7 @@ export const useGeminiStream = (
         }
       }
     },
-    [toolCalls],
+    [config, toolCalls, geminiClient, streamingState, addItem, onDebugMessage],
   );
 
   const handleCompletedTools = useCallback(
@@ -1524,7 +1607,7 @@ export const useGeminiStream = (
 
       // If all the tools were cancelled, don't submit a response to Gemini.
       const allToolsCancelled = geminiTools.every(
-        (tc) => tc.status === 'cancelled',
+        (tc) => tc.status === CoreToolCallStatus.Cancelled,
       );
 
       if (allToolsCancelled) {
@@ -1561,6 +1644,29 @@ export const useGeminiStream = (
       const responsesToSend: Part[] = geminiTools.flatMap(
         (toolCall) => toolCall.response.responseParts,
       );
+
+      if (consumeUserHint) {
+        const userHint = consumeUserHint();
+        if (userHint && userHint.trim().length > 0) {
+          const hintText = userHint.trim();
+          responsesToSend.unshift({
+            text: buildUserSteeringHintPrompt(hintText),
+          });
+          void generateSteeringAckMessage(
+            config.getBaseLlmClient(),
+            hintText,
+          ).then((ackText) => {
+            addItem({
+              type: 'info',
+              icon: '· ',
+              color: theme.text.secondary,
+              marginBottom: 1,
+              text: ackText,
+            } as HistoryItemInfo);
+          });
+        }
+      }
+
       const callIdsToMarkAsSubmitted = geminiTools.map(
         (toolCall) => toolCall.request.callId,
       );
@@ -1593,6 +1699,8 @@ export const useGeminiStream = (
       modelSwitchedFromQuotaError,
       addItem,
       registerBackgroundShell,
+      consumeUserHint,
+      config,
     ],
   );
 
@@ -1612,7 +1720,7 @@ export const useGeminiStream = (
       const restorableToolCalls = toolCalls.filter(
         (toolCall) =>
           EDIT_TOOL_NAMES.has(toolCall.request.name) &&
-          toolCall.status === 'awaiting_approval',
+          toolCall.status === CoreToolCallStatus.AwaitingApproval,
       );
 
       if (restorableToolCalls.length > 0) {

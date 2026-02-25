@@ -1,17 +1,33 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`<ChecklistItem /> > renders { status: 'cancelled', label: 'Skipped this' } item correctly 1`] = `"✗ Skipped this"`;
+exports[`<ChecklistItem /> > renders { status: 'cancelled', label: 'Skipped this' } item correctly 1`] = `
+"✗ Skipped this
+"
+`;
 
-exports[`<ChecklistItem /> > renders { status: 'completed', label: 'Done this' } item correctly 1`] = `"✓ Done this"`;
+exports[`<ChecklistItem /> > renders { status: 'completed', label: 'Done this' } item correctly 1`] = `
+"✓ Done this
+"
+`;
 
-exports[`<ChecklistItem /> > renders { status: 'in_progress', label: 'Doing this' } item correctly 1`] = `"» Doing this"`;
+exports[`<ChecklistItem /> > renders { status: 'in_progress', label: 'Doing this' } item correctly 1`] = `
+"» Doing this
+"
+`;
 
-exports[`<ChecklistItem /> > renders { status: 'pending', label: 'Do this' } item correctly 1`] = `"☐ Do this"`;
+exports[`<ChecklistItem /> > renders { status: 'pending', label: 'Do this' } item correctly 1`] = `
+"☐ Do this
+"
+`;
 
-exports[`<ChecklistItem /> > truncates long text when wrap="truncate" 1`] = `"» This is a very long text th…"`;
+exports[`<ChecklistItem /> > truncates long text when wrap="truncate" 1`] = `
+"» This is a very long text th…
+"
+`;
 
 exports[`<ChecklistItem /> > wraps long text by default 1`] = `
 "» This is a very long text
   that should wrap because the
-  default behavior is wrapping"
+  default behavior is wrapping
+"
 `;

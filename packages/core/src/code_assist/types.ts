@@ -295,6 +295,7 @@ export interface ConversationInteraction {
   status?: ActionStatus;
   interaction?: ConversationInteractionInteraction;
   acceptedLines?: string;
+  removedLines?: string;
   language?: string;
   isAgentic?: boolean;
 }
@@ -355,4 +356,5 @@ export const FetchAdminControlsResponseSchema = z.object({
   strictModeDisabled: z.boolean().optional(),
   mcpSetting: McpSettingSchema.optional(),
   cliFeatureSetting: CliFeatureSettingSchema.optional(),
+  adminControlsApplicable: z.boolean().optional(),
 });

@@ -1,23 +1,27 @@
-# Getting Started with Agent Skills
+# Get started with Agent Skills
 
-Agent Skills allow you to extend Gemini CLI with specialized expertise. This
-tutorial will guide you through creating your first skill and using it in a
-session.
+Agent Skills extend Gemini CLI with specialized expertise. In this guide, you'll
+learn how to create your first skill, bundle custom scripts, and activate them
+during a session.
 
-## 1. Create your first skill
+## How to create a skill
 
-A skill is a directory containing a `SKILL.md` file. Let's create an **API
-Auditor** skill that helps you verify if local or remote endpoints are
+A skill is defined by a directory containing a `SKILL.md` file. Let's create an
+**API Auditor** skill that helps you verify if local or remote endpoints are
 responding correctly.
 
-1.  **Create the skill directory structure:**
+### Create the directory structure
+
+1.  Run the following command to create the folders:
 
     ```bash
     mkdir -p .gemini/skills/api-auditor/scripts
     ```
 
-2.  **Create the `SKILL.md` file:** Create a file at
-    `.gemini/skills/api-auditor/SKILL.md` with the following content:
+### Create the definition
+
+1.  Create a file at `.gemini/skills/api-auditor/SKILL.md`. This tells the agent
+    _when_ to use the skill and _how_ to behave.
 
     ```markdown
     ---
@@ -40,9 +44,12 @@ responding correctly.
         without an `https://` protocol.
     ```
 
-3.  **Create the bundled Node.js script:** Create a file at
-    `.gemini/skills/api-auditor/scripts/audit.js`. This script will be used by
-    the agent to perform the actual check:
+### Add the tool logic
+
+Skills can bundle resources like scripts.
+
+1.  Create a file at `.gemini/skills/api-auditor/scripts/audit.js`. This is the
+    code the agent will run.
 
     ```javascript
     // .gemini/skills/api-auditor/scripts/audit.js
@@ -59,39 +66,37 @@ responding correctly.
       .catch((e) => console.error(`Result: Failed (${e.message})`));
     ```
 
-## 2. Verify the skill is discovered
+## How to verify discovery
 
-Use the `/skills` slash command (or `gemini skills list` from your terminal) to
-see if Gemini CLI has found your new skill.
+Gemini CLI automatically discovers skills in the `.gemini/skills` directory. You
+can also use `.agents/skills` as a more generic alternative. Check that it found
+your new skill.
 
-In a Gemini CLI session:
-
-```
-/skills list
-```
+**Command:** `/skills list`
 
 You should see `api-auditor` in the list of available skills.
 
-## 3. Use the skill in a chat
+## How to use the skill
 
-Now, let's see the skill in action. Start a new session and ask a question about
-an endpoint.
+Now, try it out. Start a new session and ask a question that triggers the
+skill's description.
 
-**User:** "Can you audit http://geminili.com"
+**User:** "Can you audit http://geminicli.com"
 
-Gemini will recognize the request matches the `api-auditor` description and will
-ask for your permission to activate it.
+Gemini recognizes the request matches the `api-auditor` description and asks for
+permission to activate it.
 
 **Model:** (After calling `activate_skill`) "I've activated the **api-auditor**
 skill. I'll run the audit script now..."
 
-Gemini will then use the `run_shell_command` tool to execute your bundled Node
+Gemini then uses the `run_shell_command` tool to execute your bundled Node
 script:
 
 `node .gemini/skills/api-auditor/scripts/audit.js http://geminili.com`
 
-## Next Steps
+## Next steps
 
-- Explore [Agent Skills Authoring Guide](../skills.md#creating-a-skill) to learn
-  about more advanced skill features.
+- Explore the
+  [Agent Skills Authoring Guide](../../cli/skills.md#creating-a-skill) to learn
+  about more advanced features.
 - Learn how to share skills via [Extensions](../../extensions/index.md).

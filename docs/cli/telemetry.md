@@ -93,7 +93,7 @@ Environment variables can be used to override the settings in the file.
 `true` or `1` will enable the feature. Any other value will disable it.
 
 For detailed information about all configuration options, see the
-[Configuration guide](../get-started/configuration.md).
+[Configuration guide](../reference/configuration.md).
 
 ## Google Cloud telemetry
 
@@ -275,9 +275,9 @@ For local development and debugging, you can capture telemetry data locally:
 The following section describes the structure of logs and metrics generated for
 Gemini CLI.
 
-The `session.id`, `installation.id`, and `user.email` (available only when
-authenticated with a Google account) are included as common attributes on all
-logs and metrics.
+The `session.id`, `installation.id`, `active_approval_mode`, and `user.email`
+(available only when authenticated with a Google account) are included as common
+attributes on all logs and metrics.
 
 ### Logs
 
@@ -360,7 +360,21 @@ Captures tool executions, output truncation, and Edit behavior.
     - `extension_name` (string, if applicable)
     - `extension_id` (string, if applicable)
     - `content_length` (int, if applicable)
-    - `metadata` (if applicable)
+    - `metadata` (if applicable), which includes for the `AskUser` tool:
+      - `ask_user` (object):
+        - `question_types` (array of strings)
+        - `ask_user_dismissed` (boolean)
+        - `ask_user_empty_submission` (boolean)
+        - `ask_user_answer_count` (number)
+      - `diffStat` (if applicable), which includes:
+        - `model_added_lines` (number)
+        - `model_removed_lines` (number)
+        - `model_added_chars` (number)
+        - `model_removed_chars` (number)
+        - `user_added_lines` (number)
+        - `user_removed_lines` (number)
+        - `user_added_chars` (number)
+        - `user_removed_chars` (number)
 
 - `gemini_cli.tool_output_truncated`: Output of a tool call was truncated.
   - **Attributes**:
@@ -473,6 +487,7 @@ Captures Gemini API requests, responses, and errors.
     - `reasoning` (string, optional)
     - `failed` (boolean)
     - `error_message` (string, optional)
+    - `approval_mode` (string)
 
 #### Chat and streaming
 
@@ -697,12 +712,14 @@ Routing latency/failures and slash-command selections.
   - **Attributes**:
     - `routing.decision_model` (string)
     - `routing.decision_source` (string)
+    - `routing.approval_mode` (string)
 
 - `gemini_cli.model_routing.failure.count` (Counter, Int): Counts model routing
   failures.
   - **Attributes**:
     - `routing.decision_source` (string)
     - `routing.error_message` (string)
+    - `routing.approval_mode` (string)
 
 ##### Agent runs
 

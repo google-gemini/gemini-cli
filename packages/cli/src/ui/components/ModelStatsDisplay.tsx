@@ -13,10 +13,17 @@ import {
   calculateCacheHitRate,
   calculateErrorRate,
 } from '../utils/computeStats.js';
-import { useSessionStats } from '../contexts/SessionContext.js';
+import {
+  useSessionStats,
+  type ModelMetrics,
+} from '../contexts/SessionContext.js';
 import { Table, type Column } from './Table.js';
 import { useSettings } from '../contexts/SettingsContext.js';
-import { getDisplayString, isAutoModel } from '@google/gemini-cli-core';
+import {
+  getDisplayString,
+  isAutoModel,
+  LlmRole,
+} from '@google/gemini-cli-core';
 import type { QuotaStats } from '../types.js';
 import { QuotaStatsInfo } from './QuotaStatsInfo.js';
 
@@ -25,8 +32,10 @@ interface StatRowData {
   isSection?: boolean;
   isSubtle?: boolean;
   // Dynamic keys for model values
-  [key: string]: string | React.ReactNode | boolean | undefined;
+  [key: string]: string | React.ReactNode | boolean | undefined | number;
 }
+
+type RoleMetrics = NonNullable<NonNullable<ModelMetrics['roles']>[LlmRole]>;
 
 interface ModelStatsDisplayProps {
   selectedAuthType?: string;
@@ -80,6 +89,22 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
   const hasCached = activeModels.some(
     ([, metrics]) => metrics.tokens.cached > 0,
   );
+
+  const allRoles = [
+    ...new Set(
+      activeModels.flatMap(([, metrics]) => Object.keys(metrics.roles ?? {})),
+    ),
+  ]
+    .filter((role): role is LlmRole => {
+      const validRoles: string[] = Object.values(LlmRole);
+      return validRoles.includes(role);
+    })
+    .sort((a, b) => {
+      if (a === b) return 0;
+      if (a === LlmRole.MAIN) return -1;
+      if (b === LlmRole.MAIN) return 1;
+      return a.localeCompare(b);
+    });
 
   // Helper to create a row with values for each model
   const createRow = (
@@ -203,6 +228,60 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
       { isSubtle: true },
     ),
   );
+
+  // Roles Section
+  if (allRoles.length > 0) {
+    // Spacer
+    rows.push({ metric: '' });
+    rows.push({ metric: 'Roles', isSection: true });
+
+    allRoles.forEach((role) => {
+      // Role Header Row
+      const roleHeaderRow: StatRowData = {
+        metric: role,
+        isSection: true,
+        color: theme.text.primary,
+      };
+      // We don't populate model values for the role header row
+      rows.push(roleHeaderRow);
+
+      const addRoleMetric = (
+        metric: string,
+        getValue: (r: RoleMetrics) => string | React.ReactNode,
+      ) => {
+        const row: StatRowData = {
+          metric,
+          isSubtle: true,
+        };
+        activeModels.forEach(([name, metrics]) => {
+          const roleMetrics = metrics.roles?.[role];
+          if (roleMetrics) {
+            row[name] = getValue(roleMetrics);
+          } else {
+            row[name] = <Text color={theme.text.secondary}>-</Text>;
+          }
+        });
+        rows.push(row);
+      };
+
+      addRoleMetric('Requests', (r) => r.totalRequests.toLocaleString());
+      addRoleMetric('Input', (r) => (
+        <Text color={theme.text.primary}>
+          {r.tokens.input.toLocaleString()}
+        </Text>
+      ));
+      addRoleMetric('Output', (r) => (
+        <Text color={theme.text.primary}>
+          {r.tokens.candidates.toLocaleString()}
+        </Text>
+      ));
+      addRoleMetric('Cache Reads', (r) => (
+        <Text color={theme.text.secondary}>
+          {r.tokens.cached.toLocaleString()}
+        </Text>
+      ));
+    });
+  }
 
   const columns: Array<Column<StatRowData>> = [
     {

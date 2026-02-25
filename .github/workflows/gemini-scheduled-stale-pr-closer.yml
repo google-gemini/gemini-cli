@@ -23,12 +23,10 @@ jobs:
     steps:
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
-        uses: 'actions/create-github-app-token@v1'
+        uses: 'actions/create-github-app-token@v2'
         with:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
-          owner: '${{ github.repository_owner }}'
-          repositories: 'gemini-cli'
 
       - name: 'Process Stale PRs'
         uses: 'actions/github-script@v7'
@@ -43,23 +41,56 @@ jobs:
 
             // 1. Fetch maintainers for verification
             let maintainerLogins = new Set();
-            let teamFetchSucceeded = false;
-            try {
-              const members = await github.paginate(github.rest.teams.listMembersInOrg, {
-                org: context.repo.owner,
-                team_slug: 'gemini-cli-maintainers'
-              });
-              maintainerLogins = new Set(members.map(m => m.login.toLowerCase()));
-              teamFetchSucceeded = true;
-              core.info(`Successfully fetched ${maintainerLogins.size} team members from gemini-cli-maintainers`);
-            } catch (e) {
-              core.warning(`Failed to fetch team members from gemini-cli-maintainers: ${e.message}. Falling back to author_association only.`);
+            const teams = ['gemini-cli-maintainers', 'gemini-cli-askmode-approvers', 'gemini-cli-docs'];
+
+            for (const team_slug of teams) {
+              try {
+                const members = await github.paginate(github.rest.teams.listMembersInOrg, {
+                  org: context.repo.owner,
+                  team_slug: team_slug
+                });
+                for (const m of members) maintainerLogins.add(m.login.toLowerCase());
+                core.info(`Successfully fetched ${members.length} team members from ${team_slug}`);
+              } catch (e) {
+                core.warning(`Failed to fetch team members from ${team_slug}: ${e.message}`);
+              }
             }
 
-            const isMaintainer = (login, assoc) => {
+            const isGooglerCache = new Map();
+            const isGoogler = async (login) => {
+              if (isGooglerCache.has(login)) return isGooglerCache.get(login);
+
+              try {
+                // Check membership in 'googlers' or 'google' orgs
+                const orgs = ['googlers', 'google'];
+                for (const org of orgs) {
+                  try {
+                    await github.rest.orgs.checkMembershipForUser({
+                      org: org,
+                      username: login
+                    });
+                    core.info(`User ${login} is a member of ${org} organization.`);
+                    isGooglerCache.set(login, true);
+                    return true;
+                  } catch (e) {
+                    // 404 just means they aren't a member, which is fine
+                    if (e.status !== 404) throw e;
+                  }
+                }
+              } catch (e) {
+                core.warning(`Failed to check org membership for ${login}: ${e.message}`);
+              }
+
+              isGooglerCache.set(login, false);
+              return false;
+            };
+
+            const isMaintainer = async (login, assoc) => {
               const isTeamMember = maintainerLogins.has(login.toLowerCase());
               const isRepoMaintainer = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(assoc);
-              return isTeamMember || isRepoMaintainer;
+              if (isTeamMember || isRepoMaintainer) return true;
+
+              return await isGoogler(login);
             };
 
             // 2. Determine which PRs to check
@@ -81,7 +112,7 @@ jobs:
             }
 
             for (const pr of prs) {
-              const maintainerPr = isMaintainer(pr.user.login, pr.author_association);
+              const maintainerPr = await isMaintainer(pr.user.login, pr.author_association);
               const isBot = pr.user.type === 'Bot' || pr.user.login.endsWith('[bot]');
 
               // Detection Logic for Linked Issues
@@ -175,7 +206,7 @@ jobs:
                     pull_number: pr.number
                   });
                   for (const r of reviews) {
-                    if (isMaintainer(r.user.login, r.author_association)) {
+                    if (await isMaintainer(r.user.login, r.author_association)) {
                       const d = new Date(r.submitted_at || r.updated_at);
                       if (d > lastActivity) lastActivity = d;
                     }
@@ -186,7 +217,7 @@ jobs:
                     issue_number: pr.number
                   });
                   for (const c of comments) {
-                    if (isMaintainer(c.user.login, c.author_association)) {
+                    if (await isMaintainer(c.user.login, c.author_association)) {
                       const d = new Date(c.updated_at);
                       if (d > lastActivity) lastActivity = d;
                     }

@@ -11,9 +11,13 @@ import { getBoundingBox, type DOMElement } from 'ink';
 import type React from 'react';
 
 // Mock ink
-vi.mock('ink', async () => ({
-  getBoundingBox: vi.fn(),
-}));
+vi.mock('ink', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ink')>();
+  return {
+    ...actual,
+    getBoundingBox: vi.fn(),
+  };
+});
 
 // Mock MouseContext
 const mockUseMouse = vi.fn();
@@ -31,7 +35,7 @@ describe('useMouseClick', () => {
     containerRef = { current: {} as DOMElement };
   });
 
-  it('should call handler with relative coordinates when click is inside bounds', () => {
+  it('should call handler with relative coordinates when click is inside bounds', async () => {
     vi.mocked(getBoundingBox).mockReturnValue({
       x: 10,
       y: 5,
@@ -39,7 +43,10 @@ describe('useMouseClick', () => {
       height: 10,
     } as unknown as ReturnType<typeof getBoundingBox>);
 
-    renderHook(() => useMouseClick(containerRef, handler));
+    const { unmount, waitUntilReady } = renderHook(() =>
+      useMouseClick(containerRef, handler),
+    );
+    await waitUntilReady();
 
     // Get the callback registered with useMouse
     expect(mockUseMouse).toHaveBeenCalled();
@@ -56,9 +63,10 @@ describe('useMouseClick', () => {
       5,
       2,
     );
+    unmount();
   });
 
-  it('should not call handler when click is outside bounds', () => {
+  it('should not call handler when click is outside bounds', async () => {
     vi.mocked(getBoundingBox).mockReturnValue({
       x: 10,
       y: 5,
@@ -66,11 +74,15 @@ describe('useMouseClick', () => {
       height: 10,
     } as unknown as ReturnType<typeof getBoundingBox>);
 
-    renderHook(() => useMouseClick(containerRef, handler));
+    const { unmount, waitUntilReady } = renderHook(() =>
+      useMouseClick(containerRef, handler),
+    );
+    await waitUntilReady();
     const callback = mockUseMouse.mock.calls[0][0];
 
     // Click outside: x=5 (col 6), y=7 (row 8) -> left of box
     callback({ name: 'left-press', col: 6, row: 8 });
     expect(handler).not.toHaveBeenCalled();
+    unmount();
   });
 });
