@@ -56,10 +56,6 @@ import {
 } from '../utils/commandUtils.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
-import {
-  DEFAULT_BACKGROUND_OPACITY,
-  DEFAULT_INPUT_BACKGROUND_OPACITY,
-} from '../constants.js';
 import { getSafeLowColorBackground } from '../themes/color-utils.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
@@ -226,7 +222,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     backgroundShells,
     backgroundShellHeight,
     shortcutsHelpVisible,
-    hintMode,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
   const { handlePress: registerPlainTabPress, resetCount: resetPlainTabPress } =
@@ -890,11 +885,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // We prioritize execution unless the user is explicitly selecting a different suggestion.
       if (
         completion.isPerfectMatch &&
-        completion.completionMode !== CompletionMode.AT &&
-        keyMatchers[Command.RETURN](key) &&
+        keyMatchers[Command.SUBMIT](key) &&
+        recentUnsafePasteTime === null &&
         (!completion.showSuggestions || completion.activeSuggestionIndex <= 0)
       ) {
         handleSubmit(buffer.text);
+        return true;
+      }
+
+      // Newline insertion
+      if (keyMatchers[Command.NEWLINE](key)) {
+        buffer.newline();
         return true;
       }
 
@@ -1075,12 +1076,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             handleSubmit(buffer.text);
           }
         }
-        return true;
-      }
-
-      // Newline insertion
-      if (keyMatchers[Command.NEWLINE](key)) {
-        buffer.newline();
         return true;
       }
 
@@ -1422,14 +1417,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         />
       ) : null}
       <HalfLinePaddedBox
-        backgroundBaseColor={
-          hintMode ? theme.text.accent : theme.text.secondary
-        }
-        backgroundOpacity={
-          showCursor
-            ? DEFAULT_INPUT_BACKGROUND_OPACITY
-            : DEFAULT_BACKGROUND_OPACITY
-        }
+        backgroundBaseColor={theme.background.input}
+        backgroundOpacity={1}
         useBackgroundColor={useBackgroundColor}
       >
         <Box
