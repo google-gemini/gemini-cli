@@ -45,8 +45,14 @@ export async function reportError(
   try {
     await fs.mkdir(reportingDir, { recursive: true });
   } catch {
-    // If we can't create the directory, fall back to os.tmpdir()
-    reportingDir = os.tmpdir();
+    // Fall back to a dedicated folder in the OS temp directory
+    reportingDir = path.join(os.tmpdir(), 'gemini-cli-error-reports');
+    try {
+      await fs.mkdir(reportingDir, { recursive: true });
+    } catch {
+      // Absolute worst-case fallback
+      reportingDir = os.tmpdir();
+    }
   }
 
   const reportPath = path.join(reportingDir, reportFileName);
