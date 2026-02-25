@@ -87,6 +87,36 @@ export const PYTHON_EXCLUDES: string[] = ['**/*.pyc', '**/*.pyo'];
 export const SYSTEM_FILE_EXCLUDES: string[] = ['**/.DS_Store', '**/.env'];
 
 /**
+ * Sensitive file patterns that should be strictly protected from access.
+ * These patterns cover common locations for API keys, credentials, and private keys.
+ */
+export const SENSITIVE_FILE_PATTERNS: string[] = [
+  '**/.env',
+  '**/.env.*',
+  '**/id_rsa',
+  '**/id_dsa',
+  '**/id_ed25519',
+  '**/id_ecdsa',
+  '**/*.pem',
+  '**/*.key',
+  '**/*.p12',
+  '**/*.pfx',
+  '**/*.crt',
+  '**/*.cer',
+  '**/*.der',
+  '**/terraform.tfstate',
+  '**/terraform.tfstate.backup',
+  '**/.aws/credentials',
+  '**/.aws/config',
+  '**/.npmrc',
+  '**/.netrc',
+  '**/docker-compose.override.yml',
+  '**/secrets/**',
+  '**/*.secret',
+  '**/*.credential',
+];
+
+/**
  * Comprehensive file exclusion patterns combining all common ignore patterns.
  * These patterns are compatible with glob ignore patterns.
  * Note: Media files (PDF, images) are not excluded here as they need special handling in read-many-files.
@@ -97,6 +127,7 @@ export const DEFAULT_FILE_EXCLUDES: string[] = [
   ...BINARY_FILE_PATTERNS,
   ...PYTHON_EXCLUDES,
   ...SYSTEM_FILE_EXCLUDES,
+  ...SENSITIVE_FILE_PATTERNS,
 ];
 
 /**
@@ -202,7 +233,12 @@ export class FileExclusions {
     // TODO: getCustomExcludes method needs to be implemented in Config interface
     const configPatterns = this.config?.getCustomExcludes?.() ?? [];
 
-    return [...corePatterns, ...configPatterns, ...additionalExcludes];
+    return [
+      ...corePatterns,
+      ...configPatterns,
+      ...additionalExcludes,
+      ...SENSITIVE_FILE_PATTERNS,
+    ];
   }
 
   /**

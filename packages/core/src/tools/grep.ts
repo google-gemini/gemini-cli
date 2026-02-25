@@ -22,6 +22,7 @@ import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import type { Config } from '../config/config.js';
 import type { FileExclusions } from '../utils/ignorePatterns.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { ToolErrorType } from './tool-error.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -79,6 +80,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 
   constructor(
     private readonly config: Config,
+    private readonly fileDiscoveryService: FileDiscoveryService,
     params: GrepToolParams,
     messageBus: MessageBus,
     _toolName?: string,
@@ -248,6 +250,22 @@ class GrepToolInvocation extends BaseToolInvocation<
         clearTimeout(timeoutId);
         signal.removeEventListener('abort', onAbort);
       }
+
+      // Filter matches to exclude sensitive files
+      const uniqueFiles = Array.from(
+        new Set(allMatches.map((m) => m.filePath)),
+      );
+      const absoluteFilePaths = uniqueFiles.map((f) =>
+        path.resolve(this.config.getTargetDir(), f),
+      );
+
+      // We always filter sensitive files
+      const allowedFiles =
+        this.fileDiscoveryService.filterFiles(absoluteFilePaths);
+      const allowedSet = new Set(allowedFiles);
+      allMatches = allMatches.filter((m) =>
+        allowedSet.has(path.resolve(this.config.getTargetDir(), m.filePath)),
+      );
 
       let searchLocationDescription: string;
       if (searchDirAbs === null) {
@@ -588,6 +606,8 @@ class GrepToolInvocation extends BaseToolInvocation<
  */
 export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
   static readonly Name = GREP_TOOL_NAME;
+  private readonly fileDiscoveryService: FileDiscoveryService;
+
   constructor(
     private readonly config: Config,
     messageBus: MessageBus,
@@ -601,6 +621,10 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
       messageBus,
       true,
       false,
+    );
+    this.fileDiscoveryService = new FileDiscoveryService(
+      config.getTargetDir(),
+      config.getFileFilteringOptions(),
     );
   }
 
@@ -679,6 +703,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
   ): ToolInvocation<GrepToolParams, ToolResult> {
     return new GrepToolInvocation(
       this.config,
+      this.fileDiscoveryService,
       params,
       messageBus,
       _toolName,

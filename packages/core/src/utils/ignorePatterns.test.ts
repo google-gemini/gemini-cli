@@ -131,8 +131,11 @@ describe('FileExclusions', () => {
       expect(patterns).toContain('**/.svn/**');
       expect(patterns).toContain('**/.hg/**');
 
-      // Should not include comprehensive patterns by default
-      expect(patterns).toHaveLength(5);
+      // Should also include sensitive patterns
+      expect(patterns).toContain('**/.env');
+      expect(patterns).toContain('**/secrets/**');
+
+      expect(patterns.length).toBeGreaterThan(5);
     });
 
     it('should include additional excludes', () => {

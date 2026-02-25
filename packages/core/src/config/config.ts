@@ -102,9 +102,13 @@ import type { AnyToolInvocation, AnyDeclarativeTool } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
-import { FileExclusions } from '../utils/ignorePatterns.js';
+import {
+  FileExclusions,
+  SENSITIVE_FILE_PATTERNS,
+} from '../utils/ignorePatterns.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { EventEmitter } from 'node:events';
+import picomatch from 'picomatch';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
@@ -686,6 +690,7 @@ export class Config {
   private initPromise: Promise<void> | undefined;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
+  private readonly sensitivePathMatcher: (path: string) => boolean;
   private readonly eventEmitter?: EventEmitter;
   private readonly useWriteTodos: boolean;
   private readonly messageBus: MessageBus;
@@ -906,6 +911,10 @@ export class Config {
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
     this.fileExclusions = new FileExclusions(this);
+    this.sensitivePathMatcher = picomatch(SENSITIVE_FILE_PATTERNS, {
+      dot: true,
+      nocase: true,
+    });
     this.eventEmitter = params.eventEmitter;
     this.enableConseca = params.enableConseca ?? false;
 
@@ -2233,6 +2242,26 @@ export class Config {
   }
 
   /**
+   * Checks if a given absolute path matches any sensitive file patterns.
+   *
+   * @param absolutePath The absolute path to check.
+   * @returns true if the path matches a sensitive pattern, false otherwise.
+   */
+  isSensitivePath(absolutePath: string): boolean {
+    const targetDir = this.getTargetDir();
+    const relativePath = path.relative(targetDir, absolutePath);
+
+    // Normalize path separators to forward slashes for picomatch consistency
+    const normalizedRelativePath = relativePath.split(path.sep).join('/');
+    const normalizedAbsolutePath = absolutePath.split(path.sep).join('/');
+
+    return (
+      this.sensitivePathMatcher(normalizedRelativePath) ||
+      this.sensitivePathMatcher(normalizedAbsolutePath)
+    );
+  }
+
+  /**
    * Checks if a given absolute path is allowed for file system operations.
    * A path is allowed if it's within the workspace context or the project's temporary directory.
    *
@@ -2274,6 +2303,11 @@ export class Config {
     absolutePath: string,
     checkType: 'read' | 'write' = 'write',
   ): string | null {
+    // Strictly block access to sensitive files (secrets, keys, etc.)
+    if (this.isSensitivePath(absolutePath)) {
+      return `Access denied: "${absolutePath}" matches a sensitive file pattern and cannot be accessed for security reasons.`;
+    }
+
     // For read operations, check read-only paths first
     if (checkType === 'read') {
       if (this.getWorkspaceContext().isPathReadable(absolutePath)) {

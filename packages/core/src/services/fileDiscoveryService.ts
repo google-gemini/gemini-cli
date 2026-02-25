@@ -12,6 +12,8 @@ import { isGitRepository } from '../utils/gitUtils.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import fs from 'node:fs';
 import * as path from 'node:path';
+import picomatch from 'picomatch';
+import { SENSITIVE_FILE_PATTERNS } from '../utils/ignorePatterns.js';
 
 export interface FilterFilesOptions {
   respectGitIgnore?: boolean;
@@ -36,6 +38,10 @@ export class FileDiscoveryService {
     customIgnoreFilePaths: [],
   };
   private projectRoot: string;
+  private sensitiveMatcher = picomatch(SENSITIVE_FILE_PATTERNS, {
+    dot: true,
+    nocase: true,
+  });
 
   constructor(projectRoot: string, options?: FilterFilesOptions) {
     this.projectRoot = path.resolve(projectRoot);
@@ -104,6 +110,13 @@ export class FileDiscoveryService {
       respectGeminiIgnore = this.defaultFilterFileOptions.respectGeminiIgnore,
     } = options;
     return filePaths.filter((filePath) => {
+      // Normalize path separators to forward slashes for picomatch consistency
+      const normalizedPath = filePath.split(path.sep).join('/');
+      // Always strictly ignore sensitive files regardless of other options
+      if (this.sensitiveMatcher(normalizedPath)) {
+        return false;
+      }
+
       if (
         respectGitIgnore &&
         respectGeminiIgnore &&
