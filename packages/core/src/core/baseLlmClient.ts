@@ -114,6 +114,13 @@ export class BaseLlmClient {
     private readonly authType?: AuthType,
   ) {}
 
+  protected getErrorReportDir(): string {
+    return path.join(
+      this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
+      'error-reports',
+    );
+  }
+
   async generateJson(
     options: GenerateJsonOptions,
   ): Promise<Record<string, unknown>> {
@@ -336,10 +343,7 @@ export class BaseLlmClient {
       }
 
       // Check if the error is from exhausting retries, and report accordingly.
-      const errorReportDir = path.join(
-        this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
-        'error-reports',
-      );
+      const errorReportDir = this.getErrorReportDir();
 
       if (
         error instanceof Error &&

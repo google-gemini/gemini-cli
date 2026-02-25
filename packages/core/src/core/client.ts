@@ -93,6 +93,13 @@ export class GeminiClient {
   private lastSentIdeContext: IdeContext | undefined;
   private forceFullIdeContext = true;
 
+  private getErrorReportDir(): string {
+    return path.join(
+      this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
+      'error-reports',
+    );
+  }
+
   /**
    * At any point in this conversation, was compression triggered without
    * being forced and did it fail?
@@ -358,10 +365,7 @@ export class GeminiClient {
         },
       );
     } catch (error) {
-      const errorReportDir = path.join(
-        this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
-        'error-reports',
-      );
+      const errorReportDir = this.getErrorReportDir();
       await reportError(
         error,
         'Error initializing Gemini chat session.',
@@ -562,10 +566,7 @@ export class GeminiClient {
     isInvalidStreamRetry: boolean,
     displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
-    const errorReportDir = path.join(
-      this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
-      'error-reports',
-    );
+    const errorReportDir = this.getErrorReportDir();
     // Re-initialize turn (it was empty before if in loop, or new instance)
     let turn = new Turn(this.getChat(), prompt_id, errorReportDir);
 
@@ -805,10 +806,7 @@ export class GeminiClient {
     isInvalidStreamRetry: boolean = false,
     displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
-    const sharedErrorReportDir = path.join(
-      this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
-      'error-reports',
-    );
+    const sharedErrorReportDir = this.getErrorReportDir();
 
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
@@ -1047,10 +1045,7 @@ export class GeminiClient {
         throw error;
       }
 
-      const errorReportDir = path.join(
-        this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
-        'error-reports',
-      );
+      const errorReportDir = this.getErrorReportDir();
       await reportError(
         error,
         `Error generating content via API with model ${currentAttemptModel}.`,
