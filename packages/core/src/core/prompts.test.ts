@@ -652,7 +652,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     const prompt = getCoreSystemPrompt(mockConfig);
 
     expect(prompt).toContain(
-      'When the task requires planning, architectural decisions, or cross-cutting changes, use the `enter_plan_mode` tool to safely research and design your strategy. Do NOT use Plan Mode for answering simple questions or inquiries.',
+      'If the request is ambiguous, broad in scope, or involves architectural decisions or cross-cutting changes, use the `enter_plan_mode` tool to safely research and design your strategy. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.',
     );
     expect(prompt).toMatchSnapshot();
   });

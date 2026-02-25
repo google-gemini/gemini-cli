@@ -529,7 +529,7 @@ function mandateContinueWork(interactive: boolean): string {
 function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
   let suggestion = '';
   if (options.enableEnterPlanModeTool) {
-    suggestion = ` When the task requires planning, architectural decisions, or cross-cutting changes, use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to safely research and design your strategy. Do NOT use Plan Mode for answering simple questions or inquiries.`;
+    suggestion = ` If the request is ambiguous, broad in scope, or involves architectural decisions or cross-cutting changes, use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to safely research and design your strategy. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.`;
   }
 
   const searchTools: string[] = [];

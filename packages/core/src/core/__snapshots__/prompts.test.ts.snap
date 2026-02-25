@@ -2386,7 +2386,7 @@ For example:
 ## Development Lifecycle
 Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
 
-1. **Research:** Systematically map the codebase and validate assumptions. Use search tools extensively to understand file structures, existing code patterns, and conventions. Use \`read_file\` to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.** When the task requires planning, architectural decisions, or cross-cutting changes, use the \`enter_plan_mode\` tool to safely research and design your strategy. Do NOT use Plan Mode for answering simple questions or inquiries.
+1. **Research:** Systematically map the codebase and validate assumptions. Use search tools extensively to understand file structures, existing code patterns, and conventions. Use \`read_file\` to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.** If the request is ambiguous, broad in scope, or involves architectural decisions or cross-cutting changes, use the \`enter_plan_mode\` tool to safely research and design your strategy. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.
 2. **Strategy:** Formulate a grounded plan based on your research. Share a concise summary of your strategy.
 3. **Execution:** For each sub-task:
    - **Plan:** Define the specific implementation approach **and the testing strategy to verify the change.**
