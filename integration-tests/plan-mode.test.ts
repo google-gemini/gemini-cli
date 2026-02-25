@@ -78,9 +78,11 @@ describe('Plan Mode', () => {
     );
 
     // We ask the agent to create a plan for a feature, which should trigger a write_file in the plans directory.
+    // Verify that write_file outside of plan directory fails
     await rig.run({
       approvalMode: 'plan',
-      stdin: 'Create a file called plan.md in the plans directory',
+      stdin:
+        'Create a file called plan.md in the plans directory. Then create a file called hello.txt in the current directory',
     });
 
     const toolLogs = rig.readToolLogs();
@@ -93,6 +95,15 @@ describe('Plan Mode', () => {
         l.toolRequest.args.includes('plans') &&
         l.toolRequest.args.includes('plan.md'),
     );
+
+    const blockedWrite = writeLogs.find((l) =>
+      l.toolRequest.args.includes('hello.txt'),
+    );
+
+    // Model is undeterministic, sometimes a blocked write appears in tool logs and sometimes it doesn't
+    if (blockedWrite) {
+      expect(blockedWrite?.toolRequest.success).toBe(false);
+    }
 
     expect(planWrite?.toolRequest.success).toBe(true);
   });
