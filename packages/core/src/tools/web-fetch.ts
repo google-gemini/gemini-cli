@@ -31,6 +31,7 @@ import { retryWithBackoff } from '../utils/retry.js';
 import { WEB_FETCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { LRUCache } from 'mnemonist';
+import { checkDomainWithConfig, extractHostname } from '../services/networkProxy/domainMatcher.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
@@ -186,6 +187,12 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     const { validUrls: urls } = parsePrompt(this.params.prompt!);
     // For now, we only support one URL for fallback
     let url = urls[0];
+
+    // Check domain policy before fetching
+    const domainBlock = this.checkDomainPolicy(url);
+    if (domainBlock) {
+      return domainBlock;
+    }
 
     // Convert GitHub blob URL to raw URL
     url = convertGithubUrlToRaw(url);
@@ -388,6 +395,12 @@ ${textContent}
     // Convert GitHub blob URL to raw URL
     url = convertGithubUrlToRaw(url);
 
+    // Check domain policy before fetching
+    const domainBlock = this.checkDomainPolicy(url);
+    if (domainBlock) {
+      return domainBlock;
+    }
+
     try {
       const response = await retryWithBackoff(
         async () => {
@@ -503,6 +516,38 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
     }
   }
 
+  /**
+   * Check if a URL's domain is allowed by the network proxy domain rules.
+   * Returns a ToolResult with an error if the domain is denied, or null if allowed.
+   */
+  private checkDomainPolicy(url: string): ToolResult | null {
+    const proxyConfig = this.config.getNetworkProxyConfig();
+    if (!proxyConfig?.enabled) {
+      return null;
+    }
+
+    const hostname = extractHostname(url);
+    if (!hostname) {
+      return null;
+    }
+
+    const result = checkDomainWithConfig(hostname, proxyConfig);
+    if (result.action === 'deny') {
+      const errorMessage = `Domain '${hostname}' is blocked by network proxy policy.`;
+      debugLogger.warn(`[WebFetchTool] ${errorMessage}`);
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_FETCH_PROCESSING_ERROR,
+        },
+      };
+    }
+
+    return null;
+  }
+
   async execute(signal: AbortSignal): Promise<ToolResult> {
     if (this.config.getDirectWebFetch()) {
       return this.executeExperimental(signal);
@@ -510,6 +555,12 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
     const userPrompt = this.params.prompt!;
     const { validUrls: urls } = parsePrompt(userPrompt);
     const url = urls[0];
+
+    // Enforce domain filtering from network proxy config
+    const domainBlock = this.checkDomainPolicy(url);
+    if (domainBlock) {
+      return domainBlock;
+    }
 
     // Enforce rate limiting
     const rateLimitResult = checkRateLimit(url);

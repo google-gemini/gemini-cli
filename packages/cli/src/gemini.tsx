@@ -588,6 +588,20 @@ export async function main() {
     const messageBus = config.getMessageBus();
     createPolicyUpdater(policyEngine, messageBus, config.storage);
 
+    // Start network proxy if enabled in settings
+    const networkProxyManager = config.getNetworkProxyManager();
+    if (networkProxyManager) {
+      try {
+        await networkProxyManager.start();
+        debugLogger.log('Network proxy started');
+      } catch (e) {
+        debugLogger.error('Failed to start network proxy:', e);
+      }
+      registerCleanup(async () => {
+        await networkProxyManager.stop();
+      });
+    }
+
     // Register SessionEnd hook to fire on graceful exit
     // This runs before telemetry shutdown in runExitCleanup()
     registerCleanup(async () => {
