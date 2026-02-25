@@ -128,6 +128,10 @@ async function downloadFiles({
         } as RequestInit);
 
         if (!response.ok) {
+          if (response.status === 404) {
+            debugLogger.warn(`File not found, skipping: ${endpoint}`);
+            return;
+          }
           throw new Error(
             `Invalid response code downloading ${endpoint}: ${response.status} - ${response.statusText}`,
           );

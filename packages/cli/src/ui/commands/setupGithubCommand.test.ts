@@ -14,6 +14,7 @@ import {
   setupGithubCommand,
   updateGitignore,
   GITHUB_WORKFLOW_PATHS,
+  GITHUB_COMMANDS_PATHS,
 } from './setupGithubCommand.js';
 import type { CommandContext } from './types.js';
 import * as commandUtils from '../utils/commandUtils.js';
@@ -192,14 +193,14 @@ describe('setupGithubCommand', async () => {
     }
   });
 
-  it('throws an error when download fails', async () => {
+  it('throws an error when download fails with non-404 error', async () => {
     const fakeRepoRoot = scratchDir;
     const fakeReleaseVersion = 'v1.2.3';
 
     vi.mocked(global.fetch).mockResolvedValue(
-      new Response('Not Found', {
-        status: 404,
-        statusText: 'Not Found',
+      new Response('Internal Server Error', {
+        status: 500,
+        statusText: 'Internal Server Error',
       }),
     );
 
@@ -215,7 +216,75 @@ describe('setupGithubCommand', async () => {
 
     await expect(
       setupGithubCommand.action?.({} as CommandContext, ''),
-    ).rejects.toThrow(/Invalid response code downloading.*404 - Not Found/);
+    ).rejects.toThrow(
+      /Invalid response code downloading.*500 - Internal Server Error/,
+    );
+  });
+
+  it('skips files that return 404 without failing', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+    const fakeRepoRoot = scratchDir;
+    const fakeReleaseVersion = 'v1.2.3';
+
+    vi.mocked(global.fetch).mockImplementation(async (url) => {
+      const filename = path.basename(url.toString());
+      if (filename.endsWith('.toml')) {
+        return new Response('Not Found', {
+          status: 404,
+          statusText: 'Not Found',
+        });
+      }
+      return new Response(filename, {
+        status: 200,
+        statusText: 'OK',
+        headers: { 'Content-Type': 'text/plain' },
+      });
+    });
+
+    vi.mocked(gitUtils.isGitHubRepository).mockReturnValueOnce(true);
+    vi.mocked(gitUtils.getGitRepoRoot).mockReturnValueOnce(fakeRepoRoot);
+    vi.mocked(gitUtils.getLatestGitHubRelease).mockResolvedValueOnce(
+      fakeReleaseVersion,
+    );
+    vi.mocked(gitUtils.getGitHubRepoInfo).mockReturnValue({
+      owner: 'fake',
+      repo: 'repo',
+    });
+    vi.mocked(commandUtils.getUrlOpenCommand).mockReturnValueOnce(
+      'fakeOpenCommand',
+    );
+
+    const result = (await setupGithubCommand.action?.(
+      {} as CommandContext,
+      '',
+    )) as ToolActionReturn;
+
+    // Command should succeed
+    expect(result.toolName).toBe('run_shell_command');
+
+    // Verify that workflow .yml files were downloaded
+    const workflows = GITHUB_WORKFLOW_PATHS.map((p) => path.basename(p));
+    for (const workflow of workflows) {
+      const workflowFile = path.join(
+        scratchDir,
+        '.github',
+        'workflows',
+        workflow,
+      );
+      const contents = await fs.readFile(workflowFile, 'utf8');
+      expect(contents).toContain(workflow);
+    }
+
+    // Verify that .toml command files were NOT written (404 was skipped)
+    const commands = GITHUB_COMMANDS_PATHS.map((p) => path.basename(p));
+    for (const cmd of commands) {
+      const cmdFile = path.join(scratchDir, '.github', 'commands', cmd);
+      const exists = await fs
+        .access(cmdFile)
+        .then(() => true)
+        .catch(() => false);
+      expect(exists).toBe(false);
+    }
   });
 });
 
