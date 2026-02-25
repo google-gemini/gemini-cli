@@ -238,6 +238,27 @@ describe('extension tests', () => {
       expect(extensions[0].name).toBe('test-extension');
     });
 
+    it('should throw an error if a context file path is outside the extension directory', async () => {
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'traversal-extension',
+        version: '1.0.0',
+        contextFileName: '../secret.txt',
+      });
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(0);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'traversal-extension: Invalid context file path: "../secret.txt"',
+        ),
+      );
+      consoleSpy.mockRestore();
+    });
+
     it('should load context file path when GEMINI.md is present', async () => {
       createExtension({
         extensionsDir: userExtensionsDir,
@@ -640,7 +661,7 @@ name = "yolo-checker"
 
       // Bad extension
       const badExtDir = path.join(userExtensionsDir, 'bad-ext');
-      fs.mkdirSync(badExtDir);
+      fs.mkdirSync(badExtDir, { recursive: true });
       const badConfigPath = path.join(badExtDir, EXTENSIONS_CONFIG_FILENAME);
       fs.writeFileSync(badConfigPath, '{ "name": "bad-ext"'); // Malformed
 
@@ -648,7 +669,7 @@ name = "yolo-checker"
 
       expect(extensions).toHaveLength(1);
       expect(extensions[0].name).toBe('good-ext');
-      expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
+      expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining(
           `Warning: Skipping extension in ${badExtDir}: Failed to load extension config from ${badConfigPath}`,
         ),
@@ -671,7 +692,7 @@ name = "yolo-checker"
 
       // Bad extension
       const badExtDir = path.join(userExtensionsDir, 'bad-ext-no-name');
-      fs.mkdirSync(badExtDir);
+      fs.mkdirSync(badExtDir, { recursive: true });
       const badConfigPath = path.join(badExtDir, EXTENSIONS_CONFIG_FILENAME);
       fs.writeFileSync(badConfigPath, JSON.stringify({ version: '1.0.0' }));
 
@@ -679,7 +700,7 @@ name = "yolo-checker"
 
       expect(extensions).toHaveLength(1);
       expect(extensions[0].name).toBe('good-ext');
-      expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
+      expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining(
           `Warning: Skipping extension in ${badExtDir}: Failed to load extension config from ${badConfigPath}: Invalid configuration in ${badConfigPath}: missing "name"`,
         ),

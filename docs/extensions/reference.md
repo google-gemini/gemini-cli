@@ -122,8 +122,7 @@ The manifest file defines the extension's behavior and configuration.
     }
   },
   "contextFileName": "GEMINI.md",
-  "excludeTools": ["run_shell_command"],
-  "policies": "policies.toml"
+  "excludeTools": ["run_shell_command"]
 }
 ```
 
@@ -231,8 +230,8 @@ agent definition files (`.md`) to an `agents/` directory in your extension root.
 ### <a id="policy-engine"></a>Policy Engine
 
 Extensions can contribute policy rules and safety checkers to the Gemini CLI
-[Policy Engine](../admin/policy-engine.md). These rules are defined in `.toml`
-files and take effect when the extension is activated.
+[Policy Engine](../reference/policy-engine.md). These rules are defined in
+`.toml` files and take effect when the extension is activated.
 
 To add policies, create a `policies/` directory in your extension's root and
 place your `.toml` policy files inside it. Gemini CLI automatically loads all

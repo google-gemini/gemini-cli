@@ -55,6 +55,7 @@ import {
   loadPoliciesFromToml,
   PolicyDecision,
   ApprovalMode,
+  isSubpath,
   type PolicyRule,
   type SafetyCheckerRule,
 } from '@google/gemini-cli-core';
@@ -704,9 +705,18 @@ Would you like to attempt to install via "git clone" instead?`,
       }
 
       const contextFiles = getContextFileNames(config)
-        .map((contextFileName) =>
-          path.join(effectiveExtensionPath, contextFileName),
-        )
+        .map((contextFileName) => {
+          const contextFilePath = path.join(
+            effectiveExtensionPath,
+            contextFileName,
+          );
+          if (!isSubpath(effectiveExtensionPath, contextFilePath)) {
+            throw new Error(
+              `Invalid context file path: "${contextFileName}". Context files must be within the extension directory.`,
+            );
+          }
+          return contextFilePath;
+        })
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
       const hydrationContext: VariableContext = {
@@ -762,6 +772,11 @@ Would you like to attempt to install via "git clone" instead?`,
       let checkers: SafetyCheckerRule[] | undefined;
 
       const policyDir = path.join(effectiveExtensionPath, 'policies');
+      if (!isSubpath(effectiveExtensionPath, policyDir)) {
+        throw new Error(
+          `Invalid policy directory path. Policies must be within the extension directory.`,
+        );
+      }
       if (fs.existsSync(policyDir)) {
         const result = await loadPoliciesFromToml(
           [policyDir],
@@ -790,7 +805,9 @@ Would you like to attempt to install via "git clone" instead?`,
               return false;
             }
 
-            rule.source = `Extension (${config.name}): ${rule.source}`;
+            rule.source = rule.source?.startsWith(`Extension (${config.name}):`)
+              ? rule.source
+              : `Extension (${config.name}): ${rule.source}`;
             return true;
           });
         }
@@ -805,7 +822,11 @@ Would you like to attempt to install via "git clone" instead?`,
               return false;
             }
 
-            checker.source = `Extension (${config.name}): ${checker.source}`;
+            checker.source = checker.source?.startsWith(
+              `Extension (${config.name}):`,
+            )
+              ? checker.source
+              : `Extension (${config.name}): ${checker.source}`;
             return true;
           });
         }
