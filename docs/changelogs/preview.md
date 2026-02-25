@@ -55,7 +55,7 @@ npm install -g @google/gemini-cli@preview
 - fix(cli): support legacy onConfirm callback in ToolActionsContext by
   @SandyTao520 in
   [#19369](https://github.com/google-gemini/gemini-cli/pull/19369)
-- chore(deps): bump tar from 7.5.7 to 7.5.8 by @.github/dependabot.yml[bot] in
+- chore(deps): bump tar from 7.5.7 to 7.5.8 by dependabot[bot] in
   [#19367](https://github.com/google-gemini/gemini-cli/pull/19367)
 - fix(plan): allow safe fallback when experiment setting for plan is not enabled
   but approval mode at startup is plan by @Adib234 in
