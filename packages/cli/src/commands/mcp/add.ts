@@ -69,7 +69,6 @@ async function addMcpServer(
     case 'sse':
       newServer = {
         url: commandOrUrl,
-        type: 'sse',
         headers,
         timeout,
         trust,
@@ -80,8 +79,7 @@ async function addMcpServer(
       break;
     case 'http':
       newServer = {
-        url: commandOrUrl,
-        type: 'http',
+        httpUrl: commandOrUrl,
         headers,
         timeout,
         trust,

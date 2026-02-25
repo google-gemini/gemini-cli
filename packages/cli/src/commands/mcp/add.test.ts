@@ -115,8 +115,12 @@ describe('mcp add command', () => {
     expect(mockSetValue).toHaveBeenCalledWith(SettingScope.User, 'mcpServers', {
       'sse-server': {
         url: 'https://example.com/sse-endpoint',
-        type: 'sse',
         headers: { 'X-API-Key': 'your-key' },
+        timeout: undefined,
+        trust: undefined,
+        description: undefined,
+        includeTools: undefined,
+        excludeTools: undefined,
       },
     });
   });
@@ -131,9 +135,13 @@ describe('mcp add command', () => {
       'mcpServers',
       {
         'http-server': {
-          url: 'https://example.com/mcp',
-          type: 'http',
+          httpUrl: 'https://example.com/mcp',
           headers: { Authorization: 'Bearer your-token' },
+          timeout: undefined,
+          trust: undefined,
+          description: undefined,
+          includeTools: undefined,
+          excludeTools: undefined,
         },
       },
     );
@@ -147,8 +155,12 @@ describe('mcp add command', () => {
     expect(mockSetValue).toHaveBeenCalledWith(SettingScope.User, 'mcpServers', {
       'sse-server': {
         url: 'https://example.com/sse',
-        type: 'sse',
         headers: { 'X-API-Key': 'your-key' },
+        timeout: undefined,
+        trust: undefined,
+        description: undefined,
+        includeTools: undefined,
+        excludeTools: undefined,
       },
     });
   });
@@ -163,9 +175,13 @@ describe('mcp add command', () => {
       'mcpServers',
       {
         'http-server': {
-          url: 'https://example.com/mcp',
-          type: 'http',
+          httpUrl: 'https://example.com/mcp',
           headers: { Authorization: 'Bearer your-token' },
+          timeout: undefined,
+          trust: undefined,
+          description: undefined,
+          includeTools: undefined,
+          excludeTools: undefined,
         },
       },
     );
