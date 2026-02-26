@@ -395,8 +395,7 @@ interface StatsDisplayProps {
   tier?: string;
   currentModel?: string;
   quotaStats?: QuotaStats;
-  /** G1 AI Credits balance, null if not eligible */
-  creditBalance?: number | null;
+  creditBalance?: number;
 }
 
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({

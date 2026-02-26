@@ -835,7 +835,7 @@ const SETTINGS_SCHEMA = {
     requiresRestart: false,
     default: {},
     description: 'Billing and AI credits settings.',
-    showInDialog: true,
+    showInDialog: false,
     properties: {
       overageStrategy: {
         type: 'enum',

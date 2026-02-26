@@ -62,7 +62,7 @@ describe('statsCommand', () => {
       tier: undefined,
       userEmail: 'mock@example.com',
       currentModel: undefined,
-      creditBalance: null,
+      creditBalance: undefined,
     });
   });
 

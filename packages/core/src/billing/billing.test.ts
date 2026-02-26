@@ -226,7 +226,7 @@ describe('billing', () => {
     });
 
     it('should return true for gemini-3.1-pro-preview', () => {
-      expect(isOverageEligibleModel('gemini-3.1-pro-preview')).toBe(false);
+      expect(isOverageEligibleModel('gemini-3.1-pro-preview')).toBe(true);
     });
 
     it('should return true for gemini-3.1-pro-preview-customtools', () => {
