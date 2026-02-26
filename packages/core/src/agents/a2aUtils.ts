@@ -13,7 +13,6 @@ import type {
   Artifact,
   TaskState,
   TaskStatusUpdateEvent,
-  Task,
 } from '@a2a-js/sdk';
 import type { SendMessageResult } from './a2a-client-manager.js';
 
@@ -76,8 +75,10 @@ export class A2AResultReassembler {
           }
         }
         // History Fallback: If no message or artifacts were found yet,
-        // look for the most recent agent message in the history.
+        // and the task is in a terminal state, look for the most recent
+        // agent message in the history.
         if (
+          isTerminalState(chunk.status?.state) &&
           this.messageLog.length === 0 &&
           this.artifacts.size === 0 &&
           chunk.history &&
@@ -179,61 +180,16 @@ function extractPartText(part: Part): string {
 
   if (isFilePart(part)) {
     const fileData = part.file;
-    if ('name' in fileData) {
+    if (fileData.name) {
       return `File: ${fileData.name}`;
     }
-    if ('uri' in fileData) {
+    if ('uri' in fileData && fileData.uri) {
       return `File: ${fileData.uri}`;
     }
     return `File: [binary/unnamed]`;
   }
 
   return '';
-}
-
-/**
- * Extracts a clean, human-readable text summary from a Task object.
- * Includes the status message and any artifact content with context headers.
- */
-export function extractTaskText(task: Task): string {
-  const parts: string[] = [];
-
-  // Status Message (Current "what is happening" update)
-  const statusMessageText = extractMessageText(task.status?.message);
-  if (statusMessageText) {
-    parts.push(statusMessageText);
-  }
-
-  // Artifacts
-  if (task.artifacts) {
-    for (const artifact of task.artifacts) {
-      const artifactContent = extractPartsText(artifact.parts, '\n');
-
-      if (artifactContent) {
-        const header = artifact.name
-          ? `Artifact (${artifact.name}):`
-          : 'Artifact:';
-        parts.push(`${header}\n${artifactContent}`);
-      }
-    }
-  }
-
-  // History Fallback
-  // If we still have no content (no status message and no artifacts),
-  // we look for the most recent agent message in the history.
-  if (!parts.length && task.history && task.history.length > 0) {
-    const lastAgentMsg = [...task.history]
-      .reverse()
-      .find((m) => m.role?.toLowerCase().includes('agent'));
-    if (lastAgentMsg) {
-      const historyText = extractMessageText(lastAgentMsg);
-      if (historyText) {
-        parts.push(historyText);
-      }
-    }
-  }
-
-  return parts.join('\n\n');
 }
 
 // Type Guards

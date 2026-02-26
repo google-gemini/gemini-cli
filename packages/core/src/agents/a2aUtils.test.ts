@@ -10,7 +10,6 @@ import {
   extractIdsFromResponse,
   isTerminalState,
   A2AResultReassembler,
-  extractTaskText,
 } from './a2aUtils.js';
 import type { SendMessageResult } from './a2a-client-manager.js';
 import type {
@@ -260,7 +259,7 @@ describe('a2aUtils', () => {
       );
     });
 
-    it('should fallback to history in a task chunk if no message or artifacts exist', () => {
+    it('should fallback to history in a task chunk if no message or artifacts exist and task is terminal', () => {
       const reassembler = new A2AResultReassembler();
 
       reassembler.update({
@@ -276,6 +275,24 @@ describe('a2aUtils', () => {
       } as unknown as SendMessageResult);
 
       expect(reassembler.toString()).toBe('Answer from history');
+    });
+
+    it('should NOT fallback to history in a task chunk if task is not terminal', () => {
+      const reassembler = new A2AResultReassembler();
+
+      reassembler.update({
+        kind: 'task',
+        status: { state: 'working' },
+        history: [
+          {
+            kind: 'message',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Answer from history' }],
+          } as Message,
+        ],
+      } as unknown as SendMessageResult);
+
+      expect(reassembler.toString()).toBe('');
     });
 
     it('should not fallback to history if artifacts exist', () => {
@@ -303,174 +320,6 @@ describe('a2aUtils', () => {
       const output = reassembler.toString();
       expect(output).toContain('Artifact (Data):');
       expect(output).not.toContain('Answer from history');
-    });
-  });
-
-  describe('extractTaskText', () => {
-    it('should extract basic task info from status message', () => {
-      const task: Task = {
-        id: 'task-1',
-        contextId: 'ctx-1',
-        kind: 'task',
-        status: {
-          state: 'working',
-          message: {
-            kind: 'message',
-            role: 'agent',
-            messageId: 'm1',
-            parts: [{ kind: 'text', text: 'Processing...' } as TextPart],
-          },
-        },
-      };
-
-      const result = extractTaskText(task);
-      expect(result).toBe('Processing...');
-    });
-
-    it('should extract artifacts with headers', () => {
-      const task: Task = {
-        id: 'task-1',
-        contextId: 'ctx-1',
-        kind: 'task',
-        status: { state: 'completed' },
-        artifacts: [
-          {
-            artifactId: 'art-1',
-            name: 'Report',
-            parts: [{ kind: 'text', text: 'This is the report.' } as TextPart],
-          },
-        ],
-      };
-
-      const result = extractTaskText(task);
-      expect(result).toContain('Artifact (Report):');
-      expect(result).toContain('This is the report.');
-    });
-
-    it('should fallback to last agent message in history if status message is missing', () => {
-      const task: Task = {
-        id: 'task-1',
-        contextId: 'ctx-1',
-        kind: 'task',
-        status: { state: 'completed' },
-        history: [
-          {
-            kind: 'message',
-            role: 'user',
-            messageId: 'u1',
-            parts: [{ kind: 'text', text: 'Question' } as TextPart],
-          },
-          {
-            kind: 'message',
-            role: 'agent',
-            messageId: 'a1',
-            parts: [{ kind: 'text', text: 'First Answer' } as TextPart],
-          },
-          {
-            kind: 'message',
-            role: 'user',
-            messageId: 'u2',
-            parts: [{ kind: 'text', text: 'Follow up' } as TextPart],
-          },
-          {
-            kind: 'message',
-            role: 'agent',
-            messageId: 'a2',
-            parts: [{ kind: 'text', text: 'Final Answer' } as TextPart],
-          },
-        ],
-      };
-
-      const result = extractTaskText(task);
-      expect(result).toBe('Final Answer');
-    });
-
-    it('should fallback to history only if status message and artifacts are missing', () => {
-      const task: Task = {
-        id: 'task-1',
-        contextId: 'ctx-1',
-        kind: 'task',
-        status: { state: 'completed' },
-        history: [
-          {
-            kind: 'message',
-            role: 'agent',
-            messageId: 'a1',
-            parts: [{ kind: 'text', text: 'Answer' } as TextPart],
-          },
-        ],
-        artifacts: [
-          {
-            artifactId: 'art-1',
-            name: 'Data',
-            parts: [{ kind: 'text', text: 'Artifact Content' } as TextPart],
-          },
-        ],
-      };
-
-      const result = extractTaskText(task);
-      expect(result).not.toContain('Answer');
-      expect(result).toContain('Artifact (Data):');
-      expect(result).toContain('Artifact Content');
-    });
-
-    it('should prioritize status message over history fallback', () => {
-      const task: Task = {
-        id: 'task-1',
-        contextId: 'ctx-1',
-        kind: 'task',
-        status: {
-          state: 'completed',
-          message: {
-            kind: 'message',
-            role: 'agent',
-            messageId: 'm1',
-            parts: [{ kind: 'text', text: 'Status Message' } as TextPart],
-          },
-        },
-        history: [
-          {
-            kind: 'message',
-            role: 'agent',
-            messageId: 'a1',
-            parts: [{ kind: 'text', text: 'History Message' } as TextPart],
-          },
-        ],
-      };
-
-      const result = extractTaskText(task);
-      expect(result).toBe('Status Message');
-      expect(result).not.toContain('History Message');
-    });
-
-    it('should handle history with no agent messages', () => {
-      const task: Task = {
-        id: 'task-1',
-        contextId: 'ctx-1',
-        kind: 'task',
-        status: { state: 'completed' },
-        history: [
-          {
-            kind: 'message',
-            role: 'user',
-            messageId: 'u1',
-            parts: [{ kind: 'text', text: 'Only user' } as TextPart],
-          },
-        ],
-      };
-
-      const result = extractTaskText(task);
-      expect(result).toBe('');
-    });
-
-    it('should return empty string if everything is missing', () => {
-      const task: Task = {
-        id: 'task-1',
-        contextId: 'ctx-1',
-        kind: 'task',
-        status: { state: 'working' },
-      };
-      expect(extractTaskText(task)).toBe('');
     });
   });
 });
