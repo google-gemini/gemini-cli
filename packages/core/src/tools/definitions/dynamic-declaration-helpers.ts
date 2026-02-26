@@ -96,7 +96,7 @@ export function getShellDeclaration(
         dir_path: {
           type: 'string',
           description:
-            '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
+            '(OPTIONAL) The path of the directory to run the command in (relative to workspace root preferred). If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
         },
         is_background: {
           type: 'boolean',

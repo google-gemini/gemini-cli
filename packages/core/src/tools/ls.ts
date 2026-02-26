@@ -23,7 +23,7 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
  */
 export interface LSToolParams {
   /**
-   * The absolute path to the directory to list
+   * The path to the directory to list (relative to workspace root preferred)
    */
   dir_path: string;
 

@@ -54,7 +54,7 @@ import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
  */
 export interface WriteFileToolParams {
   /**
-   * The absolute path to the file to write to
+   * The path to the file to write to (relative to workspace root preferred)
    */
   file_path: string;
 

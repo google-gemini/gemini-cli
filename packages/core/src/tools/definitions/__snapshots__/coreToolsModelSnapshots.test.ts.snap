@@ -592,7 +592,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
         "type": "string",
       },
       "dir_path": {
-        "description": "(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.",
+        "description": "(OPTIONAL) The path of the directory to run the command in (relative to workspace root preferred). If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.",
         "type": "string",
       },
       "is_background": {
@@ -996,7 +996,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
         "type": "boolean",
       },
       "dir_path": {
-        "description": "Optional: The absolute path to the directory to search within. If omitted, searches the root directory.",
+        "description": "Optional: The path to the directory to search within (relative to workspace root preferred). If omitted, searches the root directory.",
         "type": "string",
       },
       "pattern": {
@@ -1046,7 +1046,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
   "parametersJsonSchema": {
     "properties": {
       "dir_path": {
-        "description": "Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.",
+        "description": "Optional: The path to the directory to search within (relative to workspace root preferred). If omitted, searches the current working directory.",
         "type": "string",
       },
       "exclude_pattern": {
@@ -1109,7 +1109,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
         "type": "integer",
       },
       "dir_path": {
-        "description": "Directory or file to search. Directories are searched recursively. Relative paths are resolved against current working directory. Defaults to current working directory ('.') if omitted.",
+        "description": "Directory or file to search (relative to workspace root preferred). Directories are searched recursively. Relative paths are resolved against current working directory. Defaults to current working directory ('.') if omitted.",
         "type": "string",
       },
       "exclude_pattern": {
@@ -1162,7 +1162,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
   "parametersJsonSchema": {
     "properties": {
       "dir_path": {
-        "description": "The path to the directory to list",
+        "description": "The path to the directory to list (relative to workspace root preferred).",
         "type": "string",
       },
       "file_filtering_options": {
@@ -1206,7 +1206,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
         "type": "number",
       },
       "file_path": {
-        "description": "The path to the file to read.",
+        "description": "The path to the file to read (relative to workspace root preferred).",
         "type": "string",
       },
       "start_line": {
@@ -1300,7 +1300,7 @@ The user has the ability to modify the \`new_string\` content. If modified, this
         "type": "boolean",
       },
       "file_path": {
-        "description": "The path to the file to modify.",
+        "description": "The path to the file to modify (relative to workspace root preferred).",
         "type": "string",
       },
       "instruction": {
@@ -1355,7 +1355,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
         "type": "string",
       },
       "dir_path": {
-        "description": "(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.",
+        "description": "(OPTIONAL) The path of the directory to run the command in (relative to workspace root preferred). If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.",
         "type": "string",
       },
       "is_background": {
@@ -1421,7 +1421,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
         "type": "string",
       },
       "file_path": {
-        "description": "Path to the file.",
+        "description": "Path to the file (relative to workspace root preferred).",
         "type": "string",
       },
     },

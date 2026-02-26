@@ -43,7 +43,8 @@ export const GEMINI_3_SET: CoreToolSet = {
       type: 'object',
       properties: {
         file_path: {
-          description: 'The path to the file to read.',
+          description:
+            'The path to the file to read (relative to workspace root preferred).',
           type: 'string',
         },
         start_line: {
@@ -68,7 +69,8 @@ export const GEMINI_3_SET: CoreToolSet = {
       type: 'object',
       properties: {
         file_path: {
-          description: 'Path to the file.',
+          description:
+            'Path to the file (relative to workspace root preferred).',
           type: 'string',
         },
         content: {
@@ -94,7 +96,7 @@ export const GEMINI_3_SET: CoreToolSet = {
         },
         dir_path: {
           description:
-            'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
+            'Optional: The path to the directory to search within (relative to workspace root preferred). If omitted, searches the current working directory.',
           type: 'string',
         },
         include_pattern: {
@@ -141,7 +143,7 @@ export const GEMINI_3_SET: CoreToolSet = {
         },
         dir_path: {
           description:
-            "Directory or file to search. Directories are searched recursively. Relative paths are resolved against current working directory. Defaults to current working directory ('.') if omitted.",
+            "Directory or file to search (relative to workspace root preferred). Directories are searched recursively. Relative paths are resolved against current working directory. Defaults to current working directory ('.') if omitted.",
           type: 'string',
         },
         include_pattern: {
@@ -222,7 +224,7 @@ export const GEMINI_3_SET: CoreToolSet = {
         },
         dir_path: {
           description:
-            'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
+            'Optional: The path to the directory to search within (relative to workspace root preferred). If omitted, searches the root directory.',
           type: 'string',
         },
         case_sensitive: {
@@ -253,7 +255,8 @@ export const GEMINI_3_SET: CoreToolSet = {
       type: 'object',
       properties: {
         dir_path: {
-          description: 'The path to the directory to list',
+          description:
+            'The path to the directory to list (relative to workspace root preferred).',
           type: 'string',
         },
         ignore: {
@@ -296,7 +299,8 @@ The user has the ability to modify the \`new_string\` content. If modified, this
       type: 'object',
       properties: {
         file_path: {
-          description: 'The path to the file to modify.',
+          description:
+            'The path to the file to modify (relative to workspace root preferred).',
           type: 'string',
         },
         instruction: {
