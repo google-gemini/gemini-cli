@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Copy Mode Alignment Regression > ThinkingMessage > aligns to column 4 in copy mode 1`] = `
+"   Thinking summary
+    Thinking body
+"
+`;
+
+exports[`Copy Mode Alignment Regression > ThinkingMessage > aligns to column 4 in normal mode 1`] = `
+"   Thinking summary
+  │ Thinking body
+"
+`;
+
+exports[`Copy Mode Alignment Regression > ToolGroupMessage (Shell Tool) > aligns header and content to column 4 in copy mode 1`] = `
+"
+   ⊷
+   Shell Command Running ls -la
+   ls -la output
+"
+`;

@@ -1,0 +1,27 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CopySafeBox > handles partial borders correctly in copy mode 1`] = `
+"
+  Content
+"
+`;
+
+exports[`CopySafeBox > preserves top/bottom padding in copy mode 1`] = `
+"
+
+ Content
+"
+`;
+
+exports[`CopySafeBox > removes borders and adds compensatory padding in copy mode 1`] = `
+"
+  Content
+"
+`;
+
+exports[`CopySafeBox > renders with borders in normal mode 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Content                                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
