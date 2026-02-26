@@ -236,7 +236,7 @@ describe('InputPrompt', () => {
       visualToLogicalMap: [[0, 0]],
       visualToTransformedMap: [0],
       transformationsByLine: [],
-      getOffset: vi.fn().mockReturnValue(0),
+      getOffset: vi.fn(() => cpLen(mockBuffer.text)),
       pastedContent: {},
     } as unknown as TextBuffer;
 
@@ -3261,6 +3261,201 @@ describe('InputPrompt', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(mockAccept).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('accepts ghost text word-by-word on Ctrl+Right', async () => {
+      const mockMarkSelected = vi.fn();
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: false,
+        suggestions: [],
+        promptCompletion: {
+          text: 'build a weather app',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: mockMarkSelected,
+        },
+      });
+
+      props.buffer.setText('build ');
+      mockBuffer.setText.mockClear();
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[1;5C'); // Ctrl+Right
+        stdin.write('\x1b[1;5C'); // Ctrl+Right
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.setText).toHaveBeenNthCalledWith(1, 'build a ');
+        expect(mockBuffer.setText).toHaveBeenNthCalledWith(
+          2,
+          'build a weather ',
+        );
+        expect(mockMarkSelected).toHaveBeenNthCalledWith(1, 'build a ');
+        expect(mockMarkSelected).toHaveBeenNthCalledWith(
+          2,
+          'build a weather ',
+        );
+      });
+      unmount();
+    });
+
+    it('does not accept ghost text word-by-word when current text has trailing spaces not present in ghost text', async () => {
+      const mockMarkSelected = vi.fn();
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: false,
+        suggestions: [],
+        promptCompletion: {
+          text: 'build a weather app',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: mockMarkSelected,
+        },
+      });
+
+      props.buffer.setText('build   ');
+      mockBuffer.setText.mockClear();
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[1;5C'); // Ctrl+Right
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockBuffer.setText).not.toHaveBeenCalled();
+      expect(mockMarkSelected).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('does not accept ghost text word-by-word when cursor is not at end of input', async () => {
+      const mockMarkSelected = vi.fn();
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: false,
+        suggestions: [],
+        promptCompletion: {
+          text: 'build a weather app',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: mockMarkSelected,
+        },
+      });
+
+      props.buffer.setText('build ');
+      mockBuffer.getOffset = vi.fn().mockReturnValue(2);
+      mockBuffer.setText.mockClear();
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[1;5C'); // Ctrl+Right
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockBuffer.setText).not.toHaveBeenCalled();
+      expect(mockMarkSelected).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('does not accept ghost text word-by-word when suggestions are visible', async () => {
+      const mockMarkSelected = vi.fn();
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: true,
+        suggestions: [{ label: 'test', value: 'test' }],
+        promptCompletion: {
+          text: 'build a weather app',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: mockMarkSelected,
+        },
+      });
+
+      props.buffer.setText('build ');
+      mockBuffer.setText.mockClear();
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[1;5C'); // Ctrl+Right
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockBuffer.setText).not.toHaveBeenCalled();
+      expect(mockMarkSelected).not.toHaveBeenCalled();
+      unmount();
+    });
+
+    it('sanitizes ghost text before word-by-word acceptance', async () => {
+      const mockMarkSelected = vi.fn();
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: false,
+        suggestions: [],
+        promptCompletion: {
+          text: 'echo \x1b[31mhello\x1b[0m world',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: true,
+          markSelected: mockMarkSelected,
+        },
+      });
+
+      props.buffer.setText('echo ');
+      mockBuffer.setText.mockClear();
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[1;5C'); // Ctrl+Right
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.setText).toHaveBeenCalledWith('echo hello ');
+        expect(mockMarkSelected).toHaveBeenCalledWith('echo hello ');
+      });
       unmount();
     });
 

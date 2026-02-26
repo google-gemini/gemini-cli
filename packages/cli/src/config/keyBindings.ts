@@ -440,7 +440,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.MOVE_LEFT]: 'Move the cursor one character to the left.',
   [Command.MOVE_RIGHT]: 'Move the cursor one character to the right.',
   [Command.MOVE_WORD_LEFT]: 'Move the cursor one word to the left.',
-  [Command.MOVE_WORD_RIGHT]: 'Move the cursor one word to the right.',
+  [Command.MOVE_WORD_RIGHT]:
+    'Move the cursor one word to the right, or accept the next inline suggestion word when ghost text is shown.',
 
   // Editing
   [Command.KILL_LINE_RIGHT]: 'Delete from the cursor to the end of the line.',

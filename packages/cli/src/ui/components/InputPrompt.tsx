@@ -25,6 +25,7 @@ import {
   cpLen,
   toCodePoints,
   cpIndexToOffset,
+  stripUnsafeCharacters,
 } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
@@ -139,6 +140,63 @@ export function isLargePaste(text: string): boolean {
     pasteLineCount > LARGE_PASTE_LINE_THRESHOLD ||
     text.length > LARGE_PASTE_CHAR_THRESHOLD
   );
+}
+
+function getTextWithNextGhostWord(
+  currentText: string,
+  ghostText: string,
+): string | null {
+  const strippedGhostText = stripUnsafeCharacters(ghostText).replace(
+    PASTED_TEXT_PLACEHOLDER_REGEX,
+    '',
+  );
+  if (!strippedGhostText || !strippedGhostText.startsWith(currentText)) {
+    return null;
+  }
+
+  const suffix = strippedGhostText.slice(currentText.length);
+  if (!suffix) {
+    return null;
+  }
+
+  const suffixCp = toCodePoints(suffix);
+  if (suffixCp.length === 0) {
+    return null;
+  }
+
+  let i = 0;
+  const isHorizontalWhitespace = (char: string) =>
+    char !== '\n' && /\s/.test(char);
+
+  // Keep existing spacing before the next word.
+  while (i < suffixCp.length && isHorizontalWhitespace(suffixCp[i]!)) {
+    i++;
+  }
+
+  // Treat line breaks as their own step and keep indentation.
+  if (i < suffixCp.length && suffixCp[i] === '\n') {
+    i++;
+    while (i < suffixCp.length && isHorizontalWhitespace(suffixCp[i]!)) {
+      i++;
+    }
+  } else {
+    // Consume one word.
+    while (i < suffixCp.length && !/\s/.test(suffixCp[i]!)) {
+      i++;
+    }
+
+    // Keep trailing spaces so repeated accepts feel natural.
+    while (i < suffixCp.length && isHorizontalWhitespace(suffixCp[i]!)) {
+      i++;
+    }
+  }
+
+  if (i === 0) {
+    return null;
+  }
+
+  const acceptedPart = suffixCp.slice(0, i).join('');
+  return `${currentText}${acceptedPart}`;
 }
 
 const DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS = 350;
@@ -1010,6 +1068,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       ) {
         completion.promptCompletion.accept();
         return true;
+      }
+
+      if (
+        keyMatchers[Command.MOVE_WORD_RIGHT](key) &&
+        !completion.showSuggestions &&
+        completion.promptCompletion.text &&
+        buffer.getOffset() === cpLen(buffer.text)
+      ) {
+        const nextText = getTextWithNextGhostWord(
+          buffer.text,
+          completion.promptCompletion.text,
+        );
+        if (nextText) {
+          buffer.setText(nextText);
+          completion.promptCompletion.markSelected(nextText);
+          setExpandedSuggestionIndex(-1);
+          return true;
+        }
       }
 
       if (!shellModeActive) {
