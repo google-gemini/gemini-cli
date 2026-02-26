@@ -7,10 +7,6 @@ on:
         description: 'Branch to run on (defaults to selected branch)'
         required: false
         type: 'string'
-      test_name_pattern:
-        description: 'The test name pattern to use'
-        required: false
-        type: 'string'
       runs:
         description: 'The number of runs'
         required: false
@@ -63,14 +59,13 @@ jobs:
           IS_DOCKER: "${{ matrix.sandbox == 'sandbox:docker' }}"
           KEEP_OUTPUT: 'true'
           RUNS: '${{ github.event.inputs.runs }}'
-          TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
           VERBOSE: 'true'
         shell: 'bash'
         run: |
           if [[ "${IS_DOCKER}" == "true" ]]; then
-            npm run deflake:test:integration:sandbox:docker -- --runs="${RUNS}" -- --testNamePattern "'${TEST_NAME_PATTERN}'"
+            npm run deflake:test:integration:sandbox:docker -- --runs="${RUNS}"
           else
-            npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}" -- --testNamePattern "'${TEST_NAME_PATTERN}'"
+            npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}"
           fi
 
   deflake_e2e_mac:
@@ -105,10 +100,9 @@ jobs:
           KEEP_OUTPUT: 'true'
           RUNS: '${{ github.event.inputs.runs }}'
           SANDBOX: 'sandbox:none'
-          TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
           VERBOSE: 'true'
         run: |
-          npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}" -- --testNamePattern "'${TEST_NAME_PATTERN}'"
+          npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}"
 
   deflake_e2e_windows:
     name: 'Slow E2E - Win'
@@ -163,7 +157,6 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
           RUNS: '${{ github.event.inputs.runs }}'
-          TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
         shell: 'pwsh'
         run: |
-          npm run deflake:test:integration:sandbox:none -- --runs="$env:RUNS" -- --testNamePattern "'$env:TEST_NAME_PATTERN'"
+          npm run deflake:test:integration:sandbox:none -- --runs="$env:RUNS"
