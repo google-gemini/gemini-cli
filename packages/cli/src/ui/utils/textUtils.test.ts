@@ -48,12 +48,12 @@ describe('textUtils', () => {
     it('should handle unicode characters that crash string-width', () => {
       // U+0602 caused string-width to crash (see #16418)
       const char = '؂';
-      expect(getCachedStringWidth(char)).toBe(1);
+      expect(getCachedStringWidth(char)).toBe(0);
     });
 
     it('should handle unicode characters that crash string-width with ANSI codes', () => {
       const charWithAnsi = '\u001b[31m' + '؂' + '\u001b[0m';
-      expect(getCachedStringWidth(charWithAnsi)).toBe(1);
+      expect(getCachedStringWidth(charWithAnsi)).toBe(0);
     });
   });
 
@@ -329,6 +329,35 @@ describe('textUtils', () => {
       it('should handle mixed BMP and non-BMP characters', () => {
         const input = 'Hello 世界 🌍 привет';
         expect(stripUnsafeCharacters(input)).toBe('Hello 世界 🌍 привет');
+      });
+    });
+
+    describe('BiDi and deceptive Unicode characters', () => {
+      it('should strip BiDi override characters', () => {
+        const input = 'safe\u202Etxt.sh';
+        // When stripped, it should be 'safetxt.sh'
+        expect(stripUnsafeCharacters(input)).toBe('safetxt.sh');
+      });
+
+      it('should strip all BiDi control characters (LRM, RLM, U+202A-U+202E, U+2066-U+2069)', () => {
+        const bidiChars =
+          '\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069';
+        expect(stripUnsafeCharacters('a' + bidiChars + 'b')).toBe('ab');
+      });
+
+      it('should strip zero-width characters (U+200B, U+FEFF)', () => {
+        const zeroWidthChars = '\u200B\uFEFF';
+        expect(stripUnsafeCharacters('a' + zeroWidthChars + 'b')).toBe('ab');
+      });
+
+      it('should preserve ZWJ (U+200D) for complex emojis', () => {
+        const input = 'Family: 👨‍👩‍👧‍👦';
+        expect(stripUnsafeCharacters(input)).toBe('Family: 👨‍👩‍👧‍👦');
+      });
+
+      it('should preserve ZWNJ (U+200C)', () => {
+        const input = 'hello\u200Cworld';
+        expect(stripUnsafeCharacters(input)).toBe('hello\u200Cworld');
       });
     });
 

@@ -32,6 +32,7 @@ jobs:
         with:
           # The user-level skills need to be available to the workflow
           fetch-depth: 0
+          ref: 'main'
 
       - name: 'Set up Node.js'
         uses: 'actions/setup-node@v4'
@@ -42,7 +43,6 @@ jobs:
         id: 'release_info'
         run: |
           VERSION="${{ github.event.inputs.version || github.event.release.tag_name }}"
-          BODY="${{ github.event.inputs.body || github.event.release.body }}"
           TIME="${{ github.event.inputs.time || github.event.release.created_at }}"
 
           echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
@@ -50,12 +50,24 @@ jobs:
 
           # Use a heredoc to preserve multiline release body
           echo 'RAW_CHANGELOG<<EOF' >> "$GITHUB_OUTPUT"
-          printf "%s\n" "${BODY}" >> "$GITHUB_OUTPUT"
+          printf "%s\n" "$BODY" >> "$GITHUB_OUTPUT"
           echo 'EOF' >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          BODY: '${{ github.event.inputs.body || github.event.release.body }}'
+
+      - name: 'Validate version'
+        id: 'validate_version'
+        run: |
+          if echo "${{ steps.release_info.outputs.VERSION }}" | grep -q "nightly"; then
+            echo "Nightly release detected. Stopping workflow."
+            echo "CONTINUE=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "CONTINUE=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: 'Generate Changelog with Gemini'
+        if: "steps.validate_version.outputs.CONTINUE == 'true'"
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
@@ -69,7 +81,10 @@ jobs:
 
             Execute the release notes generation process using the information provided.
 
+            When you are done, please output your thought process and the steps you took for future debugging purposes.
+
       - name: 'Create Pull Request'
+        if: "steps.validate_version.outputs.CONTINUE == 'true'"
         uses: 'peter-evans/create-pull-request@v6'
         with:
           token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'

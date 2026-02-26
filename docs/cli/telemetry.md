@@ -93,7 +93,7 @@ Environment variables can be used to override the settings in the file.
 `true` or `1` will enable the feature. Any other value will disable it.
 
 For detailed information about all configuration options, see the
-[Configuration guide](../get-started/configuration.md).
+[Configuration guide](../reference/configuration.md).
 
 ## Google Cloud telemetry
 
@@ -487,6 +487,7 @@ Captures Gemini API requests, responses, and errors.
     - `reasoning` (string, optional)
     - `failed` (boolean)
     - `error_message` (string, optional)
+    - `approval_mode` (string)
 
 #### Chat and streaming
 
@@ -711,12 +712,14 @@ Routing latency/failures and slash-command selections.
   - **Attributes**:
     - `routing.decision_model` (string)
     - `routing.decision_source` (string)
+    - `routing.approval_mode` (string)
 
 - `gemini_cli.model_routing.failure.count` (Counter, Int): Counts model routing
   failures.
   - **Attributes**:
     - `routing.decision_source` (string)
     - `routing.error_message` (string)
+    - `routing.approval_mode` (string)
 
 ##### Agent runs
 

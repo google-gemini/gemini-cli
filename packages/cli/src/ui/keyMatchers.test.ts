@@ -130,6 +130,7 @@ describe('keyMatchers', () => {
       positive: [
         createKey('delete', { ctrl: true }),
         createKey('delete', { alt: true }),
+        createKey('d', { alt: true }),
       ],
       negative: [createKey('delete'), createKey('backspace', { ctrl: true })],
     },
@@ -351,7 +352,6 @@ describe('keyMatchers', () => {
         createKey('l', { ctrl: true }),
       ],
     },
-
     // Shell commands
     {
       command: Command.REVERSE_SEARCH,

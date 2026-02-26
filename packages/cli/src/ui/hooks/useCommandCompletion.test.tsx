@@ -40,6 +40,16 @@ vi.mock('./useSlashCompletion', () => ({
   })),
 }));
 
+vi.mock('./useShellCompletion', async () => {
+  const actual = await vi.importActual<
+    typeof import('./useShellCompletion.js')
+  >('./useShellCompletion');
+  return {
+    ...actual,
+    useShellCompletion: vi.fn(),
+  };
+});
+
 // Helper to set up mocks in a consistent way for both child hooks
 const setupMocks = ({
   atSuggestions = [],

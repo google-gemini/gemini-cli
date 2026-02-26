@@ -13,6 +13,10 @@ import {
   isFolderTrustEnabled,
   isWorkspaceTrusted,
 } from '../config/trustedFolders.js';
+import {
+  getCompatibilityWarnings,
+  WarningPriority,
+} from '@google/gemini-cli-core';
 
 // Mock os.homedir to control the home directory in tests
 vi.mock('os', async (importOriginal) => {
@@ -29,6 +33,11 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     homedir: () => os.homedir(),
+    getCompatibilityWarnings: vi.fn().mockReturnValue([]),
+    WarningPriority: {
+      Low: 'low',
+      High: 'high',
+    },
   };
 });
 
@@ -51,23 +60,25 @@ describe('getUserStartupWarnings', () => {
       isTrusted: false,
       source: undefined,
     });
+    vi.mocked(getCompatibilityWarnings).mockReturnValue([]);
   });
 
   afterEach(async () => {
     await fs.rm(testRootDir, { recursive: true, force: true });
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe('home directory check', () => {
     it('should return a warning when running in home directory', async () => {
       const warnings = await getUserStartupWarnings({}, homeDir);
       expect(warnings).toContainEqual(
-        expect.stringContaining(
-          'Warning you are running Gemini CLI in your home directory',
-        ),
-      );
-      expect(warnings).toContainEqual(
-        expect.stringContaining('warning can be disabled in /settings'),
+        expect.objectContaining({
+          id: 'home-directory',
+          message: expect.stringContaining(
+            'Warning you are running Gemini CLI in your home directory',
+          ),
+          priority: WarningPriority.Low,
+        }),
       );
     });
 
@@ -75,9 +86,7 @@ describe('getUserStartupWarnings', () => {
       const projectDir = path.join(testRootDir, 'project');
       await fs.mkdir(projectDir);
       const warnings = await getUserStartupWarnings({}, projectDir);
-      expect(warnings).not.toContainEqual(
-        expect.stringContaining('home directory'),
-      );
+      expect(warnings.find((w) => w.id === 'home-directory')).toBeUndefined();
     });
 
     it('should not return a warning when showHomeDirectoryWarning is false', async () => {
@@ -85,9 +94,7 @@ describe('getUserStartupWarnings', () => {
         { ui: { showHomeDirectoryWarning: false } },
         homeDir,
       );
-      expect(warnings).not.toContainEqual(
-        expect.stringContaining('home directory'),
-      );
+      expect(warnings.find((w) => w.id === 'home-directory')).toBeUndefined();
     });
 
     it('should not return a warning when folder trust is enabled and workspace is trusted', async () => {
@@ -98,9 +105,7 @@ describe('getUserStartupWarnings', () => {
       });
 
       const warnings = await getUserStartupWarnings({}, homeDir);
-      expect(warnings).not.toContainEqual(
-        expect.stringContaining('home directory'),
-      );
+      expect(warnings.find((w) => w.id === 'home-directory')).toBeUndefined();
     });
   });
 
@@ -109,10 +114,11 @@ describe('getUserStartupWarnings', () => {
       const rootDir = path.parse(testRootDir).root;
       const warnings = await getUserStartupWarnings({}, rootDir);
       expect(warnings).toContainEqual(
-        expect.stringContaining('root directory'),
-      );
-      expect(warnings).toContainEqual(
-        expect.stringContaining('folder structure will be used'),
+        expect.objectContaining({
+          id: 'root-directory',
+          message: expect.stringContaining('root directory'),
+          priority: WarningPriority.High,
+        }),
       );
     });
 
@@ -120,9 +126,7 @@ describe('getUserStartupWarnings', () => {
       const projectDir = path.join(testRootDir, 'project');
       await fs.mkdir(projectDir);
       const warnings = await getUserStartupWarnings({}, projectDir);
-      expect(warnings).not.toContainEqual(
-        expect.stringContaining('root directory'),
-      );
+      expect(warnings.find((w) => w.id === 'root-directory')).toBeUndefined();
     });
   });
 
@@ -130,9 +134,45 @@ describe('getUserStartupWarnings', () => {
     it('should handle errors when checking directory', async () => {
       const nonExistentPath = path.join(testRootDir, 'non-existent');
       const warnings = await getUserStartupWarnings({}, nonExistentPath);
-      const expectedWarning =
+      const expectedMessage =
         'Could not verify the current directory due to a file system error.';
-      expect(warnings).toEqual([expectedWarning, expectedWarning]);
+      expect(warnings).toEqual([
+        expect.objectContaining({ message: expectedMessage }),
+        expect.objectContaining({ message: expectedMessage }),
+      ]);
+    });
+  });
+
+  describe('compatibility warnings', () => {
+    it('should include compatibility warnings by default', async () => {
+      const compWarning = {
+        id: 'comp-1',
+        message: 'Comp warning 1',
+        priority: WarningPriority.High,
+      };
+      vi.mocked(getCompatibilityWarnings).mockReturnValue([compWarning]);
+      const projectDir = path.join(testRootDir, 'project');
+      await fs.mkdir(projectDir);
+
+      const warnings = await getUserStartupWarnings({}, projectDir);
+      expect(warnings).toContainEqual(compWarning);
+    });
+
+    it('should not include compatibility warnings when showCompatibilityWarnings is false', async () => {
+      const compWarning = {
+        id: 'comp-1',
+        message: 'Comp warning 1',
+        priority: WarningPriority.High,
+      };
+      vi.mocked(getCompatibilityWarnings).mockReturnValue([compWarning]);
+      const projectDir = path.join(testRootDir, 'project');
+      await fs.mkdir(projectDir);
+
+      const warnings = await getUserStartupWarnings(
+        { ui: { showCompatibilityWarnings: false } },
+        projectDir,
+      );
+      expect(warnings).not.toContainEqual(compWarning);
     });
   });
 });
