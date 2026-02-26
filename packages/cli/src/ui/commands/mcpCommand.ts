@@ -256,7 +256,7 @@ const listAction = async (
   }
   const errors: Record<string, string> = {};
   for (const serverName of serverNames) {
-    const error = config.getLastMcpError(serverName);
+    const error = config.getMcpClientManager()?.getLastError(serverName);
     if (error) {
       errors[serverName] = error;
     }

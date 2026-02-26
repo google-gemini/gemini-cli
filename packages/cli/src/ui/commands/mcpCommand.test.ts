@@ -106,14 +106,14 @@ describe('mcpCommand', () => {
       }),
       getGeminiClient: vi.fn(),
       getMcpClientManager: vi.fn().mockImplementation(() => ({
-        getBlockedMcpServers: vi.fn(),
-        getMcpServers: vi.fn(),
+        getBlockedMcpServers: vi.fn().mockReturnValue([]),
+        getMcpServers: vi.fn().mockReturnValue({}),
+        getLastError: vi.fn().mockReturnValue(undefined),
       })),
       getResourceRegistry: vi.fn().mockReturnValue({
         getAllResources: vi.fn().mockReturnValue([]),
       }),
       setUserInteractedWithMcp: vi.fn(),
-      getLastMcpError: vi.fn().mockReturnValue(undefined),
     };
 
     mockContext = createMockCommandContext({
@@ -169,6 +169,7 @@ describe('mcpCommand', () => {
       mockConfig.getMcpClientManager = vi.fn().mockReturnValue({
         getMcpServers: vi.fn().mockReturnValue(mockMcpServers),
         getBlockedMcpServers: vi.fn().mockReturnValue([]),
+        getLastError: vi.fn().mockReturnValue(undefined),
       });
     });
 
