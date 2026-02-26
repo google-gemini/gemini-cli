@@ -1309,7 +1309,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const handleClearScreen = useCallback(() => {
     reset();
     // Explicitly hide the expansion hint and clear its x-second timer when clearing the screen.
-    triggerExpandHint(false);
+    triggerExpandHint(null);
     historyManager.clearItems();
     clearConsoleMessagesState();
     refreshStatic();
