@@ -392,7 +392,10 @@ describe('editor utils', () => {
         );
       });
 
-      it(`should reject if ${editor} exits with non-zero code`, async () => {
+      it(`should resolve and log warning if ${editor} exits with non-zero code`, async () => {
+        const warnSpy = vi
+          .spyOn(debugLogger, 'warn')
+          .mockImplementation(() => {});
         const mockSpawnOn = vi.fn((event, cb) => {
           if (event === 'close') {
             cb(1);
@@ -400,9 +403,51 @@ describe('editor utils', () => {
         });
         (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
 
+        await openDiff('old.txt', 'new.txt', editor);
+        expect(warnSpy).toHaveBeenCalledWith(`${editor} exited with code 1`);
+      });
+
+      it(`should emit ExternalEditorClosed when ${editor} exits successfully`, async () => {
+        const emitSpy = vi.spyOn(coreEvents, 'emit');
+        const mockSpawnOn = vi.fn((event, cb) => {
+          if (event === 'close') {
+            cb(0);
+          }
+        });
+        (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
+        await openDiff('old.txt', 'new.txt', editor);
+        expect(emitSpy).toHaveBeenCalledWith(CoreEvent.ExternalEditorClosed);
+      });
+
+      it(`should emit ExternalEditorClosed when ${editor} exits with non-zero code`, async () => {
+        vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
+        const emitSpy = vi.spyOn(coreEvents, 'emit');
+        const mockSpawnOn = vi.fn((event, cb) => {
+          if (event === 'close') {
+            cb(1);
+          }
+        });
+        (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
+        await openDiff('old.txt', 'new.txt', editor);
+        expect(emitSpy).toHaveBeenCalledWith(CoreEvent.ExternalEditorClosed);
+      });
+
+      it(`should emit ExternalEditorClosed when ${editor} spawn errors`, async () => {
+        const emitSpy = vi.spyOn(coreEvents, 'emit');
+        const mockError = new Error('spawn error');
+        const mockSpawnOn = vi.fn((event, cb) => {
+          if (event === 'error') {
+            cb(mockError);
+          }
+        });
+        (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
         await expect(openDiff('old.txt', 'new.txt', editor)).rejects.toThrow(
-          `${editor} exited with code 1`,
+          'spawn error',
         );
+        expect(emitSpy).toHaveBeenCalledWith(CoreEvent.ExternalEditorClosed);
       });
     }
 
