@@ -494,6 +494,7 @@ describe('TableRenderer', () => {
           rows={rows}
           terminalWidth={terminalWidth}
         />,
+        { width: terminalWidth },
       );
       const { lastFrame, waitUntilReady, unmount } = renderResult;
       await waitUntilReady();
