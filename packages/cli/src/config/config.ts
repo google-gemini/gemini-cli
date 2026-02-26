@@ -97,6 +97,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  a2aPort: number | undefined;
 }
 
 export async function parseArguments(
@@ -288,6 +289,12 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('a2a-port', {
+          type: 'number',
+          nargs: 1,
+          description:
+            'Enable the embedded A2A HTTP listener on the specified port (0 for random). Implies --a2a enabled.',
         }),
     )
     // Register MCP subcommands

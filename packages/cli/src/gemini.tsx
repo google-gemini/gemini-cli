@@ -82,6 +82,7 @@ import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
+import { startExternalListener } from './external-listener.js';
 import { SessionSelector } from './utils/sessionUtils.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { MouseProvider } from './ui/contexts/MouseContext.js';
@@ -188,6 +189,7 @@ export async function startInteractiveUI(
   workspaceRoot: string = process.cwd(),
   resumedSessionData: ResumedSessionData | undefined,
   initializationResult: InitializationResult,
+  a2aPort?: number,
 ) {
   // Never enter Ink alternate buffer mode when screen reader mode is enabled
   // as there is no benefit of alternate buffer mode when using a screen reader
@@ -319,6 +321,23 @@ export async function startInteractiveUI(
     });
 
   registerCleanup(() => instance.unmount());
+
+  // Start embedded A2A HTTP listener if enabled via --a2a-port
+  if (a2aPort !== undefined) {
+    try {
+      const listener = await startExternalListener({ port: a2aPort });
+      registerCleanup(listener.cleanup);
+      coreEvents.emitFeedback(
+        'info',
+        `A2A endpoint listening on port ${listener.port}`,
+      );
+    } catch (err) {
+      coreEvents.emitFeedback(
+        'warning',
+        `Failed to start A2A listener: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
 }
 
 export async function main() {
@@ -722,6 +741,7 @@ export async function main() {
         process.cwd(),
         resumedSessionData,
         initializationResult,
+        argv.a2aPort,
       );
       return;
     }
