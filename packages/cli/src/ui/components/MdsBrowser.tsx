@@ -181,7 +181,7 @@ export const MdsBrowser: React.FC<MdsBrowserProps> = ({ config, onClose }) => {
         }
         return true;
       }
-      return false;
+      return true;
     },
     { isActive: true, priority: true },
   );
