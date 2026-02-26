@@ -53,7 +53,7 @@ interface BackgroundColorRow {
 
 type ColorRow = StandardColorRow | GradientColorRow | BackgroundColorRow;
 
-const VALUE_COLUMN_WIDTH = '12%';
+const VALUE_COLUMN_WIDTH = '8%';
 const NAME_COLUMN_WIDTH = '30%';
 
 export const ColorsDisplay: React.FC = () => {
