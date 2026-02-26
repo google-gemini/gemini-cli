@@ -15,45 +15,55 @@ export function useExtensionStatusBadges(config: Config): StatusBadge[] {
     const activeExtensions = config
       .getExtensionLoader()
       .getExtensions()
-      .filter((ext) => ext.isActive && ext.ui?.badges && ext.ui.badges.length > 0);
-
-    const newBadges: StatusBadge[] = [];
+      .filter(
+        (ext) => ext.isActive && ext.ui?.badges && ext.ui.badges.length > 0,
+      );
 
     const badgePromises = activeExtensions.flatMap((ext) => {
       if (!ext.ui?.badges) return [];
 
-      return ext.ui.badges.map(async (badgeConfig) => {
-        try {
-          const { stdout } = await spawnAsync(
-            badgeConfig.command,
-            badgeConfig.args ?? [],
-          );
-          const text = stdout.toString().trim();
-          if (text) {
-            newBadges.push({
-              text: badgeConfig.icon ? `${badgeConfig.icon} ${text}` : text,
-              color: badgeConfig.color,
-            });
+      return ext.ui.badges.map(
+        async (badgeConfig): Promise<StatusBadge | null> => {
+          try {
+            const { stdout } = await spawnAsync(
+              badgeConfig.command,
+              badgeConfig.args ?? [],
+            );
+            const text = stdout.toString().trim();
+            if (text) {
+              return {
+                text: badgeConfig.icon ? `${badgeConfig.icon} ${text}` : text,
+                color: badgeConfig.color,
+              };
+            }
+          } catch (_e) {
+            // Ignore failing badge commands silently so they don't break the UI
           }
-        } catch (_e) {
-          // Ignore failing badge commands silently so they don't break the UI
-        }
-      });
+          return null;
+        },
+      );
     });
 
-    await Promise.allSettled(badgePromises);
+    const results = await Promise.allSettled(badgePromises);
+    const newBadges: StatusBadge[] = results
+      .filter(
+        (result): result is PromiseFulfilledResult<StatusBadge> =>
+          result.status === 'fulfilled' && result.value !== null,
+      )
+      .map((result) => result.value);
+
     setBadges(newBadges);
   }, [config]);
 
   useEffect(() => {
     void fetchBadges();
-    
+
     // Poll every 30 seconds for all extension badges
     // Future enhancement: Respect `intervalMs` from individual badge configs
     const interval = setInterval(() => {
       void fetchBadges();
     }, 30000);
-    
+
     return () => clearInterval(interval);
   }, [fetchBadges]);
 

@@ -179,6 +179,11 @@ async function extensionConsentString(
       '⚠️  This extension contains Hooks which can automatically execute commands.',
     );
   }
+  if (sanitizedConfig.ui?.badges && sanitizedConfig.ui.badges.length > 0) {
+    output.push(
+      '⚠️  This extension contributes UI Badges which will automatically execute commands in the background to update their status.',
+    );
+  }
   if (skills.length > 0) {
     output.push(`\n${chalk.bold('Agent Skills:')}`);
     output.push('\nThis extension will install the following agent skills:\n');
