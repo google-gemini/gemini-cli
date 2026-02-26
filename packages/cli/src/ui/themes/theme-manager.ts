@@ -15,6 +15,8 @@ import { Holiday } from './holiday.js';
 import { DefaultLight } from './default-light.js';
 import { DefaultDark } from './default.js';
 import { ShadesOfPurple } from './shades-of-purple.js';
+import { SolarizedDark } from './solarized-dark.js';
+import { SolarizedLight } from './solarized-light.js';
 import { XCode } from './xcode.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -27,7 +29,11 @@ import {
   getThemeTypeFromBackgroundColor,
   resolveColor,
 } from './color-utils.js';
-import { DEFAULT_BORDER_OPACITY } from '../constants.js';
+import {
+  DEFAULT_BACKGROUND_OPACITY,
+  DEFAULT_INPUT_BACKGROUND_OPACITY,
+  DEFAULT_BORDER_OPACITY,
+} from '../constants.js';
 import { ANSI } from './ansi.js';
 import { ANSILight } from './ansi-light.js';
 import { NoColorTheme } from './no-color.js';
@@ -68,6 +74,8 @@ class ThemeManager {
       GoogleCode,
       Holiday,
       ShadesOfPurple,
+      SolarizedDark,
+      SolarizedLight,
       XCode,
       ANSI,
       ANSILight,
@@ -306,7 +314,21 @@ class ThemeManager {
       this.cachedColors = {
         ...colors,
         Background: this.terminalBackground,
-        DarkGray: interpolateColor(colors.Gray, this.terminalBackground, 0.5),
+        DarkGray: interpolateColor(
+          this.terminalBackground,
+          colors.Gray,
+          DEFAULT_BORDER_OPACITY,
+        ),
+        InputBackground: interpolateColor(
+          this.terminalBackground,
+          colors.Gray,
+          DEFAULT_INPUT_BACKGROUND_OPACITY,
+        ),
+        MessageBackground: interpolateColor(
+          this.terminalBackground,
+          colors.Gray,
+          DEFAULT_BACKGROUND_OPACITY,
+        ),
       };
     } else {
       this.cachedColors = colors;
@@ -332,27 +354,22 @@ class ThemeManager {
       this.terminalBackground &&
       this.isThemeCompatible(activeTheme, this.terminalBackground)
     ) {
+      const colors = this.getColors();
       this.cachedSemanticColors = {
         ...semanticColors,
         background: {
           ...semanticColors.background,
           primary: this.terminalBackground,
+          message: colors.MessageBackground!,
+          input: colors.InputBackground!,
         },
         border: {
           ...semanticColors.border,
-          default: interpolateColor(
-            this.terminalBackground,
-            activeTheme.colors.Gray,
-            DEFAULT_BORDER_OPACITY,
-          ),
+          default: colors.DarkGray,
         },
         ui: {
           ...semanticColors.ui,
-          dark: interpolateColor(
-            activeTheme.colors.Gray,
-            this.terminalBackground,
-            0.5,
-          ),
+          dark: colors.DarkGray,
         },
       };
     } else {

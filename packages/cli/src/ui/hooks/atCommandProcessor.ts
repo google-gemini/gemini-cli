@@ -21,7 +21,10 @@ import {
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { Buffer } from 'node:buffer';
-import type { HistoryItem, IndividualToolCallDisplay } from '../types.js';
+import type {
+  HistoryItemToolGroup,
+  IndividualToolCallDisplay,
+} from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 const REF_CONTENT_HEADER = `\n${REFERENCE_CONTENT_START}`;
@@ -697,7 +700,7 @@ export async function handleAtCommand({
       {
         type: 'tool_group',
         tools: allDisplays,
-      } as Omit<HistoryItem, 'id'>,
+      } as HistoryItemToolGroup,
       userMessageTimestamp,
     );
   }

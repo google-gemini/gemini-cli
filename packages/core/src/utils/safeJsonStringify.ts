@@ -27,6 +27,7 @@ export function safeJsonStringify(
         }
         seen.add(value);
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return value;
     },
     space,
@@ -37,6 +38,7 @@ export function safeJsonStringify(
 function removeEmptyObjects(data: any): object {
   const cleanedObject: { [key: string]: unknown } = {};
   for (const k in data) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const v = data[k];
     if (v !== null && v !== undefined && typeof v === 'boolean') {
       cleanedObject[k] = v;
@@ -59,6 +61,7 @@ export function safeJsonStringifyBooleanValuesOnly(obj: any): string {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if ((value as Config) !== null && !configSeen) {
       configSeen = true;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return value;
     }
     if (typeof value === 'boolean') {

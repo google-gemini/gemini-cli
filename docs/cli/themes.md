@@ -16,12 +16,14 @@ using the `/theme` command within Gemini CLI:
   - `Default`
   - `Dracula`
   - `GitHub`
+  - `Solarized Dark`
 - **Light themes:**
   - `ANSI Light`
   - `Ayu Light`
   - `Default Light`
   - `GitHub Light`
   - `Google Code`
+  - `Solarized Light`
   - `Xcode`
 
 ### Changing themes
@@ -39,8 +41,8 @@ can change the theme using the `/theme` command.
 ### Theme persistence
 
 Selected themes are saved in Gemini CLI's
-[configuration](../get-started/configuration.md) so your preference is
-remembered across sessions.
+[configuration](../reference/configuration.md) so your preference is remembered
+across sessions.
 
 ---
 
@@ -54,7 +56,7 @@ used in the CLI.
 
 Add a `customThemes` block to your user, project, or system `settings.json`
 file. Each custom theme is defined as an object with a unique name and a set of
-color keys. For example:
+nested configuration objects. For example:
 
 ```json
 {
@@ -63,50 +65,52 @@ color keys. For example:
       "MyCustomTheme": {
         "name": "MyCustomTheme",
         "type": "custom",
-        "Background": "#181818",
-        ...
+        "background": {
+          "primary": "#181818"
+        },
+        "text": {
+          "primary": "#f0f0f0",
+          "secondary": "#a0a0a0"
+        }
       }
     }
   }
 }
 ```
 
-**Color keys:**
+**Configuration objects:**
 
-- `Background`
-- `Foreground`
-- `LightBlue`
-- `AccentBlue`
-- `AccentPurple`
-- `AccentCyan`
-- `AccentGreen`
-- `AccentYellow`
-- `AccentRed`
-- `Comment`
-- `Gray`
-- `DiffAdded` (optional, for added lines in diffs)
-- `DiffRemoved` (optional, for removed lines in diffs)
-
-You can also override individual UI text roles by adding a nested `text` object.
-This object supports the keys `primary`, `secondary`, `link`, `accent`, and
-`response`. When `text.response` is provided it takes precedence over
-`text.primary` for rendering model responses in chat.
+- **`text`**: Defines text colors.
+  - `primary`: The default text color.
+  - `secondary`: Used for less prominent text.
+  - `link`: Color for URLs and links.
+  - `accent`: Used for highlights and emphasis.
+  - `response`: Precedence over `primary` for rendering model responses.
+- **`background`**: Defines background colors.
+  - `primary`: The main background color of the UI.
+  - `diff.added`: Background for added lines in diffs.
+  - `diff.removed`: Background for removed lines in diffs.
+- **`border`**: Defines border colors.
+  - `default`: The standard border color.
+  - `focused`: Border color when an element is focused.
+- **`status`**: Colors for status indicators.
+  - `success`: Used for successful operations.
+  - `warning`: Used for warnings.
+  - `error`: Used for errors.
+- **`ui`**: Other UI elements.
+  - `comment`: Color for code comments.
+  - `symbol`: Color for code symbols and operators.
+  - `gradient`: An array of colors used for gradient effects.
 
 **Required properties:**
 
 - `name` (must match the key in the `customThemes` object and be a string)
 - `type` (must be the string `"custom"`)
-- `Background`
-- `Foreground`
-- `LightBlue`
-- `AccentBlue`
-- `AccentPurple`
-- `AccentCyan`
-- `AccentGreen`
-- `AccentYellow`
-- `AccentRed`
-- `Comment`
-- `Gray`
+
+While all sub-properties are technically optional, we recommend providing at
+least `background.primary`, `text.primary`, `text.secondary`, and the various
+accent colors via `text.link`, `text.accent`, and `status` to ensure a cohesive
+UI.
 
 You can use either hex codes (e.g., `#FF0000`) **or** standard CSS color names
 (e.g., `coral`, `teal`, `blue`) for any color value. See
@@ -141,22 +145,35 @@ custom theme defined in `settings.json`.
 
 ```json
 {
-  "name": "My File Theme",
+  "name": "Gruvbox Dark",
   "type": "custom",
-  "Background": "#282A36",
-  "Foreground": "#F8F8F2",
-  "LightBlue": "#82AAFF",
-  "AccentBlue": "#61AFEF",
-  "AccentPurple": "#BD93F9",
-  "AccentCyan": "#8BE9FD",
-  "AccentGreen": "#50FA7B",
-  "AccentYellow": "#F1FA8C",
-  "AccentRed": "#FF5555",
-  "Comment": "#6272A4",
-  "Gray": "#ABB2BF",
-  "DiffAdded": "#A6E3A1",
-  "DiffRemoved": "#F38BA8",
-  "GradientColors": ["#4796E4", "#847ACE", "#C3677F"]
+  "background": {
+    "primary": "#282828",
+    "diff": {
+      "added": "#2b3312",
+      "removed": "#341212"
+    }
+  },
+  "text": {
+    "primary": "#ebdbb2",
+    "secondary": "#a89984",
+    "link": "#83a598",
+    "accent": "#d3869b"
+  },
+  "border": {
+    "default": "#3c3836",
+    "focused": "#458588"
+  },
+  "status": {
+    "success": "#b8bb26",
+    "warning": "#fabd2f",
+    "error": "#fb4934"
+  },
+  "ui": {
+    "comment": "#928374",
+    "symbol": "#8ec07c",
+    "gradient": ["#cc241d", "#d65d0e", "#d79921"]
+  }
 }
 ```
 
@@ -177,8 +194,17 @@ untrusted sources.
 - Or, set it as the default by adding `"theme": "MyCustomTheme"` to the `ui`
   object in your `settings.json`.
 - Custom themes can be set at the user, project, or system level, and follow the
-  same [configuration precedence](../get-started/configuration.md) as other
+  same [configuration precedence](../reference/configuration.md) as other
   settings.
+
+### Themes from extensions
+
+[Extensions](../extensions/reference.md#themes) can also provide custom themes.
+Once an extension is installed and enabled, its themes are automatically added
+to the selection list in the `/theme` command.
+
+Themes from extensions appear with the extension name in parentheses to help you
+identify their source, for example: `shades-of-green (green-extension)`.
 
 ---
 
@@ -208,6 +234,10 @@ untrusted sources.
 
 <img src="/assets/theme-github.png" alt="GitHub theme" width="600">
 
+### Solarized Dark
+
+<img src="/assets/theme-solarized-dark.png" alt="Solarized Dark theme" width="600">
+
 ## Light themes
 
 ### ANSI Light
@@ -229,6 +259,10 @@ untrusted sources.
 ### Google Code
 
 <img src="/assets/theme-google-light.png" alt="Google Code theme" width="600">
+
+### Solarized Light
+
+<img src="/assets/theme-solarized-light.png" alt="Solarized Light theme" width="600">
 
 ### Xcode
 
