@@ -14,6 +14,7 @@ import {
   type Config,
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
+  type EditorType,
   hasRedirection,
   debugLogger,
 } from '@google/gemini-cli-core';
@@ -49,6 +50,7 @@ export interface ToolConfirmationMessageProps {
   callId: string;
   confirmationDetails: SerializableConfirmationDetails;
   config: Config;
+  getPreferredEditor: () => EditorType | undefined;
   isFocused?: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
@@ -60,6 +62,7 @@ export const ToolConfirmationMessage: React.FC<
   callId,
   confirmationDetails,
   config,
+  getPreferredEditor,
   isFocused = true,
   availableTerminalHeight,
   terminalWidth,
@@ -424,6 +427,7 @@ export const ToolConfirmationMessage: React.FC<
       bodyContent = (
         <ExitPlanModeDialog
           planPath={confirmationDetails.planPath}
+          getPreferredEditor={getPreferredEditor}
           onApprove={(approvalMode) => {
             handleConfirm(ToolConfirmationOutcome.ProceedOnce, {
               approved: true,
@@ -629,6 +633,7 @@ export const ToolConfirmationMessage: React.FC<
     hasMcpToolDetails,
     mcpToolDetailsText,
     expandDetailsHintKey,
+    getPreferredEditor,
   ]);
 
   const bodyOverflowDirection: 'top' | 'bottom' =
