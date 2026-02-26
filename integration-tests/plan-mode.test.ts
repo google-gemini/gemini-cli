@@ -72,7 +72,12 @@ describe('Plan Mode', () => {
             core: ['write_file', 'read_file', 'list_directory'],
             allowed: ['write_file'],
           },
-          general: { defaultApprovalMode: 'plan' },
+          general: {
+            defaultApprovalMode: 'plan',
+            plan: {
+              directory: '.gemini/tmp/session/v1/plans',
+            },
+          },
         },
       },
     );
