@@ -180,9 +180,35 @@ describe('a2aUtils', () => {
               mimeType: 'text/plain',
             },
           } as FilePart,
+          {
+            kind: 'file',
+            file: {
+              uri: 'http://example.com/doc',
+              mimeType: 'application/pdf',
+            },
+          } as FilePart,
         ],
       };
+      // The formatting logic in a2aUtils prefers name over uri
       expect(extractMessageText(message)).toContain('File: test.txt');
+      expect(extractMessageText(message)).toContain(
+        'File: http://example.com/doc',
+      );
+    });
+
+    it('should handle mixed parts', () => {
+      const message: Message = {
+        kind: 'message',
+        role: 'user',
+        messageId: '1',
+        parts: [
+          { kind: 'text', text: 'Here is data:' } as TextPart,
+          { kind: 'data', data: { value: 123 } } as DataPart,
+        ],
+      };
+      expect(extractMessageText(message)).toBe(
+        'Here is data:\nData: {"value":123}',
+      );
     });
 
     it('should return empty string for undefined or empty message', () => {
