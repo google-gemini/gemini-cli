@@ -40,7 +40,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ github.event.pull_request.head.sha }}'
+          ref: '${{ github.event.inputs.branch_ref }}'
           repository: '${{ github.repository }}'
 
       - name: 'Set up Node.js ${{ matrix.node-version }}'
@@ -81,7 +81,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ github.event.pull_request.head.sha }}'
+          ref: '${{ github.event.inputs.branch_ref }}'
           repository: '${{ github.repository }}'
 
       - name: 'Set up Node.js 20.x'
@@ -119,7 +119,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ github.event.pull_request.head.sha }}'
+          ref: '${{ github.event.inputs.branch_ref }}'
           repository: '${{ github.repository }}'
 
       - name: 'Set up Node.js 20.x'
