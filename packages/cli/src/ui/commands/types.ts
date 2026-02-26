@@ -166,6 +166,16 @@ export interface LogoutActionReturn {
   type: 'logout';
 }
 
+/**
+ * The return type for a command action that opens content in the user's
+ * configured external editor (e.g. vim, nano, VS Code).
+ */
+export interface OpenInEditorActionReturn {
+  type: 'open_in_editor';
+  /** The text content to write to a temporary file and open in the editor. */
+  content: string;
+}
+
 export type SlashCommandActionReturn =
   | CommandActionReturn<HistoryItemWithoutId[]>
   | QuitActionReturn
@@ -173,7 +183,8 @@ export type SlashCommandActionReturn =
   | ConfirmShellCommandsActionReturn
   | ConfirmActionReturn
   | OpenCustomDialogActionReturn
-  | LogoutActionReturn;
+  | LogoutActionReturn
+  | OpenInEditorActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',

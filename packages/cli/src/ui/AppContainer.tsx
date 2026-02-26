@@ -43,6 +43,9 @@ import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
 import {
   type StartupWarning,
   type EditorType,
+  getEditorCommand,
+  isGuiEditor,
+  isGuiEditorCommand,
   type Config,
   type IdeInfo,
   type IdeContext,
@@ -104,7 +107,10 @@ import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
-import { basename } from 'node:path';
+import { basename, join as pathJoin } from 'node:path';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import { computeTerminalTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
@@ -583,6 +589,112 @@ export const AppContainer = (props: AppContainerProps) => {
     [settings.merged.general.preferredEditor],
   );
 
+  const openContentInExternalEditor = useCallback(
+    async (content: string): Promise<void> => {
+      const tmpDir = await fs.promises.mkdtemp(
+        pathJoin(os.tmpdir(), 'gemini-chat-'),
+      );
+      const filePath = pathJoin(tmpDir, 'chat.md');
+      await fs.promises.writeFile(filePath, content, 'utf8');
+
+      let command: string | undefined;
+      const args = [filePath];
+
+      const preferredEditorType = getPreferredEditor();
+      if (preferredEditorType) {
+        command = getEditorCommand(preferredEditorType);
+        if (isGuiEditor(preferredEditorType)) {
+          args.unshift('--wait');
+        }
+      }
+
+      if (!command) {
+        const editorFromEnv = process.env['VISUAL'] ?? process.env['EDITOR'];
+        if (editorFromEnv) {
+          command = editorFromEnv;
+          // Detect GUI editors set via $VISUAL/$EDITOR that fork into the
+          // background and need --wait to block until the file is closed.
+          const firstToken =
+            editorFromEnv.match(/[^\s"']+|"([^"]*)"|'([^']*)'/)?.[0] ?? '';
+          const exeBasename = basename(firstToken.replace(/["']/g, '')).replace(
+            /\.(exe|cmd)$/i,
+            '',
+          );
+          if (isGuiEditorCommand(exeBasename) && !args.includes('--wait')) {
+            args.unshift('--wait');
+          }
+        } else {
+          command = process.platform === 'win32' ? 'notepad' : 'vi';
+        }
+      }
+
+      // Tokenize the command string respecting quoted segments so paths with
+      // spaces are preserved (e.g. $EDITOR='"C:\Program Files\ed.exe" --flag').
+      const tokens = [...command.matchAll(/[^\s"']+|"([^"]*)"|'([^']*)'/g)].map(
+        ([full, dq, sq]) => dq ?? sq ?? full,
+      );
+      const [exe = '', ...embeddedArgs] = tokens;
+      const spawnCmd = exe;
+      const spawnArgs = [...embeddedArgs, ...args];
+
+      let cleaned = false;
+      const cleanup = async (): Promise<void> => {
+        if (cleaned) return;
+        cleaned = true;
+        try {
+          await fs.promises.unlink(filePath);
+        } catch {
+          /* ignore */
+        }
+        try {
+          await fs.promises.rm(tmpDir, { recursive: true, force: true });
+        } catch {
+          /* ignore */
+        }
+      };
+
+      try {
+        const child = spawn(spawnCmd, spawnArgs, {
+          stdio: 'inherit',
+          shell: process.platform === 'win32',
+        });
+
+        // Ensure temp files are removed if gemini-cli exits while the editor
+        // is still open (cleanup() is otherwise only triggered by child events).
+        registerCleanup(cleanup);
+
+        child.on('error', (err) => {
+          coreEvents.emitFeedback(
+            'error',
+            '[AppContainer] external editor error',
+            err,
+          );
+          void cleanup();
+        });
+
+        child.on('close', (code) => {
+          if (typeof code === 'number' && code !== 0) {
+            coreEvents.emitFeedback(
+              'error',
+              '[AppContainer] external editor error',
+              new Error(`External editor exited with status ${code}`),
+            );
+          }
+          coreEvents.emit(CoreEvent.ExternalEditorClosed);
+          void cleanup();
+        });
+      } catch (err) {
+        coreEvents.emitFeedback(
+          'error',
+          '[AppContainer] external editor error',
+          err,
+        );
+        await cleanup();
+      }
+    },
+    [getPreferredEditor],
+  );
+
   const buffer = useTextBuffer({
     initialText: '',
     viewport: { height: 10, width: inputWidth },
@@ -918,6 +1030,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       },
       toggleShortcutsHelp: () => setShortcutsHelpVisible((visible) => !visible),
       setText: stableSetText,
+      openContentInExternalEditor,
     }),
     [
       setAuthState,
@@ -937,6 +1050,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       setShortcutsHelpVisible,
       stableSetText,
+      openContentInExternalEditor,
     ],
   );
 
