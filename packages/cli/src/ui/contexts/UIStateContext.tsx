@@ -66,6 +66,12 @@ export interface QuotaState {
   validationRequest: ValidationDialogRequest | null;
 }
 
+export interface AccountSuspensionInfo {
+  message: string;
+  appealUrl?: string;
+  appealLinkText?: string;
+}
+
 export interface UIState {
   history: HistoryItem[];
   historyManager: UseHistoryManagerReturn;
@@ -76,6 +82,7 @@ export interface UIState {
   isAuthenticating: boolean;
   isConfigInitialized: boolean;
   authError: string | null;
+  accountSuspensionInfo: AccountSuspensionInfo | null;
   isAuthDialogOpen: boolean;
   isAwaitingApiKeyInput: boolean;
   apiKeyDefaultValue?: string;
