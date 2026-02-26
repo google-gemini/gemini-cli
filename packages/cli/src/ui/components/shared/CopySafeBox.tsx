@@ -38,7 +38,22 @@ export const CopySafeBox = forwardRef<DOMElement, CopySafeBoxProps>(
       ...rest
     } = props;
 
-    // When in copy mode, we remove borders and add compensatory padding (2)
+    const hasBorderLeft = _borderLeft !== false && _borderStyle !== undefined;
+    const hasBorderRight = _borderRight !== false && _borderStyle !== undefined;
+    const borderLeftWidth = hasBorderLeft ? 1 : 0;
+    const borderRightWidth = hasBorderRight ? 1 : 0;
+
+    const originalPaddingLeft = Number(
+      _paddingLeft ?? _paddingX ?? props.padding ?? 0,
+    );
+    const originalPaddingRight = Number(
+      _paddingRight ?? _paddingX ?? props.padding ?? 0,
+    );
+
+    const newPaddingLeft = borderLeftWidth + originalPaddingLeft;
+    const newPaddingRight = borderRightWidth + originalPaddingRight;
+
+    // When in copy mode, we remove borders and add compensatory padding
     // to maintain the layout of the content relative to the terminal edge.
     return (
       <Box
@@ -49,8 +64,8 @@ export const CopySafeBox = forwardRef<DOMElement, CopySafeBoxProps>(
         borderBottom={false}
         borderLeft={false}
         borderRight={false}
-        paddingLeft={2}
-        paddingRight={2}
+        paddingLeft={newPaddingLeft}
+        paddingRight={newPaddingRight}
       >
         {children}
       </Box>

@@ -49,7 +49,7 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
       width={width}
       stickyChildren={
         <CopySafeBox {...commonProps} opaque>
-          <Box paddingX={copyModeEnabled ? 0 : 1}>{children}</Box>
+          <Box paddingX={1}>{children}</Box>
           {/* Dark border to separate header from content. */}
           {!copyModeEnabled && (
             <Box
@@ -71,7 +71,7 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
         borderRight={true}
         paddingBottom={copyModeEnabled ? 0 : 1}
       >
-        <Box paddingX={copyModeEnabled ? 0 : 1}>{children}</Box>
+        <Box paddingX={1}>{children}</Box>
       </CopySafeBox>
     </Box>
   );
