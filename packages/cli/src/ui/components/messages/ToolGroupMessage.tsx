@@ -62,7 +62,11 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const toolCalls = useMemo(
     () =>
       allToolCalls.filter((t) => {
-        if (isLowErrorVerbosity && t.status === CoreToolCallStatus.Error) {
+        if (
+          isLowErrorVerbosity &&
+          t.status === CoreToolCallStatus.Error &&
+          !t.isClientInitiated
+        ) {
           return false;
         }
 

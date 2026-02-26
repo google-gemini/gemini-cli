@@ -205,6 +205,39 @@ describe('<ToolGroupMessage />', () => {
       unmount();
     });
 
+    it('keeps client-initiated errored tool calls visible in low error verbosity mode', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'tool-1',
+          name: 'client-error-tool',
+          status: CoreToolCallStatus.Error,
+          isClientInitiated: true,
+          resultDisplay: 'Client tool failed',
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          uiState: {
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
+          },
+        },
+      );
+
+      await waitUntilReady();
+      const output = lastFrame();
+      expect(output).toContain('client-error-tool');
+      unmount();
+    });
+
     it('renders mixed tool calls including shell command', async () => {
       const toolCalls = [
         createToolCall({

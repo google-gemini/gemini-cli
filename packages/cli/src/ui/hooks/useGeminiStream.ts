@@ -1625,6 +1625,7 @@ export const useGeminiStream = (
       );
 
       if (isLowErrorVerbosity) {
+        // Low-mode suppression applies only to model-initiated tool failures.
         suppressedToolErrorCountRef.current += geminiTools.filter(
           (tc) => tc.status === CoreToolCallStatus.Error,
         ).length;
