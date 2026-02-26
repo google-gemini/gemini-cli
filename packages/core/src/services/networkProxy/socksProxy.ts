@@ -89,6 +89,7 @@ export interface SocksProxyOptions {
 export class SocksProxy extends BaseProxy {
   private server: net.Server | null = null;
   private boundPort: number = 0;
+  private sockets = new Set<net.Socket>();
 
   constructor(private readonly options: SocksProxyOptions) {
     super(options);
@@ -97,6 +98,10 @@ export class SocksProxy extends BaseProxy {
   async start(): Promise<number> {
     return new Promise((resolve, reject) => {
       this.server = net.createServer((socket) => {
+        this.sockets.add(socket);
+        socket.on('close', () => {
+          this.sockets.delete(socket);
+        });
         this.handleConnection(socket);
       });
 
@@ -117,6 +122,11 @@ export class SocksProxy extends BaseProxy {
   }
 
   async stop(): Promise<void> {
+    for (const socket of this.sockets) {
+      socket.destroy();
+    }
+    this.sockets.clear();
+
     return new Promise((resolve) => {
       if (!this.server) {
         resolve();
@@ -293,6 +303,14 @@ export class SocksProxy extends BaseProxy {
 
     clientSocket.on('error', () => {
       targetSocket.destroy();
+    });
+
+    // Ensure both sides are torn down when either side closes
+    clientSocket.on('close', () => {
+      targetSocket.destroy();
+    });
+    targetSocket.on('close', () => {
+      clientSocket.destroy();
     });
   }
 
