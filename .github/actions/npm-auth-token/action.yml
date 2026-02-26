@@ -44,8 +44,8 @@ runs:
         fi
         echo "auth-token=$AUTH_TOKEN" >> $GITHUB_OUTPUT
       env:
-        INPUTS_GITHUB_TOKEN: '${{ inputs.github-token }}'
-        INPUTS_PACKAGE_NAME: '${{ inputs.package-name }}'
-        INPUTS_WOMBAT_TOKEN_CLI: '${{ inputs.wombat-token-cli }}'
-        INPUTS_WOMBAT_TOKEN_CORE: '${{ inputs.wombat-token-core }}'
-        INPUTS_WOMBAT_TOKEN_A2A_SERVER: '${{ inputs.wombat-token-a2a-server }}'
+        INPUTS_GITHUB_TOKEN: ${{ inputs.github-token }}
+        INPUTS_PACKAGE_NAME: ${{ inputs.package-name }}
+        INPUTS_WOMBAT_TOKEN_CLI: ${{ inputs.wombat-token-cli }}
+        INPUTS_WOMBAT_TOKEN_CORE: ${{ inputs.wombat-token-core }}
+        INPUTS_WOMBAT_TOKEN_A2A_SERVER: ${{ inputs.wombat-token-a2a-server }}

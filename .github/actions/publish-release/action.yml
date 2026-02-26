@@ -97,7 +97,7 @@ runs:
         git switch -c "${BRANCH_NAME}"
         echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
       env:
-        INPUTS_RELEASE_TAG: '${{ inputs.release-tag }}'
+        INPUTS_RELEASE_TAG: ${{ inputs.release-tag }}
 
     - name: '⬆️ Update package versions'
       working-directory: '${{ inputs.working-directory }}'
@@ -105,7 +105,7 @@ runs:
       run: |
         npm run release:version "${INPUTS_RELEASE_VERSION}"
       env:
-        INPUTS_RELEASE_VERSION: '${{ inputs.release-version }}'
+        INPUTS_RELEASE_VERSION: ${{ inputs.release-version }}
 
     - name: '💾 Commit and Conditionally Push package versions'
       working-directory: '${{ inputs.working-directory }}'
@@ -167,8 +167,8 @@ runs:
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ steps.core-token.outputs.auth-token }}'
-        INPUTS_DRY_RUN: '${{ inputs.dry-run }}'
-        INPUTS_CORE_PACKAGE_NAME: '${{ inputs.core-package-name }}'
+        INPUTS_DRY_RUN: ${{ inputs.dry-run }}
+        INPUTS_CORE_PACKAGE_NAME: ${{ inputs.core-package-name }}
       shell: 'bash'
       run: |
         npm publish \
@@ -187,10 +187,11 @@ runs:
         --workspace="${INPUTS_A2A_PACKAGE_NAME}" \
         --save-exact
       env:
-        INPUTS_CORE_PACKAGE_NAME: '${{ inputs.core-package-name }}'
-        INPUTS_RELEASE_VERSION: '${{ inputs.release-version }}'
-        INPUTS_CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
-        INPUTS_A2A_PACKAGE_NAME: '${{ inputs.a2a-package-name }}'
+        INPUTS_CORE_PACKAGE_NAME: ${{ inputs.core-package-name }}
+        INPUTS_RELEASE_VERSION: ${{ inputs.release-version }}
+        INPUTS_CLI_PACKAGE_NAME: ${{ inputs.cli-package-name }}
+        INPUTS_A2A_PACKAGE_NAME: ${{ inputs.a2a-package-name }}
+
     - name: 'Get CLI Token'
       uses: './.github/actions/npm-auth-token'
       id: 'cli-token'
@@ -205,8 +206,8 @@ runs:
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ steps.cli-token.outputs.auth-token }}'
-        INPUTS_DRY_RUN: '${{ inputs.dry-run }}'
-        INPUTS_CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+        INPUTS_DRY_RUN: ${{ inputs.dry-run }}
+        INPUTS_CLI_PACKAGE_NAME: ${{ inputs.cli-package-name }}
       shell: 'bash'
       run: |
         npm publish \
@@ -229,8 +230,8 @@ runs:
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ steps.a2a-token.outputs.auth-token }}'
-        INPUTS_DRY_RUN: '${{ inputs.dry-run }}'
-        INPUTS_A2A_PACKAGE_NAME: '${{ inputs.a2a-package-name }}'
+        INPUTS_DRY_RUN: ${{ inputs.dry-run }}
+        INPUTS_A2A_PACKAGE_NAME: ${{ inputs.a2a-package-name }}
       shell: 'bash'
       # Tag staging for initial release
       run: |
@@ -272,9 +273,9 @@ runs:
       if: "${{ inputs.dry-run != 'true' && inputs.skip-github-release != 'true' && inputs.npm-tag != 'dev' && inputs.npm-registry-url != 'https://npm.pkg.github.com/' }}"
       env:
         GITHUB_TOKEN: '${{ inputs.github-release-token || inputs.github-token }}'
-        INPUTS_RELEASE_TAG: '${{ inputs.release-tag }}'
-        STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
-        INPUTS_PREVIOUS_TAG: '${{ inputs.previous-tag }}'
+        INPUTS_RELEASE_TAG: ${{ inputs.release-tag }}
+        STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME: ${{ steps.release_branch.outputs.BRANCH_NAME }}
+        INPUTS_PREVIOUS_TAG: ${{ inputs.previous-tag }}
       shell: 'bash'
       run: |
         gh release create "${INPUTS_RELEASE_TAG}" \
@@ -295,4 +296,4 @@ runs:
         git push origin --delete "${STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME}"
 
       env:
-        STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+        STEPS_RELEASE_BRANCH_OUTPUTS_BRANCH_NAME: ${{ steps.release_branch.outputs.BRANCH_NAME }}

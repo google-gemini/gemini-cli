@@ -118,7 +118,7 @@ jobs:
           ORIGINAL_RELEASE_VERSION: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
           ORIGINAL_RELEASE_TAG: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
           ORIGINAL_PREVIOUS_TAG: '${{ steps.patch_version.outputs.PREVIOUS_TAG }}'
-          VARS_CLI_PACKAGE_NAME: '${{ vars.CLI_PACKAGE_NAME }}'
+          VARS_CLI_PACKAGE_NAME: ${{vars.CLI_PACKAGE_NAME}}
         run: |
           echo "🔍 Verifying no concurrent patch releases have occurred..."
 
@@ -168,10 +168,10 @@ jobs:
           echo "  NPM Tag: ${STEPS_PATCH_VERSION_OUTPUTS_NPM_TAG}"
           echo "  Previous Tag: ${STEPS_PATCH_VERSION_OUTPUTS_PREVIOUS_TAG}"
         env:
-          STEPS_PATCH_VERSION_OUTPUTS_RELEASE_VERSION: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
-          STEPS_PATCH_VERSION_OUTPUTS_RELEASE_TAG: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
-          STEPS_PATCH_VERSION_OUTPUTS_NPM_TAG: '${{ steps.patch_version.outputs.NPM_TAG }}'
-          STEPS_PATCH_VERSION_OUTPUTS_PREVIOUS_TAG: '${{ steps.patch_version.outputs.PREVIOUS_TAG }}'
+          STEPS_PATCH_VERSION_OUTPUTS_RELEASE_VERSION: ${{ steps.patch_version.outputs.RELEASE_VERSION }}
+          STEPS_PATCH_VERSION_OUTPUTS_RELEASE_TAG: ${{ steps.patch_version.outputs.RELEASE_TAG }}
+          STEPS_PATCH_VERSION_OUTPUTS_NPM_TAG: ${{ steps.patch_version.outputs.NPM_TAG }}
+          STEPS_PATCH_VERSION_OUTPUTS_PREVIOUS_TAG: ${{ steps.patch_version.outputs.PREVIOUS_TAG }}
 
       - name: 'Run Tests'
         if: "${{github.event.inputs.force_skip_tests != 'true'}}"

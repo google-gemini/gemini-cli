@@ -69,8 +69,8 @@ runs:
           exit 1
         fi
       env:
-        INPUTS_EXPECTED_VERSION: '${{ inputs.expected-version }}'
-        INPUTS_NPM_PACKAGE: '${{ inputs.npm-package }}'
+        INPUTS_EXPECTED_VERSION: ${{ inputs.expected-version }}
+        INPUTS_NPM_PACKAGE: ${{ inputs.npm-package }}
 
     - name: 'Clear npm cache'
       shell: 'bash'
@@ -86,8 +86,8 @@ runs:
           exit 1
         fi
       env:
-        INPUTS_NPM_PACKAGE: '${{ inputs.npm-package }}'
-        INPUTS_EXPECTED_VERSION: '${{ inputs.expected-version }}'
+        INPUTS_NPM_PACKAGE: ${{ inputs.npm-package }}
+        INPUTS_EXPECTED_VERSION: ${{ inputs.expected-version }}
 
     - name: 'Install dependencies for integration tests'
       shell: 'bash'
