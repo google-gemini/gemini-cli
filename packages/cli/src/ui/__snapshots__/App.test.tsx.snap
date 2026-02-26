@@ -2,14 +2,14 @@
 
 exports[`App > Snapshots > renders default layout correctly 1`] = `
 "
- ███         █████████
+ ███         █████████ 
 ░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
+  ░░░███   ███     ░░░ 
+    ░░░███░███         
      ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+   ███░   ░░███  ░░███ 
+ ███░      ░░█████████ 
+░░░         ░░░░░░░░░  
 
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
@@ -47,33 +47,34 @@ exports[`App > Snapshots > renders screen reader layout correctly 1`] = `
 "Notifications
 Footer
 
- ███         █████████
+ ███         █████████ 
 ░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
+  ░░░███   ███     ░░░ 
+    ░░░███░███         
      ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+   ███░   ░░███  ░░███ 
+ ███░      ░░█████████ 
+░░░         ░░░░░░░░░  
 
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
 2. Be specific for the best results.
 3. Create GEMINI.md files to customize your interactions with Gemini.
 4. /help for more information.
-Composer"
+Composer
+"
 `;
 
 exports[`App > Snapshots > renders with dialogs visible 1`] = `
 "
- ███         █████████
+ ███         █████████ 
 ░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
+  ░░░███   ███     ░░░ 
+    ░░░███░███         
      ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+   ███░   ░░███  ░░███ 
+ ███░      ░░█████████ 
+░░░         ░░░░░░░░░  
 
 
 
@@ -109,14 +110,14 @@ DialogManager
 
 exports[`App > should render ToolConfirmationQueue along with Composer when tool is confirming and experiment is on 1`] = `
 "
- ███         █████████
+ ███         █████████ 
 ░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
+  ░░░███   ███     ░░░ 
+    ░░░███░███         
      ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+   ███░   ░░███  ░░███ 
+ ███░      ░░█████████ 
+░░░         ░░░░░░░░░  
 
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
@@ -124,19 +125,19 @@ Tips for getting started:
 3. Create GEMINI.md files to customize your interactions with Gemini.
 4. /help for more information.
 HistoryItemDisplay
-╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Action Required                                                                                                      │
-│                                                                                                                      │
-│ ?  ls list directory                                                                                                 │
-│                                                                                                                      │
-│ ls                                                                                                                   │
-│ Allow execution of: 'ls'?                                                                                            │
-│                                                                                                                      │
-│ ● 1. Allow once                                                                                                      │
-│   2. Allow for this session                                                                                          │
-│   3. No, suggest changes (esc)                                                                                       │
-│                                                                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Action Required                                                                                  │
+│                                                                                                  │
+│ ?  ls list directory                                                                             │
+│                                                                                                  │
+│ ls                                                                                               │
+│ Allow execution of: 'ls'?                                                                        │
+│                                                                                                  │
+│ ● 1. Allow once                                                                                  │
+│   2. Allow for this session                                                                      │
+│   3. No, suggest changes (esc)                                                                   │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 
 

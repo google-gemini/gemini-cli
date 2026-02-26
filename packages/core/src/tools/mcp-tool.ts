@@ -10,13 +10,13 @@ import type {
   ToolInvocation,
   ToolMcpConfirmationDetails,
   ToolResult,
+  PolicyUpdateOptions,
 } from './tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
   ToolConfirmationOutcome,
-  type PolicyUpdateOptions,
 } from './tools.js';
 import type { CallableTool, FunctionCall, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
@@ -28,6 +28,16 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
  * e.g. "server_name__tool_name"
  */
 export const MCP_QUALIFIED_NAME_SEPARATOR = '__';
+
+/**
+ * Returns true if `name` matches the MCP qualified name format: "server__tool",
+ * i.e. exactly two non-empty parts separated by the MCP_QUALIFIED_NAME_SEPARATOR.
+ */
+export function isMcpToolName(name: string): boolean {
+  if (!name.includes(MCP_QUALIFIED_NAME_SEPARATOR)) return false;
+  const parts = name.split(MCP_QUALIFIED_NAME_SEPARATOR);
+  return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
+}
 
 type ToolParams = Record<string, unknown>;
 
@@ -80,6 +90,9 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     readonly trust?: boolean,
     params: ToolParams = {},
     private readonly cliConfig?: Config,
+    private readonly toolDescription?: string,
+    private readonly toolParameterSchema?: unknown,
+    toolAnnotationsData?: Record<string, unknown>,
   ) {
     // Use composite format for policy checks: serverName__toolName
     // This enables server wildcards (e.g., "google-workspace__*")
@@ -91,6 +104,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${serverToolName}`,
       displayName,
       serverName,
+      toolAnnotationsData,
     );
   }
 
@@ -123,6 +137,9 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       serverName: this.serverName,
       toolName: this.serverToolName, // Display original tool name in confirmation
       toolDisplayName: this.displayName, // Display global registry name exposed to model and user
+      toolArgs: this.params,
+      toolDescription: this.toolDescription,
+      toolParameterSchema: this.toolParameterSchema,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
           DiscoveredMCPToolInvocation.allowlist.add(serverAllowListKey);
@@ -130,7 +147,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
           DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
         } else if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
           DiscoveredMCPToolInvocation.allowlist.add(toolAllowListKey);
-          await this.publishPolicyUpdate(outcome);
+          // Persistent policy updates are now handled centrally by the scheduler
         }
       },
     };
@@ -247,11 +264,12 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     override readonly parameterSchema: unknown,
     messageBus: MessageBus,
     readonly trust?: boolean,
-    readonly isReadOnly?: boolean,
+    isReadOnly?: boolean,
     nameOverride?: string,
     private readonly cliConfig?: Config,
     override readonly extensionName?: string,
     override readonly extensionId?: string,
+    private readonly _toolAnnotations?: Record<string, unknown>,
   ) {
     super(
       nameOverride ?? generateValidName(serverToolName),
@@ -265,6 +283,20 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       extensionName,
       extensionId,
     );
+    this._isReadOnly = isReadOnly;
+  }
+
+  private readonly _isReadOnly?: boolean;
+
+  override get isReadOnly(): boolean {
+    if (this._isReadOnly !== undefined) {
+      return this._isReadOnly;
+    }
+    return super.isReadOnly;
+  }
+
+  override get toolAnnotations(): Record<string, unknown> | undefined {
+    return this._toolAnnotations;
   }
 
   getFullyQualifiedPrefix(): string {
@@ -289,6 +321,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.cliConfig,
       this.extensionName,
       this.extensionId,
+      this._toolAnnotations,
     );
   }
 
@@ -307,6 +340,9 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.trust,
       params,
       this.cliConfig,
+      this.description,
+      this.parameterSchema,
+      this._toolAnnotations,
     );
   }
 }

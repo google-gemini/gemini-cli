@@ -1,59 +1,35 @@
 # Web fetch tool (`web_fetch`)
 
-This document describes the `web_fetch` tool for the Gemini CLI.
+The `web_fetch` tool allows the Gemini agent to retrieve and process content
+from specific URLs provided in your prompt.
 
-## Description
+## Technical reference
 
-Use `web_fetch` to summarize, compare, or extract information from web pages.
-The `web_fetch` tool processes content from one or more URLs (up to 20) embedded
-in a prompt. `web_fetch` takes a natural language prompt and returns a generated
-response.
+The agent uses this tool when you include URLs in your prompt and request
+specific operations like summarization or extraction.
 
 ### Arguments
 
-`web_fetch` takes one argument:
+- `prompt` (string, required): A request containing up to 20 valid URLs
+  (starting with `http://` or `https://`) and instructions on how to process
+  them.
 
-- `prompt` (string, required): A comprehensive prompt that includes the URL(s)
-  (up to 20) to fetch and specific instructions on how to process their content.
-  For example:
-  `"Summarize https://example.com/article and extract key points from https://another.com/data"`.
-  The prompt must contain at least one URL starting with `http://` or
-  `https://`.
+## Technical behavior
 
-## How to use `web_fetch` with the Gemini CLI
+- **Confirmation:** Triggers a confirmation dialog showing the converted URLs.
+- **Processing:** Uses the Gemini API's `urlContext` for retrieval.
+- **Fallback:** If API access fails, the tool attempts to fetch raw content
+  directly from your local machine.
+- **Formatting:** Returns a synthesized response with source attribution.
 
-To use `web_fetch` with the Gemini CLI, provide a natural language prompt that
-contains URLs. The tool will ask for confirmation before fetching any URLs. Once
-confirmed, the tool will process URLs through Gemini API's `urlContext`.
+## Use cases
 
-If the Gemini API cannot access the URL, the tool will fall back to fetching
-content directly from the local machine. The tool will format the response,
-including source attribution and citations where possible. The tool will then
-provide the response to the user.
+- Summarizing technical articles or blog posts.
+- Comparing data between two or more web pages.
+- Extracting specific information from a documentation site.
 
-Usage:
+## Next steps
 
-```
-web_fetch(prompt="Your prompt, including a URL such as https://google.com.")
-```
-
-## `web_fetch` examples
-
-Summarize a single article:
-
-```
-web_fetch(prompt="Can you summarize the main points of https://example.com/news/latest")
-```
-
-Compare two articles:
-
-```
-web_fetch(prompt="What are the differences in the conclusions of these two papers: https://arxiv.org/abs/2401.0001 and https://arxiv.org/abs/2401.0002?")
-```
-
-## Important notes
-
-- **URL processing:** `web_fetch` relies on the Gemini API's ability to access
-  and process the given URLs.
-- **Output quality:** The quality of the output will depend on the clarity of
-  the instructions in the prompt.
+- Follow the [Web tools guide](../cli/tutorials/web-tools.md) for practical
+  usage examples.
+- See the [Web search tool reference](./web-search.md) for general queries.

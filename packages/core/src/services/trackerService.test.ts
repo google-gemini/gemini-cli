@@ -9,7 +9,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { TrackerService } from './trackerService.js';
-import type { TrackerTask } from './trackerTypes.js';
+import { TaskStatus, TaskType, type TrackerTask } from './trackerTypes.js';
 
 describe('TrackerService', () => {
   let testTrackerDir: string;
@@ -30,8 +30,8 @@ describe('TrackerService', () => {
     const taskData: Omit<TrackerTask, 'id'> = {
       title: 'Test Task',
       description: 'Test Description',
-      type: 'task',
-      status: 'open',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
       dependencies: [],
     };
 
@@ -47,15 +47,15 @@ describe('TrackerService', () => {
     await service.createTask({
       title: 'Task 1',
       description: 'Desc 1',
-      type: 'task',
-      status: 'open',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
       dependencies: [],
     });
     await service.createTask({
       title: 'Task 2',
       description: 'Desc 2',
-      type: 'task',
-      status: 'open',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
       dependencies: [],
     });
 
@@ -69,14 +69,14 @@ describe('TrackerService', () => {
     const task = await service.createTask({
       title: 'Original Title',
       description: 'Original Desc',
-      type: 'task',
-      status: 'open',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
       dependencies: [],
     });
 
     const updated = await service.updateTask(task.id, {
       title: 'New Title',
-      status: 'in_progress',
+      status: TaskStatus.IN_PROGRESS,
     });
     expect(updated.title).toBe('New Title');
     expect(updated.status).toBe('in_progress');
@@ -90,28 +90,30 @@ describe('TrackerService', () => {
     const dep = await service.createTask({
       title: 'Dependency',
       description: 'Must be closed first',
-      type: 'task',
-      status: 'open',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
       dependencies: [],
     });
 
     const task = await service.createTask({
       title: 'Main Task',
       description: 'Depends on dep',
-      type: 'task',
-      status: 'open',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
       dependencies: [dep.id],
     });
 
     await expect(
-      service.updateTask(task.id, { status: 'closed' }),
+      service.updateTask(task.id, { status: TaskStatus.CLOSED }),
     ).rejects.toThrow(/Cannot close task/);
 
     // Close dependency
-    await service.updateTask(dep.id, { status: 'closed' });
+    await service.updateTask(dep.id, { status: TaskStatus.CLOSED });
 
     // Now it should work
-    const updated = await service.updateTask(task.id, { status: 'closed' });
+    const updated = await service.updateTask(task.id, {
+      status: TaskStatus.CLOSED,
+    });
     expect(updated.status).toBe('closed');
   });
 
@@ -119,16 +121,16 @@ describe('TrackerService', () => {
     const taskA = await service.createTask({
       title: 'Task A',
       description: 'A',
-      type: 'task',
-      status: 'open',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
       dependencies: [],
     });
 
     const taskB = await service.createTask({
       title: 'Task B',
       description: 'B',
-      type: 'task',
-      status: 'open',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
       dependencies: [taskA.id],
     });
 

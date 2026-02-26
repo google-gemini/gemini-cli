@@ -7,7 +7,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { TrackerTaskSchema, type TrackerTask } from './trackerTypes.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
+import {
+  TrackerTaskSchema,
+  TaskStatus,
+  type TrackerTask,
+} from './trackerTypes.js';
+import { type z } from 'zod';
 
 export class TrackerService {
   private readonly tasksDir: string;
@@ -15,7 +22,6 @@ export class TrackerService {
   private initialized = false;
 
   constructor(readonly trackerDir: string) {
-    console.log('trackerDir', trackerDir);
     this.tasksDir = trackerDir;
   }
 
@@ -49,26 +55,46 @@ export class TrackerService {
   }
 
   /**
-   * Reads a task by ID.
+  /**
+   * Helper to read and validate a JSON file.
    */
-  async getTask(id: string): Promise<TrackerTask | null> {
-    await this.ensureInitialized();
-    const taskPath = path.join(this.tasksDir, `${id}.json`);
+  private async readJsonFile<T>(
+    filePath: string,
+    schema: z.ZodSchema<T>,
+  ): Promise<T | null> {
     try {
-      const content = await fs.readFile(taskPath, 'utf8');
+      const content = await fs.readFile(filePath, 'utf8');
       const data: unknown = JSON.parse(content);
-      return TrackerTaskSchema.parse(data);
+      return schema.parse(data);
     } catch (error) {
       if (
         error &&
         typeof error === 'object' &&
         'code' in error &&
-        error.code === 'ENOENT'
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (error as NodeJS.ErrnoException).code === 'ENOENT'
       ) {
         return null;
       }
+
+      const fileName = path.basename(filePath);
+      debugLogger.warn(`Failed to read or parse task file ${fileName}:`, error);
+      coreEvents.emitFeedback(
+        'warning',
+        `Task tracker encountered an issue reading ${fileName}. The data might be corrupted.`,
+        error,
+      );
       throw error;
     }
+  }
+
+  /**
+   * Reads a task by ID.
+   */
+  async getTask(id: string): Promise<TrackerTask | null> {
+    await this.ensureInitialized();
+    const taskPath = path.join(this.tasksDir, `${id}.json`);
+    return this.readJsonFile(taskPath, TrackerTaskSchema);
   }
 
   /**
@@ -78,18 +104,14 @@ export class TrackerService {
     await this.ensureInitialized();
     try {
       const files = await fs.readdir(this.tasksDir);
-      const jsonFiles = files.filter((f) => f.endsWith('.json'));
+      const jsonFiles = files.filter((f: string) => f.endsWith('.json'));
       const tasks = await Promise.all(
-        jsonFiles.map(async (f) => {
-          const content = await fs.readFile(
-            path.join(this.tasksDir, f),
-            'utf8',
-          );
-          const data: unknown = JSON.parse(content);
-          return TrackerTaskSchema.parse(data);
+        jsonFiles.map(async (f: string) => {
+          const taskPath = path.join(this.tasksDir, f);
+          return this.readJsonFile(taskPath, TrackerTaskSchema);
         }),
       );
-      return tasks;
+      return tasks.filter((t): t is TrackerTask => t !== null);
     } catch (error) {
       if (
         error &&
@@ -118,7 +140,10 @@ export class TrackerService {
     const updatedTask = { ...task, ...updates };
 
     // Validate status transition if closing
-    if (updatedTask.status === 'closed' && task.status !== 'closed') {
+    if (
+      updatedTask.status === TaskStatus.CLOSED &&
+      task.status !== TaskStatus.CLOSED
+    ) {
       await this.validateCanClose(updatedTask);
     }
 
@@ -148,7 +173,7 @@ export class TrackerService {
       if (!dep) {
         throw new Error(`Dependency ${depId} not found for task ${task.id}.`);
       }
-      if (dep.status !== 'closed') {
+      if (dep.status !== TaskStatus.CLOSED) {
         throw new Error(
           `Cannot close task ${task.id} because dependency ${depId} is still ${dep.status}.`,
         );

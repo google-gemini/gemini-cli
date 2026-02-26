@@ -43,7 +43,7 @@ export const planCommand: SlashCommand = {
     try {
       const content = await processSingleFileContent(
         approvedPlanPath,
-        config.storage.getProjectTempPlansDir(),
+        config.storage.getPlansDir(),
         config.getFileSystemService(),
       );
       const fileName = path.basename(approvedPlanPath);

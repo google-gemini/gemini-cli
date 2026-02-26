@@ -65,7 +65,23 @@ describe('classifyGoogleError', () => {
     expect((result as RetryableQuotaError).message).toBe(rawError.message);
   });
 
-  it('should return original error if code is not 429', () => {
+  it('should return RetryableQuotaError for 503 Service Unavailable', () => {
+    const apiError: GoogleApiError = {
+      code: 503,
+      message: 'Service Unavailable',
+      details: [],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const originalError = new Error('Service Unavailable');
+    const result = classifyGoogleError(originalError);
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof RetryableQuotaError) {
+      expect(result.cause).toBe(apiError);
+      expect(result.message).toBe('Service Unavailable');
+    }
+  });
+
+  it('should return original error if code is not 429, 499 or 503', () => {
     const apiError: GoogleApiError = {
       code: 500,
       message: 'Server error',
@@ -77,6 +93,22 @@ describe('classifyGoogleError', () => {
     expect(result).toBe(originalError);
     expect(result).not.toBeInstanceOf(TerminalQuotaError);
     expect(result).not.toBeInstanceOf(RetryableQuotaError);
+  });
+
+  it('should return RetryableQuotaError for 499 Client Closed Request', () => {
+    const apiError: GoogleApiError = {
+      code: 499,
+      message: 'Client Closed Request',
+      details: [],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const originalError = new Error('Client Closed Request');
+    const result = classifyGoogleError(originalError);
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof RetryableQuotaError) {
+      expect(result.cause).toBe(apiError);
+      expect(result.message).toBe('Client Closed Request');
+    }
   });
 
   it('should return TerminalQuotaError for daily quota violations in QuotaFailure', () => {

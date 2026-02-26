@@ -152,6 +152,18 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  policyPaths: {
+    type: 'array',
+    label: 'Policy Paths',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: [] as string[],
+    description: 'Additional policy files or directories to load.',
+    showInDialog: false,
+    items: { type: 'string' },
+    mergeStrategy: MergeStrategy.UNION,
+  },
+
   general: {
     type: 'object',
     label: 'General',
@@ -224,6 +236,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable update notification prompts.',
         showInDialog: false,
       },
+      enableNotifications: {
+        type: 'boolean',
+        label: 'Enable Notifications',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable run-event notifications for action-required prompts and session completion. Currently macOS only.',
+        showInDialog: true,
+      },
       checkpointing: {
         type: 'object',
         label: 'Checkpointing',
@@ -244,15 +266,36 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      enablePromptCompletion: {
-        type: 'boolean',
-        label: 'Enable Prompt Completion',
+      plan: {
+        type: 'object',
+        label: 'Plan',
         category: 'General',
         requiresRestart: true,
-        default: false,
-        description:
-          'Enable AI-powered prompt completion suggestions while typing.',
-        showInDialog: true,
+        default: {},
+        description: 'Planning features configuration.',
+        showInDialog: false,
+        properties: {
+          directory: {
+            type: 'string',
+            label: 'Plan Directory',
+            category: 'General',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description:
+              'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.',
+            showInDialog: true,
+          },
+          modelRouting: {
+            type: 'boolean',
+            label: 'Plan Model Routing',
+            category: 'General',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.',
+            showInDialog: true,
+          },
+        },
       },
       retryFetchErrors: {
         type: 'boolean',
@@ -263,6 +306,16 @@ const SETTINGS_SCHEMA = {
         description:
           'Retry on "exception TypeError: fetch failed sending request" errors.',
         showInDialog: false,
+      },
+      maxAttempts: {
+        type: 'number',
+        label: 'Max Chat Model Attempts',
+        category: 'General',
+        requiresRestart: false,
+        default: 10,
+        description:
+          'Maximum number of attempts for requests to the main chat model. Cannot exceed 10.',
+        showInDialog: true,
       },
       debugKeystrokeLogging: {
         type: 'boolean',
@@ -292,13 +345,13 @@ const SETTINGS_SCHEMA = {
           },
           maxAge: {
             type: 'string',
-            label: 'Max Session Age',
+            label: 'Keep chat history',
             category: 'General',
             requiresRestart: false,
             default: undefined as string | undefined,
             description:
-              'Maximum age of sessions to keep (e.g., "30d", "7d", "24h", "1w")',
-            showInDialog: false,
+              'Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")',
+            showInDialog: true,
           },
           maxCount: {
             type: 'number',
@@ -318,6 +371,16 @@ const SETTINGS_SCHEMA = {
             default: DEFAULT_MIN_RETENTION,
             description: `Minimum retention period (safety limit, defaults to "${DEFAULT_MIN_RETENTION}")`,
             showInDialog: false,
+          },
+          warningAcknowledged: {
+            type: 'boolean',
+            label: 'Warning Acknowledged',
+            category: 'General',
+            requiresRestart: false,
+            default: false,
+            showInDialog: false,
+            description:
+              'INTERNAL: Whether the user has acknowledged the session retention warning',
           },
         },
         description: 'Settings for automatic session cleanup.',
@@ -451,6 +514,15 @@ const SETTINGS_SCHEMA = {
         default: true,
         description:
           'Show a warning when running Gemini CLI in the home directory.',
+        showInDialog: true,
+      },
+      showCompatibilityWarnings: {
+        type: 'boolean',
+        label: 'Show Compatibility Warnings',
+        category: 'UI',
+        requiresRestart: true,
+        default: true,
+        description: 'Show warnings about terminal or OS compatibility issues.',
         showInDialog: true,
       },
       hideTips: {
@@ -631,6 +703,22 @@ const SETTINGS_SCHEMA = {
         description: 'Show the spinner during operations.',
         showInDialog: true,
       },
+      loadingPhrases: {
+        type: 'enum',
+        label: 'Loading Phrases',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'tips',
+        description:
+          'What to show while the model is working: tips, witty comments, both, or nothing.',
+        showInDialog: true,
+        options: [
+          { value: 'tips', label: 'Tips' },
+          { value: 'witty', label: 'Witty' },
+          { value: 'all', label: 'All' },
+          { value: 'off', label: 'Off' },
+        ],
+      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',
@@ -659,8 +747,9 @@ const SETTINGS_SCHEMA = {
             category: 'UI',
             requiresRestart: true,
             default: true,
-            description: 'Enable loading phrases during operations.',
-            showInDialog: true,
+            description:
+              '@deprecated Use ui.loadingPhrases instead. Enable loading phrases during operations.',
+            showInDialog: false,
           },
           screenReader: {
             type: 'boolean',
@@ -755,7 +844,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: undefined as string | undefined,
         description: 'The Gemini model to use for conversations.',
-        showInDialog: false,
+        showInDialog: true,
       },
       maxSessionTurns: {
         type: 'number',
@@ -895,6 +984,60 @@ const SETTINGS_SCHEMA = {
           ref: 'AgentOverride',
         },
       },
+      browser: {
+        type: 'object',
+        label: 'Browser Agent',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: {},
+        description: 'Settings specific to the browser agent.',
+        showInDialog: false,
+        properties: {
+          sessionMode: {
+            type: 'enum',
+            label: 'Browser Session Mode',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: 'persistent',
+            description:
+              "Session mode: 'persistent', 'isolated', or 'existing'.",
+            showInDialog: false,
+            options: [
+              { value: 'persistent', label: 'Persistent' },
+              { value: 'isolated', label: 'Isolated' },
+              { value: 'existing', label: 'Existing' },
+            ],
+          },
+          headless: {
+            type: 'boolean',
+            label: 'Browser Headless',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description: 'Run browser in headless mode.',
+            showInDialog: false,
+          },
+          profilePath: {
+            type: 'string',
+            label: 'Browser Profile Path',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description:
+              'Path to browser profile directory for session persistence.',
+            showInDialog: false,
+          },
+          visualModel: {
+            type: 'string',
+            label: 'Browser Visual Model',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description: 'Model override for the visual agent.',
+            showInDialog: false,
+          },
+        },
+      },
     },
   },
 
@@ -925,6 +1068,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: undefined as MemoryImportFormat | undefined,
         description: 'The format to use when importing memory.',
+        showInDialog: false,
+      },
+      includeDirectoryTree: {
+        type: 'boolean',
+        label: 'Include Directory Tree',
+        category: 'Context',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Whether to include the directory tree of the current working directory in the initial request to the model.',
         showInDialog: false,
       },
       discoveryMaxDirs: {
@@ -1245,6 +1398,7 @@ const SETTINGS_SCHEMA = {
       },
     },
   },
+
   useWriteTodos: {
     type: 'boolean',
     label: 'Use WriteTodos',
@@ -1402,6 +1556,16 @@ const SETTINGS_SCHEMA = {
             showInDialog: false,
           },
         },
+      },
+      enableConseca: {
+        type: 'boolean',
+        label: 'Enable Context-Aware Security',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.',
+        showInDialog: true,
       },
     },
   },
@@ -1581,7 +1745,17 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).',
+          'Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).',
+        showInDialog: true,
+      },
+      useOSC52Copy: {
+        type: 'boolean',
+        label: 'Use OSC 52 Copy',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).',
         showInDialog: true,
       },
       plan: {
@@ -1600,6 +1774,26 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable task tracker tools.',
+        showInDialog: true,
+      },
+      modelSteering: {
+        type: 'boolean',
+        label: 'Model Steering',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable model steering (user hints) to guide the model during tool execution.',
+        showInDialog: true,
+      },
+      directWebFetch: {
+        type: 'boolean',
+        label: 'Direct Web Fetch',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable web fetch behavior that bypasses LLM summarization.',
         showInDialog: true,
       },
     },

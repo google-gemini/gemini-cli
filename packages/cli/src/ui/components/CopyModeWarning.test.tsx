@@ -18,20 +18,24 @@ describe('CopyModeWarning', () => {
     vi.clearAllMocks();
   });
 
-  it('renders nothing when copy mode is disabled', () => {
+  it('renders nothing when copy mode is disabled', async () => {
     mockUseUIState.mockReturnValue({
       copyModeEnabled: false,
     } as unknown as UIState);
-    const { lastFrame } = render(<CopyModeWarning />);
-    expect(lastFrame()).toBe('');
+    const { lastFrame, waitUntilReady, unmount } = render(<CopyModeWarning />);
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 
-  it('renders warning when copy mode is enabled', () => {
+  it('renders warning when copy mode is enabled', async () => {
     mockUseUIState.mockReturnValue({
       copyModeEnabled: true,
     } as unknown as UIState);
-    const { lastFrame } = render(<CopyModeWarning />);
+    const { lastFrame, waitUntilReady, unmount } = render(<CopyModeWarning />);
+    await waitUntilReady();
     expect(lastFrame()).toContain('In Copy Mode');
     expect(lastFrame()).toContain('Press any key to exit');
+    unmount();
   });
 });
