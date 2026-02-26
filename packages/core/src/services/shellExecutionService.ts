@@ -317,6 +317,7 @@ export class ShellExecutionService {
             [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
               GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
             TERM: process.env['TERM'] || 'xterm-256color',
+            COLORTERM: process.env['COLORTERM'] || 'truecolor',
             PAGER: 'cat',
             GIT_PAGER: 'cat',
           },
@@ -581,6 +582,7 @@ export class ShellExecutionService {
           ),
           GEMINI_CLI: '1',
           TERM: process.env['TERM'] || 'xterm-256color',
+          COLORTERM: process.env['COLORTERM'] || 'truecolor',
           PAGER: shellExecutionConfig.pager ?? 'cat',
           GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
         },
