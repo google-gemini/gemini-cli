@@ -7,7 +7,6 @@
 import type React from 'react';
 import { Box, type DOMElement } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { useUIState } from '../contexts/UIStateContext.js';
 import { CopySafeBox } from './shared/CopySafeBox.js';
 
 export interface StickyHeaderProps {
@@ -27,8 +26,6 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
   borderDimColor,
   containerRef,
 }) => {
-  const { copyModeEnabled } = useUIState();
-
   const commonProps = {
     borderStyle: 'round' as const,
     flexDirection: 'column' as const,
@@ -38,6 +35,7 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
     borderBottom: false,
     borderTop: isFirst,
     paddingTop: isFirst ? 0 : 1,
+    paddingX: 1,
   };
 
   return (
@@ -49,29 +47,22 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
       width={width}
       stickyChildren={
         <CopySafeBox {...commonProps} opaque>
-          <Box paddingX={1}>{children}</Box>
+          {children}
           {/* Dark border to separate header from content. */}
-          {!copyModeEnabled && (
-            <Box
-              width={width - 2}
-              borderColor={theme.ui.dark}
-              borderStyle="single"
-              borderTop={false}
-              borderBottom={true}
-              borderLeft={false}
-              borderRight={false}
-            ></Box>
-          )}
+          <CopySafeBox
+            width="100%"
+            borderColor={theme.ui.dark}
+            borderStyle="single"
+            borderTop={false}
+            borderBottom={true}
+            borderLeft={false}
+            borderRight={false}
+          />
         </CopySafeBox>
       }
     >
-      <CopySafeBox
-        {...commonProps}
-        borderLeft={true}
-        borderRight={true}
-        paddingBottom={copyModeEnabled ? 0 : 1}
-      >
-        <Box paddingX={1}>{children}</Box>
+      <CopySafeBox {...commonProps} borderLeft={true} borderRight={true}>
+        {children}
       </CopySafeBox>
     </Box>
   );

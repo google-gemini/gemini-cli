@@ -8,11 +8,13 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { theme } from '../semantic-colors.js';
 import { interpolateColor } from '../themes/color-utils.js';
 import { debugState } from '../debug.js';
+import { useUIState } from '../contexts/UIStateContext.js';
 
 export function useAnimatedScrollbar(
   isFocused: boolean,
   scrollBy: (delta: number) => void,
 ) {
+  const { copyModeEnabled } = useUIState();
   const [scrollbarColor, setScrollbarColor] = useState(theme.ui.dark);
   const colorRef = useRef(scrollbarColor);
   colorRef.current = scrollbarColor;
@@ -126,5 +128,9 @@ export function useAnimatedScrollbar(
     [scrollBy, flashScrollbar],
   );
 
-  return { scrollbarColor, flashScrollbar, scrollByWithAnimation };
+  return {
+    scrollbarColor: copyModeEnabled ? undefined : scrollbarColor,
+    flashScrollbar,
+    scrollByWithAnimation,
+  };
 }

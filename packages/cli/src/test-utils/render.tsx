@@ -503,6 +503,7 @@ const baseMockUiState = {
   terminalBackgroundColor: 'black',
   cleanUiDetailsVisible: false,
   allowPlanMode: true,
+  copyModeEnabled: false,
   activePtyId: undefined,
   backgroundShells: new Map(),
   backgroundShellHeight: 0,

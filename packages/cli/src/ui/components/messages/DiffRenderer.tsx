@@ -279,14 +279,15 @@ const renderDiffContent = (
       ) {
         acc.push(
           <Box key={`gap-${index}`}>
-            <Box
+            <CopySafeBox
               borderStyle="double"
               borderLeft={false}
               borderRight={false}
               borderBottom={false}
               width={terminalWidth}
               borderColor={semanticTheme.text.secondary}
-            ></Box>
+              paddingX={0}
+            />
           </Box>,
         );
       }

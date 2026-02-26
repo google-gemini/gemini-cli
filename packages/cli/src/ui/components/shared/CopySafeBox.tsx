@@ -12,6 +12,11 @@ export interface CopySafeBoxProps extends BoxProps {
   children?: ReactNode;
 }
 
+/**
+ * A Box that removes borders and adds compensatory padding in alternate buffer
+ * copy mode. This ensures that the layout remains consistent for selection
+ * while making it easier to copy text without horizontal borders.
+ */
 export const CopySafeBox = forwardRef<DOMElement, CopySafeBoxProps>(
   (props, ref) => {
     const { copyModeEnabled } = useUIState();
@@ -32,29 +37,38 @@ export const CopySafeBox = forwardRef<DOMElement, CopySafeBoxProps>(
       borderBottom: _borderBottom,
       borderLeft: _borderLeft,
       borderRight: _borderRight,
+      padding: _padding,
       paddingX: _paddingX,
+      paddingY: _paddingY,
       paddingLeft: _paddingLeft,
       paddingRight: _paddingRight,
+      paddingTop: _paddingTop,
+      paddingBottom: _paddingBottom,
       ...rest
     } = props;
 
-    const hasBorderLeft = _borderLeft !== false && _borderStyle !== undefined;
-    const hasBorderRight = _borderRight !== false && _borderStyle !== undefined;
-    const borderLeftWidth = hasBorderLeft ? 1 : 0;
-    const borderRightWidth = hasBorderRight ? 1 : 0;
+    // Calculate compensatory padding.
+    // If borderStyle is set, it means all 4 sides have borders unless explicitly disabled.
+    const hasBorderStyle = _borderStyle !== undefined;
+    const effectiveLeftBorder =
+      _borderLeft === true || (hasBorderStyle && _borderLeft !== false);
+    const effectiveRightBorder =
+      _borderRight === true || (hasBorderStyle && _borderRight !== false);
+    const effectiveTopBorder =
+      _borderTop === true || (hasBorderStyle && _borderTop !== false);
+    const effectiveBottomBorder =
+      _borderBottom === true || (hasBorderStyle && _borderBottom !== false);
 
-    const originalPaddingLeft = Number(
-      _paddingLeft ?? _paddingX ?? props.padding ?? 0,
-    );
-    const originalPaddingRight = Number(
-      _paddingRight ?? _paddingX ?? props.padding ?? 0,
-    );
+    const pL = Number(_paddingLeft ?? _paddingX ?? _padding ?? 0);
+    const pR = Number(_paddingRight ?? _paddingX ?? _padding ?? 0);
+    const pT = Number(_paddingTop ?? _paddingY ?? _padding ?? 0);
+    const pB = Number(_paddingBottom ?? _paddingY ?? _padding ?? 0);
 
-    const newPaddingLeft = borderLeftWidth + originalPaddingLeft;
-    const newPaddingRight = borderRightWidth + originalPaddingRight;
+    const finalPaddingLeft = (effectiveLeftBorder ? 1 : 0) + pL;
+    const finalPaddingRight = (effectiveRightBorder ? 1 : 0) + pR;
+    const finalPaddingTop = (effectiveTopBorder ? 1 : 0) + pT;
+    const finalPaddingBottom = (effectiveBottomBorder ? 1 : 0) + pB;
 
-    // When in copy mode, we remove borders and add compensatory padding
-    // to maintain the layout of the content relative to the terminal edge.
     return (
       <Box
         {...rest}
@@ -64,8 +78,10 @@ export const CopySafeBox = forwardRef<DOMElement, CopySafeBoxProps>(
         borderBottom={false}
         borderLeft={false}
         borderRight={false}
-        paddingLeft={newPaddingLeft}
-        paddingRight={newPaddingRight}
+        paddingLeft={finalPaddingLeft}
+        paddingRight={finalPaddingRight}
+        paddingTop={finalPaddingTop}
+        paddingBottom={finalPaddingBottom}
       >
         {children}
       </Box>

@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { type DOMElement } from 'ink';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { StickyHeader } from '../StickyHeader.js';
@@ -19,6 +20,7 @@ import {
   isThisShellFocused as checkIsShellFocused,
   useFocusHint,
   FocusHint,
+  STATUS_INDICATOR_WIDTH,
 } from './ToolShared.js';
 import type { ToolMessageProps } from './ToolMessage.js';
 import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
@@ -27,47 +29,40 @@ import { useUIState } from '../../contexts/UIStateContext.js';
 import { type Config } from '@google/gemini-cli-core';
 import { calculateShellMaxLines } from '../../utils/toolLayoutUtils.js';
 import { CopySafeBox } from '../shared/CopySafeBox.js';
+import { Box } from 'ink';
 
 export interface ShellToolMessageProps extends ToolMessageProps {
   config?: Config;
   isExpandable?: boolean;
+  constrainHeight?: boolean;
 }
 
 export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   name,
-
   description,
-
   resultDisplay,
-
   status,
-
   availableTerminalHeight,
-
   terminalWidth,
-
   emphasis = 'medium',
-
   renderOutputAsMarkdown = true,
-
   ptyId,
-
   config,
-
   isFirst,
-
   borderColor,
-
   borderDimColor,
   isExpandable,
+  constrainHeight: propsConstrainHeight,
   originalRequestName,
 }) => {
   const {
     activePtyId: activeShellPtyId,
     embeddedShellFocused,
-    constrainHeight,
+    constrainHeight: contextConstrainHeight,
   } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
+  const actions = useUIActions();
+  const constrainHeight = propsConstrainHeight ?? contextConstrainHeight;
 
   const isThisShellFocused = checkIsShellFocused(
     name,
@@ -77,41 +72,38 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     embeddedShellFocused,
   );
 
-  const { setEmbeddedShellFocused } = useUIActions();
-  const wasFocusedRef = React.useRef(false);
+  const wasFocusedRef = useRef(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isThisShellFocused) {
       wasFocusedRef.current = true;
     } else if (wasFocusedRef.current) {
       if (embeddedShellFocused) {
-        setEmbeddedShellFocused(false);
+        actions.setEmbeddedShellFocused(false);
       }
       wasFocusedRef.current = false;
     }
-  }, [isThisShellFocused, embeddedShellFocused, setEmbeddedShellFocused]);
+  }, [isThisShellFocused, embeddedShellFocused, actions]);
 
-  const headerRef = React.useRef<DOMElement>(null);
-
-  const contentRef = React.useRef<DOMElement>(null);
+  const headerRef = useRef<DOMElement>(null);
+  const contentRef = useRef<DOMElement>(null);
 
   // The shell is focusable if it's the shell command, it's executing, and the interactive shell is enabled.
-
   const isThisShellFocusable = checkIsShellFocusable(name, status, config);
 
-  const handleFocus = () => {
+  const handleFocus = useCallback(() => {
     if (isThisShellFocusable) {
-      setEmbeddedShellFocused(true);
+      actions.setEmbeddedShellFocused(true);
     }
-  };
+  }, [isThisShellFocusable, actions]);
 
   useMouseClick(headerRef, handleFocus, { isActive: !!isThisShellFocusable });
-
   useMouseClick(contentRef, handleFocus, { isActive: !!isThisShellFocusable });
 
   const { shouldShowFocusHint } = useFocusHint(
     isThisShellFocusable,
     isThisShellFocused,
+     
     resultDisplay,
   );
 
@@ -125,20 +117,17 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         containerRef={headerRef}
       >
         <ToolStatusIndicator status={status} name={name} />
-
         <ToolInfo
           name={name}
           status={status}
-          description={description}
+          description={description ?? ''}
           emphasis={emphasis}
           originalRequestName={originalRequestName}
         />
-
         <FocusHint
           shouldShowFocusHint={shouldShowFocusHint}
           isThisShellFocused={isThisShellFocused}
         />
-
         {emphasis === 'high' && <TrailingIndicator />}
       </StickyHeader>
 
@@ -171,11 +160,13 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           })}
         />
         {isThisShellFocused && config && (
-          <ShellInputPrompt
-            activeShellPtyId={activeShellPtyId ?? null}
-            focus={embeddedShellFocused}
-            scrollPageSize={availableTerminalHeight ?? ACTIVE_SHELL_MAX_LINES}
-          />
+          <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
+            <ShellInputPrompt
+              activeShellPtyId={activeShellPtyId ?? null}
+              focus={embeddedShellFocused}
+              scrollPageSize={availableTerminalHeight ?? ACTIVE_SHELL_MAX_LINES}
+            />
+          </Box>
         )}
       </CopySafeBox>
     </>
