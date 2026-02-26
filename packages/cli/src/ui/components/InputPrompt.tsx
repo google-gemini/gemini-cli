@@ -56,6 +56,7 @@ import {
   isSlashCommand,
 } from '../utils/commandUtils.js';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { getSafeLowColorBackground } from '../themes/color-utils.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
@@ -928,7 +929,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               const suggestion = completion.suggestions[targetIndex];
               if (
                 completion.completionMode === CompletionMode.AT &&
-                !suggestion.commandKind
+                !suggestion.commandKind &&
+                // Heuristic to exclude MCP resources, which are not file paths.
+                !suggestion.label.includes(':')
               ) {
                 const absolutePath = path.resolve(
                   config.getTargetDir(),
@@ -939,14 +942,34 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                     setQueueErrorMessage(`Failed to open file: ${e.message}`);
                   });
                 } else {
-                  open(path.dirname(absolutePath)).catch((e: Error) => {
+                  let dirPath = absolutePath;
+                  // If it's not a directory, open its parent
+                  if (
+                    !suggestion.label.endsWith('/') &&
+                    !suggestion.label.endsWith('\\')
+                  ) {
+                    try {
+                      const stat = fs.statSync(absolutePath);
+                      if (!stat.isDirectory()) {
+                        dirPath = path.dirname(absolutePath);
+                      }
+                    } catch {
+                      dirPath = path.dirname(absolutePath);
+                    }
+                  }
+
+                  open(dirPath).catch((e: Error) => {
                     setQueueErrorMessage(
                       `Failed to open directory: ${e.message}`,
                     );
                   });
                 }
-                return true;
+                return true; // We successfully handled the file shortcut
               }
+              // If it's an agent/command, we still return true to consume the shortcut
+              // so it doesn't fall back to inserting 'o' or 'x' or opening the external editor
+              // for the prompt box itself, since the user obviously intended to target the list.
+              return true;
             }
           }
         }
