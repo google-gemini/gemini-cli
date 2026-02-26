@@ -1199,7 +1199,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 Important Rules:
 * You are running in a non-interactive mode. You CANNOT ask the user for input or clarification.
 * Work systematically using available tools to complete your task.
-* Always use absolute paths for file operations. Construct them using the provided "Environment Context".`;
+* Prefer relative paths (relative to workspace root) for file operations. Construct them using the provided "Environment Context".`;
 
     if (this.definition.outputConfig) {
       finalPrompt += `
