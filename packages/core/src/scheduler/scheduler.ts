@@ -19,6 +19,7 @@ import {
   type ExecutingToolCall,
   type ValidatingToolCall,
   type ErroredToolCall,
+  type SuccessfulToolCall,
   CoreToolCallStatus,
   type ScheduledToolCall,
 } from './types.js';
@@ -130,13 +131,27 @@ export class Scheduler {
   }
 
   private readonly handleMcpProgress = (payload: McpProgressPayload) => {
-    const callId = payload.callId;
+    const { callId } = payload;
+
+    const call = this.state.getToolCall(callId);
+    if (!call || call.status !== CoreToolCallStatus.Executing) {
+      return;
+    }
+
+    const validTotal =
+      payload.total !== undefined &&
+      Number.isFinite(payload.total) &&
+      payload.total > 0
+        ? payload.total
+        : undefined;
+
     this.state.updateStatus(callId, CoreToolCallStatus.Executing, {
       progressMessage: payload.message,
-      progressPercent:
-        payload.total && payload.total > 0
-          ? (payload.progress / payload.total) * 100
-          : undefined,
+      progressPercent: validTotal
+        ? Math.min(100, (payload.progress / validTotal) * 100)
+        : undefined,
+      progress: payload.progress,
+      progressTotal: validTotal,
     });
   };
 
@@ -446,13 +461,16 @@ export class Scheduler {
         c.status === CoreToolCallStatus.Scheduled || this.isTerminal(c.status),
     );
 
+    let madeProgress = false;
     if (allReady && scheduledCalls.length > 0) {
-      await Promise.all(scheduledCalls.map((c) => this._execute(c, signal)));
+      const execResults = await Promise.all(
+        scheduledCalls.map((c) => this._execute(c, signal)),
+      );
+      madeProgress = execResults.some((res) => res);
     }
 
     // 3. Finalize terminal calls
     activeCalls = this.state.allActiveCalls;
-    let madeProgress = false;
     for (const call of activeCalls) {
       if (this.isTerminal(call.status)) {
         this.state.finalizeCall(call.request.callId);
@@ -595,12 +613,12 @@ export class Scheduler {
   // --- Sub-phase Handlers ---
 
   /**
-   * Executes the tool and records the result.
+   * Executes the tool and records the result. Returns true if a new tool call was added.
    */
   private async _execute(
     toolCall: ScheduledToolCall,
     signal: AbortSignal,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const callId = toolCall.request.callId;
     if (signal.aborted) {
       this.state.updateStatus(
@@ -608,7 +626,7 @@ export class Scheduler {
         CoreToolCallStatus.Cancelled,
         'Operation cancelled',
       );
-      return;
+      return false;
     }
     this.state.updateStatus(callId, CoreToolCallStatus.Executing);
 
@@ -642,6 +660,64 @@ export class Scheduler {
         }),
     );
 
+    if (
+      (result.status === CoreToolCallStatus.Success ||
+        result.status === CoreToolCallStatus.Error) &&
+      result.tailToolCallRequest
+    ) {
+      // Log the intermediate tool call before it gets replaced.
+      const intermediateCall: SuccessfulToolCall | ErroredToolCall = {
+        request: activeCall.request,
+        tool: activeCall.tool,
+        invocation: activeCall.invocation,
+        status: result.status,
+        response: result.response,
+        durationMs: activeCall.startTime
+          ? Date.now() - activeCall.startTime
+          : undefined,
+        outcome: activeCall.outcome,
+        schedulerId: this.schedulerId,
+      };
+      logToolCall(this.config, new ToolCallEvent(intermediateCall));
+
+      const tailRequest = result.tailToolCallRequest;
+      const originalCallId = result.request.callId;
+      const originalRequestName =
+        result.request.originalRequestName || result.request.name;
+
+      const newTool = this.config.getToolRegistry().getTool(tailRequest.name);
+
+      const newRequest: ToolCallRequestInfo = {
+        callId: originalCallId,
+        name: tailRequest.name,
+        args: tailRequest.args,
+        originalRequestName,
+        isClientInitiated: result.request.isClientInitiated,
+        prompt_id: result.request.prompt_id,
+        schedulerId: this.schedulerId,
+      };
+
+      if (!newTool) {
+        // Enqueue an errored tool call
+        const errorCall = this._createToolNotFoundErroredToolCall(
+          newRequest,
+          this.config.getToolRegistry().getAllToolNames(),
+        );
+        this.state.replaceActiveCallWithTailCall(callId, errorCall);
+      } else {
+        // Enqueue a validating tool call for the new tail tool
+        const validatingCall = this._validateAndCreateToolCall(
+          newRequest,
+          newTool,
+          activeCall.approvalMode ?? this.config.getApprovalMode(),
+        );
+        this.state.replaceActiveCallWithTailCall(callId, validatingCall);
+      }
+
+      // Loop continues, picking up the new tail call at the front of the queue.
+      return true;
+    }
+
     if (result.status === CoreToolCallStatus.Success) {
       this.state.updateStatus(
         callId,
@@ -661,6 +737,7 @@ export class Scheduler {
         result.response,
       );
     }
+    return false;
   }
 
   private _processNextInRequestQueue() {
