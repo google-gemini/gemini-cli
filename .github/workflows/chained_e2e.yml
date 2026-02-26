@@ -329,10 +329,10 @@ jobs:
           fi
           echo "All required E2E jobs passed!"
         env:
-          NEEDS_E2E_LINUX_RESULT: ${{ needs.e2e_linux.result }}
-          NEEDS_E2E_MAC_RESULT: ${{ needs.e2e_mac.result }}
-          NEEDS_E2E_WINDOWS_RESULT: ${{ needs.e2e_windows.result }}
-          NEEDS_EVALS_RESULT: ${{ needs.evals.result }}
+          NEEDS_E2E_LINUX_RESULT: '${{ needs.e2e_linux.result }}'
+          NEEDS_E2E_MAC_RESULT: '${{ needs.e2e_mac.result }}'
+          NEEDS_E2E_WINDOWS_RESULT: '${{ needs.e2e_windows.result }}'
+          NEEDS_EVALS_RESULT: '${{ needs.evals.result }}'
 
   set_workflow_status:
     runs-on: 'gemini-cli-ubuntu-16-core'
