@@ -10,29 +10,6 @@ import Gradient from 'ink-gradient';
 import { theme } from '../semantic-colors.js';
 import type { Theme } from '../themes/theme.js';
 
-const COLOR_DESCRIPTIONS: Record<string, string> = {
-  'text.primary': 'Primary text color (uses terminal default if blank)',
-  'text.secondary': 'Secondary/dimmed text color',
-  'text.link': 'Hyperlink and highlighting color',
-  'text.accent': 'Accent color for emphasis',
-  'text.response':
-    'Color for model response text (uses terminal default if blank)',
-  'background.primary': 'Main terminal background color',
-  'background.message': 'Subtle background for message blocks',
-  'background.input': 'Background for the input prompt',
-  'background.diff.added': 'Background for added lines in diffs',
-  'background.diff.removed': 'Background for removed lines in diffs',
-  'border.default': 'Standard border color',
-  'border.focused': 'Border color when an element is focused',
-  'ui.comment': 'Color for code comments and metadata',
-  'ui.symbol': 'Color for technical symbols and UI icons',
-  'ui.dark': 'Deeply dimmed color for subtle UI elements',
-  'ui.gradient': 'Array of colors used for UI gradients',
-  'status.error': 'Color for error messages and critical status',
-  'status.success': 'Color for success messages and positive status',
-  'status.warning': 'Color for warnings and cautionary status',
-};
-
 interface StandardColorRow {
   type: 'standard';
   name: string;
@@ -53,8 +30,8 @@ interface BackgroundColorRow {
 
 type ColorRow = StandardColorRow | GradientColorRow | BackgroundColorRow;
 
-const VALUE_COLUMN_WIDTH = '10%';
-const NAME_COLUMN_WIDTH = '30%';
+const VALUE_COLUMN_WIDTH = '25%';
+const NAME_COLUMN_WIDTH = '75%';
 
 interface ColorsDisplayProps {
   activeTheme: Theme;
@@ -145,30 +122,29 @@ export const ColorsDisplay: React.FC<ColorsDisplayProps> = ({
         <Text bold color={theme.text.accent}>
           DEVELOPER TOOLS (Not visible to users)
         </Text>
-        <Text color={theme.text.primary}>
-          <Text bold>How themes and terminals interact:</Text>
-        </Text>
-        <Box marginLeft={2} flexDirection="column">
+        <Box marginTop={1} flexDirection="column">
           <Text color={theme.text.primary}>
-            • <Text bold>TrueColor (Hex):</Text> Modern terminals render hex
-            codes exactly. They are <Text italic>not</Text> overridden by
-            terminal app themes.
+            <Text bold>Theme/Terminal interaction:</Text>
           </Text>
-          <Text color={theme.text.primary}>
-            • <Text bold>ANSI Names:</Text> Colors like &apos;red&apos; or
-            &apos;green&apos; <Text italic>are</Text> mapped to your terminal
-            app&apos;s specific palette.
-          </Text>
-          <Text color={theme.text.primary}>
-            • <Text bold>Default colors:</Text> When Value is
-            &apos;(blank)&apos;, the app uses your terminal&apos;s default
-            foreground/background.
-          </Text>
-          <Text color={theme.text.primary}>
-            • <Text bold>Compatibility:</Text> In terminals with limited color,
-            hex colors are automatically approximated to the closest available
-            ANSI color.
-          </Text>
+          <Box marginLeft={2} flexDirection="column">
+            <Text color={theme.text.primary}>
+              • <Text bold>Hex:</Text> Rendered exactly by modern terminals. Not
+              overridden by app themes.
+            </Text>
+            <Text color={theme.text.primary}>
+              • <Text bold>Blank:</Text> Uses your terminal&apos;s default
+              foreground/background.
+            </Text>
+            <Text color={theme.text.primary}>
+              • <Text bold>Compatibility:</Text> On older terminals, hex is
+              approximated to the nearest ANSI color.
+            </Text>
+            <Text color={theme.text.primary}>
+              • <Text bold>ANSI Names:</Text> &apos;red&apos;,
+              &apos;green&apos;, etc. are mapped to your terminal app&apos;s
+              palette.
+            </Text>
+          </Box>
         </Box>
       </Box>
 
@@ -182,11 +158,6 @@ export const ColorsDisplay: React.FC<ColorsDisplayProps> = ({
         <Box width={NAME_COLUMN_WIDTH}>
           <Text bold color={theme.text.link} dimColor>
             Name
-          </Text>
-        </Box>
-        <Box flexGrow={1}>
-          <Text bold color={theme.text.link} dimColor>
-            Usage
           </Text>
         </Box>
       </Box>
@@ -205,7 +176,6 @@ export const ColorsDisplay: React.FC<ColorsDisplayProps> = ({
 };
 
 function renderStandardRow({ name, value }: StandardColorRow) {
-  const description = COLOR_DESCRIPTIONS[name] || '';
   const isHex = value.startsWith('#');
   const displayColor = isHex ? value : theme.text.primary;
 
@@ -217,16 +187,11 @@ function renderStandardRow({ name, value }: StandardColorRow) {
       <Box width={NAME_COLUMN_WIDTH}>
         <Text color={displayColor}>{name}</Text>
       </Box>
-      <Box flexGrow={1}>
-        <Text color={theme.text.secondary}>{description}</Text>
-      </Box>
     </Box>
   );
 }
 
 function renderGradientRow({ name, value }: GradientColorRow) {
-  const description = COLOR_DESCRIPTIONS[name] || '';
-
   return (
     <Box key={name} flexDirection="row" paddingX={1}>
       <Box width={VALUE_COLUMN_WIDTH} flexDirection="column">
@@ -241,16 +206,11 @@ function renderGradientRow({ name, value }: GradientColorRow) {
           <Text>{name}</Text>
         </Gradient>
       </Box>
-      <Box flexGrow={1}>
-        <Text color={theme.text.secondary}>{description}</Text>
-      </Box>
     </Box>
   );
 }
 
 function renderBackgroundRow({ name, value }: BackgroundColorRow) {
-  const description = COLOR_DESCRIPTIONS[name] || '';
-
   return (
     <Box key={name} flexDirection="row" paddingX={1}>
       <Box
@@ -265,9 +225,6 @@ function renderBackgroundRow({ name, value }: BackgroundColorRow) {
       </Box>
       <Box width={NAME_COLUMN_WIDTH} paddingLeft={1}>
         <Text color={theme.text.primary}>{name}</Text>
-      </Box>
-      <Box flexGrow={1}>
-        <Text color={theme.text.secondary}>{description}</Text>
       </Box>
     </Box>
   );

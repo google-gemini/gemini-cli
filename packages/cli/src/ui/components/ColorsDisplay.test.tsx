@@ -100,21 +100,16 @@ describe('ColorsDisplay', () => {
     const output = lastFrame();
 
     // Check for title and description
-    expect(output).toContain('How themes and terminals interact:');
-    expect(output).toContain('TrueColor (Hex):');
+    expect(output).toContain('Theme/Terminal interaction:');
+    expect(output).toContain('Hex:');
 
-    // Check for some color names and values
-    expect(output).toContain('text.primary');
+    // Check for some color names and values    expect(output).toContain('text.primary');
     expect(output).toContain('#ffffff');
     expect(output).toContain('background.diff.added');
     expect(output).toContain('#003300');
     expect(output).toContain('border.default');
     expect(output).toContain('#555555');
 
-    // Check for some descriptions
-    expect(output).toContain('Primary text color');
-    expect(output).toContain('Standard border color');
-    expect(output).toContain('Main terminal background color');
     unmount();
   });
 });
