@@ -89,14 +89,17 @@ manually during a session.
 3.  **Draft:** Once an approach is selected, write a detailed implementation
     plan to the plans directory.
 4.  **Review & Approval:** Use the [`exit_plan_mode`] tool to present the plan
-    and formally request approval. - **Approve:** Exit Plan Mode and start
-    implementation. - **Iterate:** Provide feedback to refine the plan. -
-    **Refine manually:** Press **Ctrl + X** to open the plan file in your
-    [preferred external editor](../reference/configuration.md#general). This
-    allows you to manually refine the plan steps before approval. The CLI will
-    automatically refresh and show the updated plan after you save and close the
-    editor. For more complex or specialized planning tasks, you can
-    [customize the planning workflow with skills](#customizing-planning-with-skills).
+    and formally request approval.
+    - **Approve:** Exit Plan Mode and start implementation.
+    - **Iterate:** Provide feedback to refine the plan.
+    - **Refine manually:** Press **Ctrl + X** to open the plan file in your
+      [preferred external editor](../reference/configuration.md#general). This
+      allows you to manually refine the plan steps before approval. The CLI will
+      automatically refresh and show the updated plan after you save and close
+      the editor.
+
+For more complex or specialized planning tasks, you can
+[customize the planning workflow with skills](#customizing-planning-with-skills).
 
 ### Exiting Plan Mode
 
