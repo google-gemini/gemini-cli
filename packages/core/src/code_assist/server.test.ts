@@ -84,7 +84,6 @@ describe('CodeAssistServer', () => {
         responseType: 'json',
         body: expect.any(String),
         signal: undefined,
-        timeout: 60000,
       }),
     );
 
@@ -405,7 +404,6 @@ describe('CodeAssistServer', () => {
           'Content-Type': 'application/json',
         },
         signal: undefined,
-        timeout: 60000,
       }),
     );
 
