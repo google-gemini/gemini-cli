@@ -447,11 +447,11 @@ deny_message = "Git status is not allowed"
       expect(result.hookRules[0].commandPattern?.test('git log')).toBe(false);
     });
 
-    it('should parse hook rules with commandRegex', async () => {
+    it('should parse hook rules with commandPattern', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[hook_rule]]
 eventName = "BeforeAgent"
-commandRegex = "npm run .*"
+commandPattern = "npm run .*"
 decision = "deny"
 priority = 100
 `);

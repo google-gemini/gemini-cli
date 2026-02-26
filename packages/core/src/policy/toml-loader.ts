@@ -59,8 +59,7 @@ const HookRuleSchema = z.object({
   hookName: z.string().optional(),
   eventName: z.string().optional(),
   commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
-  commandRegex: z.string().optional(),
-  argsPattern: z.string().optional(),
+  commandPattern: z.string().optional(),
   decision: z.nativeEnum(PolicyDecision),
   priority: z
     .number({
@@ -487,10 +486,8 @@ export async function loadPoliciesFromToml(
                 : [rule.commandPrefix];
               const escapedPrefixes = prefixes.map((p) => escapeRegex(p));
               commandPatternStr = `^(${escapedPrefixes.join('|')})(\\s|$)`;
-            } else if (rule.commandRegex) {
-              commandPatternStr = rule.commandRegex;
-            } else if (rule.argsPattern) {
-              commandPatternStr = rule.argsPattern;
+            } else if (rule.commandPattern) {
+              commandPatternStr = rule.commandPattern;
             }
 
             if (commandPatternStr) {

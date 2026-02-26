@@ -809,8 +809,11 @@ export class PolicyEngine {
       if (rule.hookName && rule.hookName !== hookConfig.name) {
         continue;
       }
-      if (rule.commandPattern && hookConfig.command) {
-        if (!rule.commandPattern.test(hookConfig.command)) {
+      if (rule.commandPattern) {
+        if (
+          !hookConfig.command ||
+          !rule.commandPattern.test(hookConfig.command)
+        ) {
           continue;
         }
       }
