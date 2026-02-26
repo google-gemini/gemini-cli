@@ -98,7 +98,7 @@ export function BaseSelectionList<
   const numberColumnWidth = String(items.length).length;
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" aria-role="list">
       {/* Use conditional coloring instead of conditional rendering */}
       {showScrollArrows && items.length > maxItemsToShow && (
         <Text
@@ -137,7 +137,12 @@ export function BaseSelectionList<
         )}.`;
 
         return (
-          <Box key={item.key} alignItems="flex-start">
+          <Box
+            key={item.key}
+            alignItems="flex-start"
+            aria-role="listitem"
+            aria-state={{ checked: isSelected }}
+          >
             {/* Radio button indicator */}
             <Box minWidth={2} flexShrink={0}>
               <Text
@@ -154,7 +159,6 @@ export function BaseSelectionList<
                 marginRight={1}
                 flexShrink={0}
                 minWidth={itemNumberText.length}
-                aria-state={{ checked: isSelected }}
               >
                 <Text color={numberColor}>{itemNumberText}</Text>
               </Box>
