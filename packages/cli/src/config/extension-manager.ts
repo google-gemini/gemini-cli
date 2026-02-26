@@ -839,15 +839,22 @@ Would you like to attempt to install via "git clone" instead?`,
       let rules: PolicyRule[] | undefined;
       let checkers: SafetyCheckerRule[] | undefined;
 
-      const policyDir = path.join(effectiveExtensionPath, 'policies');
-      if (!isSubpath(effectiveExtensionPath, policyDir)) {
-        throw new Error(
-          `Invalid policy directory path. Policies must be within the extension directory.`,
-        );
-      }
-      if (fs.existsSync(policyDir)) {
+      const policyPaths = config.policyPaths || ['policies'];
+      const validPolicyDirs = policyPaths
+        .map((p) => path.join(effectiveExtensionPath, p))
+        .filter((dir) => {
+          if (!isSubpath(effectiveExtensionPath, dir)) {
+            debugLogger.warn(
+              `[ExtensionManager] Extension "${config.name}" attempted to contribute policies from outside its directory: "${dir}". Ignoring these policies for security.`,
+            );
+            return false;
+          }
+          return fs.existsSync(dir);
+        });
+
+      if (validPolicyDirs.length > 0) {
         const result = await loadPoliciesFromToml(
-          [policyDir],
+          validPolicyDirs,
           () => EXTENSION_POLICY_TIER,
         );
         rules = result.rules;

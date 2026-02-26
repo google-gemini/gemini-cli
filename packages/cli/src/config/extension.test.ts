@@ -428,6 +428,56 @@ priority = 100
       );
     });
 
+    it('should load extension policies from custom paths in the extension manifest', async () => {
+      const extDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'custom-policy-extension',
+        version: '1.0.0',
+        policyPaths: ['my-custom-policies', 'more-policies'],
+      });
+
+      const customDir1 = path.join(extDir, 'my-custom-policies');
+      fs.mkdirSync(customDir1);
+      fs.writeFileSync(
+        path.join(customDir1, 'policies.toml'),
+        `
+[[rule]]
+toolName = "custom_tool_1"
+decision = "deny"
+priority = 500
+`,
+      );
+
+      const customDir2 = path.join(extDir, 'more-policies');
+      fs.mkdirSync(customDir2);
+      fs.writeFileSync(
+        path.join(customDir2, 'policies.toml'),
+        `
+[[rule]]
+toolName = "custom_tool_2"
+decision = "ask_user"
+priority = 100
+`,
+      );
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
+      const extension = extensions[0];
+
+      expect(extension.rules).toBeDefined();
+      expect(extension.rules).toHaveLength(2);
+      expect(
+        extension.rules!.find((r) => r.toolName === 'custom_tool_1')?.decision,
+      ).toBe('deny');
+      expect(
+        extension.rules!.find((r) => r.toolName === 'custom_tool_2')?.decision,
+      ).toBe('ask_user');
+      // Verify source is prefixed
+      expect(extension.rules![0].source).toContain(
+        'Extension (custom-policy-extension):',
+      );
+    });
+
     it('should ignore ALLOW rules and YOLO mode from extension policies for security', async () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const extDir = createExtension({
