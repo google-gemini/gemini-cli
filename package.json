@@ -68,14 +68,10 @@
     "wrap-ansi": "9.0.2",
     "cliui": {
       "wrap-ansi": "7.0.0"
-<<<<<<< HEAD
-    }
-=======
     },
     "glob": "^12.0.0",
     "node-domexception": "npm:empty@^0.10.1",
     "prebuild-install": "npm:nop@1.0.0"
->>>>>>> 812794a47 (Update packages. (#20152))
   },
   "bin": {
     "gemini": "bundle/gemini.js"
