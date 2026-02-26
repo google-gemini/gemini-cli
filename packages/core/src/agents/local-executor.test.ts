@@ -653,7 +653,7 @@ describe('LocalAgentExecutor', () => {
       expect(systemInstruction).toContain(
         'You are running in a non-interactive mode',
       );
-      expect(systemInstruction).toContain('Always use absolute paths');
+      expect(systemInstruction).toContain('Prefer relative paths');
 
       const { modelConfigKey } = getMockMessageParams(0);
       expect(modelConfigKey.model).toBe(getModelConfigAlias(definition));
