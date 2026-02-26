@@ -51,7 +51,39 @@ describe('ColorsDisplay', () => {
       name: 'Test Theme',
       type: 'dark',
       colors: {} as unknown as ColorsTheme,
-      semanticColors: {} as unknown as SemanticColors,
+      semanticColors: {
+        text: {
+          primary: '#ffffff',
+          secondary: '#cccccc',
+          link: '#0000ff',
+          accent: '#ff00ff',
+          response: '#ffffff',
+        },
+        background: {
+          primary: '#000000',
+          message: '#111111',
+          input: '#222222',
+          diff: {
+            added: '#003300',
+            removed: '#330000',
+          },
+        },
+        border: {
+          default: '#555555',
+          focused: '#0000ff',
+        },
+        ui: {
+          comment: '#666666',
+          symbol: '#cccccc',
+          dark: '#333333',
+          gradient: undefined,
+        },
+        status: {
+          error: '#ff0000',
+          success: '#00ff00',
+          warning: '#ffff00',
+        },
+      } as unknown as SemanticColors,
     } as unknown as Theme);
   });
 
@@ -60,21 +92,16 @@ describe('ColorsDisplay', () => {
   });
 
   it('renders correctly', async () => {
+    const mockTheme = themeManager.getActiveTheme();
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <ColorsDisplay />,
+      <ColorsDisplay activeTheme={mockTheme} />,
     );
     await waitUntilReady();
     const output = lastFrame();
 
     // Check for title and description
-    expect(output).toContain('/colors - Theme Colors Demo');
-    expect(output).toContain('visualize how colors are used');
-    expect(output).toContain('How themes and terminals interact');
-    expect(output).toContain('TrueColor (Hex)');
-    expect(output).toContain('ANSI Names');
-
-    // Check for active theme name
-    expect(output).toContain('Test Theme');
+    expect(output).toContain('How themes and terminals interact:');
+    expect(output).toContain('TrueColor (Hex):');
 
     // Check for some color names and values
     expect(output).toContain('text.primary');

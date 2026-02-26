@@ -7,8 +7,8 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import Gradient from 'ink-gradient';
-import { themeManager } from '../themes/theme-manager.js';
 import { theme } from '../semantic-colors.js';
+import type { Theme } from '../themes/theme.js';
 
 const COLOR_DESCRIPTIONS: Record<string, string> = {
   'text.primary': 'Primary text color (uses terminal default if blank)',
@@ -56,9 +56,14 @@ type ColorRow = StandardColorRow | GradientColorRow | BackgroundColorRow;
 const VALUE_COLUMN_WIDTH = '10%';
 const NAME_COLUMN_WIDTH = '30%';
 
-export const ColorsDisplay: React.FC = () => {
-  const semanticColors = themeManager.getSemanticColors();
-  const activeTheme = themeManager.getActiveTheme();
+interface ColorsDisplayProps {
+  activeTheme: Theme;
+}
+
+export const ColorsDisplay: React.FC<ColorsDisplayProps> = ({
+  activeTheme,
+}) => {
+  const semanticColors = activeTheme.semanticColors;
 
   const backgroundRows: BackgroundColorRow[] = [];
   const standardRows: StandardColorRow[] = [];
@@ -129,26 +134,17 @@ export const ColorsDisplay: React.FC = () => {
   ];
 
   return (
-    <Box flexDirection="column" paddingX={1} marginY={1}>
+    <Box flexDirection="column" paddingX={0} marginY={1}>
       <Box marginBottom={1} flexDirection="column">
-        <Text bold color={theme.text.accent}>
-          /colors - Theme Colors Demo
-        </Text>
-        <Text color={theme.text.primary}>
-          The purpose of this feature is to visualize how colors are used in the
-          app, test across a variety of Terminals (Mac Terminal, Ghostty,
-          iTerm2, VSCode, etc), and see how the colors change across different
-          themes.
-        </Text>
-        <Box marginTop={1} flexDirection="column">
+        <Box flexDirection="column">
           <Text color={theme.text.primary}>
             <Text bold>How themes and terminals interact:</Text>
           </Text>
           <Box marginLeft={2} flexDirection="column">
             <Text color={theme.text.primary}>
-              • <Text bold>TrueColor (Hex):</Text> Modern terminals (iTerm2,
-              Ghostty, VSCode) render hex codes exactly. They are{' '}
-              <Text italic>not</Text> overridden by terminal app themes.
+              • <Text bold>TrueColor (Hex):</Text> Modern terminals render hex
+              codes exactly. They are <Text italic>not</Text> overridden by
+              terminal app themes.
             </Text>
             <Text color={theme.text.primary}>
               • <Text bold>ANSI Names:</Text> Colors like &apos;red&apos; or
@@ -161,20 +157,11 @@ export const ColorsDisplay: React.FC = () => {
               foreground/background.
             </Text>
             <Text color={theme.text.primary}>
-              • <Text bold>Compatibility:</Text> In terminals with limited color
-              (like older Mac Terminals), hex colors are automatically
-              approximated to the closest available ANSI color.
+              • <Text bold>Compatibility:</Text> In terminals with limited
+              color, hex colors are automatically approximated to the closest
+              available ANSI color.
             </Text>
           </Box>
-        </Box>
-        <Box marginTop={1}>
-          <Text color={theme.text.primary}>
-            Active Theme:{' '}
-            <Text color={theme.text.accent} bold>
-              {activeTheme.name}
-            </Text>{' '}
-            ({activeTheme.type})
-          </Text>
         </Box>
       </Box>
 

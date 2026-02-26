@@ -23,6 +23,8 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { ScopeSelector } from './shared/ScopeSelector.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { ColorsDisplay } from './ColorsDisplay.js';
+import { isDevelopment } from '../../utils/installationInfo.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
@@ -372,6 +374,11 @@ def fibonacci(n):
                     terminalWidth={colorizeCodeWidth}
                     theme={previewTheme}
                   />
+                  {isDevelopment && (
+                    <Box marginTop={1}>
+                      <ColorsDisplay activeTheme={previewTheme} />
+                    </Box>
+                  )}
                 </Box>
               );
             })()}
