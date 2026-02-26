@@ -2375,6 +2375,309 @@ describe('PolicyEngine', () => {
         expect(Array.from(excluded).sort()).toEqual(expected.sort());
       },
     );
+
+    it('should skip annotation-based rules when no metadata is provided', () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolAnnotations: { destructiveHint: true },
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+      });
+      const excluded = engine.getExcludedTools();
+      expect(Array.from(excluded)).toEqual([]);
+    });
+
+    it('should exclude tools matching annotation-based DENY rule when metadata is provided', () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolAnnotations: { destructiveHint: true },
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+      });
+      const metadata = new Map<string, Record<string, unknown>>([
+        ['dangerous_tool', { destructiveHint: true }],
+        ['safe_tool', { readOnlyHint: true }],
+      ]);
+      const excluded = engine.getExcludedTools(metadata);
+      expect(Array.from(excluded)).toEqual(['dangerous_tool']);
+    });
+
+    it('should NOT exclude tools whose annotations do not match', () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolAnnotations: { destructiveHint: true },
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+      });
+      const metadata = new Map<string, Record<string, unknown>>([
+        ['safe_tool', { readOnlyHint: true }],
+      ]);
+      const excluded = engine.getExcludedTools(metadata);
+      expect(Array.from(excluded)).toEqual([]);
+    });
+
+    it('should exclude tools matching both toolName pattern AND annotations', () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'server__*',
+            toolAnnotations: { destructiveHint: true },
+            decision: PolicyDecision.DENY,
+            priority: 10,
+          },
+        ],
+      });
+      const metadata = new Map<string, Record<string, unknown>>([
+        ['server__dangerous_tool', { destructiveHint: true }],
+        ['other__dangerous_tool', { destructiveHint: true }],
+        ['server__safe_tool', { readOnlyHint: true }],
+      ]);
+      const excluded = engine.getExcludedTools(metadata);
+      expect(Array.from(excluded)).toEqual(['server__dangerous_tool']);
+    });
+
+    it('should exclude unprocessed tools from allToolNames when global DENY is active', () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'glob',
+            decision: PolicyDecision.ALLOW,
+            priority: 70,
+          },
+          {
+            toolName: 'read_file',
+            decision: PolicyDecision.ALLOW,
+            priority: 70,
+          },
+          {
+            // Simulates plan.toml: mcpName="*" → toolName="*__*"
+            toolName: '*__*',
+            toolAnnotations: { readOnlyHint: true },
+            decision: PolicyDecision.ASK_USER,
+            priority: 70,
+          },
+          {
+            decision: PolicyDecision.DENY,
+            priority: 60,
+          },
+        ],
+      });
+      // MCP tools are registered with unqualified names in ToolRegistry
+      const allToolNames = new Set([
+        'glob',
+        'read_file',
+        'shell',
+        'web_fetch',
+        'read_mcp_tool',
+        'write_mcp_tool',
+      ]);
+      // buildToolMetadata() includes _serverName for MCP tools
+      const toolMetadata = new Map<string, Record<string, unknown>>([
+        ['read_mcp_tool', { readOnlyHint: true, _serverName: 'my-server' }],
+        ['write_mcp_tool', { readOnlyHint: false, _serverName: 'my-server' }],
+      ]);
+      const excluded = engine.getExcludedTools(toolMetadata, allToolNames);
+      expect(excluded.has('shell')).toBe(true);
+      expect(excluded.has('web_fetch')).toBe(true);
+      // Non-read-only MCP tool excluded by catch-all DENY
+      expect(excluded.has('write_mcp_tool')).toBe(true);
+      expect(excluded.has('glob')).toBe(false);
+      expect(excluded.has('read_file')).toBe(false);
+      // Read-only MCP tool allowed by annotation rule
+      expect(excluded.has('read_mcp_tool')).toBe(false);
+    });
+
+    it('should match already-qualified MCP tool names without _serverName', () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: '*__*',
+            toolAnnotations: { readOnlyHint: true },
+            decision: PolicyDecision.ASK_USER,
+            priority: 70,
+          },
+          {
+            decision: PolicyDecision.DENY,
+            priority: 60,
+          },
+        ],
+      });
+      // Tool registered with qualified name (collision case)
+      const allToolNames = new Set([
+        'myserver__read_tool',
+        'myserver__write_tool',
+      ]);
+      const toolMetadata = new Map<string, Record<string, unknown>>([
+        ['myserver__read_tool', { readOnlyHint: true }],
+        ['myserver__write_tool', { readOnlyHint: false }],
+      ]);
+      const excluded = engine.getExcludedTools(toolMetadata, allToolNames);
+      // Qualified name already contains __, matched directly without _serverName
+      expect(excluded.has('myserver__read_tool')).toBe(false);
+      expect(excluded.has('myserver__write_tool')).toBe(true);
+    });
+
+    it('should not exclude unprocessed tools when allToolNames is not provided (backward compat)', () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'glob',
+            decision: PolicyDecision.ALLOW,
+            priority: 70,
+          },
+          {
+            toolName: 'read_file',
+            decision: PolicyDecision.ALLOW,
+            priority: 70,
+          },
+          {
+            decision: PolicyDecision.DENY,
+            priority: 60,
+          },
+        ],
+      });
+      const excluded = engine.getExcludedTools();
+      // Without allToolNames, only explicitly named DENY tools are excluded
+      expect(excluded.has('shell')).toBe(false);
+      expect(excluded.has('web_fetch')).toBe(false);
+      expect(excluded.has('glob')).toBe(false);
+      expect(excluded.has('read_file')).toBe(false);
+    });
+
+    it('should correctly simulate plan.toml rules with allToolNames including MCP tools', () => {
+      // Simulate plan.toml: catch-all DENY at priority 60, explicit ALLOWs at 70,
+      // annotation-based ASK_USER for read-only MCP tools at priority 70.
+      // mcpName="*" in TOML becomes toolName="*__*" after loading.
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'glob',
+            decision: PolicyDecision.ALLOW,
+            priority: 70,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
+            toolName: 'grep_search',
+            decision: PolicyDecision.ALLOW,
+            priority: 70,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
+            toolName: 'read_file',
+            decision: PolicyDecision.ALLOW,
+            priority: 70,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
+            toolName: 'list_directory',
+            decision: PolicyDecision.ALLOW,
+            priority: 70,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
+            toolName: 'google_web_search',
+            decision: PolicyDecision.ALLOW,
+            priority: 70,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
+            toolName: 'activate_skill',
+            decision: PolicyDecision.ALLOW,
+            priority: 70,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
+            toolName: 'ask_user',
+            decision: PolicyDecision.ASK_USER,
+            priority: 70,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
+            toolName: 'save_memory',
+            decision: PolicyDecision.ASK_USER,
+            priority: 70,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
+            toolName: 'exit_plan_mode',
+            decision: PolicyDecision.ASK_USER,
+            priority: 70,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
+            toolName: '*__*',
+            toolAnnotations: { readOnlyHint: true },
+            decision: PolicyDecision.ASK_USER,
+            priority: 70,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
+            decision: PolicyDecision.DENY,
+            priority: 60,
+            modes: [ApprovalMode.PLAN],
+          },
+        ],
+        approvalMode: ApprovalMode.PLAN,
+      });
+      // MCP tools are registered with unqualified names in ToolRegistry
+      const allToolNames = new Set([
+        'glob',
+        'grep_search',
+        'read_file',
+        'list_directory',
+        'google_web_search',
+        'activate_skill',
+        'ask_user',
+        'exit_plan_mode',
+        'shell',
+        'write_file',
+        'replace',
+        'web_fetch',
+        'write_todos',
+        'memory',
+        'save_memory',
+        'read_tool',
+        'write_tool',
+      ]);
+      // buildToolMetadata() includes _serverName for MCP tools
+      const toolMetadata = new Map<string, Record<string, unknown>>([
+        ['read_tool', { readOnlyHint: true, _serverName: 'mcp-server' }],
+        ['write_tool', { readOnlyHint: false, _serverName: 'mcp-server' }],
+      ]);
+      const excluded = engine.getExcludedTools(toolMetadata, allToolNames);
+      // These should be excluded (caught by catch-all DENY)
+      expect(excluded.has('shell')).toBe(true);
+      expect(excluded.has('web_fetch')).toBe(true);
+      expect(excluded.has('write_todos')).toBe(true);
+      expect(excluded.has('memory')).toBe(true);
+      // write_file and replace are excluded unless they have argsPattern rules
+      // (argsPattern rules don't exclude, but don't explicitly allow either)
+      expect(excluded.has('write_file')).toBe(true);
+      expect(excluded.has('replace')).toBe(true);
+      // Non-read-only MCP tool excluded by catch-all DENY
+      expect(excluded.has('write_tool')).toBe(true);
+      // These should NOT be excluded (explicitly allowed)
+      expect(excluded.has('glob')).toBe(false);
+      expect(excluded.has('grep_search')).toBe(false);
+      expect(excluded.has('read_file')).toBe(false);
+      expect(excluded.has('list_directory')).toBe(false);
+      expect(excluded.has('google_web_search')).toBe(false);
+      expect(excluded.has('activate_skill')).toBe(false);
+      expect(excluded.has('ask_user')).toBe(false);
+      expect(excluded.has('exit_plan_mode')).toBe(false);
+      expect(excluded.has('save_memory')).toBe(false);
+      // Read-only MCP tool allowed by annotation rule (matched via _serverName)
+      expect(excluded.has('read_tool')).toBe(false);
+    });
   });
 
   describe('YOLO mode with ask_user tool', () => {
