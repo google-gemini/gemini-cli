@@ -14,8 +14,7 @@ Lists the names of files and subdirectories directly within a specified path.
 
 - **Tool name:** `list_directory`
 - **Arguments:**
-  - `dir_path` (string, required): Path to the directory (relative to workspace
-    root preferred).
+  - `dir_path` (string, required): Absolute or relative path to the directory.
   - `ignore` (array, optional): Glob patterns to exclude.
   - `file_filtering_options` (object, optional): Configuration for `.gitignore`
     and `.geminiignore` compliance.
@@ -27,8 +26,7 @@ and PDF.
 
 - **Tool name:** `read_file`
 - **Arguments:**
-  - `file_path` (string, required): Path to the file (relative to workspace root
-    preferred).
+  - `file_path` (string, required): Path to the file.
   - `offset` (number, optional): Start line for text files (0-based).
   - `limit` (number, optional): Maximum lines to read.
 
@@ -39,8 +37,7 @@ if not.
 
 - **Tool name:** `write_file`
 - **Arguments:**
-  - `file_path` (string, required): Path to the file (relative to workspace root
-    preferred).
+  - `file_path` (string, required): Path to the file.
   - `content` (string, required): Data to write.
 - **Confirmation:** Requires manual user approval.
 
@@ -54,16 +51,16 @@ Finds files matching specific glob patterns across the workspace.
 - **Parameters:**
   - `pattern` (string, required): The glob pattern to match against (e.g.,
     `"*.py"`, `"src/**/*.js"`).
-  - `dir_path` (string, optional): The path to the directory to search within
-    (relative to workspace root preferred). If omitted, searches the tool's root
-    directory.
+  - `path` (string, optional): The absolute path to the directory to search
+    within. If omitted, searches the tool's root directory.
   - `case_sensitive` (boolean, optional): Whether the search should be
     case-sensitive. Defaults to `false`.
   - `respect_git_ignore` (boolean, optional): Whether to respect .gitignore
     patterns when finding files. Defaults to `true`.
 - **Behavior:**
   - Searches for files matching the glob pattern within the specified directory.
-  - Returns a list of paths, sorted with the most recently modified files first.
+  - Returns a list of absolute paths, sorted with the most recently modified
+    files first.
   - Ignores common nuisance directories like `node_modules` and `.git` by
     default.
 - **Output (`llmContent`):** A message like:
@@ -82,9 +79,8 @@ lines containing matches, along with their file paths and line numbers.
 - **Parameters:**
   - `pattern` (string, required): The regular expression (regex) to search for
     (e.g., `"function\s+myFunction"`).
-  - `dir_path` (string, optional): The path to the directory to search within
-    (relative to workspace root preferred). Defaults to the current working
-    directory.
+  - `path` (string, optional): The absolute path to the directory to search
+    within. Defaults to the current working directory.
   - `include` (string, optional): A glob pattern to filter which files are
     searched (e.g., `"*.js"`, `"src/**/*.{ts,tsx}"`). If omitted, searches most
     files (respecting common ignores).
@@ -117,8 +113,7 @@ around the `old_string` to ensure it modifies the correct location.
 
 - **Tool name:** `replace`
 - **Arguments:**
-  - `file_path` (string, required): Path to the file (relative to workspace root
-    preferred).
+  - `file_path` (string, required): Path to the file.
   - `instruction` (string, required): Semantic description of the change.
   - `old_string` (string, required): Exact literal text to find.
   - `new_string` (string, required): Exact literal text to replace with.

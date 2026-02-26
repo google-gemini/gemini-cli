@@ -14,10 +14,8 @@ platforms, they execute with `bash -c`.
 - `command` (string, required): The exact shell command to execute.
 - `description` (string, optional): A brief description shown to the user for
   confirmation.
-- `dir_path` (string, optional): The path of the directory to run the command in
-  (relative to workspace root preferred). If not provided, the project root
-  directory is used. Must be a directory within the workspace and must already
-  exist.
+- `dir_path` (string, optional): The absolute path or relative path from
+  workspace root where the command runs.
 - `is_background` (boolean, optional): Whether to move the process to the
   background immediately after starting.
 
