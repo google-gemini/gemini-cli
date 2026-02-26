@@ -169,9 +169,13 @@ User, and (if configured) Admin directories.
 
 #### System-wide policies (Admin)
 
-Administrators can enforce system-wide policies (Tier 3) that override all user
-and default settings. These policies must be placed in specific, secure
-directories:
+Administrators can enforce system-wide policies (Tier 4) that override all user
+and default settings. These policies can be loaded from standard system
+locations or supplemental paths.
+
+##### Standard Locations
+
+These are the default paths the CLI searches for admin policies:
 
 | OS          | Policy Directory Path                             |
 | :---------- | :------------------------------------------------ |
@@ -179,10 +183,24 @@ directories:
 | **macOS**   | `/Library/Application Support/GeminiCli/policies` |
 | **Windows** | `C:\ProgramData\gemini-cli\policies`              |
 
-**Security Requirements:**
+##### Supplemental Admin Policies
+
+Administrators can also specify supplemental policy paths using:
+- The `--admin-policy` command-line flag.
+- The `adminPolicyPaths` setting in a system settings file.
+
+These supplemental policies are assigned the same **Admin** tier (Base 4) as
+policies in standard locations.
+
+**Security Guard**: Supplemental admin policies are **ignored** if any `.toml`
+policy files are found in the standard system location. This prevents
+flag-based overrides when a central system policy has already been established.
+
+#### Security Requirements
 
 To prevent privilege escalation, the CLI enforces strict security checks on
-admin directories. If checks fail, system policies are **ignored**.
+**all** admin directories (standard and supplemental). If checks fail, the
+policies in that directory are **ignored**.
 
 - **Linux / macOS:** Must be owned by `root` (UID 0) and NOT writable by group
   or others (e.g., `chmod 755`).

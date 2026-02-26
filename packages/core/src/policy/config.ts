@@ -171,20 +171,27 @@ export function formatPolicyError(error: PolicyFileError): string {
 }
 
 /**
- * Filters out insecure policy directories (specifically the system policy directory).
+ * Filters out insecure policy directories (specifically the system policy directory
+ * and supplemental admin policy paths).
  * Emits warnings if insecure directories are found.
  */
 async function filterSecurePolicyDirectories(
   dirs: string[],
   systemPoliciesDir: string,
+  adminPolicyPaths?: Set<string>,
 ): Promise<string[]> {
   const results = await Promise.all(
     dirs.map(async (dir) => {
-      // Only check security for system policies
-      if (path.resolve(dir) === systemPoliciesDir) {
+      const normalizedDir = path.resolve(dir);
+      const isAdminPolicy =
+        normalizedDir === systemPoliciesDir ||
+        adminPolicyPaths?.has(normalizedDir);
+
+      if (isAdminPolicy) {
         const { secure, reason } = await isDirectorySecure(dir);
         if (!secure) {
-          const msg = `Security Warning: Skipping system policies from ${dir}: ${reason}`;
+          const tier = normalizedDir === systemPoliciesDir ? 'system' : 'admin';
+          const msg = `Security Warning: Skipping ${tier} policies from ${dir}: ${reason}`;
           emitWarningOnce(msg);
           return null;
         }
@@ -231,17 +238,21 @@ export async function createPolicyEngineConfig(
     settings.workspacePoliciesDir,
     adminPolicyPaths,
   );
+
+  const adminPolicyPathsSet = adminPolicyPaths
+    ? new Set(adminPolicyPaths.map((p) => path.resolve(p)))
+    : undefined;
+
   const securePolicyDirs = await filterSecurePolicyDirectories(
     policyDirs,
     systemPoliciesDir,
+    adminPolicyPathsSet,
   );
 
   const tierContext = {
     defaultPoliciesDir,
     workspacePoliciesDir: settings.workspacePoliciesDir,
-    adminPolicyPaths: adminPolicyPaths
-      ? new Set(adminPolicyPaths.map((p) => path.resolve(p)))
-      : undefined,
+    adminPolicyPaths: adminPolicyPathsSet,
     systemPoliciesDir,
     userPoliciesDir,
   };
