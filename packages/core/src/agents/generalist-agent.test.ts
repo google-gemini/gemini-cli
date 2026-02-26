@@ -19,6 +19,7 @@ describe('GeneralistAgent', () => {
     vi.spyOn(config, 'getAgentRegistry').mockReturnValue({
       getDirectoryContext: () => 'mock directory context',
       getAllAgentNames: () => ['agent-tool'],
+      getAllDefinitions: () => [],
     } as unknown as AgentRegistry);
 
     const agent = GeneralistAgent(config);

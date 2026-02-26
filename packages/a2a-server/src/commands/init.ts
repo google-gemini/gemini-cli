@@ -85,6 +85,7 @@ export class InitCommand implements Command {
     if (!context.agentExecutor) {
       throw new Error('Agent executor not found in context.');
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const agentExecutor = context.agentExecutor as CoderAgentExecutor;
 
     const agentSettings: AgentSettings = {

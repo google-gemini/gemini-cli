@@ -65,7 +65,6 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 vi.mock('node:crypto');
-vi.mock('../utils/textUtils.js');
 
 import {
   useShellCommandProcessor,
@@ -76,12 +75,12 @@ import {
   type GeminiClient,
   type ShellExecutionResult,
   type ShellOutputEvent,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { ToolCallStatus } from '../types.js';
 
 describe('useShellCommandProcessor', () => {
   let addItemToHistoryMock: Mock;
@@ -202,7 +201,7 @@ describe('useShellCommandProcessor', () => {
       tools: [
         expect.objectContaining({
           name: 'Shell Command',
-          status: ToolCallStatus.Executing,
+          status: CoreToolCallStatus.Executing,
         }),
       ],
     });
@@ -241,7 +240,7 @@ describe('useShellCommandProcessor', () => {
       expect.objectContaining({
         tools: [
           expect.objectContaining({
-            status: ToolCallStatus.Success,
+            status: CoreToolCallStatus.Success,
             resultDisplay: 'ok',
           }),
         ],
@@ -270,7 +269,7 @@ describe('useShellCommandProcessor', () => {
     await act(async () => await execPromise);
 
     const finalHistoryItem = addItemToHistoryMock.mock.calls[1][0];
-    expect(finalHistoryItem.tools[0].status).toBe(ToolCallStatus.Error);
+    expect(finalHistoryItem.tools[0].status).toBe(CoreToolCallStatus.Error);
     expect(finalHistoryItem.tools[0].resultDisplay).toContain(
       'Command exited with code 127',
     );
@@ -484,7 +483,7 @@ describe('useShellCommandProcessor', () => {
     await act(async () => await execPromise);
 
     const finalHistoryItem = addItemToHistoryMock.mock.calls[1][0];
-    expect(finalHistoryItem.tools[0].status).toBe(ToolCallStatus.Success);
+    expect(finalHistoryItem.tools[0].status).toBe(CoreToolCallStatus.Success);
     expect(finalHistoryItem.tools[0].resultDisplay).toBe(
       '[Command produced binary output, which is not shown.]',
     );

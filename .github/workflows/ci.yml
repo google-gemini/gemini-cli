@@ -356,11 +356,16 @@ jobs:
           clean-script: 'clean'
 
   test_windows:
-    name: 'Slow Test - Win'
+    name: 'Slow Test - Win - ${{ matrix.shard }}'
     runs-on: 'gemini-cli-windows-16-core'
     needs: 'merge_queue_skipper'
     if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
-    continue-on-error: true
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        shard:
+          - 'cli'
+          - 'others'
 
     steps:
       - name: 'Checkout'
@@ -411,7 +416,14 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
-        run: 'npm run test:ci -- --coverage.enabled=false'
+        run: |
+          if ("${{ matrix.shard }}" -eq "cli") {
+            npm run test:ci --workspace @google/gemini-cli -- --coverage.enabled=false
+          } else {
+            # Explicitly list non-cli packages to ensure they are sharded correctly
+            npm run test:ci --workspace @google/gemini-cli-core --workspace @google/gemini-cli-a2a-server --workspace gemini-cli-vscode-ide-companion --workspace @google/gemini-cli-test-utils --if-present -- --coverage.enabled=false
+            npm run test:scripts
+          }
         shell: 'pwsh'
 
       - name: 'Bundle'
@@ -445,6 +457,7 @@ jobs:
       - 'link_checker'
       - 'test_linux'
       - 'test_mac'
+      - 'test_windows'
       - 'codeql'
       - 'bundle_size'
     runs-on: 'gemini-cli-ubuntu-16-core'
@@ -455,6 +468,7 @@ jobs:
                (${{ needs.link_checker.result }} != 'success' && ${{ needs.link_checker.result }} != 'skipped') || \
                (${{ needs.test_linux.result }} != 'success' && ${{ needs.test_linux.result }} != 'skipped') || \
                (${{ needs.test_mac.result }} != 'success' && ${{ needs.test_mac.result }} != 'skipped') || \
+               (${{ needs.test_windows.result }} != 'success' && ${{ needs.test_windows.result }} != 'skipped') || \
                (${{ needs.codeql.result }} != 'success' && ${{ needs.codeql.result }} != 'skipped') || \
                (${{ needs.bundle_size.result }} != 'success' && ${{ needs.bundle_size.result }} != 'skipped') ]]; then
             echo "One or more CI jobs failed."

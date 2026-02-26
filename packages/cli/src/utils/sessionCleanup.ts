@@ -174,7 +174,10 @@ export async function cleanupExpiredSessions(
 /**
  * Identifies sessions that should be deleted (corrupted or expired based on retention policy)
  */
-async function identifySessionsToDelete(
+/**
+ * Identifies sessions that should be deleted (corrupted or expired based on retention policy)
+ */
+export async function identifySessionsToDelete(
   allFiles: SessionFileEntry[],
   retentionConfig: SessionRetentionSettings,
 ): Promise<SessionFileEntry[]> {
@@ -273,6 +276,7 @@ function parseRetentionPeriod(period: string): number {
     );
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return value * MULTIPLIERS[unit as keyof typeof MULTIPLIERS];
 }
 
@@ -293,6 +297,7 @@ function validateRetentionConfig(
     try {
       maxAgeMs = parseRetentionPeriod(retentionConfig.maxAge);
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return (error as Error | string).toString();
     }
 

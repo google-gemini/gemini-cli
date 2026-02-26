@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lightTheme, darkTheme, ansiTheme } from './theme.js';
+import { lightTheme, darkTheme } from './theme.js';
 
 export interface SemanticColors {
   text: {
@@ -16,6 +16,8 @@ export interface SemanticColors {
   };
   background: {
     primary: string;
+    message: string;
+    input: string;
     diff: {
       added: string;
       removed: string;
@@ -48,13 +50,15 @@ export const lightSemanticColors: SemanticColors = {
   },
   background: {
     primary: lightTheme.Background,
+    message: lightTheme.MessageBackground!,
+    input: lightTheme.InputBackground!,
     diff: {
       added: lightTheme.DiffAdded,
       removed: lightTheme.DiffRemoved,
     },
   },
   border: {
-    default: lightTheme.Gray,
+    default: lightTheme.DarkGray,
     focused: lightTheme.AccentBlue,
   },
   ui: {
@@ -80,13 +84,15 @@ export const darkSemanticColors: SemanticColors = {
   },
   background: {
     primary: darkTheme.Background,
+    message: darkTheme.MessageBackground!,
+    input: darkTheme.InputBackground!,
     diff: {
       added: darkTheme.DiffAdded,
       removed: darkTheme.DiffRemoved,
     },
   },
   border: {
-    default: darkTheme.Gray,
+    default: darkTheme.DarkGray,
     focused: darkTheme.AccentBlue,
   },
   ui: {
@@ -99,37 +105,5 @@ export const darkSemanticColors: SemanticColors = {
     error: darkTheme.AccentRed,
     success: darkTheme.AccentGreen,
     warning: darkTheme.AccentYellow,
-  },
-};
-
-export const ansiSemanticColors: SemanticColors = {
-  text: {
-    primary: ansiTheme.Foreground,
-    secondary: ansiTheme.Gray,
-    link: ansiTheme.AccentBlue,
-    accent: ansiTheme.AccentPurple,
-    response: ansiTheme.Foreground,
-  },
-  background: {
-    primary: ansiTheme.Background,
-    diff: {
-      added: ansiTheme.DiffAdded,
-      removed: ansiTheme.DiffRemoved,
-    },
-  },
-  border: {
-    default: ansiTheme.Gray,
-    focused: ansiTheme.AccentBlue,
-  },
-  ui: {
-    comment: ansiTheme.Comment,
-    symbol: ansiTheme.Gray,
-    dark: ansiTheme.DarkGray,
-    gradient: ansiTheme.GradientColors,
-  },
-  status: {
-    error: ansiTheme.AccentRed,
-    success: ansiTheme.AccentGreen,
-    warning: ansiTheme.AccentYellow,
   },
 };

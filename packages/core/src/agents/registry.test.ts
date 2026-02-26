@@ -8,7 +8,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AgentRegistry, getModelConfigAlias } from './registry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import type { AgentDefinition, LocalAgentDefinition } from './types.js';
-import type { Config, GeminiCLIExtension } from '../config/config.js';
+import type {
+  Config,
+  GeminiCLIExtension,
+  ConfigParameters,
+} from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import { A2AClientManager } from './a2a-client-manager.js';
@@ -22,7 +26,6 @@ import {
 } from '../config/models.js';
 import * as tomlLoader from './agentLoader.js';
 import { SimpleExtensionLoader } from '../utils/extensionLoader.js';
-import type { ConfigParameters } from '../config/config.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import { ThinkingLevel } from '@google/genai';
 import type { AcknowledgedAgentsService } from './acknowledgedAgents.js';
@@ -1102,30 +1105,6 @@ describe('AgentRegistry', () => {
       expect(getterCalled).toBe(false); // Getter should not have been called yet
       expect(registeredDef.toolConfig?.tools).toEqual(['lazy-tool']);
       expect(getterCalled).toBe(true); // Getter should have been called now
-    });
-  });
-
-  describe('getDirectoryContext', () => {
-    it('should return default message when no agents are registered', () => {
-      expect(registry.getDirectoryContext()).toContain(
-        'No sub-agents are currently available.',
-      );
-    });
-
-    it('should return formatted list of agents when agents are available', async () => {
-      await registry.testRegisterAgent(MOCK_AGENT_V1);
-      await registry.testRegisterAgent({
-        ...MOCK_AGENT_V2,
-        name: 'AnotherAgent',
-        description: 'Another agent description',
-      });
-
-      const description = registry.getDirectoryContext();
-
-      expect(description).toContain('Sub-agents are specialized expert agents');
-      expect(description).toContain('Available Sub-Agents');
-      expect(description).toContain(`- ${MOCK_AGENT_V1.name}`);
-      expect(description).toContain(`- AnotherAgent`);
     });
   });
 });

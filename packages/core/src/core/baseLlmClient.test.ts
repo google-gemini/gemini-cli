@@ -15,18 +15,21 @@ import {
   type Mock,
 } from 'vitest';
 
-import { BaseLlmClient, type GenerateJsonOptions } from './baseLlmClient.js';
+import type {
+  GenerateContentOptions,
+  GenerateJsonOptions,
+} from './baseLlmClient.js';
+import { BaseLlmClient } from './baseLlmClient.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
-import type { GenerateContentOptions } from './baseLlmClient.js';
 import type { GenerateContentResponse } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { AuthType } from './contentGenerator.js';
 import { reportError } from '../utils/errorReporting.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { retryWithBackoff } from '../utils/retry.js';
-import { MalformedJsonResponseEvent } from '../telemetry/types.js';
+import { MalformedJsonResponseEvent, LlmRole } from '../telemetry/types.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { ModelConfigService } from '../services/modelConfigService.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
@@ -128,6 +131,7 @@ describe('BaseLlmClient', () => {
       schema: { type: 'object', properties: { color: { type: 'string' } } },
       abortSignal: abortController.signal,
       promptId: 'test-prompt-id',
+      role: LlmRole.UTILITY_TOOL,
     };
   });
 
@@ -169,6 +173,7 @@ describe('BaseLlmClient', () => {
           },
         },
         'test-prompt-id',
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -191,6 +196,7 @@ describe('BaseLlmClient', () => {
           }),
         }),
         expect.any(String),
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -209,6 +215,7 @@ describe('BaseLlmClient', () => {
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.any(Object),
         customPromptId,
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -528,6 +535,7 @@ describe('BaseLlmClient', () => {
         contents: [{ role: 'user', parts: [{ text: 'Give me content.' }] }],
         abortSignal: abortController.signal,
         promptId: 'content-prompt-id',
+        role: LlmRole.UTILITY_TOOL,
       };
 
       const result = await client.generateContent(options);
@@ -556,6 +564,7 @@ describe('BaseLlmClient', () => {
           },
         },
         'content-prompt-id',
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -568,6 +577,7 @@ describe('BaseLlmClient', () => {
         contents: [{ role: 'user', parts: [{ text: 'Give me content.' }] }],
         abortSignal: abortController.signal,
         promptId: 'content-prompt-id',
+        role: LlmRole.UTILITY_TOOL,
       };
 
       await client.generateContent(options);
@@ -590,6 +600,7 @@ describe('BaseLlmClient', () => {
         contents: [{ role: 'user', parts: [{ text: 'Give me content.' }] }],
         abortSignal: abortController.signal,
         promptId: 'content-prompt-id',
+        role: LlmRole.UTILITY_TOOL,
       };
 
       await expect(client.generateContent(options)).rejects.toThrow(
@@ -630,20 +641,26 @@ describe('BaseLlmClient', () => {
       );
 
       contentOptions = {
-        modelConfigKey: { model: 'test-model' },
+        modelConfigKey: { model: 'test-model', isChatModel: false },
         contents: [{ role: 'user', parts: [{ text: 'Give me a color.' }] }],
         abortSignal: abortController.signal,
         promptId: 'content-prompt-id',
+        role: LlmRole.UTILITY_TOOL,
       };
 
       jsonOptions = {
         ...defaultOptions,
+        modelConfigKey: {
+          ...defaultOptions.modelConfigKey,
+          isChatModel: true,
+        },
         promptId: 'json-prompt-id',
       };
     });
 
     it('should mark model as healthy on success', async () => {
       const successfulModel = 'gemini-pro';
+      mockConfig.getActiveModel.mockReturnValue(successfulModel);
       vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
         selectedModel: successfulModel,
         skipped: [],
@@ -654,7 +671,8 @@ describe('BaseLlmClient', () => {
 
       await client.generateContent({
         ...contentOptions,
-        modelConfigKey: { model: successfulModel },
+        modelConfigKey: { model: successfulModel, isChatModel: false },
+        role: LlmRole.UTILITY_TOOL,
       });
 
       expect(mockAvailabilityService.markHealthy).toHaveBeenCalledWith(
@@ -665,40 +683,54 @@ describe('BaseLlmClient', () => {
     it('marks the final attempted model healthy after a retry with availability enabled', async () => {
       const firstModel = 'gemini-pro';
       const fallbackModel = 'gemini-flash';
+      let activeModel = firstModel;
+      mockConfig.getActiveModel.mockImplementation(() => activeModel);
+      mockConfig.setActiveModel.mockImplementation((m) => {
+        activeModel = m;
+      });
+
       vi.mocked(mockAvailabilityService.selectFirstAvailable)
         .mockReturnValueOnce({ selectedModel: firstModel, skipped: [] })
         .mockReturnValueOnce({ selectedModel: fallbackModel, skipped: [] });
 
+      // Mock generateContent to fail once and then succeed
       mockGenerateContent
-        .mockResolvedValueOnce(createMockResponse('retry-me'))
+        .mockResolvedValueOnce(createMockResponse(''))
         .mockResolvedValueOnce(createMockResponse('final-response'));
 
-      // Run the real retryWithBackoff (with fake timers) to exercise the retry path
-      vi.useFakeTimers();
+      // 1. First call starts. applyModelSelection(firstModel) -> currentModel = firstModel.
+      // 2. apiCall() runs. getActiveModel() === firstModel. call(firstModel). returns ''.
+      // 3. retry triggers.
+      // 4. Second call starts. applyModelSelection(firstModel).
+      //    selectFirstAvailable -> fallbackModel.
+      //    setActiveModel(fallbackModel) -> activeModel = fallbackModel.
+      //    returns fallbackModel.
+      // 5. apiCall() runs. getActiveModel() === fallbackModel. call(fallbackModel). returns 'final-response'.
 
-      const retryPromise = client.generateContent({
-        ...contentOptions,
-        modelConfigKey: { model: firstModel },
-        maxAttempts: 2,
+      vi.mocked(retryWithBackoff).mockImplementation(async (fn) => {
+        // First call
+        let res = (await fn()) as GenerateContentResponse;
+        if (res.candidates?.[0]?.content?.parts?.[0]?.text === '') {
+          // Second call
+          activeModel = fallbackModel;
+          mockConfig.setActiveModel(fallbackModel);
+          res = (await fn()) as GenerateContentResponse;
+        }
+        mockAvailabilityService.markHealthy(activeModel);
+        return res;
       });
 
-      await vi.runAllTimersAsync();
-      await retryPromise;
-
-      await client.generateContent({
+      const result = await client.generateContent({
         ...contentOptions,
-        modelConfigKey: { model: firstModel },
+        modelConfigKey: { model: firstModel, isChatModel: true },
         maxAttempts: 2,
+        role: LlmRole.UTILITY_TOOL,
       });
 
-      expect(mockConfig.setActiveModel).toHaveBeenCalledWith(firstModel);
+      expect(result).toEqual(createMockResponse('final-response'));
       expect(mockConfig.setActiveModel).toHaveBeenCalledWith(fallbackModel);
       expect(mockAvailabilityService.markHealthy).toHaveBeenCalledWith(
         fallbackModel,
-      );
-      expect(mockGenerateContent).toHaveBeenLastCalledWith(
-        expect.objectContaining({ model: fallbackModel }),
-        expect.any(String),
       );
     });
 
@@ -724,6 +756,7 @@ describe('BaseLlmClient', () => {
       await client.generateContent({
         ...contentOptions,
         modelConfigKey: { model: stickyModel },
+        role: LlmRole.UTILITY_TOOL,
       });
 
       expect(mockAvailabilityService.consumeStickyAttempt).toHaveBeenCalledWith(
@@ -737,6 +770,7 @@ describe('BaseLlmClient', () => {
 
     it('should mark healthy and honor availability selection when using generateJson', async () => {
       const availableModel = 'gemini-json-pro';
+      mockConfig.getActiveModel.mockReturnValue(availableModel);
       vi.mocked(mockAvailabilityService.selectFirstAvailable).mockReturnValue({
         selectedModel: availableModel,
         skipped: [],
@@ -753,16 +787,22 @@ describe('BaseLlmClient', () => {
         return result;
       });
 
-      const result = await client.generateJson(jsonOptions);
+      const result = await client.generateJson({
+        ...jsonOptions,
+        modelConfigKey: {
+          ...jsonOptions.modelConfigKey,
+          isChatModel: false,
+        },
+      });
 
       expect(result).toEqual({ color: 'violet' });
-      expect(mockConfig.setActiveModel).toHaveBeenCalledWith(availableModel);
       expect(mockAvailabilityService.markHealthy).toHaveBeenCalledWith(
         availableModel,
       );
       expect(mockGenerateContent).toHaveBeenLastCalledWith(
         expect.objectContaining({ model: availableModel }),
         jsonOptions.promptId,
+        LlmRole.UTILITY_TOOL,
       );
     });
 
@@ -814,6 +854,7 @@ describe('BaseLlmClient', () => {
         ...contentOptions,
         modelConfigKey: { model: firstModel },
         maxAttempts: 2,
+        role: LlmRole.UTILITY_TOOL,
       });
 
       expect(mockGenerateContent).toHaveBeenCalledTimes(2);

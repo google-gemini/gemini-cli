@@ -20,6 +20,7 @@ export interface UseApprovalModeIndicatorArgs {
   addItem?: (item: HistoryItemWithoutId, timestamp: number) => void;
   onApprovalModeChange?: (mode: ApprovalMode) => void;
   isActive?: boolean;
+  allowPlanMode?: boolean;
 }
 
 export function useApprovalModeIndicator({
@@ -27,6 +28,7 @@ export function useApprovalModeIndicator({
   addItem,
   onApprovalModeChange,
   isActive = true,
+  allowPlanMode = false,
 }: UseApprovalModeIndicatorArgs): ApprovalMode {
   const currentConfigValue = config.getApprovalMode();
   const [showApprovalMode, setApprovalMode] = useState(currentConfigValue);
@@ -75,7 +77,7 @@ export function useApprovalModeIndicator({
             nextApprovalMode = ApprovalMode.AUTO_EDIT;
             break;
           case ApprovalMode.AUTO_EDIT:
-            nextApprovalMode = config.isPlanEnabled()
+            nextApprovalMode = allowPlanMode
               ? ApprovalMode.PLAN
               : ApprovalMode.DEFAULT;
             break;
@@ -102,6 +104,7 @@ export function useApprovalModeIndicator({
             addItem(
               {
                 type: MessageType.INFO,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                 text: (e as Error).message,
               },
               Date.now(),

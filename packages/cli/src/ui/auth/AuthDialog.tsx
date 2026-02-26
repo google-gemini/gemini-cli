@@ -88,8 +88,10 @@ export function AuthDialog({
   const defaultAuthTypeEnv = process.env['GEMINI_DEFAULT_AUTH_TYPE'];
   if (
     defaultAuthTypeEnv &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     Object.values(AuthType).includes(defaultAuthTypeEnv as AuthType)
   ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     defaultAuthType = defaultAuthTypeEnv as AuthType;
   }
 
@@ -248,9 +250,7 @@ export function AuthDialog({
         </Box>
         <Box marginTop={1}>
           <Text color={theme.text.link}>
-            {
-              'https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md'
-            }
+            {'https://geminicli.com/docs/resources/tos-privacy/'}
           </Text>
         </Box>
       </Box>

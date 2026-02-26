@@ -8,17 +8,19 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 
-import type { TelemetryTarget } from '@google/gemini-cli-core';
+import type {
+  TelemetryTarget,
+  ConfigParameters,
+  ExtensionLoader,
+} from '@google/gemini-cli-core';
 import {
   AuthType,
   Config,
-  type ConfigParameters,
   FileDiscoveryService,
   ApprovalMode,
   loadServerHierarchicalMemory,
   GEMINI_DIR,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
-  type ExtensionLoader,
   startupProfiler,
   PREVIEW_GEMINI_MODEL,
   homedir,
@@ -66,8 +68,9 @@ export async function loadConfig(
     debugMode: process.env['DEBUG'] === 'true' || false,
     question: '', // Not used in server mode directly like CLI
 
-    coreTools: settings.coreTools || undefined,
-    excludeTools: settings.excludeTools || undefined,
+    coreTools: settings.coreTools || settings.tools?.core || undefined,
+    excludeTools: settings.excludeTools || settings.tools?.exclude || undefined,
+    allowedTools: settings.allowedTools || settings.tools?.allowed || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
     approvalMode:
       process.env['GEMINI_YOLO_MODE'] === 'true'
@@ -77,6 +80,7 @@ export async function loadConfig(
     cwd: workspaceDir,
     telemetry: {
       enabled: settings.telemetry?.enabled,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       target: settings.telemetry?.target as TelemetryTarget,
       otlpEndpoint:
         process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] ??

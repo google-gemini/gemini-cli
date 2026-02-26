@@ -18,6 +18,7 @@ import { NumericalClassifierStrategy } from './strategies/numericalClassifierStr
 import { CompositeStrategy } from './strategies/compositeStrategy.js';
 import { FallbackStrategy } from './strategies/fallbackStrategy.js';
 import { OverrideStrategy } from './strategies/overrideStrategy.js';
+import { ApprovalModeStrategy } from './strategies/approvalModeStrategy.js';
 
 import { logModelRouting } from '../telemetry/loggers.js';
 import { ModelRoutingEvent } from '../telemetry/types.js';
@@ -41,6 +42,9 @@ export class ModelRouterService {
     // Order matters here. Fallback and override are checked first.
     strategies.push(new FallbackStrategy());
     strategies.push(new OverrideStrategy());
+
+    // Approval mode is next.
+    strategies.push(new ApprovalModeStrategy());
 
     // Then, if enabled, the Gemma classifier is used.
     if (this.config.getGemmaModelRouterSettings()?.enabled) {
@@ -120,6 +124,7 @@ export class ModelRouterService {
         decision!.metadata.reasoning,
         failed,
         error_message,
+        this.config.getApprovalMode(),
         enableNumericalRouting,
         classifierThreshold,
       );

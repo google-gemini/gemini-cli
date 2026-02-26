@@ -8,7 +8,7 @@ import { render } from '../../test-utils/render.js';
 import { GeminiRespondingSpinner } from './GeminiRespondingSpinner.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
-import { useIsScreenReaderEnabled } from 'ink';
+import { Text, useIsScreenReaderEnabled } from 'ink';
 import { StreamingState } from '../types.js';
 import {
   SCREEN_READER_LOADING,
@@ -16,16 +16,18 @@ import {
 } from '../textConstants.js';
 
 vi.mock('../contexts/StreamingContext.js');
-vi.mock('ink', async () => {
-  const actual = await vi.importActual('ink');
+vi.mock('ink', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ink')>();
   return {
     ...actual,
     useIsScreenReaderEnabled: vi.fn(),
   };
 });
 
-vi.mock('./CliSpinner.js', () => ({
-  CliSpinner: () => 'Spinner',
+vi.mock('./GeminiSpinner.js', () => ({
+  GeminiSpinner: ({ altText }: { altText?: string }) => (
+    <Text>GeminiSpinner {altText}</Text>
+  ),
 }));
 
 describe('GeminiRespondingSpinner', () => {
@@ -37,40 +39,55 @@ describe('GeminiRespondingSpinner', () => {
     mockUseIsScreenReaderEnabled.mockReturnValue(false);
   });
 
-  it('renders spinner when responding', () => {
+  it('renders spinner when responding', async () => {
     mockUseStreamingContext.mockReturnValue(StreamingState.Responding);
-    const { lastFrame } = render(<GeminiRespondingSpinner />);
-    // Spinner output varies, but it shouldn't be empty
-    expect(lastFrame()).not.toBe('');
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <GeminiRespondingSpinner />,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toContain('GeminiSpinner');
+    unmount();
   });
 
-  it('renders screen reader text when responding and screen reader enabled', () => {
+  it('renders screen reader text when responding and screen reader enabled', async () => {
     mockUseStreamingContext.mockReturnValue(StreamingState.Responding);
     mockUseIsScreenReaderEnabled.mockReturnValue(true);
-    const { lastFrame } = render(<GeminiRespondingSpinner />);
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <GeminiRespondingSpinner />,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toContain(SCREEN_READER_RESPONDING);
+    unmount();
   });
 
-  it('renders nothing when not responding and no non-responding display', () => {
+  it('renders nothing when not responding and no non-responding display', async () => {
     mockUseStreamingContext.mockReturnValue(StreamingState.Idle);
-    const { lastFrame } = render(<GeminiRespondingSpinner />);
-    expect(lastFrame()).toBe('');
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <GeminiRespondingSpinner />,
+    );
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 
-  it('renders non-responding display when provided', () => {
+  it('renders non-responding display when provided', async () => {
     mockUseStreamingContext.mockReturnValue(StreamingState.Idle);
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <GeminiRespondingSpinner nonRespondingDisplay="Waiting..." />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toContain('Waiting...');
+    unmount();
   });
 
-  it('renders screen reader loading text when non-responding display provided and screen reader enabled', () => {
+  it('renders screen reader loading text when non-responding display provided and screen reader enabled', async () => {
     mockUseStreamingContext.mockReturnValue(StreamingState.Idle);
     mockUseIsScreenReaderEnabled.mockReturnValue(true);
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <GeminiRespondingSpinner nonRespondingDisplay="Waiting..." />,
     );
+    await waitUntilReady();
     expect(lastFrame()).toContain(SCREEN_READER_LOADING);
+    unmount();
   });
 });

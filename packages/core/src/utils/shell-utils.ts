@@ -237,6 +237,7 @@ function parseCommandTree(
       progressCallback: () => {
         if (performance.now() > deadline) {
           timedOut = true;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return true as unknown as void; // Returning true cancels parsing, but type says void
         }
       },
@@ -478,6 +479,7 @@ function parsePowerShellCommandDetails(
       hasRedirection?: boolean;
     } | null = null;
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       parsed = JSON.parse(output);
     } catch {
       return { details: [], hasError: true };

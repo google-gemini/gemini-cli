@@ -88,6 +88,7 @@ function estimateFunctionResponseTokens(part: Part, depth: number): number {
   }
 
   // Gemini 3: Handle nested multimodal parts recursively.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const nestedParts = (fr as unknown as { parts?: Part[] }).parts;
   if (nestedParts && nestedParts.length > 0) {
     totalTokens += estimateTokenCountSync(nestedParts, depth + 1);

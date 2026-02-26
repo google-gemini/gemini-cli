@@ -26,6 +26,10 @@ export interface ModelConfigKey {
   // This allows overrides to specify different settings (e.g., higher temperature)
   // specifically for retry scenarios.
   isRetry?: boolean;
+
+  // Indicates whether this request originates from the primary interactive chat model.
+  // Enables the default fallback configuration to `chat-base` when unknown.
+  isChatModel?: boolean;
 }
 
 export interface ModelConfig {
@@ -122,6 +126,7 @@ export class ModelConfigService {
     const { aliasChain, baseModel, resolvedConfig } = this.resolveAliasChain(
       context.model,
       allAliases,
+      context.isChatModel,
     );
 
     const modelToLevel = this.buildModelLevelMap(aliasChain, baseModel);
@@ -159,6 +164,7 @@ export class ModelConfigService {
   private resolveAliasChain(
     requestedModel: string,
     allAliases: Record<string, ModelConfigAlias>,
+    isChatModel?: boolean,
   ): {
     aliasChain: string[];
     baseModel: string | undefined;
@@ -206,6 +212,21 @@ export class ModelConfigService {
       };
     }
 
+    if (isChatModel) {
+      const fallbackAlias = 'chat-base';
+      if (allAliases[fallbackAlias]) {
+        const fallbackResolution = this.resolveAliasChain(
+          fallbackAlias,
+          allAliases,
+        );
+        return {
+          aliasChain: [...fallbackResolution.aliasChain, requestedModel],
+          baseModel: requestedModel,
+          resolvedConfig: fallbackResolution.resolvedConfig,
+        };
+      }
+    }
+
     return {
       aliasChain: [requestedModel],
       baseModel: requestedModel,
@@ -245,6 +266,7 @@ export class ModelConfigService {
         let matchedLevel = 0; // Default to Global
         const isMatch = matchEntries.every(([key, value]) => {
           if (key === 'model') {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             const level = modelToLevel.get(value as string);
             if (level === undefined) return false;
             matchedLevel = level;
@@ -253,6 +275,7 @@ export class ModelConfigService {
           if (key === 'overrideScope' && value === 'core') {
             return context.overrideScope === 'core' || !context.overrideScope;
           }
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return context[key as keyof ModelConfigKey] === value;
         });
 
@@ -291,6 +314,7 @@ export class ModelConfigService {
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return {
       model: resolved.model,
       generateContentConfig: resolved.generateContentConfig,
@@ -321,7 +345,9 @@ export class ModelConfigService {
     config2: GenerateContentConfig | undefined,
   ): GenerateContentConfig {
     return ModelConfigService.genericDeepMerge(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       config1 as Record<string, unknown> | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       config2 as Record<string, unknown> | undefined,
     ) as GenerateContentConfig;
   }

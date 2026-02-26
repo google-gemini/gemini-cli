@@ -37,6 +37,11 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 
 vi.mock('fs', () => ({
   mkdirSync: vi.fn(),
+  createWriteStream: vi.fn(() => ({
+    on: vi.fn(),
+    write: vi.fn(),
+    end: vi.fn(),
+  })),
 }));
 
 vi.mock('os');
@@ -102,7 +107,7 @@ describe('MemoryTool', () => {
       expect(memoryTool.name).toBe('save_memory');
       expect(memoryTool.displayName).toBe('SaveMemory');
       expect(memoryTool.description).toContain(
-        'Saves a specific piece of information',
+        'Saves concise global user context',
       );
       expect(memoryTool.schema).toBeDefined();
       expect(memoryTool.schema.name).toBe('save_memory');

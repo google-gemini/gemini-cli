@@ -20,7 +20,7 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-// eslint-disable-next-line import/no-internal-modules
+
 import mime from 'mime/lite';
 
 import {
@@ -930,7 +930,7 @@ describe('fileUtils', () => {
       expect(result.returnDisplay).toContain('Path is a directory');
     });
 
-    it('should paginate text files correctly (offset and limit)', async () => {
+    it('should paginate text files correctly (startLine and endLine)', async () => {
       const lines = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`);
       actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
 
@@ -938,9 +938,9 @@ describe('fileUtils', () => {
         testTextFilePath,
         tempRootDir,
         new StandardFileSystemService(),
-        5,
-        5,
-      ); // Read lines 6-10
+        6,
+        10,
+      ); // Read lines 6-10 (1-based)
       const expectedContent = lines.slice(5, 10).join('\n');
 
       expect(result.llmContent).toBe(expectedContent);
@@ -954,13 +954,13 @@ describe('fileUtils', () => {
       const lines = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`);
       actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
 
-      // Read from line 11 to 20. The start is not 0, so it's truncated.
+      // Read from line 11 to 20. The start is not 1, so it's truncated.
       const result = await processSingleFileContent(
         testTextFilePath,
         tempRootDir,
         new StandardFileSystemService(),
-        10,
-        10,
+        11,
+        20,
       );
       const expectedContent = lines.slice(10, 20).join('\n');
 
@@ -971,7 +971,7 @@ describe('fileUtils', () => {
       expect(result.linesShown).toEqual([11, 20]);
     });
 
-    it('should handle limit exceeding file length', async () => {
+    it('should handle endLine exceeding file length', async () => {
       const lines = ['Line 1', 'Line 2'];
       actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
 
@@ -979,7 +979,7 @@ describe('fileUtils', () => {
         testTextFilePath,
         tempRootDir,
         new StandardFileSystemService(),
-        0,
+        1,
         10,
       );
       const expectedContent = lines.join('\n');
@@ -1015,21 +1015,22 @@ describe('fileUtils', () => {
       expect(result.isTruncated).toBe(true);
     });
 
-    it('should truncate when line count exceeds the limit', async () => {
-      const lines = Array.from({ length: 11 }, (_, i) => `Line ${i + 1}`);
+    it('should truncate when line count exceeds the default limit', async () => {
+      const lines = Array.from({ length: 2500 }, (_, i) => `Line ${i + 1}`);
       actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
 
-      // Read 5 lines, but there are 11 total
+      // No ranges provided, should use default limit (2000)
       const result = await processSingleFileContent(
         testTextFilePath,
         tempRootDir,
         new StandardFileSystemService(),
-        0,
-        5,
       );
 
       expect(result.isTruncated).toBe(true);
-      expect(result.returnDisplay).toBe('Read lines 1-5 of 11 from test.txt');
+      expect(result.returnDisplay).toBe(
+        'Read lines 1-2000 of 2500 from test.txt',
+      );
+      expect(result.linesShown).toEqual([1, 2000]);
     });
 
     it('should truncate when a line length exceeds the character limit', async () => {
@@ -1043,7 +1044,7 @@ describe('fileUtils', () => {
         testTextFilePath,
         tempRootDir,
         new StandardFileSystemService(),
-        0,
+        1,
         11,
       );
 
@@ -1069,7 +1070,7 @@ describe('fileUtils', () => {
         testTextFilePath,
         tempRootDir,
         new StandardFileSystemService(),
-        0,
+        1,
         10,
       );
       expect(result.isTruncated).toBe(true);
@@ -1110,7 +1111,7 @@ describe('fileUtils', () => {
     it('should save content to a file with safe name', async () => {
       const content = 'some content';
       const toolName = 'shell';
-      const id = '123';
+      const id = 'shell_123';
 
       const result = await saveTruncatedToolOutput(
         content,
@@ -1125,7 +1126,6 @@ describe('fileUtils', () => {
         'shell_123.txt',
       );
       expect(result.outputFile).toBe(expectedOutputFile);
-      expect(result.totalLines).toBe(1);
 
       const savedContent = await fsPromises.readFile(
         expectedOutputFile,
@@ -1155,6 +1155,26 @@ describe('fileUtils', () => {
       expect(result.outputFile).toBe(expectedOutputFile);
     });
 
+    it('should not duplicate tool name when id already starts with it', async () => {
+      const content = 'content';
+      const toolName = 'run_shell_command';
+      const id = 'run_shell_command_1707400000000_0';
+
+      const result = await saveTruncatedToolOutput(
+        content,
+        toolName,
+        id,
+        tempRootDir,
+      );
+
+      const expectedOutputFile = path.join(
+        tempRootDir,
+        'tool-outputs',
+        'run_shell_command_1707400000000_0.txt',
+      );
+      expect(result.outputFile).toBe(expectedOutputFile);
+    });
+
     it('should sanitize id in filename', async () => {
       const content = 'content';
       const toolName = 'shell';
@@ -1179,7 +1199,7 @@ describe('fileUtils', () => {
     it('should sanitize sessionId in filename/path', async () => {
       const content = 'content';
       const toolName = 'shell';
-      const id = '1';
+      const id = 'shell_1';
       const sessionId = '../../etc/passwd';
 
       const result = await saveTruncatedToolOutput(
@@ -1200,43 +1220,32 @@ describe('fileUtils', () => {
       expect(result.outputFile).toBe(expectedOutputFile);
     });
 
-    it('should format multi-line output correctly', () => {
-      const lines = Array.from({ length: 50 }, (_, i) => `line ${i}`);
-      const content = lines.join('\n');
+    it('should truncate showing first 20% and last 80%', () => {
+      const content = 'abcdefghijklmnopqrstuvwxyz'; // 26 chars
       const outputFile = '/tmp/out.txt';
 
+      // maxChars=10 -> head=2 (20%), tail=8 (80%)
       const formatted = formatTruncatedToolOutput(content, outputFile, 10);
 
-      expect(formatted).toContain(
-        'Output too large. Showing the last 10 of 50 lines.',
-      );
+      expect(formatted).toContain('Showing first 2 and last 8 characters');
       expect(formatted).toContain('For full output see: /tmp/out.txt');
-      expect(formatted).toContain('line 49');
-      expect(formatted).not.toContain('line 0');
+      expect(formatted).toContain('ab'); // first 2 chars
+      expect(formatted).toContain('stuvwxyz'); // last 8 chars
+      expect(formatted).toContain('[16 characters omitted]'); // 26 - 2 - 8 = 16
     });
 
-    it('should truncate "elephant lines" (long single line in multi-line output)', () => {
-      const longLine = 'a'.repeat(2000);
-      const content = `line 1\n${longLine}\nline 3`;
-      const outputFile = '/tmp/out.txt';
-
-      const formatted = formatTruncatedToolOutput(content, outputFile, 3);
-
-      expect(formatted).toContain('(some long lines truncated)');
-      expect(formatted).toContain('... [LINE WIDTH TRUNCATED]');
-      expect(formatted.length).toBeLessThan(longLine.length);
-    });
-
-    it('should handle massive single-line string with character-based truncation', () => {
+    it('should format large content with head/tail truncation', () => {
       const content = 'a'.repeat(50000);
       const outputFile = '/tmp/out.txt';
 
-      const formatted = formatTruncatedToolOutput(content, outputFile);
+      // maxChars=4000 -> head=800 (20%), tail=3200 (80%)
+      const formatted = formatTruncatedToolOutput(content, outputFile, 4000);
 
       expect(formatted).toContain(
-        'Output too large. Showing the last 4,000 characters',
+        'Showing first 800 and last 3,200 characters',
       );
-      expect(formatted.endsWith(content.slice(-4000))).toBe(true);
+      expect(formatted).toContain('For full output see: /tmp/out.txt');
+      expect(formatted).toContain('[46,000 characters omitted]'); // 50000 - 800 - 3200
     });
   });
 });

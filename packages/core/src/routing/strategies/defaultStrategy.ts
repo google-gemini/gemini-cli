@@ -23,7 +23,10 @@ export class DefaultStrategy implements TerminalStrategy {
     _baseLlmClient: BaseLlmClient,
     _localLiteRtLmClient: LocalLiteRtLmClient,
   ): Promise<RoutingDecision> {
-    const defaultModel = resolveModel(config.getModel());
+    const defaultModel = resolveModel(
+      config.getModel(),
+      config.getGemini31LaunchedSync?.() ?? false,
+    );
     return {
       model: defaultModel,
       metadata: {

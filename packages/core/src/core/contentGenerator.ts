@@ -24,6 +24,7 @@ import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
+import type { LlmRole } from '../telemetry/llmRole.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -32,11 +33,13 @@ export interface ContentGenerator {
   generateContent(
     request: GenerateContentParameters,
     userPromptId: string,
+    role: LlmRole,
   ): Promise<GenerateContentResponse>;
 
   generateContentStream(
     request: GenerateContentParameters,
     userPromptId: string,
+    role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>>;
 
   countTokens(request: CountTokensParameters): Promise<CountTokensResponse>;
@@ -56,6 +59,27 @@ export enum AuthType {
   COMPUTE_ADC = 'compute-default-credentials',
 }
 
+/**
+ * Detects the best authentication type based on environment variables.
+ *
+ * Checks in order:
+ * 1. GOOGLE_GENAI_USE_GCA=true -> LOGIN_WITH_GOOGLE
+ * 2. GOOGLE_GENAI_USE_VERTEXAI=true -> USE_VERTEX_AI
+ * 3. GEMINI_API_KEY -> USE_GEMINI
+ */
+export function getAuthTypeFromEnv(): AuthType | undefined {
+  if (process.env['GOOGLE_GENAI_USE_GCA'] === 'true') {
+    return AuthType.LOGIN_WITH_GOOGLE;
+  }
+  if (process.env['GOOGLE_GENAI_USE_VERTEXAI'] === 'true') {
+    return AuthType.USE_VERTEX_AI;
+  }
+  if (process.env['GEMINI_API_KEY']) {
+    return AuthType.USE_GEMINI;
+  }
+  return undefined;
+}
+
 export type ContentGeneratorConfig = {
   apiKey?: string;
   vertexai?: boolean;
@@ -66,9 +90,13 @@ export type ContentGeneratorConfig = {
 export async function createContentGeneratorConfig(
   config: Config,
   authType: AuthType | undefined,
+  apiKey?: string,
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey =
-    process.env['GEMINI_API_KEY'] || (await loadApiKey()) || undefined;
+    apiKey ||
+    process.env['GEMINI_API_KEY'] ||
+    (await loadApiKey()) ||
+    undefined;
   const googleApiKey = process.env['GOOGLE_API_KEY'] || undefined;
   const googleCloudProject =
     process.env['GOOGLE_CLOUD_PROJECT'] ||
@@ -122,7 +150,12 @@ export async function createContentGenerator(
       return new LoggingContentGenerator(fakeGenerator, gcConfig);
     }
     const version = await getVersion();
-    const model = resolveModel(gcConfig.getModel());
+    const model = resolveModel(
+      gcConfig.getModel(),
+      config.authType === AuthType.USE_GEMINI ||
+        config.authType === AuthType.USE_VERTEX_AI ||
+        ((await gcConfig.getGemini31Launched?.()) ?? false),
+    );
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
     const userAgent = `GeminiCLI/${version}/${model} (${process.platform}; ${process.arch})`;

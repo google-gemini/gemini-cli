@@ -72,9 +72,11 @@ export class FileTokenStorage extends BaseTokenStorage {
     try {
       const data = await fs.readFile(this.tokenFilePath, 'utf-8');
       const decrypted = this.decrypt(data);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const tokens = JSON.parse(decrypted) as Record<string, OAuthCredentials>;
       return new Map(Object.entries(tokens));
     } catch (error: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const err = error as NodeJS.ErrnoException & { message?: string };
       if (err.code === 'ENOENT') {
         return new Map();
@@ -85,7 +87,12 @@ export class FileTokenStorage extends BaseTokenStorage {
           'Unsupported state or unable to authenticate data',
         )
       ) {
-        throw new Error('Token file corrupted');
+        // Decryption failed - this can happen when switching between auth types
+        // or if the file is genuinely corrupted.
+        throw new Error(
+          `Corrupted token file detected at: ${this.tokenFilePath}\n` +
+            `Please delete or rename this file to resolve the issue.`,
+        );
       }
       throw error;
     }
@@ -144,6 +151,7 @@ export class FileTokenStorage extends BaseTokenStorage {
       try {
         await fs.unlink(this.tokenFilePath);
       } catch (error: unknown) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const err = error as NodeJS.ErrnoException;
         if (err.code !== 'ENOENT') {
           throw error;
@@ -176,6 +184,7 @@ export class FileTokenStorage extends BaseTokenStorage {
     try {
       await fs.unlink(this.tokenFilePath);
     } catch (error: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const err = error as NodeJS.ErrnoException;
       if (err.code !== 'ENOENT') {
         throw error;

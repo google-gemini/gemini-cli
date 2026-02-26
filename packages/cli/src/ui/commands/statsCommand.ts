@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -44,6 +44,7 @@ async function defaultSessionView(context: CommandContext) {
   const wallDuration = now.getTime() - sessionStartTime.getTime();
 
   const { selectedAuthType, userEmail, tier } = getUserIdentity(context);
+  const currentModel = context.services.config?.getModel();
 
   const statsItem: HistoryItemStats = {
     type: MessageType.STATS,
@@ -51,12 +52,16 @@ async function defaultSessionView(context: CommandContext) {
     selectedAuthType,
     userEmail,
     tier,
+    currentModel,
   };
 
   if (context.services.config) {
     const quota = await context.services.config.refreshUserQuota();
     if (quota) {
       statsItem.quotas = quota;
+      statsItem.pooledRemaining = context.services.config.getQuotaRemaining();
+      statsItem.pooledLimit = context.services.config.getQuotaLimit();
+      statsItem.pooledResetTime = context.services.config.getQuotaResetTime();
     }
   }
 
@@ -89,11 +94,19 @@ export const statsCommand: SlashCommand = {
       autoExecute: true,
       action: (context: CommandContext) => {
         const { selectedAuthType, userEmail, tier } = getUserIdentity(context);
+        const currentModel = context.services.config?.getModel();
+        const pooledRemaining = context.services.config?.getQuotaRemaining();
+        const pooledLimit = context.services.config?.getQuotaLimit();
+        const pooledResetTime = context.services.config?.getQuotaResetTime();
         context.ui.addItem({
           type: MessageType.MODEL_STATS,
           selectedAuthType,
           userEmail,
           tier,
+          currentModel,
+          pooledRemaining,
+          pooledLimit,
+          pooledResetTime,
         } as HistoryItemModelStats);
       },
     },

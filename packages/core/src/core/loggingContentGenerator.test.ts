@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -24,14 +24,20 @@ vi.mock('../telemetry/trace.js', () => ({
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type {
+  Content,
+  GenerateContentConfig,
   GenerateContentResponse,
   EmbedContentResponse,
 } from '@google/genai';
 import type { ContentGenerator } from './contentGenerator.js';
-import { LoggingContentGenerator } from './loggingContentGenerator.js';
+import {
+  LoggingContentGenerator,
+  estimateContextBreakdown,
+} from './loggingContentGenerator.js';
 import type { Config } from '../config/config.js';
-import { ApiRequestEvent } from '../telemetry/types.js';
 import { UserTierId } from '../code_assist/types.js';
+import { ApiRequestEvent, LlmRole } from '../telemetry/types.js';
+import { FatalAuthenticationError } from '../utils/errors.js';
 
 describe('LoggingContentGenerator', () => {
   let wrapped: ContentGenerator;
@@ -51,6 +57,7 @@ describe('LoggingContentGenerator', () => {
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'API_KEY',
       }),
+      refreshUserQuotaIfStale: vi.fn().mockResolvedValue(undefined),
     } as unknown as Config;
     loggingContentGenerator = new LoggingContentGenerator(wrapped, config);
     vi.useFakeTimers();
@@ -88,13 +95,18 @@ describe('LoggingContentGenerator', () => {
       const promise = loggingContentGenerator.generateContent(
         req,
         userPromptId,
+        LlmRole.MAIN,
       );
 
       vi.advanceTimersByTime(1000);
 
       await promise;
 
-      expect(wrapped.generateContent).toHaveBeenCalledWith(req, userPromptId);
+      expect(wrapped.generateContent).toHaveBeenCalledWith(
+        req,
+        userPromptId,
+        LlmRole.MAIN,
+      );
       expect(logApiRequest).toHaveBeenCalledWith(
         config,
         expect.any(ApiRequestEvent),
@@ -117,6 +129,7 @@ describe('LoggingContentGenerator', () => {
       const promise = loggingContentGenerator.generateContent(
         req,
         userPromptId,
+        LlmRole.MAIN,
       );
 
       vi.advanceTimersByTime(1000);
@@ -129,6 +142,19 @@ describe('LoggingContentGenerator', () => {
       );
       const errorEvent = vi.mocked(logApiError).mock.calls[0][1];
       expect(errorEvent.duration_ms).toBe(1000);
+    });
+
+    describe('error type extraction', () => {
+      it('should extract error type correctly', async () => {
+        const req = { contents: [], model: 'm' };
+        const error = new FatalAuthenticationError('test');
+        vi.mocked(wrapped.generateContent).mockRejectedValue(error);
+        await expect(
+          loggingContentGenerator.generateContent(req, 'id', LlmRole.MAIN),
+        ).rejects.toThrow();
+        const errorEvent = vi.mocked(logApiError).mock.calls[0][1];
+        expect(errorEvent.error_type).toBe('FatalAuthenticationError');
+      });
     });
   });
 
@@ -155,12 +181,17 @@ describe('LoggingContentGenerator', () => {
       vi.mocked(wrapped.generateContentStream).mockResolvedValue(
         createAsyncGenerator(),
       );
+
       const startTime = new Date('2025-01-01T00:00:00.000Z');
+
       vi.setSystemTime(startTime);
 
       const stream = await loggingContentGenerator.generateContentStream(
         req,
+
         userPromptId,
+
+        LlmRole.MAIN,
       );
 
       vi.advanceTimersByTime(1000);
@@ -172,6 +203,7 @@ describe('LoggingContentGenerator', () => {
       expect(wrapped.generateContentStream).toHaveBeenCalledWith(
         req,
         userPromptId,
+        LlmRole.MAIN,
       );
       expect(logApiRequest).toHaveBeenCalledWith(
         config,
@@ -202,6 +234,7 @@ describe('LoggingContentGenerator', () => {
       const stream = await loggingContentGenerator.generateContentStream(
         req,
         userPromptId,
+        LlmRole.MAIN,
       );
 
       vi.advanceTimersByTime(1000);
@@ -239,6 +272,7 @@ describe('LoggingContentGenerator', () => {
       await loggingContentGenerator.generateContentStream(
         req,
         mainAgentPromptId,
+        LlmRole.MAIN,
       );
 
       expect(config.setLatestApiRequest).toHaveBeenCalledWith(req);
@@ -263,6 +297,7 @@ describe('LoggingContentGenerator', () => {
       await loggingContentGenerator.generateContentStream(
         req,
         subAgentPromptId,
+        LlmRole.SUBAGENT,
       );
 
       expect(config.setLatestApiRequest).not.toHaveBeenCalled();
@@ -314,5 +349,282 @@ describe('LoggingContentGenerator', () => {
       wrapped.userTierName = 'Standard Tier';
       expect(loggingContentGenerator.userTierName).toBe('Standard Tier');
     });
+  });
+});
+
+describe('estimateContextBreakdown', () => {
+  it('should return zeros for empty contents and no config', () => {
+    const result = estimateContextBreakdown([], undefined);
+    expect(result).toEqual({
+      system_instructions: 0,
+      tool_definitions: 0,
+      history: 0,
+      tool_calls: {},
+      mcp_servers: 0,
+    });
+  });
+
+  it('should estimate system instruction tokens', () => {
+    const config = {
+      systemInstruction: 'You are a helpful assistant.',
+    } as GenerateContentConfig;
+    const result = estimateContextBreakdown([], config);
+    expect(result.system_instructions).toBeGreaterThan(0);
+    expect(result.tool_definitions).toBe(0);
+    expect(result.history).toBe(0);
+  });
+
+  it('should estimate non-MCP tool definition tokens', () => {
+    const config = {
+      tools: [
+        {
+          functionDeclarations: [
+            { name: 'read_file', description: 'Reads a file', parameters: {} },
+          ],
+        },
+      ],
+    } as unknown as GenerateContentConfig;
+    const result = estimateContextBreakdown([], config);
+    expect(result.tool_definitions).toBeGreaterThan(0);
+    expect(result.mcp_servers).toBe(0);
+  });
+
+  it('should classify MCP tool definitions into mcp_servers, not tool_definitions', () => {
+    const config = {
+      tools: [
+        {
+          functionDeclarations: [
+            {
+              name: 'myserver__search',
+              description: 'Search via MCP',
+              parameters: {},
+            },
+            {
+              name: 'read_file',
+              description: 'Reads a file',
+              parameters: {},
+            },
+          ],
+        },
+      ],
+    } as unknown as GenerateContentConfig;
+    const result = estimateContextBreakdown([], config);
+    expect(result.mcp_servers).toBeGreaterThan(0);
+    expect(result.tool_definitions).toBeGreaterThan(0);
+    // MCP tokens should not be in tool_definitions
+    const configOnlyBuiltin = {
+      tools: [
+        {
+          functionDeclarations: [
+            {
+              name: 'read_file',
+              description: 'Reads a file',
+              parameters: {},
+            },
+          ],
+        },
+      ],
+    } as unknown as GenerateContentConfig;
+    const builtinOnly = estimateContextBreakdown([], configOnlyBuiltin);
+    // tool_definitions should be smaller when MCP tools are separated out
+    expect(result.tool_definitions).toBeLessThan(
+      result.tool_definitions + result.mcp_servers,
+    );
+    expect(builtinOnly.mcp_servers).toBe(0);
+  });
+
+  it('should not classify tools with __ in the middle of a segment as MCP', () => {
+    // "__" at start or end (not a valid server__tool pattern) should not be MCP
+    const config = {
+      tools: [
+        {
+          functionDeclarations: [
+            { name: '__leading', description: 'test', parameters: {} },
+            { name: 'trailing__', description: 'test', parameters: {} },
+            {
+              name: 'a__b__c',
+              description: 'three parts - not valid MCP',
+              parameters: {},
+            },
+          ],
+        },
+      ],
+    } as unknown as GenerateContentConfig;
+    const result = estimateContextBreakdown([], config);
+    expect(result.mcp_servers).toBe(0);
+  });
+
+  it('should estimate history tokens excluding tool call/response parts', () => {
+    const contents: Content[] = [
+      { role: 'user', parts: [{ text: 'Hello world' }] },
+      { role: 'model', parts: [{ text: 'Hi there!' }] },
+    ];
+    const result = estimateContextBreakdown(contents);
+    expect(result.history).toBeGreaterThan(0);
+    expect(result.tool_calls).toEqual({});
+  });
+
+  it('should separate tool call tokens from history', () => {
+    const contents: Content[] = [
+      {
+        role: 'model',
+        parts: [
+          {
+            functionCall: {
+              name: 'read_file',
+              args: { path: '/tmp/test.txt' },
+            },
+          },
+        ],
+      },
+      {
+        role: 'function',
+        parts: [
+          {
+            functionResponse: {
+              name: 'read_file',
+              response: { content: 'file contents here' },
+            },
+          },
+        ],
+      },
+    ];
+    const result = estimateContextBreakdown(contents);
+    expect(result.tool_calls['read_file']).toBeGreaterThan(0);
+    // history should be zero since all parts are tool calls
+    expect(result.history).toBe(0);
+  });
+
+  it('should produce additive (non-overlapping) fields', () => {
+    const contents: Content[] = [
+      { role: 'user', parts: [{ text: 'Hello' }] },
+      {
+        role: 'model',
+        parts: [
+          {
+            functionCall: {
+              name: 'read_file',
+              args: { path: '/tmp/test.txt' },
+            },
+          },
+        ],
+      },
+      {
+        role: 'function',
+        parts: [
+          {
+            functionResponse: {
+              name: 'read_file',
+              response: { content: 'data' },
+            },
+          },
+        ],
+      },
+    ];
+    const config = {
+      systemInstruction: 'Be helpful.',
+      tools: [
+        {
+          functionDeclarations: [
+            { name: 'read_file', description: 'Read', parameters: {} },
+            {
+              name: 'myserver__search',
+              description: 'MCP search',
+              parameters: {},
+            },
+          ],
+        },
+      ],
+    } as unknown as GenerateContentConfig;
+    const result = estimateContextBreakdown(contents, config);
+
+    // All fields should be non-overlapping
+    expect(result.system_instructions).toBeGreaterThan(0);
+    expect(result.tool_definitions).toBeGreaterThan(0);
+    expect(result.history).toBeGreaterThan(0);
+    // tool_calls should only contain non-MCP tools
+    expect(result.tool_calls['read_file']).toBeGreaterThan(0);
+    expect(result.tool_calls['myserver__search']).toBeUndefined();
+    // MCP tokens are only in mcp_servers
+    expect(result.mcp_servers).toBeGreaterThan(0);
+  });
+
+  it('should classify MCP tool calls into mcp_servers only, not tool_calls', () => {
+    const contents: Content[] = [
+      {
+        role: 'model',
+        parts: [
+          {
+            functionCall: {
+              name: 'myserver__search',
+              args: { query: 'test' },
+            },
+          },
+        ],
+      },
+      {
+        role: 'function',
+        parts: [
+          {
+            functionResponse: {
+              name: 'myserver__search',
+              response: { results: [] },
+            },
+          },
+        ],
+      },
+    ];
+    const result = estimateContextBreakdown(contents);
+    // MCP tool calls should NOT appear in tool_calls
+    expect(result.tool_calls['myserver__search']).toBeUndefined();
+    // MCP call tokens should only be counted in mcp_servers
+    expect(result.mcp_servers).toBeGreaterThan(0);
+  });
+
+  it('should handle mixed MCP and non-MCP tool calls', () => {
+    const contents: Content[] = [
+      {
+        role: 'model',
+        parts: [
+          {
+            functionCall: {
+              name: 'read_file',
+              args: { path: '/test' },
+            },
+          },
+          {
+            functionCall: {
+              name: 'myserver__search',
+              args: { q: 'hello' },
+            },
+          },
+        ],
+      },
+    ];
+    const result = estimateContextBreakdown(contents);
+    // Non-MCP tools should be in tool_calls
+    expect(result.tool_calls['read_file']).toBeGreaterThan(0);
+    // MCP tools should NOT be in tool_calls
+    expect(result.tool_calls['myserver__search']).toBeUndefined();
+    // MCP tool calls should only be in mcp_servers
+    expect(result.mcp_servers).toBeGreaterThan(0);
+  });
+
+  it('should use "unknown" for tool calls without a name', () => {
+    const contents: Content[] = [
+      {
+        role: 'model',
+        parts: [
+          {
+            functionCall: {
+              name: undefined as unknown as string,
+              args: { x: 1 },
+            },
+          },
+        ],
+      },
+    ];
+    const result = estimateContextBreakdown(contents);
+    expect(result.tool_calls['unknown']).toBeGreaterThan(0);
   });
 });

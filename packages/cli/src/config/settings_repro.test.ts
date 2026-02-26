@@ -131,7 +131,6 @@ describe('Settings Repro', () => {
       },
       general: {
         debugKeystrokeLogging: false,
-        enablePromptCompletion: false,
         preferredEditor: 'vim',
         vimMode: false,
       },
@@ -149,7 +148,6 @@ describe('Settings Repro', () => {
           showColor: true,
           enableInteractiveShell: true,
         },
-        truncateToolOutputLines: 100,
       },
       experimental: {
         useModelRouter: false,

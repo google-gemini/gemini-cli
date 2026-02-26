@@ -70,6 +70,7 @@ function migrateClaudeHook(claudeHook: unknown): unknown {
     return claudeHook;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const hook = claudeHook as Record<string, unknown>;
   const migrated: Record<string, unknown> = {};
 
@@ -107,10 +108,12 @@ function migrateClaudeHooks(claudeConfig: unknown): Record<string, unknown> {
     return {};
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const config = claudeConfig as Record<string, unknown>;
   const geminiHooks: Record<string, unknown> = {};
 
   // Check if there's a hooks section
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const hooksSection = config['hooks'] as Record<string, unknown> | undefined;
   if (!hooksSection || typeof hooksSection !== 'object') {
     return {};
@@ -130,6 +133,7 @@ function migrateClaudeHooks(claudeConfig: unknown): Record<string, unknown> {
         return def;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const definition = def as Record<string, unknown>;
       const migratedDef: Record<string, unknown> = {};
 
@@ -179,6 +183,7 @@ export async function handleMigrateFromClaude() {
     sourceFile = claudeLocalSettingsPath;
     try {
       const content = fs.readFileSync(claudeLocalSettingsPath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       claudeSettings = JSON.parse(stripJsonComments(content)) as Record<
         string,
         unknown
@@ -192,6 +197,7 @@ export async function handleMigrateFromClaude() {
     sourceFile = claudeSettingsPath;
     try {
       const content = fs.readFileSync(claudeSettingsPath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       claudeSettings = JSON.parse(stripJsonComments(content)) as Record<
         string,
         unknown
@@ -259,6 +265,7 @@ export const migrateCommand: CommandModule = {
       default: false,
     }),
   handler: async (argv) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const args = argv as unknown as MigrateArgs;
     if (args.fromClaude) {
       await handleMigrateFromClaude();

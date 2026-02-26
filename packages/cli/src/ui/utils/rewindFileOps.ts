@@ -14,7 +14,7 @@ import {
   coreEvents,
   debugLogger,
   getFileDiffFromResultDisplay,
-  computeAddedAndRemovedLines,
+  computeModelAddedAndRemovedLines,
 } from '@google/gemini-cli-core';
 
 export interface FileChangeDetail {
@@ -61,7 +61,7 @@ export function calculateTurnStats(
         if (fileDiff) {
           hasEdits = true;
           const stats = fileDiff.diffStat;
-          const calculations = computeAddedAndRemovedLines(stats);
+          const calculations = computeModelAddedAndRemovedLines(stats);
           addedLines += calculations.addedLines;
           removedLines += calculations.removedLines;
 
@@ -112,7 +112,7 @@ export function calculateRewindImpact(
         if (fileDiff) {
           hasEdits = true;
           const stats = fileDiff.diffStat;
-          const calculations = computeAddedAndRemovedLines(stats);
+          const calculations = computeModelAddedAndRemovedLines(stats);
           addedLines += calculations.addedLines;
           removedLines += calculations.removedLines;
           files.add(fileDiff.fileName);
@@ -174,6 +174,7 @@ export async function revertFileChanges(
             try {
               currentContent = await fs.readFile(filePath, 'utf8');
             } catch (e) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               const error = e as Error;
               if ('code' in error && error.code === 'ENOENT') {
                 // File does not exist, which is fine in some revert scenarios.

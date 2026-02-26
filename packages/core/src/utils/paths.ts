@@ -6,20 +6,12 @@
 
 import path from 'node:path';
 import os from 'node:os';
-import process from 'node:process';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
-
-/**
- * Special characters that need to be escaped in file paths for shell compatibility.
- * Includes: spaces, parentheses, brackets, braces, semicolons, ampersands, pipes,
- * asterisks, question marks, dollar signs, backticks, quotes, hash, and other shell metacharacters.
- */
-export const SHELL_SPECIAL_CHARS = /[ \t()[\]{};|*?$`'"#&<>!~]/;
 
 /**
  * Returns the home directory.
@@ -278,43 +270,43 @@ export function makeRelative(
 }
 
 /**
- * Escapes special characters in a file path like macOS terminal does.
- * Escapes: spaces, parentheses, brackets, braces, semicolons, ampersands, pipes,
- * asterisks, question marks, dollar signs, backticks, quotes, hash, and other shell metacharacters.
+ * Escape paths for at-commands.
+ *
+ *  - Windows: double quoted if they contain special chars, otherwise bare
+ *  - POSIX: backslash-escaped
  */
 export function escapePath(filePath: string): string {
-  let result = '';
-  for (let i = 0; i < filePath.length; i++) {
-    const char = filePath[i];
-
-    // Count consecutive backslashes before this character
-    let backslashCount = 0;
-    for (let j = i - 1; j >= 0 && filePath[j] === '\\'; j--) {
-      backslashCount++;
+  if (process.platform === 'win32') {
+    // Windows: Double quote if it contains special chars
+    if (/[\s&()[\]{}^=;!'+,`~%$@#]/.test(filePath)) {
+      return `"${filePath}"`;
     }
-
-    // Character is already escaped if there's an odd number of backslashes before it
-    const isAlreadyEscaped = backslashCount % 2 === 1;
-
-    // Only escape if not already escaped
-    if (!isAlreadyEscaped && SHELL_SPECIAL_CHARS.test(char)) {
-      result += '\\' + char;
-    } else {
-      result += char;
-    }
+    return filePath;
+  } else {
+    // POSIX: Backslash escape
+    return filePath.replace(/([ \t()[\]{};|*?$`'"#&<>!~\\])/g, '\\$1');
   }
-  return result;
 }
 
 /**
- * Unescapes special characters in a file path.
- * Removes backslash escaping from shell metacharacters.
+ * Unescapes paths for at-commands.
+ *
+ *  - Windows: double quoted if they contain special chars, otherwise bare
+ *  - POSIX: backslash-escaped
  */
 export function unescapePath(filePath: string): string {
-  return filePath.replace(
-    new RegExp(`\\\\([${SHELL_SPECIAL_CHARS.source.slice(1, -1)}])`, 'g'),
-    '$1',
-  );
+  if (process.platform === 'win32') {
+    if (
+      filePath.length >= 2 &&
+      filePath.startsWith('"') &&
+      filePath.endsWith('"')
+    ) {
+      return filePath.slice(1, -1);
+    }
+    return filePath;
+  } else {
+    return filePath.replace(/\\(.)/g, '$1');
+  }
 }
 
 /**
@@ -327,13 +319,25 @@ export function getProjectHash(projectRoot: string): string {
 }
 
 /**
+ * Normalizes a path for reliable comparison across platforms.
+ * - Resolves to an absolute path.
+ * - Converts all path separators to forward slashes.
+ * - On Windows, converts to lowercase for case-insensitivity.
+ */
+export function normalizePath(p: string): string {
+  const resolved = path.resolve(p);
+  const normalized = resolved.replace(/\\/g, '/');
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+
+/**
  * Checks if a path is a subpath of another path.
  * @param parentPath The parent path.
  * @param childPath The child path.
  * @returns True if childPath is a subpath of parentPath, false otherwise.
  */
 export function isSubpath(parentPath: string, childPath: string): boolean {
-  const isWindows = os.platform() === 'win32';
+  const isWindows = process.platform === 'win32';
   const pathModule = isWindows ? path.win32 : path;
 
   // On Windows, path.relative is case-insensitive. On POSIX, it's case-sensitive.

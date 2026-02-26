@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import pathMod from 'node:path';
@@ -13,12 +12,9 @@ import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
 import { LRUCache } from 'mnemonist';
 import {
   coreEvents,
-  CoreEvent,
   debugLogger,
   unescapePath,
   type EditorType,
-  getEditorCommand,
-  isGuiEditor,
 } from '@google/gemini-cli-core';
 import {
   toCodePoints,
@@ -33,9 +29,10 @@ import { keyMatchers, Command } from '../../keyMatchers.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
+import { openFileInEditor } from '../../utils/editorUtils.js';
 
-const LARGE_PASTE_LINE_THRESHOLD = 5;
-const LARGE_PASTE_CHAR_THRESHOLD = 500;
+export const LARGE_PASTE_LINE_THRESHOLD = 5;
+export const LARGE_PASTE_CHAR_THRESHOLD = 500;
 
 // Regex to match paste placeholders like [Pasted Text: 6 lines] or [Pasted Text: 501 chars #2]
 export const PASTED_TEXT_PLACEHOLDER_REGEX =
@@ -757,7 +754,7 @@ interface UseTextBufferProps {
   stdin?: NodeJS.ReadStream | null; // For external editor
   setRawMode?: (mode: boolean) => void; // For external editor
   onChange?: (text: string) => void; // Callback for when text changes
-  isValidPath: (path: string) => boolean;
+  escapePastedPaths?: boolean;
   shellModeActive?: boolean; // Whether the text buffer is in shell mode
   inputFilter?: (text: string) => string; // Optional filter for input text
   singleLine?: boolean;
@@ -986,11 +983,15 @@ export function getTransformUnderCursor(
   row: number,
   col: number,
   spansByLine: Transformation[][],
+  options: { includeEdge?: boolean } = {},
 ): Transformation | null {
   const spans = spansByLine[row];
   if (!spans || spans.length === 0) return null;
   for (const span of spans) {
-    if (col >= span.logStart && col < span.logEnd) {
+    if (
+      col >= span.logStart &&
+      (options.includeEdge ? col <= span.logEnd : col < span.logEnd)
+    ) {
       return span;
     }
     if (col < span.logStart) break;
@@ -1653,8 +1654,9 @@ export type TextBufferAction =
   | { type: 'vim_change_big_word_end'; payload: { count: number } }
   | { type: 'vim_delete_line'; payload: { count: number } }
   | { type: 'vim_change_line'; payload: { count: number } }
-  | { type: 'vim_delete_to_end_of_line' }
-  | { type: 'vim_change_to_end_of_line' }
+  | { type: 'vim_delete_to_end_of_line'; payload: { count: number } }
+  | { type: 'vim_delete_to_start_of_line' }
+  | { type: 'vim_change_to_end_of_line'; payload: { count: number } }
   | {
       type: 'vim_change_movement';
       payload: { movement: 'h' | 'j' | 'k' | 'l'; count: number };
@@ -1684,6 +1686,11 @@ export type TextBufferAction =
   | { type: 'vim_move_to_last_line' }
   | { type: 'vim_move_to_line'; payload: { lineNumber: number } }
   | { type: 'vim_escape_insert_mode' }
+  | { type: 'vim_delete_to_first_nonwhitespace' }
+  | { type: 'vim_change_to_start_of_line' }
+  | { type: 'vim_change_to_first_nonwhitespace' }
+  | { type: 'vim_delete_to_first_line'; payload: { count: number } }
+  | { type: 'vim_delete_to_last_line'; payload: { count: number } }
   | {
       type: 'toggle_paste_expansion';
       payload: { id: string; row: number; col: number };
@@ -2433,6 +2440,7 @@ function textBufferReducerLogic(
     case 'vim_delete_line':
     case 'vim_change_line':
     case 'vim_delete_to_end_of_line':
+    case 'vim_delete_to_start_of_line':
     case 'vim_change_to_end_of_line':
     case 'vim_change_movement':
     case 'vim_move_left':
@@ -2459,6 +2467,11 @@ function textBufferReducerLogic(
     case 'vim_move_to_last_line':
     case 'vim_move_to_line':
     case 'vim_escape_insert_mode':
+    case 'vim_delete_to_first_nonwhitespace':
+    case 'vim_change_to_start_of_line':
+    case 'vim_change_to_first_nonwhitespace':
+    case 'vim_delete_to_first_line':
+    case 'vim_delete_to_last_line':
       return handleVimAction(state, action as VimAction);
 
     case 'toggle_paste_expansion': {
@@ -2678,7 +2691,7 @@ export function useTextBuffer({
   stdin,
   setRawMode,
   onChange,
-  isValidPath,
+  escapePastedPaths = false,
   shellModeActive = false,
   inputFilter,
   singleLine = false,
@@ -2795,17 +2808,10 @@ export function useTextBuffer({
       if (
         ch.length >= minLengthToInferAsDragDrop &&
         !shellModeActive &&
-        paste
+        paste &&
+        escapePastedPaths
       ) {
-        let potentialPath = ch.trim();
-        const quoteMatch = potentialPath.match(/^'(.*)'$/);
-        if (quoteMatch) {
-          potentialPath = quoteMatch[1];
-        }
-
-        potentialPath = potentialPath.trim();
-
-        const processed = parsePastedPaths(potentialPath, isValidPath);
+        const processed = parsePastedPaths(ch.trim());
         if (processed) {
           textToInsert = processed;
         }
@@ -2827,7 +2833,7 @@ export function useTextBuffer({
         dispatch({ type: 'insert', payload: currentText, isPaste: paste });
       }
     },
-    [isValidPath, shellModeActive],
+    [shellModeActive, escapePastedPaths],
   );
 
   const newline = useCallback((): void => {
@@ -2940,12 +2946,36 @@ export function useTextBuffer({
     dispatch({ type: 'vim_change_line', payload: { count } });
   }, []);
 
-  const vimDeleteToEndOfLine = useCallback((): void => {
-    dispatch({ type: 'vim_delete_to_end_of_line' });
+  const vimDeleteToEndOfLine = useCallback((count: number = 1): void => {
+    dispatch({ type: 'vim_delete_to_end_of_line', payload: { count } });
   }, []);
 
-  const vimChangeToEndOfLine = useCallback((): void => {
-    dispatch({ type: 'vim_change_to_end_of_line' });
+  const vimDeleteToStartOfLine = useCallback((): void => {
+    dispatch({ type: 'vim_delete_to_start_of_line' });
+  }, []);
+
+  const vimChangeToEndOfLine = useCallback((count: number = 1): void => {
+    dispatch({ type: 'vim_change_to_end_of_line', payload: { count } });
+  }, []);
+
+  const vimDeleteToFirstNonWhitespace = useCallback((): void => {
+    dispatch({ type: 'vim_delete_to_first_nonwhitespace' });
+  }, []);
+
+  const vimChangeToStartOfLine = useCallback((): void => {
+    dispatch({ type: 'vim_change_to_start_of_line' });
+  }, []);
+
+  const vimChangeToFirstNonWhitespace = useCallback((): void => {
+    dispatch({ type: 'vim_change_to_first_nonwhitespace' });
+  }, []);
+
+  const vimDeleteToFirstLine = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_to_first_line', payload: { count } });
+  }, []);
+
+  const vimDeleteToLastLine = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_to_last_line', payload: { count } });
   }, []);
 
   const vimChangeMovement = useCallback(
@@ -3062,35 +3092,15 @@ export function useTextBuffer({
     );
     fs.writeFileSync(filePath, expandedText, 'utf8');
 
-    let command: string | undefined = undefined;
-    const args = [filePath];
-
-    const preferredEditorType = getPreferredEditor?.();
-    if (!command && preferredEditorType) {
-      command = getEditorCommand(preferredEditorType);
-      if (isGuiEditor(preferredEditorType)) {
-        args.unshift('--wait');
-      }
-    }
-
-    if (!command) {
-      command =
-        process.env['VISUAL'] ??
-        process.env['EDITOR'] ??
-        (process.platform === 'win32' ? 'notepad' : 'vi');
-    }
-
     dispatch({ type: 'create_undo_snapshot' });
 
-    const wasRaw = stdin?.isRaw ?? false;
     try {
-      setRawMode?.(false);
-      const { status, error } = spawnSync(command, args, {
-        stdio: 'inherit',
-      });
-      if (error) throw error;
-      if (typeof status === 'number' && status !== 0)
-        throw new Error(`External editor exited with status ${status}`);
+      await openFileInEditor(
+        filePath,
+        stdin,
+        setRawMode,
+        getPreferredEditor?.(),
+      );
 
       let newText = fs.readFileSync(filePath, 'utf8');
       newText = newText.replace(/\r\n?/g, '\n');
@@ -3113,8 +3123,6 @@ export function useTextBuffer({
         err,
       );
     } finally {
-      coreEvents.emit(CoreEvent.ExternalEditorClosed);
-      if (wasRaw) setRawMode?.(true);
       try {
         fs.unlinkSync(filePath);
       } catch {
@@ -3504,7 +3512,13 @@ export function useTextBuffer({
       vimDeleteLine,
       vimChangeLine,
       vimDeleteToEndOfLine,
+      vimDeleteToStartOfLine,
       vimChangeToEndOfLine,
+      vimDeleteToFirstNonWhitespace,
+      vimChangeToStartOfLine,
+      vimChangeToFirstNonWhitespace,
+      vimDeleteToFirstLine,
+      vimDeleteToLastLine,
       vimChangeMovement,
       vimMoveLeft,
       vimMoveRight,
@@ -3586,7 +3600,13 @@ export function useTextBuffer({
       vimDeleteLine,
       vimChangeLine,
       vimDeleteToEndOfLine,
+      vimDeleteToStartOfLine,
       vimChangeToEndOfLine,
+      vimDeleteToFirstNonWhitespace,
+      vimChangeToStartOfLine,
+      vimChangeToFirstNonWhitespace,
+      vimDeleteToFirstLine,
+      vimDeleteToLastLine,
       vimChangeMovement,
       vimMoveLeft,
       vimMoveRight,
@@ -3826,12 +3846,38 @@ export interface TextBuffer {
   vimChangeLine: (count: number) => void;
   /**
    * Delete from cursor to end of line (vim 'D' command)
+   * With count > 1, deletes to end of current line plus (count-1) additional lines
    */
-  vimDeleteToEndOfLine: () => void;
+  vimDeleteToEndOfLine: (count?: number) => void;
+  /**
+   * Delete from start of line to cursor (vim 'd0' command)
+   */
+  vimDeleteToStartOfLine: () => void;
   /**
    * Change from cursor to end of line (vim 'C' command)
+   * With count > 1, changes to end of current line plus (count-1) additional lines
    */
-  vimChangeToEndOfLine: () => void;
+  vimChangeToEndOfLine: (count?: number) => void;
+  /**
+   * Delete from cursor to first non-whitespace character (vim 'd^' command)
+   */
+  vimDeleteToFirstNonWhitespace: () => void;
+  /**
+   * Change from cursor to start of line (vim 'c0' command)
+   */
+  vimChangeToStartOfLine: () => void;
+  /**
+   * Change from cursor to first non-whitespace character (vim 'c^' command)
+   */
+  vimChangeToFirstNonWhitespace: () => void;
+  /**
+   * Delete from current line to first line (vim 'dgg' command)
+   */
+  vimDeleteToFirstLine: (count: number) => void;
+  /**
+   * Delete from current line to last line (vim 'dG' command)
+   */
+  vimDeleteToLastLine: (count: number) => void;
   /**
    * Change movement operations (vim 'ch', 'cj', 'ck', 'cl' commands)
    */

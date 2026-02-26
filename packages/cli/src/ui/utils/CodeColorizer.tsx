@@ -22,7 +22,6 @@ import {
 } from '../components/shared/MaxSizedBox.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { debugLogger } from '@google/gemini-cli-core';
-import { isAlternateBufferEnabled } from '../hooks/useAlternateBuffer.js';
 
 // Configure theming and parsing utilities.
 const lowlight = createLowlight(common);
@@ -41,6 +40,7 @@ function renderHastNode(
   // Handle Element Nodes: Determine color and pass it down, don't wrap
   if (node.type === 'element') {
     const nodeClasses: string[] =
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (node.properties?.['className'] as string[]) || [];
     let elementColor: string | undefined = undefined;
 
@@ -151,7 +151,6 @@ export function colorizeCode({
     ? false
     : settings.merged.ui.showLineNumbers;
 
-  const useMaxSizedBox = !isAlternateBufferEnabled(settings);
   try {
     // Render the HAST tree using the adapted theme
     // Apply the theme's default foreground color to the top-level Text element
@@ -161,7 +160,7 @@ export function colorizeCode({
     let hiddenLinesCount = 0;
 
     // Optimization to avoid highlighting lines that cannot possibly be displayed.
-    if (availableHeight !== undefined && useMaxSizedBox) {
+    if (availableHeight !== undefined) {
       availableHeight = Math.max(availableHeight, MINIMUM_MAX_HEIGHT);
       if (lines.length > availableHeight) {
         const sliceIndex = lines.length - availableHeight;
@@ -199,7 +198,7 @@ export function colorizeCode({
       );
     });
 
-    if (useMaxSizedBox) {
+    if (availableHeight !== undefined) {
       return (
         <MaxSizedBox
           maxHeight={availableHeight}
@@ -243,7 +242,7 @@ export function colorizeCode({
       </Box>
     ));
 
-    if (useMaxSizedBox) {
+    if (availableHeight !== undefined) {
       return (
         <MaxSizedBox
           maxHeight={availableHeight}

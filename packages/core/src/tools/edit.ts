@@ -14,7 +14,7 @@ import {
   BaseToolInvocation,
   Kind,
   type ToolCallConfirmationDetails,
-  ToolConfirmationOutcome,
+  type ToolConfirmationOutcome,
   type ToolEditConfirmationDetails,
   type ToolInvocation,
   type ToolLocation,
@@ -27,8 +27,10 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
+import { CoreToolCallStatus } from '../scheduler/types.js';
 
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
+import { getDiffContextSnippet } from './diff-utils.js';
 import {
   type ModifiableDeclarativeTool,
   type ModifyContext,
@@ -36,14 +38,27 @@ import {
 import { IdeClient } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
 import { safeLiteralReplace, detectLineEnding } from '../utils/textUtils.js';
-import { EditStrategyEvent } from '../telemetry/types.js';
-import { logEditStrategy } from '../telemetry/loggers.js';
-import { EditCorrectionEvent } from '../telemetry/types.js';
-import { logEditCorrectionEvent } from '../telemetry/loggers.js';
+import { EditStrategyEvent, EditCorrectionEvent } from '../telemetry/types.js';
+import {
+  logEditStrategy,
+  logEditCorrectionEvent,
+} from '../telemetry/loggers.js';
 
 import { correctPath } from '../utils/pathCorrector.js';
-import { EDIT_TOOL_NAME, READ_FILE_TOOL_NAME } from './tool-names.js';
+import {
+  EDIT_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  EDIT_DISPLAY_NAME,
+} from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import levenshtein from 'fast-levenshtein';
+import { EDIT_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
+import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
+
+const ENABLE_FUZZY_MATCH_RECOVERY = true;
+const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
+const WHITESPACE_PENALTY_FACTOR = 0.1; // Whitespace differences cost 10% of a character difference
 interface ReplacementContext {
   params: EditToolParams;
   currentContent: string;
@@ -55,6 +70,8 @@ interface ReplacementResult {
   occurrences: number;
   finalOldString: string;
   finalNewString: string;
+  strategy?: 'exact' | 'flexible' | 'regex' | 'fuzzy';
+  matchRanges?: Array<{ start: number; end: number }>;
 }
 
 export function applyReplacement(
@@ -121,6 +138,16 @@ async function calculateExactReplacement(
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
 
   const exactOccurrences = normalizedCode.split(normalizedSearch).length - 1;
+
+  if (!params.allow_multiple && exactOccurrences > 1) {
+    return {
+      newContent: currentContent,
+      occurrences: exactOccurrences,
+      finalOldString: normalizedSearch,
+      finalNewString: normalizedReplace,
+    };
+  }
+
   if (exactOccurrences > 0) {
     let modifiedCode = safeLiteralReplace(
       normalizedCode,
@@ -167,11 +194,9 @@ async function calculateFlexibleReplacement(
     if (isMatch) {
       flexibleOccurrences++;
       const firstLineInMatch = window[0];
-      const indentationMatch = firstLineInMatch.match(/^(\s*)/);
+      const indentationMatch = firstLineInMatch.match(/^([ \t]*)/);
       const indentation = indentationMatch ? indentationMatch[1] : '';
-      const newBlockWithIndent = replaceLines.map(
-        (line: string) => `${indentation}${line}`,
-      );
+      const newBlockWithIndent = applyIndentation(replaceLines, indentation);
       sourceLines.splice(
         i,
         searchLinesStripped.length,
@@ -229,31 +254,34 @@ async function calculateRegexReplacement(
 
   // The final pattern captures leading whitespace (indentation) and then matches the token pattern.
   // 'm' flag enables multi-line mode, so '^' matches the start of any line.
-  const finalPattern = `^(\\s*)${pattern}`;
-  const flexibleRegex = new RegExp(finalPattern, 'm');
+  const finalPattern = `^([ \t]*)${pattern}`;
 
-  const match = flexibleRegex.exec(currentContent);
+  // Always use a global regex to count all potential occurrences for accurate validation.
+  const globalRegex = new RegExp(finalPattern, 'gm');
+  const matches = currentContent.match(globalRegex);
 
-  if (!match) {
+  if (!matches) {
     return null;
   }
 
-  const indentation = match[1] || '';
+  const occurrences = matches.length;
   const newLines = normalizedReplace.split('\n');
-  const newBlockWithIndent = newLines
-    .map((line) => `${indentation}${line}`)
-    .join('\n');
 
-  // Use replace with the regex to substitute the matched content.
-  // Since the regex doesn't have the 'g' flag, it will only replace the first occurrence.
+  // Use the appropriate regex for replacement based on allow_multiple.
+  const replaceRegex = new RegExp(
+    finalPattern,
+    params.allow_multiple ? 'gm' : 'm',
+  );
+
   const modifiedCode = currentContent.replace(
-    flexibleRegex,
-    newBlockWithIndent,
+    replaceRegex,
+    (_match, indentation) =>
+      applyIndentation(newLines, indentation || '').join('\n'),
   );
 
   return {
     newContent: restoreTrailingNewline(currentContent, modifiedCode),
-    occurrences: 1, // This method is designed to find and replace only the first occurrence.
+    occurrences,
     finalOldString: normalizedSearch,
     finalNewString: normalizedReplace,
   };
@@ -298,6 +326,14 @@ export async function calculateReplacement(
     return regexResult;
   }
 
+  let fuzzyResult;
+  if (
+    ENABLE_FUZZY_MATCH_RECOVERY &&
+    (fuzzyResult = await calculateFuzzyReplacement(config, context))
+  ) {
+    return fuzzyResult;
+  }
+
   return {
     newContent: currentContent,
     occurrences: 0,
@@ -309,7 +345,6 @@ export async function calculateReplacement(
 export function getErrorReplaceResult(
   params: EditToolParams,
   occurrences: number,
-  expectedReplacements: number,
   finalOldString: string,
   finalNewString: string,
 ) {
@@ -321,13 +356,10 @@ export function getErrorReplaceResult(
       raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${READ_FILE_TOOL_NAME} tool to verify.`,
       type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
     };
-  } else if (occurrences !== expectedReplacements) {
-    const occurrenceTerm =
-      expectedReplacements === 1 ? 'occurrence' : 'occurrences';
-
+  } else if (!params.allow_multiple && occurrences !== 1) {
     error = {
-      display: `Failed to edit, expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences}.`,
-      raw: `Failed to edit, Expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences} for old_string in file: ${params.file_path}`,
+      display: `Failed to edit, expected 1 occurrence but found ${occurrences}.`,
+      raw: `Failed to edit, Expected 1 occurrence but found ${occurrences} for old_string in file: ${params.file_path}. If you intended to replace multiple occurrences, set 'allow_multiple' to true.`,
       type: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
     };
   } else if (finalOldString === finalNewString) {
@@ -360,10 +392,10 @@ export interface EditToolParams {
   new_string: string;
 
   /**
-   * Number of replacements expected. Defaults to 1 if not specified.
-   * Use when you want to replace multiple occurrences.
+   * If true, the tool will replace all occurrences of `old_string` with `new_string`.
+   * If false (default), the tool will only succeed if exactly one occurrence is found.
    */
-  expected_replacements?: number;
+  allow_multiple?: boolean;
 
   /**
    * The instruction for what needs to be done.
@@ -388,6 +420,8 @@ interface CalculatedEdit {
   error?: { display: string; raw: string; type: ToolErrorType };
   isNewFile: boolean;
   originalLineEnding: '\r\n' | '\n';
+  strategy?: 'exact' | 'flexible' | 'regex' | 'fuzzy';
+  matchRanges?: Array<{ start: number; end: number }>;
 }
 
 class EditToolInvocation
@@ -483,7 +517,6 @@ class EditToolInvocation
     const secondError = getErrorReplaceResult(
       params,
       secondAttemptResult.occurrences,
-      params.expected_replacements ?? 1,
       secondAttemptResult.finalOldString,
       secondAttemptResult.finalNewString,
     );
@@ -503,7 +536,7 @@ class EditToolInvocation
       };
     }
 
-    const event = new EditCorrectionEvent('success');
+    const event = new EditCorrectionEvent(CoreToolCallStatus.Success);
     logEditCorrectionEvent(this.config, event);
 
     return {
@@ -513,6 +546,8 @@ class EditToolInvocation
       isNewFile: false,
       error: undefined,
       originalLineEnding,
+      strategy: secondAttemptResult.strategy,
+      matchRanges: secondAttemptResult.matchRanges,
     };
   }
 
@@ -526,7 +561,6 @@ class EditToolInvocation
     params: EditToolParams,
     abortSignal: AbortSignal,
   ): Promise<CalculatedEdit> {
-    const expectedReplacements = params.expected_replacements ?? 1;
     let currentContent: string | null = null;
     let fileExists = false;
     let originalLineEnding: '\r\n' | '\n' = '\n'; // Default for new files
@@ -613,7 +647,6 @@ class EditToolInvocation
     const initialError = getErrorReplaceResult(
       params,
       replacementResult.occurrences,
-      expectedReplacements,
       replacementResult.finalOldString,
       replacementResult.finalNewString,
     );
@@ -626,6 +659,8 @@ class EditToolInvocation
         isNewFile: false,
         error: undefined,
         originalLineEnding,
+        strategy: replacementResult.strategy,
+        matchRanges: replacementResult.matchRanges,
       };
     }
 
@@ -701,14 +736,9 @@ class EditToolInvocation
       fileDiff,
       originalContent: editData.currentContent,
       newContent: editData.newContent,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          // No need to publish a policy update as the default policy for
-          // AUTO_EDIT already reflects always approving edit.
-          this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-        } else {
-          await this.publishPolicyUpdate(outcome);
-        }
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Mode transitions (e.g. AUTO_EDIT) and policy updates are now
+        // handled centrally by the scheduler.
 
         if (ideConfirmation) {
           const result = await ideConfirmation;
@@ -852,6 +882,20 @@ class EditToolInvocation
           ? `Created new file: ${this.params.file_path} with provided content.`
           : `Successfully modified file: ${this.params.file_path} (${editData.occurrences} replacements).`,
       ];
+
+      // Return a diff of the file before and after the write so that the agent
+      // can avoid the need to spend a turn doing a verification read.
+      const snippet = getDiffContextSnippet(
+        editData.currentContent ?? '',
+        finalContent,
+        5,
+      );
+      llmSuccessMessageParts.push(`Here is the updated code:
+${snippet}`);
+      const fuzzyFeedback = getFuzzyMatchFeedback(editData);
+      if (fuzzyFeedback) {
+        llmSuccessMessageParts.push(fuzzyFeedback);
+      }
       if (this.params.modified_by_user) {
         llmSuccessMessageParts.push(
           `User modified the \`new_string\` content to be: ${this.params.new_string}.`,
@@ -905,64 +949,10 @@ export class EditTool
   ) {
     super(
       EditTool.Name,
-      'Edit',
-      `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
-      
-      The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
-      
-      Expectation for required parameters:
-      1. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
-      2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
-      3. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
-      4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
-      **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
-      5. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
-      **Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
+      EDIT_DISPLAY_NAME,
+      EDIT_DEFINITION.base.description!,
       Kind.Edit,
-      {
-        properties: {
-          file_path: {
-            description: 'The path to the file to modify.',
-            type: 'string',
-          },
-          instruction: {
-            description: `A clear, semantic instruction for the code change, acting as a high-quality prompt for an expert LLM assistant. It must be self-contained and explain the goal of the change.
-
-A good instruction should concisely answer:
-1.  WHY is the change needed? (e.g., "To fix a bug where users can be null...")
-2.  WHERE should the change happen? (e.g., "...in the 'renderUserProfile' function...")
-3.  WHAT is the high-level change? (e.g., "...add a null check for the 'user' object...")
-4.  WHAT is the desired outcome? (e.g., "...so that it displays a loading spinner instead of crashing.")
-
-**GOOD Example:** "In the 'calculateTotal' function, correct the sales tax calculation by updating the 'taxRate' constant from 0.05 to 0.075 to reflect the new regional tax laws."
-
-**BAD Examples:**
-- "Change the text." (Too vague)
-- "Fix the bug." (Doesn't explain the bug or the fix)
-- "Replace the line with this new line." (Brittle, just repeats the other parameters)
-`,
-            type: 'string',
-          },
-          old_string: {
-            description:
-              'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
-            type: 'string',
-          },
-          new_string: {
-            description:
-              'The exact literal text to replace `old_string` with, preferably unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
-            type: 'string',
-          },
-          expected_replacements: {
-            type: 'number',
-            description:
-              'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
-            minimum: 1,
-          },
-        },
-        required: ['file_path', 'instruction', 'old_string', 'new_string'],
-        type: 'object',
-      },
+      EDIT_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
@@ -992,6 +982,19 @@ A good instruction should concisely answer:
     }
     params.file_path = filePath;
 
+    const newPlaceholders = detectOmissionPlaceholders(params.new_string);
+    if (newPlaceholders.length > 0) {
+      const oldPlaceholders = new Set(
+        detectOmissionPlaceholders(params.old_string),
+      );
+
+      for (const placeholder of newPlaceholders) {
+        if (!oldPlaceholders.has(placeholder)) {
+          return "`new_string` contains an omission placeholder (for example 'rest of methods ...'). Provide exact literal replacement text.";
+        }
+      }
+    }
+
     return this.config.validatePathAccess(params.file_path);
   }
 
@@ -1006,6 +1009,10 @@ A good instruction should concisely answer:
       this.name,
       this.displayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(EDIT_DEFINITION, modelId);
   }
 
   getModifyContext(_: AbortSignal): ModifyContext<EditToolParams> {
@@ -1053,4 +1060,189 @@ A good instruction should concisely answer:
       },
     };
   }
+}
+
+function stripWhitespace(str: string): string {
+  return str.replace(/\s/g, '');
+}
+
+/**
+ * Applies the target indentation to the lines, while preserving relative indentation.
+ * It identifies the common indentation of the provided lines and replaces it with the target indentation.
+ */
+function applyIndentation(
+  lines: string[],
+  targetIndentation: string,
+): string[] {
+  if (lines.length === 0) return [];
+
+  // Use the first line as the reference for indentation, even if it's empty/whitespace.
+  // This is because flexible/fuzzy matching identifies the indentation of the START of the match.
+  const referenceLine = lines[0];
+  const refIndentMatch = referenceLine.match(/^([ \t]*)/);
+  const refIndent = refIndentMatch ? refIndentMatch[1] : '';
+
+  return lines.map((line) => {
+    if (line.trim() === '') {
+      return '';
+    }
+    if (line.startsWith(refIndent)) {
+      return targetIndentation + line.slice(refIndent.length);
+    }
+    return targetIndentation + line.trimStart();
+  });
+}
+
+function getFuzzyMatchFeedback(editData: CalculatedEdit): string | null {
+  if (
+    editData.strategy === 'fuzzy' &&
+    editData.matchRanges &&
+    editData.matchRanges.length > 0
+  ) {
+    const ranges = editData.matchRanges
+      .map((r) => (r.start === r.end ? `${r.start}` : `${r.start}-${r.end}`))
+      .join(', ');
+    return `Applied fuzzy match at line${editData.matchRanges.length > 1 ? 's' : ''} ${ranges}.`;
+  }
+  return null;
+}
+
+async function calculateFuzzyReplacement(
+  config: Config,
+  context: ReplacementContext,
+): Promise<ReplacementResult | null> {
+  const { currentContent, params } = context;
+  const { old_string, new_string } = params;
+
+  // Pre-check: Don't fuzzy match very short strings to avoid false positives
+  if (old_string.length < 10) {
+    return null;
+  }
+
+  const normalizedCode = currentContent.replace(/\r\n/g, '\n');
+  const normalizedSearch = old_string.replace(/\r\n/g, '\n');
+  const normalizedReplace = new_string.replace(/\r\n/g, '\n');
+
+  const sourceLines = normalizedCode.match(/.*(?:\n|$)/g)?.slice(0, -1) ?? [];
+  const searchLines = normalizedSearch
+    .match(/.*(?:\n|$)/g)
+    ?.slice(0, -1)
+    .map((l) => l.trimEnd()); // Trim end of search lines to be more robust
+
+  // Limit the scope of the fuzzy match to reduce impact on responsivesness.
+  // Each comparison takes roughly O(L^2) time.
+  // We perform sourceLines.length comparisons (sliding window).
+  // Total complexity proxy: sourceLines.length * old_string.length^2
+  // Limit to 4e8 for < 1 second.
+  if (sourceLines.length * Math.pow(old_string.length, 2) > 400_000_000) {
+    return null;
+  }
+
+  if (!searchLines || searchLines.length === 0) {
+    return null;
+  }
+
+  const N = searchLines.length;
+  const candidates: Array<{ index: number; score: number }> = [];
+  const searchBlock = searchLines.join('\n');
+
+  // Sliding window
+  for (let i = 0; i <= sourceLines.length - N; i++) {
+    const windowLines = sourceLines.slice(i, i + N);
+    const windowText = windowLines.map((l) => l.trimEnd()).join('\n'); // Normalized join for comparison
+
+    // Length Heuristic Optimization
+    const lengthDiff = Math.abs(windowText.length - searchBlock.length);
+    if (
+      lengthDiff / searchBlock.length >
+      FUZZY_MATCH_THRESHOLD / WHITESPACE_PENALTY_FACTOR
+    ) {
+      continue;
+    }
+
+    // Tiered Scoring
+    const d_raw = levenshtein.get(windowText, searchBlock);
+    const d_norm = levenshtein.get(
+      stripWhitespace(windowText),
+      stripWhitespace(searchBlock),
+    );
+
+    const weightedDist = d_norm + (d_raw - d_norm) * WHITESPACE_PENALTY_FACTOR;
+    const score = weightedDist / searchBlock.length;
+
+    if (score <= FUZZY_MATCH_THRESHOLD) {
+      candidates.push({ index: i, score });
+    }
+  }
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  // Select best non-overlapping matches
+  // Sort by score ascending. If scores equal, prefer earlier index (stable sort).
+  candidates.sort((a, b) => a.score - b.score || a.index - b.index);
+
+  const selectedMatches: Array<{ index: number; score: number }> = [];
+  for (const candidate of candidates) {
+    // Check for overlap with already selected matches
+    // Two windows overlap if their start indices are within N lines of each other
+    // (Assuming window size N. Actually overlap is |i - j| < N)
+    const overlaps = selectedMatches.some(
+      (m) => Math.abs(m.index - candidate.index) < N,
+    );
+    if (!overlaps) {
+      selectedMatches.push(candidate);
+    }
+  }
+
+  // If we found matches, apply them
+  if (selectedMatches.length > 0) {
+    const event = new EditStrategyEvent('fuzzy');
+    logEditStrategy(config, event);
+
+    // Calculate match ranges before sorting for replacement
+    // Indices in selectedMatches are 0-based line indices
+    const matchRanges = selectedMatches
+      .map((m) => ({ start: m.index + 1, end: m.index + N }))
+      .sort((a, b) => a.start - b.start);
+
+    // Sort matches by index descending to apply replacements from bottom to top
+    // so that indices remain valid
+    selectedMatches.sort((a, b) => b.index - a.index);
+
+    const newLines = normalizedReplace.split('\n');
+
+    for (const match of selectedMatches) {
+      // If we want to preserve the indentation of the first line of the match:
+      const firstLineMatch = sourceLines[match.index];
+      const indentationMatch = firstLineMatch.match(/^([ \t]*)/);
+      const indentation = indentationMatch ? indentationMatch[1] : '';
+
+      const indentedReplaceLines = applyIndentation(newLines, indentation);
+
+      let replacementText = indentedReplaceLines.join('\n');
+      // If the last line of the match had a newline, preserve it in the replacement
+      // to avoid merging with the next line or losing a blank line separator.
+      if (sourceLines[match.index + N - 1].endsWith('\n')) {
+        replacementText += '\n';
+      }
+
+      sourceLines.splice(match.index, N, replacementText);
+    }
+
+    let modifiedCode = sourceLines.join('');
+    modifiedCode = restoreTrailingNewline(currentContent, modifiedCode);
+
+    return {
+      newContent: modifiedCode,
+      occurrences: selectedMatches.length,
+      finalOldString: normalizedSearch,
+      finalNewString: normalizedReplace,
+      strategy: 'fuzzy',
+      matchRanges,
+    };
+  }
+
+  return null;
 }

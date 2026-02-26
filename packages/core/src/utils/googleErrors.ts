@@ -166,10 +166,12 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
     depth < maxDepth
   ) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const parsedMessage = JSON.parse(
         currentError.message.replace(/\u00A0/g, '').replace(/\n/g, ' '),
       );
       if (parsedMessage.error) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         currentError = parsedMessage.error;
         depth++;
       } else {
@@ -195,6 +197,7 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
     if (Array.isArray(errorDetails)) {
       for (const detail of errorDetails) {
         if (detail && typeof detail === 'object') {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const detailObj = detail as Record<string, unknown>;
           const typeKey = Object.keys(detailObj).find(
             (key) => key.trim() === '@type',
@@ -204,8 +207,13 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
               detailObj['@type'] = detailObj[typeKey];
               delete detailObj[typeKey];
             }
-            // We can just cast it; the consumer will have to switch on @type
-            details.push(detailObj as unknown as GoogleApiErrorDetail);
+            // Basic structural check before casting.
+            // Since the proto definitions are loose, we primarily rely on @type presence.
+            if (typeof detailObj['@type'] === 'string') {
+              // We can just cast it; the consumer will have to switch on @type
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              details.push(detailObj as unknown as GoogleApiErrorDetail);
+            }
           }
         }
       }
@@ -219,6 +227,16 @@ export function parseGoogleApiError(error: unknown): GoogleApiError | null {
   }
 
   return null;
+}
+
+function isErrorShape(obj: unknown): obj is ErrorShape {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    (('message' in obj &&
+      typeof (obj as { message: unknown }).message === 'string') ||
+      ('code' in obj && typeof (obj as { code: unknown }).code === 'number'))
+  );
 }
 
 function fromGaxiosError(errorObj: object): ErrorShape | undefined {
@@ -241,6 +259,7 @@ function fromGaxiosError(errorObj: object): ErrorShape | undefined {
 
     if (typeof data === 'string') {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data = JSON.parse(data);
       } catch (_) {
         // Not a JSON string, can't parse.
@@ -248,12 +267,17 @@ function fromGaxiosError(errorObj: object): ErrorShape | undefined {
     }
 
     if (Array.isArray(data) && data.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       data = data[0];
     }
 
     if (typeof data === 'object' && data !== null) {
       if ('error' in data) {
-        outerError = (data as { error: ErrorShape }).error;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const potentialError = (data as { error: unknown }).error;
+        if (isErrorShape(potentialError)) {
+          outerError = potentialError;
+        }
       }
     }
   }
@@ -285,6 +309,7 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
 
     if (typeof data === 'string') {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data = JSON.parse(data);
       } catch (_) {
         // Not a JSON string, can't parse.
@@ -294,6 +319,7 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
           const lastBrace = data.lastIndexOf('}');
           if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
             try {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               data = JSON.parse(data.substring(firstBrace, lastBrace + 1));
             } catch (__) {
               // Still failed
@@ -304,12 +330,17 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
     }
 
     if (Array.isArray(data) && data.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       data = data[0];
     }
 
     if (typeof data === 'object' && data !== null) {
       if ('error' in data) {
-        outerError = (data as { error: ErrorShape }).error;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const potentialError = (data as { error: unknown }).error;
+        if (isErrorShape(potentialError)) {
+          outerError = potentialError;
+        }
       }
     }
   }

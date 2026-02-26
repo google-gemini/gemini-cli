@@ -45,6 +45,7 @@ export async function fetchJson<T>(
         res.on('data', (chunk) => chunks.push(chunk));
         res.on('end', () => {
           const data = Buffer.concat(chunks).toString();
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           resolve(JSON.parse(data) as T);
         });
       })

@@ -66,6 +66,7 @@ export async function isDirectorySecure(
       } catch (error) {
         return {
           secure: false,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           reason: `A security check for the system policy directory '${dirPath}' failed and could not be completed. Please file a bug report. Original error: ${(error as Error).message}`,
         };
       }
@@ -93,11 +94,13 @@ export async function isDirectorySecure(
 
     return { secure: true };
   } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return { secure: true };
     }
     return {
       secure: false,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       reason: `Failed to access directory: ${(error as Error).message}`,
     };
   }

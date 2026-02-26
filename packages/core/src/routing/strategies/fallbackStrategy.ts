@@ -25,7 +25,10 @@ export class FallbackStrategy implements RoutingStrategy {
     _localLiteRtLmClient: LocalLiteRtLmClient,
   ): Promise<RoutingDecision | null> {
     const requestedModel = context.requestedModel ?? config.getModel();
-    const resolvedModel = resolveModel(requestedModel);
+    const resolvedModel = resolveModel(
+      requestedModel,
+      config.getGemini31LaunchedSync?.() ?? false,
+    );
     const service = config.getModelAvailabilityService();
     const snapshot = service.snapshot(resolvedModel);
 
