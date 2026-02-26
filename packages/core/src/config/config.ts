@@ -69,7 +69,6 @@ import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import {
-  TrackerInitTool,
   TrackerCreateTaskTool,
   TrackerUpdateTaskTool,
   TrackerGetTaskTool,
@@ -2740,9 +2739,6 @@ export class Config {
     }
 
     if (this.isTrackerEnabled()) {
-      maybeRegister(TrackerInitTool, () =>
-        registry.registerTool(new TrackerInitTool(this, this.messageBus)),
-      );
       maybeRegister(TrackerCreateTaskTool, () =>
         registry.registerTool(new TrackerCreateTaskTool(this, this.messageBus)),
       );

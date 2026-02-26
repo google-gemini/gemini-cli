@@ -52,7 +52,6 @@ export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 export const WRITE_FILE_DISPLAY_NAME = 'WriteFile';
 export const EDIT_DISPLAY_NAME = 'Edit';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
-export const TRACKER_INIT_TOOL_NAME = 'tracker_init';
 export const TRACKER_CREATE_TASK_TOOL_NAME = 'tracker_create_task';
 export const TRACKER_UPDATE_TASK_TOOL_NAME = 'tracker_update_task';
 export const TRACKER_GET_TASK_TOOL_NAME = 'tracker_get_task';
@@ -114,7 +113,6 @@ export const ALL_BUILTIN_TOOL_NAMES = [
   MEMORY_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
-  TRACKER_INIT_TOOL_NAME,
   TRACKER_CREATE_TASK_TOOL_NAME,
   TRACKER_UPDATE_TASK_TOOL_NAME,
   TRACKER_GET_TASK_TOOL_NAME,

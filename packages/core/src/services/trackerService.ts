@@ -50,11 +50,12 @@ export class TrackerService {
       id,
     };
 
+    TrackerTaskSchema.parse(task);
+
     await this.saveTask(task);
     return task;
   }
 
-  /**
   /**
    * Helper to read and validate a JSON file.
    */
@@ -157,6 +158,8 @@ export class TrackerService {
       taskMap.set(updatedTask.id, updatedTask);
       this.validateNoCircularDependencies(updatedTask, taskMap);
     }
+
+    TrackerTaskSchema.parse(updatedTask);
 
     await this.saveTask(updatedTask);
     return updatedTask;

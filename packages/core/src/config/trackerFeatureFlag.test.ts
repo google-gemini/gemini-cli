@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { Config } from './config.js';
-import { TRACKER_INIT_TOOL_NAME } from '../tools/tool-names.js';
+import { TRACKER_CREATE_TASK_TOOL_NAME } from '../tools/tool-names.js';
 import * as os from 'node:os';
 
 describe('Config Tracker Feature Flag', () => {
@@ -22,7 +22,7 @@ describe('Config Tracker Feature Flag', () => {
     const config = new Config(baseParams);
     await config.initialize();
     const registry = config.getToolRegistry();
-    expect(registry.getTool(TRACKER_INIT_TOOL_NAME)).toBeUndefined();
+    expect(registry.getTool(TRACKER_CREATE_TASK_TOOL_NAME)).toBeUndefined();
   });
 
   it('should register tracker tools when tracker is enabled', async () => {
@@ -32,7 +32,7 @@ describe('Config Tracker Feature Flag', () => {
     });
     await config.initialize();
     const registry = config.getToolRegistry();
-    expect(registry.getTool(TRACKER_INIT_TOOL_NAME)).toBeDefined();
+    expect(registry.getTool(TRACKER_CREATE_TASK_TOOL_NAME)).toBeDefined();
   });
 
   it('should not register tracker tools when tracker is explicitly disabled', async () => {
@@ -42,6 +42,6 @@ describe('Config Tracker Feature Flag', () => {
     });
     await config.initialize();
     const registry = config.getToolRegistry();
-    expect(registry.getTool(TRACKER_INIT_TOOL_NAME)).toBeUndefined();
+    expect(registry.getTool(TRACKER_CREATE_TASK_TOOL_NAME)).toBeUndefined();
   });
 });

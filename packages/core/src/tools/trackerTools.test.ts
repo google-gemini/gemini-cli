@@ -9,7 +9,6 @@ import { Config } from '../config/config.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
 import {
-  TrackerInitTool,
   TrackerCreateTaskTool,
   TrackerListTasksTool,
   TrackerUpdateTaskTool,
@@ -43,26 +42,7 @@ describe('Tracker Tools Integration', () => {
 
   const getSignal = () => new AbortController().signal;
 
-  it('runs tracker_init and creates the directory', async () => {
-    const tool = new TrackerInitTool(config, messageBus);
-    const result = await tool.buildAndExecute({}, getSignal());
-
-    expect(result.llmContent).toContain('Task tracker initialized');
-    const trackerDir = config.getTrackerService().trackerDir;
-    const tasksDir = trackerDir;
-    const stats = await fs.stat(tasksDir);
-    expect(stats.isDirectory()).toBe(true);
-    // Verify it is NOT in the tempDir root (which was the old behavior)
-    expect(trackerDir).not.toBe(path.join(tempDir, '.tracker'));
-  });
-
   it('creates and lists tasks', async () => {
-    // Init first
-    await new TrackerInitTool(config, messageBus).buildAndExecute(
-      {},
-      getSignal(),
-    );
-
     const createTool = new TrackerCreateTaskTool(config, messageBus);
     const createResult = await createTool.buildAndExecute(
       {
@@ -82,11 +62,6 @@ describe('Tracker Tools Integration', () => {
   });
 
   it('updates task status', async () => {
-    await new TrackerInitTool(config, messageBus).buildAndExecute(
-      {},
-      getSignal(),
-    );
-
     const createTool = new TrackerCreateTaskTool(config, messageBus);
     await createTool.buildAndExecute(
       {
