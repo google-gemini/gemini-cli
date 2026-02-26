@@ -3054,6 +3054,9 @@ export class Config implements McpContext, AgentLoopContext {
 
       for (const definition of definitions) {
         try {
+          if (definition.kind === 'local' && definition.runConfig.hasCustomEntryPoint === true) {
+            continue;
+          }
           const tool = new SubagentTool(definition, this, this.getMessageBus());
           registry.registerTool(tool);
         } catch (e: unknown) {

@@ -11,6 +11,7 @@ import {
   Kind,
   type ToolInfoConfirmationDetails,
   ToolConfirmationOutcome,
+  type ToolLiveOutput,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { Config } from '../config/config.js';
@@ -18,6 +19,7 @@ import { ENTER_PLAN_MODE_TOOL_NAME } from './tool-names.js';
 import { ApprovalMode } from '../policy/types.js';
 import { ENTER_PLAN_MODE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 
 export interface EnterPlanModeParams {
   reason?: string;
@@ -40,6 +42,8 @@ export class EnterPlanModeTool extends BaseDeclarativeTool<
       Kind.Plan,
       ENTER_PLAN_MODE_DEFINITION.base.parametersJsonSchema,
       messageBus,
+      /* isOutputMarkdown */ true,
+      /* canUpdateOutput */ true,
     );
   }
 
@@ -112,7 +116,10 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
     };
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute(
+    signal: AbortSignal,
+    updateOutput?: (output: ToolLiveOutput) => void,
+  ): Promise<ToolResult> {
     if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {
       return {
         llmContent: 'User cancelled entering Plan Mode.',
@@ -120,13 +127,25 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
       };
     }
 
+    // Set global modality for policies and UI
     this.config.setApprovalMode(ApprovalMode.PLAN);
 
-    return {
-      llmContent: 'Switching to Plan mode.',
-      returnDisplay: this.params.reason
-        ? `Switching to Plan mode: ${this.params.reason}`
-        : 'Switching to Plan mode',
-    };
+    const plannerDefinition = this.config
+      .getAgentRegistry()
+      .getDefinition('planner');
+    if (!plannerDefinition) {
+      throw new Error('Planner agent not found.');
+    }
+
+    const wrapper = new SubagentToolWrapper(
+      plannerDefinition,
+      this.config,
+      this.messageBus,
+    );
+    const subInvocation = wrapper.build({
+      reason: this.params.reason || 'Requested by main agent',
+    });
+
+    return subInvocation.execute(signal, updateOutput);
   }
 }

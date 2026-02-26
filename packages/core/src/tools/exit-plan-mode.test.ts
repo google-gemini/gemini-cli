@@ -200,6 +200,10 @@ describe('ExitPlanModeTool', () => {
       const expectedPath = path.join(mockPlansDir, 'test.md');
 
       expect(result).toEqual({
+        data: {
+          plan_path: expectedPath,
+        },
+        isTaskCompletion: true,
         llmContent: `Plan approved. Switching to Default mode (edits will require confirmation).
 
 The approved implementation plan is stored at: ${expectedPath}
@@ -228,6 +232,10 @@ Read and follow the plan strictly during implementation.`,
       const expectedPath = path.join(mockPlansDir, 'test.md');
 
       expect(result).toEqual({
+        data: {
+          plan_path: expectedPath,
+        },
+        isTaskCompletion: true,
         llmContent: `Plan approved. Switching to Auto-Edit mode (edits will be applied automatically).
 
 The approved implementation plan is stored at: ${expectedPath}

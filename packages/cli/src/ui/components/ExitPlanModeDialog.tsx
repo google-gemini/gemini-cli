@@ -227,6 +227,10 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
 
   const editHint = formatCommand(Command.OPEN_EXTERNAL_EDITOR);
 
+  debugLogger.log(
+    `[ExitPlanModeDialog] Rendering with availableHeight=${availableHeight}, planStatus=${planState.status}, contentLength=${planContent.length}`,
+  );
+
   return (
     <Box flexDirection="column" width={width}>
       <AskUserDialog

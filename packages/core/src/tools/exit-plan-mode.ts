@@ -26,10 +26,9 @@ import { PlanExecutionEvent } from '../telemetry/types.js';
 import { getExitPlanModeDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { getPlanModeExitMessage } from '../utils/approvalModeUtils.js';
+import { type PlannerAgentOutput } from '../agents/planner-schema.js';
 
-export interface ExitPlanModeParams {
-  plan_path: string;
-}
+export type ExitPlanModeParams = PlannerAgentOutput;
 
 export class ExitPlanModeTool extends BaseDeclarativeTool<
   ExitPlanModeParams,
@@ -225,13 +224,14 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       logPlanExecution(this.config, new PlanExecutionEvent(newMode));
 
       const exitMessage = getPlanModeExitMessage(newMode);
-
       return {
         llmContent: `${exitMessage}
 
 The approved implementation plan is stored at: ${resolvedPlanPath}
 Read and follow the plan strictly during implementation.`,
         returnDisplay: `Plan approved: ${resolvedPlanPath}`,
+        isTaskCompletion: true,
+        data: { plan_path: resolvedPlanPath },
       };
     } else {
       const feedback = payload?.feedback?.trim();
