@@ -1,0 +1,9 @@
+﻿src/config/config.ts(22,3): error TS6133: 'WRITE_FILE_TOOL_NAME' is declared but its value is never read.
+src/config/config.ts(28,3): error TS6133: 'EDIT_TOOL_NAME' is declared but its value is never read.
+src/config/config.ts(31,3): error TS6133: 'WEB_FETCH_TOOL_NAME' is declared but its value is never read.
+src/config/config.ts(32,3): error TS6133: 'ASK_USER_TOOL_NAME' is declared but its value is never read.
+src/config/config.ts(413,10): error TS6133: 'createToolExclusionFilter' is declared but its value is never read.
+src/config/config.ts(636,9): error TS6133: 'allowedToolsSet' is declared but its value is never read.
+src/config/config.ts(813,5): error TS2353: Object literal may only specify known properties, and 'enablePromptCompletion' does not exist in type 'ConfigParameters'.
+src/ui/hooks/useCommandCompletion.tsx(160,17): error TS2339: Property 'getEnablePromptCompletion' does not exist on type 'Config'.
+src/ui/hooks/usePromptCompletion.ts(46,25): error TS2339: Property 'getEnablePromptCompletion' does not exist on type 'Config'.

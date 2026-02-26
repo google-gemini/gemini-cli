@@ -1,0 +1,79 @@
+
+ RUN  v3.2.4 E:/gemini-cli
+
+stdout | integration-tests/policy_repro.test.ts > Headless Policy Reproduction > should respect --policy even in headless mode
+CLI Result: Command output verified.
+
+
+StdErr:
+Timeout of 30000 exceeds the interval of 10000. Clamping timeout to interval duration.
+The 'metricReader' option is deprecated. Please use 'metricReaders' instead.
+File C:\Users\Nilan\.cache/vscode-ripgrep/ripgrep-v13.0.0-10-x86_64-pc-windows-msvc.zip has been cached
+(node:18380) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Error executing tool run_shell_command: Tool "run_shell_command" not found. Did you mean one of: "grep_search", "cli_help", "read_file"?
+
+
+stderr | integration-tests/policy_repro.test.ts > Headless Policy Reproduction > should respect --policy even in headless mode
+Test failed - Debug info:
+Result length: [33m706[39m
+Result (first 500 chars): Command output verified.
+
+
+StdErr:
+Timeout of 30000 exceeds the interval of 10000. Clamping timeout to interval duration.
+The 'metricReader' option is deprecated. Please use 'metricReaders' instead.
+File C:\Users\Nilan\.cache/vscode-ripgrep/ripgrep-v13.0.0-10-x86_64-pc-windows-msvc.zip has been cached
+(node:18380) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+(Use `
+Result (last 500 chars): \Users\Nilan\.cache/vscode-ripgrep/ripgrep-v13.0.0-10-x86_64-pc-windows-msvc.zip has been cached
+(node:18380) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Error executing tool run_shell_command: Tool "run_shell_command" not found. Did you mean one of: "grep_search", "cli_help", "read_file"?
+
+Found tool call: [33mtrue[39m
+Policy path: C:\Users\Nilan\AppData\Local\Temp\gemini-cli-tests\should-respect-policy-even-in-headless-mode\allow-shell.toml
+Result contains expected string: [33mfalse[39m
+All tool calls found: [ [32m'run_shell_command'[39m ]
+
+ ❯ integration-tests/policy_repro.test.ts (1 test | 1 failed) 9465ms
+   × Headless Policy Reproduction > should respect --policy even in headless mode 9464ms
+     → expected 'Command output verified.\n\n\nStdErr:…' to contain 'policy-test-passed'
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  integration-tests/policy_repro.test.ts > Headless Policy Reproduction > should respect --policy even in headless mode
+AssertionError: expected 'Command output verified.\n\n\nStdErr:…' to contain 'policy-test-passed'
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- policy-test-passed[39m
+[31m+ Command output verified.[39m
+[31m+[39m
+[31m+[39m
+[31m+ StdErr:[39m
+[31m+ Timeout of 30000 exceeds the interval of 10000. Clamping timeout to interval duration.[39m
+[31m+ The 'metricReader' option is deprecated. Please use 'metricReaders' instead.[39m
+[31m+ File C:\Users\Nilan\.cache/vscode-ripgrep/ripgrep-v13.0.0-10-x86_64-pc-windows-msvc.zip has been cached[39m
+[31m+ (node:18380) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.[39m
+[31m+ (Use `node --trace-deprecation ...` to show where the warning was created)[39m
+[31m+ Error executing tool run_shell_command: Tool "run_shell_command" not found. Did you mean one of: "grep_search", "cli_help", "read_file"?[39m
+[31m+[39m
+
+ ❯ integration-tests/policy_repro.test.ts:74:20
+     72|       'Expected run_shell_command to be allowed by policy',
+     73|     ).toBe(true);
+     74|     expect(result).toContain('policy-test-passed');
+       |                    ^
+     75|   }, 30000);
+     76| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  21:21:23
+   Duration  24.00s (transform 4.23s, setup 0ms, collect 13.15s, tests 9.47s, environment 0ms, prepare 580ms)
+

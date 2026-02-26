@@ -716,7 +716,9 @@ export class PolicyEngine {
       if (!rule.toolName) {
         if (globalVerdict === undefined) {
           globalVerdict = rule.decision;
-          if (globalVerdict !== PolicyDecision.DENY) {
+          const effectiveGlobalVerdict =
+            this.applyNonInteractiveMode(globalVerdict);
+          if (effectiveGlobalVerdict !== PolicyDecision.DENY) {
             // Global ALLOW/ASK found.
             // Since rules are sorted by priority, this overrides any lower-priority rules.
             // We can stop processing because nothing else will be excluded.
