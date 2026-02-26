@@ -80,16 +80,28 @@ manually during a session.
 
 ### Planning Workflow
 
-Plan Mode uses an adaptive planning workflow where the depth and structure of
-the implementation plan are proportional to the task's complexity:
+Plan Mode uses an adaptive planning workflow where the research depth, plan
+structure, and consultation level are proportional to the task's complexity:
 
 1.  **Explore & Analyze:** Analyze requirements and use read-only tools to map
     affected modules and identify dependencies.
-2.  **Consult:** For non-trivial changes, present viable implementation
-    approaches via [`ask_user`] and wait for a selection.
+2.  **Consult:** The depth of consultation is proportional to the task's
+    complexity:
+    - **Simple Tasks:** Proceed directly to drafting.
+    - **Standard Tasks:** Present a summary of viable approaches via
+      [`ask_user`] for selection.
+    - **Complex Tasks:** Present detailed trade-offs for at least two viable
+      approaches via [`ask_user`] and obtain approval before drafting.
 3.  **Draft:** Write a detailed implementation plan to the
     [plans directory](#custom-plan-directory-and-policies). The plan's structure
-    adapts to the task (e.g., simple fixes vs. architectural changes).
+    adapts to the task:
+    - **Simple Tasks:** Focused on specific **Changes** and **Verification**
+      steps.
+    - **Standard Tasks:** Includes an **Objective**, **Key Files & Context**,
+      **Implementation Steps**, and **Verification & Testing**.
+    - **Complex Tasks:** Comprehensive plans including **Background &
+      Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives
+      Considered**, and **Migration & Rollback** strategies.
 4.  **Review & Approval:** Use the [`exit_plan_mode`] tool to present the plan
     and formally request approval.
     - **Approve:** Exit Plan Mode and start implementation.
