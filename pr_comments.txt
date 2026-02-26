@@ -1,0 +1,128 @@
+author:	gemini-code-assist
+association:	contributor
+edited:	false
+status:	none
+--
+## Summary of Changes
+
+Hello @Oerum, I'm Gemini Code Assist[^1]! I'm currently reviewing this pull request and will post my feedback shortly. In the meantime, here's a summary to help you and other reviewers quickly get up to speed!
+
+This pull request significantly enhances the command-line interface by introducing a dedicated command for managing and accessing memory and agent markdown files. It streamlines the workflow for users interacting with these critical configuration files by providing an interactive browser and direct access to external editors or file locations. Additionally, it improves model management by allowing users to quickly cycle through preferred models using new keyboard shortcuts and define a custom list of favorite models, making model switching more efficient.
+
+### Highlights
+
+* **New /mds Command**: Introduced a new CLI command `/mds` to display an interactive overlay listing all loaded memory (.GEMINI.md) and agent (.AGENTS) markdown files.
+* **File Interaction**: Users can now open listed files in an external editor (Ctrl+X) or open their containing directory (Alt+O) directly from the `/mds` command UI.
+* **Model Cycling**: Added new keyboard shortcuts (Alt+C for forward, Alt+X for backward) to cycle through available Gemini models.
+* **Favorite Models**: Implemented a new setting to define a list of 'favorite models' for cycling, allowing users to customize the models they frequently switch between.
+* **Keyboard Shortcut Updates**: Documented and implemented new keybindings for file location and model cycling, and adjusted existing keybinding logic for Alt key presses.
+
+<details>
+<summary><b>Changelog</b></summary>
+
+* **docs/CONTRIBUTING.md**
+    * Corrected a newline at the end of the file.
+* **docs/reference/keyboard-shortcuts.md**
+    * Updated documentation to include new keyboard shortcuts for cycling Gemini models and opening file locations.
+* **packages/cli/src/config/config.ts**
+    * Imported SettingScope and added a callback onFavoriteModelsChange to the CLI configuration for managing favorite models.
+* **packages/cli/src/config/keyBindings.ts**
+    * Defined new Command enums for OPEN_FILE_LOCATION, CYCLE_MODEL_FORWARD, and CYCLE_MODEL_BACKWARD, and assigned their default keybindings.
+* **packages/cli/src/config/settings.ts**
+    * Introduced the ModelSettings interface to support the new favoriteModels property.
+* **packages/cli/src/config/settingsSchema.ts**
+    * Extended the settings schema to include a favoriteModels array for model configuration.
+* **packages/cli/src/services/BuiltinCommandLoader.ts**
+    * Registered the new mdsCommand to make it available in the CLI.
+* **packages/cli/src/ui/AppContainer.tsx**
+    * Integrated logic to handle CYCLE_MODEL_FORWARD and CYCLE_MODEL_BACKWARD commands, displaying transient messages for model changes.
+* **packages/cli/src/ui/commands/mdsCommand.test.tsx**
+    * Added a new unit test file to verify the functionality of the mdsCommand.
+* **packages/cli/src/ui/commands/mdsCommand.tsx**
+    * Implemented the /mds slash command, which opens the MdsBrowser component.
+* **packages/cli/src/ui/components/MdsBrowser.tsx**
+    * Added a new React component that provides an interactive UI to list .GEMINI.md and .AGENTS files, with options to open them in an external editor or their containing folder.
+* **packages/cli/src/ui/components/ModelDialog.test.tsx**
+    * Updated mock configurations and test cases for ModelDialog to support favorite models.
+* **packages/cli/src/ui/components/ModelDialog.tsx**
+    * Refactored the ModelDialog to incorporate favorite model management, including a new onHighlight prop for DescriptiveRadioButtonSelect and a keybinding (F) to toggle favorite status.
+* **packages/cli/src/ui/components/ShortcutsHelp.tsx**
+    * Updated the displayed keyboard shortcuts to include the new model cycling options.
+* **packages/cli/src/ui/components/ToastDisplay.tsx**
+    * Added support for displaying informational transient messages.
+* **packages/cli/src/ui/components/__snapshots__/ShortcutsHelp.test.tsx.snap**
+    * Updated snapshot tests to reflect changes in the ShortcutsHelp component.
+* **packages/cli/src/ui/components/shared/BaseSelectionList.tsx**
+    * Modified the onHighlight callback to pass both the item's value and its index.
+* **packages/cli/src/ui/components/shared/DescriptiveRadioButtonSelect.tsx**
+    * Enhanced the component to accept a custom renderItem function and updated the onHighlight prop signature.
+* **packages/cli/src/ui/contexts/KeypressContext.tsx**
+    * Adjusted the insertable property logic for keypress events when alt is pressed.
+* **packages/cli/src/ui/hooks/useSelectionList.test.tsx**
+    * Updated test cases for useSelectionList to correctly handle alt key presses and the new onHighlight signature.
+* **packages/cli/src/ui/hooks/useSelectionList.ts**
+    * Modified the onHighlight callback to include the item's index and ensure it's triggered when the active index changes.
+* **packages/cli/src/ui/keyMatchers.test.ts**
+    * Added new test cases to verify the CYCLE_MODEL_FORWARD key matcher.
+* **packages/cli/src/utils/events.ts**
+    * Added Info as a new type for TransientMessageType.
+* **packages/core/src/config/config.test.ts**
+    * Added comprehensive unit tests for the new cycleModel and toggleFavoriteModel functionalities.
+* **packages/core/src/config/config.ts**
+    * Introduced DEFAULT_GEMINI_FLASH_LITE_MODEL, added onFavoriteModelsChange and favoriteModels to ConfigParameters, and implemented methods for model cycling and managing favorite models.
+* **schemas/settings.schema.json**
+    * Updated the JSON schema to include the favoriteModels array within the model settings.
+* **scripts/lint.js**
+    * Modified the yamllint command to use xargs -r for better handling of empty input.
+</details>
+
+<details>
+<summary><b>Activity</b></summary>
+
+* The pull request introduces a new `/mds` command and related UI components.
+* New keyboard shortcuts for file interaction and model cycling have been added and documented.
+* The configuration system has been extended to support favorite models.
+* Unit tests have been added for the new `mdsCommand` and model cycling logic.
+</details>
+
+<details>
+<summary><b>Using Gemini Code Assist</b></summary>
+<br>
+
+The full guide for Gemini Code Assist can be found on our [documentation page](https://developers.google.com/gemini-code-assist/docs/review-github-code), here are some quick tips.
+
+<b>Invoking Gemini</b>
+
+You can request assistance from Gemini at any point by creating a comment using either `/gemini <command>` or `@gemini-code-assist <command>`. Below is a summary of the supported commands on the current page.
+
+Feature | Command | Description
+--- | --- | ---
+Code Review | `/gemini review` | Performs a code review for the current pull request in its current state.
+Pull Request Summary | `/gemini summary` | Provides a summary of the current pull request in its current state.
+Comment | @gemini-code-assist | Responds in comments when explicitly tagged, both in pull request comments and review comments.
+Help | `/gemini help` | Displays a list of available commands.
+
+<b>Customization</b>
+
+To customize Gemini Code Assist for GitHub experience, repository maintainers can create a configuration file and/or provide a custom code review style guide (such as PEP-8 for Python) by creating and adding files to a `.gemini/` folder in the base of the repository. Detailed instructions can be found [here](https://developers.google.com/gemini-code-assist/docs/customize-gemini-behavior-github).
+
+<b>Limitations & Feedback</b>
+
+Gemini Code Assist may make mistakes. Please leave feedback on any instances where its feedback is incorrect or counter productive. You can react with :thumbsup: and :thumbsdown: on @gemini-code-assist comments. If you're interested in giving your feedback about your experience with Gemini Code Assist for Github and other Google products, sign up [here](https://google.qualtrics.com/jfe/form/SV_2cyuGuTWsEw84yG).
+
+<b>You can also get AI-powered code generation, chat, as well as code reviews directly in the IDE at no cost with the [Gemini Code Assist IDE Extension](https://cloud.google.com/products/gemini/code-assist).</b>
+</details>
+
+
+[^1]: Review the [Privacy Notices](https://policies.google.com/privacy), [Generative AI Prohibited Use Policy](https://policies.google.com/terms/generative-ai/use-policy), [Terms of Service](https://policies.google.com/terms), and learn how to configure Gemini Code Assist in GitHub [here](https://developers.google.com/gemini-code-assist/docs/customize-gemini-behavior-github). Gemini can make mistakes, so double check it and [use code with caution](https://support.google.com/legal/answer/13505487).
+
+--
+author:	gemini-code-assist
+association:	contributor
+edited:	false
+status:	commented
+--
+## Code Review
+
+This pull request introduces the `/mds` command for browsing memory and agent files, and a model cycling feature with favorites. Critical command injection vulnerabilities have been identified in the `MdsBrowser` component, stemming from the use of `child_process.exec` with unsanitized file paths and `child_process.spawnSync` with `shell: true` on Windows. These issues highlight the importance of treating user-provided data as untrusted and applying proper validation and sanitization, as per repository guidelines. This could lead to remote code execution if an attacker influences the CLI configuration. Additionally, a minor bug exists in the `ModelDialog` where the favorite-toggling shortcut is case-sensitive. Please address these security and functional issues.
+--

@@ -7,7 +7,7 @@
 import type React from 'react';
 import { useState, useMemo, useCallback } from 'react';
 import { Box, Text, useStdin } from 'ink';
-import { spawnSync, exec } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { dirname } from 'node:path';
 import { Colors } from '../colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -98,7 +98,6 @@ export const MdsBrowser: React.FC<MdsBrowserProps> = ({ config, onClose }) => {
         setRawMode?.(false);
         const { status, error } = spawnSync(command, args, {
           stdio: 'inherit',
-          shell: process.platform === 'win32',
         });
         if (error) throw error;
         if (typeof status === 'number' && status !== 0 && status !== null) {
@@ -119,23 +118,26 @@ export const MdsBrowser: React.FC<MdsBrowserProps> = ({ config, onClose }) => {
 
   const openFolder = useCallback((filePath: string) => {
     const folderPath = dirname(filePath);
-    let cmd = '';
+    let command = '';
+    const args = [folderPath];
+
     if (process.platform === 'win32') {
-      cmd = `start "" "${folderPath}"`;
+      command = 'explorer';
     } else if (process.platform === 'darwin') {
-      cmd = `open "${folderPath}"`;
+      command = 'open';
     } else {
-      cmd = `xdg-open "${folderPath}"`;
+      command = 'xdg-open';
     }
-    exec(cmd, (error) => {
-      if (error) {
-        coreEvents.emitFeedback(
-          'error',
-          '[MdsBrowser] error opening folder',
-          error,
-        );
-      }
-    });
+
+    try {
+      spawnSync(command, args, { stdio: 'ignore' });
+    } catch (error) {
+      coreEvents.emitFeedback(
+        'error',
+        '[MdsBrowser] error opening folder',
+        error,
+      );
+    }
   }, []);
 
   useKeypress(

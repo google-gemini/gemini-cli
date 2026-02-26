@@ -206,7 +206,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         setPersistMode((prev) => !prev);
         return true;
       }
-      if (key.sequence === 'f') {
+      if (key.sequence.toLowerCase() === 'f') {
         handleToggleFavorite();
         return true;
       }
