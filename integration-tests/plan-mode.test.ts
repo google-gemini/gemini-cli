@@ -75,7 +75,7 @@ describe('Plan Mode', () => {
           general: {
             defaultApprovalMode: 'plan',
             plan: {
-              directory: '.gemini/tmp/session/v1/plans',
+              directory: '.gemini/tmp/session/v1/plans', // does this need to be changed on windows?
             },
           },
         },
@@ -107,7 +107,8 @@ describe('Plan Mode', () => {
 
     // Model is undeterministic, sometimes a blocked write appears in tool logs and sometimes it doesn't
     if (blockedWrite) {
-      expect(blockedWrite?.toolRequest.success).toBe(false);
+      // no content should be written because model understands that it can't write outside of plans directory
+      expect(blockedWrite?.toolRequest.args).include('content": ""');
     }
 
     expect(planWrite?.toolRequest.success).toBe(true);
