@@ -4,15 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  addMemory,
-  listMemoryFiles,
-  refreshMemory,
-  showMemory,
-} from '@google/gemini-cli-core';
+import { addMemory, refreshMemory, showMemory } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
 import type { SlashCommand, SlashCommandActionReturn } from './types.js';
 import { CommandKind } from './types.js';
+import React from 'react';
+import { MemoryList } from '../components/MemoryList.js';
 
 export const memoryCommand: SlashCommand = {
   name: 'memory',
@@ -107,18 +104,17 @@ export const memoryCommand: SlashCommand = {
       description: 'Lists the paths of the GEMINI.md files in use',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
-      action: async (context) => {
+      action: async (context): Promise<SlashCommandActionReturn | void> => {
         const config = context.services.config;
         if (!config) return;
-        const result = listMemoryFiles(config);
 
-        context.ui.addItem(
-          {
-            type: MessageType.INFO,
-            text: result.content,
-          },
-          Date.now(),
-        );
+        return {
+          type: 'custom_dialog',
+          component: React.createElement(MemoryList, {
+            filePaths: config.getGeminiMdFilePaths() || [],
+            onClose: () => context.ui.removeComponent(),
+          }),
+        };
       },
     },
   ],
