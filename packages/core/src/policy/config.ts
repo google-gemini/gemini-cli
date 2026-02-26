@@ -39,15 +39,15 @@ export const DEFAULT_CORE_POLICIES_DIR = path.join(__dirname, 'policies');
 
 // Policy tier constants for priority calculation
 export const DEFAULT_POLICY_TIER = 1;
-export const WORKSPACE_POLICY_TIER = 2;
-export const USER_POLICY_TIER = 3;
-export const EXTENSION_POLICY_TIER = WORKSPACE_POLICY_TIER;
-export const ADMIN_POLICY_TIER = 4;
+export const EXTENSION_POLICY_TIER = 2;
+export const WORKSPACE_POLICY_TIER = 3;
+export const USER_POLICY_TIER = 4;
+export const ADMIN_POLICY_TIER = 5;
 
 // Specific priority offsets and derived priorities for dynamic/settings rules.
 // These are added to the tier base (e.g., USER_POLICY_TIER).
 
-// Workspace tier (2) + high priority (950/1000) = ALWAYS_ALLOW_PRIORITY
+// Workspace tier (3) + high priority (950/1000) = ALWAYS_ALLOW_PRIORITY
 // This ensures user "always allow" selections are high priority
 // within the workspace tier but still lose to user/admin policies.
 export const ALWAYS_ALLOW_PRIORITY = WORKSPACE_POLICY_TIER + 0.95;
@@ -60,7 +60,9 @@ export const ALLOWED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.1;
 
 /**
  * Gets the list of directories to search for policy files, in order of increasing priority
- * (Default -> User -> Project -> Admin).
+ * (Default -> Extension -> Workspace -> User -> Admin).
+ *
+ * Note: Extension policies are loaded separately by the extension manager.
  *
  * @param defaultPoliciesDir Optional path to a directory containing default policies.
  * @param policyPaths Optional user-provided policy paths (from --policy flag).
@@ -96,7 +98,7 @@ export function getPolicyDirectories(
 }
 
 /**
- * Determines the policy tier (1=default, 2=user, 3=workspace, 4=admin) for a given directory.
+ * Determines the policy tier (1=default, 2=extension, 3=workspace, 4=user, 5=admin) for a given directory.
  * This is used by the TOML loader to assign priority bands.
  */
 export function getPolicyTier(
@@ -241,11 +243,12 @@ export async function createPolicyEngineConfig(
   //
   // Priority bands (tiers):
   // - Default policies (TOML): 1 + priority/1000 (e.g., priority 100 → 1.100)
-  // - Workspace policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
-  // - User policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
-  // - Admin policies (TOML): 4 + priority/1000 (e.g., priority 100 → 4.100)
+  // - Extension policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
+  // - Workspace policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
+  // - User policies (TOML): 4 + priority/1000 (e.g., priority 100 → 4.100)
+  // - Admin policies (TOML): 5 + priority/1000 (e.g., priority 100 → 5.100)
   //
-  // This ensures Admin > User > Workspace > Default hierarchy is always preserved,
+  // This ensures Admin > User > Workspace > Extension > Default hierarchy is always preserved,
   // while allowing user-specified priorities to work within each tier.
   //
   // Settings-based and dynamic rules (mixed tiers):
@@ -255,7 +258,7 @@ export async function createPolicyEngineConfig(
   //   TRUSTED_MCP_SERVER_PRIORITY:  MCP servers with trust=true (persistent trusted servers)
   //   ALLOWED_MCP_SERVER_PRIORITY:  MCP servers allowed list (persistent general server allows)
   //   ALWAYS_ALLOW_PRIORITY:        Tools that the user has selected as "Always Allow" in the interactive UI
-  //                                 (Workspace tier 2.x - scoped to the project)
+  //                                 (Workspace tier 3.x - scoped to the project)
   //
   // TOML policy priorities (before transformation):
   //   10: Write tools default to ASK_USER (becomes 1.010 in default tier)
