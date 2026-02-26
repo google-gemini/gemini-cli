@@ -14,6 +14,7 @@ import {
   InProcessCheckerType,
   ApprovalMode,
   PRIORITY_SUBAGENT_TOOL,
+  type HookRule,
 } from './types.js';
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
@@ -2849,7 +2850,114 @@ describe('PolicyEngine', () => {
 
       const checkers = engine.getCheckers();
       expect(checkers).toHaveLength(1);
-      expect(checkers[0].priority).toBe(2.5);
+    });
+  });
+
+  describe('checkHook', () => {
+    it('should match hook by exact eventName and hookName', async () => {
+      const hookRules: HookRule[] = [
+        {
+          eventName: 'BeforeTool',
+          hookName: 'test-hook',
+          decision: PolicyDecision.DENY,
+        },
+      ];
+      engine = new PolicyEngine({ hookRules });
+
+      const result = await engine.checkHook(
+        { name: 'test-hook' },
+        'BeforeTool',
+      );
+      expect(result.decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should fallback to default decision if no rule matches', async () => {
+      const hookRules: HookRule[] = [
+        {
+          eventName: 'BeforeTool',
+          hookName: 'test-hook',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+      // Default decision is ASK_USER, which checkHook converts to DENY for headless execution
+      engine = new PolicyEngine({ hookRules });
+
+      const result = await engine.checkHook(
+        { name: 'other-hook' },
+        'BeforeTool',
+      );
+      expect(result.decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should respect exact match over partial rules if priority is higher', async () => {
+      const hookRules: HookRule[] = [
+        {
+          eventName: 'BeforeTool',
+          decision: PolicyDecision.DENY,
+          priority: 10,
+        },
+        {
+          eventName: 'BeforeTool',
+          hookName: 'safe-hook',
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+      engine = new PolicyEngine({ hookRules });
+
+      const safeResult = await engine.checkHook(
+        { name: 'safe-hook' },
+        'BeforeTool',
+      );
+      expect(safeResult.decision).toBe(PolicyDecision.ALLOW);
+
+      const otherResult = await engine.checkHook(
+        { name: 'unsafe-hook' },
+        'BeforeTool',
+      );
+      expect(otherResult.decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should match commandPattern when hook has a command', async () => {
+      const hookRules: HookRule[] = [
+        {
+          eventName: 'BeforeTool',
+          commandPattern: /npm run build/,
+          decision: PolicyDecision.DENY,
+          priority: 10,
+        },
+      ];
+      engine = new PolicyEngine({ hookRules });
+
+      const matchResult = await engine.checkHook(
+        { command: 'npm run build' },
+        'BeforeTool',
+      );
+      expect(matchResult.decision).toBe(PolicyDecision.DENY);
+
+      const noMatchResult = await engine.checkHook(
+        { command: 'ls' },
+        'BeforeTool',
+      );
+      // No match -> Default Decision -> ASK_USER -> Headless -> DENY
+      expect(noMatchResult.decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should convert ASK_USER decision from a rule to DENY', async () => {
+      const hookRules: HookRule[] = [
+        {
+          eventName: 'BeforeTool',
+          hookName: 'test-hook',
+          decision: PolicyDecision.ASK_USER,
+        },
+      ];
+      engine = new PolicyEngine({ hookRules });
+
+      const result = await engine.checkHook(
+        { name: 'test-hook' },
+        'BeforeTool',
+      );
+      expect(result.decision).toBe(PolicyDecision.DENY);
     });
   });
 

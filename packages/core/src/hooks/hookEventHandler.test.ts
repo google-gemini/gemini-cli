@@ -22,6 +22,7 @@ import type { HookPlanner } from './hookPlanner.js';
 import type { HookRunner } from './hookRunner.js';
 import type { HookAggregator } from './hookAggregator.js';
 
+
 // Mock debugLogger
 const mockDebugLogger = vi.hoisted(() => ({
   log: vi.fn(),
@@ -72,6 +73,9 @@ describe('HookEventHandler', () => {
             .fn()
             .mockReturnValue('/test/project/.gemini/tmp/chats/session.json'),
         }),
+      }),
+      getPolicyEngine: vi.fn().mockReturnValue({
+        checkHook: vi.fn().mockResolvedValue({ decision: 'allow' }),
       }),
     } as unknown as Config;
 

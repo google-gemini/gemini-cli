@@ -88,8 +88,21 @@ describe('HookSystem Integration', () => {
     });
 
     // Provide getMessageBus mock for MessageBus integration tests
-    (config as unknown as { getMessageBus: () => unknown }).getMessageBus =
-      () => undefined;
+    // Provide getMessageBus mock for MessageBus integration tests
+    (
+      config as unknown as {
+        getMessageBus: () => unknown;
+        getPolicyEngine: () => unknown;
+      }
+    ).getMessageBus = () => undefined;
+    (
+      config as unknown as {
+        getMessageBus: () => unknown;
+        getPolicyEngine: () => unknown;
+      }
+    ).getPolicyEngine = () => ({
+      checkHook: vi.fn().mockResolvedValue({ decision: 'allow' }),
+    });
 
     hookSystem = new HookSystem(config);
 
@@ -297,8 +310,19 @@ describe('HookSystem Integration', () => {
       });
 
       (
-        configWithDisabled as unknown as { getMessageBus: () => unknown }
+        configWithDisabled as unknown as {
+          getMessageBus: () => unknown;
+          getPolicyEngine: () => unknown;
+        }
       ).getMessageBus = () => undefined;
+      (
+        configWithDisabled as unknown as {
+          getMessageBus: () => unknown;
+          getPolicyEngine: () => unknown;
+        }
+      ).getPolicyEngine = () => ({
+        checkHook: vi.fn().mockResolvedValue({ decision: 'allow' }),
+      });
 
       const systemWithDisabled = new HookSystem(configWithDisabled);
       await systemWithDisabled.initialize();
@@ -362,8 +386,19 @@ describe('HookSystem Integration', () => {
       });
 
       (
-        configForDisabling as unknown as { getMessageBus: () => unknown }
+        configForDisabling as unknown as {
+          getMessageBus: () => unknown;
+          getPolicyEngine: () => unknown;
+        }
       ).getMessageBus = () => undefined;
+      (
+        configForDisabling as unknown as {
+          getMessageBus: () => unknown;
+          getPolicyEngine: () => unknown;
+        }
+      ).getPolicyEngine = () => ({
+        checkHook: vi.fn().mockResolvedValue({ decision: 'allow' }),
+      });
 
       const systemForDisabling = new HookSystem(configForDisabling);
       await systemForDisabling.initialize();
