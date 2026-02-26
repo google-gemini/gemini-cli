@@ -36,6 +36,7 @@ import {
   CoreToolCallStatus,
   buildUserSteeringHintPrompt,
   generateSteeringAckMessage,
+  getPlanModeExitMessage,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -88,7 +89,6 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
-import { getPlanModeExitMessage } from '@google/gemini-cli-core/src/utils/approvalModeUtils.js';
 
 type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;

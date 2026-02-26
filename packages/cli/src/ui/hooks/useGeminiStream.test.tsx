@@ -39,6 +39,7 @@ import {
   coreEvents,
   CoreEvent,
   MCPDiscoveryState,
+  getPlanModeExitMessage,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -47,7 +48,6 @@ import { MessageType, StreamingState } from '../types.js';
 
 import type { LoadedSettings } from '../../config/settings.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
-import { getPlanModeExitMessage } from '@google/gemini-cli-core/src/utils/approvalModeUtils.js';
 
 // --- MOCKS ---
 const mockSendMessageStream = vi
