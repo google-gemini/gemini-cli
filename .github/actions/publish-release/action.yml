@@ -191,7 +191,6 @@ runs:
         INPUTS_RELEASE_VERSION: '${{ inputs.release-version }}'
         INPUTS_CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
         INPUTS_A2A_PACKAGE_NAME: '${{ inputs.a2a-package-name }}'
-
     - name: 'Get CLI Token'
       uses: './.github/actions/npm-auth-token'
       id: 'cli-token'
