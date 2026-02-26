@@ -702,7 +702,6 @@ export const renderWithProviders = (
   // without replacing the entire config object and its other values.
   let finalConfig = config;
   if (useAlternateBuffer !== undefined) {
-     
     finalConfig = new Proxy(config, {
       get(target, prop, receiver) {
         if (prop === 'getUseAlternateBuffer') {
