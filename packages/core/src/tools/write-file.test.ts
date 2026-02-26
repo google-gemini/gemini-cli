@@ -310,6 +310,42 @@ describe('WriteFileTool', () => {
       };
       expect(() => tool.build(params)).toThrow(`Missing or empty "file_path"`);
     });
+
+    it('should throw an error if content includes an omission placeholder', () => {
+      const params = {
+        file_path: path.join(rootDir, 'placeholder.txt'),
+        content: '(rest of methods ...)',
+      };
+      expect(() => tool.build(params)).toThrow(
+        "`content` contains an omission placeholder (for example 'rest of methods ...'). Provide complete file content.",
+      );
+    });
+
+    it('should throw an error when multiline content includes omission placeholders', () => {
+      const params = {
+        file_path: path.join(rootDir, 'service.ts'),
+        content: `class Service {
+  execute() {
+    return "run";
+  }
+
+  // rest of methods ...
+}`,
+      };
+      expect(() => tool.build(params)).toThrow(
+        "`content` contains an omission placeholder (for example 'rest of methods ...'). Provide complete file content.",
+      );
+    });
+
+    it('should allow content with placeholder text in a normal string literal', () => {
+      const params = {
+        file_path: path.join(rootDir, 'valid-content.ts'),
+        content: 'const note = "(rest of methods ...)";',
+      };
+      const invocation = tool.build(params);
+      expect(invocation).toBeDefined();
+      expect(invocation.params).toEqual(params);
+    });
   });
 
   describe('getCorrectedFileContent', () => {

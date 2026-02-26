@@ -150,6 +150,7 @@ import { useSettings } from './contexts/SettingsContext.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useBanner } from './hooks/useBanner.js';
+import { useTerminalSetupPrompt } from './utils/terminalSetup.js';
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useBackgroundShellManager } from './hooks/useBackgroundShellManager.js';
 import {
@@ -605,6 +606,12 @@ export const AppContainer = (props: AppContainerProps) => {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     initializeFromLogger(logger);
   }, [logger, initializeFromLogger]);
+
+  // One-time prompt to suggest running /terminal-setup when it would help.
+  useTerminalSetupPrompt({
+    addConfirmUpdateExtensionRequest,
+    addItem: historyManager.addItem,
+  });
 
   const refreshStatic = useCallback(() => {
     if (!isAlternateBuffer) {
@@ -2547,6 +2554,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
         setNewAgents(null);
       },
+      getPreferredEditor,
     }),
     [
       handleThemeSelect,
@@ -2598,6 +2606,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       newAgents,
       config,
       historyManager,
+      getPreferredEditor,
     ],
   );
 
