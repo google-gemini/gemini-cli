@@ -147,12 +147,11 @@ function getTextWithNextGhostWord(
   ghostText: string,
 ): string | null {
   const strippedGhostText = stripUnsafeCharacters(ghostText);
-  const trimmedCurrentText = currentText.replace(/[^\S\r\n]+$/, '');
-  if (!strippedGhostText || !strippedGhostText.startsWith(trimmedCurrentText)) {
+  if (!strippedGhostText || !strippedGhostText.startsWith(currentText)) {
     return null;
   }
 
-  const suffix = strippedGhostText.slice(trimmedCurrentText.length);
+  const suffix = strippedGhostText.slice(currentText.length);
   if (!suffix) {
     return null;
   }
@@ -194,7 +193,7 @@ function getTextWithNextGhostWord(
   }
 
   const acceptedPart = suffixCp.slice(0, i).join('');
-  return `${trimmedCurrentText}${acceptedPart}`;
+  return `${currentText}${acceptedPart}`;
 }
 
 const DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS = 350;

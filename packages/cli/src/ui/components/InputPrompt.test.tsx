@@ -3243,7 +3243,7 @@ describe('InputPrompt', () => {
       unmount();
     });
 
-    it('accepts ghost text word-by-word when current text has trailing spaces', async () => {
+    it('does not accept ghost text word-by-word when current text has trailing spaces not present in ghost text', async () => {
       const mockMarkSelected = vi.fn();
       mockedUseCommandCompletion.mockReturnValue({
         ...mockCommandCompletion,
@@ -3273,10 +3273,10 @@ describe('InputPrompt', () => {
         stdin.write('\x1b[1;5C'); // Ctrl+Right
       });
 
-      await waitFor(() => {
-        expect(mockBuffer.setText).toHaveBeenCalledWith('build a ');
-        expect(mockMarkSelected).toHaveBeenCalledWith('build a ');
-      });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockBuffer.setText).not.toHaveBeenCalled();
+      expect(mockMarkSelected).not.toHaveBeenCalled();
       unmount();
     });
 
