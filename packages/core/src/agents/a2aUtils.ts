@@ -74,9 +74,12 @@ export class A2AResultReassembler {
             ]);
           }
         }
-        // History Fallback: If no message or artifacts were found yet,
-        // and the task is in a terminal state, look for the most recent
-        // agent message in the history.
+        // History Fallback: Some agent implementations do not populate the
+        // status.message in their final terminal response, instead archiving
+        // the final answer in the task's history array. To ensure we don't
+        // present an empty result, we fallback to the most recent agent message
+        // in the history only when the task is terminal and no other content
+        // (message log or artifacts) has been reassembled.
         if (
           isTerminalState(chunk.status?.state) &&
           this.messageLog.length === 0 &&
