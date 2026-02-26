@@ -13,14 +13,24 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
+import * as fs from 'node:fs/promises';
 import {
   ExtensionRegistryClient,
   type RegistryExtension,
 } from './extensionRegistryClient.js';
 import { fetchWithTimeout } from '@google/gemini-cli-core';
 
-vi.mock('@google/gemini-cli-core', () => ({
-  fetchWithTimeout: vi.fn(),
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    fetchWithTimeout: vi.fn(),
+  };
+});
+
+vi.mock('node:fs/promises', () => ({
+  readFile: vi.fn(),
 }));
 
 const mockExtensions: RegistryExtension[] = [
@@ -278,5 +288,31 @@ describe('ExtensionRegistryClient', () => {
 
     expect(ids).not.toContain('dataplex');
     expect(ids).toContain('conductor');
+  });
+
+  it('should fetch extensions from a local file path', async () => {
+    const filePath = '/path/to/extensions.json';
+    const clientWithFile = new ExtensionRegistryClient(filePath);
+    const mockReadFile = vi.mocked(fs.readFile);
+    mockReadFile.mockResolvedValue(JSON.stringify(mockExtensions));
+
+    const result = await clientWithFile.getExtensions();
+    expect(result.extensions).toHaveLength(3);
+    expect(mockReadFile).toHaveBeenCalledWith(filePath, 'utf-8');
+  });
+
+  it('should fetch extensions from a file:// URL', async () => {
+    const fileUrl = 'file:///path/to/extensions.json';
+    const clientWithFileUrl = new ExtensionRegistryClient(fileUrl);
+    const mockReadFile = vi.mocked(fs.readFile);
+    mockReadFile.mockResolvedValue(JSON.stringify(mockExtensions));
+
+    const result = await clientWithFileUrl.getExtensions();
+    expect(result.extensions).toHaveLength(3);
+    // On Unix, file:///path/to/extensions.json -> /path/to/extensions.json
+    expect(mockReadFile).toHaveBeenCalledWith(
+      '/path/to/extensions.json',
+      'utf-8',
+    );
   });
 });

@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { fetchWithTimeout } from '@google/gemini-cli-core';
+import * as fs from 'node:fs/promises';
+import { fetchWithTimeout, resolveToRealPath } from '@google/gemini-cli-core';
 import { AsyncFzf } from 'fzf';
 
 export interface RegistryExtension {
@@ -29,11 +30,18 @@ export interface RegistryExtension {
 }
 
 export class ExtensionRegistryClient {
-  private static readonly REGISTRY_URL =
+  static readonly DEFAULT_REGISTRY_URL =
     'https://geminicli.com/extensions.json';
   private static readonly FETCH_TIMEOUT_MS = 10000; // 10 seconds
 
   private static fetchPromise: Promise<RegistryExtension[]> | null = null;
+
+  private readonly registryURI: string;
+
+  constructor(registryURI?: string) {
+    this.registryURI =
+      registryURI || ExtensionRegistryClient.DEFAULT_REGISTRY_URL;
+  }
 
   /** @internal */
   static resetCache() {
@@ -97,18 +105,29 @@ export class ExtensionRegistryClient {
       return ExtensionRegistryClient.fetchPromise;
     }
 
+    const uri = this.registryURI;
     ExtensionRegistryClient.fetchPromise = (async () => {
       try {
-        const response = await fetchWithTimeout(
-          ExtensionRegistryClient.REGISTRY_URL,
-          ExtensionRegistryClient.FETCH_TIMEOUT_MS,
-        );
-        if (!response.ok) {
-          throw new Error(`Failed to fetch extensions: ${response.statusText}`);
-        }
+        if (uri.startsWith('http')) {
+          const response = await fetchWithTimeout(
+            uri,
+            ExtensionRegistryClient.FETCH_TIMEOUT_MS,
+          );
+          if (!response.ok) {
+            throw new Error(
+              `Failed to fetch extensions: ${response.statusText}`,
+            );
+          }
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        return (await response.json()) as RegistryExtension[];
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          return (await response.json()) as RegistryExtension[];
+        } else {
+          // Handle local file path
+          const filePath = resolveToRealPath(uri);
+          const content = await fs.readFile(filePath, 'utf-8');
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          return JSON.parse(content) as RegistryExtension[];
+        }
       } catch (error) {
         ExtensionRegistryClient.fetchPromise = null;
         throw error;
