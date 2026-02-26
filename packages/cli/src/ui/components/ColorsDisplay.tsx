@@ -134,35 +134,33 @@ export const ColorsDisplay: React.FC = () => {
         <Text bold color={theme.text.accent}>
           /colors - Theme Colors Demo
         </Text>
-        <Text color={theme.text.secondary}>
+        <Text color={theme.text.primary}>
           The purpose of this feature is to visualize how colors are used in the
           app, test across a variety of Terminals (Mac Terminal, Ghostty,
           iTerm2, VSCode, etc), and see how the colors change across different
           themes.
         </Text>
         <Box marginTop={1} flexDirection="column">
-          <Text color={theme.text.secondary}>
-            <Text bold color={theme.text.primary}>
-              How themes and terminals interact:
-            </Text>
+          <Text color={theme.text.primary}>
+            <Text bold>How themes and terminals interact:</Text>
           </Text>
           <Box marginLeft={2} flexDirection="column">
-            <Text color={theme.text.secondary}>
+            <Text color={theme.text.primary}>
               • <Text bold>TrueColor (Hex):</Text> Modern terminals (iTerm2,
               Ghostty, VSCode) render hex codes exactly. They are{' '}
               <Text italic>not</Text> overridden by terminal app themes.
             </Text>
-            <Text color={theme.text.secondary}>
+            <Text color={theme.text.primary}>
               • <Text bold>ANSI Names:</Text> Colors like &apos;red&apos; or
               &apos;green&apos; (used in our ANSI theme) <Text italic>are</Text>{' '}
               mapped to your terminal app&apos;s specific palette.
             </Text>
-            <Text color={theme.text.secondary}>
+            <Text color={theme.text.primary}>
               • <Text bold>Default colors:</Text> When Name or Value is
               &apos;(blank)&apos;, the app uses your terminal&apos;s default
               foreground/background.
             </Text>
-            <Text color={theme.text.secondary}>
+            <Text color={theme.text.primary}>
               • <Text bold>Compatibility:</Text> In terminals with limited color
               (like older Mac Terminals), hex colors are automatically
               approximated to the closest available ANSI color.
@@ -170,9 +168,9 @@ export const ColorsDisplay: React.FC = () => {
           </Box>
         </Box>
         <Box marginTop={1}>
-          <Text color={theme.text.secondary}>
+          <Text color={theme.text.primary}>
             Active Theme:{' '}
-            <Text color={theme.text.primary} bold>
+            <Text color={theme.text.accent} bold>
               {activeTheme.name}
             </Text>{' '}
             ({activeTheme.type})
