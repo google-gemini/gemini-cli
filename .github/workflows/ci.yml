@@ -37,7 +37,7 @@ jobs:
     permissions: 'read-all'
     name: 'Merge Queue Skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    if: github.repository == 'google-gemini/gemini-cli'
+    if: "github.repository == 'google-gemini/gemini-cli'"
     outputs:
       skip: '${{ steps.merge-queue-ci-skipper.outputs.skip-check }}'
     steps:
@@ -117,7 +117,7 @@ jobs:
   link_checker:
     name: 'Link Checker'
     runs-on: 'ubuntu-latest'
-    if: github.repository == 'google-gemini/gemini-cli'
+    if: "github.repository == 'google-gemini/gemini-cli'"
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5

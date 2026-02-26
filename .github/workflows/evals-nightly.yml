@@ -23,7 +23,7 @@ jobs:
   evals:
     name: 'Evals (USUALLY_PASSING) nightly run'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    if: github.repository == 'google-gemini/gemini-cli'
+    if: "github.repository == 'google-gemini/gemini-cli'"
     strategy:
       fail-fast: false
       matrix:

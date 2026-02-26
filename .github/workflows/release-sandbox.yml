@@ -16,7 +16,7 @@ on:
 
 jobs:
   build:
-    if: github.repository == 'google-gemini/gemini-cli'
+    if: "github.repository == 'google-gemini/gemini-cli'"
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'read'

@@ -31,7 +31,7 @@ jobs:
     name: 'Merge Queue Skipper'
     permissions: 'read-all'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    if: github.repository == 'google-gemini/gemini-cli'
+    if: "github.repository == 'google-gemini/gemini-cli'"
     outputs:
       skip: '${{ steps.merge-queue-e2e-skipper.outputs.skip-check }}'
     steps:
