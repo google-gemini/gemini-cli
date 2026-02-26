@@ -2932,7 +2932,8 @@ describe('Plans Directory Initialization', () => {
     vi.mocked(fs.promises.mkdir).mockRestore();
   });
 
-  it('should create plans directory and add it to workspace context when plan is enabled', async () => {
+  it('should add plans directory to workspace context if it exists', async () => {
+    vi.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
     const config = new Config({
       ...baseParams,
       plan: true,
@@ -2941,12 +2942,30 @@ describe('Plans Directory Initialization', () => {
     await config.initialize();
 
     const plansDir = config.storage.getPlansDir();
-    expect(fs.promises.mkdir).toHaveBeenCalledWith(plansDir, {
-      recursive: true,
-    });
+    // Should NOT create the directory eagerly
+    expect(fs.promises.mkdir).not.toHaveBeenCalled();
+    // Should check if it exists
+    expect(fs.promises.access).toHaveBeenCalledWith(plansDir);
 
     const context = config.getWorkspaceContext();
     expect(context.getDirectories()).toContain(plansDir);
+  });
+
+  it('should NOT add plans directory to workspace context if it does not exist', async () => {
+    vi.spyOn(fs.promises, 'access').mockRejectedValue({ code: 'ENOENT' });
+    const config = new Config({
+      ...baseParams,
+      plan: true,
+    });
+
+    await config.initialize();
+
+    const plansDir = config.storage.getPlansDir();
+    expect(fs.promises.mkdir).not.toHaveBeenCalled();
+    expect(fs.promises.access).toHaveBeenCalledWith(plansDir);
+
+    const context = config.getWorkspaceContext();
+    expect(context.getDirectories()).not.toContain(plansDir);
   });
 
   it('should NOT create plans directory or add it to workspace context when plan is disabled', async () => {

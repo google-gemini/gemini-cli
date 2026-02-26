@@ -50,6 +50,7 @@ import {
   type MergedSettings,
   saveModelChange,
   loadSettings,
+  getDefaultsFromSchema,
 } from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -843,9 +844,14 @@ export async function loadCliConfig(
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
     directWebFetch: settings.experimental?.directWebFetch,
-    planSettings: settings.general?.plan?.directory
-      ? settings.general.plan
-      : (extensionPlanSettings ?? settings.general?.plan),
+    planSettings: {
+      ...(getDefaultsFromSchema().general?.plan ?? {}),
+      ...(extensionPlanSettings ?? {}),
+      ...(loadedSettings?.systemDefaults?.settings?.general?.plan ?? {}),
+      ...(loadedSettings?.user?.settings?.general?.plan ?? {}),
+      ...(loadedSettings?.workspace?.settings?.general?.plan ?? {}),
+      ...(loadedSettings?.system?.settings?.general?.plan ?? {}),
+    },
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
