@@ -127,7 +127,7 @@ export class SchedulerStateManager {
   updateStatus(
     callId: string,
     status: CoreToolCallStatus.Cancelled,
-    data: string,
+    data: string | ToolCallResponseInfo,
   ): void;
   updateStatus(
     callId: string,
@@ -277,9 +277,12 @@ export class SchedulerStateManager {
       case CoreToolCallStatus.Scheduled:
         return this.toScheduled(call);
       case CoreToolCallStatus.Cancelled: {
-        if (typeof auxiliaryData !== 'string') {
+        if (
+          typeof auxiliaryData !== 'string' &&
+          !this.isToolCallResponseInfo(auxiliaryData)
+        ) {
           throw new Error(
-            `Invalid reason (string) for 'cancelled' transition (callId: ${call.request.callId})`,
+            `Invalid reason (string) or response for 'cancelled' transition (callId: ${call.request.callId})`,
           );
         }
         return this.toCancelled(call, auxiliaryData);
@@ -438,7 +441,10 @@ export class SchedulerStateManager {
     };
   }
 
-  private toCancelled(call: ToolCall, reason: string): CancelledToolCall {
+  private toCancelled(
+    call: ToolCall,
+    reason: string | ToolCallResponseInfo,
+  ): CancelledToolCall {
     this.validateHasToolAndInvocation(call, CoreToolCallStatus.Cancelled);
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
@@ -463,6 +469,20 @@ export class SchedulerStateManager {
           newContent: details.newContent,
         };
       }
+    }
+
+    if (this.isToolCallResponseInfo(reason)) {
+      return {
+        request: call.request,
+        tool: call.tool,
+        invocation: call.invocation,
+        status: CoreToolCallStatus.Cancelled,
+        response: reason,
+        durationMs: startTime ? Date.now() - startTime : undefined,
+        outcome: call.outcome,
+        schedulerId: call.schedulerId,
+        approvalMode: call.approvalMode,
+      };
     }
 
     const errorMessage = `[Operation Cancelled] Reason: ${reason}`;

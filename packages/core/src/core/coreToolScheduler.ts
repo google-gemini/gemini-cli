@@ -224,32 +224,36 @@ export class CoreToolScheduler {
           const durationMs = existingStartTime
             ? Date.now() - existingStartTime
             : undefined;
-          return {
-            request: currentCall.request,
-            tool: toolInstance,
-            invocation,
-            status: CoreToolCallStatus.Success,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            response: auxiliaryData as ToolCallResponseInfo,
-            durationMs,
-            outcome,
-            approvalMode,
-          } as SuccessfulToolCall;
+          if (this.isToolCallResponseInfo(auxiliaryData)) {
+            return {
+              request: currentCall.request,
+              tool: toolInstance,
+              invocation,
+              status: CoreToolCallStatus.Success,
+              response: auxiliaryData,
+              durationMs,
+              outcome,
+              approvalMode,
+            } as SuccessfulToolCall;
+          }
+          throw new Error('Invalid response data for tool success');
         }
         case CoreToolCallStatus.Error: {
           const durationMs = existingStartTime
             ? Date.now() - existingStartTime
             : undefined;
-          return {
-            request: currentCall.request,
-            status: CoreToolCallStatus.Error,
-            tool: toolInstance,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            response: auxiliaryData as ToolCallResponseInfo,
-            durationMs,
-            outcome,
-            approvalMode,
-          } as ErroredToolCall;
+          if (this.isToolCallResponseInfo(auxiliaryData)) {
+            return {
+              request: currentCall.request,
+              status: CoreToolCallStatus.Error,
+              tool: toolInstance,
+              response: auxiliaryData,
+              durationMs,
+              outcome,
+              approvalMode,
+            } as ErroredToolCall;
+          }
+          throw new Error('Invalid response data for tool error');
         }
         case CoreToolCallStatus.AwaitingApproval:
           return {
@@ -278,6 +282,19 @@ export class CoreToolScheduler {
           const durationMs = existingStartTime
             ? Date.now() - existingStartTime
             : undefined;
+
+          if (this.isToolCallResponseInfo(auxiliaryData)) {
+            return {
+              request: currentCall.request,
+              tool: toolInstance,
+              invocation,
+              status: CoreToolCallStatus.Cancelled,
+              response: auxiliaryData,
+              durationMs,
+              outcome,
+              approvalMode,
+            } as CancelledToolCall;
+          }
 
           // Preserve diff for cancelled edit operations
           let resultDisplay: ToolResultDisplay | undefined = undefined;
@@ -1085,5 +1102,14 @@ export class CoreToolScheduler {
         outcome,
       };
     });
+  }
+
+  private isToolCallResponseInfo(data: unknown): data is ToolCallResponseInfo {
+    return (
+      typeof data === 'object' &&
+      data !== null &&
+      'callId' in data &&
+      'responseParts' in data
+    );
   }
 }

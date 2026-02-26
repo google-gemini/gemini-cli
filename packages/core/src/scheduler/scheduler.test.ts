@@ -911,7 +911,7 @@ describe('Scheduler (Orchestrator)', () => {
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
         CoreToolCallStatus.Cancelled,
-        'Operation cancelled',
+        { callId: 'call-1', responseParts: [] },
       );
     });
 

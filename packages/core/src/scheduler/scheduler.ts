@@ -652,7 +652,7 @@ export class Scheduler {
       this.state.updateStatus(
         callId,
         CoreToolCallStatus.Cancelled,
-        'Operation cancelled',
+        result.response,
       );
     } else {
       this.state.updateStatus(

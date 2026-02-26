@@ -120,6 +120,7 @@ export class ToolExecutor {
             return this.createCancelledResult(
               call,
               'User cancelled tool execution.',
+              toolResult,
             );
           } else if (toolResult.error === undefined) {
             return await this.createSuccessResult(call, toolResult);
@@ -160,6 +161,7 @@ export class ToolExecutor {
   private createCancelledResult(
     call: ToolCall,
     reason: string,
+    toolResult?: ToolResult,
   ): CancelledToolCall {
     const errorMessage = `[Operation Cancelled] ${reason}`;
     const startTime = 'startTime' in call ? call.startTime : undefined;
@@ -169,6 +171,10 @@ export class ToolExecutor {
       // it safely
       throw new Error('Cancelled tool call missing tool/invocation references');
     }
+
+    const responseBody = toolResult?.llmContent
+      ? { error: errorMessage, output: toolResult.llmContent }
+      : { error: errorMessage };
 
     return {
       status: CoreToolCallStatus.Cancelled,
@@ -180,14 +186,17 @@ export class ToolExecutor {
             functionResponse: {
               id: call.request.callId,
               name: call.request.name,
-              response: { error: errorMessage },
+              response: responseBody,
             },
           },
         ],
-        resultDisplay: undefined,
+        resultDisplay:
+          typeof toolResult?.returnDisplay === 'string'
+            ? toolResult.returnDisplay
+            : undefined,
         error: undefined,
         errorType: undefined,
-        contentLength: errorMessage.length,
+        contentLength: JSON.stringify(responseBody).length,
       },
       tool: call.tool,
       invocation: call.invocation,

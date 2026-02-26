@@ -292,4 +292,55 @@ describe('ToolExecutor', () => {
       }),
     );
   });
+
+  it('should return cancelled result with partial output when signal is aborted', async () => {
+    const mockTool = new MockTool({
+      name: 'slowTool',
+    });
+    const invocation = mockTool.build({});
+
+    const partialOutput = 'Some partial output before cancellation';
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockImplementation(
+      async () => ({
+        llmContent: partialOutput,
+        returnDisplay: `[Cancelled] ${partialOutput}`,
+      }),
+    );
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-cancel-partial',
+        name: 'slowTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-cancel',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: controller.signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(result.status).toBe(CoreToolCallStatus.Cancelled);
+    if (result.status === CoreToolCallStatus.Cancelled) {
+      const response = result.response.responseParts[0]?.functionResponse
+        ?.response as Record<string, unknown>;
+      expect(response).toEqual({
+        error: '[Operation Cancelled] User cancelled tool execution.',
+        output: partialOutput,
+      });
+      expect(result.response.resultDisplay).toBe(
+        `[Cancelled] ${partialOutput}`,
+      );
+    }
+  });
 });
