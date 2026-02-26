@@ -55,14 +55,7 @@ export function useQuotaAndFallback({
       fallbackModel,
       error,
     ): Promise<FallbackIntent | null> => {
-      // Fallbacks are currently only handled for OAuth users.
       const contentGeneratorConfig = config.getContentGeneratorConfig();
-      if (
-        !contentGeneratorConfig ||
-        contentGeneratorConfig.authType !== AuthType.LOGIN_WITH_GOOGLE
-      ) {
-        return null;
-      }
 
       let message: string;
       let isTerminalQuotaError = false;
@@ -78,7 +71,9 @@ export function useQuotaAndFallback({
           error.retryDelayMs ? getResetTimeMessage(error.retryDelayMs) : null,
           `/stats model for usage details`,
           `/model to switch models.`,
-          `/auth to switch to API key.`,
+          contentGeneratorConfig?.authType === AuthType.LOGIN_WITH_GOOGLE
+            ? `/auth to switch to API key.`
+            : null,
         ].filter(Boolean);
         message = messageLines.join('\n');
       } else if (error instanceof ModelNotFoundError) {
@@ -122,6 +117,7 @@ export function useQuotaAndFallback({
             message,
             isTerminalQuotaError,
             isModelNotFoundError,
+            authType: contentGeneratorConfig?.authType,
           });
         },
       );

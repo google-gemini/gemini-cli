@@ -135,6 +135,7 @@ export const DialogManager = ({
         isModelNotFoundError={
           !!uiState.quota.proQuotaRequest.isModelNotFoundError
         }
+        authType={uiState.quota.proQuotaRequest.authType}
         onChoice={uiActions.handleProQuotaChoice}
       />
     );
