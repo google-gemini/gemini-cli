@@ -1856,13 +1856,16 @@ describe('Generation Config Merging (HACK)', () => {
       }
     ).config;
 
-    // Assert that the user's aliases are present
-    expect(serviceConfig.aliases).toEqual(userAliases);
+    // Assert that the user's aliases are deep-merged with defaults
+    expect(serviceConfig.aliases).toEqual({
+      ...DEFAULT_MODEL_CONFIGS.aliases,
+      ...userAliases,
+    });
     // Assert that the default overrides are present
     expect(serviceConfig.overrides).toEqual(DEFAULT_MODEL_CONFIGS.overrides);
   });
 
-  it('should use user-provided aliases if they exist', () => {
+  it('should include user-provided aliases merged with defaults', () => {
     const userAliases = {
       'my-alias': {
         modelConfig: { model: 'my-model' },
@@ -1883,8 +1886,12 @@ describe('Generation Config Merging (HACK)', () => {
       }
     ).config;
 
-    // Assert that the user's aliases are used, not the defaults
-    expect(serviceConfig.aliases).toEqual(userAliases);
+    // Assert that the user's aliases are present alongside defaults
+    expect(serviceConfig.aliases!['my-alias']).toEqual(userAliases['my-alias']);
+    // Assert that default aliases are also preserved
+    expect(serviceConfig.aliases!['base']).toEqual(
+      DEFAULT_MODEL_CONFIGS.aliases!['base'],
+    );
   });
 
   it('should use default generation config if none is provided', () => {
