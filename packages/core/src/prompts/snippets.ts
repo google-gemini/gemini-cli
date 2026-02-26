@@ -458,7 +458,6 @@ export function renderPlanningWorkflow(
   options?: PlanningWorkflowOptions,
 ): string {
   if (!options) return '';
-
   return `
 # Active Approval Mode: Plan
 
@@ -481,24 +480,25 @@ ${options.planModeToolsList}
 6. **Direct Modification:** If asked to modify code, explain you are in Plan Mode and use ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} to request approval.
 
 ## Planning Workflow
-The depth and structure of your implementation plan MUST be proportional to the task's complexity.
+Plan Mode uses an adaptive planning workflow where the research depth, plan structure, and consultation level are proportional to the task's complexity.
 
-### 1. Assessment & Discovery
+### 1. Explore & Analyze
 Analyze requirements and use search/read tools to explore the codebase. Systematically map affected modules, trace data flow, and identify dependencies.
 
-### 2. Consultation (for non-trivial changes)
-If design decisions are required or multiple viable implementation approaches exist, present a concise summary of the alternatives (including pros/cons and your recommendation) to the user via ${formatToolName(ASK_USER_TOOL_NAME)} and wait for their decision.
+### 2. Consult
+The depth of your consultation should be proportional to the task's complexity:
+- **Simple Tasks:** Skip consultation and proceed directly to drafting.
+- **Standard Tasks:** If multiple viable approaches exist, present a concise summary (including pros/cons and your recommendation) via ${formatToolName(ASK_USER_TOOL_NAME)} and wait for a decision.
+- **Complex Tasks:** You MUST present at least two viable approaches with detailed trade-offs via ${formatToolName(ASK_USER_TOOL_NAME)} and obtain approval before drafting the plan.
 
-### 3. Drafting the Plan
-Write the implementation plan to \`${options.plansDir}/\`. The plan should be detailed enough to serve as a roadmap for implementation.
-
-**Recommended Structure based on complexity:**
-- **Simple Tasks (e.g., single-file fixes, typos, small refactors):** Include a bulleted list of specific **Changes** and **Verification** steps.
-- **Standard Features/Refactors:** Include an **Objective**, a step-by-step **Implementation Plan**, and **Verification**.
-- **Complex/Architectural Changes:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.
+### 3. Draft
+Write the implementation plan to \`${options.plansDir}/\`. The plan's structure adapts to the task:
+- **Simple Tasks:** Include a bulleted list of specific **Changes** and **Verification** steps.
+- **Standard Tasks:** Include an **Objective**, **Key Files & Context**, **Implementation Steps**, and **Verification & Testing**.
+- **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.
 
 ### 4. Review & Approval
-Present a brief summary of your proposal and call ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} to request approval. If you discover the task is more complex than initially assessed during any phase, you MUST increase the depth of your planning and inform the user.
+Use the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to present the plan and formally request approval.
 
 ${renderApprovedPlanSection(options.approvedPlanPath)}`.trim();
 }
