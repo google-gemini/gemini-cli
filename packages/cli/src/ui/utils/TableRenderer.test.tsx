@@ -368,7 +368,7 @@ describe('TableRenderer', () => {
         terminalWidth={terminalWidth}
       />,
     );
-    const { lastFrame, waitUntilReady } = renderResult;
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
     await waitUntilReady();
 
     const output = lastFrame();
@@ -376,5 +376,6 @@ describe('TableRenderer', () => {
       expect(output).toContain(text);
     });
     await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
   });
 });
