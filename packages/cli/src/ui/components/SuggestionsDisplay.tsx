@@ -27,6 +27,7 @@ interface SuggestionsDisplayProps {
   userInput: string;
   mode: 'reverse' | 'slash';
   expandedIndex?: number;
+  showMentionShortcuts?: boolean;
 }
 
 export const MAX_SUGGESTIONS_TO_SHOW = 8;
@@ -41,6 +42,7 @@ export function SuggestionsDisplay({
   userInput,
   mode,
   expandedIndex,
+  showMentionShortcuts,
 }: SuggestionsDisplayProps) {
   if (isLoading) {
     return (
@@ -130,11 +132,21 @@ export function SuggestionsDisplay({
         );
       })}
       {endIndex < suggestions.length && <Text color="gray">▼</Text>}
-      {suggestions.length > MAX_SUGGESTIONS_TO_SHOW && (
-        <Text color="gray">
-          ({activeIndex + 1}/{suggestions.length})
-        </Text>
-      )}
+      <Box flexDirection="row" gap={1} width="100%">
+        {suggestions.length > MAX_SUGGESTIONS_TO_SHOW && (
+          <Text color="gray">
+            ({activeIndex + 1}/{suggestions.length})
+          </Text>
+        )}
+        {showMentionShortcuts ? (
+          <Text color="gray">
+            <Text color={theme.text.accent}>Ctrl+X</Text> open external editor ·{' '}
+            <Text color={theme.text.accent}>Alt+O</Text> open directory
+          </Text>
+        ) : (
+          <Box /> // placeholder for flex space-between
+        )}
+      </Box>
     </Box>
   );
 }

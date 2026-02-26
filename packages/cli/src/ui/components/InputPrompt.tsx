@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import clipboardy from 'clipboardy';
+import open from 'open';
 import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
@@ -913,6 +914,43 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
         }
 
+        if (
+          keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key) ||
+          keyMatchers[Command.OPEN_DIRECTORY](key)
+        ) {
+          if (completion.suggestions.length > 0) {
+            const targetIndex =
+              completion.activeSuggestionIndex === -1
+                ? 0 // Default to the first if none is active
+                : completion.activeSuggestionIndex;
+
+            if (targetIndex < completion.suggestions.length) {
+              const suggestion = completion.suggestions[targetIndex];
+              if (
+                completion.completionMode === CompletionMode.AT &&
+                !suggestion.commandKind
+              ) {
+                const absolutePath = path.resolve(
+                  config.getTargetDir(),
+                  suggestion.label,
+                );
+                if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
+                  open(absolutePath).catch((e: Error) => {
+                    setQueueErrorMessage(`Failed to open file: ${e.message}`);
+                  });
+                } else {
+                  open(path.dirname(absolutePath)).catch((e: Error) => {
+                    setQueueErrorMessage(
+                      `Failed to open directory: ${e.message}`,
+                    );
+                  });
+                }
+                return true;
+              }
+            }
+          }
+        }
+
         if (keyMatchers[Command.ACCEPT_SUGGESTION](key)) {
           if (completion.suggestions.length > 0) {
             const targetIndex =
@@ -1191,6 +1229,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       registerPlainTabPress,
       resetPlainTabPress,
       toggleCleanUiDetailsVisible,
+      config,
+      setQueueErrorMessage,
     ],
   );
 
@@ -1390,6 +1430,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               : 'reverse'
         }
         expandedIndex={expandedSuggestionIndex}
+        showMentionShortcuts={completion.completionMode === CompletionMode.AT}
       />
     </Box>
   ) : null;
