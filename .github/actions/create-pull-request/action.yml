@@ -39,10 +39,10 @@ runs:
       if: "inputs.dry-run != 'true'"
       env:
         GH_TOKEN: '${{ inputs.github-token }}'
-        INPUTS_BRANCH_NAME: ${{ inputs.branch-name }}
-        INPUTS_PR_TITLE: ${{ inputs.pr-title }}
-        INPUTS_PR_BODY: ${{ inputs.pr-body }}
-        INPUTS_BASE_BRANCH: ${{ inputs.base-branch }}
+        INPUTS_BRANCH_NAME: '${{ inputs.branch-name }}'
+        INPUTS_PR_TITLE: '${{ inputs.pr-title }}'
+        INPUTS_PR_BODY: '${{ inputs.pr-body }}'
+        INPUTS_BASE_BRANCH: '${{ inputs.base-branch }}'
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
       run: |
