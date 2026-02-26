@@ -167,6 +167,7 @@ async function initOauthClient(
       access_token: process.env['GOOGLE_CLOUD_ACCESS_TOKEN'],
     });
     await fetchAndCacheUserInfo(client);
+    recordOnboardingEndIfApplicable();
     return client;
   }
 
@@ -203,6 +204,7 @@ async function initOauthClient(
         debugLogger.log('Loaded cached credentials.');
         await triggerPostAuthCallbacks(credentials as Credentials);
 
+        recordOnboardingEndIfApplicable();
         return client;
       }
     } catch (error) {
