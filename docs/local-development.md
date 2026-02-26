@@ -98,7 +98,7 @@ await runInDevTraceSpan(
   {
     operation: GeminiCliOperation.ToolCall,
     attributes: {
-      [GEN_AI_REQUEST_MODEL]: 'gemini-4.0-mega',
+      [GEN_AI_AGENT_NAME]: 'gemini-cli',
     },
   },
   async ({ metadata }) => {
