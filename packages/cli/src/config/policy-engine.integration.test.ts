@@ -309,7 +309,18 @@ describe('Policy Engine Integration Tests', () => {
         (await engine.check({ name: 'write_file' }, undefined)).decision,
       ).toBe(PolicyDecision.ALLOW);
 
-      // Other tools should follow normal rules
+      // Read-only/search/list tools should still be allowed by policy
+      expect(
+        (await engine.check({ name: 'read_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'google_web_search' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'list_directory' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Other write tools (non-edit) should follow default ask-user behavior
       expect(
         (await engine.check({ name: 'run_shell_command' }, undefined)).decision,
       ).toBe(PolicyDecision.ASK_USER);
