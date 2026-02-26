@@ -2636,6 +2636,12 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.PLAN],
           },
           {
+            toolName: 'save_memory',
+            decision: PolicyDecision.ASK_USER,
+            priority: 70,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
             toolName: 'exit_plan_mode',
             decision: PolicyDecision.ASK_USER,
             priority: 70,
@@ -2672,6 +2678,7 @@ describe('PolicyEngine', () => {
         'web_fetch',
         'write_todos',
         'memory',
+        'save_memory',
         'read_tool',
         'write_tool',
       ]);
@@ -2701,6 +2708,7 @@ describe('PolicyEngine', () => {
       expect(excluded.has('activate_skill')).toBe(false);
       expect(excluded.has('ask_user')).toBe(false);
       expect(excluded.has('exit_plan_mode')).toBe(false);
+      expect(excluded.has('save_memory')).toBe(false);
       // Read-only MCP tool allowed by annotation rule (matched via _serverName)
       expect(excluded.has('read_tool')).toBe(false);
     });
