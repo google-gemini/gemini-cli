@@ -52,8 +52,10 @@ runs:
       id: 'branch_name'
       shell: 'bash'
       run: |
-        REF_NAME="${{ inputs.ref-name }}"
+        REF_NAME="${INPUTS_REF_NAME}"
         echo "name=${REF_NAME%/merge}" >> $GITHUB_OUTPUT
+      env:
+        INPUTS_REF_NAME: ${{ inputs.ref-name }}
     - name: 'Build and Push the Docker Image'
       uses: 'docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83' # ratchet:docker/build-push-action@v6
       with:
