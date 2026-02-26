@@ -45,7 +45,7 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
       definition.name,
       definition.displayName ?? definition.name,
       definition.description,
-      Kind.Think,
+      Kind.Agent,
       definition.inputConfig.inputSchema,
       messageBus,
       /* isOutputMarkdown */ true,
