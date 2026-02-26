@@ -323,7 +323,15 @@ export async function openDiff(
       shell: process.platform === 'win32',
     });
 
+    // Guard against both 'error' and 'close' firing for a single failure,
+    // which would emit ExternalEditorClosed twice and attempt to settle
+    // the promise twice.
+    let isSettled = false;
+
     childProcess.on('close', (code) => {
+      if (isSettled) return;
+      isSettled = true;
+
       if (code !== 0) {
         // GUI editors (VS Code, Zed, etc.) can exit with non-zero codes
         // under normal circumstances (e.g., window closed while loading).
@@ -335,6 +343,9 @@ export async function openDiff(
     });
 
     childProcess.on('error', (error) => {
+      if (isSettled) return;
+      isSettled = true;
+
       coreEvents.emit(CoreEvent.ExternalEditorClosed);
       reject(error);
     });

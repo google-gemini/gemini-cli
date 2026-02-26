@@ -449,6 +449,28 @@ describe('editor utils', () => {
         );
         expect(emitSpy).toHaveBeenCalledWith(CoreEvent.ExternalEditorClosed);
       });
+
+      it(`should only emit ExternalEditorClosed once when ${editor} fires both error and close`, async () => {
+        const emitSpy = vi.spyOn(coreEvents, 'emit');
+        const callbacks: Record<string, (arg: unknown) => void> = {};
+        const mockSpawnOn = vi.fn(
+          (event: string, cb: (arg: unknown) => void) => {
+            callbacks[event] = cb;
+          },
+        );
+        (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
+        const promise = openDiff('old.txt', 'new.txt', editor);
+        // Simulate Node.js behavior: error fires first, then close.
+        callbacks['error'](new Error('spawn error'));
+        callbacks['close'](1);
+
+        await expect(promise).rejects.toThrow('spawn error');
+        const editorClosedEmissions = emitSpy.mock.calls.filter(
+          (call) => call[0] === CoreEvent.ExternalEditorClosed,
+        );
+        expect(editorClosedEmissions).toHaveLength(1);
+      });
     }
 
     const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs', 'hx'];
