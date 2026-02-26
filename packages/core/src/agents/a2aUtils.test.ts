@@ -284,5 +284,68 @@ describe('a2aUtils', () => {
         'Analyzing...\n\nProcessing...\n\nArtifact (Code):\nprint("Done")',
       );
     });
+
+    it('should fallback to history in a task chunk if no message or artifacts exist and task is terminal', () => {
+      const reassembler = new A2AResultReassembler();
+
+      reassembler.update({
+        kind: 'task',
+        status: { state: 'completed' },
+        history: [
+          {
+            kind: 'message',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Answer from history' }],
+          } as Message,
+        ],
+      } as unknown as SendMessageResult);
+
+      expect(reassembler.toString()).toBe('Answer from history');
+    });
+
+    it('should NOT fallback to history in a task chunk if task is not terminal', () => {
+      const reassembler = new A2AResultReassembler();
+
+      reassembler.update({
+        kind: 'task',
+        status: { state: 'working' },
+        history: [
+          {
+            kind: 'message',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Answer from history' }],
+          } as Message,
+        ],
+      } as unknown as SendMessageResult);
+
+      expect(reassembler.toString()).toBe('');
+    });
+
+    it('should not fallback to history if artifacts exist', () => {
+      const reassembler = new A2AResultReassembler();
+
+      reassembler.update({
+        kind: 'task',
+        status: { state: 'completed' },
+        artifacts: [
+          {
+            artifactId: 'art-1',
+            name: 'Data',
+            parts: [{ kind: 'text', text: 'Artifact Content' }],
+          },
+        ],
+        history: [
+          {
+            kind: 'message',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Answer from history' }],
+          } as Message,
+        ],
+      } as unknown as SendMessageResult);
+
+      const output = reassembler.toString();
+      expect(output).toContain('Artifact (Data):');
+      expect(output).not.toContain('Answer from history');
+    });
   });
 });
