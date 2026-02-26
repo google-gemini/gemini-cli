@@ -18,6 +18,7 @@ import path from 'node:path';
 import toml from '@iarna/toml';
 import { z, type ZodError } from 'zod';
 import { isNodeError } from '../utils/errors.js';
+import { isWithinRoot } from '../utils/fileUtils.js';
 
 /**
  * Schema for a single policy rule in the TOML file (before transformation).
@@ -171,7 +172,28 @@ export async function readPolicyFiles(
   for (const file of filesToLoad) {
     const filePath = path.join(baseDir, file);
     try {
-      const content = await fs.readFile(filePath, 'utf-8');
+      const realFilePath = await fs.realpath(filePath);
+
+      // For workspace policies, ensure the symlink doesn't "escape" the policy directory
+      if (tierName === 'workspace') {
+        const realBaseDir = await fs.realpath(baseDir);
+        if (!isWithinRoot(realFilePath, realBaseDir)) {
+          errors.push({
+            filePath,
+            fileName: file,
+            tier: tierName,
+            errorType: 'file_read',
+            message:
+              'Security violation: Symbolic link points outside of the workspace policy directory.',
+            details: `Symlink ${file} resolves to a path outside of the policy folder. Workspace policies are restricted for security.`,
+            suggestion:
+              'To use global policies, place them in your user directory (~/.gemini/policies/) instead.',
+          });
+          continue;
+        }
+      }
+
+      const content = await fs.readFile(realFilePath, 'utf-8');
       results.push({ path: filePath, content });
     } catch (e) {
       errors.push({
