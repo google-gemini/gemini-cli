@@ -71,9 +71,9 @@ runs:
         ${{ inputs.dry-run != 'true' }}
       env:
         NODE_AUTH_TOKEN: '${{ steps.core-token.outputs.auth-token }}'
-        INPUTS_CORE_PACKAGE_NAME: ${{ inputs.core-package-name }}
-        INPUTS_VERSION: ${{ inputs.version }}
-        INPUTS_CHANNEL: ${{ inputs.channel }}
+        INPUTS_CORE_PACKAGE_NAME: '${{ inputs.core-package-name }}'
+        INPUTS_VERSION: '${{ inputs.version }}'
+        INPUTS_CHANNEL: '${{ inputs.channel }}'
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
       run: |
@@ -94,9 +94,9 @@ runs:
         ${{ inputs.dry-run != 'true' }}
       env:
         NODE_AUTH_TOKEN: '${{ steps.cli-token.outputs.auth-token }}'
-        INPUTS_CLI_PACKAGE_NAME: ${{ inputs.cli-package-name }}
-        INPUTS_VERSION: ${{ inputs.version }}
-        INPUTS_CHANNEL: ${{ inputs.channel }}
+        INPUTS_CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+        INPUTS_VERSION: '${{ inputs.version }}'
+        INPUTS_CHANNEL: '${{ inputs.channel }}'
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
       run: |
@@ -117,9 +117,9 @@ runs:
         ${{ inputs.dry-run == 'false' }}
       env:
         NODE_AUTH_TOKEN: '${{ steps.a2a-token.outputs.auth-token }}'
-        INPUTS_A2A_PACKAGE_NAME: ${{ inputs.a2a-package-name }}
-        INPUTS_VERSION: ${{ inputs.version }}
-        INPUTS_CHANNEL: ${{ inputs.channel }}
+        INPUTS_A2A_PACKAGE_NAME: '${{ inputs.a2a-package-name }}'
+        INPUTS_VERSION: '${{ inputs.version }}'
+        INPUTS_CHANNEL: '${{ inputs.channel }}'
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
       run: |
@@ -134,12 +134,12 @@ runs:
         echo "Dry run: Would have added tag '${INPUTS_CHANNEL}' to version '${INPUTS_VERSION}' for ${INPUTS_CLI_PACKAGE_NAME}, ${INPUTS_CORE_PACKAGE_NAME}, and ${INPUTS_A2A_PACKAGE_NAME}."
 
       env:
-        INPUTS_CHANNEL: ${{ inputs.channel }}
+        INPUTS_CHANNEL: '${{ inputs.channel }}'
 
-        INPUTS_VERSION: ${{ inputs.version }}
+        INPUTS_VERSION: '${{ inputs.version }}'
 
-        INPUTS_CLI_PACKAGE_NAME: ${{ inputs.cli-package-name }}
+        INPUTS_CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
 
-        INPUTS_CORE_PACKAGE_NAME: ${{ inputs.core-package-name }}
+        INPUTS_CORE_PACKAGE_NAME: '${{ inputs.core-package-name }}'
 
-        INPUTS_A2A_PACKAGE_NAME: ${{ inputs.a2a-package-name }}
+        INPUTS_A2A_PACKAGE_NAME: '${{ inputs.a2a-package-name }}'

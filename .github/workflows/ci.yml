@@ -476,10 +476,10 @@ jobs:
           fi
           echo "All CI jobs passed!"
         env:
-          NEEDS_LINT_RESULT: ${{ needs.lint.result }}
-          NEEDS_LINK_CHECKER_RESULT: ${{ needs.link_checker.result }}
-          NEEDS_TEST_LINUX_RESULT: ${{ needs.test_linux.result }}
-          NEEDS_TEST_MAC_RESULT: ${{ needs.test_mac.result }}
-          NEEDS_TEST_WINDOWS_RESULT: ${{ needs.test_windows.result }}
-          NEEDS_CODEQL_RESULT: ${{ needs.codeql.result }}
-          NEEDS_BUNDLE_SIZE_RESULT: ${{ needs.bundle_size.result }}
+          NEEDS_LINT_RESULT: '${{ needs.lint.result }}'
+          NEEDS_LINK_CHECKER_RESULT: '${{ needs.link_checker.result }}'
+          NEEDS_TEST_LINUX_RESULT: '${{ needs.test_linux.result }}'
+          NEEDS_TEST_MAC_RESULT: '${{ needs.test_mac.result }}'
+          NEEDS_TEST_WINDOWS_RESULT: '${{ needs.test_windows.result }}'
+          NEEDS_CODEQL_RESULT: '${{ needs.codeql.result }}'
+          NEEDS_BUNDLE_SIZE_RESULT: '${{ needs.bundle_size.result }}'
