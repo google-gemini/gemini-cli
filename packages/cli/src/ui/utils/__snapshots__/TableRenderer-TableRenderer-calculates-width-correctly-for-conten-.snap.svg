@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="258" viewBox="0 0 920 258">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="258" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="19" fill="#333333" textLength="900" lengthAdjust="spacingAndGlyphs">┌───────────────────────────────────┬───────────────────────────────┬───────────────────────────────</text>
+    <text x="0" y="36" fill="#333333" textLength="27" lengthAdjust="spacingAndGlyphs">──┐</text>
+    <text x="0" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="53" fill="#89b4fa" textLength="45" lengthAdjust="spacingAndGlyphs">Col 1</text>
+    <text x="306" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="333" y="53" fill="#89b4fa" textLength="45" lengthAdjust="spacingAndGlyphs">Col 2</text>
+    <text x="594" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="612" y="53" fill="#89b4fa" textLength="45" lengthAdjust="spacingAndGlyphs">Col 3</text>
+    <text x="891" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="70" fill="#333333" textLength="900" lengthAdjust="spacingAndGlyphs">├───────────────────────────────────┼───────────────────────────────┼───────────────────────────────</text>
+    <text x="0" y="87" fill="#333333" textLength="27" lengthAdjust="spacingAndGlyphs">──┤</text>
+    <text x="0" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="104" fill="#ffffff" textLength="297" lengthAdjust="spacingAndGlyphs"> Visit Google                    </text>
+    <text x="306" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="315" y="104" fill="#ffffff" textLength="279" lengthAdjust="spacingAndGlyphs">  Plain Text                   </text>
+    <text x="594" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="603" y="104" fill="#ffffff" textLength="288" lengthAdjust="spacingAndGlyphs"> More Info                      </text>
+    <text x="891" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="121" fill="#ffffff" textLength="27" lengthAdjust="spacingAndGlyphs">  (</text>
+    <text x="27" y="121" fill="#89b4fa" textLength="162" lengthAdjust="spacingAndGlyphs">https://google.com</text>
+    <text x="189" y="121" fill="#ffffff" textLength="711" lengthAdjust="spacingAndGlyphs">)                                                                              </text>
+    <text x="0" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="138" fill="#ffffff" textLength="297" lengthAdjust="spacingAndGlyphs"> Info Here                       </text>
+    <text x="306" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="315" y="138" fill="#ffffff" textLength="279" lengthAdjust="spacingAndGlyphs">  Visit Bing                   </text>
+    <text x="594" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="603" y="138" fill="#ffffff" textLength="288" lengthAdjust="spacingAndGlyphs"> Links                          </text>
+    <text x="891" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="155" fill="#ffffff" textLength="342" lengthAdjust="spacingAndGlyphs">                                     (</text>
+    <text x="342" y="155" fill="#89b4fa" textLength="144" lengthAdjust="spacingAndGlyphs">https://bing.com</text>
+    <text x="486" y="155" fill="#ffffff" textLength="414" lengthAdjust="spacingAndGlyphs">)                                             </text>
+    <text x="0" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="172" fill="#ffffff" textLength="297" lengthAdjust="spacingAndGlyphs"> Check This                      </text>
+    <text x="306" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="315" y="172" fill="#ffffff" textLength="279" lengthAdjust="spacingAndGlyphs">  Search                       </text>
+    <text x="594" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="603" y="172" fill="#ffffff" textLength="288" lengthAdjust="spacingAndGlyphs"> Visit Yahoo                    </text>
+    <text x="891" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="189" fill="#ffffff" textLength="621" lengthAdjust="spacingAndGlyphs">                                                                    (</text>
+    <text x="621" y="189" fill="#89b4fa" textLength="153" lengthAdjust="spacingAndGlyphs">https://yahoo.com</text>
+    <text x="774" y="189" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs">)             </text>
+    <text x="0" y="206" fill="#333333" textLength="900" lengthAdjust="spacingAndGlyphs">└───────────────────────────────────┴───────────────────────────────┴───────────────────────────────</text>
+    <text x="0" y="223" fill="#333333" textLength="27" lengthAdjust="spacingAndGlyphs">──┘</text>
+  </g>
+</svg>

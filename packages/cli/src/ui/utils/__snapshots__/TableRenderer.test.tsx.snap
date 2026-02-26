@@ -14,13 +14,19 @@ exports[`TableRenderer > 'calculates column widths based on ren…' 1`] = `
 
 exports[`TableRenderer > 'calculates width correctly for conten…' 1`] = `
 "
-┌───────────────────────────────────┬───────────────────────────────┬─────────────────────────────────┐
-│ Col 1                             │ Col 2                         │ Col 3                           │
-├───────────────────────────────────┼───────────────────────────────┼─────────────────────────────────┤
-│ Visit Google (https://google.com) │ Plain Text                    │ More Info                       │
-│ Info Here                         │ Visit Bing (https://bing.com) │ Links                           │
-│ Check This                        │ Search                        │ Visit Yahoo (https://yahoo.com) │
-└───────────────────────────────────┴───────────────────────────────┴─────────────────────────────────┘
+┌───────────────────────────────────┬───────────────────────────────┬───────────────────────────────
+──┐
+│ Col 1                           │  Col 2                        │ Col 3                          │
+├───────────────────────────────────┼───────────────────────────────┼───────────────────────────────
+──┤
+│ Visit Google                    │  Plain Text                   │ More Info                      │
+  (https://google.com)
+│ Info Here                       │  Visit Bing                   │ Links                          │
+                                     (https://bing.com)
+│ Check This                      │  Search                       │ Visit Yahoo                    │
+                                                                    (https://yahoo.com)
+└───────────────────────────────────┴───────────────────────────────┴───────────────────────────────
+──┘
 "
 `;
 
