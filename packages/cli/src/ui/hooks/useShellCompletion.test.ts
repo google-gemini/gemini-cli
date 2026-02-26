@@ -402,7 +402,12 @@ describe('useShellCompletion utilities', () => {
     it('should handle empty PATH', async () => {
       vi.stubEnv('PATH', '');
       const results = await scanPathExecutables();
-      expect(results).toEqual([]);
+      if (process.platform === 'win32') {
+        expect(results.length).toBeGreaterThan(0);
+        expect(results).toContain('dir');
+      } else {
+        expect(results).toEqual([]);
+      }
       vi.unstubAllEnvs();
     });
   });
