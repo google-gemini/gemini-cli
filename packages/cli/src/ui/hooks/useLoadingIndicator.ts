@@ -20,6 +20,7 @@ export interface UseLoadingIndicatorProps {
   retryStatus: RetryAttemptPayload | null;
   loadingPhrasesMode?: LoadingPhrasesMode;
   customWittyPhrases?: string[];
+  errorVerbosity?: 'low' | 'full';
 }
 
 export const useLoadingIndicator = ({
@@ -28,6 +29,7 @@ export const useLoadingIndicator = ({
   retryStatus,
   loadingPhrasesMode,
   customWittyPhrases,
+  errorVerbosity = 'full',
 }: UseLoadingIndicatorProps) => {
   const [timerResetKey, setTimerResetKey] = useState(0);
   const isTimerActive = streamingState === StreamingState.Responding;
@@ -70,7 +72,9 @@ export const useLoadingIndicator = ({
   }, [streamingState, elapsedTimeFromTimer]);
 
   const retryPhrase = retryStatus
-    ? `Trying to reach ${getDisplayString(retryStatus.model)} (Attempt ${retryStatus.attempt + 1}/${retryStatus.maxAttempts})`
+    ? errorVerbosity === 'low'
+      ? "This is taking a bit longer, we're still on it."
+      : `Trying to reach ${getDisplayString(retryStatus.model)} (Attempt ${retryStatus.attempt + 1}/${retryStatus.maxAttempts})`
     : null;
 
   return {

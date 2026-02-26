@@ -319,7 +319,10 @@ describe('useGeminiStream', () => {
   });
 
   const mockLoadedSettings: LoadedSettings = {
-    merged: { preferredEditor: 'vscode' },
+    merged: {
+      preferredEditor: 'vscode',
+      ui: { errorVerbosity: 'full' },
+    },
     user: { path: '/user/settings.json', settings: {} },
     workspace: { path: '/workspace/.gemini/settings.json', settings: {} },
     errors: [],
@@ -330,6 +333,7 @@ describe('useGeminiStream', () => {
   const renderTestHook = (
     initialToolCalls: TrackedToolCall[] = [],
     geminiClient?: any,
+    loadedSettings: LoadedSettings = mockLoadedSettings,
   ) => {
     const client = geminiClient || mockConfig.getGeminiClient();
     let lastToolCalls = initialToolCalls;
@@ -344,7 +348,7 @@ describe('useGeminiStream', () => {
         cmd: PartListUnion,
       ) => Promise<SlashCommandProcessorResult | false>,
       shellModeActive: false,
-      loadedSettings: mockLoadedSettings,
+      loadedSettings,
       toolCalls: initialToolCalls,
     };
 
@@ -936,6 +940,83 @@ describe('useGeminiStream', () => {
       // Streaming state should be Idle
       expect(result.current.streamingState).toBe(StreamingState.Idle);
     });
+
+    const infoTexts = mockAddItem.mock.calls.map(
+      ([item]) => (item as { text?: string }).text ?? '',
+    );
+    expect(
+      infoTexts.some((text) =>
+        text.includes(
+          'Some internal tool attempts failed before this final error',
+        ),
+      ),
+    ).toBe(false);
+  });
+
+  it('should add a compact suppressed-error note before STOP_EXECUTION terminal info in low verbosity mode', async () => {
+    const stopExecutionToolCalls: TrackedToolCall[] = [
+      {
+        request: {
+          callId: 'stop-call',
+          name: 'stopTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-stop',
+        },
+        status: CoreToolCallStatus.Error,
+        response: {
+          callId: 'stop-call',
+          responseParts: [{ text: 'error occurred' }],
+          errorType: ToolErrorType.STOP_EXECUTION,
+          error: new Error('Stop reason from hook'),
+          resultDisplay: undefined,
+        },
+        responseSubmittedToGemini: false,
+        tool: {
+          displayName: 'stop tool',
+        },
+        invocation: {
+          getDescription: () => `Mock description`,
+        } as unknown as AnyToolInvocation,
+      } as unknown as TrackedCompletedToolCall,
+    ];
+    const lowVerbositySettings = {
+      ...mockLoadedSettings,
+      merged: {
+        ...mockLoadedSettings.merged,
+        ui: { errorVerbosity: 'low' },
+      },
+    } as LoadedSettings;
+    const client = new MockedGeminiClientClass(mockConfig);
+
+    const { result } = renderTestHook([], client, lowVerbositySettings);
+
+    await act(async () => {
+      if (capturedOnComplete) {
+        await capturedOnComplete(stopExecutionToolCalls);
+      }
+    });
+
+    await waitFor(() => {
+      expect(mockMarkToolsAsSubmitted).toHaveBeenCalledWith(['stop-call']);
+      expect(mockSendMessageStream).not.toHaveBeenCalled();
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
+    const infoTexts = mockAddItem.mock.calls.map(
+      ([item]) => (item as { text?: string }).text ?? '',
+    );
+    const noteIndex = infoTexts.findIndex((text) =>
+      text.includes(
+        'Some internal tool attempts failed before this final error',
+      ),
+    );
+    const stopIndex = infoTexts.findIndex((text) =>
+      text.includes('Agent execution stopped: Stop reason from hook'),
+    );
+    expect(noteIndex).toBeGreaterThanOrEqual(0);
+    expect(stopIndex).toBeGreaterThanOrEqual(0);
+    expect(noteIndex).toBeLessThan(stopIndex);
   });
 
   it('should group multiple cancelled tool call responses into a single history entry', async () => {
