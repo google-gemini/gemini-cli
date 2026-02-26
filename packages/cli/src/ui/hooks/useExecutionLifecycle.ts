@@ -431,6 +431,9 @@ export const useExecutionLifecycle = (
 
                 switch (event.type) {
                   case 'raw_data':
+                    // We rely on 'file_data' for the clean output stream.
+                    break;
+                  case 'file_data':
                     if (!isBinaryStream) {
                       outputStream.write(event.chunk);
                       totalBytesWritten += Buffer.byteLength(event.chunk);
@@ -679,19 +682,15 @@ export const useExecutionLifecycle = (
           if (!outputStream.closed) {
             outputStream.destroy();
           }
-          if (pwdFilePath && fs.existsSync(pwdFilePath)) {
-            fs.unlinkSync(pwdFilePath);
+          if (pwdFilePath) {
+            fs.promises.unlink(pwdFilePath).catch(() => {});
           }
 
           dispatch({ type: 'SET_ACTIVE_PTY', pid: null });
           setShellInputFocused(false);
 
-          if (!fullOutputReturned && fs.existsSync(outputFilePath)) {
-            try {
-              fs.unlinkSync(outputFilePath);
-            } catch {
-              // Ignore errors during unlink
-            }
+          if (!fullOutputReturned) {
+            fs.promises.unlink(outputFilePath).catch(() => {});
           }
         }
       };
