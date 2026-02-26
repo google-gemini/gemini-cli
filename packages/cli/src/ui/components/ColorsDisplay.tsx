@@ -30,8 +30,8 @@ interface BackgroundColorRow {
 
 type ColorRow = StandardColorRow | GradientColorRow | BackgroundColorRow;
 
-const VALUE_COLUMN_WIDTH = '25%';
-const NAME_COLUMN_WIDTH = '75%';
+const VALUE_COLUMN_WIDTH = 10;
+const NAME_COLUMN_WIDTH = '30%';
 
 interface ColorsDisplayProps {
   activeTheme: Theme;
@@ -124,7 +124,7 @@ export const ColorsDisplay: React.FC<ColorsDisplayProps> = ({
         </Text>
         <Box marginTop={1} flexDirection="column">
           <Text color={theme.text.primary}>
-            <Text bold>Theme/Terminal interaction:</Text>
+            <Text bold>How do colors get applied?</Text>
           </Text>
           <Box marginLeft={2} flexDirection="column">
             <Text color={theme.text.primary}>

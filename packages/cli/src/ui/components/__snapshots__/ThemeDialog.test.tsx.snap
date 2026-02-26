@@ -18,39 +18,49 @@ exports[`Initial Theme Selection > should default to a dark theme when terminal 
 │   11. Ayu Light                              │                                                 │ │
 │   12. Default Light                          └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
-│                                              ╭─────────────────────────────────────────────────╮ │
-│                                              │ DEVELOPER TOOLS (Not visible to users)          │ │
-│                                              │                                                 │ │
-│                                              │ Theme/Terminal interaction:                     │ │
-│                                              │   • Hex: Rendered exactly by modern terminals.  │ │
-│                                              │   Not overridden by app themes.                 │ │
-│                                              │   • Blank: Uses your terminal's default         │ │
-│                                              │   foreground/background.                        │ │
-│                                              │   • Compatibility: On older terminals, hex is   │ │
-│                                              │   approximated to the nearest ANSI color.       │ │
-│                                              │   • ANSI Names: 'red', 'green', etc. are mapped │ │
-│                                              │   to your terminal app's palette.               │ │
-│                                              │                                                 │ │
-│                                              │  Value      Name                                │ │
-│                                              │    #1E1E2E   background.primary                 │ │
-│                                              │    #2a2b3c   background.message                 │ │
-│                                              │    #313243   background.input                   │ │
-│                                              │    #28350B   background.diff.added              │ │
-│                                              │    #430000   background.diff.removed            │ │
-│                                              │  (blank)    text.primary                        │ │
-│                                              │  #6C7086    text.secondary                      │ │
-│                                              │  #89B4FA    text.link                           │ │
-│                                              │  #CBA6F7    text.accent                         │ │
-│                                              │  (blank)    text.response                       │ │
-│                                              │  #3d3f51    border.default                      │ │
-│                                              │  #89B4FA    border.focused                      │ │
-│                                              │  #F38BA8    status.error                        │ │
-│                                              │  #A6E3A1    status.success                      │ │
-│                                              │  #F9E2AF    status.warning                      │ │
-│                                              │  #4796E4    ui.gradient                         │ │
-│                                              │  #847ACE                                        │ │
-│                                              │  #C3677F                                        │ │
-│                                              ╰─────────────────────────────────────────────────╯ │
+│                                              ╭────────────────────────────────────────────────╮  │
+│                                              │ DEVELOPER TOOLS (Not visible to users)         │  │
+│                                              │                                                │  │
+│                                              │ How do colors get applied?                     │  │
+│                                              │   • Hex: Rendered exactly by modern terminals. │  │
+│                                              │   Not overridden by app themes.                │  │
+│                                              │   • Blank: Uses your terminal's default        │  │
+│                                              │   foreground/background.                       │  │
+│                                              │   • Compatibility: On older terminals, hex is  │  │
+│                                              │   approximated to the nearest ANSI color.      │  │
+│                                              │   • ANSI Names: 'red', 'green', etc. are       │  │
+│                                              │   mapped to your terminal app's palette.       │  │
+│                                              │                                                │  │
+│                                              │  Value     Name                                │  │
+│                                              │   #1E1E2E   background.p                       │  │
+│                                              │             rimary                             │  │
+│                                              │   #2a2b3c   background.m                       │  │
+│                                              │             essage                             │  │
+│                                              │   #313243   background.i                       │  │
+│                                              │             nput                               │  │
+│                                              │   #28350B   background.d                       │  │
+│                                              │             iff.added                          │  │
+│                                              │   #430000   background.d                       │  │
+│                                              │             iff.removed                        │  │
+│                                              │  (blank)   text.primary                        │  │
+│                                              │  #6C7086   text.secondar                       │  │
+│                                              │            y                                   │  │
+│                                              │  #89B4FA   text.link                           │  │
+│                                              │  #CBA6F7   text.accent                         │  │
+│                                              │  (blank)   text.response                       │  │
+│                                              │  #3d3f51   border.defaul                       │  │
+│                                              │            t                                   │  │
+│                                              │  #89B4FA   border.focuse                       │  │
+│                                              │            d                                   │  │
+│                                              │  #F38BA8   status.error                        │  │
+│                                              │  #A6E3A1   status.succes                       │  │
+│                                              │            s                                   │  │
+│                                              │  #F9E2AF   status.warnin                       │  │
+│                                              │            g                                   │  │
+│                                              │  #4796E4   ui.gradient                         │  │
+│                                              │  #847ACE                                       │  │
+│                                              │  #C3677F                                       │  │
+│                                              ╰────────────────────────────────────────────────╯  │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
@@ -76,39 +86,49 @@ exports[`Initial Theme Selection > should default to a light theme when terminal
 │   11. Default Dark (Incompatible)            │                                                 │ │
 │   12. Dracula Dark (Incompatible)            └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
-│                                              ╭─────────────────────────────────────────────────╮ │
-│                                              │ DEVELOPER TOOLS (Not visible to users)          │ │
-│                                              │                                                 │ │
-│                                              │ Theme/Terminal interaction:                     │ │
-│                                              │   • Hex: Rendered exactly by modern terminals.  │ │
-│                                              │   Not overridden by app themes.                 │ │
-│                                              │   • Blank: Uses your terminal's default         │ │
-│                                              │   foreground/background.                        │ │
-│                                              │   • Compatibility: On older terminals, hex is   │ │
-│                                              │   approximated to the nearest ANSI color.       │ │
-│                                              │   • ANSI Names: 'red', 'green', etc. are mapped │ │
-│                                              │   to your terminal app's palette.               │ │
-│                                              │                                                 │ │
-│                                              │  Value      Name                                │ │
-│                                              │    #FAFAFA   background.primary                 │ │
-│                                              │    #eaecee   background.message                 │ │
-│                                              │    #e2e4e8   background.input                   │ │
-│                                              │    #C6EAD8   background.diff.added              │ │
-│                                              │    #FFCCCC   background.diff.removed            │ │
-│                                              │  (blank)    text.primary                        │ │
-│                                              │  #97a0b0    text.secondary                      │ │
-│                                              │  #3B82F6    text.link                           │ │
-│                                              │  #8B5CF6    text.accent                         │ │
-│                                              │  (blank)    text.response                       │ │
-│                                              │  #d2d6dc    border.default                      │ │
-│                                              │  #3B82F6    border.focused                      │ │
-│                                              │  #DD4C4C    status.error                        │ │
-│                                              │  #3CA84B    status.success                      │ │
-│                                              │  #D5A40A    status.warning                      │ │
-│                                              │  #4796E4    ui.gradient                         │ │
-│                                              │  #847ACE                                        │ │
-│                                              │  #C3677F                                        │ │
-│                                              ╰─────────────────────────────────────────────────╯ │
+│                                              ╭────────────────────────────────────────────────╮  │
+│                                              │ DEVELOPER TOOLS (Not visible to users)         │  │
+│                                              │                                                │  │
+│                                              │ How do colors get applied?                     │  │
+│                                              │   • Hex: Rendered exactly by modern terminals. │  │
+│                                              │   Not overridden by app themes.                │  │
+│                                              │   • Blank: Uses your terminal's default        │  │
+│                                              │   foreground/background.                       │  │
+│                                              │   • Compatibility: On older terminals, hex is  │  │
+│                                              │   approximated to the nearest ANSI color.      │  │
+│                                              │   • ANSI Names: 'red', 'green', etc. are       │  │
+│                                              │   mapped to your terminal app's palette.       │  │
+│                                              │                                                │  │
+│                                              │  Value     Name                                │  │
+│                                              │   #FAFAFA   background.p                       │  │
+│                                              │             rimary                             │  │
+│                                              │   #eaecee   background.m                       │  │
+│                                              │             essage                             │  │
+│                                              │   #e2e4e8   background.i                       │  │
+│                                              │             nput                               │  │
+│                                              │   #C6EAD8   background.d                       │  │
+│                                              │             iff.added                          │  │
+│                                              │   #FFCCCC   background.d                       │  │
+│                                              │             iff.removed                        │  │
+│                                              │  (blank)   text.primary                        │  │
+│                                              │  #97a0b0   text.secondar                       │  │
+│                                              │            y                                   │  │
+│                                              │  #3B82F6   text.link                           │  │
+│                                              │  #8B5CF6   text.accent                         │  │
+│                                              │  (blank)   text.response                       │  │
+│                                              │  #d2d6dc   border.defaul                       │  │
+│                                              │            t                                   │  │
+│                                              │  #3B82F6   border.focuse                       │  │
+│                                              │            d                                   │  │
+│                                              │  #DD4C4C   status.error                        │  │
+│                                              │  #3CA84B   status.succes                       │  │
+│                                              │            s                                   │  │
+│                                              │  #D5A40A   status.warnin                       │  │
+│                                              │            g                                   │  │
+│                                              │  #4796E4   ui.gradient                         │  │
+│                                              │  #847ACE                                       │  │
+│                                              │  #C3677F                                       │  │
+│                                              ╰────────────────────────────────────────────────╯  │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
@@ -134,39 +154,49 @@ exports[`Initial Theme Selection > should use the theme from settings even if te
 │   11. Ayu Light                              │                                                 │ │
 │   12. Default Light                          └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
-│                                              ╭─────────────────────────────────────────────────╮ │
-│                                              │ DEVELOPER TOOLS (Not visible to users)          │ │
-│                                              │                                                 │ │
-│                                              │ Theme/Terminal interaction:                     │ │
-│                                              │   • Hex: Rendered exactly by modern terminals.  │ │
-│                                              │   Not overridden by app themes.                 │ │
-│                                              │   • Blank: Uses your terminal's default         │ │
-│                                              │   foreground/background.                        │ │
-│                                              │   • Compatibility: On older terminals, hex is   │ │
-│                                              │   approximated to the nearest ANSI color.       │ │
-│                                              │   • ANSI Names: 'red', 'green', etc. are mapped │ │
-│                                              │   to your terminal app's palette.               │ │
-│                                              │                                                 │ │
-│                                              │  Value      Name                                │ │
-│                                              │    #1E1E2E   background.primary                 │ │
-│                                              │    #2a2b3c   background.message                 │ │
-│                                              │    #313243   background.input                   │ │
-│                                              │    #28350B   background.diff.added              │ │
-│                                              │    #430000   background.diff.removed            │ │
-│                                              │  (blank)    text.primary                        │ │
-│                                              │  #6C7086    text.secondary                      │ │
-│                                              │  #89B4FA    text.link                           │ │
-│                                              │  #CBA6F7    text.accent                         │ │
-│                                              │  (blank)    text.response                       │ │
-│                                              │  #3d3f51    border.default                      │ │
-│                                              │  #89B4FA    border.focused                      │ │
-│                                              │  #F38BA8    status.error                        │ │
-│                                              │  #A6E3A1    status.success                      │ │
-│                                              │  #F9E2AF    status.warning                      │ │
-│                                              │  #4796E4    ui.gradient                         │ │
-│                                              │  #847ACE                                        │ │
-│                                              │  #C3677F                                        │ │
-│                                              ╰─────────────────────────────────────────────────╯ │
+│                                              ╭────────────────────────────────────────────────╮  │
+│                                              │ DEVELOPER TOOLS (Not visible to users)         │  │
+│                                              │                                                │  │
+│                                              │ How do colors get applied?                     │  │
+│                                              │   • Hex: Rendered exactly by modern terminals. │  │
+│                                              │   Not overridden by app themes.                │  │
+│                                              │   • Blank: Uses your terminal's default        │  │
+│                                              │   foreground/background.                       │  │
+│                                              │   • Compatibility: On older terminals, hex is  │  │
+│                                              │   approximated to the nearest ANSI color.      │  │
+│                                              │   • ANSI Names: 'red', 'green', etc. are       │  │
+│                                              │   mapped to your terminal app's palette.       │  │
+│                                              │                                                │  │
+│                                              │  Value     Name                                │  │
+│                                              │   #1E1E2E   background.p                       │  │
+│                                              │             rimary                             │  │
+│                                              │   #2a2b3c   background.m                       │  │
+│                                              │             essage                             │  │
+│                                              │   #313243   background.i                       │  │
+│                                              │             nput                               │  │
+│                                              │   #28350B   background.d                       │  │
+│                                              │             iff.added                          │  │
+│                                              │   #430000   background.d                       │  │
+│                                              │             iff.removed                        │  │
+│                                              │  (blank)   text.primary                        │  │
+│                                              │  #6C7086   text.secondar                       │  │
+│                                              │            y                                   │  │
+│                                              │  #89B4FA   text.link                           │  │
+│                                              │  #CBA6F7   text.accent                         │  │
+│                                              │  (blank)   text.response                       │  │
+│                                              │  #3d3f51   border.defaul                       │  │
+│                                              │            t                                   │  │
+│                                              │  #89B4FA   border.focuse                       │  │
+│                                              │            d                                   │  │
+│                                              │  #F38BA8   status.error                        │  │
+│                                              │  #A6E3A1   status.succes                       │  │
+│                                              │            s                                   │  │
+│                                              │  #F9E2AF   status.warnin                       │  │
+│                                              │            g                                   │  │
+│                                              │  #4796E4   ui.gradient                         │  │
+│                                              │  #847ACE                                       │  │
+│                                              │  #C3677F                                       │  │
+│                                              ╰────────────────────────────────────────────────╯  │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
@@ -206,39 +236,49 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │   11. Ayu Light                              │                                                 │ │
 │   12. Default Light                          └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
-│                                              ╭─────────────────────────────────────────────────╮ │
-│                                              │ DEVELOPER TOOLS (Not visible to users)          │ │
-│                                              │                                                 │ │
-│                                              │ Theme/Terminal interaction:                     │ │
-│                                              │   • Hex: Rendered exactly by modern terminals.  │ │
-│                                              │   Not overridden by app themes.                 │ │
-│                                              │   • Blank: Uses your terminal's default         │ │
-│                                              │   foreground/background.                        │ │
-│                                              │   • Compatibility: On older terminals, hex is   │ │
-│                                              │   approximated to the nearest ANSI color.       │ │
-│                                              │   • ANSI Names: 'red', 'green', etc. are mapped │ │
-│                                              │   to your terminal app's palette.               │ │
-│                                              │                                                 │ │
-│                                              │  Value      Name                                │ │
-│                                              │    #1E1E2E   background.primary                 │ │
-│                                              │    #2a2b3c   background.message                 │ │
-│                                              │    #313243   background.input                   │ │
-│                                              │    #28350B   background.diff.added              │ │
-│                                              │    #430000   background.diff.removed            │ │
-│                                              │  (blank)    text.primary                        │ │
-│                                              │  #6C7086    text.secondary                      │ │
-│                                              │  #89B4FA    text.link                           │ │
-│                                              │  #CBA6F7    text.accent                         │ │
-│                                              │  (blank)    text.response                       │ │
-│                                              │  #3d3f51    border.default                      │ │
-│                                              │  #89B4FA    border.focused                      │ │
-│                                              │  #F38BA8    status.error                        │ │
-│                                              │  #A6E3A1    status.success                      │ │
-│                                              │  #F9E2AF    status.warning                      │ │
-│                                              │  #4796E4    ui.gradient                         │ │
-│                                              │  #847ACE                                        │ │
-│                                              │  #C3677F                                        │ │
-│                                              ╰─────────────────────────────────────────────────╯ │
+│                                              ╭────────────────────────────────────────────────╮  │
+│                                              │ DEVELOPER TOOLS (Not visible to users)         │  │
+│                                              │                                                │  │
+│                                              │ How do colors get applied?                     │  │
+│                                              │   • Hex: Rendered exactly by modern terminals. │  │
+│                                              │   Not overridden by app themes.                │  │
+│                                              │   • Blank: Uses your terminal's default        │  │
+│                                              │   foreground/background.                       │  │
+│                                              │   • Compatibility: On older terminals, hex is  │  │
+│                                              │   approximated to the nearest ANSI color.      │  │
+│                                              │   • ANSI Names: 'red', 'green', etc. are       │  │
+│                                              │   mapped to your terminal app's palette.       │  │
+│                                              │                                                │  │
+│                                              │  Value     Name                                │  │
+│                                              │   #1E1E2E   background.p                       │  │
+│                                              │             rimary                             │  │
+│                                              │   #2a2b3c   background.m                       │  │
+│                                              │             essage                             │  │
+│                                              │   #313243   background.i                       │  │
+│                                              │             nput                               │  │
+│                                              │   #28350B   background.d                       │  │
+│                                              │             iff.added                          │  │
+│                                              │   #430000   background.d                       │  │
+│                                              │             iff.removed                        │  │
+│                                              │  (blank)   text.primary                        │  │
+│                                              │  #6C7086   text.secondar                       │  │
+│                                              │            y                                   │  │
+│                                              │  #89B4FA   text.link                           │  │
+│                                              │  #CBA6F7   text.accent                         │  │
+│                                              │  (blank)   text.response                       │  │
+│                                              │  #3d3f51   border.defaul                       │  │
+│                                              │            t                                   │  │
+│                                              │  #89B4FA   border.focuse                       │  │
+│                                              │            d                                   │  │
+│                                              │  #F38BA8   status.error                        │  │
+│                                              │  #A6E3A1   status.succes                       │  │
+│                                              │            s                                   │  │
+│                                              │  #F9E2AF   status.warnin                       │  │
+│                                              │            g                                   │  │
+│                                              │  #4796E4   ui.gradient                         │  │
+│                                              │  #847ACE                                       │  │
+│                                              │  #C3677F                                       │  │
+│                                              ╰────────────────────────────────────────────────╯  │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │

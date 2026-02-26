@@ -100,7 +100,7 @@ describe('ColorsDisplay', () => {
     const output = lastFrame();
 
     // Check for title and description
-    expect(output).toContain('Theme/Terminal interaction:');
+    expect(output).toContain('How do colors get applied?');
     expect(output).toContain('Hex:');
 
     // Check for some color names and values    expect(output).toContain('text.primary');
