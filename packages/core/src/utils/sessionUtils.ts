@@ -7,6 +7,7 @@
 import { type Part, type PartListUnion } from '@google/genai';
 import { type ConversationRecord } from '../services/chatRecordingService.js';
 import { partListUnionToString } from '../core/geminiRequest.js';
+import { stableStringify } from '../policy/stable-stringify.js';
 
 /**
  * Converts a PartListUnion into a normalized array of Part objects.
@@ -22,6 +23,30 @@ function ensurePartArray(content: PartListUnion): Part[] {
     return [{ text: content }];
   }
   return [content];
+}
+
+function incrementCount(map: Map<string, number>, key: string): void {
+  map.set(key, (map.get(key) ?? 0) + 1);
+}
+
+function consumeCount(map: Map<string, number>, key: string): boolean {
+  const count = map.get(key);
+  if (!count) {
+    return false;
+  }
+  if (count === 1) {
+    map.delete(key);
+  } else {
+    map.set(key, count - 1);
+  }
+  return true;
+}
+
+function getFunctionCallFingerprint(
+  name: string | undefined,
+  args: unknown,
+): string {
+  return `${name ?? ''}:${stableStringify(args ?? {})}`;
 }
 
 /**
@@ -55,17 +80,51 @@ export function convertSessionToClientHistory(
 
       if (hasToolCalls) {
         const modelParts: Part[] = [];
+        const existingFunctionCallIds = new Map<string, number>();
+        const existingFunctionCallFingerprints = new Map<string, number>();
 
-        // TODO: Revisit if we should preserve more than just Part metadata (e.g. thoughtSignatures)
-        // currently those are only required within an active loop turn which resume clears
-        // by forcing a new user text prompt.
+        // Preserve original parts as source of truth. Some session records
+        // duplicate function calls in both `content` and `toolCalls`; we only
+        // append toolCalls that are not already represented in content.
 
-        // Preserve original parts to maintain multimodal integrity
         if (msg.content) {
-          modelParts.push(...ensurePartArray(msg.content));
+          const existingParts = ensurePartArray(msg.content);
+          modelParts.push(...existingParts);
+          for (const part of existingParts) {
+            if (!part.functionCall) {
+              continue;
+            }
+            if (part.functionCall.id) {
+              incrementCount(existingFunctionCallIds, part.functionCall.id);
+            } else {
+              incrementCount(
+                existingFunctionCallFingerprints,
+                getFunctionCallFingerprint(
+                  part.functionCall.name,
+                  part.functionCall.args,
+                ),
+              );
+            }
+          }
         }
 
         for (const toolCall of msg.toolCalls!) {
+          if (
+            toolCall.id &&
+            consumeCount(existingFunctionCallIds, toolCall.id)
+          ) {
+            continue;
+          }
+          if (
+            existingFunctionCallFingerprints.size > 0 &&
+            consumeCount(
+              existingFunctionCallFingerprints,
+              getFunctionCallFingerprint(toolCall.name, toolCall.args),
+            )
+          ) {
+            continue;
+          }
+
           modelParts.push({
             functionCall: {
               name: toolCall.name,

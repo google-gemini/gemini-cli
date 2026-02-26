@@ -166,6 +166,7 @@ import { shouldDismissShortcutsHelpOnHotkey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
 import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
+import { shouldBlockPromptForRestart } from './utils/restartGating.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -225,6 +226,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
   });
+  const addHistoryItem = historyManager.addItem;
 
   useMemoryMonitor(historyManager);
   const isAlternateBuffer = useAlternateBuffer();
@@ -259,6 +261,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const [settingsNonce, setSettingsNonce] = useState(0);
   const activeHooks = useHookDisplayState();
   const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
+  const [restartRequired, setRestartRequired] = useState(false);
   const [isTrustedFolder, setIsTrustedFolder] = useState<boolean | undefined>(
     () => isWorkspaceTrusted(settings.merged).isTrusted,
   );
@@ -507,8 +510,8 @@ export const AppContainer = (props: AppContainerProps) => {
   }, [config, resumedSessionData]);
 
   useEffect(
-    () => setUpdateHandler(historyManager.addItem, setUpdateInfo),
-    [historyManager.addItem],
+    () => setUpdateHandler(addHistoryItem, setUpdateInfo, setRestartRequired),
+    [addHistoryItem],
   );
 
   // Subscribe to fallback mode and model changes from core
@@ -1233,17 +1236,30 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
       config.userHintService.addUserHint(trimmed);
       // Render hints with a distinct style.
-      historyManager.addItem({
+      addHistoryItem({
         type: 'hint',
         text: trimmed,
       });
     },
-    [config, historyManager],
+    [config, addHistoryItem],
   );
 
   const handleFinalSubmit = useCallback(
     async (submittedValue: string) => {
       reset();
+      const trimmedValue = submittedValue.trim();
+      const isSlash = isSlashCommand(trimmedValue);
+      if (shouldBlockPromptForRestart(trimmedValue, restartRequired)) {
+        addHistoryItem(
+          {
+            type: MessageType.INFO,
+            text: 'Update installed. Restart required before sending prompts. Use /quit to restart Gemini CLI. /help and /about are still available.',
+          },
+          Date.now(),
+        );
+        return;
+      }
+
       // Explicitly hide the expansion hint and clear its x-second timer when a new turn begins.
       setShowIsExpandableHint(false);
       if (expandHintTimerRef.current) {
@@ -1256,7 +1272,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
       }
 
-      const isSlash = isSlashCommand(submittedValue.trim());
       const isIdle = streamingState === StreamingState.Idle;
       const isAgentRunning =
         streamingState === StreamingState.Responding ||
@@ -1320,6 +1335,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       refreshStatic,
       reset,
       handleHintSubmit,
+      addHistoryItem,
+      restartRequired,
     ],
   );
 

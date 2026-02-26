@@ -100,9 +100,11 @@ export function handleAutoUpdate(
 export function setUpdateHandler(
   addItem: (item: Omit<HistoryItem, 'id'>, timestamp: number) => void,
   setUpdateInfo: (info: UpdateObject | null) => void,
+  setRestartRequired: (required: boolean) => void,
 ) {
   let successfullyInstalled = false;
   const handleUpdateReceived = (info: UpdateObject) => {
+    setRestartRequired(false);
     setUpdateInfo(info);
     const savedMessage = info.message;
     setTimeout(() => {
@@ -120,6 +122,7 @@ export function setUpdateHandler(
   };
 
   const handleUpdateFailed = () => {
+    setRestartRequired(false);
     setUpdateInfo(null);
     addItem(
       {
@@ -132,6 +135,7 @@ export function setUpdateHandler(
 
   const handleUpdateSuccess = () => {
     successfullyInstalled = true;
+    setRestartRequired(true);
     setUpdateInfo(null);
     addItem(
       {

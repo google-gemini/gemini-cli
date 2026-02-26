@@ -144,11 +144,13 @@ describe('GeminiCliAgent Integration', () => {
   });
 
   it('propagates errors from dynamic instructions', async () => {
+    const goldenFile = getGoldenPath('agent-static-instructions');
     const agent = new GeminiCliAgent({
       instructions: () => {
         throw new Error('Dynamic instruction failure');
       },
       model: 'gemini-2.0-flash',
+      fakeResponses: goldenFile,
     });
 
     const session = agent.session();

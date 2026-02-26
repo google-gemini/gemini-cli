@@ -92,6 +92,21 @@ const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
+type ThoughtSignatureNormalizationMode = 'require' | 'strip';
+
+interface ThoughtSignatureNormalizationStats {
+  contents: Content[];
+  signaturesAdded: number;
+  signaturesStripped: number;
+}
+
+interface ThoughtSignatureNormalizationContext {
+  mode: ThoughtSignatureNormalizationMode;
+  model: string;
+  signaturesAdded: number;
+  signaturesStripped: number;
+}
+
 /**
  * Returns true if the response is valid, false otherwise.
  */
@@ -241,6 +256,9 @@ export class GeminiChat {
   private sendPromise: Promise<void> = Promise.resolve();
   private readonly chatRecordingService: ChatRecordingService;
   private lastPromptTokenCount: number;
+  private lastThoughtSignatureNormalizationContext:
+    | ThoughtSignatureNormalizationContext
+    | undefined;
 
   constructor(
     private readonly config: Config,
@@ -343,6 +361,8 @@ export class GeminiChat {
     ): AsyncGenerator<StreamEvent, void, void> {
       try {
         let lastError: unknown = new Error('Request failed after all retries.');
+        let compatibilityRetryAttempted = false;
+        let useFlippedThoughtSignatureNormalizationMode = false;
 
         const maxAttempts = INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
 
@@ -366,6 +386,7 @@ export class GeminiChat {
               prompt_id,
               signal,
               role,
+              useFlippedThoughtSignatureNormalizationMode,
             );
             isConnectionPhase = false;
             for await (const chunk of stream) {
@@ -397,6 +418,40 @@ export class GeminiChat {
               }
               lastError = null; // Clear error as this is an expected stop
               return; // Stop the generator
+            }
+
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            if (
+              isInvalidArgumentError(errorMessage) &&
+              !compatibilityRetryAttempted &&
+              !signal.aborted &&
+              attempt < maxAttempts - 1
+            ) {
+              compatibilityRetryAttempted = true;
+              useFlippedThoughtSignatureNormalizationMode = true;
+              const normalizationContext =
+                this.lastThoughtSignatureNormalizationContext;
+              coreEvents.emitRetryAttempt({
+                attempt: attempt + 1,
+                maxAttempts,
+                delayMs: 0,
+                error: JSON.stringify({
+                  reason: 'invalid_argument_compatibility_retry',
+                  initialMode: normalizationContext?.mode,
+                  retryMode: normalizationContext
+                    ? this.flipThoughtSignatureNormalizationMode(
+                        normalizationContext.mode,
+                      )
+                    : undefined,
+                  signaturesAdded: normalizationContext?.signaturesAdded ?? 0,
+                  signaturesStripped:
+                    normalizationContext?.signaturesStripped ?? 0,
+                  authType: this.config.getContentGeneratorConfig()?.authType,
+                }),
+                model: normalizationContext?.model ?? model,
+              });
+              continue;
             }
 
             // Check if the error is retryable (e.g., transient SSL errors
@@ -472,10 +527,8 @@ export class GeminiChat {
     prompt_id: string,
     abortSignal: AbortSignal,
     role: LlmRole,
+    flipThoughtSignatureNormalizationMode: boolean = false,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    const contentsForPreviewModel =
-      this.ensureActiveLoopHasThoughtSignatures(requestContents);
-
     // Track final request parameters for AfterModel hooks
     const {
       model: availabilityFinalModel,
@@ -526,9 +579,19 @@ export class GeminiChat {
         abortSignal,
       };
 
-      let contentsToUse = supportsModernFeatures(modelToUse)
-        ? contentsForPreviewModel
-        : requestContents;
+      const normalizationMode = this.getThoughtSignatureNormalizationMode(
+        modelToUse,
+        flipThoughtSignatureNormalizationMode,
+      );
+      const initialNormalization =
+        this.normalizeThoughtSignaturesForRequestWithStats(
+          requestContents,
+          normalizationMode,
+        );
+      let contentsToUse = initialNormalization.contents;
+      let signaturesAdded = initialNormalization.signaturesAdded;
+      let signaturesStripped = initialNormalization.signaturesStripped;
+      let lastNormalizationModel = modelToUse;
 
       const hookSystem = this.config.getHookSystem();
       if (hookSystem) {
@@ -566,9 +629,24 @@ export class GeminiChat {
           beforeModelResult.modifiedContents &&
           Array.isArray(beforeModelResult.modifiedContents)
         ) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          contentsToUse = beforeModelResult.modifiedContents as Content[];
+          const modifiedNormalization =
+            this.normalizeThoughtSignaturesForRequestWithStats(
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              beforeModelResult.modifiedContents as Content[],
+              normalizationMode,
+            );
+          contentsToUse = modifiedNormalization.contents;
+          signaturesAdded += modifiedNormalization.signaturesAdded;
+          signaturesStripped += modifiedNormalization.signaturesStripped;
+          lastNormalizationModel = modelToUse;
         }
+
+        this.lastThoughtSignatureNormalizationContext = {
+          mode: normalizationMode,
+          model: lastNormalizationModel,
+          signaturesAdded,
+          signaturesStripped,
+        };
 
         const toolSelectionResult =
           await hookSystem.fireBeforeToolSelectionEvent({
@@ -587,6 +665,13 @@ export class GeminiChat {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           config.tools = toolSelectionResult.tools as Tool[];
         }
+      } else {
+        this.lastThoughtSignatureNormalizationContext = {
+          mode: normalizationMode,
+          model: lastNormalizationModel,
+          signaturesAdded,
+          signaturesStripped,
+        };
       }
 
       if (this.onModelChanged) {
@@ -733,53 +818,113 @@ export class GeminiChat {
     });
   }
 
+  private getThoughtSignatureNormalizationMode(
+    model: string,
+    flip: boolean = false,
+  ): ThoughtSignatureNormalizationMode {
+    const mode = supportsModernFeatures(model) ? 'require' : 'strip';
+    return flip ? this.flipThoughtSignatureNormalizationMode(mode) : mode;
+  }
+
+  private flipThoughtSignatureNormalizationMode(
+    mode: ThoughtSignatureNormalizationMode,
+  ): ThoughtSignatureNormalizationMode {
+    return mode === 'require' ? 'strip' : 'require';
+  }
+
   // To ensure our requests validate, the first function call in every model
-  // turn within the active loop must have a `thoughtSignature` property.
-  // If we do not do this, we will get back 400 errors from the API.
-  ensureActiveLoopHasThoughtSignatures(requestContents: Content[]): Content[] {
-    // First, find the start of the active loop by finding the last user turn
-    // with a text message, i.e. that is not a function response.
-    let activeLoopStartIndex = -1;
-    for (let i = requestContents.length - 1; i >= 0; i--) {
-      const content = requestContents[i];
-      if (content.role === 'user' && content.parts?.some((part) => part.text)) {
-        activeLoopStartIndex = i;
-        break;
+  // turn in the full request must have a `thoughtSignature` property when sent
+  // to modern models. Legacy paths may reject `thoughtSignature`, so we strip
+  // all occurrences in strip mode.
+  normalizeThoughtSignaturesForRequest(
+    requestContents: Content[],
+    mode: ThoughtSignatureNormalizationMode,
+  ): Content[] {
+    return this.normalizeThoughtSignaturesForRequestWithStats(
+      requestContents,
+      mode,
+    ).contents;
+  }
+
+  private normalizeThoughtSignaturesForRequestWithStats(
+    requestContents: Content[],
+    mode: ThoughtSignatureNormalizationMode,
+  ): ThoughtSignatureNormalizationStats {
+    let updatedContents: Content[] | undefined;
+    let signaturesAdded = 0;
+    let signaturesStripped = 0;
+
+    for (let i = 0; i < requestContents.length; i++) {
+      const content = updatedContents?.[i] ?? requestContents[i];
+      const parts = content.parts;
+      if (!parts || parts.length === 0) {
+        continue;
       }
-    }
 
-    if (activeLoopStartIndex === -1) {
-      return requestContents;
-    }
+      if (mode === 'require') {
+        if (content.role !== 'model') {
+          continue;
+        }
 
-    // Iterate through every message in the active loop, ensuring that the first
-    // function call in each message's list of parts has a valid
-    // thoughtSignature property. If it does not we replace the function call
-    // with a copy that uses the synthetic thought signature.
-    const newContents = requestContents.slice(); // Shallow copy the array
-    for (let i = activeLoopStartIndex; i < newContents.length; i++) {
-      const content = newContents[i];
-      if (content.role === 'model' && content.parts) {
-        const newParts = content.parts.slice();
-        for (let j = 0; j < newParts.length; j++) {
-          const part = newParts[j];
-          if (part.functionCall) {
-            if (!part.thoughtSignature) {
-              newParts[j] = {
-                ...part,
-                thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
-              };
-              newContents[i] = {
-                ...content,
-                parts: newParts,
-              };
-            }
-            break; // Only consider the first function call
+        const firstFunctionCallIndex = parts.findIndex(
+          (part) => !!part.functionCall,
+        );
+        if (firstFunctionCallIndex === -1) {
+          continue;
+        }
+
+        const firstFunctionCall = parts[firstFunctionCallIndex];
+        if (firstFunctionCall.thoughtSignature) {
+          continue;
+        }
+
+        if (!updatedContents) {
+          updatedContents = requestContents.slice();
+        }
+        const copiedParts = parts.slice();
+        copiedParts[firstFunctionCallIndex] = {
+          ...firstFunctionCall,
+          thoughtSignature: SYNTHETIC_THOUGHT_SIGNATURE,
+        };
+        signaturesAdded++;
+        updatedContents[i] = {
+          ...content,
+          parts: copiedParts,
+        };
+        continue;
+      }
+
+      let copiedParts: Part[] | undefined;
+      for (let j = 0; j < parts.length; j++) {
+        const part = parts[j];
+        if (part && typeof part === 'object' && 'thoughtSignature' in part) {
+          if (!copiedParts) {
+            copiedParts = parts.slice();
           }
+          const strippedPart = { ...part };
+          delete (strippedPart as { thoughtSignature?: string })
+            .thoughtSignature;
+          signaturesStripped++;
+          copiedParts[j] = strippedPart;
         }
       }
+
+      if (copiedParts) {
+        if (!updatedContents) {
+          updatedContents = requestContents.slice();
+        }
+        updatedContents[i] = {
+          ...content,
+          parts: copiedParts,
+        };
+      }
     }
-    return newContents;
+
+    return {
+      contents: updatedContents ?? requestContents,
+      signaturesAdded,
+      signaturesStripped,
+    };
   }
 
   setTools(tools: Tool[]): void {

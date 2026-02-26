@@ -1,0 +1,3 @@
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"functionCall":{"name":"list_directory","args":{"path":"."}}}],"role":"model"},"finishReason":"STOP","index":0}]}]}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"List complete."}],"role":"model"},"finishReason":"STOP","index":0}]}]}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"Resume complete."}],"role":"model"},"finishReason":"STOP","index":0}]}]}

@@ -1391,6 +1391,108 @@ describe('GeminiChat', () => {
         ).toHaveBeenCalledTimes(1);
       });
 
+      it('should perform one compatibility retry with flipped normalization mode on invalid argument errors', async () => {
+        const invalidArgumentError = new ApiError({
+          message: 'Request contains an invalid argument',
+          status: 400,
+        });
+
+        chat.setHistory([
+          { role: 'user', parts: [{ text: 'Prior prompt' }] },
+          {
+            role: 'model',
+            parts: [
+              {
+                functionCall: { name: 'prior_tool', args: {} },
+                thoughtSignature: 'existing-sig',
+              },
+            ],
+          },
+        ]);
+
+        vi.mocked(mockContentGenerator.generateContentStream)
+          .mockRejectedValueOnce(invalidArgumentError)
+          .mockResolvedValueOnce(
+            (async function* () {
+              yield {
+                candidates: [
+                  {
+                    content: {
+                      parts: [{ text: 'Success after compatibility retry' }],
+                    },
+                    finishReason: 'STOP',
+                  },
+                ],
+              } as unknown as GenerateContentResponse;
+            })(),
+          );
+
+        const stream = await chat.sendMessageStream(
+          { model: 'gemini-3-flash-preview' },
+          'test message',
+          'prompt-id-invalid-argument-retry',
+          new AbortController().signal,
+          LlmRole.MAIN,
+        );
+
+        const events: StreamEvent[] = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+
+        expect(
+          mockContentGenerator.generateContentStream,
+        ).toHaveBeenCalledTimes(2);
+        expect(
+          events.some((event) => event.type === StreamEventType.RETRY),
+        ).toBe(true);
+
+        const firstAttemptContents = vi.mocked(
+          mockContentGenerator.generateContentStream,
+        ).mock.calls[0]?.[0]?.contents as Content[];
+        const secondAttemptContents = vi.mocked(
+          mockContentGenerator.generateContentStream,
+        ).mock.calls[1]?.[0]?.contents as Content[];
+
+        expect(firstAttemptContents[1]?.parts?.[0]?.thoughtSignature).toBe(
+          'existing-sig',
+        );
+        expect(secondAttemptContents[1]?.parts?.[0]).not.toHaveProperty(
+          'thoughtSignature',
+        );
+      });
+
+      it('should only perform one compatibility retry for invalid argument errors', async () => {
+        const invalidArgumentError = new ApiError({
+          message: 'Request contains an invalid argument',
+          status: 400,
+        });
+
+        vi.mocked(mockContentGenerator.generateContentStream)
+          .mockRejectedValueOnce(invalidArgumentError)
+          .mockRejectedValueOnce(invalidArgumentError);
+
+        const stream = await chat.sendMessageStream(
+          { model: 'gemini-3-flash-preview' },
+          'test message',
+          'prompt-id-invalid-argument-once',
+          new AbortController().signal,
+          LlmRole.MAIN,
+        );
+
+        await expect(
+          (async () => {
+            for await (const _ of stream) {
+              // consume
+            }
+          })(),
+        ).rejects.toThrow(invalidArgumentError);
+
+        expect(
+          mockContentGenerator.generateContentStream,
+        ).toHaveBeenCalledTimes(2);
+      });
+
       it('should retry on 429 Rate Limit errors', async () => {
         const error429 = new ApiError({ message: 'Rate Limited', status: 429 });
 
@@ -1990,8 +2092,8 @@ describe('GeminiChat', () => {
     });
   });
 
-  describe('ensureActiveLoopHasThoughtSignatures', () => {
-    it('should add thoughtSignature to the first functionCall in each model turn of the active loop', () => {
+  describe('normalizeThoughtSignaturesForRequest', () => {
+    it('should add thoughtSignature to the first functionCall in each model turn across full history in require mode', () => {
       const chat = new GeminiChat(mockConfig, '', [], []);
       const history: Content[] = [
         { role: 'user', parts: [{ text: 'Old message' }] },
@@ -2025,30 +2127,32 @@ describe('GeminiChat', () => {
         },
       ];
 
-      const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
+      const newContents = chat.normalizeThoughtSignaturesForRequest(
+        history,
+        'require',
+      );
 
-      // Outside active loop - unchanged
-      expect(newContents[1]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
+      // First model turn in earlier history now gets a synthetic signature.
+      expect(newContents[1]?.parts?.[0]?.thoughtSignature).toBe(
+        SYNTHETIC_THOUGHT_SIGNATURE,
+      );
 
-      // Inside active loop, first model turn
-      // First function call gets a signature
+      // First function call gets a signature.
       expect(newContents[3]?.parts?.[0]?.thoughtSignature).toBe(
         SYNTHETIC_THOUGHT_SIGNATURE,
       );
-      // Second function call does NOT
+      // Only the first function call per model turn gets normalized.
       expect(newContents[3]?.parts?.[1]).not.toHaveProperty('thoughtSignature');
 
       // User functionResponse part - unchanged (this is not a model turn)
       expect(newContents[4]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
 
-      // Inside active loop, second model turn
-      // First function call already has a signature, so nothing changes
+      // Existing signature is preserved.
       expect(newContents[5]?.parts?.[0]?.thoughtSignature).toBe('existing-sig');
-      // Second function call does NOT get a signature
       expect(newContents[5]?.parts?.[1]).not.toHaveProperty('thoughtSignature');
     });
 
-    it('should not modify contents if there is no user text message', () => {
+    it('should still normalize model functionCalls when there is no user text message', () => {
       const chat = new GeminiChat(mockConfig, '', [], []);
       const history: Content[] = [
         {
@@ -2060,23 +2164,83 @@ describe('GeminiChat', () => {
           parts: [{ functionCall: { name: 'tool2', args: {} } }],
         },
       ];
-      const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
-      expect(newContents).toEqual(history);
-      expect(newContents[1]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
+      const newContents = chat.normalizeThoughtSignaturesForRequest(
+        history,
+        'require',
+      );
+      expect(newContents).not.toBe(history);
+      expect(newContents[1]?.parts?.[0]?.thoughtSignature).toBe(
+        SYNTHETIC_THOUGHT_SIGNATURE,
+      );
     });
 
     it('should handle an empty history', () => {
       const chat = new GeminiChat(mockConfig, '', []);
       const history: Content[] = [];
-      const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
-      expect(newContents).toEqual([]);
+      const newContents = chat.normalizeThoughtSignaturesForRequest(
+        history,
+        'require',
+      );
+      expect(newContents).toBe(history);
     });
 
-    it('should handle history with only a user message', () => {
+    it('should handle history with only a user message without allocating in require mode', () => {
       const chat = new GeminiChat(mockConfig, '', []);
       const history: Content[] = [{ role: 'user', parts: [{ text: 'Hello' }] }];
-      const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
-      expect(newContents).toEqual(history);
+      const newContents = chat.normalizeThoughtSignaturesForRequest(
+        history,
+        'require',
+      );
+      expect(newContents).toBe(history);
+    });
+
+    it('should remove thought signatures from all parts in strip mode and be idempotent', () => {
+      const chat = new GeminiChat(mockConfig, '', []);
+      const history: Content[] = [
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: { name: 'tool_with_sig', args: {} },
+              thoughtSignature: 'existing-sig',
+            },
+            { text: 'thinking text', thoughtSignature: 'thought-sig' },
+          ],
+        },
+      ];
+
+      const stripped = chat.normalizeThoughtSignaturesForRequest(
+        history,
+        'strip',
+      );
+      expect(stripped[0]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
+      expect(stripped[0]?.parts?.[1]).not.toHaveProperty('thoughtSignature');
+
+      const strippedAgain = chat.normalizeThoughtSignaturesForRequest(
+        stripped,
+        'strip',
+      );
+      expect(strippedAgain).toBe(stripped);
+    });
+
+    it('should be idempotent in require mode', () => {
+      const chat = new GeminiChat(mockConfig, '', []);
+      const history: Content[] = [
+        {
+          role: 'model',
+          parts: [{ functionCall: { name: 'tool_without_sig', args: {} } }],
+        },
+      ];
+
+      const normalizedOnce = chat.normalizeThoughtSignaturesForRequest(
+        history,
+        'require',
+      );
+      const normalizedTwice = chat.normalizeThoughtSignaturesForRequest(
+        normalizedOnce,
+        'require',
+      );
+      expect(normalizedTwice).toBe(normalizedOnce);
     });
   });
 
@@ -2346,6 +2510,113 @@ describe('GeminiChat', () => {
         LlmRole.MAIN,
       );
     });
+
+    it('normalizes thought signatures per attempt when fallback changes model compatibility', async () => {
+      let activeModel = 'gemini-3-flash-preview';
+      vi.mocked(mockConfig.getActiveModel).mockImplementation(
+        () => activeModel,
+      );
+      vi.mocked(mockConfig.setActiveModel).mockImplementation((model) => {
+        activeModel = model;
+      });
+
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockImplementation((key) => {
+        if (key.model === 'gemini-3-flash-preview') {
+          return makeResolvedModelConfig('gemini-3-flash-preview', {
+            temperature: 0.1,
+          });
+        }
+        if (key.model === 'gemini-2.5-flash') {
+          return makeResolvedModelConfig('gemini-2.5-flash', {
+            temperature: 0.9,
+          });
+        }
+        return makeResolvedModelConfig('gemini-3-flash-preview', {
+          temperature: 0.1,
+        });
+      });
+
+      mockRetryWithBackoff.mockImplementation(async (apiCall) => {
+        await apiCall();
+        activeModel = 'gemini-2.5-flash';
+        return apiCall();
+      });
+
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockResolvedValueOnce(
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'first' }], role: 'model' },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        )
+        .mockResolvedValueOnce(
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'second' }], role: 'model' },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
+
+      const chatWithHistory = new GeminiChat(
+        mockConfig,
+        '',
+        [],
+        [
+          { role: 'user', parts: [{ text: 'prior user prompt' }] },
+          {
+            role: 'model',
+            parts: [
+              {
+                functionCall: { name: 'prior_tool', args: {} },
+                thoughtSignature: 'existing-sig',
+              },
+            ],
+          },
+          {
+            role: 'user',
+            parts: [{ functionResponse: { name: 'prior_tool', response: {} } }],
+          },
+        ],
+      );
+
+      const stream = await chatWithHistory.sendMessageStream(
+        { model: 'gemini-3-flash-preview' },
+        'test',
+        'prompt-mode-switch',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      const firstAttemptContents = vi.mocked(
+        mockContentGenerator.generateContentStream,
+      ).mock.calls[0]?.[0]?.contents as Content[];
+      const secondAttemptContents = vi.mocked(
+        mockContentGenerator.generateContentStream,
+      ).mock.calls[1]?.[0]?.contents as Content[];
+
+      expect(firstAttemptContents[1]?.parts?.[0]?.thoughtSignature).toBe(
+        'existing-sig',
+      );
+      expect(secondAttemptContents[1]?.parts?.[0]).not.toHaveProperty(
+        'thoughtSignature',
+      );
+    });
   });
 
   describe('Hook execution control', () => {
@@ -2421,6 +2692,48 @@ describe('GeminiChat', () => {
         type: StreamEventType.CHUNK,
         value: syntheticResponse,
       });
+    });
+
+    it('normalizes hook-modified contents before sending request', async () => {
+      vi.mocked(mockHookSystem.fireBeforeModelEvent).mockResolvedValue({
+        blocked: false,
+        modifiedContents: [
+          { role: 'user', parts: [{ text: 'hook user prompt' }] },
+          {
+            role: 'model',
+            parts: [{ functionCall: { name: 'hook_tool', args: {} } }],
+          },
+        ],
+      });
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'response' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-3-flash-preview' },
+        'test',
+        'prompt-hook-modified-contents',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      const sentContents = vi.mocked(mockContentGenerator.generateContentStream)
+        .mock.calls[0]?.[0]?.contents as Content[];
+      expect(sentContents[1]?.parts?.[0]?.thoughtSignature).toBe(
+        SYNTHETIC_THOUGHT_SIGNATURE,
+      );
     });
 
     it('should yield AGENT_EXECUTION_STOPPED when AfterModel hook stops execution', async () => {

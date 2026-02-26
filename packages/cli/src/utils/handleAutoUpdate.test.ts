@@ -285,13 +285,15 @@ describe('handleAutoUpdate', () => {
 describe('setUpdateHandler', () => {
   let addItem: ReturnType<typeof vi.fn>;
   let setUpdateInfo: ReturnType<typeof vi.fn>;
+  let setRestartRequired: ReturnType<typeof vi.fn>;
   let unregister: () => void;
 
   beforeEach(() => {
     addItem = vi.fn();
     setUpdateInfo = vi.fn();
+    setRestartRequired = vi.fn();
     vi.useFakeTimers();
-    unregister = setUpdateHandler(addItem, setUpdateInfo);
+    unregister = setUpdateHandler(addItem, setUpdateInfo, setRestartRequired);
   });
 
   afterEach(() => {
@@ -320,6 +322,7 @@ describe('setUpdateHandler', () => {
     // Access the actual emitter to emit events
     updateEventEmitter.emit('update-received', updateInfo);
 
+    expect(setRestartRequired).toHaveBeenCalledWith(false);
     expect(setUpdateInfo).toHaveBeenCalledWith(updateInfo);
 
     // Advance timers to trigger timeout
@@ -338,6 +341,7 @@ describe('setUpdateHandler', () => {
   it('should handle update-failed event', () => {
     updateEventEmitter.emit('update-failed', { message: 'Failed' });
 
+    expect(setRestartRequired).toHaveBeenCalledWith(false);
     expect(setUpdateInfo).toHaveBeenCalledWith(null);
     expect(addItem).toHaveBeenCalledWith(
       {
@@ -351,6 +355,7 @@ describe('setUpdateHandler', () => {
   it('should handle update-success event', () => {
     updateEventEmitter.emit('update-success', { message: 'Success' });
 
+    expect(setRestartRequired).toHaveBeenCalledWith(true);
     expect(setUpdateInfo).toHaveBeenCalledWith(null);
     expect(addItem).toHaveBeenCalledWith(
       {
