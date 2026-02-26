@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useCallback, useMemo, useReducer, useEffect } from 'react';
+import { useCallback, useMemo, useReducer } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useSettingsStore } from '../contexts/SettingsContext.js';
@@ -159,18 +159,23 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     [listItems],
   );
 
-  // Save settings when orderedIds or selectedIds change
-  useEffect(() => {
+  const isResetFocused = activeIndex === listItems.length + 1;
+  const isShowLabelsFocused = activeIndex === listItems.length;
+
+  const handleSaveAndClose = useCallback(() => {
     const finalItems = orderedIds.filter((id: string) => selectedIds.has(id));
-    // Only save if it's different from current setting to avoid loops
     const currentSetting = settings.merged.ui?.footer?.items;
     if (JSON.stringify(finalItems) !== JSON.stringify(currentSetting)) {
       setSetting(SettingScope.User, 'ui.footer.items', finalItems);
     }
-  }, [orderedIds, selectedIds, setSetting, settings.merged.ui?.footer?.items]);
-
-  const isResetFocused = activeIndex === listItems.length + 1;
-  const isShowLabelsFocused = activeIndex === listItems.length;
+    onClose?.();
+  }, [
+    orderedIds,
+    selectedIds,
+    setSetting,
+    settings.merged.ui?.footer?.items,
+    onClose,
+  ]);
 
   const handleResetToDefaults = useCallback(() => {
     setSetting(SettingScope.User, 'ui.footer.items', undefined);
@@ -192,7 +197,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
   useKeypress(
     (key: Key) => {
       if (keyMatchers[Command.ESCAPE](key)) {
-        onClose?.();
+        handleSaveAndClose();
         return true;
       }
 
@@ -311,7 +316,13 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         element: mockData[id],
       }));
 
-    return <FooterRow items={rowItems} showLabels={showLabels} />;
+    return (
+      <Box overflow="hidden" flexWrap="nowrap">
+        <Box flexShrink={0}>
+          <FooterRow items={rowItems} showLabels={showLabels} />
+        </Box>
+      </Box>
+    );
   }, [orderedIds, selectedIds, activeId, isResetFocused, showLabels]);
 
   return (
