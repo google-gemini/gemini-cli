@@ -101,7 +101,8 @@ structure, and consultation level are proportional to the task's complexity:
       **Implementation Steps**, and **Verification & Testing**.
     - **Complex Tasks:** Comprehensive plans including **Background &
       Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives
-      Considered**, and **Migration & Rollback** strategies.
+      Considered**, a phased **Implementation Plan**, **Verification**, and
+      **Migration & Rollback** strategies.
 4.  **Review & Approval:** Use the [`exit_plan_mode`] tool to present the plan
     and formally request approval.
     - **Approve:** Exit Plan Mode and start implementation.
