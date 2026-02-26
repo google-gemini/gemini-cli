@@ -146,7 +146,10 @@ function getTextWithNextGhostWord(
   currentText: string,
   ghostText: string,
 ): string | null {
-  const strippedGhostText = stripUnsafeCharacters(ghostText);
+  const strippedGhostText = stripUnsafeCharacters(ghostText).replace(
+    PASTED_TEXT_PLACEHOLDER_REGEX,
+    '',
+  );
   if (!strippedGhostText || !strippedGhostText.startsWith(currentText)) {
     return null;
   }
