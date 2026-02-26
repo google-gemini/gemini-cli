@@ -139,7 +139,7 @@ export async function formatGrepResults(
   params: {
     pattern: string;
     names_only?: boolean;
-    include?: string;
+    include_pattern?: string;
     // Context params to determine if auto-context should be skipped
     context?: number;
     before?: number;
@@ -148,10 +148,10 @@ export async function formatGrepResults(
   searchLocationDescription: string,
   totalMaxMatches: number,
 ): Promise<{ llmContent: string; returnDisplay: string }> {
-  const { pattern, names_only, include } = params;
+  const { pattern, names_only, include_pattern } = params;
 
   if (allMatches.length === 0) {
-    const noMatchMsg = `No matches found for pattern "${pattern}" ${searchLocationDescription}${include ? ` (filter: "${include}")` : ''}.`;
+    const noMatchMsg = `No matches found for pattern "${pattern}" ${searchLocationDescription}${include_pattern ? ` (filter: "${include_pattern}")` : ''}.`;
     return { llmContent: noMatchMsg, returnDisplay: `No matches found` };
   }
 
@@ -171,7 +171,7 @@ export async function formatGrepResults(
   if (names_only) {
     const filePaths = Object.keys(matchesByFile).sort();
     let llmContent = `Found ${filePaths.length} files with matches for pattern "${pattern}" ${searchLocationDescription}${
-      include ? ` (filter: "${include}")` : ''
+      include_pattern ? ` (filter: "${include_pattern}")` : ''
     }${
       wasTruncated
         ? ` (results limited to ${totalMaxMatches} matches for performance)`
@@ -184,7 +184,7 @@ export async function formatGrepResults(
     };
   }
 
-  let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${pattern}" ${searchLocationDescription}${include ? ` (filter: "${include}")` : ''}`;
+  let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${pattern}" ${searchLocationDescription}${include_pattern ? ` (filter: "${include_pattern}")` : ''}`;
 
   if (wasTruncated) {
     llmContent += ` (results limited to ${totalMaxMatches} matches for performance)`;
