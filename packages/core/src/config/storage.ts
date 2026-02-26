@@ -289,6 +289,10 @@ export class Storage {
     return path.join(this.getProjectTempDir(), 'plans');
   }
 
+  getProjectTempTrackerDir(): string {
+    return path.join(this.getProjectTempDir(), 'tracker');
+  }
+
   getPlansDir(): string {
     if (this.customPlansDir) {
       const resolvedPath = path.resolve(
