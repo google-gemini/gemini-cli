@@ -3,6 +3,56 @@
 This guide provides instructions for setting up and using local development
 features, such as development tracing.
 
+## DevTools inspector
+
+Gemini CLI includes a built-in DevTools inspector. This web-based UI provides a
+real-time view of the agent's internal state, allowing you to inspect network
+requests, tool executions, and console logs. It is an essential tool for
+debugging complex agent behaviors and developing new UI features.
+
+### Building the DevTools package
+
+The DevTools server (`@google/gemini-cli-devtools`) is a separate package in the
+monorepo. If you run the local CLI without building it first, you will encounter
+an `ERR_MODULE_NOT_FOUND` error.
+
+To use DevTools locally, you must first build the entire project from the root
+directory:
+
+```bash
+npm install
+npm run build:all
+```
+
+### Running with DevTools
+
+You must run your local build, not the globally installed `gemini` command.
+
+There are two ways to start the DevTools inspector:
+
+1.  **Always on (Recommended for UI development):** Enable the inspector
+    permanently in your settings file. The server will start in the background
+    every time you run the CLI.
+
+    Find `settings.json` in the `.gemini` folder in your user's home directory. Add or update the `"devtools": true` key-value pair within the `general` object. For example:
+
+    ```json
+    "general": {
+      "preferredEditor": "code",
+      "devtools": true
+    }
+    ```
+
+    Start your local CLI using `npm run start`. Then, open your browser and
+    navigate to `http://localhost:25417`.
+
+2.  **On-demand (Hotkey):** If you prefer faster CLI startup times, you can
+    start the DevTools server only when needed.
+
+    Start your local CLI using `npm run start`. At any point during your
+    session, press **`F12`**. The CLI will spin up the server and automatically
+    attempt to open `http://localhost:25417` in your default browser.
+
 ## Development tracing
 
 Development traces (dev traces) are OpenTelemetry (OTel) traces that help you
