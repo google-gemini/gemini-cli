@@ -35,6 +35,7 @@ export interface SystemPromptOptions {
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
+  finalReminder?: FinalReminderOptions;
 }
 
 export interface PreambleOptions {
@@ -60,7 +61,6 @@ export interface PrimaryWorkflowsOptions {
 
 export interface OperationalGuidelinesOptions {
   interactive: boolean;
-  isGemini3: boolean;
   enableShellEfficiency: boolean;
   interactiveShellEnabled: boolean;
 }
@@ -69,6 +69,10 @@ export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
 
 export interface GitRepoOptions {
   interactive: boolean;
+}
+
+export interface FinalReminderOptions {
+  readFileToolName: string;
 }
 
 export interface PlanningWorkflowOptions {
