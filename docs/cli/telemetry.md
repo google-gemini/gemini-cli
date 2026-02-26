@@ -176,11 +176,12 @@ Sends telemetry directly to Google Cloud services. No collector needed.
    }
    ```
 2. Run Gemini CLI and send prompts.
-3. View logs and metrics:
+3. View logs, metrics, and traces:
    - Open the Google Cloud Console in your browser after sending prompts:
-     - Logs: https://console.cloud.google.com/logs/
-     - Metrics: https://console.cloud.google.com/monitoring/metrics-explorer
-     - Traces: https://console.cloud.google.com/traces/list
+     - Logs (Logs Explorer): https://console.cloud.google.com/logs/
+     - Metrics (Metrics Explorer):
+       https://console.cloud.google.com/monitoring/metrics-explorer
+     - Traces (Trace Explorer): https://console.cloud.google.com/traces/list
 
 ### Collector-based export (advanced)
 
@@ -208,11 +209,12 @@ forward data to Google Cloud.
    - Save collector logs to `~/.gemini/tmp/<projectHash>/otel/collector-gcp.log`
    - Stop collector on exit (e.g. `Ctrl+C`)
 3. Run Gemini CLI and send prompts.
-4. View logs and metrics:
+4. View logs, metrics, and traces:
    - Open the Google Cloud Console in your browser after sending prompts:
-     - Logs: https://console.cloud.google.com/logs/
-     - Metrics: https://console.cloud.google.com/monitoring/metrics-explorer
-     - Traces: https://console.cloud.google.com/traces/list
+     - Logs (Logs Explorer): https://console.cloud.google.com/logs/
+     - Metrics (Metrics Explorer):
+       https://console.cloud.google.com/monitoring/metrics-explorer
+     - Traces (Trace Explorer): https://console.cloud.google.com/traces/list
    - Open `~/.gemini/tmp/<projectHash>/otel/collector-gcp.log` to view local
      collector logs.
 
@@ -824,11 +826,12 @@ Optional performance monitoring for startup, CPU/memory, and phase timing.
     - `current_value` (number)
     - `baseline_value` (number)
 
-### Traces (Dev Tracing)
+### Traces
 
-When `GEMINI_DEV_TRACING=true` is set, dev traces encapsulate agent and backend
-operations. While dev traces are inherently verbose and targeted for developers,
-we capture consistent custom span attributes:
+Traces offer a granular, "under-the-hood" view of every agent and backend
+operation. By providing a high-fidelity execution map, they enable precise
+debugging of complex tool interactions and deep performance optimization. Each
+trace captures rich, consistent metadata via custom span attributes:
 
 - `gen_ai.operation.name` (string): The high-level operation kind (e.g.
   "tool_call", "llm_call").

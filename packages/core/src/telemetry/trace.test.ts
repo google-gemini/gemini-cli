@@ -51,35 +51,13 @@ describe('runInDevTraceSpan', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(trace.getTracer).mockReturnValue(mockTracer);
-    vi.stubEnv('GEMINI_DEV_TRACING', 'true');
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('should not trace if GEMINI_DEV_TRACING is not true', async () => {
-    vi.stubEnv('GEMINI_DEV_TRACING', 'false');
-    const fn = vi.fn(async () => 'result');
-
-    const result = await runInDevTraceSpan(
-      { operation: GeminiCliOperation.LLMCall },
-      fn,
-    );
-
-    expect(result).toBe('result');
-    expect(trace.getTracer).not.toHaveBeenCalled();
-    expect(fn).toHaveBeenCalledWith(
-      expect.objectContaining({
-        metadata: expect.objectContaining({
-          name: GeminiCliOperation.LLMCall,
-          attributes: {},
-        }),
-      }),
-    );
-  });
-
-  it('should start an active span if GEMINI_DEV_TRACING is true', async () => {
+  it('should start an active span', async () => {
     const fn = vi.fn(async () => 'result');
 
     const result = await runInDevTraceSpan(
