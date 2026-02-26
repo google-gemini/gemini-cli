@@ -210,7 +210,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         handleToggleFavorite();
         return true;
       }
-      return false;
+      return true;
     },
     { isActive: true },
   );
