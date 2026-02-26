@@ -22,6 +22,7 @@ which features your extension needs.
 | **[Context file (`GEMINI.md`)](reference.md#contextfilename)** | A markdown file containing instructions that are loaded into the model's context at the start of every session.    | Use this to define the "personality" of your extension, set coding standards, or provide essential knowledge that the model should always have.                                                                                                                                                | CLI provides to model |
 | **[Agent skills](../cli/skills.md)**                           | A specialized set of instructions and workflows that the model activates only when needed.                         | Use this for complex, occasional tasks (like "create a PR" or "audit security") to avoid cluttering the main context window when the skill isn't being used.                                                                                                                                   | Model                 |
 | **[Hooks](../hooks/index.md)**                                 | A way to intercept and customize the CLI's behavior at specific lifecycle events (e.g., before/after a tool call). | Use this when you want to automate actions based on what the model is doing, like validating tool arguments, logging activity, or modifying the model's input/output.                                                                                                                          | CLI                   |
+| **[UI contributions](#step-8-add-ui-contributions)**           | Dynamic visual elements added to the CLI interface, such as status badges in the footer.                           | Use this to surface environmental context, such as the active cloud project, virtual environment, or system status, directly in the CLI's persistent status bar.                                                                                                                               | CLI                   |
 | **[Custom themes](reference.md#themes)**                       | A set of color definitions to personalize the CLI UI.                                                              | Use this to provide a unique visual identity for your extension or to offer specialized high-contrast or thematic color schemes.                                                                                                                                                               | User (via /theme)     |
 
 ## Step 1: Create a new extension
@@ -278,7 +279,44 @@ Skills are activated only when needed, which saves context tokens.
 Gemini CLI automatically discovers skills bundled with your extension. The model
 activates them when it identifies a relevant task.
 
-## Step 8: Release your extension
+## Step 8: Add UI contributions
+
+UI contributions let you add dynamic visual elements to the Gemini CLI
+interface. The most common use case is adding "status badges" to the footer to
+surface environmental context.
+
+1.  Open `gemini-extension.json`.
+2.  Add a `ui` object with a `badges` array:
+
+    ```json
+    {
+      "name": "my-first-extension",
+      "version": "1.0.0",
+      "ui": {
+        "badges": [
+          {
+            "command": "sh",
+            "args": ["${extensionPath}/status.sh"],
+            "color": "accent",
+            "intervalMs": 30000
+          }
+        ]
+      }
+    }
+    ```
+
+3.  Create the script file (for example, `status.sh`) that returns the text to
+    display:
+
+    ```bash
+    #!/bin/bash
+    echo "active-context"
+    ```
+
+Gemini CLI executes these commands asynchronously in the background and renders
+the output as a badge in the persistent footer.
+
+## Step 9: Release your extension
 
 When your extension is ready, share it with others via a Git repository or
 GitHub Releases. Refer to the [Extension Releasing Guide](./releasing.md) for
