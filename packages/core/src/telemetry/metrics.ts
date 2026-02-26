@@ -898,6 +898,7 @@ export function recordModelRoutingMetrics(
     'routing.decision_model': event.decision_model,
     'routing.decision_source': event.decision_source,
     'routing.failed': event.failed,
+    'routing.approval_mode': event.approval_mode,
   };
 
   if (event.reasoning) {
