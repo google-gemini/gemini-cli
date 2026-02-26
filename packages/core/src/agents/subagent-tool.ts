@@ -181,7 +181,12 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
           [GEN_AI_AGENT_DESCRIPTION]: this.definition.description,
         },
       },
-      () => invocation.execute(signal, updateOutput),
+      async ({ metadata }) => {
+        metadata.input = this.params;
+        const result = await invocation.execute(signal, updateOutput);
+        metadata.output = result;
+        return result;
+      },
     );
   }
 

@@ -95,13 +95,18 @@ import { runInDevTraceSpan } from '@google/gemini-cli-core';
 import { GeminiCliOperation } from '@google/gemini-cli-core/lib/telemetry/constants.js';
 
 await runInDevTraceSpan(
-  { operation: GeminiCliOperation.ToolCall },
+  {
+    operation: GeminiCliOperation.ToolCall,
+    attributes: {
+      [GEN_AI_REQUEST_MODEL]: 'gemini-4.0-mega',
+    },
+  },
   async ({ metadata }) => {
     // The `metadata` object allows you to record the input and output of the
     // operation as well as other attributes.
     metadata.input = { key: 'value' };
     // Set custom attributes.
-    metadata.attributes['gen_ai.request.model'] = 'gemini-4.0-mega';
+    metadata.attributes['custom.attribute'] = 'custom.value';
 
     // Your code to be traced goes here
     try {

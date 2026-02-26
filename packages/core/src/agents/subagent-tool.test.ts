@@ -186,6 +186,14 @@ describe('SubAgentInvocation', () => {
       }),
       expect.any(Function),
     );
+
+    // Verify metadata was set on the span
+    const spanCallback = vi.mocked(runInDevTraceSpan).mock.calls[0][1];
+    const mockMetadata = { input: undefined, output: undefined };
+    const mockSpan = { metadata: mockMetadata, endSpan: vi.fn() };
+    await spanCallback(mockSpan as Parameters<typeof spanCallback>[0]);
+    expect(mockMetadata.input).toBe(params);
+    expect(mockMetadata.output).toBe(mockResult);
   });
 
   describe('withUserHints', () => {
