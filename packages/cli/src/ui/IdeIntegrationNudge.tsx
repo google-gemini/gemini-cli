@@ -55,7 +55,7 @@ export function IdeIntegrationNudge({
       key: 'Yes',
     },
     {
-      label: 'No (esc)',
+      label: 'No (Esc)',
       value: {
         userSelection: 'no',
         isExtensionPreInstalled,
