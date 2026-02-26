@@ -11,6 +11,7 @@ import crypto from 'node:crypto';
 import { colorizeCode, colorizeLine } from '../../utils/CodeColorizer.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme as semanticTheme } from '../../semantic-colors.js';
+import { themeManager } from '../../themes/theme-manager.js';
 import type { Theme } from '../../themes/theme.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
 
@@ -177,6 +178,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         tabWidth,
         availableTerminalHeight,
         terminalWidth,
+        theme,
       );
     }
   }, [
@@ -201,7 +203,11 @@ const renderDiffContent = (
   tabWidth = DEFAULT_TAB_WIDTH,
   availableTerminalHeight: number | undefined,
   terminalWidth: number,
+  theme?: Theme,
 ) => {
+  const activeTheme = theme || themeManager.getActiveTheme();
+  const semanticColors = activeTheme.semanticColors;
+
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
     ...line,
@@ -217,7 +223,7 @@ const renderDiffContent = (
     return (
       <Box
         borderStyle="round"
-        borderColor={semanticTheme.border.default}
+        borderColor={semanticColors.border.default}
         padding={1}
       >
         <Text dimColor>No changes detected.</Text>
@@ -284,7 +290,7 @@ const renderDiffContent = (
               borderRight={false}
               borderBottom={false}
               width={terminalWidth}
-              borderColor={semanticTheme.text.secondary}
+              borderColor={semanticColors.text.secondary}
             ></Box>
           </Box>,
         );
@@ -323,10 +329,16 @@ const renderDiffContent = (
 
       const backgroundColor =
         line.type === 'add'
-          ? semanticTheme.background.diff.added
+          ? semanticColors.background.diff.added
           : line.type === 'del'
-            ? semanticTheme.background.diff.removed
+            ? semanticColors.background.diff.removed
             : undefined;
+
+      const effectiveDefaultColor =
+        activeTheme.defaultColor !== ''
+          ? activeTheme.defaultColor
+          : activeTheme.colors.Foreground;
+
       acc.push(
         <Box key={lineKey} flexDirection="row">
           <Box
@@ -336,32 +348,35 @@ const renderDiffContent = (
             backgroundColor={backgroundColor}
             justifyContent="flex-end"
           >
-            <Text color={semanticTheme.text.secondary}>{gutterNumStr}</Text>
+            <Text color={semanticColors.text.secondary}>{gutterNumStr}</Text>
           </Box>
           {line.type === 'context' ? (
-            <>
+            <Text color={effectiveDefaultColor}>
               <Text>{prefixSymbol} </Text>
-              <Text wrap="wrap">{colorizeLine(displayContent, language)}</Text>
-            </>
+              <Text wrap="wrap">
+                {colorizeLine(displayContent, language, activeTheme)}
+              </Text>
+            </Text>
           ) : (
             <Text
               backgroundColor={
                 line.type === 'add'
-                  ? semanticTheme.background.diff.added
-                  : semanticTheme.background.diff.removed
+                  ? semanticColors.background.diff.added
+                  : semanticColors.background.diff.removed
               }
+              color={effectiveDefaultColor}
               wrap="wrap"
             >
               <Text
                 color={
                   line.type === 'add'
-                    ? semanticTheme.status.success
-                    : semanticTheme.status.error
+                    ? semanticColors.status.success
+                    : semanticColors.status.error
                 }
               >
                 {prefixSymbol}
               </Text>{' '}
-              {colorizeLine(displayContent, language)}
+              {colorizeLine(displayContent, language, activeTheme)}
             </Text>
           )}
         </Box>,

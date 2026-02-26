@@ -176,6 +176,11 @@ export function colorizeCode({
         activeTheme,
       );
 
+      const effectiveDefaultColor =
+        activeTheme.defaultColor !== ''
+          ? activeTheme.defaultColor
+          : activeTheme.colors.Foreground;
+
       return (
         <Box key={index} minHeight={1}>
           {showLineNumbers && (
@@ -191,7 +196,7 @@ export function colorizeCode({
               </Text>
             </Box>
           )}
-          <Text color={activeTheme.defaultColor} wrap="wrap">
+          <Text color={effectiveDefaultColor} wrap="wrap">
             {contentToRender}
           </Text>
         </Box>

@@ -32,7 +32,7 @@ const mockSnapshot: LoadedSettingsSnapshot = {
   isTrusted: true,
   errors: [],
   merged: createTestMergedSettings({
-    ui: { theme: 'default-theme' },
+    ui: { themeLight: 'default-theme', themeDark: 'default-theme' },
   }),
 };
 
@@ -113,11 +113,11 @@ describe('SettingsContext', () => {
   it('should trigger re-renders when settings change (external event)', () => {
     const { result } = renderHook(() => useSettingsStore(), { wrapper });
 
-    expect(result.current.settings.merged.ui?.theme).toBe('default-theme');
+    expect(result.current.settings.merged.ui?.themeLight).toBe('default-theme');
 
     const newSnapshot = {
       ...mockSnapshot,
-      merged: { ui: { theme: 'new-theme' } },
+      merged: { ui: { themeLight: 'new-theme', themeDark: 'new-theme' } },
     };
     (
       mockLoadedSettings.getSnapshot as ReturnType<typeof vi.fn>
@@ -128,19 +128,19 @@ describe('SettingsContext', () => {
       listeners.forEach((l) => l());
     });
 
-    expect(result.current.settings.merged.ui?.theme).toBe('new-theme');
+    expect(result.current.settings.merged.ui?.themeLight).toBe('new-theme');
   });
 
   it('should call store.setValue when setSetting is called', () => {
     const { result } = renderHook(() => useSettingsStore(), { wrapper });
 
     act(() => {
-      result.current.setSetting(SettingScope.User, 'ui.theme', 'dark');
+      result.current.setSetting(SettingScope.User, 'ui.themeLight', 'dark');
     });
 
     expect(mockLoadedSettings.setValue).toHaveBeenCalledWith(
       SettingScope.User,
-      'ui.theme',
+      'ui.themeLight',
       'dark',
     );
   });

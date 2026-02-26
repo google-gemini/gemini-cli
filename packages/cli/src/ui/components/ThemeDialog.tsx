@@ -9,7 +9,7 @@ import { useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
-import { pickDefaultThemeName, type Theme } from '../themes/theme.js';
+import { type Theme } from '../themes/theme.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
@@ -44,7 +44,10 @@ interface ThemeDialogProps {
   terminalWidth: number;
 }
 
-import { resolveColor } from '../themes/color-utils.js';
+import { resolveColor , getThemeTypeFromBackgroundColor } from '../themes/color-utils.js';
+
+import { DefaultLight } from '../themes/default-light.js';
+import { DefaultDark } from '../themes/default.js';
 
 function generateThemeItem(
   name: string,
@@ -52,10 +55,6 @@ function generateThemeItem(
   fullTheme: Theme | undefined,
   terminalBackgroundColor: string | undefined,
 ) {
-  const isCompatible = fullTheme
-    ? themeManager.isThemeCompatible(fullTheme, terminalBackgroundColor)
-    : true;
-
   const themeBackground = fullTheme
     ? resolveColor(fullTheme.colors.Background)
     : undefined;
@@ -70,10 +69,9 @@ function generateThemeItem(
     value: name,
     themeNameDisplay: name,
     themeTypeDisplay: typeDisplay,
-    themeWarning: isCompatible ? '' : ' (Incompatible)',
     themeMatch: isBackgroundMatch ? ' (Matches terminal)' : '',
     key: name,
-    isCompatible,
+    type: fullTheme?.type,
   };
 }
 
@@ -91,50 +89,44 @@ export function ThemeDialog({
     SettingScope.User,
   );
 
-  // Track the currently highlighted theme name
-  const [highlightedThemeName, setHighlightedThemeName] = useState<string>(
-    () => {
-      // If a theme is already set, use it.
-      if (settings.merged.ui.theme) {
-        return settings.merged.ui.theme;
-      }
+  const initialTab =
+    terminalBackgroundColor &&
+    getThemeTypeFromBackgroundColor(terminalBackgroundColor) === 'dark'
+      ? 'dark'
+      : 'light';
+  const [activeTab, setActiveTab] = useState<'light' | 'dark'>(initialTab);
 
-      // Otherwise, try to pick a theme that matches the terminal background.
-      return pickDefaultThemeName(
-        terminalBackgroundColor,
-        themeManager.getAllThemes(),
-        DEFAULT_THEME.name,
-        'Default Light',
-      );
-    },
-  );
+  const [highlightedThemeNameLight, setHighlightedThemeNameLight] =
+    useState<string>(() => settings.merged.ui.themeLight || DefaultLight.name);
+  const [highlightedThemeNameDark, setHighlightedThemeNameDark] =
+    useState<string>(() => settings.merged.ui.themeDark || DefaultDark.name);
+
+  const highlightedThemeName =
+    activeTab === 'light'
+      ? highlightedThemeNameLight
+      : highlightedThemeNameDark;
 
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
   // Generate theme items
-  const themeItems = themeManager
-    .getAvailableThemes()
-    .map((theme) => {
-      const fullTheme = themeManager.getTheme(theme.name);
-      const capitalizedType = capitalize(theme.type);
-      const typeDisplay = theme.name.endsWith(capitalizedType)
-        ? ''
-        : capitalizedType;
+  const allThemeItems = themeManager.getAvailableThemes().map((theme) => {
+    const fullTheme = themeManager.getTheme(theme.name);
+    const capitalizedType = capitalize(theme.type);
+    const typeDisplay = theme.name.endsWith(capitalizedType)
+      ? ''
+      : capitalizedType;
 
-      return generateThemeItem(
-        theme.name,
-        typeDisplay,
-        fullTheme,
-        terminalBackgroundColor,
-      );
-    })
-    .sort((a, b) => {
-      // Show compatible themes first
-      if (a.isCompatible && !b.isCompatible) return -1;
-      if (!a.isCompatible && b.isCompatible) return 1;
-      // Then sort by name
-      return a.label.localeCompare(b.label);
-    });
+    return generateThemeItem(
+      theme.name,
+      typeDisplay,
+      fullTheme,
+      terminalBackgroundColor,
+    );
+  });
+
+  const themeItems = allThemeItems
+    .filter((item) => item.type === activeTab || !item.type) // Filter by tab, allow untyped
+    .sort((a, b) => a.label.localeCompare(b.label));
 
   // Find the index of the selected theme, but only if it exists in the list
   const initialThemeIndex = themeItems.findIndex(
@@ -145,13 +137,18 @@ export function ThemeDialog({
 
   const handleThemeSelect = useCallback(
     async (themeName: string) => {
-      await onSelect(themeName, selectedScope);
+      // @ts-expect-error adding extra argument for the updated hook
+      await onSelect(themeName, selectedScope, activeTab);
     },
-    [onSelect, selectedScope],
+    [onSelect, selectedScope, activeTab],
   );
 
   const handleThemeHighlight = (themeName: string) => {
-    setHighlightedThemeName(themeName);
+    if (activeTab === 'light') {
+      setHighlightedThemeNameLight(themeName);
+    } else {
+      setHighlightedThemeNameDark(themeName);
+    }
     onHighlight(themeName);
   };
 
@@ -161,9 +158,10 @@ export function ThemeDialog({
 
   const handleScopeSelect = useCallback(
     async (scope: LoadableSettingScope) => {
-      await onSelect(highlightedThemeName, scope);
+      // @ts-expect-error adding extra argument
+      await onSelect(highlightedThemeName, scope, activeTab);
     },
-    [onSelect, highlightedThemeName],
+    [onSelect, highlightedThemeName, activeTab],
   );
 
   const [mode, setMode] = useState<'theme' | 'scope'>('theme');
@@ -178,6 +176,18 @@ export function ThemeDialog({
         onCancel();
         return true;
       }
+      if (mode === 'theme') {
+        if (key.name === 'left' && activeTab === 'dark') {
+          setActiveTab('light');
+          onHighlight(highlightedThemeNameLight);
+          return true;
+        }
+        if (key.name === 'right' && activeTab === 'light') {
+          setActiveTab('dark');
+          onHighlight(highlightedThemeNameDark);
+          return true;
+        }
+      }
       return false;
     },
     { isActive: true },
@@ -185,7 +195,7 @@ export function ThemeDialog({
 
   // Generate scope message for theme setting
   const otherScopeModifiedMessage = getScopeMessageForSetting(
-    'ui.theme',
+    activeTab === 'light' ? 'ui.themeLight' : 'ui.themeDark',
     selectedScope,
     settings,
   );
@@ -273,6 +283,38 @@ export function ThemeDialog({
                 {otherScopeModifiedMessage}
               </Text>
             </Text>
+            <Box
+              flexDirection="row"
+              paddingLeft={2}
+              paddingTop={1}
+              paddingBottom={1}
+            >
+              <Text
+                color={
+                  activeTab === 'light'
+                    ? theme.text.primary
+                    : theme.text.secondary
+                }
+                underline={activeTab === 'light'}
+                bold={activeTab === 'light'}
+              >
+                {' '}
+                Light{' '}
+              </Text>
+              <Text> | </Text>
+              <Text
+                color={
+                  activeTab === 'dark'
+                    ? theme.text.primary
+                    : theme.text.secondary
+                }
+                underline={activeTab === 'dark'}
+                bold={activeTab === 'dark'}
+              >
+                {' '}
+                Dark{' '}
+              </Text>
+            </Box>
             <RadioButtonSelect
               items={themeItems}
               initialIndex={safeInitialThemeIndex}
@@ -283,9 +325,8 @@ export function ThemeDialog({
               showScrollArrows={true}
               showNumbers={mode === 'theme'}
               renderItem={(item, { titleColor }) => {
-                // We know item has themeWarning because we put it there, but we need to cast or access safely
+                // We know item has themeMatch because we put it there, but we need to cast or access safely
                 const itemWithExtras = item as typeof item & {
-                  themeWarning?: string;
                   themeMatch?: string;
                 };
 
@@ -312,11 +353,6 @@ export function ThemeDialog({
                           {itemWithExtras.themeMatch}
                         </Text>
                       )}
-                      {itemWithExtras.themeWarning && (
-                        <Text color={theme.status.warning}>
-                          {itemWithExtras.themeWarning}
-                        </Text>
-                      )}
                     </Text>
                   );
                 }
@@ -335,48 +371,65 @@ export function ThemeDialog({
             <Text bold color={theme.text.primary}>
               Preview
             </Text>
-            <Box
-              borderStyle="single"
-              borderColor={theme.border.default}
-              paddingTop={includePadding ? 1 : 0}
-              paddingBottom={includePadding ? 1 : 0}
-              paddingLeft={1}
-              paddingRight={1}
-              flexDirection="column"
-            >
-              {colorizeCode({
-                code: `# function
+            {/* Get the Theme object for the highlighted theme, fall back to default if not found */}
+            {(() => {
+              const previewTheme =
+                themeManager.getTheme(
+                  highlightedThemeName || DEFAULT_THEME.name,
+                ) || DEFAULT_THEME;
+
+              const effectiveBackground =
+                activeTab === 'light' ? '#ffffff' : '#000000';
+
+              return (
+                <>
+                  <Box
+                    borderStyle="single"
+                    borderColor={theme.border.default}
+                    paddingTop={includePadding ? 1 : 0}
+                    paddingBottom={includePadding ? 1 : 0}
+                    paddingLeft={1}
+                    paddingRight={1}
+                    flexDirection="column"
+                    backgroundColor={effectiveBackground}
+                  >
+                    {colorizeCode({
+                      code: `# function
 def fibonacci(n):
     a, b = 0, 1
     for _ in range(n):
         a, b = b, a + b
     return a`,
-                language: 'python',
-                availableHeight:
-                  isAlternateBuffer === false ? codeBlockHeight : undefined,
-                maxWidth: colorizeCodeWidth,
-                settings,
-              })}
-              <Box marginTop={1} />
-              <DiffRenderer
-                diffContent={`--- a/util.py
+                      language: 'python',
+                      availableHeight:
+                        isAlternateBuffer === false ? codeBlockHeight : undefined,
+                      maxWidth: colorizeCodeWidth,
+                      settings,
+                      theme: previewTheme,
+                    })}
+                    <Box marginTop={1} />
+                    <DiffRenderer
+                      diffContent={`--- a/util.py
 +++ b/util.py
 @@ -1,2 +1,2 @@
 - print("Hello, " + name)
 + print(f"Hello, {name}!")
 `}
-                availableTerminalHeight={
-                  isAlternateBuffer === false ? diffHeight : undefined
-                }
-                terminalWidth={colorizeCodeWidth}
-                theme={previewTheme}
-              />
-            </Box>
-            {isDevelopment && (
-              <Box marginTop={1}>
-                <ColorsDisplay activeTheme={previewTheme} />
-              </Box>
-            )}
+                      availableTerminalHeight={
+                        isAlternateBuffer === false ? diffHeight : undefined
+                      }
+                      terminalWidth={colorizeCodeWidth}
+                      theme={previewTheme}
+                    />
+                  </Box>
+                  {isDevelopment && (
+                    <Box marginTop={1}>
+                      <ColorsDisplay activeTheme={previewTheme} />
+                    </Box>
+                  )}
+                </>
+              );
+            })()}
           </Box>
         </Box>
       ) : (

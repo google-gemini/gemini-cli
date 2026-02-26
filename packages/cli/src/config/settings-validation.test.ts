@@ -23,7 +23,8 @@ describe('settings-validation', () => {
           maxSessionTurns: 10,
         },
         ui: {
-          theme: 'dark',
+          themeLight: 'dark',
+          themeDark: 'dark',
         },
       };
 
@@ -115,7 +116,8 @@ describe('settings-validation', () => {
     it('should accept nested valid settings', () => {
       const validSettings = {
         ui: {
-          theme: 'dark',
+          themeLight: 'dark',
+          themeDark: 'dark',
           hideWindowTitle: true,
           footer: {
             hideCWD: false,

@@ -239,7 +239,9 @@ describe('SettingsSchema', () => {
       expect(getSettingsSchema().telemetry.showInDialog).toBe(false);
 
       // Check that some settings are appropriately hidden
-      expect(getSettingsSchema().ui.properties.theme.showInDialog).toBe(false); // Changed to false
+      expect(getSettingsSchema().ui.properties.themeLight.showInDialog).toBe(
+        false,
+      ); // Changed to false
       expect(getSettingsSchema().ui.properties.customThemes.showInDialog).toBe(
         false,
       ); // Managed via theme editor
@@ -265,7 +267,8 @@ describe('SettingsSchema', () => {
       // This test ensures that the Settings type is properly inferred from the schema
       const settings: Settings = {
         ui: {
-          theme: 'dark',
+          themeLight: 'dark',
+          themeDark: 'dark',
         },
         context: {
           includeDirectories: ['/path/to/dir'],
@@ -274,7 +277,7 @@ describe('SettingsSchema', () => {
       };
 
       // TypeScript should not complain about these properties
-      expect(settings.ui?.theme).toBe('dark');
+      expect(settings.ui?.themeLight).toBe('dark');
       expect(settings.context?.includeDirectories).toEqual(['/path/to/dir']);
       expect(settings.context?.loadMemoryFromIncludeDirectories).toBe(true);
     });

@@ -4,20 +4,19 @@ exports[`Initial Theme Selection > should default to a dark theme when terminal 
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │ > Select Theme                               Preview                                             │
-│ ▲                                            ┌─────────────────────────────────────────────────┐ │
-│    1. ANSI Dark                              │                                                 │ │
-│    2. Atom One Dark                          │ 1 # function                                    │ │
-│    3. Ayu Dark                               │ 2 def fibonacci(n):                             │ │
-│ ●  4. Default Dark                           │ 3     a, b = 0, 1                               │ │
-│    5. Dracula Dark                           │ 4     for _ in range(n):                        │ │
-│    6. GitHub Dark                            │ 5         a, b = b, a + b                       │ │
-│    7. Holiday Dark                           │ 6     return a                                  │ │
-│    8. Shades Of Purple Dark                  │                                                 │ │
-│    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
-│   10. ANSI Light                             │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. Ayu Light                              │                                                 │ │
-│   12. Default Light                          └─────────────────────────────────────────────────┘ │
-│ ▼                                                                                                │
+│                                              ┌─────────────────────────────────────────────────┐ │
+│    Light  |  Dark                            │                                                 │ │
+│                                              │ 1 # function                                    │ │
+│   1. ANSI Dark                               │ 2 def fibonacci(n):                             │ │
+│   2. Atom One Dark                           │ 3     a, b = 0, 1                               │ │
+│   3. Ayu Dark                                │ 4     for _ in range(n):                        │ │
+│ ● 4. Default Dark                            │ 5         a, b = b, a + b                       │ │
+│   5. Dracula Dark                            │ 6     return a                                  │ │
+│   6. GitHub Dark                             │                                                 │ │
+│   7. Holiday Dark                            │ 1 - print("Hello, " + name)                     │ │
+│   8. Shades Of Purple Dark                   │ 1 + print(f"Hello, {name}!")                    │ │
+│   9. Solarized Dark                          │                                                 │ │
+│                                              └─────────────────────────────────────────────────┘ │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
@@ -29,20 +28,19 @@ exports[`Initial Theme Selection > should default to a light theme when terminal
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │ > Select Theme                               Preview                                             │
-│ ▲                                            ┌─────────────────────────────────────────────────┐ │
-│    1. ANSI Light                             │                                                 │ │
-│    2. Ayu Light                              │ 1 # function                                    │ │
-│ ●  3. Default Light                          │ 2 def fibonacci(n):                             │ │
-│    4. GitHub Light                           │ 3     a, b = 0, 1                               │ │
-│    5. Google Code Light                      │ 4     for _ in range(n):                        │ │
-│    6. Solarized Light                        │ 5         a, b = b, a + b                       │ │
-│    7. Xcode Light                            │ 6     return a                                  │ │
-│    8. ANSI Dark (Incompatible)               │                                                 │ │
-│    9. Atom One Dark (Incompatible)           │ 1 - print("Hello, " + name)                     │ │
-│   10. Ayu Dark (Incompatible)                │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. Default Dark (Incompatible)            │                                                 │ │
-│   12. Dracula Dark (Incompatible)            └─────────────────────────────────────────────────┘ │
-│ ▼                                                                                                │
+│                                              ┌─────────────────────────────────────────────────┐ │
+│    Light  |  Dark                            │                                                 │ │
+│                                              │ 1 # function                                    │ │
+│   1. ANSI Light                              │ 2 def fibonacci(n):                             │ │
+│   2. Ayu Light                               │ 3     a, b = 0, 1                               │ │
+│ ● 3. Default Light                           │ 4     for _ in range(n):                        │ │
+│   4. GitHub Light                            │ 5         a, b = b, a + b                       │ │
+│   5. Google Code Light                       │ 6     return a                                  │ │
+│   6. Solarized Light                         │                                                 │ │
+│   7. Xcode Light                             │ 1 - print("Hello, " + name)                     │ │
+│                                              │ 1 + print(f"Hello, {name}!")                    │ │
+│                                              │                                                 │ │
+│                                              └─────────────────────────────────────────────────┘ │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
@@ -54,20 +52,19 @@ exports[`Initial Theme Selection > should use the theme from settings even if te
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │ > Select Theme                               Preview                                             │
-│ ▲                                            ┌─────────────────────────────────────────────────┐ │
-│ ●  1. ANSI Dark                              │                                                 │ │
-│    2. Atom One Dark                          │ 1 # function                                    │ │
-│    3. Ayu Dark                               │ 2 def fibonacci(n):                             │ │
-│    4. Default Dark                           │ 3     a, b = 0, 1                               │ │
-│    5. Dracula Dark                           │ 4     for _ in range(n):                        │ │
-│    6. GitHub Dark                            │ 5         a, b = b, a + b                       │ │
-│    7. Holiday Dark                           │ 6     return a                                  │ │
-│    8. Shades Of Purple Dark                  │                                                 │ │
-│    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
-│   10. ANSI Light                             │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. Ayu Light                              │                                                 │ │
-│   12. Default Light                          └─────────────────────────────────────────────────┘ │
-│ ▼                                                                                                │
+│                                              ┌─────────────────────────────────────────────────┐ │
+│    Light  |  Dark                            │                                                 │ │
+│                                              │ 1 # function                                    │ │
+│   1. ANSI Dark                               │ 2 def fibonacci(n):                             │ │
+│   2. Atom One Dark                           │ 3     a, b = 0, 1                               │ │
+│   3. Ayu Dark                                │ 4     for _ in range(n):                        │ │
+│ ● 4. Default Dark                            │ 5         a, b = b, a + b                       │ │
+│   5. Dracula Dark                            │ 6     return a                                  │ │
+│   6. GitHub Dark                             │                                                 │ │
+│   7. Holiday Dark                            │ 1 - print("Hello, " + name)                     │ │
+│   8. Shades Of Purple Dark                   │ 1 + print(f"Hello, {name}!")                    │ │
+│   9. Solarized Dark                          │                                                 │ │
+│                                              └─────────────────────────────────────────────────┘ │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
@@ -93,20 +90,19 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │ > Select Theme                               Preview                                             │
-│ ▲                                            ┌─────────────────────────────────────────────────┐ │
-│ ●  1. ANSI Dark (Matches terminal)           │                                                 │ │
-│    2. Atom One Dark                          │ 1 # function                                    │ │
-│    3. Ayu Dark                               │ 2 def fibonacci(n):                             │ │
-│    4. Default Dark                           │ 3     a, b = 0, 1                               │ │
-│    5. Dracula Dark                           │ 4     for _ in range(n):                        │ │
-│    6. GitHub Dark                            │ 5         a, b = b, a + b                       │ │
-│    7. Holiday Dark                           │ 6     return a                                  │ │
-│    8. Shades Of Purple Dark                  │                                                 │ │
-│    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
-│   10. ANSI Light                             │ 1 + print(f"Hello, {name}!")                    │ │
-│   11. Ayu Light                              │                                                 │ │
-│   12. Default Light                          └─────────────────────────────────────────────────┘ │
-│ ▼                                                                                                │
+│                                              ┌─────────────────────────────────────────────────┐ │
+│    Light  |  Dark                            │                                                 │ │
+│                                              │ 1 # function                                    │ │
+│   1. ANSI Dark (Matches terminal)            │ 2 def fibonacci(n):                             │ │
+│   2. Atom One Dark                           │ 3     a, b = 0, 1                               │ │
+│   3. Ayu Dark                                │ 4     for _ in range(n):                        │ │
+│ ● 4. Default Dark                            │ 5         a, b = b, a + b                       │ │
+│   5. Dracula Dark                            │ 6     return a                                  │ │
+│   6. GitHub Dark                             │                                                 │ │
+│   7. Holiday Dark                            │ 1 - print("Hello, " + name)                     │ │
+│   8. Shades Of Purple Dark                   │ 1 + print(f"Hello, {name}!")                    │ │
+│   9. Solarized Dark                          │                                                 │ │
+│                                              └─────────────────────────────────────────────────┘ │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │

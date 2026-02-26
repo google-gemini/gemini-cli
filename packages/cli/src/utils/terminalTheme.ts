@@ -8,11 +8,35 @@ import {
   type TerminalBackgroundColor,
   terminalCapabilityManager,
 } from '../ui/utils/terminalCapabilityManager.js';
-import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
-import { pickDefaultThemeName } from '../ui/themes/theme.js';
+import { themeManager } from '../ui/themes/theme-manager.js';
+import { DefaultLight } from '../ui/themes/default-light.js';
+import { DefaultDark } from '../ui/themes/default.js';
 import { getThemeTypeFromBackgroundColor } from '../ui/themes/color-utils.js';
-import type { LoadedSettings } from '../config/settings.js';
+import type { LoadedSettings, MergedSettings } from '../config/settings.js';
 import { type Config, coreEvents, debugLogger } from '@google/gemini-cli-core';
+
+export function getActiveThemeName(
+  settings: MergedSettings,
+  terminalBackgroundColor: TerminalBackgroundColor,
+  cliTheme?: string,
+  cliThemeMode?: 'light' | 'dark',
+): string {
+  if (cliTheme) {
+    return cliTheme;
+  }
+
+  let mode = cliThemeMode;
+  if (!mode && terminalBackgroundColor) {
+    mode = getThemeTypeFromBackgroundColor(terminalBackgroundColor);
+  }
+
+  if (mode === 'light') {
+    return settings.ui?.themeLight || DefaultLight.name;
+  } else {
+    // Default to dark
+    return settings.ui?.themeDark || DefaultDark.name;
+  }
+}
 
 /**
  * Detects terminal capabilities, loads themes, and sets the active theme.
@@ -34,23 +58,17 @@ export async function setupTerminalAndTheme(
   // Load custom themes from settings
   themeManager.loadCustomThemes(settings.merged.ui.customThemes);
 
-  if (settings.merged.ui.theme) {
-    if (!themeManager.setActiveTheme(settings.merged.ui.theme)) {
-      // If the theme is not found during initial load, log a warning and continue.
-      // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
-      debugLogger.warn(
-        `Warning: Theme "${settings.merged.ui.theme}" not found.`,
-      );
-    }
-  } else {
-    // If no theme is set, check terminal background color
-    const themeName = pickDefaultThemeName(
-      terminalBackground,
-      themeManager.getAllThemes(),
-      DEFAULT_THEME.name,
-      'Default Light',
-    );
-    themeManager.setActiveTheme(themeName);
+  const activeThemeName = getActiveThemeName(
+    settings.merged,
+    terminalBackground,
+    config.getCliTheme(),
+    config.getCliThemeMode(),
+  );
+
+  if (!themeManager.setActiveTheme(activeThemeName)) {
+    // If the theme is not found during initial load, log a warning and continue.
+    // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
+    debugLogger.warn(`Warning: Theme "${activeThemeName}" not found.`);
   }
 
   config.setTerminalBackground(terminalBackground);
