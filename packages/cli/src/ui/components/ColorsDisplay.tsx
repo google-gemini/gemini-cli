@@ -53,24 +53,28 @@ interface BackgroundColorRow {
 
 type ColorRow = StandardColorRow | GradientColorRow | BackgroundColorRow;
 
+const VALUE_COLUMN_WIDTH = '12%';
+const NAME_COLUMN_WIDTH = '30%';
+
 export const ColorsDisplay: React.FC = () => {
   const semanticColors = themeManager.getSemanticColors();
   const activeTheme = themeManager.getActiveTheme();
 
-  const allRows: ColorRow[] = [];
-  const gradientRow: GradientColorRow | null =
-    semanticColors.ui.gradient && semanticColors.ui.gradient.length > 0
-      ? {
-          type: 'gradient',
-          name: 'ui.gradient',
-          value: semanticColors.ui.gradient,
-        }
-      : null;
+  const backgroundRows: BackgroundColorRow[] = [];
+  const standardRows: StandardColorRow[] = [];
+  let gradientRow: GradientColorRow | null = null;
+
+  if (semanticColors.ui.gradient && semanticColors.ui.gradient.length > 0) {
+    gradientRow = {
+      type: 'gradient',
+      name: 'ui.gradient',
+      value: semanticColors.ui.gradient,
+    };
+  }
 
   // Flatten and categorize the SemanticColors object
   for (const [category, subColors] of Object.entries(semanticColors)) {
     if (category === 'ui' && 'gradient' in subColors) {
-      // Handled separately or later
       continue;
     }
 
@@ -85,13 +89,13 @@ export const ColorsDisplay: React.FC = () => {
         for (const [diffName, diffValue] of Object.entries(value)) {
           if (typeof diffValue === 'string') {
             if (category === 'background') {
-              allRows.push({
+              backgroundRows.push({
                 type: 'background',
                 name: `${fullName}.${diffName}`,
                 value: diffValue,
               });
             } else {
-              allRows.push({
+              standardRows.push({
                 type: 'standard',
                 name: `${fullName}.${diffName}`,
                 value: diffValue,
@@ -101,13 +105,13 @@ export const ColorsDisplay: React.FC = () => {
         }
       } else if (typeof value === 'string') {
         if (category === 'background') {
-          allRows.push({
+          backgroundRows.push({
             type: 'background',
             name: fullName,
             value,
           });
         } else {
-          allRows.push({
+          standardRows.push({
             type: 'standard',
             name: fullName,
             value,
@@ -117,10 +121,12 @@ export const ColorsDisplay: React.FC = () => {
     }
   }
 
-  // Add gradient row if it exists
-  if (gradientRow) {
-    allRows.push(gradientRow);
-  }
+  // Final order: Backgrounds first, then Standards, then Gradient
+  const allRows: ColorRow[] = [
+    ...backgroundRows,
+    ...standardRows,
+    ...(gradientRow ? [gradientRow] : []),
+  ];
 
   return (
     <Box flexDirection="column" paddingX={1} marginY={1}>
@@ -153,12 +159,12 @@ export const ColorsDisplay: React.FC = () => {
         borderColor={theme.border.default}
         paddingX={1}
       >
-        <Box width="15%">
+        <Box width={VALUE_COLUMN_WIDTH}>
           <Text bold color={theme.text.link}>
             Value
           </Text>
         </Box>
-        <Box width="30%">
+        <Box width={NAME_COLUMN_WIDTH}>
           <Text bold color={theme.text.link}>
             Name
           </Text>
@@ -190,10 +196,10 @@ function renderStandardRow({ name, value }: StandardColorRow) {
 
   return (
     <Box key={name} flexDirection="row" paddingX={1}>
-      <Box width="15%">
+      <Box width={VALUE_COLUMN_WIDTH}>
         <Text color={displayColor}>{value || '(blank)'}</Text>
       </Box>
-      <Box width="30%">
+      <Box width={NAME_COLUMN_WIDTH}>
         <Text color={displayColor}>{name}</Text>
       </Box>
       <Box flexGrow={1}>
@@ -208,14 +214,14 @@ function renderGradientRow({ name, value }: GradientColorRow) {
 
   return (
     <Box key={name} flexDirection="row" paddingX={1}>
-      <Box width="15%" flexDirection="column">
+      <Box width={VALUE_COLUMN_WIDTH} flexDirection="column">
         {value.map((c, i) => (
           <Text key={i} color={c}>
             {c}
           </Text>
         ))}
       </Box>
-      <Box width="30%">
+      <Box width={NAME_COLUMN_WIDTH}>
         <Gradient colors={value}>
           <Text>{name}</Text>
         </Gradient>
@@ -231,9 +237,9 @@ function renderBackgroundRow({ name, value }: BackgroundColorRow) {
   const description = COLOR_DESCRIPTIONS[name] || '';
 
   return (
-    <Box key={name} flexDirection="row" paddingX={1} marginY={1}>
+    <Box key={name} flexDirection="row" paddingX={1} marginBottom={1}>
       <Box
-        width="15%"
+        width={VALUE_COLUMN_WIDTH}
         backgroundColor={value}
         justifyContent="center"
         paddingX={1}
@@ -242,8 +248,8 @@ function renderBackgroundRow({ name, value }: BackgroundColorRow) {
           {value || 'default'}
         </Text>
       </Box>
-      <Box width="30%" paddingLeft={1}>
-        <Text color={value}>{name}</Text>
+      <Box width={NAME_COLUMN_WIDTH} paddingLeft={1}>
+        <Text color={theme.text.primary}>{name}</Text>
       </Box>
       <Box flexGrow={1}>
         <Text color={theme.text.secondary}>{description}</Text>
