@@ -662,4 +662,82 @@ describe('ToolOutputMaskingService', () => {
       )['output'],
     ).toContain(MASKING_INDICATOR_TAG);
   });
+
+  it('should use existing outputFile if available in the tool response', async () => {
+    // Setup: Create a large history to trigger masking
+    const largeContent = 'a'.repeat(60000);
+    const existingOutputFile = path.join(testTempDir, 'truly_full_output.txt');
+    await fs.promises.writeFile(existingOutputFile, 'truly full content');
+
+    const history: Content[] = [
+      {
+        role: 'user',
+        parts: [{ text: 'Old turn' }],
+      },
+      {
+        role: 'model',
+        parts: [
+          {
+            functionResponse: {
+              name: 'shell',
+              id: 'call-1',
+              response: {
+                output: largeContent,
+                outputFile: existingOutputFile,
+              },
+            },
+          },
+        ],
+      },
+      // Protection buffer
+      {
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              name: 'padding',
+              response: { output: 'B'.repeat(60000) },
+            },
+          },
+        ],
+      },
+      {
+        role: 'user',
+        parts: [{ text: 'Newest turn' }],
+      },
+    ];
+
+    mockedEstimateTokenCountSync.mockImplementation((parts: Part[]) => {
+      const resp = parts[0].functionResponse?.response as Record<
+        string,
+        unknown
+      >;
+      const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
+      if (content.includes(`<${MASKING_INDICATOR_TAG}`)) return 100;
+
+      const name = parts[0].functionResponse?.name;
+      if (name === 'shell') return 60000;
+      if (name === 'padding') return 60000;
+      return 10;
+    });
+
+    // Trigger masking
+    const result = await service.mask(history, mockConfig);
+
+    expect(result.maskedCount).toBe(2);
+    const maskedPart = result.newHistory[1].parts![0];
+    const maskedResponse = maskedPart.functionResponse?.response as Record<
+      string,
+      unknown
+    >;
+    const maskedOutput = maskedResponse['output'] as string;
+
+    // Verify the masked snippet points to the existing file
+    expect(maskedOutput).toContain(
+      `Full output available at: ${existingOutputFile}`,
+    );
+
+    // Verify the path in maskedOutput is exactly the one we provided
+    expect(maskedOutput).toContain(existingOutputFile);
+  });
 });

@@ -21,12 +21,13 @@ function createFunctionResponsePart(
   callId: string,
   toolName: string,
   output: string,
+  outputFile?: string,
 ): Part {
   return {
     functionResponse: {
       id: callId,
       name: toolName,
-      response: { output },
+      response: { output, outputFile },
     },
   };
 }
@@ -48,9 +49,12 @@ export function convertToFunctionResponse(
   callId: string,
   llmContent: PartListUnion,
   model: string,
+  outputFile?: string,
 ): Part[] {
   if (typeof llmContent === 'string') {
-    return [createFunctionResponsePart(callId, toolName, llmContent)];
+    return [
+      createFunctionResponsePart(callId, toolName, llmContent, outputFile),
+    ];
   }
 
   const parts = toParts(llmContent);
@@ -92,7 +96,10 @@ export function convertToFunctionResponse(
     functionResponse: {
       id: callId,
       name: toolName,
-      response: textParts.length > 0 ? { output: textParts.join('\n') } : {},
+      response: {
+        ...(textParts.length > 0 ? { output: textParts.join('\n') } : {}),
+        outputFile,
+      },
     },
   };
 

@@ -179,25 +179,47 @@ export class ToolOutputMaskingService {
 
       const toolName = part.functionResponse.name || 'unknown_tool';
       const callId = part.functionResponse.id || Date.now().toString();
-      const safeToolName = sanitizeFilenamePart(toolName).toLowerCase();
-      const safeCallId = sanitizeFilenamePart(callId).toLowerCase();
-      const fileName = `${safeToolName}_${safeCallId}_${Math.random()
-        .toString(36)
-        .substring(7)}.txt`;
-      const filePath = path.join(toolOutputsDir, fileName);
-
-      await fsPromises.writeFile(filePath, content, 'utf-8');
 
       const originalResponse =
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         (part.functionResponse.response as Record<string, unknown>) || {};
 
-      const totalLines = content.split('\n').length;
-      const fileSizeMB = (
-        Buffer.byteLength(content, 'utf8') /
-        1024 /
-        1024
-      ).toFixed(2);
+      let filePath = '';
+      let fileSizeMB = '0.00';
+      let totalLines = 0;
+
+      if (
+        typeof originalResponse['outputFile'] === 'string' &&
+        originalResponse['outputFile']
+      ) {
+        filePath = originalResponse['outputFile'];
+        try {
+          const stats = await fsPromises.stat(filePath);
+          fileSizeMB = (stats.size / 1024 / 1024).toFixed(2);
+          // For truly full files, we don't count lines as it's too slow.
+          // We just indicate it's the full file.
+          totalLines = -1;
+        } catch {
+          // Fallback if file is gone
+          filePath = '';
+        }
+      }
+
+      if (!filePath) {
+        const safeToolName = sanitizeFilenamePart(toolName).toLowerCase();
+        const safeCallId = sanitizeFilenamePart(callId).toLowerCase();
+        const fileName = `${safeToolName}_${safeCallId}_${Math.random()
+          .toString(36)
+          .substring(7)}.txt`;
+        filePath = path.join(toolOutputsDir, fileName);
+
+        await fsPromises.writeFile(filePath, content, 'utf-8');
+
+        totalLines = content.split('\n').length;
+        fileSizeMB = (Buffer.byteLength(content, 'utf8') / 1024 / 1024).toFixed(
+          2,
+        );
+      }
 
       let preview = '';
       if (toolName === SHELL_TOOL_NAME) {
