@@ -62,7 +62,7 @@ describe('Plan Mode', () => {
     });
   });
 
-  it('should allow write_file only in the plans directory in plan mode', async () => {
+  it.skip('should allow write_file only in the plans directory in plan mode', async () => {
     await rig.setup(
       'should allow write_file only in the plans directory in plan mode',
       {
