@@ -86,13 +86,7 @@ export default tseslint.config(
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: {
-        projectService: {
-          allowDefaultProject: [
-            // gemini.test.tsx shares its stem with gemini.test.ts, so TS
-            // project service resolves the .ts and skips the .tsx variant.
-            'packages/cli/src/gemini.test.tsx',
-          ],
-        },
+        projectService: true,
         tsconfigRootDir: projectRoot,
       },
       globals: {
