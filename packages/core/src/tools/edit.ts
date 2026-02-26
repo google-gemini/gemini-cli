@@ -547,7 +547,6 @@ class EditToolInvocation
       error: undefined,
       originalLineEnding,
       strategy: secondAttemptResult.strategy,
-      matchRanges: secondAttemptResult.matchRanges,
     };
   }
 
@@ -660,7 +659,6 @@ class EditToolInvocation
         error: undefined,
         originalLineEnding,
         strategy: replacementResult.strategy,
-        matchRanges: replacementResult.matchRanges,
       };
     }
 
@@ -877,10 +875,28 @@ class EditToolInvocation
         };
       }
 
+      const totalLength = finalContent.split(String.fromCharCode(10)).length;
+      const metadataParts = [];
+      const totalLength = finalContent.split(String.fromCharCode(10)).length;
+      const metadataParts = [];
+      if (editData.matchRanges && editData.matchRanges.length > 0) {
+        if (editData.matchRanges.length === 1) {
+          metadataParts.push(
+            `start_line: ${editData.matchRanges[0].start}, end_line: ${editData.matchRanges[0].end}`,
+          );
+        } else {
+          const ranges = editData.matchRanges
+            .map((r) => `${r.start}-${r.end}`)
+            .join(', ');
+          metadataParts.push(`ranges: ${ranges}`);
+        }
+      }
+      metadataParts.push(`file_length: ${totalLength}`);
+
       const llmSuccessMessageParts = [
         editData.isNewFile
-          ? `Created new file: ${this.params.file_path} with provided content.`
-          : `Successfully modified file: ${this.params.file_path} (${editData.occurrences} replacements).`,
+          ? `Created new file: ${this.params.file_path} with provided content. [file_length: ${totalLength}]`
+          : `Successfully modified file: ${this.params.file_path}. [${metadataParts.join(', ')}]`,
       ];
 
       // Return a diff of the file before and after the write so that the agent
@@ -1240,7 +1256,6 @@ async function calculateFuzzyReplacement(
       finalOldString: normalizedSearch,
       finalNewString: normalizedReplace,
       strategy: 'fuzzy',
-      matchRanges,
     };
   }
 
