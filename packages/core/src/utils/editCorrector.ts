@@ -181,9 +181,6 @@ export async function ensureCorrectEdit(
   }
 
   let finalNewString = originalParams.new_string;
-  const newStringPotentiallyEscaped =
-    unescapeStringForGeminiBug(originalParams.new_string) !==
-    originalParams.new_string;
 
   const allowMultiple = originalParams.allow_multiple ?? false;
 
@@ -195,14 +192,8 @@ export async function ensureCorrectEdit(
     : occurrences === 1;
 
   if (isOccurrencesMatch) {
-    if (newStringPotentiallyEscaped && !disableLLMCorrection) {
-      finalNewString = await correctNewStringEscaping(
-        baseLlmClient,
-        finalOldString,
-        originalParams.new_string,
-        abortSignal,
-      );
-    }
+    // old_string matched the file content directly — no over-escaping detected.
+    // new_string is therefore also likely correct as-is.
   } else if (occurrences > 1 && !allowMultiple) {
     // If user doesn't allow multiple but found multiple, return as-is (will fail validation later)
     const result: CorrectedEditResult = {
@@ -212,7 +203,9 @@ export async function ensureCorrectEdit(
     editCorrectionCache.set(cacheKey, result);
     return result;
   } else {
-    // occurrences is 0 or some other unexpected state initially
+    // occurrences is 0 — old_string doesn't match the file as-is.
+    // Try unescaping: if the unescaped version matches, we have definitive
+    // proof that the LLM over-escaped this generation.
     const unescapedOldStringAttempt = unescapeStringForGeminiBug(
       originalParams.old_string,
     );
@@ -223,15 +216,25 @@ export async function ensureCorrectEdit(
       : occurrences === 1;
 
     if (isUnescapedOccurrencesMatch) {
+      // Unescaped old_string matched — confirmed over-escaping.
       finalOldString = unescapedOldStringAttempt;
-      if (newStringPotentiallyEscaped && !disableLLMCorrection) {
+
+      // Since old_string was over-escaped, new_string from the same generation
+      // needs the same treatment. Use LLM if available, otherwise apply the
+      // same unescaping (we have confirmed context that this generation is
+      // over-escaped).
+      if (!disableLLMCorrection) {
         finalNewString = await correctNewString(
           baseLlmClient,
           originalParams.old_string, // original old
           unescapedOldStringAttempt, // corrected old
-          originalParams.new_string, // original new (which is potentially escaped)
+          originalParams.new_string, // original new (which is over-escaped)
           abortSignal,
         );
+      } else {
+        // LLM unavailable, but we KNOW over-escaping occurred (old_string
+        // proved it). Apply the same unescaping to new_string.
+        finalNewString = unescapeStringForGeminiBug(originalParams.new_string);
       }
     } else if (occurrences === 0) {
       if (filePath) {
@@ -290,18 +293,18 @@ export async function ensureCorrectEdit(
         finalOldString = llmCorrectedOldString;
         occurrences = llmOldOccurrences;
 
-        if (newStringPotentiallyEscaped) {
-          const baseNewStringForLLMCorrection = unescapeStringForGeminiBug(
-            originalParams.new_string,
-          );
-          finalNewString = await correctNewString(
-            baseLlmClient,
-            originalParams.old_string, // original old
-            llmCorrectedOldString, // corrected old
-            baseNewStringForLLMCorrection, // base new for correction
-            abortSignal,
-          );
-        }
+        // old_string needed LLM correction — it was over-escaped or otherwise
+        // wrong. Apply unescaping to new_string as a starting point for LLM.
+        const baseNewStringForLLMCorrection = unescapeStringForGeminiBug(
+          originalParams.new_string,
+        );
+        finalNewString = await correctNewString(
+          baseLlmClient,
+          originalParams.old_string, // original old
+          llmCorrectedOldString, // corrected old
+          baseNewStringForLLMCorrection, // base new for correction
+          abortSignal,
+        );
       } else {
         // LLM correction also failed for old_string
         const result: CorrectedEditResult = {
@@ -355,20 +358,30 @@ export async function ensureCorrectFileContent(
     return cachedResult;
   }
 
+  // For new file content there is no ground truth to compare against (unlike
+  // old_string which can be validated against the existing file). Without
+  // context we cannot distinguish over-escaped content from content that
+  // legitimately contains backslash sequences (\title, \n in regexes, \" in
+  // JSON, etc.).
+  //
+  // When the LLM is available, let it decide — it can use its understanding of
+  // the target file format. When the LLM is not available, return the content
+  // unchanged rather than risking silent corruption.
+
+  if (disableLLMCorrection) {
+    // No LLM and no ground truth — return content as-is.
+    fileContentCorrectionCache.set(content, content);
+    return content;
+  }
+
+  // Check if the content might be over-escaped before invoking the LLM.
+  // unescapeStringForGeminiBug is used here purely as a cheap detection
+  // probe — its result is discarded. The LLM makes the actual correction.
   const contentPotentiallyEscaped =
     unescapeStringForGeminiBug(content) !== content;
   if (!contentPotentiallyEscaped) {
     fileContentCorrectionCache.set(content, content);
     return content;
-  }
-
-  if (disableLLMCorrection) {
-    // If we can't use LLM, we should at least use the unescaped content
-    // as it's likely better than the original if it was detected as potentially escaped.
-    // unescapeStringForGeminiBug is a heuristic, not an LLM call.
-    const unescaped = unescapeStringForGeminiBug(content);
-    fileContentCorrectionCache.set(content, unescaped);
-    return unescaped;
   }
 
   const correctedContent = await correctStringEscaping(
@@ -725,46 +738,58 @@ function trimPairIfPossible(
 }
 
 /**
- * Unescapes a string that might have been overly escaped by an LLM.
+ * Undoes one level of JSON-style backslash escaping from a string.
+ *
+ * The Gemini over-escaping bug: the LLM sometimes adds an extra level of
+ * backslash escaping when generating JSON tool-call parameters. After the SDK
+ * does JSON.parse, the resulting JS strings still contain literal escape
+ * sequences (\n, \t, \", \\, etc.) where actual control/quote characters
+ * were intended.
+ *
+ * This function strips exactly one backslash layer — it is equivalent to what
+ * a second JSON.parse would do to string escape sequences. It does NOT try to
+ * guess whether individual sequences are "intentional" or not, because that
+ * requires knowledge of the target file format which this function does not
+ * have.
+ *
+ * IMPORTANT — callers must gate usage of this function appropriately:
+ *   • For old_string: safe to apply — result is validated against file content.
+ *   • For new_string when old_string was over-escaped: safe — context proves
+ *     the entire generation is over-escaped.
+ *   • For detection probes: safe — just checks if unescaping changes anything.
+ *   • For blind correction (no LLM, no validation target): callers should NOT
+ *     apply this without confirmed context (e.g., old_string match).
+ *
+ * Only a single backslash is consumed per match (no greedy \\+), which
+ * correctly preserves intentional multi-backslash sequences. For example,
+ * \\n (double-backslash + n in memory) becomes \n (single-backslash + n)
+ * rather than being collapsed to a bare newline.
  */
 export function unescapeStringForGeminiBug(inputString: string): string {
-  // Regex explanation:
-  // \\ : Matches exactly one literal backslash character.
-  // (n|t|r|'|"|`|\\|\n) : This is a capturing group. It matches one of the following:
-  //   n, t, r, ', ", ` : These match the literal characters 'n', 't', 'r', single quote, double quote, or backtick.
-  //                       This handles cases like "\\n", "\\`", etc.
-  //   \\ : This matches a literal backslash. This handles cases like "\\\\" (escaped backslash).
-  //   \n : This matches an actual newline character. This handles cases where the input
-  //        string might have something like "\\\n" (a literal backslash followed by a newline).
-  // g : Global flag, to replace all occurrences.
-
+  // Regex: match exactly one literal backslash followed by an escapable char.
+  // Using \\ (not \\+) ensures we only strip one escaping level at a time.
   return inputString.replace(
-    /\\+(n|t|r|'|"|`|\\|\n)/g,
-    (match, capturedChar) => {
-      // 'match' is the entire erroneous sequence, e.g., if the input (in memory) was "\\\\`", match is "\\\\`".
-      // 'capturedChar' is the character that determines the true meaning, e.g., '`'.
-
+    /\\(n|t|r|'|"|`|\\|\n)/g,
+    (_match, capturedChar) => {
       switch (capturedChar) {
         case 'n':
-          return '\n'; // Correctly escaped: \n (newline character)
+          return '\n';
         case 't':
-          return '\t'; // Correctly escaped: \t (tab character)
+          return '\t';
         case 'r':
-          return '\r'; // Correctly escaped: \r (carriage return character)
+          return '\r';
         case "'":
-          return "'"; // Correctly escaped: ' (apostrophe character)
+          return "'";
         case '"':
-          return '"'; // Correctly escaped: " (quotation mark character)
+          return '"';
         case '`':
-          return '`'; // Correctly escaped: ` (backtick character)
-        case '\\': // This handles when 'capturedChar' is a literal backslash
-          return '\\'; // Replace escaped backslash (e.g., "\\\\") with single backslash
-        case '\n': // This handles when 'capturedChar' is an actual newline
-          return '\n'; // Replace the whole erroneous sequence (e.g., "\\\n" in memory) with a clean newline
+          return '`';
+        case '\\':
+          return '\\'; // \\  →  \  (reduce double-backslash to single)
+        case '\n':
+          return '\n'; // \<actual newline>  →  <newline>
         default:
-          // This fallback should ideally not be reached if the regex captures correctly.
-          // It would return the original matched sequence if an unexpected character was captured.
-          return match;
+          return _match;
       }
     },
   );

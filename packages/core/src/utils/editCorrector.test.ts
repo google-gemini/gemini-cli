@@ -86,25 +86,31 @@ describe('editCorrector', () => {
   });
 
   describe('unescapeStringForGeminiBug', () => {
-    it('should unescape common sequences', () => {
+    // This function undoes exactly one level of JSON-style backslash escaping.
+    // It is format-agnostic — it does NOT try to infer the target file format.
+    // Callers are responsible for checking whether unescaping is appropriate
+    // (e.g., by validating old_string against file content).
+
+    it('should unescape common single-backslash sequences', () => {
       expect(unescapeStringForGeminiBug('\\n')).toBe('\n');
       expect(unescapeStringForGeminiBug('\\t')).toBe('\t');
+      expect(unescapeStringForGeminiBug('\\r')).toBe('\r');
       expect(unescapeStringForGeminiBug("\\'")).toBe("'");
       expect(unescapeStringForGeminiBug('\\"')).toBe('"');
       expect(unescapeStringForGeminiBug('\\`')).toBe('`');
     });
-    it('should handle multiple escaped sequences', () => {
+    it('should handle multiple escaped sequences in one string', () => {
       expect(unescapeStringForGeminiBug('Hello\\nWorld\\tTest')).toBe(
         'Hello\nWorld\tTest',
       );
     });
-    it('should not alter already correct sequences', () => {
+    it('should not alter strings that are already correct', () => {
       expect(unescapeStringForGeminiBug('\n')).toBe('\n');
       expect(unescapeStringForGeminiBug('Correct string')).toBe(
         'Correct string',
       );
     });
-    it('should handle mixed correct and incorrect sequences', () => {
+    it('should handle mixed actual and escaped sequences', () => {
       expect(unescapeStringForGeminiBug('\\nCorrect\t\\`')).toBe(
         '\nCorrect\t`',
       );
@@ -115,44 +121,96 @@ describe('editCorrector', () => {
         'First line\nSecond line',
       );
     });
-    it('should handle multiple backslashes before an escapable character (aggressive unescaping)', () => {
-      expect(unescapeStringForGeminiBug('\\\\n')).toBe('\n');
-      expect(unescapeStringForGeminiBug('\\\\\\t')).toBe('\t');
-      expect(unescapeStringForGeminiBug('\\\\\\\\`')).toBe('`');
+
+    // ---- Single-backslash matching (\\+ → \\ fix) ----
+    // The function matches exactly ONE backslash per replacement. This prevents
+    // collapsing multi-backslash sequences that represent legitimately nested
+    // escaping levels.
+    it('should only consume one backslash level (not greedy \\\\+)', () => {
+      // \\n (JS: \, \, n) → first \\ matches the \\-alternative → \
+      //   remaining n has no preceding backslash → stays as n
+      //   Result: \n (literal backslash + n)
+      expect(unescapeStringForGeminiBug('\\\\n')).toBe('\\n');
+
+      // \\\t (JS: \, \, \, t) → \\(pos 0-1) → \, then \t(pos 2-3) → tab
+      expect(unescapeStringForGeminiBug('\\\\\\t')).toBe('\\\t');
+
+      // \\\\` (JS: \, \, \, \, `) → \\(pos 0-1) → \, \\(pos 2-3) → \, ` stays
+      expect(unescapeStringForGeminiBug('\\\\\\\\`')).toBe('\\\\`');
     });
+
     it('should return empty string for empty input', () => {
       expect(unescapeStringForGeminiBug('')).toBe('');
     });
     it('should not alter strings with no targeted escape sequences', () => {
       expect(unescapeStringForGeminiBug('abc def')).toBe('abc def');
+      // \F is not in the capture group → no match
       expect(unescapeStringForGeminiBug('C:\\Folder\\File')).toBe(
         'C:\\Folder\\File',
       );
     });
-    it('should correctly process strings with some targeted escapes', () => {
+
+    // The function is a raw unescaper — it does NOT try to be context-aware.
+    // \n in \name is unescaped just like any other \n. The CALLERS are
+    // responsible for deciding when this is appropriate.
+    it('should unescape \\n even when followed by lowercase letters (format-agnostic)', () => {
+      // This IS what "undo one level of JSON escaping" does — it converts
+      // \n → newline regardless of what follows. The caller (ensureCorrectEdit
+      // / ensureCorrectFileContent) decides whether to apply the result.
       expect(unescapeStringForGeminiBug('C:\\Users\\name')).toBe(
         'C:\\Users\name',
       );
+      // \title → tab + itle (the function is format-agnostic)
+      expect(unescapeStringForGeminiBug('\\title{Hello}')).toBe(
+        '\title{Hello}',
+      );
+      // \newline → newline + ewline
+      expect(unescapeStringForGeminiBug('\\newline')).toBe('\newline');
     });
-    it('should handle complex cases with mixed slashes and characters', () => {
-      expect(
-        unescapeStringForGeminiBug('\\\\\\\nLine1\\\nLine2\\tTab\\\\`Tick\\"'),
-      ).toBe('\nLine1\nLine2\tTab`Tick"');
-    });
-    it('should handle escaped backslashes', () => {
+
+    it('should handle escaped backslashes (double-backslash → single)', () => {
       expect(unescapeStringForGeminiBug('\\\\')).toBe('\\');
       expect(unescapeStringForGeminiBug('C:\\\\Users')).toBe('C:\\Users');
+      // path\\to\\file → each \\ becomes \
       expect(unescapeStringForGeminiBug('path\\\\to\\\\file')).toBe(
-        'path\to\\file',
+        'path\\to\\file',
       );
     });
-    it('should handle escaped backslashes mixed with other escapes (aggressive unescaping)', () => {
-      expect(unescapeStringForGeminiBug('line1\\\\\\nline2')).toBe(
-        'line1\nline2',
+
+    it('should handle double-backslash adjacent to escapable chars (single-level only)', () => {
+      // \\<actual newline> → \\ becomes \, actual newline stays
+      expect(unescapeStringForGeminiBug('line1\\\\\nline2')).toBe(
+        'line1\\\nline2',
       );
+      // \\n (JS: \, \, n) → \\ becomes \, then n is just n → \n literal
+      expect(unescapeStringForGeminiBug('line1\\\\nline2')).toBe(
+        'line1\\nline2',
+      );
+      // \\"text → \\ becomes \, " is just a char, text is text
+      // \\n → \\ becomes \, n just n
       expect(unescapeStringForGeminiBug('quote\\\\"text\\\\nline')).toBe(
-        'quote"text\nline',
+        'quote\\"text\\nline',
       );
+    });
+
+    it('should correctly handle uniformly over-escaped content (the Gemini bug)', () => {
+      // Simulates: model intended "line1\nline2" (with newline) but over-escaped
+      // so JSON had \\n → JS received literal \n.
+      const overEscaped = 'function foo() {\\n  return 1;\\n}';
+      const expected = 'function foo() {\n  return 1;\n}';
+      expect(unescapeStringForGeminiBug(overEscaped)).toBe(expected);
+    });
+
+    it('should correctly handle over-escaped content with backslash commands', () => {
+      // When the LLM over-escapes a LaTeX file, every backslash is doubled:
+      // \title → \\title, \n (newline) → \n (literal)
+      // After unescapeStringForGeminiBug:
+      //   \\title → \title (correct — \\ reduced to \, 'title' untouched)
+      //   \n → newline (correct — over-escaped newline restored)
+      const overEscapedLatex =
+        '\\\\title{Hello}\\n\\\\textbf{bold}\\n\\\\newline';
+      const expected = '\\title{Hello}\n\\textbf{bold}\n\\newline';
+      expect(unescapeStringForGeminiBug(overEscapedLatex)).toBe(expected);
     });
   });
 
@@ -256,16 +314,15 @@ describe('editCorrector', () => {
     });
 
     describe('Scenario Group 1: originalParams.old_string matches currentContent directly', () => {
-      it('Test 1.1: old_string (no literal \\), new_string (escaped by Gemini) -> new_string unescaped', async () => {
+      it('Test 1.1: old_string (no literal \\), new_string (escaped by Gemini) -> new_string unchanged (no over-escaping evidence)', async () => {
+        // old_string matches directly — no evidence of over-escaping.
+        // new_string is left as-is (no LLM call).
         const currentContent = 'This is a test string to find me.';
         const originalParams = {
           file_path: '/test/file.txt',
           old_string: 'find me',
           new_string: 'replace with \\"this\\"',
         };
-        mockResponses.push({
-          corrected_new_string_escaping: 'replace with "this"',
-        });
         const result = await ensureCorrectEdit(
           '/test/file.txt',
           currentContent,
@@ -275,8 +332,8 @@ describe('editCorrector', () => {
           abortSignal,
           false,
         );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
-        expect(result.params.new_string).toBe('replace with "this"');
+        expect(mockGenerateJson).toHaveBeenCalledTimes(0);
+        expect(result.params.new_string).toBe('replace with \\"this\\"');
         expect(result.params.old_string).toBe('find me');
         expect(result.occurrences).toBe(1);
       });
@@ -301,16 +358,15 @@ describe('editCorrector', () => {
         expect(result.params.old_string).toBe('find me');
         expect(result.occurrences).toBe(1);
       });
-      it('Test 1.3: old_string (with literal \\), new_string (escaped by Gemini) -> new_string unchanged (still escaped)', async () => {
+      it('Test 1.3: old_string (with literal \\), new_string (escaped by Gemini) -> new_string unchanged (no over-escaping evidence)', async () => {
+        // old_string matches directly — no evidence of over-escaping.
+        // new_string is left as-is (no LLM call).
         const currentContent = 'This is a test string to find\\me.';
         const originalParams = {
           file_path: '/test/file.txt',
           old_string: 'find\\me',
           new_string: 'replace with \\"this\\"',
         };
-        mockResponses.push({
-          corrected_new_string_escaping: 'replace with "this"',
-        });
         const result = await ensureCorrectEdit(
           '/test/file.txt',
           currentContent,
@@ -320,8 +376,8 @@ describe('editCorrector', () => {
           abortSignal,
           false,
         );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
-        expect(result.params.new_string).toBe('replace with "this"');
+        expect(mockGenerateJson).toHaveBeenCalledTimes(0);
+        expect(result.params.new_string).toBe('replace with \\"this\\"');
         expect(result.params.old_string).toBe('find\\me');
         expect(result.occurrences).toBe(1);
       });
@@ -371,7 +427,11 @@ describe('editCorrector', () => {
         expect(result.params.old_string).toBe('find "me"');
         expect(result.occurrences).toBe(1);
       });
-      it('Test 2.2: old_string (over-escaped, no intended literal \\), new_string (correctly formatted) -> new_string unescaped (harmlessly)', async () => {
+      it('Test 2.2: old_string (over-escaped, no intended literal \\), new_string (correctly formatted) -> new_string adjusted by LLM', async () => {
+        // old_string needed unescaping → over-escaping confirmed → LLM is
+        // asked to adjust new_string (even though it's already correct).
+        // correctNewString sees original≠corrected old_string, calls LLM.
+        // LLM returns empty → correctNewString returns original new_string.
         const currentContent = 'This is a test string to find "me".';
         const originalParams = {
           file_path: '/test/file.txt',
@@ -387,12 +447,14 @@ describe('editCorrector', () => {
           abortSignal,
           false,
         );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(0);
+        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params.new_string).toBe('replace with this');
         expect(result.params.old_string).toBe('find "me"');
         expect(result.occurrences).toBe(1);
       });
-      it('Test 2.3: old_string (over-escaped, with intended literal \\), new_string (simple) -> new_string corrected', async () => {
+      it('Test 2.3: old_string (over-escaped, with intended literal \\), new_string (simple) -> LLM adjusts new_string', async () => {
+        // old_string needed unescaping → over-escaping confirmed → LLM is
+        // asked to adjust new_string. LLM returns empty → original returned.
         const currentContent = 'This is a test string to find \\me.';
         const originalParams = {
           file_path: '/test/file.txt',
@@ -408,7 +470,7 @@ describe('editCorrector', () => {
           abortSignal,
           false,
         );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(0);
+        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params.new_string).toBe('replace with foobar');
         expect(result.params.old_string).toBe('find \\me');
         expect(result.occurrences).toBe(1);
@@ -416,15 +478,15 @@ describe('editCorrector', () => {
     });
 
     describe('Scenario Group 3: LLM Correction Path', () => {
-      it('Test 3.1: old_string (no literal \\), new_string (escaped by Gemini), LLM re-escapes new_string -> final new_string is double unescaped', async () => {
+      it('Test 3.1: old_string matches directly -> no LLM correction, new_string unchanged', async () => {
+        // old_string matches directly — no evidence of over-escaping.
+        // new_string is left as-is regardless of its content.
         const currentContent = 'This is a test string to corrected find me.';
         const originalParams = {
           file_path: '/test/file.txt',
           old_string: 'find me',
           new_string: 'replace with \\\\"this\\\\"',
         };
-        const llmNewString = 'LLM says replace with "that"';
-        mockResponses.push({ corrected_new_string_escaping: llmNewString });
         const result = await ensureCorrectEdit(
           '/test/file.txt',
           currentContent,
@@ -434,8 +496,8 @@ describe('editCorrector', () => {
           abortSignal,
           false,
         );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
-        expect(result.params.new_string).toBe(llmNewString);
+        expect(mockGenerateJson).toHaveBeenCalledTimes(0);
+        expect(result.params.new_string).toBe('replace with \\\\"this\\\\"');
         expect(result.params.old_string).toBe('find me');
         expect(result.occurrences).toBe(1);
       });
@@ -464,7 +526,9 @@ describe('editCorrector', () => {
         expect(result.params.old_string).toBe(llmCorrectedOldString);
         expect(result.occurrences).toBe(1);
       });
-      it('Test 3.3: old_string needs LLM, new_string is fine -> old_string corrected, new_string original', async () => {
+      it('Test 3.3: old_string needs LLM, new_string also sent to LLM -> both corrected', async () => {
+        // old_string needed LLM correction → new_string is also sent to LLM
+        // for adjustment. LLM returns empty for new_string → original returned.
         const currentContent = 'This is a test string to be corrected.';
         const originalParams = {
           file_path: '/test/file.txt',
@@ -473,6 +537,7 @@ describe('editCorrector', () => {
         };
         const llmCorrectedOldString = 'to be corrected';
         mockResponses.push({ corrected_target_snippet: llmCorrectedOldString });
+        // Second LLM call (correctNewString) gets no mock → returns original
         const result = await ensureCorrectEdit(
           '/test/file.txt',
           currentContent,
@@ -482,22 +547,20 @@ describe('editCorrector', () => {
           abortSignal,
           false,
         );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
+        expect(mockGenerateJson).toHaveBeenCalledTimes(2);
         expect(result.params.new_string).toBe('replace with "this"');
         expect(result.params.old_string).toBe(llmCorrectedOldString);
         expect(result.occurrences).toBe(1);
       });
-      it('Test 3.4: LLM correction path, correctNewString returns the originalNewString it was passed (which was unescaped) -> final new_string is unescaped', async () => {
+      it('Test 3.4: old_string matches directly -> no LLM correction, new_string unchanged', async () => {
+        // old_string matches directly — no evidence of over-escaping.
+        // new_string is left as-is regardless of its content.
         const currentContent = 'This is a test string to corrected find me.';
         const originalParams = {
           file_path: '/test/file.txt',
           old_string: 'find me',
           new_string: 'replace with \\\\"this\\\\"',
         };
-        const newStringForLLMAndReturnedByLLM = 'replace with "this"';
-        mockResponses.push({
-          corrected_new_string_escaping: newStringForLLMAndReturnedByLLM,
-        });
         const result = await ensureCorrectEdit(
           '/test/file.txt',
           currentContent,
@@ -507,8 +570,8 @@ describe('editCorrector', () => {
           abortSignal,
           false,
         );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
-        expect(result.params.new_string).toBe(newStringForLLMAndReturnedByLLM);
+        expect(mockGenerateJson).toHaveBeenCalledTimes(0);
+        expect(result.params.new_string).toBe('replace with \\\\"this\\\\"');
         expect(result.occurrences).toBe(1);
       });
     });
@@ -559,7 +622,10 @@ describe('editCorrector', () => {
     });
 
     describe('Scenario Group 5: Specific unescapeStringForGeminiBug checks (integrated into ensureCorrectEdit)', () => {
-      it('Test 5.1: old_string needs LLM to become currentContent, new_string also needs correction', async () => {
+      it('Test 5.1: old_string matches via unescaping, new_string needs LLM correction', async () => {
+        // With single-backslash matching (\\), unescapeStringForGeminiBug now
+        // correctly converts old_string to match currentContent without LLM.
+        // Only new_string correction needs LLM.
         const currentContent = 'const x = "a\nbc\\"def\\"';
         const originalParams = {
           file_path: '/test/file.txt',
@@ -567,7 +633,7 @@ describe('editCorrector', () => {
           new_string: 'const y = \\"new\\nval\\\\"content\\\\"',
         };
         const expectedFinalNewString = 'const y = "new\nval\\"content\\"';
-        mockResponses.push({ corrected_target_snippet: currentContent });
+        // Only one LLM call needed: correctNewString (old_string matched via unescaping)
         mockResponses.push({ corrected_new_string: expectedFinalNewString });
         const result = await ensureCorrectEdit(
           '/test/file.txt',
@@ -578,7 +644,7 @@ describe('editCorrector', () => {
           abortSignal,
           false,
         );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(2);
+        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params.old_string).toBe(currentContent);
         expect(result.params.new_string).toBe(expectedFinalNewString);
         expect(result.occurrences).toBe(1);
@@ -725,7 +791,11 @@ describe('editCorrector', () => {
       resetEditCorrectorCaches_TEST_ONLY();
     });
 
-    it('should return content unchanged if no escaping issues detected', async () => {
+    // Detection uses unescapeStringForGeminiBug as a cheap probe: if unescaping
+    // would change the content, the LLM is asked to decide. When LLM is
+    // disabled, content is returned unchanged (no ground truth to validate).
+
+    it('should return content unchanged if no escaping signal detected', async () => {
       const content = 'This is normal content without escaping issues';
       const result = await ensureCorrectFileContent(
         content,
@@ -737,30 +807,23 @@ describe('editCorrector', () => {
       expect(mockGenerateJson).toHaveBeenCalledTimes(0);
     });
 
-    it('should call correctStringEscaping for potentially escaped content', async () => {
+    it('should call LLM when content has \\" (unescaping probe detects change)', async () => {
+      // Content has \" which unescapeStringForGeminiBug would change → LLM
+      // is asked to decide. LLM returns empty → original content returned.
       const content = 'console.log(\\"Hello World\\");';
-      const correctedContent = 'console.log("Hello World");';
-      mockResponses.push({
-        corrected_string_escaping: correctedContent,
-      });
-
       const result = await ensureCorrectFileContent(
         content,
         mockBaseLlmClientInstance,
         abortSignal,
         false,
       );
-
-      expect(result).toBe(correctedContent);
+      expect(result).toBe(content);
       expect(mockGenerateJson).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle correctStringEscaping returning corrected content via correct property name', async () => {
-      // This test specifically verifies the property name fix
+    it('should call LLM when content has \\n (unescaping probe detects change)', async () => {
       const content = 'const message = \\"Hello\\nWorld\\";';
       const correctedContent = 'const message = "Hello\nWorld";';
-
-      // Mock the response with the correct property name
       mockResponses.push({
         corrected_string_escaping: correctedContent,
       });
@@ -777,8 +840,8 @@ describe('editCorrector', () => {
     });
 
     it('should return original content if LLM correction fails', async () => {
-      const content = 'console.log(\\"Hello World\\");';
-      // Mock empty response to simulate LLM failure
+      // This content triggers detection (has \n, no actual newlines)
+      const content = 'console.log(\\"Hello\\nWorld\\");';
       mockResponses.push({});
 
       const result = await ensureCorrectFileContent(
@@ -792,7 +855,7 @@ describe('editCorrector', () => {
       expect(mockGenerateJson).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle various escape sequences that need correction', async () => {
+    it('should handle various escape sequences when \\n signal is present', async () => {
       const content =
         'const obj = { name: \\"John\\", age: 30, bio: \\"Developer\\nEngineer\\" };';
       const correctedContent =
@@ -810,6 +873,52 @@ describe('editCorrector', () => {
       );
 
       expect(result).toBe(correctedContent);
+    });
+
+    it('should call LLM for LaTeX content (probe detects \\t in \\title), LLM returns unchanged', async () => {
+      // LaTeX content has \t in \title and \n in \newline which the unescaping
+      // probe detects. LLM is asked to decide — it correctly identifies the
+      // content as LaTeX and returns it unchanged.
+      const content = '\\title{Hello}\n\\textbf{bold}\n\\newline';
+      mockResponses.push({
+        corrected_string_escaping: content,
+      });
+      const result = await ensureCorrectFileContent(
+        content,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        false,
+      );
+      expect(result).toBe(content);
+      expect(mockGenerateJson).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return content unchanged when LLM is disabled (no ground truth)', async () => {
+      // Over-escaped content, but LLM is disabled and there is no ground truth
+      // (no file content to compare against). Return as-is rather than risk
+      // silent corruption.
+      const content = 'function foo() {\\n  return 1;\\n}';
+      const result = await ensureCorrectFileContent(
+        content,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        true, // LLM disabled
+      );
+      expect(result).toBe(content);
+      expect(mockGenerateJson).toHaveBeenCalledTimes(0);
+    });
+
+    it('should return LaTeX content unchanged when LLM is disabled', async () => {
+      // LLM disabled — content returned as-is regardless of escape sequences.
+      const content = '\\title{Hello}\n\\textbf{bold}';
+      const result = await ensureCorrectFileContent(
+        content,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        true, // LLM disabled
+      );
+      expect(result).toBe(content);
+      expect(mockGenerateJson).toHaveBeenCalledTimes(0);
     });
   });
 });
