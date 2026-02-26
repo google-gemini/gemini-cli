@@ -13,8 +13,9 @@ import {
   type PolicyEngineConfig,
   PolicyDecision,
   type PolicyRule,
-  type ApprovalMode,
+  ApprovalMode,
   type PolicySettings,
+  type SafetyCheckerRule,
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
 import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
@@ -181,6 +182,69 @@ async function filterSecurePolicyDirectories(
   return results.filter((dir): dir is string => dir !== null);
 }
 
+/**
+ * Loads and sanitizes policies from an extension's policies directory.
+ * Security: Filters out 'ALLOW' rules and YOLO mode configurations.
+ */
+export async function loadExtensionPolicies(
+  extensionName: string,
+  policyDir: string,
+): Promise<{
+  rules: PolicyRule[];
+  checkers: SafetyCheckerRule[];
+  errors: PolicyFileError[];
+}> {
+  const result = await loadPoliciesFromToml(
+    [policyDir],
+    () => EXTENSION_POLICY_TIER,
+  );
+
+  const rules = result.rules.filter((rule) => {
+    // Security: Extensions are not allowed to automatically approve tool calls.
+    if (rule.decision === PolicyDecision.ALLOW) {
+      debugLogger.warn(
+        `[PolicyConfig] Extension "${extensionName}" attempted to contribute an ALLOW rule for tool "${rule.toolName}". Ignoring this rule for security.`,
+      );
+      return false;
+    }
+
+    // Security: Extensions are not allowed to contribute YOLO mode rules.
+    if (rule.modes?.includes(ApprovalMode.YOLO)) {
+      debugLogger.warn(
+        `[PolicyConfig] Extension "${extensionName}" attempted to contribute a rule for YOLO mode. Ignoring this rule for security.`,
+      );
+      return false;
+    }
+
+    // Prefix source with extension name to avoid collisions and double prefixing.
+    // toml-loader.ts adds "Extension: file.toml", we transform it to "Extension (name): file.toml".
+    rule.source = rule.source?.replace(
+      /^Extension: /,
+      `Extension (${extensionName}): `,
+    );
+    return true;
+  });
+
+  const checkers = result.checkers.filter((checker) => {
+    // Security: Extensions are not allowed to contribute YOLO mode checkers.
+    if (checker.modes?.includes(ApprovalMode.YOLO)) {
+      debugLogger.warn(
+        `[PolicyConfig] Extension "${extensionName}" attempted to contribute a safety checker for YOLO mode. Ignoring this checker for security.`,
+      );
+      return false;
+    }
+
+    // Prefix source with extension name.
+    checker.source = checker.source?.replace(
+      /^Extension: /,
+      `Extension (${extensionName}): `,
+    );
+    return true;
+  });
+
+  return { rules, checkers, errors: result.errors };
+}
+
 export async function createPolicyEngineConfig(
   settings: PolicySettings,
   approvalMode: ApprovalMode,
@@ -237,6 +301,7 @@ export async function createPolicyEngineConfig(
   const checkers = [...tomlCheckers];
 
   // Priority system for policy rules:
+
   // - Higher priority numbers win over lower priority numbers
   // - When multiple rules match, the highest priority rule is applied
   // - Rules are evaluated in order of priority (highest first)

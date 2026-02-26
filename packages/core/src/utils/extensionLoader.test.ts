@@ -58,14 +58,14 @@ describe('SimpleExtensionLoader', () => {
       {
         toolName: 'test-tool',
         decision: PolicyDecision.ALLOW,
-        source: 'Extension (test-extension): Extension: policies.toml',
+        source: 'Extension (test-extension): policies.toml',
       },
     ],
     checkers: [
       {
         toolName: 'test-tool',
         checker: { type: 'external', name: 'test-checker' },
-        source: 'Extension (test-extension): Extension: policies.toml',
+        source: 'Extension (test-extension): policies.toml',
       },
     ],
   };
@@ -133,10 +133,10 @@ describe('SimpleExtensionLoader', () => {
     await loader.start(mockConfig);
     await loader.stopExtension(activeExtension);
     expect(mockPolicyEngine.removeRulesBySource).toHaveBeenCalledWith(
-      'Extension (test-extension): Extension: policies.toml',
+      'Extension (test-extension): policies.toml',
     );
     expect(mockPolicyEngine.removeCheckersBySource).toHaveBeenCalledWith(
-      'Extension (test-extension): Extension: policies.toml',
+      'Extension (test-extension): policies.toml',
     );
   });
 

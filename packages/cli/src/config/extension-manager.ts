@@ -52,10 +52,7 @@ import {
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
   CoreToolCallStatus,
-  EXTENSION_POLICY_TIER,
-  loadPoliciesFromToml,
-  PolicyDecision,
-  ApprovalMode,
+  loadExtensionPolicies,
   isSubpath,
   type PolicyRule,
   type SafetyCheckerRule,
@@ -840,64 +837,10 @@ Would you like to attempt to install via "git clone" instead?`,
       let checkers: SafetyCheckerRule[] | undefined;
 
       const policyDir = path.join(effectiveExtensionPath, 'policies');
-      if (!isSubpath(effectiveExtensionPath, policyDir)) {
-        throw new Error(
-          `Invalid policy directory path. Policies must be within the extension directory.`,
-        );
-      }
       if (fs.existsSync(policyDir)) {
-        const result = await loadPoliciesFromToml(
-          [policyDir],
-          () => EXTENSION_POLICY_TIER,
-        );
+        const result = await loadExtensionPolicies(config.name, policyDir);
         rules = result.rules;
         checkers = result.checkers;
-
-        // Prefix source with extension name to avoid collisions
-        if (rules) {
-          rules = rules.filter((rule) => {
-            // Security: Extensions are not allowed to automatically approve tool calls.
-            // We ignore any rule that is ALLOW.
-            if (rule.decision === PolicyDecision.ALLOW) {
-              debugLogger.warn(
-                `[ExtensionManager] Extension "${config.name}" attempted to contribute an ALLOW rule for tool "${rule.toolName}". Ignoring this rule for security.`,
-              );
-              return false;
-            }
-
-            // Security: Extensions are not allowed to contribute YOLO mode rules.
-            if (rule.modes?.includes(ApprovalMode.YOLO)) {
-              debugLogger.warn(
-                `[ExtensionManager] Extension "${config.name}" attempted to contribute a rule for YOLO mode. Ignoring this rule for security.`,
-              );
-              return false;
-            }
-
-            rule.source = rule.source?.startsWith(`Extension (${config.name}):`)
-              ? rule.source
-              : `Extension (${config.name}): ${rule.source}`;
-            return true;
-          });
-        }
-
-        if (checkers) {
-          checkers = checkers.filter((checker) => {
-            // Security: Extensions are not allowed to contribute YOLO mode checkers.
-            if (checker.modes?.includes(ApprovalMode.YOLO)) {
-              debugLogger.warn(
-                `[ExtensionManager] Extension "${config.name}" attempted to contribute a safety checker for YOLO mode. Ignoring this checker for security.`,
-              );
-              return false;
-            }
-
-            checker.source = checker.source?.startsWith(
-              `Extension (${config.name}):`,
-            )
-              ? checker.source
-              : `Extension (${config.name}): ${checker.source}`;
-            return true;
-          });
-        }
 
         if (result.errors.length > 0) {
           for (const error of result.errors) {
