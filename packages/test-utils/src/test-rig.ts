@@ -76,6 +76,10 @@ export function createToolCallErrorMessage(
   );
 }
 
+function isSuccess(value: unknown): boolean {
+  return value === true || value === 'true';
+}
+
 // Helper to print debug information when tests fail
 export function printDebugInfo(
   rig: TestRig,
@@ -1066,7 +1070,7 @@ export class TestRig {
 
     for (const match of matches) {
       const toolName = match[1];
-      const success = match[2] === 'true';
+      const success = isSuccess(match[2]);
       const duration = parseInt(match[3], 10);
 
       // Try to find function_args nearby
@@ -1142,15 +1146,12 @@ export class TestRig {
               ) {
                 const bodyMatch = obj.body.match(/Tool call: (\w+)\./);
                 if (bodyMatch) {
-                  const successValue = obj.attributes.success;
-                  const success =
-                    successValue === true || successValue === 'true';
                   logs.push({
                     timestamp: obj.timestamp || Date.now(),
                     toolRequest: {
                       name: bodyMatch[1],
                       args: obj.attributes.function_args || '{}',
-                      success: success,
+                      success: isSuccess(obj.attributes.success),
                       duration_ms: obj.attributes.duration_ms || 0,
                       prompt_id: obj.attributes.prompt_id,
                     },
@@ -1160,15 +1161,12 @@ export class TestRig {
                 obj.attributes &&
                 obj.attributes['event.name'] === 'gemini_cli.tool_call'
               ) {
-                const successValue = obj.attributes.success;
-                const success =
-                  successValue === true || successValue === 'true';
                 logs.push({
                   timestamp: obj.attributes['event.timestamp'],
                   toolRequest: {
                     name: obj.attributes.function_name,
                     args: obj.attributes.function_args,
-                    success: success,
+                    success: isSuccess(obj.attributes.success),
                     duration_ms: obj.attributes.duration_ms,
                     prompt_id: obj.attributes.prompt_id,
                   },
@@ -1278,7 +1276,7 @@ export class TestRig {
           toolRequest: {
             name: toolName,
             args: logData.attributes.function_args ?? '{}',
-            success: logData.attributes.success ?? false,
+            success: isSuccess(logData.attributes.success),
             duration_ms: logData.attributes.duration_ms ?? 0,
             prompt_id: logData.attributes.prompt_id,
             error: logData.attributes.error,
@@ -1438,7 +1436,7 @@ export class TestRig {
             stdout: logData.attributes.stdout ?? '',
             stderr: logData.attributes.stderr ?? '',
             duration_ms: logData.attributes.duration_ms ?? 0,
-            success: logData.attributes.success ?? false,
+            success: isSuccess(logData.attributes.success),
             error: logData.attributes.error ?? '',
           },
         });
