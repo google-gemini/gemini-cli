@@ -617,9 +617,9 @@ export class PolicyEngine {
       // Determine decision
       let decision: PolicyDecision;
       if (globalVerdict !== undefined) {
-        decision = globalVerdict;
+        decision = this.applyNonInteractiveMode(globalVerdict);
       } else {
-        decision = rule.decision;
+        decision = this.applyNonInteractiveMode(rule.decision);
       }
 
       if (decision === PolicyDecision.DENY) {
