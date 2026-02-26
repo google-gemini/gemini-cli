@@ -391,7 +391,7 @@ describe('Composer', () => {
       expect(output).not.toContain('ShortcutsHint');
     });
 
-    it('renders LoadingIndicator without thought when loadingPhrases is off', async () => {
+    it('renders LoadingIndicator with thought when loadingPhrases is off', async () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         thought: { subject: 'Hidden', description: 'Should not show' },
@@ -404,7 +404,7 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).toContain('LoadingIndicator');
-      expect(output).not.toContain('Should not show');
+      expect(output).toContain('LoadingIndicator: Hidden');
     });
 
     it('does not render LoadingIndicator when waiting for confirmation', async () => {
