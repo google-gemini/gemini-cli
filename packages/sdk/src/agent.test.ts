@@ -17,7 +17,10 @@ describe('GeminiCliSession', () => {
     vi.spyOn(GeminiCliSession.prototype, 'initialize').mockImplementation(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       async function (this: any) {
-        this.client = { getHistory: () => [] };
+        this.client = {
+          getHistory: () => [],
+          async *sendMessageStream () {},
+        };
         this.initialized = true;
       },
     );
