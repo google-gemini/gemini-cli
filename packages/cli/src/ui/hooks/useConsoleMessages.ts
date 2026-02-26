@@ -9,7 +9,7 @@ import {
   useEffect,
   useReducer,
   useRef,
-  useTransition,
+  startTransition,
 } from 'react';
 import type { ConsoleMessageItem } from '../types.js';
 import {
@@ -71,10 +71,11 @@ export function useConsoleMessages(): UseConsoleMessagesReturn {
   const [consoleMessages, dispatch] = useReducer(consoleMessagesReducer, []);
   const messageQueueRef = useRef<ConsoleMessageItem[]>([]);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [, startTransition] = useTransition();
+  const isProcessingRef = useRef(false);
 
   const processQueue = useCallback(() => {
     if (messageQueueRef.current.length > 0) {
+      isProcessingRef.current = true;
       const messagesToProcess = messageQueueRef.current;
       messageQueueRef.current = [];
       startTransition(() => {
@@ -87,14 +88,25 @@ export function useConsoleMessages(): UseConsoleMessagesReturn {
   const handleNewMessage = useCallback(
     (message: ConsoleMessageItem) => {
       messageQueueRef.current.push(message);
-      if (!timeoutRef.current) {
-        // Batch updates using a timeout. 16ms is a reasonable delay to batch
-        // rapid-fire messages without noticeable lag.
-        timeoutRef.current = setTimeout(processQueue, 16);
+      if (!isProcessingRef.current && !timeoutRef.current) {
+        // Batch updates using a timeout. 50ms is a reasonable delay to batch
+        // rapid-fire messages without noticeable lag while avoiding React update
+        // queue flooding.
+        timeoutRef.current = setTimeout(processQueue, 50);
       }
     },
     [processQueue],
   );
+
+  // Once the updated consoleMessages have been committed to the screen,
+  // we can safely process the next batch of queued messages if any exist.
+  // This completely eliminates overlapping concurrent updates to this state.
+  useEffect(() => {
+    isProcessingRef.current = false;
+    if (messageQueueRef.current.length > 0 && !timeoutRef.current) {
+      timeoutRef.current = setTimeout(processQueue, 50);
+    }
+  }, [consoleMessages, processQueue]);
 
   useEffect(() => {
     const handleConsoleLog = (payload: ConsoleLogPayload) => {
@@ -149,6 +161,7 @@ export function useConsoleMessages(): UseConsoleMessagesReturn {
       timeoutRef.current = null;
     }
     messageQueueRef.current = [];
+    isProcessingRef.current = true;
     startTransition(() => {
       dispatch({ type: 'CLEAR' });
     });

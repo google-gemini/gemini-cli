@@ -6,7 +6,7 @@
 
 import { act } from 'react';
 import type { EventEmitter } from 'node:events';
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { ConfigInitDisplay } from './ConfigInitDisplay.js';
 import {
@@ -27,7 +27,7 @@ import {
 import { Text } from 'ink';
 
 // Mock GeminiSpinner
-vi.mock('./GeminiRespondingSpinner.js', () => ({
+vi.mock('./GeminiSpinner.js', () => ({
   GeminiSpinner: () => <Text>Spinner</Text>,
 }));
 
@@ -42,8 +42,11 @@ describe('ConfigInitDisplay', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders initial state', () => {
-    const { lastFrame } = render(<ConfigInitDisplay />);
+  it('renders initial state', async () => {
+    const { lastFrame, waitUntilReady } = renderWithProviders(
+      <ConfigInitDisplay />,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
@@ -56,7 +59,7 @@ describe('ConfigInitDisplay', () => {
       return coreEvents;
     });
 
-    const { lastFrame } = render(<ConfigInitDisplay />);
+    const { lastFrame } = renderWithProviders(<ConfigInitDisplay />);
 
     // Wait for listener to be registered
     await waitFor(() => {
@@ -94,7 +97,7 @@ describe('ConfigInitDisplay', () => {
       return coreEvents;
     });
 
-    const { lastFrame } = render(<ConfigInitDisplay />);
+    const { lastFrame } = renderWithProviders(<ConfigInitDisplay />);
 
     await waitFor(() => {
       if (!listener) throw new Error('Listener not registered yet');
@@ -130,7 +133,7 @@ describe('ConfigInitDisplay', () => {
       return coreEvents;
     });
 
-    const { lastFrame } = render(<ConfigInitDisplay />);
+    const { lastFrame } = renderWithProviders(<ConfigInitDisplay />);
 
     await waitFor(() => {
       if (!listener) throw new Error('Listener not registered yet');

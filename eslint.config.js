@@ -38,6 +38,7 @@ export default tseslint.config(
       'dist/**',
       'evals/**',
       'packages/test-utils/**',
+      '.gemini/skills/**',
     ],
   },
   eslint.configs.recommended,
@@ -55,7 +56,7 @@ export default tseslint.config(
   },
   {
     // Import specific config
-    files: ['packages/cli/src/**/*.{ts,tsx}'], // Target only TS/TSX in the cli package
+    files: ['packages/*/src/**/*.{ts,tsx}'], // Target all TS/TSX in the packages
     plugins: {
       import: importPlugin,
     },
@@ -127,17 +128,7 @@ export default tseslint.config(
       ],
       // Prevent async errors from bypassing catch handlers
       '@typescript-eslint/return-await': ['error', 'in-try-catch'],
-      'import/no-internal-modules': [
-        'error',
-        {
-          allow: [
-            'react-dom/test-utils',
-            'memfs/lib/volume.js',
-            'yargs/**',
-            'msw/node',
-          ],
-        },
-      ],
+      'import/no-internal-modules': 'off',
       'import/no-relative-packages': 'error',
       'no-cond-assign': 'error',
       'no-debugger': 'error',
@@ -199,6 +190,8 @@ export default tseslint.config(
     ignores: ['**/*.test.ts', '**/*.test.tsx'],
     rules: {
       '@typescript-eslint/no-unsafe-type-assertion': 'error',
+      '@typescript-eslint/no-unsafe-assignment': 'error',
+      '@typescript-eslint/no-unsafe-return': 'error',
     },
   },
   {

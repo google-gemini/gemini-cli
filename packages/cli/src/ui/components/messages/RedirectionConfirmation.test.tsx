@@ -23,7 +23,7 @@ describe('ToolConfirmationMessage Redirection', () => {
     getIdeMode: () => false,
   } as unknown as Config;
 
-  it('should display redirection warning and tip for redirected commands', () => {
+  it('should display redirection warning and tip for redirected commands', async () => {
     const confirmationDetails: SerializableConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Shell Command',
@@ -32,17 +32,20 @@ describe('ToolConfirmationMessage Redirection', () => {
       rootCommands: ['echo'],
     };
 
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={100}
       />,
     );
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toMatchSnapshot();
+    unmount();
   });
 });
