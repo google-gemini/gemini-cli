@@ -140,6 +140,19 @@ export const ColorsDisplay: React.FC = () => {
           iTerm2, VSCode, etc), and see how the colors change across different
           themes.
         </Text>
+        <Box marginTop={1} flexDirection="column">
+          <Text color={theme.text.secondary}>
+            <Text bold color={theme.text.primary}>
+              Note on overrides:
+            </Text>{' '}
+            Hex values (TrueColor) are rendered exactly as shown and are
+            generally <Text italic>not</Text> affected by your Terminal
+            app&apos;s theme. Color names (like &apos;red&apos;,
+            &apos;green&apos;, &apos;gray&apos;) used in the ANSI theme{' '}
+            <Text italic>are</Text> overridden by your Terminal app&apos;s
+            palette.
+          </Text>
+        </Box>
         <Box marginTop={1}>
           <Text color={theme.text.secondary}>
             Active Theme:{' '}
