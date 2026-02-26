@@ -52,6 +52,13 @@ import {
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
   CoreToolCallStatus,
+  EXTENSION_POLICY_TIER,
+  loadPoliciesFromToml,
+  PolicyDecision,
+  ApprovalMode,
+  isSubpath,
+  type PolicyRule,
+  type SafetyCheckerRule,
   HookType,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
@@ -764,9 +771,18 @@ Would you like to attempt to install via "git clone" instead?`,
       }
 
       const contextFiles = getContextFileNames(config)
-        .map((contextFileName) =>
-          path.join(effectiveExtensionPath, contextFileName),
-        )
+        .map((contextFileName) => {
+          const contextFilePath = path.join(
+            effectiveExtensionPath,
+            contextFileName,
+          );
+          if (!isSubpath(effectiveExtensionPath, contextFilePath)) {
+            throw new Error(
+              `Invalid context file path: "${contextFileName}". Context files must be within the extension directory.`,
+            );
+          }
+          return contextFilePath;
+        })
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
       const hydrationContext: VariableContext = {
@@ -820,6 +836,85 @@ Would you like to attempt to install via "git clone" instead?`,
         recursivelyHydrateStrings(skill, hydrationContext),
       );
 
+      let rules: PolicyRule[] | undefined;
+      let checkers: SafetyCheckerRule[] | undefined;
+
+      const policyPaths = config.policyPaths || ['policies'];
+      const validPolicyDirs = policyPaths
+        .map((p) => path.join(effectiveExtensionPath, p))
+        .filter((dir) => {
+          if (!isSubpath(effectiveExtensionPath, dir)) {
+            debugLogger.warn(
+              `[ExtensionManager] Extension "${config.name}" attempted to contribute policies from outside its directory: "${dir}". Ignoring these policies for security.`,
+            );
+            return false;
+          }
+          return fs.existsSync(dir);
+        });
+
+      if (validPolicyDirs.length > 0) {
+        const result = await loadPoliciesFromToml(
+          validPolicyDirs,
+          () => EXTENSION_POLICY_TIER,
+        );
+        rules = result.rules;
+        checkers = result.checkers;
+
+        // Prefix source with extension name to avoid collisions
+        if (rules) {
+          rules = rules.filter((rule) => {
+            // Security: Extensions are not allowed to automatically approve tool calls.
+            // We ignore any rule that is ALLOW.
+            if (rule.decision === PolicyDecision.ALLOW) {
+              debugLogger.warn(
+                `[ExtensionManager] Extension "${config.name}" attempted to contribute an ALLOW rule for tool "${rule.toolName}". Ignoring this rule for security.`,
+              );
+              return false;
+            }
+
+            // Security: Extensions are not allowed to contribute YOLO mode rules.
+            if (rule.modes?.includes(ApprovalMode.YOLO)) {
+              debugLogger.warn(
+                `[ExtensionManager] Extension "${config.name}" attempted to contribute a rule for YOLO mode. Ignoring this rule for security.`,
+              );
+              return false;
+            }
+
+            rule.source = rule.source?.startsWith(`Extension (${config.name}):`)
+              ? rule.source
+              : `Extension (${config.name}): ${rule.source}`;
+            return true;
+          });
+        }
+
+        if (checkers) {
+          checkers = checkers.filter((checker) => {
+            // Security: Extensions are not allowed to contribute YOLO mode checkers.
+            if (checker.modes?.includes(ApprovalMode.YOLO)) {
+              debugLogger.warn(
+                `[ExtensionManager] Extension "${config.name}" attempted to contribute a safety checker for YOLO mode. Ignoring this checker for security.`,
+              );
+              return false;
+            }
+
+            checker.source = checker.source?.startsWith(
+              `Extension (${config.name}):`,
+            )
+              ? checker.source
+              : `Extension (${config.name}): ${checker.source}`;
+            return true;
+          });
+        }
+
+        if (result.errors.length > 0) {
+          for (const error of result.errors) {
+            debugLogger.warn(
+              `[ExtensionManager] Error loading policies from ${config.name}: ${error.message}${error.details ? `\nDetails: ${error.details}` : ''}`,
+            );
+          }
+        }
+      }
+
       const agentLoadResult = await loadAgentsFromDirectory(
         path.join(effectiveExtensionPath, 'agents'),
       );
@@ -842,6 +937,7 @@ Would you like to attempt to install via "git clone" instead?`,
         installMetadata,
         mcpServers: config.mcpServers,
         excludeTools: config.excludeTools,
+        plan: config.plan,
         hooks,
         isActive: this.extensionEnablementManager.isEnabled(
           config.name,
@@ -853,6 +949,8 @@ Would you like to attempt to install via "git clone" instead?`,
         skills,
         agents: agentLoadResult.agents,
         themes: config.themes,
+        rules,
+        checkers,
       };
     } catch (e) {
       debugLogger.error(

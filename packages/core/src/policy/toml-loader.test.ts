@@ -262,30 +262,30 @@ deny_message = "Deletion is permanent"
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should support modes property for Tier 2 and Tier 3 policies', async () => {
+    it('should support modes property for Tier 3 and Tier 4 policies', async () => {
       await fs.writeFile(
-        path.join(tempDir, 'tier2.toml'),
+        path.join(tempDir, 'tier3.toml'),
         `
 [[rule]]
-toolName = "tier2-tool"
+toolName = "tier3-tool"
 decision = "allow"
 priority = 100
 modes = ["autoEdit"]
 `,
       );
 
-      const getPolicyTier2 = (_dir: string) => 2; // Tier 2
-      const result2 = await loadPoliciesFromToml([tempDir], getPolicyTier2);
-
-      expect(result2.rules).toHaveLength(1);
-      expect(result2.rules[0].toolName).toBe('tier2-tool');
-      expect(result2.rules[0].modes).toEqual(['autoEdit']);
-      expect(result2.rules[0].source).toBe('Workspace: tier2.toml');
-
-      const getPolicyTier3 = (_dir: string) => 3; // Tier 3
+      const getPolicyTier3 = (_dir: string) => 3; // Tier 3 (User)
       const result3 = await loadPoliciesFromToml([tempDir], getPolicyTier3);
-      expect(result3.rules[0].source).toBe('User: tier2.toml');
-      expect(result3.errors).toHaveLength(0);
+
+      expect(result3.rules).toHaveLength(1);
+      expect(result3.rules[0].toolName).toBe('tier3-tool');
+      expect(result3.rules[0].modes).toEqual(['autoEdit']);
+      expect(result3.rules[0].source).toBe('User: tier3.toml');
+
+      const getPolicyTier4 = (_dir: string) => 4; // Tier 4 (Admin)
+      const result4 = await loadPoliciesFromToml([tempDir], getPolicyTier4);
+      expect(result4.rules[0].source).toBe('Admin: tier3.toml');
+      expect(result4.errors).toHaveLength(0);
     });
 
     it('should handle TOML parse errors', async () => {

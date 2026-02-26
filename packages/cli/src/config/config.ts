@@ -33,6 +33,7 @@ import {
   getVersion,
   PREVIEW_GEMINI_MODEL_AUTO,
   type HierarchicalMemory,
+  type PlanSettings,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
   getAdminErrorMessage,
@@ -511,6 +512,21 @@ export async function loadCliConfig(
   });
   await extensionManager.loadExtensions();
 
+  // Filter active extensions that define a plan directory
+  const activeExtensionsWithPlan = extensionManager
+    .getExtensions()
+    .filter((e) => e.isActive && e.plan?.directory);
+
+  let extensionPlanSettings: PlanSettings | undefined;
+  if (activeExtensionsWithPlan.length > 0) {
+    if (activeExtensionsWithPlan.length > 1) {
+      debugLogger.warn(
+        `Multiple active extensions define a plan directory. Using plan directory from extension: "${activeExtensionsWithPlan[0].name}"`,
+      );
+    }
+    extensionPlanSettings = activeExtensionsWithPlan[0].plan;
+  }
+
   const experimentalJitContext = settings.experimental?.jitContext ?? false;
 
   let memoryContent: string | HierarchicalMemory = '';
@@ -827,7 +843,9 @@ export async function loadCliConfig(
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
     directWebFetch: settings.experimental?.directWebFetch,
-    planSettings: settings.general?.plan,
+    planSettings: settings.general?.plan?.directory
+      ? settings.general.plan
+      : (extensionPlanSettings ?? settings.general?.plan),
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,

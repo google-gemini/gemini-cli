@@ -106,7 +106,12 @@ import { FileExclusions } from '../utils/ignorePatterns.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
-import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
+import {
+  ApprovalMode,
+  type PolicyEngineConfig,
+  type PolicyRule,
+  type SafetyCheckerRule,
+} from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type {
   UserTierId,
@@ -304,6 +309,7 @@ export interface GeminiCLIExtension {
   mcpServers?: Record<string, MCPServerConfig>;
   contextFiles: string[];
   excludeTools?: string[];
+  plan?: PlanSettings;
   id: string;
   hooks?: { [K in HookEventName]?: HookDefinition[] };
   settings?: ExtensionSetting[];
@@ -315,6 +321,14 @@ export interface GeminiCLIExtension {
    * These themes will be registered when the extension is activated.
    */
   themes?: CustomTheme[];
+  /**
+   * Policy rules contributed by this extension.
+   */
+  rules?: PolicyRule[];
+  /**
+   * Safety checkers contributed by this extension.
+   */
+  checkers?: SafetyCheckerRule[];
 }
 
 export interface ExtensionInstallMetadata {
