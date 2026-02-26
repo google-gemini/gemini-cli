@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   build:
-    if: "github.repository == 'google-gemini/gemini-cli'" && !contains(github.ref_name, 'nightly')
+    if: "github.repository == 'google-gemini/gemini-cli' && !contains(github.ref_name, 'nightly')"
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Checkout'
