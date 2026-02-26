@@ -132,6 +132,35 @@ describe('Policy Engine Integration Tests', () => {
       ).toBe(PolicyDecision.ASK_USER);
     });
 
+    it('should handle global MCP wildcard (*) in settings', async () => {
+      const settings: Settings = {
+        mcp: {
+          allowed: ['*'],
+        },
+      };
+
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
+      const engine = new PolicyEngine(config);
+
+      // ANY tool with a server name should be allowed
+      expect(
+        (await engine.check({ name: 'mcp-server__tool' }, 'mcp-server'))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'another-server__tool' }, 'another-server'))
+          .decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Built-in tools should NOT be allowed by the MCP wildcard
+      expect(
+        (await engine.check({ name: 'run_shell_command' }, undefined)).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+    });
+
     it('should correctly prioritize specific tool excludes over MCP server wildcards', async () => {
       const settings: Settings = {
         mcp: {
@@ -323,6 +352,38 @@ describe('Policy Engine Integration Tests', () => {
       ).toBe(PolicyDecision.DENY);
     });
 
+    it('should correctly match tool annotations', async () => {
+      const settings: Settings = {};
+
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.DEFAULT,
+      );
+
+      // Add a manual rule with annotations to the config
+      config.rules = config.rules || [];
+      config.rules.push({
+        toolAnnotations: { readOnlyHint: true },
+        decision: PolicyDecision.ALLOW,
+        priority: 10,
+      });
+
+      const engine = new PolicyEngine(config);
+
+      // A tool with readOnlyHint=true should be ALLOWED
+      const roCall = { name: 'some_tool', args: {} };
+      const roMeta = { readOnlyHint: true };
+      expect((await engine.check(roCall, undefined, roMeta)).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+
+      // A tool without the hint (or with false) should follow default decision (ASK_USER)
+      const rwMeta = { readOnlyHint: false };
+      expect((await engine.check(roCall, undefined, rwMeta)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
+    });
+
     describe.each(['write_file', 'replace'])(
       'Plan Mode policy for %s',
       (toolName) => {
@@ -339,6 +400,8 @@ describe('Policy Engine Integration Tests', () => {
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/session-1/plans/my-plan.md',
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/session-1/plans/feature_auth.md',
             '/home/user/.gemini/tmp/new-temp_dir_123/session-1/plans/plan.md', // new style of temp directory
+            'C:\\Users\\user\\.gemini\\tmp\\project-id\\session-id\\plans\\plan.md',
+            'D:\\gemini-cli\\.gemini\\tmp\\project-id\\session-1\\plans\\plan.md', // no session ID
           ];
 
           for (const file_path of validPaths) {
@@ -364,7 +427,8 @@ describe('Policy Engine Integration Tests', () => {
           const invalidPaths = [
             '/project/src/file.ts', // Workspace
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/script.js', // Wrong extension
-            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/../../../etc/passwd.md', // Path traversal
+            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/../../../etc/passwd.md', // Path traversal (Unix)
+            'C:\\Users\\user\\.gemini\\tmp\\id\\session\\plans\\..\\..\\..\\Windows\\System32\\config\\SAM', // Path traversal (Windows)
             '/home/user/.gemini/non-tmp/new-temp_dir_123/plans/plan.md', // outside of temp dir
           ];
 

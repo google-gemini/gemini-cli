@@ -13,6 +13,7 @@ import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
 import { useAtCompletion } from './useAtCompletion.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
+import { useShellCompletion, getTokenAtCursor } from './useShellCompletion.js';
 import type { PromptCompletion } from './usePromptCompletion.js';
 import {
   usePromptCompletion,
@@ -26,6 +27,7 @@ export enum CompletionMode {
   AT = 'AT',
   SLASH = 'SLASH',
   PROMPT = 'PROMPT',
+  SHELL = 'SHELL',
 }
 
 export interface UseCommandCompletionReturn {
@@ -99,87 +101,135 @@ export function useCommandCompletion({
   const cursorRow = buffer.cursor[0];
   const cursorCol = buffer.cursor[1];
 
-  const { completionMode, query, completionStart, completionEnd } =
-    useMemo(() => {
-      const currentLine = buffer.lines[cursorRow] || '';
-      const codePoints = toCodePoints(currentLine);
+  const {
+    completionMode,
+    query,
+    completionStart,
+    completionEnd,
+    shellTokenIsCommand,
+    shellTokens,
+    shellCursorIndex,
+    shellCommandToken,
+  } = useMemo(() => {
+    const currentLine = buffer.lines[cursorRow] || '';
+    const codePoints = toCodePoints(currentLine);
 
-      // FIRST: Check for @ completion (scan backwards from cursor)
-      // This must happen before slash command check so that `/cmd @file`
-      // triggers file completion, not just slash command completion.
-      for (let i = cursorCol - 1; i >= 0; i--) {
-        const char = codePoints[i];
+    if (shellModeActive) {
+      const tokenInfo = getTokenAtCursor(currentLine, cursorCol);
+      if (tokenInfo) {
+        return {
+          completionMode: CompletionMode.SHELL,
+          query: tokenInfo.token,
+          completionStart: tokenInfo.start,
+          completionEnd: tokenInfo.end,
+          shellTokenIsCommand: tokenInfo.isFirstToken,
+          shellTokens: tokenInfo.tokens,
+          shellCursorIndex: tokenInfo.cursorIndex,
+          shellCommandToken: tokenInfo.commandToken,
+        };
+      }
+      return {
+        completionMode: CompletionMode.SHELL,
+        query: '',
+        completionStart: cursorCol,
+        completionEnd: cursorCol,
+        shellTokenIsCommand: currentLine.trim().length === 0,
+        shellTokens: [''],
+        shellCursorIndex: 0,
+        shellCommandToken: '',
+      };
+    }
 
-        if (char === ' ') {
-          let backslashCount = 0;
-          for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
-            backslashCount++;
-          }
-          if (backslashCount % 2 === 0) {
-            break;
-          }
-        } else if (char === '@') {
-          let end = codePoints.length;
-          for (let i = cursorCol; i < codePoints.length; i++) {
-            if (codePoints[i] === ' ') {
-              let backslashCount = 0;
-              for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
-                backslashCount++;
-              }
+    // FIRST: Check for @ completion (scan backwards from cursor)
+    // This must happen before slash command check so that `/cmd @file`
+    // triggers file completion, not just slash command completion.
+    for (let i = cursorCol - 1; i >= 0; i--) {
+      const char = codePoints[i];
 
-              if (backslashCount % 2 === 0) {
-                end = i;
-                break;
-              }
+      if (char === ' ') {
+        let backslashCount = 0;
+        for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
+          backslashCount++;
+        }
+        if (backslashCount % 2 === 0) {
+          break;
+        }
+      } else if (char === '@') {
+        let end = codePoints.length;
+        for (let i = cursorCol; i < codePoints.length; i++) {
+          if (codePoints[i] === ' ') {
+            let backslashCount = 0;
+            for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
+              backslashCount++;
+            }
+
+            if (backslashCount % 2 === 0) {
+              end = i;
+              break;
             }
           }
-          const pathStart = i + 1;
-          const partialPath = currentLine.substring(pathStart, end);
-          return {
-            completionMode: CompletionMode.AT,
-            query: partialPath,
-            completionStart: pathStart,
-            completionEnd: end,
-          };
         }
-      }
-
-      // THEN: Check for slash command (only if no @ completion is active)
-      if (cursorRow === 0 && isSlashCommand(currentLine.trim())) {
+        const pathStart = i + 1;
+        const partialPath = currentLine.substring(pathStart, end);
         return {
-          completionMode: CompletionMode.SLASH,
-          query: currentLine,
-          completionStart: 0,
-          completionEnd: currentLine.length,
+          completionMode: CompletionMode.AT,
+          query: partialPath,
+          completionStart: pathStart,
+          completionEnd: end,
+          shellTokenIsCommand: false,
+          shellTokens: [],
+          shellCursorIndex: -1,
+          shellCommandToken: '',
         };
       }
+    }
 
-      // Check for prompt completion - only if enabled
-      const trimmedText = buffer.text.trim();
-      const isPromptCompletionEnabled =
-        config?.getEnablePromptCompletion() ?? false;
-
-      if (
-        isPromptCompletionEnabled &&
-        trimmedText.length >= PROMPT_COMPLETION_MIN_LENGTH &&
-        !isSlashCommand(trimmedText) &&
-        !trimmedText.includes('@')
-      ) {
-        return {
-          completionMode: CompletionMode.PROMPT,
-          query: trimmedText,
-          completionStart: 0,
-          completionEnd: trimmedText.length,
-        };
-      }
-
+    // THEN: Check for slash command (only if no @ completion is active)
+    if (cursorRow === 0 && isSlashCommand(currentLine.trim())) {
       return {
-        completionMode: CompletionMode.IDLE,
-        query: null,
-        completionStart: -1,
-        completionEnd: -1,
+        completionMode: CompletionMode.SLASH,
+        query: currentLine,
+        completionStart: 0,
+        completionEnd: currentLine.length,
+        shellTokenIsCommand: false,
+        shellTokens: [],
+        shellCursorIndex: -1,
+        shellCommandToken: '',
       };
-    }, [cursorRow, cursorCol, buffer.lines, buffer.text, config]);
+    }
+
+    // Check for prompt completion - only if enabled
+    const trimmedText = buffer.text.trim();
+    const isPromptCompletionEnabled = false;
+    if (
+      isPromptCompletionEnabled &&
+      trimmedText.length >= PROMPT_COMPLETION_MIN_LENGTH &&
+      !isSlashCommand(trimmedText) &&
+      !trimmedText.includes('@')
+    ) {
+      return {
+        completionMode: CompletionMode.PROMPT,
+        query: trimmedText,
+        completionStart: 0,
+        completionEnd: trimmedText.length,
+        shellTokenIsCommand: false,
+        shellTokens: [],
+        shellCursorIndex: -1,
+        shellCommandToken: '',
+      };
+    }
+
+    return {
+      completionMode: CompletionMode.IDLE,
+      query: null,
+      completionStart: -1,
+      completionEnd: -1,
+      shellTokenIsCommand: false,
+      shellTokens: [],
+      shellCursorIndex: -1,
+      shellCommandToken: '',
+    };
+  }, [cursorRow, cursorCol, buffer.lines, buffer.text, shellModeActive]);
 
   useAtCompletion({
     enabled: active && completionMode === CompletionMode.AT,
@@ -201,10 +251,20 @@ export function useCommandCompletion({
     setIsPerfectMatch,
   });
 
+  useShellCompletion({
+    enabled: active && completionMode === CompletionMode.SHELL,
+    query: query || '',
+    isCommandPosition: shellTokenIsCommand,
+    tokens: shellTokens,
+    cursorIndex: shellCursorIndex,
+    commandToken: shellCommandToken,
+    cwd,
+    setSuggestions,
+    setIsLoadingSuggestions,
+  });
+
   const promptCompletion = usePromptCompletion({
     buffer,
-    config,
-    enabled: active && completionMode === CompletionMode.PROMPT,
   });
 
   useEffect(() => {
