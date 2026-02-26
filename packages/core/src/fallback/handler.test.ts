@@ -128,14 +128,15 @@ describe('handleFallback', () => {
       );
     });
 
-    it('should return null immediately if authType is not OAuth', async () => {
+    it('should proceed with fallback for API key users', async () => {
+      policyHandler.mockResolvedValue('retry_always');
       const result = await handleFallback(
         policyConfig,
         MOCK_PRO_MODEL,
         AUTH_API_KEY,
       );
-      expect(result).toBeNull();
-      expect(policyHandler).not.toHaveBeenCalled();
+      expect(result).toBe(true);
+      expect(policyHandler).toHaveBeenCalled();
     });
 
     it('uses availability selection with correct candidates when enabled', async () => {

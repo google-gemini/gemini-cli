@@ -5,7 +5,6 @@
  */
 
 import {
-  AuthType,
   type Config,
   type FallbackModelHandler,
   type FallbackIntent,
@@ -55,15 +54,6 @@ export function useQuotaAndFallback({
       fallbackModel,
       error,
     ): Promise<FallbackIntent | null> => {
-      // Fallbacks are currently only handled for OAuth users.
-      const contentGeneratorConfig = config.getContentGeneratorConfig();
-      if (
-        !contentGeneratorConfig ||
-        contentGeneratorConfig.authType !== AuthType.LOGIN_WITH_GOOGLE
-      ) {
-        return null;
-      }
-
       let message: string;
       let isTerminalQuotaError = false;
       let isModelNotFoundError = false;
