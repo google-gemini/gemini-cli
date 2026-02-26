@@ -101,6 +101,7 @@ export function mapToDisplay(
     return {
       ...baseDisplayProperties,
       status: call.status,
+      kind: call.tool?.kind,
       resultDisplay,
       confirmationDetails,
       outputFile,

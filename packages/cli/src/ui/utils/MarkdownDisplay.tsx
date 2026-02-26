@@ -414,6 +414,7 @@ const RenderListItemInternal: React.FC<RenderListItemProps> = ({
 }) => {
   const prefix = type === 'ol' ? `${marker}. ` : `${marker} `;
   const prefixWidth = prefix.length;
+  // Account for leading whitespace (indentation level) plus the standard prefix padding
   const indentation = leadingWhitespace.length;
   const listResponseColor = theme.text.response ?? theme.text.primary;
 
@@ -422,7 +423,7 @@ const RenderListItemInternal: React.FC<RenderListItemProps> = ({
       paddingLeft={indentation + LIST_ITEM_PREFIX_PADDING}
       flexDirection="row"
     >
-      <Box width={prefixWidth}>
+      <Box width={prefixWidth} flexShrink={0}>
         <Text color={listResponseColor}>{prefix}</Text>
       </Box>
       <Box flexGrow={LIST_ITEM_TEXT_FLEX_GROW}>

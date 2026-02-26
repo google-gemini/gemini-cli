@@ -21,8 +21,10 @@ import {
   useFocusHint,
   FocusHint,
 } from './ToolShared.js';
-import { type Config, CoreToolCallStatus } from '@google/gemini-cli-core';
+import { type Config, CoreToolCallStatus, Kind } from '@google/gemini-cli-core';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
+import { SUBAGENT_MAX_LINES } from '../../constants.js';
+import { useUIState } from '../../contexts/UIStateContext.js';
 
 export type { TextEmphasis };
 
@@ -38,6 +40,7 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   embeddedShellFocused?: boolean;
   ptyId?: number;
   config?: Config;
+  isExpandable?: boolean;
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -45,6 +48,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   description,
   resultDisplay,
   status,
+  kind,
   availableTerminalHeight,
   terminalWidth,
   emphasis = 'medium',
@@ -60,7 +64,9 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   originalRequestName,
   progress,
   progressTotal,
+  isExpandable,
 }) => {
+  const { constrainHeight } = useUIState();
   const isThisShellFocused = checkIsShellFocused(
     name,
     status,
@@ -128,6 +134,12 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           terminalWidth={terminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}
           hasFocus={isThisShellFocused}
+          maxLines={
+            kind === Kind.Agent && (constrainHeight || !isExpandable)
+              ? SUBAGENT_MAX_LINES
+              : undefined
+          }
+          overflowDirection={kind === Kind.Agent ? 'bottom' : 'top'}
         />
         {isThisShellFocused && config && (
           <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>

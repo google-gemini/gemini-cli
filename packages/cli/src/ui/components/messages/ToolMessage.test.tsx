@@ -9,7 +9,11 @@ import { ToolMessage, type ToolMessageProps } from './ToolMessage.js';
 import { describe, it, expect, vi } from 'vitest';
 import { StreamingState } from '../../types.js';
 import { Text } from 'ink';
-import { type AnsiOutput, CoreToolCallStatus } from '@google/gemini-cli-core';
+import {
+  type AnsiOutput,
+  CoreToolCallStatus,
+  Kind,
+} from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
 
@@ -434,5 +438,67 @@ describe('<ToolMessage />', () => {
     expect(output).not.toContain('%');
     expect(output).toMatchSnapshot();
     unmount();
+  });
+
+  describe('Truncation', () => {
+    it('applies truncation for Kind.Agent', async () => {
+      const multilineString = Array.from(
+        { length: 30 },
+        (_, i) => `Line ${i + 1}`,
+      ).join('\n');
+
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ToolMessage
+          {...baseProps}
+          kind={Kind.Agent}
+          resultDisplay={multilineString}
+          renderOutputAsMarkdown={false}
+        />,
+        {
+          uiActions,
+          uiState: { streamingState: StreamingState.Idle },
+          width: 80,
+          useAlternateBuffer: false,
+        },
+      );
+      await waitUntilReady();
+      const output = lastFrame();
+
+      // Since kind=Kind.Agent, it should truncate to SUBAGENT_MAX_LINES (15)
+      // and show the FIRST lines (overflowDirection='bottom')
+      expect(output).toContain('Line 1');
+      expect(output).toContain('Line 14');
+      expect(output).not.toContain('Line 16');
+      expect(output).not.toContain('Line 30');
+      unmount();
+    });
+
+    it('does NOT apply truncation for Kind.Read', async () => {
+      const multilineString = Array.from(
+        { length: 30 },
+        (_, i) => `Line ${i + 1}`,
+      ).join('\n');
+
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ToolMessage
+          {...baseProps}
+          kind={Kind.Read}
+          resultDisplay={multilineString}
+          renderOutputAsMarkdown={false}
+        />,
+        {
+          uiActions,
+          uiState: { streamingState: StreamingState.Idle },
+          width: 80,
+          useAlternateBuffer: false,
+        },
+      );
+      await waitUntilReady();
+      const output = lastFrame();
+
+      expect(output).toContain('Line 1');
+      expect(output).toContain('Line 30');
+      unmount();
+    });
   });
 });
