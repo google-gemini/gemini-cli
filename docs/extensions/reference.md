@@ -40,6 +40,12 @@ To uninstall one or more extensions, use the `uninstall` command:
 gemini extensions uninstall <name...>
 ```
 
+To uninstall all installed extensions at once:
+
+```bash
+gemini extensions uninstall --all
+```
+
 ### Disable an extension
 
 Extensions are enabled globally by default. You can disable an extension
