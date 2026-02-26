@@ -97,7 +97,7 @@ describe('ShellTool Regression - Output Truncation Threshold', () => {
     const promise = invocation.execute(new AbortController().signal);
 
     // Send small output
-    mockShellOutputCallback({ type: 'raw_data', chunk: 'hello world' });
+    mockShellOutputCallback({ type: 'file_data', chunk: 'hello world' });
 
     resolveExecutionPromise({
       output: 'hello world',
@@ -125,7 +125,7 @@ describe('ShellTool Regression - Output Truncation Threshold', () => {
     // Send large output (exactly 40KB)
     const threshold = DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
     const largeChunk = 'A'.repeat(threshold);
-    mockShellOutputCallback({ type: 'raw_data', chunk: largeChunk });
+    mockShellOutputCallback({ type: 'file_data', chunk: largeChunk });
 
     resolveExecutionPromise({
       output: 'large output',
@@ -156,7 +156,7 @@ describe('ShellTool Regression - Output Truncation Threshold', () => {
     // 40KB + 1 byte
     const thresholdPlusOne = DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD + 1;
     const largeChunk = 'B'.repeat(thresholdPlusOne);
-    mockShellOutputCallback({ type: 'raw_data', chunk: largeChunk });
+    mockShellOutputCallback({ type: 'file_data', chunk: largeChunk });
 
     resolveExecutionPromise({
       output: largeChunk, // Verify this is still passed through to llmContent
