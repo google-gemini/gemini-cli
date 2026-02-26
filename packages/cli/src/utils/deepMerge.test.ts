@@ -152,13 +152,27 @@ describe('customDeepMerge', () => {
   });
 
   it('should not pollute the prototype', () => {
-    const maliciousSource = JSON.parse('{"__proto__": {"polluted": "true"}}');
+    const maliciousSource = JSON.parse('{"__proto__": {"polluted1": "true"}}');
     const getMergeStrategy = () => undefined;
-    const result = customDeepMerge(getMergeStrategy, {}, maliciousSource);
+    let result = customDeepMerge(getMergeStrategy, {}, maliciousSource);
 
     expect(result).toEqual({});
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(({} as any).polluted).toBeUndefined();
+    expect(({} as any).polluted1).toBeUndefined();
+
+    const maliciousSource2 = JSON.parse(
+      '{"constructor": {"prototype": {"polluted2": "true"}}}',
+    );
+    result = customDeepMerge(getMergeStrategy, {}, maliciousSource2);
+    expect(result).toEqual({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(({} as any).polluted2).toBeUndefined();
+
+    const maliciousSource3 = JSON.parse('{"prototype": {"polluted3": "true"}}');
+    result = customDeepMerge(getMergeStrategy, {}, maliciousSource3);
+    expect(result).toEqual({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(({} as any).polluted3).toBeUndefined();
   });
 
   it('should use additionalProperties merge strategy for dynamic properties', () => {
