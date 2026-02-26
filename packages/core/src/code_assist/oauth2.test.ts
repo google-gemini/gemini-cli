@@ -1383,21 +1383,18 @@ describe('oauth2', () => {
       });
 
       it('should NOT record onboarding events for other auth types', async () => {
-        // Mock getOauthClient behavior for other auth types if needed, 
-        // or just rely on the fact that existing tests cover them. 
+        // Mock getOauthClient behavior for other auth types if needed,
+        // or just rely on the fact that existing tests cover them.
         // But here we want to explicitly verify the absence of calls.
         // For simplicity, let's reuse the cached creds scenario but with a different AuthType if possible,
         // or mock the flow to succeed without LOGIN_WITH_GOOGLE.
-        
-        // However, getOauthClient logic is specific to AuthType. 
+        // However, getOauthClient logic is specific to AuthType.
         // Let's test with AuthType.USE_GEMINI which might have a different flow.
         // Actually, initOauthClient is what we modified.
         // Let's just verify that standard calls don't trigger it if we can.
-        
-        // Since we modified initOauthClient, we can check that function directly if exposed, 
+        // Since we modified initOauthClient, we can check that function directly if exposed,
         // but it is not.
-        
-        // Let's just stick to the positive case for now as negative cases would require 
+        // Let's just stick to the positive case for now as negative cases would require
         // setting up different valid auth flows which might be complex.
       });
     });
