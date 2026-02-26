@@ -1216,6 +1216,8 @@ describe('startInteractiveUI', () => {
     runExitCleanup: vi.fn(),
     registerSyncCleanup: vi.fn(),
     registerTelemetryConfig: vi.fn(),
+    setupSignalHandlers: vi.fn(),
+    setupTtyCheck: vi.fn(() => vi.fn()),
   }));
 
   beforeEach(() => {
@@ -1322,7 +1324,8 @@ describe('startInteractiveUI', () => {
 
     // Verify all startup tasks were called
     expect(getVersion).toHaveBeenCalledTimes(1);
-    expect(registerCleanup).toHaveBeenCalledTimes(4);
+    // 5 cleanups: mouseEvents, consolePatcher, lineWrapping, instance.unmount, and TTY check
+    expect(registerCleanup).toHaveBeenCalledTimes(5);
 
     // Verify cleanup handler is registered with unmount function
     const cleanupFn = vi.mocked(registerCleanup).mock.calls[0][0];
