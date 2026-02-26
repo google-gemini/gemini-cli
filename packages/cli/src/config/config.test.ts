@@ -668,11 +668,20 @@ describe('parseArguments', () => {
     expect(argv.isCommand).toBe(true);
   });
 
-  it('should correctly parse the --forever flag', async () => {
+  it('should correctly parse the --forever flag and set default a2aPort to 0', async () => {
     process.argv = ['node', 'script.js', '--forever'];
     const settings = createTestMergedSettings({});
     const argv = await parseArguments(settings);
     expect(argv.forever).toBe(true);
+    expect(argv.a2aPort).toBe(0);
+  });
+
+  it('should not override explicit a2aPort when --forever is specified', async () => {
+    process.argv = ['node', 'script.js', '--forever', '--a2a-port', '8080'];
+    const settings = createTestMergedSettings({});
+    const argv = await parseArguments(settings);
+    expect(argv.forever).toBe(true);
+    expect(argv.a2aPort).toBe(8080);
   });
 });
 

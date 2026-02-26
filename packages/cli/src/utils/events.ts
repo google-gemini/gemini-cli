@@ -23,6 +23,7 @@ export enum AppEvent {
   PasteTimeout = 'paste-timeout',
   TerminalBackground = 'terminal-background',
   TransientMessage = 'transient-message',
+  ExternalMessage = 'external-message',
 }
 
 export interface AppEvents {
@@ -32,6 +33,7 @@ export interface AppEvents {
   [AppEvent.PasteTimeout]: never[];
   [AppEvent.TerminalBackground]: [string];
   [AppEvent.TransientMessage]: [TransientMessagePayload];
+  [AppEvent.ExternalMessage]: [string];
 }
 
 export const appEvents = new EventEmitter<AppEvents>();

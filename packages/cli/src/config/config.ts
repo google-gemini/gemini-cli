@@ -103,6 +103,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  a2aPort: number | undefined;
 }
 
 export async function parseArguments(
@@ -299,6 +300,12 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('a2a-port', {
+          type: 'number',
+          nargs: 1,
+          description:
+            'Enable the embedded A2A HTTP listener on the specified port (0 for random). Implies --a2a enabled.',
         }),
     )
     // Register MCP subcommands
@@ -400,8 +407,15 @@ export async function parseArguments(
   (result as Record<string, unknown>)['query'] = q || undefined;
   (result as Record<string, unknown>)['startupMessages'] = startupMessages;
 
-  // The import format is now only controlled by settings.memoryImportFormat
-  // We no longer accept it as a CLI argument
+  // Enable A2A listener by default in Forever Mode
+  if (
+    result['forever'] &&
+    result['a2aPort'] === undefined &&
+    result['a2a-port'] === undefined
+  ) {
+    (result as Record<string, unknown>)['a2aPort'] = 0;
+  }
+  // The import format is now only controlled by settings.memoryImportFormat  // We no longer accept it as a CLI argument
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return result as unknown as CliArgs;
 }
