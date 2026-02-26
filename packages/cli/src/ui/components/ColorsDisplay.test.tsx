@@ -69,6 +69,9 @@ describe('ColorsDisplay', () => {
     // Check for title and description
     expect(output).toContain('/colors - Theme Colors Demo');
     expect(output).toContain('visualize how colors are used');
+    expect(output).toContain('How themes and terminals interact');
+    expect(output).toContain('TrueColor (Hex)');
+    expect(output).toContain('ANSI Names');
 
     // Check for active theme name
     expect(output).toContain('Test Theme');

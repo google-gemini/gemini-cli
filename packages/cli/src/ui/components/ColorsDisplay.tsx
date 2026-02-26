@@ -143,15 +143,31 @@ export const ColorsDisplay: React.FC = () => {
         <Box marginTop={1} flexDirection="column">
           <Text color={theme.text.secondary}>
             <Text bold color={theme.text.primary}>
-              Note on overrides:
-            </Text>{' '}
-            Hex values (TrueColor) are rendered exactly as shown and are
-            generally <Text italic>not</Text> affected by your Terminal
-            app&apos;s theme. Color names (like &apos;red&apos;,
-            &apos;green&apos;, &apos;gray&apos;) used in the ANSI theme{' '}
-            <Text italic>are</Text> overridden by your Terminal app&apos;s
-            palette.
+              How themes and terminals interact:
+            </Text>
           </Text>
+          <Box marginLeft={2} flexDirection="column">
+            <Text color={theme.text.secondary}>
+              • <Text bold>TrueColor (Hex):</Text> Modern terminals (iTerm2,
+              Ghostty, VSCode) render hex codes exactly. They are{' '}
+              <Text italic>not</Text> overridden by terminal app themes.
+            </Text>
+            <Text color={theme.text.secondary}>
+              • <Text bold>ANSI Names:</Text> Colors like &apos;red&apos; or
+              &apos;green&apos; (used in our ANSI theme) <Text italic>are</Text>{' '}
+              mapped to your terminal app&apos;s specific palette.
+            </Text>
+            <Text color={theme.text.secondary}>
+              • <Text bold>Default colors:</Text> When Name or Value is
+              &apos;(blank)&apos;, the app uses your terminal&apos;s default
+              foreground/background.
+            </Text>
+            <Text color={theme.text.secondary}>
+              • <Text bold>Compatibility:</Text> In terminals with limited color
+              (like older Mac Terminals), hex colors are automatically
+              approximated to the closest available ANSI color.
+            </Text>
+          </Box>
         </Box>
         <Box marginTop={1}>
           <Text color={theme.text.secondary}>
@@ -250,7 +266,7 @@ function renderBackgroundRow({ name, value }: BackgroundColorRow) {
   const description = COLOR_DESCRIPTIONS[name] || '';
 
   return (
-    <Box key={name} flexDirection="row" paddingX={1} marginBottom={1}>
+    <Box key={name} flexDirection="row" paddingX={1}>
       <Box
         width={VALUE_COLUMN_WIDTH}
         backgroundColor={value}
