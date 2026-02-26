@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import {
   resolveWorkspacePolicyState,
-  AUTO_ACCEPT_WORKSPACE_POLICIES,
+  autoAcceptWorkspacePolicies,
   setAutoAcceptWorkspacePolicies,
 } from './policy.js';
 import { writeToStderr } from '@google/gemini-cli-core';
@@ -106,7 +106,7 @@ describe('resolveWorkspacePolicyState', () => {
   });
 
   it('should return confirmation request if changed in interactive mode when AUTO_ACCEPT is false', async () => {
-    const originalValue = AUTO_ACCEPT_WORKSPACE_POLICIES;
+    const originalValue = autoAcceptWorkspacePolicies;
     setAutoAcceptWorkspacePolicies(false);
 
     try {
@@ -149,7 +149,7 @@ describe('resolveWorkspacePolicyState', () => {
   });
 
   it('should warn and auto-accept if changed in non-interactive mode when AUTO_ACCEPT is false', async () => {
-    const originalValue = AUTO_ACCEPT_WORKSPACE_POLICIES;
+    const originalValue = autoAcceptWorkspacePolicies;
     setAutoAcceptWorkspacePolicies(false);
 
     try {

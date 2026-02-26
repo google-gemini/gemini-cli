@@ -25,14 +25,14 @@ import { type Settings } from './settings.js';
  * Temporary flag to automatically accept workspace policies to reduce friction.
  * Exported as 'let' to allow monkey patching in tests via the setter.
  */
-export let AUTO_ACCEPT_WORKSPACE_POLICIES = true;
+export let autoAcceptWorkspacePolicies = true;
 
 /**
- * Sets the AUTO_ACCEPT_WORKSPACE_POLICIES flag.
+ * Sets the autoAcceptWorkspacePolicies flag.
  * Used primarily for testing purposes.
  */
 export function setAutoAcceptWorkspacePolicies(value: boolean) {
-  AUTO_ACCEPT_WORKSPACE_POLICIES = value;
+  autoAcceptWorkspacePolicies = value;
 }
 
 export async function createPolicyEngineConfig(
@@ -106,7 +106,7 @@ export async function resolveWorkspacePolicyState(options: {
     ) {
       // No workspace policies found
       workspacePoliciesDir = undefined;
-    } else if (interactive && !AUTO_ACCEPT_WORKSPACE_POLICIES) {
+    } else if (interactive && !autoAcceptWorkspacePolicies) {
       // Policies changed or are new, and we are in interactive mode and auto-accept is disabled
       policyUpdateConfirmationRequest = {
         scope: 'workspace',

@@ -240,8 +240,8 @@ describe('Workspace-Level Policy CLI Integration', () => {
   });
 
   it('should set policyUpdateConfirmationRequest if integrity MISMATCH in interactive mode when AUTO_ACCEPT is false', async () => {
-    // Monkey patch AUTO_ACCEPT_WORKSPACE_POLICIES using setter
-    const originalValue = Policy.AUTO_ACCEPT_WORKSPACE_POLICIES;
+    // Monkey patch autoAcceptWorkspacePolicies using setter
+    const originalValue = Policy.autoAcceptWorkspacePolicies;
     Policy.setAutoAcceptWorkspacePolicies(false);
 
     try {
