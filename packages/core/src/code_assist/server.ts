@@ -305,6 +305,7 @@ export class CodeAssistServer implements ContentGenerator {
       responseType: 'json',
       body: JSON.stringify(req),
       signal,
+      timeout: 60000,
     });
     return res.data;
   }
@@ -352,6 +353,7 @@ export class CodeAssistServer implements ContentGenerator {
       responseType: 'stream',
       body: JSON.stringify(req),
       signal,
+      timeout: 60000,
     });
 
     return (async function* (): AsyncGenerator<T> {
