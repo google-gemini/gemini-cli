@@ -8,6 +8,7 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { theme } from '../semantic-colors.js';
+import { AuthType } from '@google/gemini-cli-core';
 
 interface ProQuotaDialogProps {
   failedModel: string;
@@ -15,6 +16,7 @@ interface ProQuotaDialogProps {
   message: string;
   isTerminalQuotaError: boolean;
   isModelNotFoundError?: boolean;
+  authType?: AuthType;
   onChoice: (
     choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
   ) => void;
@@ -26,6 +28,7 @@ export function ProQuotaDialog({
   message,
   isTerminalQuotaError,
   isModelNotFoundError,
+  authType,
   onChoice,
 }: ProQuotaDialogProps): React.JSX.Element {
   let items;
@@ -51,11 +54,15 @@ export function ProQuotaDialog({
         value: 'retry_always' as const,
         key: 'retry_always',
       },
-      {
-        label: 'Upgrade for higher limits',
-        value: 'upgrade' as const,
-        key: 'upgrade',
-      },
+      ...(authType === AuthType.LOGIN_WITH_GOOGLE
+        ? [
+            {
+              label: 'Upgrade for higher limits',
+              value: 'upgrade' as const,
+              key: 'upgrade',
+            },
+          ]
+        : []),
       {
         label: `Stop`,
         value: 'retry_later' as const,
