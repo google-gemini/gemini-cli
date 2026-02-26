@@ -76,6 +76,7 @@ manually during a session.
 
 - **Natural Language:** Ask Gemini CLI to "start a plan for...". Gemini CLI then
   calls the [`enter_plan_mode`] tool to switch modes.
+  > **Note:** This tool is not available when Gemini CLI is in [YOLO mode].
 
 ### Planning Workflow
 
