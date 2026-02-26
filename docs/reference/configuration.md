@@ -92,6 +92,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
   - **Requires restart:** Yes
 
+- **`adminPolicyPaths`** (array):
+  - **Description:** Supplemental administrator-provided policy paths. These are
+    assigned the `Admin` tier (highest priority). For security, these paths must
+    be secure (owned by root and not writable by others).
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 #### `general`
 
 - **`general.preferredEditor`** (string):
