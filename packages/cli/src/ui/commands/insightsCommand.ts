@@ -7,11 +7,10 @@
 import path from 'node:path';
 import type { Content } from '@google/genai';
 import {
-  partListUnionToString,
   type ConversationRecord,
-  type MessageRecord,
   LlmRole,
   getResponseText,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import { getSessionFiles, type SessionInfo } from '../../utils/sessionUtils.js';
 import { MessageType, type HistoryItemInsights } from '../types.js';
@@ -23,8 +22,6 @@ import {
 import * as fs from 'node:fs/promises';
 
 const MAX_SESSIONS_TO_ANALYZE = 20;
-const MAX_MESSAGES_PER_SESSION = 15;
-const MAX_MESSAGE_LENGTH = 300;
 const INSIGHTS_TIMEOUT_MS = 30_000;
 
 /**
@@ -105,33 +102,6 @@ function computeMetrics(conversations: ConversationRecord[]): SessionMetrics {
   return metrics;
 }
 
-/**
- * Builds a condensed transcript of recent sessions suitable for LLM analysis.
- */
-function buildTranscriptPayload(conversations: ConversationRecord[]): string {
-  const parts: string[] = [];
-
-  for (const conv of conversations.slice(-MAX_SESSIONS_TO_ANALYZE)) {
-    const sessionHeader = `--- Session (${conv.startTime}) ---`;
-    const msgs = conv.messages
-      .filter((m: MessageRecord) => m.type === 'user' || m.type === 'gemini')
-      .slice(0, MAX_MESSAGES_PER_SESSION)
-      .map((m: MessageRecord) => {
-        const role = m.type === 'user' ? 'User' : 'Assistant';
-        let content = partListUnionToString(m.content);
-        if (content.length > MAX_MESSAGE_LENGTH) {
-          content = content.slice(0, MAX_MESSAGE_LENGTH) + '...';
-        }
-        return `${role}: ${content}`;
-      })
-      .join('\n');
-
-    parts.push(`${sessionHeader}\n${msgs}`);
-  }
-
-  return parts.join('\n\n');
-}
-
 export const insightsCommand: SlashCommand = {
   name: 'insights',
   description:
@@ -189,34 +159,54 @@ export const insightsCommand: SlashCommand = {
     // 3. Compute quantitative metrics
     const metrics = computeMetrics(conversations);
 
-    // 4. Build transcript and call LLM for qualitative analysis
+    // 4. Call LLM for qualitative analysis using ONLY sanitized metrics.
+    //    SECURITY: We intentionally do NOT pass raw session transcripts to
+    //    the LLM to prevent indirect prompt injection. Session logs may
+    //    contain untrusted content from tool outputs (e.g. web_fetch).
+    //    Only computed numeric metrics and tool names (extracted by our
+    //    code) are sent, which cannot carry attacker-controlled payloads.
     let llmAnalysis: string | null = null;
     try {
       const baseLlmClient = config.getBaseLlmClient();
-      const transcript = buildTranscriptPayload(conversations);
 
-      const systemInstruction = `You are a productivity analyst reviewing a developer's recent AI coding assistant sessions.
-Based on the conversation transcripts and tool usage data provided, produce a concise analysis covering:
-1. **Session Categories**: Briefly categorize the sessions (e.g., bug fixing, refactoring, exploration, code generation).
-2. **Friction Points**: Identify patterns where the user had to repeat themselves, correct the AI, or abandon a line of inquiry.
-3. **Underutilized Features**: If you notice the user could benefit from tools or commands they aren't using, mention them.
-4. **GEMINI.md Suggestions**: Suggest 1-3 concrete lines that could be added to the project's GEMINI.md (system instructions) to improve future interactions based on observed patterns.
+      const toolBreakdown = Object.entries(metrics.toolUsage)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 10)
+        .map(
+          ([name, data]) =>
+            `  - ${name}: ${data.count} calls, ${data.successes} successes (${data.count > 0 ? ((data.successes / data.count) * 100).toFixed(0) : 0}% success rate)`,
+        )
+        .join('\n');
+
+      const systemInstruction = `You are a productivity analyst reviewing aggregated usage metrics from a developer's AI coding assistant sessions.
+You are given ONLY numeric statistics and tool names — no raw conversation content.
+Based on these metrics, produce a concise analysis covering:
+1. **Usage Patterns**: Comment on the overall interaction volume and tool usage distribution.
+2. **Tool Effectiveness**: Identify tools with low success rates that may indicate friction.
+3. **Underutilized Features**: Based on the tool names present (or absent), suggest CLI features the user could try.
+4. **Workflow Tips**: Suggest 1-3 general best practices for improving productivity with the CLI.
 
 Keep the output concise and actionable. Use Markdown formatting with headers and bullet points.`;
 
-      const userPrompt = `Here are the quantitative metrics:
-- Sessions: ${metrics.totalSessions}
+      const successRate =
+        metrics.totalToolCalls > 0
+          ? (
+              (metrics.successfulToolCalls / metrics.totalToolCalls) *
+              100
+            ).toFixed(1)
+          : 'N/A';
+
+      const userPrompt = `Here are the aggregated usage metrics (no raw content included):
+- Sessions analyzed: ${metrics.totalSessions}
 - Total messages: ${metrics.totalMessages}
-- Tool calls: ${metrics.totalToolCalls} (Success rate: ${metrics.totalToolCalls > 0 ? ((metrics.successfulToolCalls / metrics.totalToolCalls) * 100).toFixed(1) : 'N/A'}%)
-- Most used tools: ${Object.entries(metrics.toolUsage)
-        .sort((a, b) => b[1].count - a[1].count)
-        .slice(0, 5)
-        .map(([name, data]) => `${name} (${data.count})`)
-        .join(', ')}
-
-Here are the condensed session transcripts:
-
-${transcript}
+- User messages: ${metrics.totalUserMessages}
+- Assistant messages: ${metrics.totalAssistantMessages}
+- Total tool calls: ${metrics.totalToolCalls}
+- Successful tool calls: ${metrics.successfulToolCalls}
+- Failed tool calls: ${metrics.failedToolCalls}
+- Overall tool success rate: ${successRate}%
+- Tool breakdown:
+${toolBreakdown}
 
 Please provide your analysis.`;
 
@@ -246,8 +236,9 @@ Please provide your analysis.`;
       } finally {
         clearTimeout(timeoutId);
       }
-    } catch {
+    } catch (e) {
       // Graceful degradation: still show quantitative report
+      debugLogger.warn('[Insights] LLM analysis failed:', e);
       llmAnalysis = null;
     }
 
