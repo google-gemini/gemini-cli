@@ -18,6 +18,8 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
 
+import { TaskStatus, TaskType } from '../services/trackerTypes.js';
+
 describe('Tracker Tools Integration', () => {
   let tempDir: string;
   let config: Config;
@@ -66,7 +68,7 @@ describe('Tracker Tools Integration', () => {
       {
         title: 'Test Task',
         description: 'Test Description',
-        type: 'task',
+        type: TaskType.TASK,
       },
       getSignal(),
     );
@@ -76,7 +78,7 @@ describe('Tracker Tools Integration', () => {
     const listTool = new TrackerListTasksTool(config, messageBus);
     const listResult = await listTool.buildAndExecute({}, getSignal());
     expect(listResult.llmContent).toContain('Test Task');
-    expect(listResult.llmContent).toContain('(open)');
+    expect(listResult.llmContent).toContain(`(${TaskStatus.OPEN})`);
   });
 
   it('updates task status', async () => {
@@ -90,7 +92,7 @@ describe('Tracker Tools Integration', () => {
       {
         title: 'Update Me',
         description: '...',
-        type: 'task',
+        type: TaskType.TASK,
       },
       getSignal(),
     );
@@ -102,14 +104,16 @@ describe('Tracker Tools Integration', () => {
     const updateResult = await updateTool.buildAndExecute(
       {
         id: taskId,
-        status: 'in_progress',
+        status: TaskStatus.IN_PROGRESS,
       },
       getSignal(),
     );
 
-    expect(updateResult.llmContent).toContain('Status: in_progress');
+    expect(updateResult.llmContent).toContain(
+      `Status: ${TaskStatus.IN_PROGRESS}`,
+    );
 
     const task = await config.getTrackerService().getTask(taskId);
-    expect(task?.status).toBe('in_progress');
+    expect(task?.status).toBe(TaskStatus.IN_PROGRESS);
   });
 });

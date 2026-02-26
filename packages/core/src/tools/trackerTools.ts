@@ -28,11 +28,7 @@ import {
 import type { ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import type {
-  TrackerTask,
-  TaskStatus,
-  TaskType,
-} from '../services/trackerTypes.js';
+import type { TrackerTask , TaskStatus, type TaskType } from '../services/trackerTypes.js';
 
 // --- Shared Base ---
 
@@ -131,7 +127,7 @@ class TrackerCreateTaskInvocation extends BaseTrackerInvocation<
       title: this.params.title,
       description: this.params.description,
       type: this.params.type,
-      status: 'open',
+      status: TaskStatus.OPEN,
       parentId: this.params.parentId,
       dependencies: this.params.dependencies ?? [],
     });
