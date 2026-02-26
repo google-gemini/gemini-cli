@@ -11,10 +11,9 @@ import { createMockSettings } from '../../test-utils/settings.js';
 import path from 'node:path';
 
 // Normalize paths to POSIX slashes for stable cross-platform snapshots.
-// We replace the Windows drive letter with spaces to preserve the rendered string length.
 const normalizeFrame = (frame: string | undefined) => {
   if (!frame) return frame;
-  return frame.replace(/\\/g, '/').replace(/[A-Za-z]:\//g, '  /');
+  return frame.replace(/\\/g, '/');
 };
 
 const mockSessionStats = {
@@ -73,6 +72,11 @@ const defaultProps = {
 };
 
 describe('<Footer />', () => {
+  beforeEach(() => {
+    const root = path.parse(process.cwd()).root;
+    vi.stubEnv('GEMINI_CLI_HOME', path.join(root, 'Users', 'test'));
+  });
+
   it('renders the component', async () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <Footer />,

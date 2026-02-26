@@ -1,38 +1,45 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`<Footer /> > displays "Limit reached" message when remaining is 0 1`] = `
-" Path                                                                    /docs        /model       /stats
- /Users/test/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   limit reached"
+" Path                                                          /docs        /model       /stats
+ ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   limit reached
+"
 `;
 
 exports[`<Footer /> > displays the usage indicator when usage is low 1`] = `
-" Path                                                                    /docs        /model       /stats
- /Users/test/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   daily 15%"
+" Path                                                          /docs        /model       /stats
+ ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   daily 15%
+"
 `;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders complete footer in narrow terminal (baseline narrow) > complete-footer-narrow 1`] = `
 " Path                                     /docs        /model       Context
- /Users/.../directories/to/make/it/long   no sandbox   gemini-pro   100%"
+ ~/.../more/directories/to/make/it/long   no sandbox   gemini-pro   86%
+"
 `;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders complete footer with all sections visible (baseline) > complete-footer-wide 1`] = `
-" Path                                                                    /docs        /model       Context
- /Users/test/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   100% left"
+" Path                                                          /docs        /model       Context
+ ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   86% left
+"
 `;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders footer with CWD and model info hidden to test alignment (only sandbox visible) > footer-only-sandbox 1`] = `
 " /docs
- no sandbox"
+ no sandbox
+"
 `;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders footer with all optional sections hidden (minimal footer) > footer-minimal 1`] = `""`;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders footer with only model info hidden (partial filtering) > footer-no-model 1`] = `
-" Path                                                                    /docs
- /Users/test/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox"
+" Path                                                          /docs
+ ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox
+"
 `;
 
 exports[`<Footer /> > hides the usage indicator when usage is not near limit 1`] = `
-" Path                                                                    /docs        /model       /stats
- /Users/test/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   daily 85%"
+" Path                                                          /docs        /model       /stats
+ ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   daily 85%
+"
 `;
