@@ -360,11 +360,6 @@ export type HistoryItemHooksList = HistoryItemBase & {
   }>;
 };
 
-export type HistoryItemColors = HistoryItemBase & {
-  type: 'colors';
-  timestamp: Date;
-};
-
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
 // type inference e.g. historyItem.type === 'tool_group' isn't auto-inferring that
 // 'tools' in historyItem.
@@ -379,7 +374,6 @@ export type HistoryItemWithoutId =
   | HistoryItemWarning
   | HistoryItemAbout
   | HistoryItemHelp
-  | HistoryItemColors
   | HistoryItemToolGroup
   | HistoryItemStats
   | HistoryItemModelStats
@@ -407,7 +401,6 @@ export enum MessageType {
   USER = 'user',
   ABOUT = 'about',
   HELP = 'help',
-  COLORS = 'colors',
   STATS = 'stats',
   MODEL_STATS = 'model_stats',
   TOOL_STATS = 'tool_stats',
@@ -448,10 +441,6 @@ export type Message =
       type: MessageType.HELP;
       timestamp: Date;
       content?: string; // Optional content, not really used for HELP
-    }
-  | {
-      type: MessageType.COLORS;
-      timestamp: Date;
     }
   | {
       type: MessageType.STATS;

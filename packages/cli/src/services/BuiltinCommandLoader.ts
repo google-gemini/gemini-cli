@@ -22,7 +22,6 @@ import { agentsCommand } from '../ui/commands/agentsCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
 import { chatCommand, debugCommand } from '../ui/commands/chatCommand.js';
-import { colorsCommand } from '../ui/commands/colorsCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
 import { commandsCommand } from '../ui/commands/commandsCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
@@ -84,7 +83,6 @@ export class BuiltinCommandLoader implements ICommandLoader {
       ...(this.config?.isAgentsEnabled() ? [agentsCommand] : []),
       authCommand,
       bugCommand,
-      colorsCommand,
       {
         ...chatCommand,
         subCommands: isNightlyBuild

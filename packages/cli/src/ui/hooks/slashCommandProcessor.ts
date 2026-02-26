@@ -172,11 +172,6 @@ export const useSlashCommandProcessor = (
           type: 'help',
           timestamp: message.timestamp,
         };
-      } else if (message.type === MessageType.COLORS) {
-        historyItemContent = {
-          type: 'colors',
-          timestamp: message.timestamp,
-        };
       } else if (message.type === MessageType.STATS) {
         historyItemContent = {
           type: 'stats',

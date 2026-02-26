@@ -53,7 +53,7 @@ interface BackgroundColorRow {
 
 type ColorRow = StandardColorRow | GradientColorRow | BackgroundColorRow;
 
-const VALUE_COLUMN_WIDTH = '8%';
+const VALUE_COLUMN_WIDTH = '10%';
 const NAME_COLUMN_WIDTH = '30%';
 
 export const ColorsDisplay: React.FC = () => {
@@ -271,7 +271,7 @@ function renderBackgroundRow({ name, value }: BackgroundColorRow) {
         justifyContent="center"
         paddingX={1}
       >
-        <Text color={theme.text.primary} bold>
+        <Text color={theme.text.primary} bold wrap="truncate">
           {value || 'default'}
         </Text>
       </Box>
