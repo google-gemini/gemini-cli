@@ -110,6 +110,7 @@ export const MdsBrowser: React.FC<MdsBrowserProps> = ({ config, onClose }) => {
           err,
         );
       } finally {
+        setRawMode?.(true);
         coreEvents.emit(CoreEvent.ExternalEditorClosed);
       }
     },

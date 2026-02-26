@@ -1374,7 +1374,7 @@ export class Config {
     }
 
     const nextModel = models[nextIndex];
-    this.setModel(nextModel, false);
+    this.setModel(nextModel, true);
     return nextModel;
   }
 
