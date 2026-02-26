@@ -951,6 +951,11 @@ describe('useGeminiStream', () => {
         ),
       ),
     ).toBe(false);
+    expect(
+      infoTexts.some((text) =>
+        text.includes('This request failed. Press F12 for diagnostics'),
+      ),
+    ).toBe(false);
   });
 
   it('should add a compact suppressed-error note before STOP_EXECUTION terminal info in low verbosity mode', async () => {
@@ -1014,9 +1019,14 @@ describe('useGeminiStream', () => {
     const stopIndex = infoTexts.findIndex((text) =>
       text.includes('Agent execution stopped: Stop reason from hook'),
     );
+    const failureHintIndex = infoTexts.findIndex((text) =>
+      text.includes('This request failed. Press F12 for diagnostics'),
+    );
     expect(noteIndex).toBeGreaterThanOrEqual(0);
     expect(stopIndex).toBeGreaterThanOrEqual(0);
+    expect(failureHintIndex).toBeGreaterThanOrEqual(0);
     expect(noteIndex).toBeLessThan(stopIndex);
+    expect(stopIndex).toBeLessThan(failureHintIndex);
   });
 
   it('should group multiple cancelled tool call responses into a single history entry', async () => {

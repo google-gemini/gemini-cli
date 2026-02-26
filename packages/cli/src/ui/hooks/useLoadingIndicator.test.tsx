@@ -242,10 +242,30 @@ describe('useLoadingIndicator', () => {
     expect(result.current.currentLoadingPhrase).toContain('Attempt 3/3');
   });
 
-  it('should show a generic retry phrase in low error verbosity mode', () => {
+  it('should hide low-verbosity retry status for early retry attempts', () => {
     const retryStatus = {
       model: 'gemini-pro',
       attempt: 1,
+      maxAttempts: 5,
+      delayMs: 1000,
+    };
+    const { result } = renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      retryStatus,
+      'all',
+      'low',
+    );
+
+    expect(result.current.currentLoadingPhrase).not.toBe(
+      "This is taking a bit longer, we're still on it.",
+    );
+  });
+
+  it('should show a generic retry phrase in low error verbosity mode for later retries', () => {
+    const retryStatus = {
+      model: 'gemini-pro',
+      attempt: 2,
       maxAttempts: 5,
       delayMs: 1000,
     };

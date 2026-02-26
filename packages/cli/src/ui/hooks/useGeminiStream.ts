@@ -107,7 +107,9 @@ enum StreamProcessingStatus {
 }
 
 const SUPPRESSED_TOOL_ERRORS_NOTE =
-  'Some internal tool attempts failed before this final error. Set ui.errorVerbosity to full for details.';
+  'Some internal tool attempts failed before this final error. Press F12 for diagnostics, or set ui.errorVerbosity to full for full details.';
+const LOW_VERBOSITY_FAILURE_NOTE =
+  'This request failed. Press F12 for diagnostics, or set ui.errorVerbosity to full for full details.';
 
 function isShellToolData(data: unknown): data is ShellToolData {
   if (typeof data !== 'object' || data === null) {
@@ -207,6 +209,7 @@ export const useGeminiStream = (
   const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
   const suppressedToolErrorCountRef = useRef(0);
   const suppressedToolErrorNoteShownRef = useRef(false);
+  const lowVerbosityFailureNoteShownRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
@@ -588,6 +591,27 @@ export const useGeminiStream = (
     [addItem, isLowErrorVerbosity],
   );
 
+  const maybeAddLowVerbosityFailureNote = useCallback(
+    (userMessageTimestamp?: number) => {
+      if (!isLowErrorVerbosity || config.getDebugMode()) {
+        return;
+      }
+      if (lowVerbosityFailureNoteShownRef.current) {
+        return;
+      }
+
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: LOW_VERBOSITY_FAILURE_NOTE,
+        },
+        userMessageTimestamp,
+      );
+      lowVerbosityFailureNoteShownRef.current = true;
+    },
+    [addItem, config, isLowErrorVerbosity],
+  );
+
   const cancelOngoingRequest = useCallback(() => {
     if (
       streamingState !== StreamingState.Responding &&
@@ -951,6 +975,7 @@ export const useGeminiStream = (
         },
         userMessageTimestamp,
       );
+      maybeAddLowVerbosityFailureNote(userMessageTimestamp);
       setThought(null); // Reset thought when there's an error
     },
     [
@@ -960,6 +985,7 @@ export const useGeminiStream = (
       config,
       setThought,
       maybeAddSuppressedToolErrorNote,
+      maybeAddLowVerbosityFailureNote,
     ],
   );
 
@@ -1123,6 +1149,7 @@ export const useGeminiStream = (
         },
         userMessageTimestamp,
       );
+      maybeAddLowVerbosityFailureNote(userMessageTimestamp);
       if (contextCleared) {
         addItem(
           {
@@ -1134,7 +1161,13 @@ export const useGeminiStream = (
       }
       setIsResponding(false);
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem, setIsResponding],
+    [
+      addItem,
+      pendingHistoryItemRef,
+      setPendingHistoryItem,
+      setIsResponding,
+      maybeAddLowVerbosityFailureNote,
+    ],
   );
 
   const handleAgentExecutionBlockedEvent = useCallback(
@@ -1155,6 +1188,7 @@ export const useGeminiStream = (
         },
         userMessageTimestamp,
       );
+      maybeAddLowVerbosityFailureNote(userMessageTimestamp);
       if (contextCleared) {
         addItem(
           {
@@ -1165,7 +1199,12 @@ export const useGeminiStream = (
         );
       }
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+    [
+      addItem,
+      pendingHistoryItemRef,
+      setPendingHistoryItem,
+      maybeAddLowVerbosityFailureNote,
+    ],
   );
 
   const processGeminiStreamEvents = useCallback(
@@ -1321,6 +1360,7 @@ export const useGeminiStream = (
             config.setQuotaErrorOccurred(false);
             suppressedToolErrorCountRef.current = 0;
             suppressedToolErrorNoteShownRef.current = false;
+            lowVerbosityFailureNoteShownRef.current = false;
           }
 
           abortControllerRef.current = new AbortController();
@@ -1451,6 +1491,7 @@ export const useGeminiStream = (
                   },
                   userMessageTimestamp,
                 );
+                maybeAddLowVerbosityFailureNote(userMessageTimestamp);
               }
             } finally {
               if (activeQueryIdRef.current === queryId) {
@@ -1476,6 +1517,7 @@ export const useGeminiStream = (
       getPromptCount,
       setThought,
       maybeAddSuppressedToolErrorNote,
+      maybeAddLowVerbosityFailureNote,
     ],
   );
 
@@ -1646,6 +1688,7 @@ export const useGeminiStream = (
           type: MessageType.INFO,
           text: `Agent execution stopped: ${stopExecutionTool.response.error.message}`,
         });
+        maybeAddLowVerbosityFailureNote();
         setIsResponding(false);
 
         const callIdsToMarkAsSubmitted = geminiTools.map(
@@ -1753,6 +1796,7 @@ export const useGeminiStream = (
       config,
       isLowErrorVerbosity,
       maybeAddSuppressedToolErrorNote,
+      maybeAddLowVerbosityFailureNote,
     ],
   );
 

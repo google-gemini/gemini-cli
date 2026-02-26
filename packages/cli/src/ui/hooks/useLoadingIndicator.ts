@@ -14,6 +14,8 @@ import {
 } from '@google/gemini-cli-core';
 import type { LoadingPhrasesMode } from '../../config/settings.js';
 
+const LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD = 2;
+
 export interface UseLoadingIndicatorProps {
   streamingState: StreamingState;
   shouldShowFocusHint: boolean;
@@ -73,7 +75,9 @@ export const useLoadingIndicator = ({
 
   const retryPhrase = retryStatus
     ? errorVerbosity === 'low'
-      ? "This is taking a bit longer, we're still on it."
+      ? retryStatus.attempt >= LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD
+        ? "This is taking a bit longer, we're still on it."
+        : null
       : `Trying to reach ${getDisplayString(retryStatus.model)} (Attempt ${retryStatus.attempt + 1}/${retryStatus.maxAttempts})`
     : null;
 
