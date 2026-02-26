@@ -5,7 +5,11 @@
  */
 
 import * as fs from 'node:fs/promises';
-import { fetchWithTimeout, resolveToRealPath } from '@google/gemini-cli-core';
+import {
+  fetchWithTimeout,
+  resolveToRealPath,
+  isPrivateIp,
+} from '@google/gemini-cli-core';
 import { AsyncFzf } from 'fzf';
 
 export interface RegistryExtension {
@@ -109,6 +113,11 @@ export class ExtensionRegistryClient {
     ExtensionRegistryClient.fetchPromise = (async () => {
       try {
         if (uri.startsWith('http')) {
+          if (isPrivateIp(uri)) {
+            throw new Error(
+              'Private IP addresses are not allowed for the extension registry.',
+            );
+          }
           const response = await fetchWithTimeout(
             uri,
             ExtensionRegistryClient.FETCH_TIMEOUT_MS,
