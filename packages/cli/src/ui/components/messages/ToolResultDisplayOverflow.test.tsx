@@ -4,74 +4,109 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
-import { ToolGroupMessage } from './ToolGroupMessage.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
-import { StreamingState, type IndividualToolCallDisplay } from '../../types.js';
-import { OverflowProvider } from '../../contexts/OverflowContext.js';
-import { waitFor } from '../../../test-utils/async.js';
-import { CoreToolCallStatus } from '@google/gemini-cli-core';
+import { ToolResultDisplay } from './ToolResultDisplay.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { AnsiOutput } from '@google/gemini-cli-core';
+
+// Mock UIStateContext partially
+const mockUseUIState = vi.fn();
+vi.mock('../../contexts/UIStateContext.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../contexts/UIStateContext.js')>();
+  return {
+    ...actual,
+    useUIState: () => mockUseUIState(),
+  };
+});
+
+// Mock useAlternateBuffer
+const mockUseAlternateBuffer = vi.fn();
+vi.mock('../../hooks/useAlternateBuffer.js', () => ({
+  useAlternateBuffer: () => mockUseAlternateBuffer(),
+}));
 
 describe('ToolResultDisplay Overflow', () => {
-  it('should display "press ctrl-o" hint when content overflows in ToolGroupMessage', async () => {
-    // Large output that will definitely overflow
-    const lines = [];
-    for (let i = 0; i < 50; i++) {
-      lines.push(`line ${i + 1}`);
-    }
-    const resultDisplay = lines.join('\n');
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseUIState.mockReturnValue({ renderMarkdown: true });
+    mockUseAlternateBuffer.mockReturnValue(false);
+  });
 
-    const toolCalls: IndividualToolCallDisplay[] = [
-      {
-        callId: 'call-1',
-        name: 'test-tool',
-        description: 'a test tool',
-        status: CoreToolCallStatus.Success,
-        resultDisplay,
-        confirmationDetails: undefined,
-      },
-    ];
-
-    const { lastFrame } = renderWithProviders(
-      <OverflowProvider>
-        <ToolGroupMessage
-          item={{ id: 1, type: 'tool_group', tools: toolCalls }}
-          toolCalls={toolCalls}
-          availableTerminalHeight={15} // Small height to force overflow
-          terminalWidth={80}
-          isExpandable={true}
-        />
-      </OverflowProvider>,
-      {
-        uiState: {
-          streamingState: StreamingState.Idle,
-          constrainHeight: true,
-        },
-        useAlternateBuffer: true,
-      },
+  it('shows the head of the content when overflowDirection is bottom (string)', async () => {
+    const content = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5';
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <ToolResultDisplay
+        resultDisplay={content}
+        terminalWidth={80}
+        maxLines={3}
+        overflowDirection="bottom"
+      />,
     );
+    await waitUntilReady();
+    const output = lastFrame();
 
-    // ResizeObserver might take a tick
-    await waitFor(() =>
-      expect(lastFrame()?.toLowerCase()).toContain(
-        'press ctrl+o to show more lines',
-      ),
+    expect(output).toContain('Line 1');
+    expect(output).toContain('Line 2');
+    expect(output).not.toContain('Line 3'); // Line 3 is replaced by the "hidden" label
+    expect(output).not.toContain('Line 4');
+    expect(output).not.toContain('Line 5');
+    expect(output).toContain('hidden');
+    unmount();
+  });
+
+  it('shows the tail of the content when overflowDirection is top (string default)', async () => {
+    const content = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5';
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <ToolResultDisplay
+        resultDisplay={content}
+        terminalWidth={80}
+        maxLines={3}
+        overflowDirection="top"
+      />,
     );
+    await waitUntilReady();
+    const output = lastFrame();
 
-    const frame = lastFrame();
-    expect(frame).toBeDefined();
-    if (frame) {
-      expect(frame.toLowerCase()).toContain('press ctrl+o to show more lines');
-      // Ensure it's AFTER the bottom border
-      const linesOfOutput = frame.split('\n');
-      const bottomBorderIndex = linesOfOutput.findLastIndex((l) =>
-        l.includes('╰─'),
-      );
-      const hintIndex = linesOfOutput.findIndex((l) =>
-        l.toLowerCase().includes('press ctrl+o to show more lines'),
-      );
-      expect(hintIndex).toBeGreaterThan(bottomBorderIndex);
-      expect(frame).toMatchSnapshot();
-    }
+    expect(output).not.toContain('Line 1');
+    expect(output).not.toContain('Line 2');
+    expect(output).not.toContain('Line 3');
+    expect(output).toContain('Line 4');
+    expect(output).toContain('Line 5');
+    expect(output).toContain('hidden');
+    unmount();
+  });
+
+  it('shows the head of the content when overflowDirection is bottom (ANSI)', async () => {
+    const ansiResult: AnsiOutput = Array.from({ length: 5 }, (_, i) => [
+      {
+        text: `Line ${i + 1}`,
+        fg: '',
+        bg: '',
+        bold: false,
+        italic: false,
+        underline: false,
+        dim: false,
+        inverse: false,
+      },
+    ]);
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <ToolResultDisplay
+        resultDisplay={ansiResult}
+        terminalWidth={80}
+        maxLines={3}
+        overflowDirection="bottom"
+      />,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+
+    expect(output).toContain('Line 1');
+    expect(output).toContain('Line 2');
+    expect(output).not.toContain('Line 3');
+    expect(output).not.toContain('Line 4');
+    expect(output).not.toContain('Line 5');
+    expect(output).toContain('hidden');
+    unmount();
   });
 });

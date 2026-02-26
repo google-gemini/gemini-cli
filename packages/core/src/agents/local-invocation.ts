@@ -6,6 +6,7 @@
 
 import type { Config } from '../config/config.js';
 import { LocalAgentExecutor } from './local-executor.js';
+import { safeJsonToMarkdown } from '../utils/markdownUtils.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import { BaseToolInvocation, type ToolResult } from '../tools/tools.js';
 import { ToolErrorType } from '../tools/tool-error.js';
@@ -109,6 +110,8 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
 
       const output = await executor.run(this.params, signal);
 
+      const displayResult = safeJsonToMarkdown(output.result);
+
       const resultContent = `Subagent '${this.definition.name}' finished.
 Termination Reason: ${output.terminate_reason}
 Result:
@@ -120,7 +123,7 @@ Subagent ${this.definition.name} Finished
 Termination Reason:\n ${output.terminate_reason}
 
 Result:
-${output.result}
+${displayResult}
 `;
 
       return {

@@ -15,6 +15,7 @@ import {
   type SkillDefinition,
   type AgentDefinition,
   type ApprovalMode,
+  type Kind,
   CoreToolCallStatus,
   checkExhaustive,
 } from '@google/gemini-cli-core';
@@ -102,6 +103,7 @@ export interface IndividualToolCallDisplay {
   description: string;
   resultDisplay: ToolResultDisplay | undefined;
   status: CoreToolCallStatus;
+  kind?: Kind;
   confirmationDetails: SerializableConfirmationDetails | undefined;
   renderOutputAsMarkdown?: boolean;
   ptyId?: number;

@@ -32,6 +32,7 @@ export interface ToolResultDisplayProps {
   renderOutputAsMarkdown?: boolean;
   maxLines?: number;
   hasFocus?: boolean;
+  overflowDirection?: 'top' | 'bottom';
 }
 
 interface FileDiffResult {
@@ -46,6 +47,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   renderOutputAsMarkdown = true,
   maxLines,
   hasFocus = false,
+  overflowDirection = 'top',
 }) => {
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
@@ -80,7 +82,11 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     if (typeof resultDisplay === 'string' && !isAlternateBuffer) {
       let text = resultDisplay;
       if (text.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
-        text = '...' + text.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
+        if (overflowDirection === 'bottom') {
+          text = text.slice(0, MAXIMUM_RESULT_DISPLAY_CHARACTERS) + '...';
+        } else {
+          text = '...' + text.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
+        }
       }
       if (maxLines) {
         const hasTrailingNewline = text.endsWith('\n');
@@ -90,9 +96,15 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           // We will have a label from MaxSizedBox. Reserve space for it.
           const targetLines = Math.max(1, maxLines - 1);
           hiddenLines = lines.length - targetLines;
-          text =
-            lines.slice(-targetLines).join('\n') +
-            (hasTrailingNewline ? '\n' : '');
+          if (overflowDirection === 'bottom') {
+            text =
+              lines.slice(0, targetLines).join('\n') +
+              (hasTrailingNewline ? '\n' : '');
+          } else {
+            text =
+              lines.slice(-targetLines).join('\n') +
+              (hasTrailingNewline ? '\n' : '');
+          }
         }
       }
       return { truncatedResultDisplay: text, hiddenLinesCount: hiddenLines };
@@ -102,15 +114,19 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
       if (resultDisplay.length > maxLines) {
         // We will have a label from MaxSizedBox. Reserve space for it.
         const targetLines = Math.max(1, maxLines - 1);
+        const hiddenCount = resultDisplay.length - targetLines;
         return {
-          truncatedResultDisplay: resultDisplay.slice(-targetLines),
-          hiddenLinesCount: resultDisplay.length - targetLines,
+          truncatedResultDisplay:
+            overflowDirection === 'bottom'
+              ? resultDisplay.slice(0, targetLines)
+              : resultDisplay.slice(-targetLines),
+          hiddenLinesCount: hiddenCount,
         };
       }
     }
 
     return { truncatedResultDisplay: resultDisplay, hiddenLinesCount: 0 };
-  }, [resultDisplay, isAlternateBuffer, maxLines]);
+  }, [resultDisplay, isAlternateBuffer, maxLines, overflowDirection]);
 
   if (!truncatedResultDisplay) return null;
 
@@ -241,6 +257,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         maxHeight={availableHeight}
         maxWidth={childWidth}
         additionalHiddenLinesCount={hiddenLinesCount}
+        overflowDirection={overflowDirection}
       >
         {content}
       </MaxSizedBox>
