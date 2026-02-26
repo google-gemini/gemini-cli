@@ -5,7 +5,6 @@
  */
 
 import { spawn, execSync } from 'node:child_process';
-import { HookEventName, ConfigSource } from './types.js';
 import type {
   HookConfig,
   CommandHookConfig,
