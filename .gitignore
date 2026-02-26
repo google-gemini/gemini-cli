@@ -62,3 +62,5 @@ gemini-debug.log
 .gemini-clipboard/
 .eslintcache
 evals/logs/
+.claude/
+ISSUE_LIST.md
