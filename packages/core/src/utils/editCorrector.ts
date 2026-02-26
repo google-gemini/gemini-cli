@@ -25,6 +25,15 @@ import { debugLogger } from './debugLogger.js';
 import { LRUCache } from 'mnemonist';
 import { LlmRole } from '../telemetry/types.js';
 
+/**
+ * Escapes triple backticks in untrusted input before embedding it in a
+ * markdown code-fence inside an LLM prompt. Without this, input containing
+ * ``` could break out of the fence and inject arbitrary prompt content.
+ */
+function sanitizeForPrompt(input: string): string {
+  return input.replace(/```/g, '\\`\\`\\`');
+}
+
 const CODE_CORRECTION_SYSTEM_PROMPT = `
 You are an expert code-editing assistant. Your task is to analyze a failed edit attempt and provide a corrected version of the text snippets.
 The correction should be as minimal as possible, staying very close to the original.
@@ -419,12 +428,12 @@ Task: Analyze the provided file content and the problematic target snippet. Iden
 
 Problematic target snippet:
 \`\`\`
-${problematicSnippet}
+${sanitizeForPrompt(problematicSnippet)}
 \`\`\`
 
 File Content:
 \`\`\`
-${fileContent}
+${sanitizeForPrompt(fileContent)}
 \`\`\`
 
 For example, if the problematic target snippet was "\\\\\\nconst greeting = \`Hello \\\\\`\${name}\\\\\`\`;" and the file content had content that looked like "\nconst greeting = \`Hello ${'\\`'}\${name}${'\\`'}\`;", then corrected_target_snippet should likely be "\nconst greeting = \`Hello ${'\\`'}\${name}${'\\`'}\`;" to fix the incorrect escaping to match the original file content.
@@ -502,17 +511,17 @@ We now need to adjust the replacement text (original_new_string) so that it make
 
 original_old_string (what was initially intended to be found):
 \`\`\`
-${originalOldString}
+${sanitizeForPrompt(originalOldString)}
 \`\`\`
 
 corrected_old_string (what was actually found in the file and will be replaced):
 \`\`\`
-${correctedOldString}
+${sanitizeForPrompt(correctedOldString)}
 \`\`\`
 
 original_new_string (what was intended to replace original_old_string):
 \`\`\`
-${originalNewString}
+${sanitizeForPrompt(originalNewString)}
 \`\`\`
 
 Task: Based on the differences between original_old_string and corrected_old_string, and the content of original_new_string, generate a corrected_new_string. This corrected_new_string should be what original_new_string would have been if it was designed to replace corrected_old_string directly, while maintaining the spirit of the original transformation.
@@ -578,12 +587,12 @@ Context: A text replacement operation is planned. The text to be replaced (old_s
 
 old_string (this is the exact text that will be replaced):
 \`\`\`
-${oldString}
+${sanitizeForPrompt(oldString)}
 \`\`\`
 
 potentially_problematic_new_string (this is the text that should replace old_string, but MIGHT have bad escaping, or might be entirely correct):
 \`\`\`
-${potentiallyProblematicNewString}
+${sanitizeForPrompt(potentiallyProblematicNewString)}
 \`\`\`
 
 Task: Analyze the potentially_problematic_new_string. If it's syntactically invalid due to incorrect escaping (e.g., "\n", "\t", "\\", "\\'", "\\""), correct the invalid syntax. The goal is to ensure the new_string, when inserted into the code, will be a valid and correctly interpreted.
@@ -651,7 +660,7 @@ Context: An LLM has just generated potentially_problematic_string and the text m
 
 potentially_problematic_string (this text MIGHT have bad escaping, or might be entirely correct):
 \`\`\`
-${potentiallyProblematicString}
+${sanitizeForPrompt(potentiallyProblematicString)}
 \`\`\`
 
 Task: Analyze the potentially_problematic_string. If it's syntactically invalid due to incorrect escaping (e.g., "\n", "\t", "\\", "\\'", "\\""), correct the invalid syntax. The goal is to ensure the text will be a valid and correctly interpreted.
