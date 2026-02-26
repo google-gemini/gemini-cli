@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import clipboardy from 'clipboardy';
+import open from 'open';
 import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
@@ -55,6 +56,7 @@ import {
   isSlashCommand,
 } from '../utils/commandUtils.js';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { getSafeLowColorBackground } from '../themes/color-utils.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
@@ -923,6 +925,80 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }
         }
 
+        if (
+          keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key) ||
+          keyMatchers[Command.OPEN_DIRECTORY](key)
+        ) {
+          if (completion.suggestions.length > 0) {
+            const targetIndex =
+              completion.activeSuggestionIndex === -1
+                ? 0 // Default to the first if none is active
+                : completion.activeSuggestionIndex;
+
+            if (targetIndex < completion.suggestions.length) {
+              const suggestion = completion.suggestions[targetIndex];
+              if (
+                completion.completionMode === CompletionMode.AT &&
+                !suggestion.commandKind &&
+                // Heuristic to exclude MCP resources, which are not file paths.
+                !suggestion.label.includes('://')
+              ) {
+                const absolutePath = path.resolve(
+                  config.getTargetDir(),
+                  suggestion.label,
+                );
+
+                if (!absolutePath.startsWith(config.getTargetDir())) {
+                  setQueueErrorMessage(
+                    'Access denied: Path is outside the project directory.',
+                  );
+                  return true;
+                }
+
+                if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
+                  open(absolutePath).catch((e: Error) => {
+                    setQueueErrorMessage(`Failed to open file: ${e.message}`);
+                  });
+                } else {
+                  // Use an async IIFE to avoid blocking the input handler with sync file I/O.
+                  (async () => {
+                    let dirPath = absolutePath;
+                    // If it's not a directory, open its parent
+                    if (
+                      !suggestion.label.endsWith('/') &&
+                      !suggestion.label.endsWith('\\')
+                    ) {
+                      try {
+                        const stat = await fs.promises.stat(absolutePath);
+                        if (!stat.isDirectory()) {
+                          dirPath = path.dirname(absolutePath);
+                        }
+                      } catch {
+                        dirPath = path.dirname(absolutePath);
+                      }
+                    }
+
+                    open(dirPath).catch((e: Error) => {
+                      setQueueErrorMessage(
+                        `Failed to open directory: ${e.message}`,
+                      );
+                    });
+                  })().catch((e: Error) => {
+                    setQueueErrorMessage(
+                      `Failed to process directory action: ${e.message}`,
+                    );
+                  });
+                }
+                return true; // We successfully handled the file shortcut
+              }
+              // If it's an agent/command, we still return true to consume the shortcut
+              // so it doesn't fall back to inserting 'o' or 'x' or opening the external editor
+              // for the prompt box itself, since the user obviously intended to target the list.
+              return true;
+            }
+          }
+        }
+
         if (keyMatchers[Command.ACCEPT_SUGGESTION](key)) {
           if (completion.suggestions.length > 0) {
             const targetIndex =
@@ -1219,6 +1295,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       registerPlainTabPress,
       resetPlainTabPress,
       toggleCleanUiDetailsVisible,
+      config,
+      setQueueErrorMessage,
     ],
   );
 
@@ -1419,6 +1497,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               : 'reverse'
         }
         expandedIndex={expandedSuggestionIndex}
+        showMentionShortcuts={completion.completionMode === CompletionMode.AT}
       />
     </Box>
   ) : null;
