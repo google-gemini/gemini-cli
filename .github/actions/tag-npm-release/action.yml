@@ -71,10 +71,13 @@ runs:
         ${{ inputs.dry-run != 'true' }}
       env:
         NODE_AUTH_TOKEN: '${{ steps.core-token.outputs.auth-token }}'
+        INPUTS_CORE_PACKAGE_NAME: '${{ inputs.core-package-name }}'
+        INPUTS_VERSION: '${{ inputs.version }}'
+        INPUTS_CHANNEL: '${{ inputs.channel }}'
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
       run: |
-        npm dist-tag add ${{ inputs.core-package-name }}@${{ inputs.version }} ${{ inputs.channel }}
+        npm dist-tag add ${INPUTS_CORE_PACKAGE_NAME}@${INPUTS_VERSION} ${INPUTS_CHANNEL}
 
     - name: 'Get cli Token'
       uses: './.github/actions/npm-auth-token'
@@ -91,10 +94,13 @@ runs:
         ${{ inputs.dry-run != 'true' }}
       env:
         NODE_AUTH_TOKEN: '${{ steps.cli-token.outputs.auth-token }}'
+        INPUTS_CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+        INPUTS_VERSION: '${{ inputs.version }}'
+        INPUTS_CHANNEL: '${{ inputs.channel }}'
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
       run: |
-        npm dist-tag add ${{ inputs.cli-package-name }}@${{ inputs.version }} ${{ inputs.channel }}
+        npm dist-tag add ${INPUTS_CLI_PACKAGE_NAME}@${INPUTS_VERSION} ${INPUTS_CHANNEL}
 
     - name: 'Get a2a Token'
       uses: './.github/actions/npm-auth-token'
@@ -111,10 +117,13 @@ runs:
         ${{ inputs.dry-run == 'false' }}
       env:
         NODE_AUTH_TOKEN: '${{ steps.a2a-token.outputs.auth-token }}'
+        INPUTS_A2A_PACKAGE_NAME: '${{ inputs.a2a-package-name }}'
+        INPUTS_VERSION: '${{ inputs.version }}'
+        INPUTS_CHANNEL: '${{ inputs.channel }}'
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
       run: |
-        npm dist-tag add ${{ inputs.a2a-package-name }}@${{ inputs.version }} ${{ inputs.channel }}
+        npm dist-tag add ${INPUTS_A2A_PACKAGE_NAME}@${INPUTS_VERSION} ${INPUTS_CHANNEL}
 
     - name: 'Log dry run'
       if: |-
@@ -122,4 +131,15 @@ runs:
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
       run: |
-        echo "Dry run: Would have added tag '${{ inputs.channel }}' to version '${{ inputs.version }}' for ${{ inputs.cli-package-name }}, ${{ inputs.core-package-name }}, and ${{ inputs.a2a-package-name }}."
+        echo "Dry run: Would have added tag '${INPUTS_CHANNEL}' to version '${INPUTS_VERSION}' for ${INPUTS_CLI_PACKAGE_NAME}, ${INPUTS_CORE_PACKAGE_NAME}, and ${INPUTS_A2A_PACKAGE_NAME}."
+
+      env:
+        INPUTS_CHANNEL: '${{ inputs.channel }}'
+
+        INPUTS_VERSION: '${{ inputs.version }}'
+
+        INPUTS_CLI_PACKAGE_NAME: '${{ inputs.cli-package-name }}'
+
+        INPUTS_CORE_PACKAGE_NAME: '${{ inputs.core-package-name }}'
+
+        INPUTS_A2A_PACKAGE_NAME: '${{ inputs.a2a-package-name }}'
