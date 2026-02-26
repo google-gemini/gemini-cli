@@ -1969,6 +1969,23 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useEffect(() => {
     const handleUserFeedback = (payload: UserFeedbackPayload) => {
+      const errorVerbosity =
+        settings.merged.ui.errorVerbosity === 'full' ? 'full' : 'low';
+
+      // In low verbosity mode, suppress non-error feedback from the main chat
+      // history so recoverable/internal chatter (info/warnings) does not look
+      // like hard failures. We still log attached error details to the debug
+      // logger when present.
+      if (errorVerbosity === 'low' && payload.severity !== 'error') {
+        if (payload.error) {
+          debugLogger.warn(
+            `[Feedback Details for "${payload.message}"]`,
+            payload.error,
+          );
+        }
+        return;
+      }
+
       let type: MessageType;
       switch (payload.severity) {
         case 'error':
@@ -2012,7 +2029,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     return () => {
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     };
-  }, [historyManager]);
+  }, [historyManager, settings.merged.ui.errorVerbosity]);
 
   const filteredConsoleMessages = useMemo(() => {
     if (config.getDebugMode()) {
