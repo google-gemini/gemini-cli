@@ -382,6 +382,14 @@ export async function runNonInteractive({
                   durationMs,
                 ),
               });
+            } else if (config.getOutputFormat() === OutputFormat.JSON) {
+              const formatter = new JsonFormatter();
+              const stats = uiTelemetryService.getMetrics();
+              textOutput.write(
+                formatter.format(config.getSessionId(), responseText, stats),
+              );
+            } else {
+              textOutput.ensureTrailingNewline(); // Ensure a final newline
             }
             return;
           } else if (event.type === GeminiEventType.AgentExecutionBlocked) {

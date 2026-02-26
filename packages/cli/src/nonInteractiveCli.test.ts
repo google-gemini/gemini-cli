@@ -2003,6 +2003,73 @@ describe('runNonInteractive', () => {
       expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
     });
 
+    it('should write JSON output when AgentExecutionStopped event is received in JSON mode', async () => {
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+      vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      const events: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.Content, value: 'Partial content' },
+        {
+          type: GeminiEventType.AgentExecutionStopped,
+          value: { reason: 'Stopped by hook' },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test stop json',
+        prompt_id: 'prompt-id-stop-json',
+      });
+
+      expect(processStdoutSpy).toHaveBeenCalledWith(
+        JSON.stringify(
+          {
+            session_id: 'test-session-id',
+            response: 'Partial content',
+            stats: MOCK_SESSION_METRICS,
+          },
+          null,
+          2,
+        ),
+      );
+    });
+
+    it('should emit result event when AgentExecutionStopped event is received in streaming JSON mode', async () => {
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
+        OutputFormat.STREAM_JSON,
+      );
+      vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      const events: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.AgentExecutionStopped,
+          value: { reason: 'Stopped by hook' },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(events),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test stop stream',
+        prompt_id: 'prompt-id-stop-stream',
+      });
+
+      const output = getWrittenOutput();
+      expect(output).toContain('"type":"result"');
+      expect(output).toContain('"status":"success"');
+    });
+
     it('should handle AgentExecutionBlocked event', async () => {
       const allEvents: ServerGeminiStreamEvent[] = [
         {
