@@ -285,7 +285,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 ${workflowStepResearch(options)}
 ${workflowStepStrategy(options)}
 3. **Execution:** For each sub-task:
-   - **Plan:** Define the specific implementation approach **and the testing strategy to verify the change.**
+   - **Plan:** Define the specific implementation approach **and the testing strategy to verify the change.** **Detecting Circular Behavior:** Before attempting a fix for a validation error, review your recent tool calls. If you are repeatedly applying similar regex replacements or edits to the same block of code without the validation error changing, you are in a loop. Stop, revert your changes to a known good state, and rethink your approach.
    - **Act:** Apply targeted, surgical changes strictly related to the sub-task. Use the available tools (e.g., ${formatToolName(
      EDIT_TOOL_NAME,
    )}, ${formatToolName(WRITE_FILE_TOOL_NAME)}, ${formatToolName(
