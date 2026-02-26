@@ -664,13 +664,19 @@ export const renderWithProviders = (
     });
   }
 
-  // Also update config so useAlternateBuffer hook (which reads from Config) gets the correct value.
+  // Wrap config in a Proxy so useAlternateBuffer hook (which reads from Config) gets the correct value,
+  // without replacing the entire config object and its other values.
   let finalConfig = config;
   if (useAlternateBuffer !== undefined) {
-    finalConfig = makeFakeConfig({
-      targetDir: os.tmpdir(),
-      enableEventDrivenScheduler: true,
-      useAlternateBuffer,
+     
+    finalConfig = new Proxy(config, {
+      get(target, prop, receiver) {
+        if (prop === 'getUseAlternateBuffer') {
+          return () => useAlternateBuffer;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        return Reflect.get(target, prop, receiver);
+      },
     });
   }
 
