@@ -18,11 +18,13 @@ import path from 'node:path';
 interface MemoryListProps {
   filePaths: string[];
   onClose: () => void;
+  onError: (message: string) => void;
 }
 
 export const MemoryList: React.FC<MemoryListProps> = ({
   filePaths,
   onClose,
+  onError,
 }) => {
   const { terminalWidth, terminalHeight } = useUIState();
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
@@ -47,13 +49,10 @@ export const MemoryList: React.FC<MemoryListProps> = ({
       if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
         const selectedFile = filePaths[highlightedIndex];
         if (selectedFile) {
-          try {
-            // Using open package so we do not run into command injection issues
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            open(selectedFile);
-          } catch (_e) {
-            // silently fail or display an error
-          }
+          // Using open package so we do not run into command injection issues
+          open(selectedFile).catch((e: Error) => {
+            onError(`Failed to open file: ${e.message}`);
+          });
         }
         return true;
       }
@@ -61,12 +60,9 @@ export const MemoryList: React.FC<MemoryListProps> = ({
       if (keyMatchers[Command.OPEN_DIRECTORY](key)) {
         const selectedFile = filePaths[highlightedIndex];
         if (selectedFile) {
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            open(path.dirname(selectedFile));
-          } catch (_e) {
-            // silently fail or display an error
-          }
+          open(path.dirname(selectedFile)).catch((e: Error) => {
+            onError(`Failed to open directory: ${e.message}`);
+          });
         }
         return true;
       }

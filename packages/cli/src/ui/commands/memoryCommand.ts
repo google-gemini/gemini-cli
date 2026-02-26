@@ -113,6 +113,11 @@ export const memoryCommand: SlashCommand = {
           component: React.createElement(MemoryList, {
             filePaths: config.getGeminiMdFilePaths() || [],
             onClose: () => context.ui.removeComponent(),
+            onError: (message: string) =>
+              context.ui.addItem(
+                { type: MessageType.ERROR, text: message },
+                Date.now(),
+              ),
           }),
         };
       },
