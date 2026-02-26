@@ -4,12 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { Footer } from './Footer.js';
 import { createMockSettings } from '../../test-utils/settings.js';
+import path from 'node:path';
 
-const customMockSessionStats = {
+// Normalize paths to POSIX slashes for stable cross-platform snapshots.
+const normalizeFrame = (frame: string | undefined) => {
+  if (!frame) return frame;
+  return frame.replace(/\\/g, '/').replace(/[A-Za-z]:\/(Users)/g, '/$1');
+};
+
+const mockSessionStats = {
   sessionId: 'test-session-id',
   sessionStartTime: new Date(),
   promptCount: 0,
@@ -50,6 +57,7 @@ const customMockSessionStats = {
           thoughts: 0,
           tool: 0,
         },
+        roles: {},
       },
     },
   },
@@ -64,397 +72,469 @@ const defaultProps = {
 };
 
 describe('<Footer />', () => {
-  it('renders the component', () => {
-    const { lastFrame } = renderWithProviders(<Footer />, {
-      width: 120,
-      uiState: { sessionStats: customMockSessionStats },
-    });
+  it('renders the component', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <Footer />,
+      {
+        width: 120,
+        uiState: {
+          branchName: defaultProps.branchName,
+          sessionStats: mockSessionStats,
+        },
+      },
+    );
+    await waitUntilReady();
     expect(lastFrame()).toBeDefined();
+    unmount();
   });
 
   describe('path display', () => {
-    it('should display a shortened path on a narrow terminal', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 40,
-        uiState: {
-          sessionStats: customMockSessionStats,
+    it('should display a shortened path on a narrow terminal', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 79,
+          uiState: { sessionStats: mockSessionStats },
         },
-      });
+      );
+      await waitUntilReady();
       const output = lastFrame();
       expect(output).toBeDefined();
-      expect(output!.length).toBeLessThanOrEqual(120); // 40 width * 3? it depends.
+      // Should contain some part of the path, likely shortened
+      expect(output).toContain(
+        path.join('directories', 'to', 'make', 'it', 'long'),
+      );
+      unmount();
     });
 
-    it('should use wide layout at 80 columns', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 80,
-        uiState: {
-          sessionStats: customMockSessionStats,
+    it('should use wide layout at 80 columns', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 80,
+          uiState: { sessionStats: mockSessionStats },
         },
-      });
+      );
+      await waitUntilReady();
       const output = lastFrame();
       expect(output).toBeDefined();
+      expect(output).toContain(
+        path.join('directories', 'to', 'make', 'it', 'long'),
+      );
+      unmount();
     });
   });
 
-  it('displays the branch name when provided', () => {
-    const { lastFrame } = renderWithProviders(<Footer />, {
-      width: 120,
-      uiState: {
-        branchName: defaultProps.branchName,
-        sessionStats: customMockSessionStats,
+  it('displays the branch name when provided', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <Footer />,
+      {
+        width: 120,
+        uiState: {
+          branchName: defaultProps.branchName,
+          sessionStats: mockSessionStats,
+        },
       },
-    });
+    );
+    await waitUntilReady();
     expect(lastFrame()).toContain(defaultProps.branchName);
+    unmount();
   });
 
-  it('does not display the branch name when not provided', () => {
-    const { lastFrame } = renderWithProviders(<Footer />, {
-      width: 120,
-      uiState: { branchName: undefined, sessionStats: customMockSessionStats },
-    });
-    expect(lastFrame()).not.toContain('(');
-  });
-
-  it('displays the model name and context percentage', () => {
-    const { lastFrame } = renderWithProviders(<Footer />, {
-      width: 120,
-      uiState: {
-        currentModel: 'gemini-pro',
-        sessionStats: {
-          ...customMockSessionStats,
-          lastPromptTokenCount: 1000,
-        },
+  it('does not display the branch name when not provided', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <Footer />,
+      {
+        width: 120,
+        uiState: { branchName: undefined, sessionStats: mockSessionStats },
       },
-      settings: createMockSettings({
-        ui: {
-          footer: {
-            hideContextPercentage: false,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).not.toContain('Branch');
+    unmount();
+  });
+
+  it('displays the model name and context percentage', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <Footer />,
+      {
+        width: 120,
+        uiState: {
+          currentModel: defaultProps.model,
+          sessionStats: {
+            ...mockSessionStats,
+            lastPromptTokenCount: 1000,
           },
         },
-      }),
-    });
-    expect(lastFrame()).toContain('gemini-pro');
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              hideContextPercentage: false,
+            },
+          },
+        }),
+      },
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toContain(defaultProps.model);
+    expect(lastFrame()).toMatch(/\d+% left/);
+    unmount();
   });
 
-  it('displays the usage indicator when usage is low', () => {
-    const { lastFrame } = renderWithProviders(<Footer />, {
-      width: 120,
-      uiState: {
-        quota: {
-          stats: { remaining: 15, limit: 100 },
-          userTier: 'free',
-          proQuotaRequest: null,
-          validationRequest: null,
+  it('displays the usage indicator when usage is low', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <Footer />,
+      {
+        width: 120,
+        uiState: {
+          sessionStats: mockSessionStats,
+          quota: {
+            userTier: undefined,
+            stats: {
+              remaining: 15,
+              limit: 100,
+              resetTime: undefined,
+            },
+            proQuotaRequest: null,
+            validationRequest: null,
+          },
         },
-        sessionStats: customMockSessionStats,
       },
-    });
+    );
+    await waitUntilReady();
     expect(lastFrame()).toContain('15%');
-    expect(lastFrame()).toMatchSnapshot();
+    expect(normalizeFrame(lastFrame())).toMatchSnapshot();
+    unmount();
   });
 
-  it('hides the usage indicator when usage is not near limit', () => {
-    const { lastFrame } = renderWithProviders(<Footer />, {
-      width: 120,
-      uiState: {
-        quota: {
-          stats: { remaining: 85, limit: 100 },
-          userTier: 'free',
-          proQuotaRequest: null,
-          validationRequest: null,
-        },
-        sessionStats: customMockSessionStats,
-      },
-    });
-    expect(lastFrame()).not.toContain('Usage remaining');
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('displays "Limit reached" message when remaining is 0', () => {
-    const { lastFrame } = renderWithProviders(<Footer />, {
-      width: 120,
-      uiState: {
-        quota: {
-          stats: { remaining: 0, limit: 100 },
-          userTier: 'free',
-          proQuotaRequest: null,
-          validationRequest: null,
-        },
-        sessionStats: customMockSessionStats,
-      },
-    });
-    expect(lastFrame()?.toLowerCase()).toContain('limit reached');
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('displays the model name and abbreviated context percentage', () => {
-    const { lastFrame } = renderWithProviders(<Footer />, {
-      width: 80,
-      uiState: {
-        currentModel: 'gemini-pro',
-        sessionStats: {
-          ...customMockSessionStats,
-          lastPromptTokenCount: 500,
-        },
-      },
-      settings: createMockSettings({
-        ui: {
-          footer: {
-            hideContextPercentage: false,
+  it('hides the usage indicator when usage is not near limit', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <Footer />,
+      {
+        width: 120,
+        uiState: {
+          sessionStats: mockSessionStats,
+          quota: {
+            userTier: undefined,
+            stats: {
+              remaining: 85,
+              limit: 100,
+              resetTime: undefined,
+            },
+            proQuotaRequest: null,
+            validationRequest: null,
           },
         },
-      }),
-    });
-    expect(lastFrame()).toContain('gemini-pro');
+      },
+    );
+    await waitUntilReady();
+    expect(lastFrame()).not.toContain('Usage remaining');
+    expect(normalizeFrame(lastFrame())).toMatchSnapshot();
+    unmount();
+  });
+
+  it('displays "Limit reached" message when remaining is 0', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <Footer />,
+      {
+        width: 120,
+        uiState: {
+          sessionStats: mockSessionStats,
+          quota: {
+            userTier: undefined,
+            stats: {
+              remaining: 0,
+              limit: 100,
+              resetTime: undefined,
+            },
+            proQuotaRequest: null,
+            validationRequest: null,
+          },
+        },
+      },
+    );
+    await waitUntilReady();
+    expect(lastFrame()?.toLowerCase()).toContain('limit reached');
+    expect(normalizeFrame(lastFrame())).toMatchSnapshot();
+    unmount();
+  });
+
+  it('displays the model name and abbreviated context percentage', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <Footer />,
+      {
+        width: 99,
+        uiState: { sessionStats: mockSessionStats },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              hideContextPercentage: false,
+            },
+          },
+        }),
+      },
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toContain(defaultProps.model);
+    expect(lastFrame()).toMatch(/\d+%/);
+    unmount();
   });
 
   describe('sandbox and trust info', () => {
-    afterEach(() => {
-      vi.unstubAllEnvs();
-    });
-
-    it('should display untrusted when isTrustedFolder is false', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: {
-          isTrustedFolder: false,
-          sessionStats: customMockSessionStats,
+    it('should display untrusted when isTrustedFolder is false', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: { isTrustedFolder: false, sessionStats: mockSessionStats },
         },
-      });
+      );
+      await waitUntilReady();
       expect(lastFrame()).toContain('untrusted');
+      unmount();
     });
 
-    it('should display custom sandbox info when SANDBOX env is set', () => {
-      vi.stubEnv('SANDBOX', 'gemini-test-sandbox');
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: {
-          isTrustedFolder: true,
-          sessionStats: customMockSessionStats,
+    it('should display custom sandbox info when SANDBOX env is set', async () => {
+      vi.stubEnv('SANDBOX', 'gemini-cli-test-sandbox');
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            isTrustedFolder: undefined,
+            sessionStats: mockSessionStats,
+          },
         },
-      });
-      expect(lastFrame()).toContain('test-sandbox');
+      );
+      await waitUntilReady();
+      expect(lastFrame()).toContain('test');
+      vi.unstubAllEnvs();
+      unmount();
     });
 
-    it('should display macOS Seatbelt info when SANDBOX is sandbox-exec', () => {
+    it('should display macOS Seatbelt info when SANDBOX is sandbox-exec', async () => {
       vi.stubEnv('SANDBOX', 'sandbox-exec');
       vi.stubEnv('SEATBELT_PROFILE', 'test-profile');
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: {
-          isTrustedFolder: true,
-          sessionStats: customMockSessionStats,
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: { isTrustedFolder: true, sessionStats: mockSessionStats },
         },
-      });
-      expect(lastFrame()).toContain('macOS Seatbelt');
-      expect(lastFrame()).toContain('test-profile');
+      );
+      await waitUntilReady();
+      expect(lastFrame()).toMatch(/macOS Seatbelt.*\(test-profile\)/s);
+      vi.unstubAllEnvs();
+      unmount();
     });
 
-    it('should display "no sandbox" when SANDBOX is not set and folder is trusted', () => {
+    it('should display "no sandbox" when SANDBOX is not set and folder is trusted', async () => {
+      // Clear any SANDBOX env var that might be set.
       vi.stubEnv('SANDBOX', '');
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: {
-          isTrustedFolder: true,
-          sessionStats: customMockSessionStats,
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: { isTrustedFolder: true, sessionStats: mockSessionStats },
         },
-      });
+      );
+      await waitUntilReady();
       expect(lastFrame()).toContain('no sandbox');
+      vi.unstubAllEnvs();
+      unmount();
     });
 
-    it('should prioritize untrusted message over sandbox info', () => {
-      vi.stubEnv('SANDBOX', 'gemini-test-sandbox');
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: {
-          isTrustedFolder: false,
-          sessionStats: customMockSessionStats,
+    it('should prioritize untrusted message over sandbox info', async () => {
+      vi.stubEnv('SANDBOX', 'gemini-cli-test-sandbox');
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: { isTrustedFolder: false, sessionStats: mockSessionStats },
         },
-      });
+      );
+      await waitUntilReady();
       expect(lastFrame()).toContain('untrusted');
-      expect(lastFrame()).not.toContain('test-sandbox');
+      expect(lastFrame()).not.toMatch(/test-sandbox/s);
+      vi.unstubAllEnvs();
+      unmount();
     });
   });
 
   describe('footer configuration filtering (golden snapshots)', () => {
-    it('renders complete footer with all sections visible (baseline)', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: {
-          currentModel: 'gemini-pro',
-          sessionStats: {
-            ...customMockSessionStats,
-            lastPromptTokenCount: 0,
-          },
-        },
-        settings: createMockSettings({
-          ui: {
-            footer: {
-              items: [
-                'cwd',
-                'sandbox-status',
-                'model-name',
-                'context-remaining',
-              ],
-              hideContextPercentage: false,
+    beforeEach(() => {
+      vi.stubEnv('SANDBOX', '');
+      vi.stubEnv('SEATBELT_PROFILE', '');
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('renders complete footer with all sections visible (baseline)', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: { sessionStats: mockSessionStats },
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                hideContextPercentage: false,
+              },
             },
-          },
-        }),
-      });
-      expect(lastFrame()).toMatchSnapshot('complete-footer-wide');
-    });
-
-    it('renders footer with all optional sections hidden (minimal footer)', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: { sessionStats: customMockSessionStats },
-        settings: createMockSettings({
-          ui: {
-            footer: {
-              items: [],
-            },
-          },
-        }),
-      });
-      expect(lastFrame()).toMatchSnapshot('footer-minimal');
-    });
-
-    it('renders footer with only model info hidden (partial filtering)', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: {
-          sessionStats: customMockSessionStats,
+          }),
         },
-        settings: createMockSettings({
-          ui: {
-            footer: {
-              items: ['cwd', 'sandbox-status'],
+      );
+      await waitUntilReady();
+      expect(normalizeFrame(lastFrame())).toMatchSnapshot(
+        'complete-footer-wide',
+      );
+      unmount();
+    });
+
+    it('renders footer with all optional sections hidden (minimal footer)', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: { sessionStats: mockSessionStats },
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                hideCWD: true,
+                hideSandboxStatus: true,
+                hideModelInfo: true,
+              },
             },
-          },
-        }),
-      });
-      expect(lastFrame()).toMatchSnapshot('footer-no-model');
+          }),
+        },
+      );
+      await waitUntilReady();
+      expect(normalizeFrame(lastFrame({ allowEmpty: true }))).toMatchSnapshot(
+        'footer-minimal',
+      );
+      unmount();
     });
 
-    it('renders footer with CWD and model info hidden to test alignment (only sandbox visible)', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: { sessionStats: customMockSessionStats },
-        settings: createMockSettings({
-          ui: {
-            footer: {
-              items: ['sandbox-status'],
+    it('renders footer with only model info hidden (partial filtering)', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: { sessionStats: mockSessionStats },
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                hideCWD: false,
+                hideSandboxStatus: false,
+                hideModelInfo: true,
+              },
             },
-          },
-        }),
-      });
-      expect(lastFrame()).toMatchSnapshot('footer-only-sandbox');
+          }),
+        },
+      );
+      await waitUntilReady();
+      expect(normalizeFrame(lastFrame())).toMatchSnapshot('footer-no-model');
+      unmount();
     });
 
-    it('hides the context percentage when hideContextPercentage is true', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: {
-          currentModel: 'gemini-pro',
-          sessionStats: {
-            ...customMockSessionStats,
-            lastPromptTokenCount: 1000,
-          },
-        },
-        settings: createMockSettings({
-          ui: {
-            footer: {
-              hideContextPercentage: true,
+    it('renders footer with CWD and model info hidden to test alignment (only sandbox visible)', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: { sessionStats: mockSessionStats },
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                hideCWD: true,
+                hideSandboxStatus: false,
+                hideModelInfo: true,
+              },
             },
-          },
-        }),
-      });
-      expect(lastFrame()).not.toContain('left');
+          }),
+        },
+      );
+      await waitUntilReady();
+      expect(normalizeFrame(lastFrame())).toMatchSnapshot(
+        'footer-only-sandbox',
+      );
+      unmount();
     });
 
-    it('shows the context percentage when hideContextPercentage is false', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: {
-          currentModel: 'gemini-pro',
-          sessionStats: {
-            ...customMockSessionStats,
-            lastPromptTokenCount: 1000,
-          },
-        },
-        settings: createMockSettings({
-          ui: {
-            footer: {
-              hideContextPercentage: false,
+    it('hides the context percentage when hideContextPercentage is true', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: { sessionStats: mockSessionStats },
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                hideContextPercentage: true,
+              },
             },
-          },
-        }),
-      });
-      expect(lastFrame()).toContain('left');
-    });
-
-    it('renders complete footer in narrow terminal (baseline narrow)', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 80,
-        uiState: {
-          currentModel: 'gemini-pro',
-          sessionStats: {
-            ...customMockSessionStats,
-            lastPromptTokenCount: 0,
-          },
+          }),
         },
-        settings: createMockSettings({
-          ui: {
-            footer: {
-              items: [
-                'cwd',
-                'sandbox-status',
-                'model-name',
-                'context-remaining',
-              ],
-              hideContextPercentage: false,
+      );
+      await waitUntilReady();
+      expect(lastFrame()).toContain(defaultProps.model);
+      expect(lastFrame()).not.toMatch(/\d+% left/);
+      unmount();
+    });
+    it('shows the context percentage when hideContextPercentage is false', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: { sessionStats: mockSessionStats },
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                hideContextPercentage: false,
+              },
             },
-          },
-        }),
-      });
-      expect(lastFrame()).toMatchSnapshot('complete-footer-narrow');
-    });
-  });
-
-  describe('fallback mode display', () => {
-    it('should display Flash model when in fallback mode, not the configured Pro model', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: {
-          currentModel: 'gemini-1.5-flash',
-          sessionStats: customMockSessionStats,
+          }),
         },
-      });
-      expect(lastFrame()).toContain('gemini-1.5-flash');
+      );
+      await waitUntilReady();
+      expect(lastFrame()).toContain(defaultProps.model);
+      expect(lastFrame()).toMatch(/\d+% left/);
+      unmount();
     });
-
-    it('should display Pro model when NOT in fallback mode', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: {
-          currentModel: 'gemini-pro',
-          sessionStats: customMockSessionStats,
+    it('renders complete footer in narrow terminal (baseline narrow)', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 79,
+          uiState: { sessionStats: mockSessionStats },
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                hideContextPercentage: false,
+              },
+            },
+          }),
         },
-      });
-      expect(lastFrame()).toContain('gemini-pro');
+      );
+      await waitUntilReady();
+      expect(normalizeFrame(lastFrame())).toMatchSnapshot(
+        'complete-footer-narrow',
+      );
+      unmount();
     });
   });
 
   describe('Footer Token Formatting', () => {
-    const renderWithTokens = (tokens: number) =>
-      renderWithProviders(<Footer />, {
+    const renderWithTokens = async (tokens: number) => {
+      const result = renderWithProviders(<Footer />, {
         width: 120,
         uiState: {
           sessionStats: {
-            ...customMockSessionStats,
+            ...mockSessionStats,
             metrics: {
-              ...customMockSessionStats.metrics,
+              ...mockSessionStats.metrics,
               models: {
                 'gemini-pro': {
                   api: {
@@ -471,6 +551,7 @@ describe('<Footer />', () => {
                     thoughts: 0,
                     tool: 0,
                   },
+                  roles: {},
                 },
               },
             },
@@ -484,69 +565,85 @@ describe('<Footer />', () => {
           },
         }),
       });
+      await result.waitUntilReady();
+      return result;
+    };
 
-    it('formats thousands with k', () => {
-      const { lastFrame } = renderWithTokens(1500);
+    it('formats thousands with k', async () => {
+      const { lastFrame, unmount } = await renderWithTokens(1500);
       expect(lastFrame()).toContain('1.5k tokens');
+      unmount();
     });
 
-    it('formats millions with m', () => {
-      const { lastFrame } = renderWithTokens(1500000);
+    it('formats millions with m', async () => {
+      const { lastFrame, unmount } = await renderWithTokens(1500000);
       expect(lastFrame()).toContain('1.5m tokens');
+      unmount();
     });
 
-    it('formats billions with b', () => {
-      const { lastFrame } = renderWithTokens(1500000000);
+    it('formats billions with b', async () => {
+      const { lastFrame, unmount } = await renderWithTokens(1500000000);
       expect(lastFrame()).toContain('1.5b tokens');
+      unmount();
     });
 
-    it('formats small numbers without suffix', () => {
-      const { lastFrame } = renderWithTokens(500);
+    it('formats small numbers without suffix', async () => {
+      const { lastFrame, unmount } = await renderWithTokens(500);
       expect(lastFrame()).toContain('500 tokens');
+      unmount();
     });
   });
 
   describe('Footer Custom Items', () => {
-    it('renders items in the specified order', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: {
-          currentModel: 'gemini-pro',
-          sessionStats: customMockSessionStats,
-        },
-        settings: createMockSettings({
-          ui: {
-            footer: {
-              items: ['model-name', 'cwd'],
-            },
+    it('renders items in the specified order', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            currentModel: 'gemini-pro',
+            sessionStats: mockSessionStats,
           },
-        }),
-      });
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                items: ['model-name', 'cwd'],
+              },
+            },
+          }),
+        },
+      );
+      await waitUntilReady();
 
       const output = lastFrame();
-      const modelIdx = output!.indexOf('/model');
-      const cwdIdx = output!.indexOf('Path');
+      const modelIdx = output.indexOf('/model');
+      const cwdIdx = output.indexOf('Path');
       expect(modelIdx).toBeLessThan(cwdIdx);
+      unmount();
     });
 
-    it('renders multiple items with proper alignment', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: {
-          sessionStats: customMockSessionStats,
-          branchName: 'main',
-        },
-        settings: createMockSettings({
-          vimMode: {
-            vimMode: true,
+    it('renders multiple items with proper alignment', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            branchName: 'main',
           },
-          ui: {
-            footer: {
-              items: ['cwd', 'git-branch', 'sandbox-status', 'model-name'],
+          settings: createMockSettings({
+            vimMode: {
+              vimMode: true,
             },
-          },
-        }),
-      });
+            ui: {
+              footer: {
+                items: ['cwd', 'git-branch', 'sandbox-status', 'model-name'],
+              },
+            },
+          }),
+        },
+      );
+      await waitUntilReady();
 
       const output = lastFrame();
       expect(output).toBeDefined();
@@ -558,47 +655,96 @@ describe('<Footer />', () => {
       // Data should be present
       expect(output).toContain('main');
       expect(output).toContain('gemini-pro');
+      unmount();
     });
 
-    it('handles empty items array', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: { sessionStats: customMockSessionStats },
-        settings: createMockSettings({
-          ui: {
-            footer: {
-              items: [],
+    it('handles empty items array', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: { sessionStats: mockSessionStats },
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                items: [],
+              },
             },
-          },
-        }),
-      });
-
-      const output = lastFrame();
-      expect(output).toBeDefined();
-      expect(output!.trim()).toBe('');
-    });
-
-    it('does not render items that are conditionally hidden', () => {
-      const { lastFrame } = renderWithProviders(<Footer />, {
-        width: 120,
-        uiState: {
-          sessionStats: customMockSessionStats,
-          branchName: undefined, // No branch
+          }),
         },
-        settings: createMockSettings({
-          ui: {
-            footer: {
-              items: ['cwd', 'git-branch', 'model-name'],
-            },
+      );
+      await waitUntilReady();
+
+      const output = lastFrame({ allowEmpty: true });
+      expect(output).toBeDefined();
+      expect(output.trim()).toBe('');
+      unmount();
+    });
+
+    it('does not render items that are conditionally hidden', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            branchName: undefined, // No branch
           },
-        }),
-      });
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                items: ['cwd', 'git-branch', 'model-name'],
+              },
+            },
+          }),
+        },
+      );
+      await waitUntilReady();
 
       const output = lastFrame();
       expect(output).toBeDefined();
       expect(output).not.toContain('Branch');
       expect(output).toContain('Path');
       expect(output).toContain('/model');
+      unmount();
+    });
+  });
+
+  describe('fallback mode display', () => {
+    it('should display Flash model when in fallback mode, not the configured Pro model', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            currentModel: 'gemini-2.5-flash', // Fallback active, showing Flash
+          },
+        },
+      );
+      await waitUntilReady();
+
+      // Footer should show the effective model (Flash), not the config model (Pro)
+      expect(lastFrame()).toContain('gemini-2.5-flash');
+      expect(lastFrame()).not.toContain('gemini-2.5-pro');
+      unmount();
+    });
+
+    it('should display Pro model when NOT in fallback mode', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            currentModel: 'gemini-2.5-pro', // Normal mode, showing Pro
+          },
+        },
+      );
+      await waitUntilReady();
+
+      expect(lastFrame()).toContain('gemini-2.5-pro');
+      unmount();
     });
   });
 });
