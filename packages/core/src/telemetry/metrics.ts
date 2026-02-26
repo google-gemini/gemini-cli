@@ -617,6 +617,40 @@ let baselineComparisonHistogram: Histogram | undefined;
 let isMetricsInitialized = false;
 let isPerformanceMonitoringEnabled = false;
 
+// In-memory accumulators for in-CLI perf snapshot (read via getters only).
+const toolStatsAccumulator = new Map<
+  string,
+  { count: number; totalMs: number }
+>();
+const apiStatsAccumulator = new Map<
+  string,
+  { requestCount: number; errorCount: number; totalLatencyMs: number }
+>();
+let sessionStartTimestamp: number | null = null;
+
+export interface ToolStatsSnapshot {
+  name: string;
+  callCount: number;
+  totalExecutionTimeMs: number;
+}
+
+export interface ApiStatsSnapshot {
+  byModel: Array<{
+    model: string;
+    requestCount: number;
+    errorCount: number;
+    avgLatencyMs: number;
+  }>;
+  totalRequests: number;
+  totalErrors: number;
+  errorRate: number;
+}
+
+export interface SessionStatsSnapshot {
+  uptimeMs: number;
+  requestCount: number;
+}
+
 function getMeter(): Meter | undefined {
   if (!cliMeter) {
     cliMeter = metrics.getMeter(SERVICE_NAME);
@@ -646,6 +680,8 @@ export function initializeMetrics(config: Config): void {
   // Increment session counter after all metrics are initialized
   sessionCounter?.add(1, baseMetricDefinition.getCommonAttributes(config));
 
+  sessionStartTimestamp = Date.now();
+
   // Initialize performance monitoring metrics if enabled
   initializePerformanceMonitoring(config);
 
@@ -670,6 +706,16 @@ export function recordToolCallMetrics(
 ): void {
   if (!toolCallCounter || !toolCallLatencyHistogram || !isMetricsInitialized)
     return;
+
+  const name = attributes.function_name;
+  const existing = toolStatsAccumulator.get(name) ?? {
+    count: 0,
+    totalMs: 0,
+  };
+  toolStatsAccumulator.set(name, {
+    count: existing.count + 1,
+    totalMs: existing.totalMs + durationMs,
+  });
 
   const metricAttributes: Attributes = {
     ...baseMetricDefinition.getCommonAttributes(config),
@@ -705,6 +751,18 @@ export function recordCustomApiResponseMetrics(
     !isMetricsInitialized
   )
     return;
+  const model = attributes.model;
+  const existing = apiStatsAccumulator.get(model) ?? {
+    requestCount: 0,
+    errorCount: 0,
+    totalLatencyMs: 0,
+  };
+  apiStatsAccumulator.set(model, {
+    requestCount: existing.requestCount + 1,
+    errorCount: existing.errorCount,
+    totalLatencyMs: existing.totalLatencyMs + durationMs,
+  });
+
   const metricAttributes: Attributes = {
     ...baseMetricDefinition.getCommonAttributes(config),
     model: attributes.model,
@@ -728,6 +786,18 @@ export function recordApiErrorMetrics(
     !isMetricsInitialized
   )
     return;
+  const model = attributes.model;
+  const existing = apiStatsAccumulator.get(model) ?? {
+    requestCount: 0,
+    errorCount: 0,
+    totalLatencyMs: 0,
+  };
+  apiStatsAccumulator.set(model, {
+    requestCount: existing.requestCount + 1,
+    errorCount: existing.errorCount + 1,
+    totalLatencyMs: existing.totalLatencyMs + durationMs,
+  });
+
   const metricAttributes: Attributes = {
     ...baseMetricDefinition.getCommonAttributes(config),
     model: attributes.model,
@@ -1212,6 +1282,47 @@ export function recordBaselineComparison(
 // Utility function to check if performance monitoring is enabled
 export function isPerformanceMonitoringActive(): boolean {
   return isPerformanceMonitoringEnabled && isMetricsInitialized;
+}
+
+/** In-memory tool stats for in-CLI perf snapshot. */
+export function getToolStatsSnapshot(): ToolStatsSnapshot[] {
+  return Array.from(toolStatsAccumulator.entries()).map(([name, data]) => ({
+    name,
+    callCount: data.count,
+    totalExecutionTimeMs: data.totalMs,
+  }));
+}
+
+/** In-memory API stats for in-CLI perf snapshot. */
+export function getApiStatsSnapshot(): ApiStatsSnapshot {
+  const byModel = Array.from(apiStatsAccumulator.entries()).map(
+    ([model, data]) => ({
+      model,
+      requestCount: data.requestCount,
+      errorCount: data.errorCount,
+      avgLatencyMs:
+        data.requestCount > 0 ? data.totalLatencyMs / data.requestCount : 0,
+    }),
+  );
+  const totalRequests = byModel.reduce((s, m) => s + m.requestCount, 0);
+  const totalErrors = byModel.reduce((s, m) => s + m.errorCount, 0);
+  return {
+    byModel,
+    totalRequests,
+    totalErrors,
+    errorRate: totalRequests > 0 ? totalErrors / totalRequests : 0,
+  };
+}
+
+/** In-memory session stats for in-CLI perf snapshot. */
+export function getSessionStatsSnapshot(): SessionStatsSnapshot {
+  const requestCount = Array.from(apiStatsAccumulator.values()).reduce(
+    (s, d) => s + d.requestCount,
+    0,
+  );
+  const uptimeMs =
+    sessionStartTimestamp !== null ? Date.now() - sessionStartTimestamp : 0;
+  return { uptimeMs, requestCount };
 }
 
 /**
