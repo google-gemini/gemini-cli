@@ -421,6 +421,23 @@ const SETTINGS_SCHEMA = {
     description: 'User interface settings.',
     showInDialog: false,
     properties: {
+      errorVerbosity: {
+        type: 'enum',
+        label: 'Error Verbosity',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'low',
+        description: oneLine`
+          Controls how much recoverable/internal error detail is shown in the interactive UI.
+          Use "low" to hide non-fatal chatter in the main chat history while still surfacing terminal failures.
+          Use "full" to show all error, warning, and info feedback entries.
+        `,
+        showInDialog: true,
+        options: [
+          { value: 'low', label: 'Low (terminal failures only)' },
+          { value: 'full', label: 'Full (all feedback)' },
+        ],
+      },
       theme: {
         type: 'string',
         label: 'Theme',

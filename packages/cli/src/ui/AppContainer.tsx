@@ -1967,8 +1967,39 @@ Logging in with Google... Restarting Gemini CLI to continue.
     stdout,
   ]);
 
+  // Sanitize log messages to avoid log injection and accidental leakage of
+  // large / multi-line content into debug logs.
+  const sanitizeForLog = (input: string): string =>
+    input.replace(/[\r\n]+/g, ' ').slice(0, 500);
+
   useEffect(() => {
     const handleUserFeedback = (payload: UserFeedbackPayload) => {
+      const errorVerbosity =
+        settings.merged.ui.errorVerbosity === 'full' ? 'full' : 'low';
+
+      // In low verbosity mode, suppress non-error feedback from the main chat
+      // history so recoverable/internal chatter (info/warnings) does not look
+      // like hard failures. We still log attached error details to the debug
+      // logger when present.
+      if (errorVerbosity === 'low' && payload.severity !== 'error') {
+        if (payload.error) {
+          const safeMessage = sanitizeForLog(payload.message);
+          if (payload.error instanceof Error) {
+            debugLogger.warn(
+              `[Feedback Details] ${safeMessage}`,
+              `Error name: ${sanitizeForLog(payload.error.name)}`,
+              `Error message: ${sanitizeForLog(payload.error.message)}`,
+            );
+          } else {
+            debugLogger.warn(
+              `[Feedback Details] ${safeMessage}`,
+              '[Redacted non-Error payload.error details]',
+            );
+          }
+        }
+        return;
+      }
+
       let type: MessageType;
       switch (payload.severity) {
         case 'error':
@@ -2012,7 +2043,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     return () => {
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     };
-  }, [historyManager]);
+  }, [historyManager, settings.merged.ui.errorVerbosity]);
 
   const filteredConsoleMessages = useMemo(() => {
     if (config.getDebugMode()) {

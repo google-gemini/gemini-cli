@@ -219,6 +219,14 @@
       "default": {},
       "type": "object",
       "properties": {
+        "errorVerbosity": {
+          "title": "Error Verbosity",
+          "description": "Controls how much recoverable/internal error detail is shown in the interactive UI.",
+          "markdownDescription": "Controls how much recoverable/internal error detail is shown in the interactive UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `low`\n\n- `low`: Hide non-fatal/recoverable chatter from the main chat history while still surfacing terminal failures.\n- `full`: Show all error, warning, and info feedback in the chat history.",
+          "default": "low",
+          "type": "string",
+          "enum": ["low", "full"]
+        },
         "theme": {
           "title": "Theme",
           "description": "The color theme for the UI. See the CLI themes guide for available options.",
