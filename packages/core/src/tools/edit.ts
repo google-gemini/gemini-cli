@@ -877,8 +877,6 @@ class EditToolInvocation
 
       const totalLength = finalContent.split(String.fromCharCode(10)).length;
       const metadataParts = [];
-      const totalLength = finalContent.split(String.fromCharCode(10)).length;
-      const metadataParts = [];
       if (editData.matchRanges && editData.matchRanges.length > 0) {
         if (editData.matchRanges.length === 1) {
           metadataParts.push(
@@ -1256,6 +1254,7 @@ async function calculateFuzzyReplacement(
       finalOldString: normalizedSearch,
       finalNewString: normalizedReplace,
       strategy: 'fuzzy',
+      matchRanges,
     };
   }
 
