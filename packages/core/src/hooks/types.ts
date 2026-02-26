@@ -592,6 +592,7 @@ export enum SessionStartSource {
   Startup = 'startup',
   Resume = 'resume',
   Clear = 'clear',
+  New = 'new',
 }
 
 /**
@@ -617,6 +618,7 @@ export interface SessionStartOutput extends HookOutput {
 export enum SessionEndReason {
   Exit = 'exit',
   Clear = 'clear',
+  New = 'new',
   Logout = 'logout',
   PromptInputExit = 'prompt_input_exit',
   Other = 'other',
