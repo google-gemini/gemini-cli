@@ -41,7 +41,7 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
       definition.name,
       definition.displayName ?? definition.name,
       definition.description,
-      Kind.Think,
+      Kind.Agent,
       inputSchema,
       messageBus,
       /* isOutputMarkdown */ true,

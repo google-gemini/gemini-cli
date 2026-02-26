@@ -1335,6 +1335,8 @@ function toAcpToolKind(kind: Kind): acp.ToolKind {
     case Kind.SwitchMode:
     case Kind.Other:
       return kind as acp.ToolKind;
+    case Kind.Agent:
+      return 'think';
     case Kind.Plan:
     case Kind.Communicate:
     default:

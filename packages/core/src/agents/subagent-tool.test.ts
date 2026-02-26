@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SubagentTool } from './subagent-tool.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
+import { Kind } from '../tools/tools.js';
 import type {
   LocalAgentDefinition,
   RemoteAgentDefinition,
@@ -68,6 +69,11 @@ describe('SubAgentInvocation', () => {
     MockSubagentToolWrapper.prototype.build = vi
       .fn()
       .mockReturnValue(mockInnerInvocation);
+  });
+
+  it('should have Kind.Agent', () => {
+    const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
+    expect(tool.kind).toBe(Kind.Agent);
   });
 
   it('should delegate shouldConfirmExecute to the inner sub-invocation (local)', async () => {
