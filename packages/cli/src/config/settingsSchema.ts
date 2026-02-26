@@ -421,14 +421,24 @@ const SETTINGS_SCHEMA = {
     description: 'User interface settings.',
     showInDialog: false,
     properties: {
-      theme: {
+      themeLight: {
         type: 'string',
-        label: 'Theme',
+        label: 'Light Theme',
         category: 'UI',
         requiresRestart: false,
         default: undefined as string | undefined,
         description:
-          'The color theme for the UI. See the CLI themes guide for available options.',
+          'The color theme for the UI when in light mode. See the CLI themes guide for available options.',
+        showInDialog: false,
+      },
+      themeDark: {
+        type: 'string',
+        label: 'Dark Theme',
+        category: 'UI',
+        requiresRestart: false,
+        default: undefined as string | undefined,
+        description:
+          'The color theme for the UI when in dark mode. See the CLI themes guide for available options.',
         showInDialog: false,
       },
       autoThemeSwitching: {

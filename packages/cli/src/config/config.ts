@@ -97,6 +97,8 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  themeMode: 'light' | 'dark' | undefined;
+  theme: string | undefined;
 }
 
 export async function parseArguments(
@@ -127,6 +129,15 @@ export async function parseArguments(
           type: 'string',
           nargs: 1,
           description: `Model`,
+        })
+        .option('theme-mode', {
+          type: 'string',
+          choices: ['light', 'dark'],
+          description: 'Force the theme detection mode to light or dark',
+        })
+        .option('theme', {
+          type: 'string',
+          description: 'Force a specific theme by name',
         })
         .option('prompt', {
           alias: 'p',
@@ -871,6 +882,8 @@ export async function loadCliConfig(
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
+    cliTheme: argv.theme,
+    cliThemeMode: argv.themeMode,
     onModelChange: (model: string) => saveModelChange(loadedSettings, model),
     onReload: async () => {
       const refreshedSettings = loadSettings(cwd);

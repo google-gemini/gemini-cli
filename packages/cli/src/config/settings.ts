@@ -710,15 +710,17 @@ export function loadSettings(
   workspaceSettings = resolveEnvVarsInObject(workspaceResult.settings);
 
   // Support legacy theme names
-  if (userSettings.ui?.theme === 'VS') {
-    userSettings.ui.theme = DefaultLight.name;
-  } else if (userSettings.ui?.theme === 'VS2015') {
-    userSettings.ui.theme = DefaultDark.name;
+  if (userSettings.ui?.themeLight === 'VS') {
+    userSettings.ui.themeLight = DefaultLight.name;
   }
-  if (workspaceSettings.ui?.theme === 'VS') {
-    workspaceSettings.ui.theme = DefaultLight.name;
-  } else if (workspaceSettings.ui?.theme === 'VS2015') {
-    workspaceSettings.ui.theme = DefaultDark.name;
+  if (userSettings.ui?.themeDark === 'VS2015') {
+    userSettings.ui.themeDark = DefaultDark.name;
+  }
+  if (workspaceSettings.ui?.themeLight === 'VS') {
+    workspaceSettings.ui.themeLight = DefaultLight.name;
+  }
+  if (workspaceSettings.ui?.themeDark === 'VS2015') {
+    workspaceSettings.ui.themeDark = DefaultDark.name;
   }
 
   // For the initial trust check, we can only use user and system settings.
@@ -889,6 +891,23 @@ export function migrateDeprecatedSettings(
     const uiSettings = settings.ui as Record<string, unknown> | undefined;
     if (uiSettings) {
       const newUi = { ...uiSettings };
+      let uiModified = false;
+
+      // Migrate ui.theme to themeLight and themeDark
+      if (newUi['theme'] !== undefined) {
+        foundDeprecated.push('ui.theme');
+        if (newUi['themeLight'] === undefined) {
+          newUi['themeLight'] = newUi['theme'];
+        }
+        if (newUi['themeDark'] === undefined) {
+          newUi['themeDark'] = newUi['theme'];
+        }
+        if (removeDeprecated) {
+          delete newUi['theme'];
+        }
+        uiModified = true;
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const accessibilitySettings = newUi['accessibility'] as
         | Record<string, unknown>
@@ -906,10 +925,7 @@ export function migrateDeprecatedSettings(
           )
         ) {
           newUi['accessibility'] = newAccessibility;
-          loadedSettings.setValue(scope, 'ui', newUi);
-          if (!settingsFile.readOnly) {
-            anyModified = true;
-          }
+          uiModified = true;
         }
 
         // Migrate enableLoadingPhrases: false → loadingPhrases: 'off'
@@ -920,12 +936,16 @@ export function migrateDeprecatedSettings(
         ) {
           if (!enableLP) {
             newUi['loadingPhrases'] = 'off';
-            loadedSettings.setValue(scope, 'ui', newUi);
-            if (!settingsFile.readOnly) {
-              anyModified = true;
-            }
+            uiModified = true;
           }
           foundDeprecated.push('ui.accessibility.enableLoadingPhrases');
+        }
+      }
+
+      if (uiModified) {
+        loadedSettings.setValue(scope, 'ui', newUi);
+        if (!settingsFile.readOnly) {
+          anyModified = true;
         }
       }
     }

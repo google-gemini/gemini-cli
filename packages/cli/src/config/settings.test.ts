@@ -202,7 +202,7 @@ describe('Settings Loading and Merging', () => {
         scope: 'system',
         path: getSystemSettingsPath(),
         content: {
-          ui: { theme: 'system-default' },
+          ui: { themeLight: 'system-default', themeDark: 'system-default' },
           tools: { sandbox: false },
         },
       },
@@ -210,7 +210,7 @@ describe('Settings Loading and Merging', () => {
         scope: 'user',
         path: USER_SETTINGS_PATH,
         content: {
-          ui: { theme: 'dark' },
+          ui: { themeLight: 'dark', themeDark: 'dark' },
           context: { fileName: 'USER_CONTEXT.md' },
         },
       },
@@ -238,10 +238,16 @@ describe('Settings Loading and Merging', () => {
         const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
         expect(fs.readFileSync).toHaveBeenCalledWith(path, 'utf-8');
+        const expectedSettings = { ...content };
+        // Account for migrateDeprecatedSettings
+        if (expectedSettings.ui) {
+          expectedSettings.ui.themeLight = content.ui?.themeLight;
+          expectedSettings.ui.themeDark = content.ui?.themeLight;
+        }
         expect(
           settings[scope as 'system' | 'user' | 'workspace'].settings,
-        ).toEqual(content);
-        expect(settings.merged).toMatchObject(content);
+        ).toEqual(expectedSettings);
+        expect(settings.merged).toMatchObject(expectedSettings);
       },
     );
 
@@ -254,7 +260,8 @@ describe('Settings Loading and Merging', () => {
       );
       const systemSettingsContent = {
         ui: {
-          theme: 'system-theme',
+          themeLight: 'system-theme',
+          themeDark: 'system-theme',
         },
         tools: {
           sandbox: false,
@@ -266,7 +273,8 @@ describe('Settings Loading and Merging', () => {
       };
       const userSettingsContent = {
         ui: {
-          theme: 'dark',
+          themeLight: 'dark',
+          themeDark: 'dark',
         },
         tools: {
           sandbox: true,
@@ -307,7 +315,8 @@ describe('Settings Loading and Merging', () => {
       expect(settings.workspace.settings).toEqual(workspaceSettingsContent);
       expect(settings.merged).toMatchObject({
         ui: {
-          theme: 'system-theme',
+          themeLight: 'system-theme',
+          themeDark: 'system-theme',
         },
         tools: {
           sandbox: false,
@@ -350,7 +359,8 @@ describe('Settings Loading and Merging', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const systemDefaultsContent = {
         ui: {
-          theme: 'default-theme',
+          themeLight: 'default-theme',
+          themeDark: 'default-theme',
         },
         tools: {
           sandbox: true,
@@ -362,7 +372,8 @@ describe('Settings Loading and Merging', () => {
       };
       const userSettingsContent = {
         ui: {
-          theme: 'user-theme',
+          themeLight: 'user-theme',
+          themeDark: 'user-theme',
         },
         context: {
           fileName: 'USER_CONTEXT.md',
@@ -380,7 +391,8 @@ describe('Settings Loading and Merging', () => {
       };
       const systemSettingsContent = {
         ui: {
-          theme: 'system-theme',
+          themeLight: 'system-theme',
+          themeDark: 'system-theme',
         },
         telemetry: false,
         context: {
@@ -421,7 +433,10 @@ describe('Settings Loading and Merging', () => {
           fileName: 'WORKSPACE_CONTEXT.md',
         },
         mcpServers: {},
-        ui: { theme: 'system-theme' },
+        ui: {
+          themeLight: 'system-theme',
+          themeDark: 'system-theme',
+        },
         tools: { sandbox: false },
         telemetry: false,
       });
@@ -645,7 +660,9 @@ describe('Settings Loading and Merging', () => {
         (p: fs.PathLike) =>
           p === USER_SETTINGS_PATH || p === MOCK_WORKSPACE_SETTINGS_PATH,
       );
-      const userSettingsContent = { ui: { theme: 'dark' } };
+      const userSettingsContent = {
+        ui: { themeLight: 'dark', themeDark: 'dark' },
+      };
       const workspaceSettingsContent = { tools: { sandbox: true } };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
@@ -1187,14 +1204,16 @@ describe('Settings Loading and Merging', () => {
         configValue: '$SHARED_VAR',
         userOnly: '$USER_VAR',
         ui: {
-          theme: 'dark',
+          themeLight: 'dark',
+          themeDark: 'dark',
         },
       };
       const workspaceSettingsContent: TestSettings = {
         configValue: '$SHARED_VAR',
         workspaceOnly: '$WORKSPACE_VAR',
         ui: {
-          theme: 'light',
+          themeLight: 'light',
+          themeDark: 'light',
         },
       };
 
@@ -1247,7 +1266,7 @@ describe('Settings Loading and Merging', () => {
       expect((settings.merged as TestSettings)['workspaceOnly']).toBe(
         'workspace_value',
       );
-      expect(settings.merged.ui?.theme).toBe('light'); // workspace overrides user
+      expect(settings.merged.ui?.themeLight).toBe('light'); // workspace overrides user
 
       delete process.env['SYSTEM_VAR'];
       delete process.env['USER_VAR'];
@@ -1470,7 +1489,10 @@ describe('Settings Loading and Merging', () => {
           (p: fs.PathLike) => p === MOCK_ENV_SYSTEM_SETTINGS_PATH,
         );
         const systemSettingsContent = {
-          ui: { theme: 'env-var-theme' },
+          ui: {
+            themeLight: 'env-var-theme',
+            themeDark: 'env-var-theme',
+          },
           tools: { sandbox: true },
         };
         (fs.readFileSync as Mock).mockImplementation(
@@ -1692,7 +1714,7 @@ describe('Settings Loading and Merging', () => {
     it('should merge workspace settings when workspace is trusted', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {
-        ui: { theme: 'dark' },
+        ui: { themeLight: 'dark', themeDark: 'dark' },
         tools: { sandbox: false },
       };
       const workspaceSettingsContent = {
@@ -1713,7 +1735,7 @@ describe('Settings Loading and Merging', () => {
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       expect(settings.merged.tools?.sandbox).toBe(true);
       expect(settings.merged.context?.fileName).toBe('WORKSPACE.md');
-      expect(settings.merged.ui?.theme).toBe('dark');
+      expect(settings.merged.ui?.themeLight).toBe('dark');
     });
 
     it('should NOT merge workspace settings when workspace is not trusted', () => {
@@ -1723,7 +1745,7 @@ describe('Settings Loading and Merging', () => {
       });
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {
-        ui: { theme: 'dark' },
+        ui: { themeLight: 'dark', themeDark: 'dark' },
         tools: { sandbox: false },
         context: { fileName: 'USER.md' },
       };
@@ -1746,7 +1768,7 @@ describe('Settings Loading and Merging', () => {
 
       expect(settings.merged.tools?.sandbox).toBe(false); // User setting
       expect(settings.merged.context?.fileName).toBe('USER.md'); // User setting
-      expect(settings.merged.ui?.theme).toBe('dark'); // User setting
+      expect(settings.merged.ui?.themeLight).toBe('dark'); // User setting
     });
 
     it('should NOT merge workspace settings when workspace trust is undefined', () => {
@@ -1756,7 +1778,7 @@ describe('Settings Loading and Merging', () => {
       });
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {
-        ui: { theme: 'dark' },
+        ui: { themeLight: 'dark', themeDark: 'dark' },
         tools: { sandbox: false },
         context: { fileName: 'USER.md' },
       };
@@ -1805,7 +1827,8 @@ describe('Settings Loading and Merging', () => {
       });
       const userSettingsContent: Settings = {
         ui: {
-          theme: 'dark',
+          themeLight: 'dark',
+          themeDark: 'dark',
         },
         security: {
           folderTrust: {
@@ -2414,13 +2437,15 @@ describe('Settings Loading and Merging', () => {
   describe('saveSettings', () => {
     it('should save settings using updateSettingsFilePreservingFormat', () => {
       const mockUpdateSettings = vi.mocked(updateSettingsFilePreservingFormat);
-      const settingsFile = createMockSettings({ ui: { theme: 'dark' } }).user;
+      const settingsFile = createMockSettings({
+        ui: { themeLight: 'dark', themeDark: 'dark' },
+      }).user;
       settingsFile.path = '/mock/settings.json';
 
       saveSettings(settingsFile);
 
       expect(mockUpdateSettings).toHaveBeenCalledWith('/mock/settings.json', {
-        ui: { theme: 'dark' },
+        ui: { themeLight: 'dark', themeDark: 'dark' },
       });
     });
 
@@ -2471,7 +2496,7 @@ describe('Settings Loading and Merging', () => {
           extensions: { enabled: false },
         },
         // A non-admin setting to ensure it's still processed
-        ui: { theme: 'system-theme' },
+        ui: { themeLight: 'system-theme', themeDark: 'system-theme' },
       };
 
       (fs.readFileSync as Mock).mockImplementation(
@@ -2490,7 +2515,7 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false); // default: false
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true); // default: true
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true); // default: true
-      expect(loadedSettings.merged.ui?.theme).toBe('system-theme'); // non-admin setting should be loaded
+      expect(loadedSettings.merged.ui?.themeLight).toBe('system-theme'); // non-admin setting should be loaded
 
       // 2. Now, set remote admin settings.
       loadedSettings.setRemoteAdminSettings({
@@ -2507,7 +2532,7 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
       // non-admin setting should remain unchanged
-      expect(loadedSettings.merged.ui?.theme).toBe('system-theme');
+      expect(loadedSettings.merged.ui?.themeLight).toBe('system-theme');
     });
 
     it('should set remote admin settings and recompute merged settings', () => {
@@ -2518,7 +2543,7 @@ describe('Settings Loading and Merging', () => {
           mcp: { enabled: false },
           extensions: { enabled: false },
         },
-        ui: { theme: 'initial-theme' },
+        ui: { themeLight: 'initial-theme', themeDark: 'initial-theme' },
       };
 
       (fs.readFileSync as Mock).mockImplementation(
@@ -2535,7 +2560,7 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
-      expect(loadedSettings.merged.ui?.theme).toBe('initial-theme');
+      expect(loadedSettings.merged.ui?.themeLight).toBe('initial-theme');
 
       const newRemoteSettings = {
         strictModeDisabled: false,
@@ -2553,13 +2578,13 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
       // Non-admin settings should remain untouched
-      expect(loadedSettings.merged.ui?.theme).toBe('initial-theme');
+      expect(loadedSettings.merged.ui?.themeLight).toBe('initial-theme');
     });
 
     it('should correctly handle undefined remote admin settings', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const systemSettingsContent = {
-        ui: { theme: 'initial-theme' },
+        ui: { themeLight: 'initial-theme', themeDark: 'initial-theme' },
       };
 
       (fs.readFileSync as Mock).mockImplementation(
@@ -2704,13 +2729,17 @@ describe('Settings Loading and Merging', () => {
       const oldSnapshot = loadedSettings.getSnapshot();
       const oldUserRef = oldSnapshot.user.settings;
 
-      loadedSettings.setValue(SettingScope.User, 'ui.theme', 'high-contrast');
+      loadedSettings.setValue(
+        SettingScope.User,
+        'ui.themeLight',
+        'high-contrast',
+      );
 
       const newSnapshot = loadedSettings.getSnapshot();
 
       expect(newSnapshot).not.toBe(oldSnapshot);
       expect(newSnapshot.user.settings).not.toBe(oldUserRef);
-      expect(newSnapshot.user.settings.ui?.theme).toBe('high-contrast');
+      expect(newSnapshot.user.settings.ui?.themeLight).toBe('high-contrast');
 
       expect(newSnapshot.system.settings).not.toBe(oldSnapshot.system.settings);
 

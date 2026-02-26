@@ -15,6 +15,9 @@ import process from 'node:process';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useTerminalContext } from '../contexts/TerminalContext.js';
 
+import { getActiveThemeName } from '../../utils/terminalTheme.js';
+import type { Config } from '@google/gemini-cli-core';
+
 interface UseThemeCommandReturn {
   isThemeDialogOpen: boolean;
   openThemeDialog: () => void;
@@ -22,6 +25,7 @@ interface UseThemeCommandReturn {
   handleThemeSelect: (
     themeName: string,
     scope: LoadableSettingScope,
+    themeMode?: 'light' | 'dark',
   ) => Promise<void>;
   handleThemeHighlight: (themeName: string | undefined) => void;
 }
@@ -32,6 +36,7 @@ export const useThemeCommand = (
   addItem: UseHistoryManagerReturn['addItem'],
   initialThemeError: string | null,
   refreshStatic: () => void,
+  config: Config,
 ): UseThemeCommandReturn => {
   const [isThemeDialogOpen, setIsThemeDialogOpen] =
     useState(!!initialThemeError);
@@ -79,12 +84,22 @@ export const useThemeCommand = (
 
   const closeThemeDialog = useCallback(() => {
     // Re-apply the saved theme to revert any preview changes from highlighting
-    applyTheme(loadedSettings.merged.ui.theme);
+    const activeTheme = getActiveThemeName(
+      loadedSettings.merged,
+      config.getTerminalBackground(),
+      config.getCliTheme(),
+      config.getCliThemeMode(),
+    );
+    applyTheme(activeTheme);
     setIsThemeDialogOpen(false);
-  }, [applyTheme, loadedSettings]);
+  }, [applyTheme, loadedSettings, config]);
 
   const handleThemeSelect = useCallback(
-    async (themeName: string, scope: LoadableSettingScope) => {
+    async (
+      themeName: string,
+      scope: LoadableSettingScope,
+      themeMode?: 'light' | 'dark',
+    ) => {
       try {
         const mergedCustomThemes = {
           ...(loadedSettings.user.settings.ui?.customThemes || {}),
@@ -98,18 +113,34 @@ export const useThemeCommand = (
           setIsThemeDialogOpen(true);
           return;
         }
-        loadedSettings.setValue(scope, 'ui.theme', themeName); // Update the merged settings
+
+        if (themeMode === 'light') {
+          loadedSettings.setValue(scope, 'ui.themeLight', themeName);
+        } else if (themeMode === 'dark') {
+          loadedSettings.setValue(scope, 'ui.themeDark', themeName);
+        } else {
+          loadedSettings.setValue(scope, 'ui.themeLight', themeName);
+          loadedSettings.setValue(scope, 'ui.themeDark', themeName);
+        }
+
         if (loadedSettings.merged.ui.customThemes) {
           themeManager.loadCustomThemes(loadedSettings.merged.ui.customThemes);
         }
-        applyTheme(loadedSettings.merged.ui.theme); // Apply the current theme
+
+        const activeTheme = getActiveThemeName(
+          loadedSettings.merged,
+          config.getTerminalBackground(),
+          config.getCliTheme(),
+          config.getCliThemeMode(),
+        );
+        applyTheme(activeTheme);
         refreshStatic();
         setThemeError(null);
       } finally {
         setIsThemeDialogOpen(false); // Close the dialog
       }
     },
-    [applyTheme, loadedSettings, refreshStatic, setThemeError],
+    [applyTheme, loadedSettings, refreshStatic, setThemeError, config],
   );
 
   return {

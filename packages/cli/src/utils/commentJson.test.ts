@@ -50,7 +50,8 @@ describe('commentJson', () => {
       updateSettingsFilePreservingFormat(testFilePath, {
         model: 'gemini-2.5-flash',
         ui: {
-          theme: 'dark',
+          themeLight: 'dark',
+          themeDark: 'dark',
         },
       });
 
@@ -59,7 +60,7 @@ describe('commentJson', () => {
       expect(updatedContent).toContain('// Model configuration');
       expect(updatedContent).toContain('// Theme setting');
       expect(updatedContent).toContain('"model": "gemini-2.5-flash"');
-      expect(updatedContent).toContain('"theme": "dark"');
+      expect(updatedContent).toContain('"themeLight": "dark"');
     });
 
     it('should handle nested object updates', () => {
@@ -74,13 +75,14 @@ describe('commentJson', () => {
 
       updateSettingsFilePreservingFormat(testFilePath, {
         ui: {
-          theme: 'light',
+          themeLight: 'light',
+          themeDark: 'light',
           showLineNumbers: true,
         },
       });
 
       const updatedContent = fs.readFileSync(testFilePath, 'utf-8');
-      expect(updatedContent).toContain('"theme": "light"');
+      expect(updatedContent).toContain('"themeLight": "light"');
       expect(updatedContent).toContain('"showLineNumbers": true');
     });
 
@@ -220,7 +222,8 @@ describe('commentJson', () => {
       updateSettingsFilePreservingFormat(testFilePath, {
         model: 'gemini-2.5-flash',
         ui: {
-          theme: 'light',
+          themeLight: 'light',
+          themeDark: 'light',
         },
         preservedField: 'keep me',
       });
@@ -228,7 +231,7 @@ describe('commentJson', () => {
       const updatedContent = fs.readFileSync(testFilePath, 'utf-8');
       expect(updatedContent).toContain('// Configuration');
       expect(updatedContent).toContain('"model": "gemini-2.5-flash"');
-      expect(updatedContent).toContain('"theme": "light"');
+      expect(updatedContent).toContain('"themeLight": "light"');
       expect(updatedContent).not.toContain('"existingSetting": "value"');
       expect(updatedContent).toContain('"preservedField": "keep me"');
     });

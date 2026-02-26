@@ -51,7 +51,7 @@ describe('FolderTrustDiscoveryService', () => {
         BeforeTool: [{ command: 'test-hook' }],
       },
       general: { vimMode: true },
-      ui: { theme: 'Dark' },
+      ui: { themeLight: 'Dark', themeDark: 'Dark' },
     };
     await fs.writeFile(
       path.join(geminiDir, 'settings.json'),

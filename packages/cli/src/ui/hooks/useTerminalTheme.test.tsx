@@ -40,7 +40,8 @@ vi.mock('../contexts/TerminalContext.js', () => ({
 const mockSettings = {
   merged: {
     ui: {
-      theme: 'default', // DEFAULT_THEME.name
+      themeLight: 'default', // DEFAULT_THEME.name
+      themeDark: 'default',
       autoThemeSwitching: true,
       terminalBackgroundPollingInterval: 60,
     },
@@ -60,6 +61,7 @@ vi.mock('../themes/theme-manager.js', async (importOriginal) => {
       isDefaultTheme: (name: string) =>
         name === 'default' || name === 'default-light',
       setTerminalBackground: vi.fn(),
+      setActiveTheme: vi.fn(),
     },
     DEFAULT_THEME: { name: 'default' },
   };
@@ -86,8 +88,10 @@ describe('useTerminalTheme', () => {
     mockHandleThemeSelect.mockClear();
     mockQueryTerminalBackground.mockClear();
     vi.mocked(themeManager.setTerminalBackground).mockClear();
+    vi.mocked(themeManager.setActiveTheme).mockClear();
     mockSettings.merged.ui.autoThemeSwitching = true;
-    mockSettings.merged.ui.theme = 'default';
+    mockSettings.merged.ui.themeLight = 'default';
+    mockSettings.merged.ui.themeDark = 'default';
   });
 
   afterEach(() => {
@@ -133,7 +137,8 @@ describe('useTerminalTheme', () => {
     unmount();
   });
 
-  it('should switch to light theme when background is light and not call refreshStatic directly', () => {
+  it('should switch to light theme when background is light', () => {
+    mockSettings.merged.ui.themeLight = 'default-light';
     const refreshStatic = vi.fn();
     const { unmount } = renderHook(() =>
       useTerminalTheme(mockHandleThemeSelect, config, refreshStatic),
@@ -145,19 +150,16 @@ describe('useTerminalTheme', () => {
 
     expect(config.setTerminalBackground).toHaveBeenCalledWith('#ffffff');
     expect(themeManager.setTerminalBackground).toHaveBeenCalledWith('#ffffff');
-    expect(refreshStatic).not.toHaveBeenCalled();
-    expect(mockHandleThemeSelect).toHaveBeenCalledWith(
-      'default-light',
-      expect.anything(),
-    );
+    expect(themeManager.setActiveTheme).toHaveBeenCalledWith('default-light');
+    expect(refreshStatic).toHaveBeenCalled();
+    expect(mockHandleThemeSelect).not.toHaveBeenCalled();
     unmount();
   });
 
   it('should switch to dark theme when background is dark', () => {
-    mockSettings.merged.ui.theme = 'default-light';
-
+    mockSettings.merged.ui.themeLight = 'default-light';
+    mockSettings.merged.ui.themeDark = 'default';
     config.setTerminalBackground('#ffffff');
-
     const refreshStatic = vi.fn();
     const { unmount } = renderHook(() =>
       useTerminalTheme(mockHandleThemeSelect, config, refreshStatic),
@@ -169,13 +171,9 @@ describe('useTerminalTheme', () => {
 
     expect(config.setTerminalBackground).toHaveBeenCalledWith('#000000');
     expect(themeManager.setTerminalBackground).toHaveBeenCalledWith('#000000');
-    expect(refreshStatic).not.toHaveBeenCalled();
-    expect(mockHandleThemeSelect).toHaveBeenCalledWith(
-      'default',
-      expect.anything(),
-    );
-
-    mockSettings.merged.ui.theme = 'default';
+    expect(themeManager.setActiveTheme).toHaveBeenCalledWith('default');
+    expect(refreshStatic).toHaveBeenCalled();
+    expect(mockHandleThemeSelect).not.toHaveBeenCalled();
     unmount();
   });
 
