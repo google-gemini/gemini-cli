@@ -142,4 +142,25 @@ describe('GeminiCliAgent Integration', () => {
       new GeminiCliAgent({ instructions: 123 as any }).session(),
     ).toThrow('Instructions must be a string or a function.');
   });
+
+  it('propagates errors from dynamic instructions', async () => {
+    const agent = new GeminiCliAgent({
+      instructions: () => {
+        throw new Error('Dynamic instruction failure');
+      },
+      model: 'gemini-2.0-flash',
+      fakeResponses: RECORD_MODE
+        ? undefined
+        : getGoldenPath('agent-dynamic-instructions'),
+    });
+
+    const session = agent.session();
+    const stream = session.sendStream('Say hello.');
+
+    await expect(async () => {
+      for await (const _event of stream) {
+        // Just consume the stream
+      }
+    }).rejects.toThrow('Dynamic instruction failure');
+  }, 30000);
 });

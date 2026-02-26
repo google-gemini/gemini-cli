@@ -12,6 +12,7 @@ interface CategorizedRules {
   normal: PolicyRule[];
   autoEdit: PolicyRule[];
   yolo: PolicyRule[];
+  plan: PolicyRule[];
 }
 
 const categorizeRulesByMode = (
@@ -21,6 +22,7 @@ const categorizeRulesByMode = (
     normal: [],
     autoEdit: [],
     yolo: [],
+    plan: [],
   };
   const ALL_MODES = Object.values(ApprovalMode);
   rules.forEach((rule) => {
@@ -29,6 +31,7 @@ const categorizeRulesByMode = (
     if (modeSet.has(ApprovalMode.DEFAULT)) result.normal.push(rule);
     if (modeSet.has(ApprovalMode.AUTO_EDIT)) result.autoEdit.push(rule);
     if (modeSet.has(ApprovalMode.YOLO)) result.yolo.push(rule);
+    if (modeSet.has(ApprovalMode.PLAN)) result.plan.push(rule);
   });
   return result;
 };
@@ -82,6 +85,9 @@ const listPoliciesCommand: SlashCommand = {
     const uniqueYolo = categorized.yolo.filter(
       (rule) => !normalRulesSet.has(rule),
     );
+    const uniquePlan = categorized.plan.filter(
+      (rule) => !normalRulesSet.has(rule),
+    );
 
     let content = '**Active Policies**\n\n';
     content += formatSection('Normal Mode Policies', categorized.normal);
@@ -93,6 +99,7 @@ const listPoliciesCommand: SlashCommand = {
       'Yolo Mode Policies (combined with normal mode policies)',
       uniqueYolo,
     );
+    content += formatSection('Plan Mode Policies', uniquePlan);
 
     context.ui.addItem(
       {

@@ -1,0 +1,93 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`consent > maybeRequestConsentOrFail > consent string generation > should generate a consent string with all fields 1`] = `
+"Installing extension "test-ext".
+This extension will run the following MCP servers:
+  * server1 (local): npm start
+  * server2 (remote): https://remote.com
+This extension will append info to your gemini.md context using my-context.md
+This extension will exclude the following core tools: tool1,tool2
+
+The extension you are about to install may have been created by a third-party developer and sourced
+from a public repository. Google does not vet, endorse, or guarantee the functionality or security
+of extensions. Please carefully inspect any extension and its source code before installing to
+understand the permissions it requires and the actions it may perform."
+`;
+
+exports[`consent > maybeRequestConsentOrFail > consent string generation > should include warning when hooks are present 1`] = `
+"Installing extension "test-ext".
+⚠️  This extension contains Hooks which can automatically execute commands.
+
+The extension you are about to install may have been created by a third-party developer and sourced
+from a public repository. Google does not vet, endorse, or guarantee the functionality or security
+of extensions. Please carefully inspect any extension and its source code before installing to
+understand the permissions it requires and the actions it may perform."
+`;
+
+exports[`consent > maybeRequestConsentOrFail > consent string generation > should request consent if skills change 1`] = `
+"Installing extension "test-ext".
+This extension will run the following MCP servers:
+  * server1 (local): npm start
+  * server2 (remote): https://remote.com
+This extension will append info to your gemini.md context using my-context.md
+This extension will exclude the following core tools: tool1,tool2
+
+Agent Skills:
+
+This extension will install the following agent skills:
+
+  * skill1: desc1
+    (Source: /mock/temp/dir/skill1/SKILL.md) (2 items in directory)
+
+  * skill2: desc2
+    (Source: /mock/temp/dir/skill2/SKILL.md) (1 items in directory)
+
+
+The extension you are about to install may have been created by a third-party developer and sourced
+from a public repository. Google does not vet, endorse, or guarantee the functionality or security
+of extensions. Please carefully inspect any extension and its source code before installing to
+understand the permissions it requires and the actions it may perform.
+
+Agent skills inject specialized instructions and domain-specific knowledge into the agent's system
+prompt. This can change how the agent interprets your requests and interacts with your environment.
+Review the skill definitions at the location(s) provided below to ensure they meet your security
+standards."
+`;
+
+exports[`consent > maybeRequestConsentOrFail > consent string generation > should show a warning if the skill directory cannot be read 1`] = `
+"Installing extension "test-ext".
+
+Agent Skills:
+
+This extension will install the following agent skills:
+
+  * locked-skill: A skill in a locked dir
+    (Source: /mock/temp/dir/locked/SKILL.md) ⚠️ (Could not count items in directory)
+
+
+The extension you are about to install may have been created by a third-party developer and sourced
+from a public repository. Google does not vet, endorse, or guarantee the functionality or security
+of extensions. Please carefully inspect any extension and its source code before installing to
+understand the permissions it requires and the actions it may perform.
+
+Agent skills inject specialized instructions and domain-specific knowledge into the agent's system
+prompt. This can change how the agent interprets your requests and interacts with your environment.
+Review the skill definitions at the location(s) provided below to ensure they meet your security
+standards."
+`;
+
+exports[`consent > skillsConsentString > should generate a consent string for skills 1`] = `
+"Installing agent skill(s) from "https://example.com/repo.git".
+
+The following agent skill(s) will be installing:
+
+  * skill1: desc1
+    (Source: /mock/temp/dir/skill1/SKILL.md) (1 items in directory)
+
+Install Destination: /mock/target/dir
+
+Agent skills inject specialized instructions and domain-specific knowledge into the agent's system
+prompt. This can change how the agent interprets your requests and interacts with your environment.
+Review the skill definitions at the location(s) provided below to ensure they meet your security
+standards."
+`;
