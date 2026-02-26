@@ -129,7 +129,9 @@ describe('parsingUtils', () => {
       const input = 'Check [this link](https://example.com)';
       const output = parseMarkdownToANSI(input);
       expect(output).toBe(
-        `${primary('Check this link (')}${link('https://example.com')}${primary(')')}`,
+        `${primary('Check ')}${primary('this link')}${primary(' (')}${link(
+          'https://example.com',
+        )}${primary(')')}`,
       );
     });
 
@@ -153,9 +155,11 @@ describe('parsingUtils', () => {
       const input = '**Bold** and *italic* and `code` and [link](url)';
       const output = parseMarkdownToANSI(input);
       expect(output).toBe(
-        `${chalk.bold(primary('Bold'))}${primary(' and ')}${chalk.italic(primary('italic'))}${primary(' and ')}${accent(
-          'code',
-        )}${primary(' and link (')}${link('url')}${primary(')')}`,
+        `${chalk.bold(primary('Bold'))}${primary(' and ')}${chalk.italic(
+          primary('italic'),
+        )}${primary(' and ')}${accent('code')}${primary(' and ')}${primary(
+          'link',
+        )}${primary(' (')}${link('url')}${primary(')')}`,
       );
     });
 
@@ -172,7 +176,9 @@ describe('parsingUtils', () => {
       const output = parseMarkdownToANSI(input);
       expect(output).toBe(
         chalk.bold(
-          `${primary('Bold with ')}${chalk.italic(primary('italic'))}${primary(' inside')}`,
+          `${primary('Bold with ')}${chalk.italic(primary('italic'))}${primary(
+            ' inside',
+          )}`,
         ),
       );
     });
@@ -191,7 +197,9 @@ describe('parsingUtils', () => {
       const input = 'Check [link](url)';
       const output = parseMarkdownToANSI(input, 'red');
       const red = (str: string) => chalk.red(str);
-      expect(output).toBe(`${red('Check link (')}${link('url')}${red(')')}`);
+      expect(output).toBe(
+        `${red('Check ')}${red('link')}${red(' (')}${link('url')}${red(')')}`,
+      );
     });
 
     it('should override default color with accent color for code', () => {

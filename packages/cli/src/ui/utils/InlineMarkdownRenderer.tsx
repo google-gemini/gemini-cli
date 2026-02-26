@@ -185,9 +185,9 @@ export const parseMarkdownToANSI = (
           const url = linkMatch[2];
           styledPart =
             parseMarkdownToANSI(linkText, baseColor) +
-            ' (' +
+            ansiColorize(' (', baseColor) +
             ansiColorize(url, theme.text.link) +
-            ')';
+            ansiColorize(')', baseColor);
         }
       } else if (
         fullMatch.startsWith('<u>') &&
