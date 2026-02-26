@@ -74,8 +74,8 @@ export async function handleCreditsFlow(
   const { overageStrategy } = args;
 
   // If credits are already auto-enabled (strategy='always'), the request
-  // that just failed already included credits — they didn't help.
-  // Fall through to ProQuotaDialog which offers the Flash downgrade.
+  // that just failed already included enabledCreditTypes — credits didn't
+  // help. Fall through to ProQuotaDialog which offers the Flash downgrade.
   if (shouldAutoUseCredits(overageStrategy, creditBalance)) {
     return null;
   }

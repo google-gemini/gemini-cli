@@ -31,7 +31,7 @@ function getUserIdentity(context: CommandContext) {
 
   const tier = context.services.config?.getUserTierName();
   const paidTier = context.services.config?.getUserPaidTier();
-  const creditBalance = getG1CreditBalance(paidTier);
+  const creditBalance = getG1CreditBalance(paidTier) ?? undefined;
 
   return { selectedAuthType, userEmail, tier, creditBalance };
 }

@@ -9,7 +9,10 @@ import type {
   CreditType,
   GeminiUserTier,
 } from '../code_assist/types.js';
-import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
+import {
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
+} from '../config/models.js';
 
 /**
  * Strategy for handling quota exhaustion when AI credits are available.
@@ -26,7 +29,10 @@ export const G1_CREDIT_TYPE: CreditType = 'GOOGLE_ONE_AI';
  * The set of models that support AI credits overage billing.
  * Only these models are eligible for the credits-based retry flow.
  */
-export const OVERAGE_ELIGIBLE_MODELS = new Set([PREVIEW_GEMINI_MODEL]);
+export const OVERAGE_ELIGIBLE_MODELS = new Set([
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
+]);
 
 /**
  * Checks if a model is eligible for AI credits overage billing.
