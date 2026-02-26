@@ -229,7 +229,7 @@ async function calculateFlexibleReplacement(
 
   let flexibleOccurrences = 0;
   const matchRanges: Array<{ start: number; end: number }> = [];
-  let lineOffset = 0;
+  let currentOriginalLine = 1;
   let i = 0;
   while (i <= sourceLines.length - searchLinesStripped.length) {
     const window = sourceLines.slice(i, i + searchLinesStripped.length);
@@ -241,21 +241,24 @@ async function calculateFlexibleReplacement(
     if (isMatch) {
       flexibleOccurrences++;
       matchRanges.push({
-        start: i + 1 - lineOffset,
-        end: i + searchLinesStripped.length - lineOffset,
+        start: currentOriginalLine,
+        end: currentOriginalLine + searchLinesStripped.length - 1,
       });
       const firstLineInMatch = window[0];
       const indentationMatch = firstLineInMatch.match(/^([ \t]*)/);
       const indentation = indentationMatch ? indentationMatch[1] : '';
       const newBlockWithIndent = applyIndentation(replaceLines, indentation);
-      sourceLines.splice(
-        i,
-        searchLinesStripped.length,
-        newBlockWithIndent.join('\n'),
-      );
-      lineOffset += replaceLines.length - searchLinesStripped.length;
-      i += replaceLines.length;
+
+      let replacementText = newBlockWithIndent.join('\n');
+      if (window[window.length - 1].endsWith('\n')) {
+        replacementText += '\n';
+      }
+
+      sourceLines.splice(i, searchLinesStripped.length, replacementText);
+      currentOriginalLine += searchLinesStripped.length;
+      i++;
     } else {
+      currentOriginalLine++;
       i++;
     }
   }

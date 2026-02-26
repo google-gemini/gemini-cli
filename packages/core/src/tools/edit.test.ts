@@ -415,6 +415,9 @@ describe('EditTool', () => {
         { start: 2, end: 3 },
         { start: 5, end: 6 },
       ]);
+      expect(result.newContent).toBe(
+        '  line1\n  replacement\n  line3\n  replacement\n  line5',
+      );
     });
 
     it('should correctly calculate matchRanges for regex replacements', async () => {
