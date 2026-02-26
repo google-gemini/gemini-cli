@@ -179,6 +179,13 @@ describe('<Footer />', () => {
             validationRequest: null,
           },
         },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              hideContextPercentage: true,
+            },
+          },
+        }),
       },
     );
     await waitUntilReady();
@@ -205,6 +212,13 @@ describe('<Footer />', () => {
             validationRequest: null,
           },
         },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              hideContextPercentage: true,
+            },
+          },
+        }),
       },
     );
     await waitUntilReady();
@@ -231,6 +245,13 @@ describe('<Footer />', () => {
             validationRequest: null,
           },
         },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              hideContextPercentage: true,
+            },
+          },
+        }),
       },
     );
     await waitUntilReady();
