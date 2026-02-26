@@ -421,8 +421,51 @@ name = "allowed-path"
 `);
 
       expect(result.checkers).toHaveLength(1);
-      expect(result.checkers[0].priority).toBe(1.1); // tier 1 + 100/1000
       expect(result.checkers[0].source).toBe('Default: test.toml');
+    });
+
+    it('should parse [[hook_rule]] configurations correctly', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[hook_rule]]
+hookName = "git-status-hook"
+eventName = "BeforeTool"
+commandPrefix = "git status"
+decision = "allow"
+priority = 50
+deny_message = "Git status is not allowed"
+`);
+
+      expect(result.hookRules).toHaveLength(1);
+      expect(result.hookRules[0].hookName).toBe('git-status-hook');
+      expect(result.hookRules[0].eventName).toBe('BeforeTool');
+      expect(result.hookRules[0].decision).toBe(PolicyDecision.ALLOW);
+      expect(result.hookRules[0].priority).toBe(1.05); // tier 1 + 50/1000
+      expect(result.hookRules[0].denyMessage).toBe('Git status is not allowed');
+
+      // commandPrefix should be converted to regex
+      expect(result.hookRules[0].commandPattern?.test('git status')).toBe(true);
+      expect(result.hookRules[0].commandPattern?.test('git log')).toBe(false);
+    });
+
+    it('should parse hook rules with commandPattern', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[hook_rule]]
+eventName = "BeforeAgent"
+commandPattern = "npm run .*"
+decision = "deny"
+priority = 100
+`);
+
+      expect(result.hookRules).toHaveLength(1);
+      expect(result.hookRules[0].eventName).toBe('BeforeAgent');
+      expect(result.hookRules[0].decision).toBe(PolicyDecision.DENY);
+
+      expect(result.hookRules[0].commandPattern?.test('npm run build')).toBe(
+        true,
+      );
+      expect(result.hookRules[0].commandPattern?.test('npm install')).toBe(
+        false,
+      );
     });
   });
 

@@ -58,6 +58,7 @@ describe('createPolicyEngineConfig', () => {
     const loadPoliciesSpy = vi.spyOn(tomlLoader, 'loadPoliciesFromToml');
     loadPoliciesSpy.mockResolvedValue({
       rules: [],
+      hookRules: [],
       checkers: [],
       errors: [],
     });

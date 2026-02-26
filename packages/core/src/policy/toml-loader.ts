@@ -11,8 +11,9 @@ import {
   type SafetyCheckerConfig,
   type SafetyCheckerRule,
   InProcessCheckerType,
+  type HookRule,
 } from './types.js';
-import { buildArgsPatterns, isSafeRegExp } from './utils.js';
+import { buildArgsPatterns, isSafeRegExp, escapeRegex } from './utils.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import toml from '@iarna/toml';
@@ -52,6 +53,29 @@ const PolicyRuleSchema = z.object({
 });
 
 /**
+ * Schema for a single hook rule in the TOML file.
+ */
+const HookRuleSchema = z.object({
+  hookName: z.string().optional(),
+  eventName: z.string().optional(),
+  commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
+  commandPattern: z.string().optional(),
+  decision: z.nativeEnum(PolicyDecision),
+  priority: z
+    .number({
+      required_error: 'priority is required',
+      invalid_type_error: 'priority must be a number',
+    })
+    .int({ message: 'priority must be an integer' })
+    .min(0, { message: 'priority must be >= 0' })
+    .max(999, {
+      message:
+        'priority must be <= 999 to prevent tier overflow. Priorities >= 1000 would jump to the next tier.',
+    }),
+  deny_message: z.string().optional(),
+});
+
+/**
  * Schema for a single safety checker rule in the TOML file.
  */
 const SafetyCheckerRuleSchema = z.object({
@@ -84,6 +108,7 @@ const SafetyCheckerRuleSchema = z.object({
  */
 const PolicyFileSchema = z.object({
   rule: z.array(PolicyRuleSchema).optional(),
+  hook_rule: z.array(HookRuleSchema).optional(),
   safety_checker: z.array(SafetyCheckerRuleSchema).optional(),
 });
 
@@ -121,6 +146,7 @@ export interface PolicyFileError {
  */
 export interface PolicyLoadResult {
   rules: PolicyRule[];
+  hookRules: HookRule[];
   checkers: SafetyCheckerRule[];
   errors: PolicyFileError[];
 }
@@ -268,6 +294,7 @@ export async function loadPoliciesFromToml(
   getPolicyTier: (path: string) => number,
 ): Promise<PolicyLoadResult> {
   const rules: PolicyRule[] = [];
+  const hookRules: HookRule[] = [];
   const checkers: SafetyCheckerRule[] = [];
   const errors: PolicyFileError[] = [];
 
@@ -436,6 +463,70 @@ export async function loadPoliciesFromToml(
 
         rules.push(...parsedRules);
 
+        // Transform hook rules
+        const parsedHookRules: HookRule[] = (
+          validationResult.data.hook_rule ?? []
+        )
+          .map((rule) => {
+            const hookRule: HookRule = {
+              hookName: rule.hookName,
+              eventName: rule.eventName,
+              decision: rule.decision,
+              priority: transformPriority(rule.priority, tier),
+              source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
+              denyMessage: rule.deny_message,
+            };
+
+            let commandPatternStr: string | undefined;
+
+            if (rule.commandPrefix) {
+              // Convert prefix strings into an exact starting prefix matcher
+              const prefixes = Array.isArray(rule.commandPrefix)
+                ? rule.commandPrefix
+                : [rule.commandPrefix];
+              const escapedPrefixes = prefixes.map((p) => escapeRegex(p));
+              commandPatternStr = `^(${escapedPrefixes.join('|')})(\\s|$)`;
+            } else if (rule.commandPattern) {
+              commandPatternStr = rule.commandPattern;
+            }
+
+            if (commandPatternStr) {
+              try {
+                hookRule.commandPattern = new RegExp(commandPatternStr);
+              } catch (e) {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                const error = e as Error;
+                errors.push({
+                  filePath,
+                  fileName: file,
+                  tier: tierName,
+                  errorType: 'regex_compilation',
+                  message: 'Invalid regex pattern in hook rule',
+                  details: `Pattern: ${commandPatternStr}\nError: ${error.message}`,
+                });
+                return null;
+              }
+
+              if (!isSafeRegExp(commandPatternStr)) {
+                errors.push({
+                  filePath,
+                  fileName: file,
+                  tier: tierName,
+                  errorType: 'regex_compilation',
+                  message:
+                    'Unsafe regex pattern in hook rule (potential ReDoS)',
+                  details: `Pattern: ${commandPatternStr}`,
+                });
+                return null;
+              }
+            }
+
+            return hookRule;
+          })
+          .filter((rule): rule is HookRule => rule !== null);
+
+        hookRules.push(...parsedHookRules);
+
         // Transform checkers
         const parsedCheckers: SafetyCheckerRule[] = (
           validationResult.data.safety_checker ?? []
@@ -530,5 +621,5 @@ export async function loadPoliciesFromToml(
     }
   }
 
-  return { rules, checkers, errors };
+  return { rules, hookRules, checkers, errors };
 }

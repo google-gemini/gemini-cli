@@ -13,6 +13,7 @@ import {
   type PolicyEngineConfig,
   PolicyDecision,
   type PolicyRule,
+  type HookRule,
   type ApprovalMode,
   type PolicySettings,
 } from './types.js';
@@ -197,6 +198,7 @@ export async function createPolicyEngineConfig(
   // Load policies from TOML files
   const {
     rules: tomlRules,
+    hookRules: tomlHookRules,
     checkers: tomlCheckers,
     errors,
   } = await loadPoliciesFromToml(securePolicyDirs, (p) => {
@@ -231,6 +233,7 @@ export async function createPolicyEngineConfig(
   }
 
   const rules: PolicyRule[] = [...tomlRules];
+  const hookRules: HookRule[] = [...tomlHookRules];
   const checkers = [...tomlCheckers];
 
   // Priority system for policy rules:
@@ -376,6 +379,7 @@ export async function createPolicyEngineConfig(
 
   return {
     rules,
+    hookRules,
     checkers,
     defaultDecision: PolicyDecision.ASK_USER,
     approvalMode,

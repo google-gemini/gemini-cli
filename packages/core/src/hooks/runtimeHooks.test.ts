@@ -38,8 +38,21 @@ describe('Runtime Hooks', () => {
     });
 
     // Stub getMessageBus
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (config as any).getMessageBus = () => undefined;
+     
+    (
+      config as unknown as {
+        getMessageBus: () => unknown;
+        getPolicyEngine: () => unknown;
+      }
+    ).getMessageBus = () => undefined;
+    (
+      config as unknown as {
+        getMessageBus: () => unknown;
+        getPolicyEngine: () => unknown;
+      }
+    ).getPolicyEngine = () => ({
+      checkHook: vi.fn().mockResolvedValue({ decision: 'allow' }),
+    });
 
     hookSystem = new HookSystem(config);
   });

@@ -8,7 +8,7 @@ import type { Config } from '../config/config.js';
 import type { HookPlanner, HookEventContext } from './hookPlanner.js';
 import type { HookRunner } from './hookRunner.js';
 import type { HookAggregator, AggregatedHookResult } from './hookAggregator.js';
-import { HookEventName, HookType } from './types.js';
+import { HookEventName, HookType, createHookOutput } from './types.js';
 import type {
   HookConfig,
   HookInput,
@@ -29,8 +29,10 @@ import type {
   PreCompressTrigger,
   HookExecutionResult,
   McpToolContext,
+  HookOutput,
 } from './types.js';
 import { defaultHookTranslator } from './hookTranslator.js';
+import { PolicyDecision } from '../policy/types.js';
 import type {
   GenerateContentParameters,
   GenerateContentResponse,
@@ -298,12 +300,93 @@ export class HookEventHandler {
         };
       }
 
+      // Filter hooks by policy
+      const policyEngine = this.config.getPolicyEngine();
+      const allowedConfigs: HookConfig[] = [];
+      const policyErrors: Error[] = [];
+      const policyOutputs: HookOutput[] = [];
+      const policyResults: HookExecutionResult[] = [];
+
+      for (let i = 0; i < plan.hookConfigs.length; i++) {
+        const config = plan.hookConfigs[i];
+        const { decision, rule } = await policyEngine.checkHook(
+          config,
+          eventName,
+        );
+        if (decision === PolicyDecision.DENY) {
+          const reason =
+            rule?.denyMessage ||
+            `Blocked by policy rule: ${rule?.source || 'unknown'}`;
+          debugLogger.warn(
+            `[HookEventHandler] Hook execution denied by policy: ${config.command}`,
+          );
+          const error = new Error(reason);
+          policyErrors.push(error);
+
+          const output = createHookOutput(eventName, {
+            decision: 'deny',
+            reason,
+          });
+          policyOutputs.push(output);
+
+          policyResults.push({
+            hookConfig: config,
+            eventName,
+            success: false,
+            error,
+            output,
+            duration: 0,
+          });
+
+          coreEvents.emitHookStart({
+            hookName: this.getHookName(config),
+            eventName,
+            hookIndex: i + 1,
+            totalHooks: plan.hookConfigs.length,
+          });
+          coreEvents.emitHookEnd({
+            hookName: this.getHookName(config),
+            eventName,
+            success: false,
+          });
+        } else {
+          allowedConfigs.push(config);
+        }
+      }
+
+      plan.hookConfigs = allowedConfigs;
+
+      if (plan.hookConfigs.length === 0) {
+        if (policyResults.length > 0) {
+          const aggregated = this.hookAggregator.aggregateResults(
+            policyResults,
+            eventName,
+          );
+          this.processCommonHookOutputFields(aggregated);
+          this.logHookExecution(
+            eventName,
+            input,
+            policyResults,
+            aggregated,
+            requestContext,
+          );
+          return aggregated;
+        }
+
+        return {
+          success: true,
+          allOutputs: [],
+          errors: [],
+          totalDuration: 0,
+        };
+      }
+
       const onHookStart = (config: HookConfig, index: number) => {
         coreEvents.emitHookStart({
           hookName: this.getHookName(config),
           eventName,
-          hookIndex: index + 1,
-          totalHooks: plan.hookConfigs.length,
+          hookIndex: index + 1 + policyResults.length, // Offset by denied hooks to preserve count
+          totalHooks: plan.hookConfigs.length + policyResults.length,
         });
       };
 
@@ -332,9 +415,12 @@ export class HookEventHandler {
             onHookEnd,
           );
 
+      // Combine policy results (denied hooks) with execution results
+      const combinedResults = [...policyResults, ...results];
+
       // Aggregate results
       const aggregated = this.hookAggregator.aggregateResults(
-        results,
+        combinedResults,
         eventName,
       );
 
@@ -345,7 +431,7 @@ export class HookEventHandler {
       this.logHookExecution(
         eventName,
         input,
-        results,
+        combinedResults,
         aggregated,
         requestContext,
       );

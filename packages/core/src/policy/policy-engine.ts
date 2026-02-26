@@ -11,6 +11,7 @@ import {
   type PolicyRule,
   type SafetyCheckerRule,
   type HookCheckerRule,
+  type HookRule,
   ApprovalMode,
   type CheckResult,
 } from './types.js';
@@ -162,6 +163,7 @@ export class PolicyEngine {
   private rules: PolicyRule[];
   private checkers: SafetyCheckerRule[];
   private hookCheckers: HookCheckerRule[];
+  private hookRules: HookRule[];
   private readonly defaultDecision: PolicyDecision;
   private readonly nonInteractive: boolean;
   private readonly checkerRunner?: CheckerRunner;
@@ -175,6 +177,9 @@ export class PolicyEngine {
       (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
     );
     this.hookCheckers = (config.hookCheckers ?? []).sort(
+      (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
+    );
+    this.hookRules = (config.hookRules ?? []).sort(
       (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
     );
     this.defaultDecision = config.defaultDecision ?? PolicyDecision.ASK_USER;
@@ -788,5 +793,51 @@ export class PolicyEngine {
       return PolicyDecision.DENY;
     }
     return decision;
+  }
+
+  /**
+   * Check if a hook execution is allowed based on the configured hook policies.
+   */
+  async checkHook(
+    hookConfig: { name?: string; command?: string },
+    eventName: string,
+  ): Promise<{ decision: PolicyDecision; rule?: HookRule }> {
+    for (const rule of this.hookRules) {
+      if (rule.eventName && rule.eventName !== eventName) {
+        continue;
+      }
+      if (rule.hookName && rule.hookName !== hookConfig.name) {
+        continue;
+      }
+      if (rule.commandPattern) {
+        if (
+          !hookConfig.command ||
+          !rule.commandPattern.test(hookConfig.command)
+        ) {
+          continue;
+        }
+      }
+
+      // If it matches all defined criteria
+      debugLogger.debug(
+        `[PolicyEngine.checkHook] MATCHED hook rule: eventName=${rule.eventName || 'any'}, hookName=${rule.hookName || 'any'}, commandPattern=${rule.commandPattern?.source || 'none'}, decision=${rule.decision}`,
+      );
+
+      let decision = rule.decision;
+      // Hook executions are completely headless and non-interactive.
+      if (decision === PolicyDecision.ASK_USER) {
+        decision = PolicyDecision.DENY;
+      }
+
+      return { decision, rule };
+    }
+
+    // Default decision if no rule matches.
+    let decision = this.defaultDecision;
+    if (decision === PolicyDecision.ASK_USER || this.nonInteractive) {
+      decision = PolicyDecision.DENY;
+    }
+
+    return { decision };
   }
 }

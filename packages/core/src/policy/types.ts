@@ -98,6 +98,46 @@ export type SafetyCheckerConfig =
   | ExternalCheckerConfig
   | InProcessCheckerConfig;
 
+export interface HookRule {
+  /**
+   * The name of the hook this rule applies to.
+   * If undefined, the rule applies to all hooks.
+   */
+  hookName?: string;
+
+  /**
+   * The name of the event this rule applies to.
+   * If undefined, the rule applies to all events.
+   */
+  eventName?: string;
+
+  /**
+   * Pattern to match against the hook command.
+   */
+  commandPattern?: RegExp;
+
+  /**
+   * The decision to make when this rule matches.
+   */
+  decision: PolicyDecision;
+
+  /**
+   * Priority of this rule. Higher numbers take precedence.
+   * Default is 0.
+   */
+  priority?: number;
+
+  /**
+   * Source of this rule.
+   */
+  source?: string;
+
+  /**
+   * Optional message to display when this rule results in a DENY decision.
+   */
+  denyMessage?: string;
+}
+
 export interface PolicyRule {
   /**
    * A unique name for the policy rule, useful for identification and debugging.
@@ -254,6 +294,11 @@ export interface PolicyEngineConfig {
    * List of safety checkers to apply to hook executions.
    */
   hookCheckers?: HookCheckerRule[];
+
+  /**
+   * List of hook rules to apply to hook executions.
+   */
+  hookRules?: HookRule[];
 
   /**
    * Default decision when no rules match.
