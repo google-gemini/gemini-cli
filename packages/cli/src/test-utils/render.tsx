@@ -557,6 +557,7 @@ export const mockAppState: AppState = {
 const mockUIActions: UIActions = {
   handleThemeSelect: vi.fn(),
   closeThemeDialog: vi.fn(),
+  setIsOnboardingForeverMode: vi.fn(),
   handleThemeHighlight: vi.fn(),
   handleAuthSelect: vi.fn(),
   setAuthState: vi.fn(),

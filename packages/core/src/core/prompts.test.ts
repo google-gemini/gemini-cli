@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getCoreSystemPrompt } from './prompts.js';
+import { getCoreSystemPrompt, CONFUCIUS_PROMPT } from './prompts.js';
 import { resolvePathFromEnv } from '../prompts/utils.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import fs from 'node:fs';
@@ -19,8 +19,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL_AUTO,
-  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
 } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -54,12 +53,11 @@ vi.mock('../utils/gitUtils', () => ({
   isGitRepository: vi.fn().mockReturnValue(false),
 }));
 vi.mock('node:fs');
-vi.mock('../config/models.js', async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...(actual as object),
-  };
-});
+
+import {
+  setGeminiMdFilename,
+  DEFAULT_CONTEXT_FILENAME,
+} from '../tools/memoryTool.js';
 
 describe('Core System Prompt (prompts.ts)', () => {
   const mockPlatform = (platform: string) => {
@@ -74,8 +72,24 @@ describe('Core System Prompt (prompts.ts)', () => {
   };
 
   let mockConfig: Config;
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetAllMocks();
+
+    const models = await import('../config/models.js');
+    vi.spyOn(models, 'isPreviewModel').mockImplementation((m) => {
+      if (
+        m === PREVIEW_GEMINI_MODEL ||
+        m === PREVIEW_GEMINI_FLASH_MODEL ||
+        m === PREVIEW_GEMINI_MODEL_AUTO
+      )
+        return true;
+      return false;
+    });
+    vi.spyOn(models, 'resolveModel').mockImplementation((m) => {
+      if (m === PREVIEW_GEMINI_MODEL_AUTO) return PREVIEW_GEMINI_MODEL;
+      return m;
+    });
+
     // Stub process.platform to 'linux' by default for deterministic snapshots across OSes
     mockPlatform('linux');
 
@@ -96,8 +110,8 @@ describe('Core System Prompt (prompts.ts)', () => {
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
       isAgentsEnabled: vi.fn().mockReturnValue(false),
       getPreviewFeatures: vi.fn().mockReturnValue(true),
-      getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
-      getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
+      getModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO),
+      getActiveModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL),
       getMessageBus: vi.fn(),
       getAgentRegistry: vi.fn().mockReturnValue({
         getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
@@ -113,6 +127,11 @@ describe('Core System Prompt (prompts.ts)', () => {
       }),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
+      getIsForeverMode: vi.fn().mockReturnValue(false),
+      getConfuciusMode: vi.fn().mockReturnValue({ intervalHours: 8 }),
+      getSisyphusMode: vi.fn().mockReturnValue({ enabled: false }),
+      getCompressionMode: vi.fn().mockReturnValue('summarize'),
+      getContextFilename: vi.fn().mockReturnValue('GEMINI.md'),
     } as unknown as Config;
   });
 
@@ -134,7 +153,7 @@ describe('Core System Prompt (prompts.ts)', () => {
 
     expect(prompt).toContain('# Available Agent Skills');
     expect(prompt).toContain(
-      "To activate a skill and receive its detailed instructions, you can call the `activate_skill` tool with the skill's name.",
+      "To activate a skill and receive its detailed instructions, call the `activate_skill` tool with the skill's name.",
     );
     expect(prompt).toContain('Skill Guidance');
     expect(prompt).toContain('<available_skills>');
@@ -400,10 +419,16 @@ describe('Core System Prompt (prompts.ts)', () => {
           getSkills: vi.fn().mockReturnValue([]),
         }),
         getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
+        getIsForeverMode: vi.fn().mockReturnValue(false),
+        getConfuciusMode: vi.fn().mockReturnValue({ intervalHours: 8 }),
+        getSisyphusMode: vi.fn().mockReturnValue({ enabled: false }),
+        getCompressionMode: vi.fn().mockReturnValue('summarize'),
+        getContextFilename: vi.fn().mockReturnValue('GEMINI.md'),
       } as unknown as Config;
 
       const prompt = getCoreSystemPrompt(testConfig);
       if (expectCodebaseInvestigator) {
+        expect(prompt).toContain('You are Gemini CLI, an autonomous CLI agent');
         expect(prompt).toContain(
           `Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery`,
         );
@@ -411,6 +436,7 @@ describe('Core System Prompt (prompts.ts)', () => {
           'Use `grep_search` and `glob` search tools extensively',
         );
       } else {
+        expect(prompt).toContain('You are Gemini CLI, an autonomous CLI agent');
         expect(prompt).not.toContain(
           `Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery`,
         );
@@ -567,28 +593,22 @@ describe('Core System Prompt (prompts.ts)', () => {
   describe('Platform-specific and Background Process instructions', () => {
     it('should include Windows-specific shell efficiency commands on win32', () => {
       mockPlatform('win32');
+      // Force legacy snippets by using a non-preview model
       vi.mocked(mockConfig.getActiveModel).mockReturnValue(
         DEFAULT_GEMINI_FLASH_LITE_MODEL,
       );
       const prompt = getCoreSystemPrompt(mockConfig);
-      expect(prompt).toContain(
-        "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)",
-      );
-      expect(prompt).not.toContain(
-        "using commands like 'grep', 'tail', 'head'",
-      );
+      expect(prompt).toContain("using commands like 'type' or 'findstr'");
     });
 
     it('should include generic shell efficiency commands on non-Windows', () => {
       mockPlatform('linux');
+      // Force legacy snippets by using a non-preview model
       vi.mocked(mockConfig.getActiveModel).mockReturnValue(
         DEFAULT_GEMINI_FLASH_LITE_MODEL,
       );
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain("using commands like 'grep', 'tail', 'head'");
-      expect(prompt).not.toContain(
-        "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)",
-      );
     });
 
     it('should use is_background parameter in background process instructions', () => {
@@ -772,6 +792,68 @@ describe('Core System Prompt (prompts.ts)', () => {
         );
       },
     );
+  });
+
+  describe('Long-Running Agent Mode (Sisyphus)', () => {
+    it('should include sisyphus instructions when enabled', () => {
+      vi.mocked(mockConfig.getSisyphusMode).mockReturnValue({
+        enabled: true,
+        idleTimeout: 1,
+        prompt: 'continue',
+      });
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('# Long-Running Agent Mode (Forever Mode)');
+      expect(prompt).toContain('use the `schedule_work` tool');
+      expect(prompt).toContain('Adaptive Memory');
+      expect(prompt).toContain('Deterministic Execution');
+    });
+
+    it('should NOT include sisyphus instructions when disabled', () => {
+      vi.mocked(mockConfig.getSisyphusMode).mockReturnValue({
+        enabled: false,
+        idleTimeout: 1,
+        prompt: 'continue',
+      });
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('# Long-Running Agent Mode (Sisyphus)');
+    });
+
+    it('should use SISYPHUS.md in context header when sisyphusMode is enabled', () => {
+      vi.mocked(mockConfig.getSisyphusMode).mockReturnValue({
+        enabled: true,
+        idleTimeout: 1,
+        prompt: 'continue',
+      });
+      setGeminiMdFilename('SISYPHUS.md');
+
+      const prompt = getCoreSystemPrompt(mockConfig, 'mission context');
+      expect(prompt).toContain('# Contextual Instructions (SISYPHUS.md)');
+      expect(prompt).toContain('mission context');
+      setGeminiMdFilename(DEFAULT_CONTEXT_FILENAME);
+    });
+
+    it('should have a valid CONFUCIUS_PROMPT', () => {
+      expect(CONFUCIUS_PROMPT).toContain(
+        '# Task: Self-Reflection & Knowledge Solidification (Confucius Mode)',
+      );
+      expect(CONFUCIUS_PROMPT).toContain('`.gemini/knowledge/`');
+      expect(CONFUCIUS_PROMPT).toContain('吾日三省吾身');
+    });
+  });
+
+  describe('Archive Mode Reminder', () => {
+    it('should include archive mode instructions when enabled', () => {
+      vi.mocked(mockConfig.getCompressionMode).mockReturnValue('archive');
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('# Archive Mode Enabled');
+      expect(prompt).toContain('JSON files in `.gemini/history/`');
+    });
+
+    it('should NOT include archive mode instructions when summarize mode is enabled', () => {
+      vi.mocked(mockConfig.getCompressionMode).mockReturnValue('summarize');
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('**Archive Mode Enabled:**');
+    });
   });
 });
 

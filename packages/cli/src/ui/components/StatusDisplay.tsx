@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Text } from 'ink';
+import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
@@ -24,18 +24,36 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
   const settings = useSettings();
   const config = useConfig();
 
+  const items: React.ReactNode[] = [];
+
   if (process.env['GEMINI_SYSTEM_MD']) {
-    return <Text color={theme.status.error}>|⌐■_■|</Text>;
+    items.push(<Text color={theme.status.error}>|⌐■_■|</Text>);
   }
 
   if (
     uiState.activeHooks.length > 0 &&
     settings.merged.hooksConfig.notifications
   ) {
-    return <HookStatusDisplay activeHooks={uiState.activeHooks} />;
+    items.push(<HookStatusDisplay activeHooks={uiState.activeHooks} />);
   }
 
-  if (!settings.merged.ui.hideContextSummary && !hideContextSummary) {
+  if (uiState.sisyphusSecondsRemaining !== null) {
+    const mins = Math.floor(uiState.sisyphusSecondsRemaining / 60);
+    const secs = uiState.sisyphusSecondsRemaining % 60;
+    const timerStr = `${mins.toString().padStart(2, '0')}:${secs
+      .toString()
+      .padStart(2, '0')}`;
+    items.push(
+      <Text color={theme.text.accent}>✦ Resuming work in {timerStr}</Text>,
+    );
+  }
+
+  if (
+    items.length === 0 &&
+    uiState.sisyphusSecondsRemaining === null &&
+    !settings.merged.ui.hideContextSummary &&
+    !hideContextSummary
+  ) {
     return (
       <ContextSummaryDisplay
         ideContext={uiState.ideContextState}
@@ -51,5 +69,17 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     );
   }
 
-  return null;
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <Box flexDirection="row">
+      {items.map((item, index) => (
+        <Box key={index} marginRight={index < items.length - 1 ? 1 : 0}>
+          {item}
+        </Box>
+      ))}
+    </Box>
+  );
 };

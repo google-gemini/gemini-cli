@@ -203,3 +203,8 @@ export * from './utils/terminal.js';
 
 // Export types from @google/genai
 export type { Content, Part, FunctionCall } from '@google/genai';
+
+// Export constants for forever mode parsing
+export { FRONTMATTER_REGEX } from './skills/skillLoader.js';
+export { GEMINI_DIR } from './utils/paths.js';
+export { DEFAULT_CONTEXT_FILENAME } from './tools/memoryTool.js';

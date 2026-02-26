@@ -31,9 +31,14 @@ import { EditTool } from '../tools/edit.js';
 import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
-import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
+import {
+  MemoryTool,
+  setGeminiMdFilename,
+  getCurrentGeminiMdFilename,
+} from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
+import { ScheduleWorkTool } from '../tools/schedule-work.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
@@ -212,6 +217,12 @@ export interface AgentOverride {
 export interface AgentSettings {
   overrides?: Record<string, AgentOverride>;
   browser?: BrowserAgentCustomConfig;
+}
+
+export interface SisyphusModeSettings {
+  enabled: boolean;
+  idleTimeout?: number;
+  prompt?: string;
 }
 
 export interface CustomTheme {
@@ -543,6 +554,9 @@ export interface ConfigParameters {
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
   agents?: AgentSettings;
+  sisyphusMode?: SisyphusModeSettings;
+  isForeverMode?: boolean;
+  isForeverModeConfigured?: boolean;
   onReload?: () => Promise<{
     disabledSkills?: string[];
     adminSkillsEnabled?: boolean;
@@ -727,6 +741,9 @@ export class Config {
 
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
+  private readonly isForeverMode: boolean;
+  private readonly isForeverModeConfigured: boolean;
+  private readonly sisyphusMode: SisyphusModeSettings;
   private readonly enableEventDrivenScheduler: boolean;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
@@ -823,6 +840,13 @@ export class Config {
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
+    this.isForeverMode = params.isForeverMode ?? false;
+    this.isForeverModeConfigured = params.isForeverModeConfigured ?? false;
+    this.sisyphusMode = {
+      enabled: params.sisyphusMode?.enabled ?? false,
+      idleTimeout: params.sisyphusMode?.idleTimeout,
+      prompt: params.sisyphusMode?.prompt,
+    };
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
     this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
@@ -1046,6 +1070,11 @@ export class Config {
       await fs.promises.mkdir(plansDir, { recursive: true });
       this.workspaceContext.addDirectory(plansDir);
     }
+
+    // Ensure knowledge directory exists
+    const knowledgeDir = this.storage.getKnowledgeDir();
+    await fs.promises.mkdir(knowledgeDir, { recursive: true });
+    this.workspaceContext.addDirectory(knowledgeDir);
 
     // Initialize centralized FileDiscoveryService
     const discoverToolsHandle = startupProfiler.start('discover_tools');
@@ -1291,6 +1320,10 @@ export class Config {
 
   getDiscoveryMaxDirs(): number {
     return this.discoveryMaxDirs;
+  }
+
+  getContextFilename(): string {
+    return getCurrentGeminiMdFilename();
   }
 
   getContentGeneratorConfig(): ContentGeneratorConfig {
@@ -1715,14 +1748,25 @@ export class Config {
   }
 
   getUserMemory(): string | HierarchicalMemory {
+    let memory: string | HierarchicalMemory;
     if (this.experimentalJitContext && this.contextManager) {
-      return {
+      memory = {
         global: this.contextManager.getGlobalMemory(),
         extension: this.contextManager.getExtensionMemory(),
         project: this.contextManager.getEnvironmentMemory(),
       };
+    } else {
+      memory = this.userMemory;
     }
-    return this.userMemory;
+
+    if (this.isForeverMode && typeof memory !== 'string') {
+      return {
+        ...memory,
+        global: undefined,
+      };
+    }
+
+    return memory;
   }
 
   /**
@@ -2316,6 +2360,23 @@ export class Config {
     return remoteThreshold;
   }
 
+  getCompressionMode(): 'summarize' | 'archive' {
+    if (this.isForeverMode) return 'archive';
+    return 'summarize';
+  }
+
+  getIsForeverMode(): boolean {
+    return this.isForeverMode;
+  }
+
+  getIsForeverModeConfigured(): boolean {
+    return this.isForeverModeConfigured;
+  }
+
+  getSisyphusMode(): SisyphusModeSettings {
+    return this.sisyphusMode;
+  }
+
   async getUserCaching(): Promise<boolean | undefined> {
     await this.ensureExperimentsLoaded();
 
@@ -2689,15 +2750,22 @@ export class Config {
     maybeRegister(ShellTool, () =>
       registry.registerTool(new ShellTool(this, this.messageBus)),
     );
-    maybeRegister(MemoryTool, () =>
-      registry.registerTool(new MemoryTool(this.messageBus)),
-    );
+    if (!this.isForeverMode) {
+      maybeRegister(MemoryTool, () =>
+        registry.registerTool(new MemoryTool(this.messageBus)),
+      );
+    }
     maybeRegister(WebSearchTool, () =>
       registry.registerTool(new WebSearchTool(this, this.messageBus)),
     );
     maybeRegister(AskUserTool, () =>
       registry.registerTool(new AskUserTool(this.messageBus)),
     );
+    if (this.isForeverMode) {
+      maybeRegister(ScheduleWorkTool, () =>
+        registry.registerTool(new ScheduleWorkTool(this.messageBus)),
+      );
+    }
     if (this.getUseWriteTodos()) {
       maybeRegister(WriteTodosTool, () =>
         registry.registerTool(new WriteTodosTool(this.messageBus)),
@@ -2707,9 +2775,11 @@ export class Config {
       maybeRegister(ExitPlanModeTool, () =>
         registry.registerTool(new ExitPlanModeTool(this, this.messageBus)),
       );
-      maybeRegister(EnterPlanModeTool, () =>
-        registry.registerTool(new EnterPlanModeTool(this, this.messageBus)),
-      );
+      if (!this.isForeverMode) {
+        maybeRegister(EnterPlanModeTool, () =>
+          registry.registerTool(new EnterPlanModeTool(this, this.messageBus)),
+        );
+      }
     }
 
     // Register Subagents as Tools

@@ -5,8 +5,11 @@
  */
 
 import yargs from 'yargs/yargs';
+
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
+import * as path from 'node:path';
+import * as fsPromises from 'node:fs/promises';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
@@ -43,6 +46,8 @@ import {
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
+  type SisyphusModeSettings,
+  GEMINI_DIR,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -72,6 +77,7 @@ export interface CliArgs {
   query: string | undefined;
   model: string | undefined;
   sandbox: boolean | string | undefined;
+  forever: boolean | undefined;
   debug: boolean | undefined;
   prompt: string | undefined;
   promptInteractive: string | undefined;
@@ -147,7 +153,12 @@ export async function parseArguments(
           type: 'boolean',
           description: 'Run in sandbox?',
         })
-
+        .option('forever', {
+          type: 'boolean',
+          description:
+            'Enable forever (long-running agent) mode. Uses GEMINI.md frontmatter for sisyphus engine config.',
+          default: false,
+        })
         .option('yolo', {
           alias: 'y',
           type: 'boolean',
@@ -513,6 +524,66 @@ export async function loadCliConfig(
 
   const experimentalJitContext = settings.experimental?.jitContext ?? false;
 
+  let sisyphusMode: SisyphusModeSettings | undefined;
+  let isForeverModeConfigured = false;
+  const isForeverMode = argv.forever ?? false;
+
+  if (isForeverMode) {
+    try {
+      const yaml = await import('js-yaml');
+      const fsPromises = await import('node:fs/promises');
+      const path = await import('node:path');
+      const { FRONTMATTER_REGEX } = await import('@google/gemini-cli-core');
+      const { GEMINI_DIR } = await import('@google/gemini-cli-core');
+      const { DEFAULT_CONTEXT_FILENAME } = await import(
+        '@google/gemini-cli-core'
+      );
+
+      const geminiMdPath = path.default.join(
+        cwd,
+        GEMINI_DIR,
+        DEFAULT_CONTEXT_FILENAME,
+      );
+      const mdContent = await fsPromises.default.readFile(
+        geminiMdPath,
+        'utf-8',
+      );
+      const match = mdContent.match(FRONTMATTER_REGEX);
+
+      if (match) {
+        const parsed = yaml.default.load(match[1]);
+        if (parsed && typeof parsed === 'object') {
+          isForeverModeConfigured = true;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const frontmatter = parsed as Record<string, unknown>;
+          if (frontmatter['sisyphus']) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            const sisyphusSettings = frontmatter['sisyphus'] as Record<
+              string,
+              unknown
+            >;
+            sisyphusMode = {
+              enabled:
+                typeof sisyphusSettings['enabled'] === 'boolean'
+                  ? sisyphusSettings['enabled']
+                  : false,
+              idleTimeout:
+                typeof sisyphusSettings['idleTimeout'] === 'number'
+                  ? sisyphusSettings['idleTimeout']
+                  : undefined,
+              prompt:
+                typeof sisyphusSettings['prompt'] === 'string'
+                  ? sisyphusSettings['prompt']
+                  : undefined,
+            };
+          }
+        }
+      }
+    } catch (_e) {
+      // Ignored
+    }
+  }
+
   let memoryContent: string | HierarchicalMemory = '';
   let fileCount = 0;
   let filePaths: string[] = [];
@@ -537,8 +608,24 @@ export async function loadCliConfig(
     filePaths = result.filePaths;
   }
 
-  const question = argv.promptInteractive || argv.prompt || '';
+  let onboardingPrompt = '';
+  const onboardingPromptPath = path.join(cwd, GEMINI_DIR, '.onboarding_prompt');
+  try {
+    onboardingPrompt = await fsPromises.readFile(onboardingPromptPath, 'utf-8');
+    if (onboardingPrompt) {
+      await fsPromises.unlink(onboardingPromptPath).catch(() => {});
+      process.env['GEMINI_CLI_INITIAL_PROMPT'] = onboardingPrompt;
+    }
+  } catch (_e) {
+    // Ignored
+  }
 
+  const question =
+    argv.promptInteractive ||
+    argv.prompt ||
+    onboardingPrompt ||
+    process.env['GEMINI_CLI_INITIAL_PROMPT'] ||
+    '';
   // Determine approval mode with backward compatibility
   let approvalMode: ApprovalMode;
   const rawApprovalMode =
@@ -630,7 +717,8 @@ export async function loadCliConfig(
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
     (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
-      !argv.isCommand);
+      !argv.isCommand) ||
+    !!argv.forever;
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -829,6 +917,9 @@ export async function loadCliConfig(
     directWebFetch: settings.experimental?.directWebFetch,
     planSettings: settings.general?.plan,
     enableEventDrivenScheduler: true,
+    isForeverMode,
+    isForeverModeConfigured,
+    sisyphusMode,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,

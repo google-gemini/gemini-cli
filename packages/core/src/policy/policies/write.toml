@@ -77,3 +77,8 @@ required_context = ["environment"]
 toolName = "web_fetch"
 decision = "ask_user"
 priority = 10
+
+[[rule]]
+toolName = "schedule_work"
+decision = "allow"
+priority = 50

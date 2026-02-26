@@ -172,6 +172,7 @@ describe('ChatCompressionService', () => {
 
     mockConfig = {
       getCompressionThreshold: vi.fn(),
+      getCompressionMode: vi.fn().mockReturnValue('summarize'),
       getBaseLlmClient: vi.fn().mockReturnValue({
         generateContent: mockGenerateContent,
       }),
@@ -185,8 +186,10 @@ describe('ChatCompressionService', () => {
       getHookSystem: () => undefined,
       getNextCompressionTruncationId: vi.fn().mockReturnValue(1),
       getTruncateToolOutputThreshold: vi.fn().mockReturnValue(40000),
+      getProjectRoot: vi.fn(),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue(testTempDir),
+        getGeminiDir: vi.fn().mockReturnValue(testTempDir),
       },
     } as unknown as Config;
 
@@ -375,6 +378,51 @@ describe('ChatCompressionService', () => {
 
     expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
     expect(result.newHistory).not.toBeNull();
+  });
+
+  it('should archive history to a file when compressionMode is archive', async () => {
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'msg1' }] },
+      { role: 'model', parts: [{ text: 'msg2' }] },
+      { role: 'user', parts: [{ text: 'msg3' }] },
+      { role: 'model', parts: [{ text: 'msg4' }] },
+    ];
+    vi.mocked(mockChat.getHistory).mockReturnValue(history);
+    vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
+    vi.mocked(mockConfig.getCompressionMode).mockReturnValue('archive');
+    vi.mocked(mockConfig.storage.getGeminiDir).mockReturnValue(testTempDir);
+    vi.mocked(mockConfig.getProjectRoot).mockReturnValue(testTempDir);
+
+    const result = await service.compress(
+      mockChat,
+      mockPromptId,
+      false,
+      mockModel,
+      mockConfig,
+      false,
+    );
+
+    expect(result.info.compressionStatus).toBe(CompressionStatus.ARCHIVED);
+    expect(result.info.archivePath).toBeDefined();
+    expect(result.newHistory).not.toBeNull();
+    // With the fallback logic on error, it splices index 0 to 1
+    // leaving msg3 and msg4. The first message should contain the archive text.
+    expect(result.newHistory![0].parts![0].text).toContain(
+      'To save context window space',
+    );
+
+    const historyDir = path.join(testTempDir, 'history');
+    const files = fs.readdirSync(historyDir);
+    expect(files.length).toBe(1);
+    expect(files[0]).toMatch(/archive_.*\.json/);
+
+    const archivedContent = JSON.parse(
+      fs.readFileSync(path.join(historyDir, files[0]), 'utf-8'),
+    );
+    // The fallback logic: Math.floor(4 * 0.7) = 2.
+    // End index is 2 - 1 = 1.
+    // Segment sliced is 0 to 1 + 1 = 2 items (indices 0 and 1).
+    expect(archivedContent.length).toBe(2);
   });
 
   it('should return FAILED if new token count is inflated', async () => {

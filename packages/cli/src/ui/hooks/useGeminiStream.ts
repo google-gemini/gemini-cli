@@ -37,6 +37,9 @@ import {
   buildUserSteeringHintPrompt,
   generateSteeringAckMessage,
   getPlanModeExitMessage,
+  CompressionStatus,
+  SCHEDULE_WORK_TOOL_NAME,
+  CONFUCIUS_PROMPT,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -220,6 +223,28 @@ export const useGeminiStream = (
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
     useStateAndRef<boolean>(true);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
+
+  // Sisyphus Mode States
+  const activeSisyphusScheduleRef = useRef<{
+    breakTime?: number;
+    prompt?: string;
+    isExplicitSchedule?: boolean;
+  } | null>(null);
+  const sisyphusTargetTimestampRef = useRef<number | null>(null);
+  const [sisyphusSecondsRemaining, setSisyphusSecondsRemaining] = useState<
+    number | null
+  >(null);
+  const [, setSisyphusTick] = useState<number>(0);
+  const submitQueryRef = useRef<
+    (
+      query: PartListUnion,
+      options?: { isContinuation: boolean },
+      prompt_id?: string,
+    ) => Promise<void>
+  >(() => Promise.resolve());
+  const pendingQueryRef = useRef<PartListUnion | null>(null);
+  const hasForcedConfuciusRef = useRef<boolean>(false);
+
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
   const logger = useLogger(storage);
@@ -996,17 +1021,34 @@ export const useGeminiStream = (
       eventValue: ServerGeminiChatCompressedEvent['value'],
       userMessageTimestamp: number,
     ) => {
+      // Reset the force flag so Confucius can trigger again before the NEXT compression cycle
+      hasForcedConfuciusRef.current = false;
+
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
       }
+      const isArchived =
+        eventValue?.compressionStatus === CompressionStatus.ARCHIVED;
+      const archivePath = eventValue?.archivePath;
+
+      let text =
+        `IMPORTANT: This conversation exceeded the compress threshold. ` +
+        `A compressed context will be sent for future messages (compressed from: ` +
+        `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
+        `${eventValue?.newTokenCount ?? 'unknown'} tokens).`;
+
+      if (isArchived && archivePath) {
+        text =
+          `IMPORTANT: This conversation exceeded the compress threshold. ` +
+          `History has been archived to: ${archivePath} (compressed from: ` +
+          `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
+          `${eventValue?.newTokenCount ?? 'unknown'} tokens).`;
+      }
+
       return addItem({
         type: 'info',
-        text:
-          `IMPORTANT: This conversation exceeded the compress threshold. ` +
-          `A compressed context will be sent for future messages (compressed from: ` +
-          `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
-          `${eventValue?.newTokenCount ?? 'unknown'} tokens).`,
+        text,
       });
     },
     [addItem, pendingHistoryItemRef, setPendingHistoryItem],
@@ -1160,6 +1202,17 @@ export const useGeminiStream = (
             );
             break;
           case ServerGeminiEventType.ToolCallRequest:
+            if (event.value.name === SCHEDULE_WORK_TOOL_NAME) {
+              const args = event.value.args;
+              const inMinutes = Number(args?.['inMinutes'] ?? 0);
+              activeSisyphusScheduleRef.current = {
+                breakTime: inMinutes,
+                isExplicitSchedule: true,
+              };
+              setSisyphusSecondsRemaining(inMinutes * 60);
+              // Do NOT intercept and manually resolve it here.
+              // Push it to toolCallRequests so it is executed properly by the backend tool registry.
+            }
             toolCallRequests.push(event.value);
             break;
           case ServerGeminiEventType.UserCancelled:
@@ -1277,6 +1330,10 @@ export const useGeminiStream = (
 
           const userMessageTimestamp = Date.now();
 
+          // Reset Sisyphus timer on any activity but preserve the active schedule override if it exists
+          setSisyphusSecondsRemaining(null);
+          sisyphusTargetTimestampRef.current = null;
+
           // Reset quota error flag when starting a new query (not a continuation)
           if (!options?.isContinuation) {
             setModelSwitchedFromQuotaError(false);
@@ -1290,6 +1347,24 @@ export const useGeminiStream = (
           if (!prompt_id) {
             prompt_id = config.getSessionId() + '########' + getPromptCount();
           }
+
+          if (config.getIsForeverMode() && query !== CONFUCIUS_PROMPT) {
+            const currentTokens = geminiClient
+              .getChat()
+              .getLastPromptTokenCount();
+            const threshold = (await config.getCompressionThreshold()) ?? 0.8;
+            const limit = tokenLimit(config.getActiveModel());
+
+            if (
+              currentTokens >= limit * threshold * 0.9 &&
+              !hasForcedConfuciusRef.current
+            ) {
+              hasForcedConfuciusRef.current = true;
+              pendingQueryRef.current = query;
+              query = CONFUCIUS_PROMPT;
+            }
+          }
+
           return promptIdContext.run(prompt_id, async () => {
             const { queryToSend, shouldProceed } = await prepareQueryForGemini(
               query,
@@ -1350,6 +1425,7 @@ export const useGeminiStream = (
                 addItem(pendingHistoryItemRef.current, userMessageTimestamp);
                 setPendingHistoryItem(null);
               }
+
               if (loopDetectedRef.current) {
                 loopDetectedRef.current = false;
                 // Show the confirmation dialog to choose whether to disable loop detection
@@ -1772,6 +1848,106 @@ export const useGeminiStream = (
     storage,
   ]);
 
+  // Handle Sisyphus countdown and automatic trigger
+  useEffect(() => {
+    submitQueryRef.current = submitQuery;
+  }, [submitQuery]);
+
+  // Handle Sisyphus activation and automatic trigger
+  useEffect(() => {
+    const sisyphusSettings = config.getSisyphusMode();
+    const isExplicitlyScheduled =
+      activeSisyphusScheduleRef.current?.isExplicitSchedule;
+
+    if (!sisyphusSettings.enabled && !isExplicitlyScheduled) {
+      setSisyphusSecondsRemaining(null);
+      sisyphusTargetTimestampRef.current = null;
+      activeSisyphusScheduleRef.current = null;
+      return;
+    }
+
+    if (streamingState !== StreamingState.Idle) {
+      setSisyphusSecondsRemaining(null);
+      sisyphusTargetTimestampRef.current = null;
+      return;
+    }
+
+    // Now we are IDLE. If no target is set, set one.
+    if (sisyphusTargetTimestampRef.current === null) {
+      if (
+        !activeSisyphusScheduleRef.current &&
+        sisyphusSettings.idleTimeout !== undefined
+      ) {
+        activeSisyphusScheduleRef.current = {
+          breakTime: sisyphusSettings.idleTimeout,
+          prompt: sisyphusSettings.prompt,
+        };
+      }
+
+      if (activeSisyphusScheduleRef.current?.breakTime !== undefined) {
+        const delayMs = activeSisyphusScheduleRef.current.breakTime * 60 * 1000;
+        sisyphusTargetTimestampRef.current = Date.now() + delayMs;
+        setSisyphusSecondsRemaining(Math.ceil(delayMs / 1000));
+      }
+    }
+
+    if (
+      streamingState === StreamingState.Idle &&
+      sisyphusSecondsRemaining !== null &&
+      sisyphusSecondsRemaining <= 0
+    ) {
+      const isExplicitSchedule =
+        activeSisyphusScheduleRef.current?.isExplicitSchedule;
+      const promptToUse = isExplicitSchedule
+        ? 'System: The scheduled break has ended. Please resume your work.'
+        : (activeSisyphusScheduleRef.current?.prompt ??
+          sisyphusSettings.prompt ??
+          'continue workflow');
+
+      // Clear for next time so it reverts to default
+      activeSisyphusScheduleRef.current = null;
+      sisyphusTargetTimestampRef.current = null;
+      setSisyphusSecondsRemaining(null);
+      void submitQueryRef.current(promptToUse);
+    }
+  }, [streamingState, sisyphusSecondsRemaining, config]);
+
+  // Handle Sisyphus countdown timers independently to ensure UI updates
+  const isTimerActive =
+    (streamingState === StreamingState.Idle &&
+      sisyphusTargetTimestampRef.current !== null) ||
+    config.getSisyphusMode().enabled ||
+    activeSisyphusScheduleRef.current?.isExplicitSchedule;
+
+  useEffect(() => {
+    if (streamingState === StreamingState.Idle && pendingQueryRef.current) {
+      const queryToRun = pendingQueryRef.current;
+      pendingQueryRef.current = null;
+      void submitQueryRef.current(queryToRun);
+    }
+  }, [streamingState]);
+
+  useEffect(() => {
+    if (!isTimerActive) {
+      return;
+    }
+
+    const updateTimer = () => {
+      // Sisyphus countdown
+      if (sisyphusTargetTimestampRef.current !== null) {
+        const remainingMs = sisyphusTargetTimestampRef.current - Date.now();
+        const remainingSecs = Math.max(0, Math.ceil(remainingMs / 1000));
+        setSisyphusSecondsRemaining(remainingSecs);
+      }
+
+      setSisyphusTick((t) => t + 1); // Force a re-render
+    };
+
+    const timer = setInterval(updateTimer, 100); // Update frequently for high responsiveness
+
+    return () => clearInterval(timer);
+  }, [isTimerActive, config]);
+
   const lastOutputTime = Math.max(
     lastToolOutputTime,
     lastShellOutputTime,
@@ -1797,5 +1973,6 @@ export const useGeminiStream = (
     backgroundShells,
     dismissBackgroundShell,
     retryStatus,
+    sisyphusSecondsRemaining,
   };
 };

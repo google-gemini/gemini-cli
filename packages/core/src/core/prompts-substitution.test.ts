@@ -47,6 +47,7 @@ describe('Core System Prompt Substitution', () => {
         getSkills: vi.fn().mockReturnValue([]),
       }),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
+      getContextFilename: vi.fn().mockReturnValue('GEMINI.md'),
     } as unknown as Config;
   });
 

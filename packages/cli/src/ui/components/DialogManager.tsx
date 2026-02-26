@@ -38,6 +38,7 @@ import { SessionRetentionWarningDialog } from './SessionRetentionWarningDialog.j
 import { useCallback } from 'react';
 import { SettingScope } from '../../config/settings.js';
 import { PolicyUpdateDialog } from './PolicyUpdateDialog.js';
+import { ForeverModeOnboardingDialog } from './ForeverModeOnboardingDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -109,6 +110,13 @@ export const DialogManager = ({
     );
   }
 
+  if (uiState.isOnboardingForeverMode) {
+    return (
+      <ForeverModeOnboardingDialog
+        onComplete={() => uiActions.setIsOnboardingForeverMode(false)}
+      />
+    );
+  }
   if (uiState.adminSettingsChanged) {
     return <AdminSettingsChangedDialog />;
   }

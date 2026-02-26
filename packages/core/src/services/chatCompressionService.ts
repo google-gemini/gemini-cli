@@ -5,11 +5,16 @@
  */
 
 import type { Content } from '@google/genai';
+import fsPromises from 'node:fs/promises';
+import path from 'node:path';
 import type { Config } from '../config/config.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { type ChatCompressionInfo, CompressionStatus } from '../core/turn.js';
 import { tokenLimit } from '../core/tokenLimits.js';
-import { getCompressionPrompt } from '../core/prompts.js';
+import {
+  getCompressionPrompt,
+  getArchiveIndexPrompt,
+} from '../core/prompts.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { logChatCompression } from '../telemetry/loggers.js';
 import { makeChatCompressionEvent, LlmRole } from '../telemetry/types.js';
@@ -327,6 +332,173 @@ export class ChatCompressionService {
           originalTokenCount,
           newTokenCount: originalTokenCount,
           compressionStatus: CompressionStatus.NOOP,
+        },
+      };
+    }
+
+    if (config.getCompressionMode() === 'archive') {
+      const historyDir = path.join(config.storage.getGeminiDir(), 'history');
+      await fsPromises.mkdir(historyDir, { recursive: true });
+
+      // 1. Generate the semantic index ranges using generateJson on the ENTIRE history
+      const schema = {
+        type: 'object',
+        properties: {
+          indexes: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                startIndex: {
+                  type: 'number',
+                  description: 'The array index where the logical topic begins',
+                },
+                endIndex: {
+                  type: 'number',
+                  description:
+                    'The array index where the logical topic ends (inclusive)',
+                },
+                summary: {
+                  type: 'string',
+                  description:
+                    'A 1-2 sentence summary of what was accomplished in this range',
+                },
+              },
+              required: ['startIndex', 'endIndex', 'summary'],
+            },
+          },
+        },
+        required: ['indexes'],
+      };
+
+      const contentsWithIndexes: Content[] = truncatedHistory.map((c, i) => ({
+        role: c.role,
+        parts: [{ text: `[INDEX: ${i}]\n` }, ...(c.parts || [])],
+      }));
+
+      const modelAlias = modelStringToModelConfigAlias(model);
+      let semanticIndexes: Array<{
+        startIndex: number;
+        endIndex: number;
+        summary: string;
+      }> = [];
+
+      try {
+        const jsonResponse = await config.getBaseLlmClient().generateJson({
+          modelConfigKey: { model: modelAlias },
+          contents: contentsWithIndexes,
+          schema,
+          systemInstruction: getArchiveIndexPrompt(config),
+          promptId: `${promptId}-archive-index`,
+          role: LlmRole.UTILITY_SUMMARIZER,
+          abortSignal: abortSignal ?? new AbortController().signal,
+        });
+
+        semanticIndexes =
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          (jsonResponse['indexes'] as Array<{
+            startIndex: number;
+            endIndex: number;
+            summary: string;
+          }>) || [];
+      } catch (e) {
+        debugLogger.error('Failed to generate semantic archive indexes', e);
+        // Fallback: If JSON generation fails, archive roughly the first 70%
+        const fallbackSplitPoint = Math.floor(truncatedHistory.length * 0.7);
+        semanticIndexes = [
+          {
+            startIndex: 0,
+            endIndex: fallbackSplitPoint > 0 ? fallbackSplitPoint - 1 : 0,
+            summary: 'The earlier part of this chat history.',
+          },
+        ];
+      }
+
+      // 2. Sort indexes descending so we can splice safely
+      semanticIndexes.sort((a, b) => b.startIndex - a.startIndex);
+
+      // 3. Splice the entire truncatedHistory array and write each segment to its own file
+      const splicedHistory = [...truncatedHistory];
+      const baseTimestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      let firstRelativePath = '';
+
+      for (let i = 0; i < semanticIndexes.length; i++) {
+        const item = semanticIndexes[i];
+        if (
+          typeof item.startIndex === 'number' &&
+          typeof item.endIndex === 'number' &&
+          item.startIndex >= 0 &&
+          item.endIndex < splicedHistory.length &&
+          item.startIndex <= item.endIndex
+        ) {
+          const deleteCount = item.endIndex - item.startIndex + 1;
+
+          // Extract the exact segment to be archived from the UN-SPLICED original array
+          const segmentToArchive = truncatedHistory.slice(
+            item.startIndex,
+            item.endIndex + 1,
+          );
+
+          // Write this specific segment to its own file
+          const filename = `archive_${baseTimestamp}_${item.startIndex}-${item.endIndex}.json`;
+          const archivePath = path.join(historyDir, filename);
+          const relativePath = path.relative(
+            config.getProjectRoot(),
+            archivePath,
+          );
+
+          if (!firstRelativePath) {
+            firstRelativePath = relativePath;
+          }
+
+          await fsPromises.writeFile(
+            archivePath,
+            JSON.stringify(segmentToArchive, null, 2),
+          );
+
+          const archiveSummaryMsg = `IMPORTANT: To save context window space, this segment of chat history has been archived to a JSON file.
+The archived history can be found at: ${relativePath}
+
+--- Archive Summary ---
+${item.summary}
+-----------------------
+
+If you need to reference specific details from this segment, use the \`read_file\` tool to read the JSON file.`;
+
+          splicedHistory.splice(item.startIndex, deleteCount, {
+            role: 'user',
+            parts: [{ text: archiveSummaryMsg }],
+          });
+        }
+      }
+
+      // Use a shared utility to construct the initial history for an accurate token count.
+      const fullNewHistory = await getInitialChatHistory(
+        config,
+        splicedHistory,
+      );
+
+      const newTokenCount = await calculateRequestTokenCount(
+        fullNewHistory.flatMap((c) => c.parts || []),
+        config.getContentGenerator(),
+        model,
+      );
+
+      logChatCompression(
+        config,
+        makeChatCompressionEvent({
+          tokens_before: originalTokenCount,
+          tokens_after: newTokenCount,
+        }),
+      );
+
+      return {
+        newHistory: splicedHistory,
+        info: {
+          originalTokenCount,
+          newTokenCount,
+          compressionStatus: CompressionStatus.ARCHIVED,
+          archivePath: firstRelativePath || 'multiple_files',
         },
       };
     }

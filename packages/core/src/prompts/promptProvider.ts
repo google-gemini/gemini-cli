@@ -113,72 +113,103 @@ export class PromptProvider {
           !!userMemory.extension?.trim() ||
           !!userMemory.project?.trim());
 
+      const isForeverMode = config.getIsForeverMode() ?? false;
+
+      let hippocampusContent = '';
+      if (isForeverMode) {
+        try {
+          const knowledgeDir = config.storage.getKnowledgeDir();
+          const hippocampusPath = path.join(knowledgeDir, 'hippocampus.md');
+          if (fs.existsSync(hippocampusPath)) {
+            hippocampusContent = fs.readFileSync(hippocampusPath, 'utf8');
+          }
+        } catch (_e) {
+          // Ignore
+        }
+      }
+
       const options: snippets.SystemPromptOptions = {
         preamble: this.withSection('preamble', () => ({
           interactive: interactiveMode,
+          isForeverMode,
         })),
-        coreMandates: this.withSection('coreMandates', () => ({
-          interactive: interactiveMode,
-          hasSkills: skills.length > 0,
-          hasHierarchicalMemory,
-          contextFilenames,
-        })),
-        subAgents: this.withSection('agentContexts', () =>
-          config
-            .getAgentRegistry()
-            .getAllDefinitions()
-            .map((d) => ({
-              name: d.name,
-              description: d.description,
+        coreMandates: isForeverMode
+          ? undefined
+          : this.withSection('coreMandates', () => ({
+              interactive: interactiveMode,
+              isGemini3: isModernModel,
+              hasSkills: skills.length > 0,
+              hasHierarchicalMemory,
+              contextFilenames,
             })),
-        ),
-        agentSkills: this.withSection(
-          'agentSkills',
-          () =>
-            skills.map((s) => ({
-              name: s.name,
-              description: s.description,
-              location: s.location,
+        subAgents: isForeverMode
+          ? undefined
+          : this.withSection('agentContexts', () =>
+              config
+                .getAgentRegistry()
+                .getAllDefinitions()
+                .map((d) => ({
+                  name: d.name,
+                  description: d.description,
+                })),
+            ),
+        agentSkills: isForeverMode
+          ? undefined
+          : this.withSection(
+              'agentSkills',
+              () =>
+                skills.map((s) => ({
+                  name: s.name,
+                  description: s.description,
+                  location: s.location,
+                })),
+              skills.length > 0,
+            ),
+        hookContext: isForeverMode
+          ? undefined
+          : isSectionEnabled('hookContext') || undefined,
+        primaryWorkflows: isForeverMode
+          ? undefined
+          : this.withSection(
+              'primaryWorkflows',
+              () => ({
+                interactive: interactiveMode,
+                enableCodebaseInvestigator: enabledToolNames.has(
+                  CodebaseInvestigatorAgent.name,
+                ),
+                enableWriteTodosTool: enabledToolNames.has(
+                  WRITE_TODOS_TOOL_NAME,
+                ),
+                enableEnterPlanModeTool: enabledToolNames.has(
+                  ENTER_PLAN_MODE_TOOL_NAME,
+                ),
+                enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
+                enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
+                approvedPlan: approvedPlanPath
+                  ? { path: approvedPlanPath }
+                  : undefined,
+              }),
+              !isPlanMode,
+            ),
+        planningWorkflow:
+          isPlanMode && !isForeverMode
+            ? this.withSection(
+                'planningWorkflow',
+                () => ({
+                  planModeToolsList,
+                  plansDir: config.storage.getPlansDir(),
+                  approvedPlanPath: config.getApprovedPlanPath(),
+                }),
+                isPlanMode,
+              )
+            : undefined,
+        operationalGuidelines: isForeverMode
+          ? undefined
+          : this.withSection('operationalGuidelines', () => ({
+              interactive: interactiveMode,
+              enableShellEfficiency: config.getEnableShellOutputEfficiency(),
+              interactiveShellEnabled: config.isInteractiveShellEnabled(),
             })),
-          skills.length > 0,
-        ),
-        hookContext: isSectionEnabled('hookContext') || undefined,
-        primaryWorkflows: this.withSection(
-          'primaryWorkflows',
-          () => ({
-            interactive: interactiveMode,
-            enableCodebaseInvestigator: enabledToolNames.has(
-              CodebaseInvestigatorAgent.name,
-            ),
-            enableWriteTodosTool: enabledToolNames.has(WRITE_TODOS_TOOL_NAME),
-            enableEnterPlanModeTool: enabledToolNames.has(
-              ENTER_PLAN_MODE_TOOL_NAME,
-            ),
-            enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
-            enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
-            approvedPlan: approvedPlanPath
-              ? { path: approvedPlanPath }
-              : undefined,
-          }),
-          !isPlanMode,
-        ),
-        planningWorkflow: this.withSection(
-          'planningWorkflow',
-          () => ({
-            planModeToolsList,
-            plansDir: config.storage.getPlansDir(),
-            approvedPlanPath: config.getApprovedPlanPath(),
-          }),
-          isPlanMode,
-        ),
-        operationalGuidelines: this.withSection(
-          'operationalGuidelines',
-          () => ({
-            interactive: interactiveMode,
-            enableShellEfficiency: config.getEnableShellOutputEfficiency(),
-            interactiveShellEnabled: config.isInteractiveShellEnabled(),
-          }),
-        ),
         sandbox: this.withSection('sandbox', () => getSandboxMode()),
         interactiveYoloMode: this.withSection(
           'interactiveYoloMode',
@@ -195,6 +226,14 @@ export class PromptProvider {
           : this.withSection('finalReminder', () => ({
               readFileToolName: READ_FILE_TOOL_NAME,
             })),
+        sisyphusMode: this.withSection('sisyphusMode', () => ({
+          enabled: config.getSisyphusMode()?.enabled ?? false,
+          hippocampusContent,
+        })),
+        archiveMode: this.withSection('archiveMode', () => ({
+          enabled: config.getCompressionMode() === 'archive',
+        })),
+        contextFilename: config.getContextFilename(),
       } as snippets.SystemPromptOptions;
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -232,6 +271,15 @@ export class PromptProvider {
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
     return activeSnippets.getCompressionPrompt();
+  }
+
+  getArchiveIndexPrompt(config: Config): string {
+    const desiredModel = resolveModel(config.getActiveModel());
+    const isModernModel = supportsModernFeatures(desiredModel);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+    const activeSnippets = (isModernModel ? snippets : legacySnippets) as any;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return activeSnippets.getArchiveIndexPrompt();
   }
 
   private withSection<T>(

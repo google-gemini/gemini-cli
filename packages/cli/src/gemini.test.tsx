@@ -479,6 +479,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       promptInteractive: undefined,
       query: undefined,
       yolo: undefined,
+      forever: undefined,
       approvalMode: undefined,
       policy: undefined,
       allowedMcpServerNames: undefined,

@@ -667,6 +667,13 @@ describe('parseArguments', () => {
     const argv = await parseArguments(settings);
     expect(argv.isCommand).toBe(true);
   });
+
+  it('should correctly parse the --forever flag', async () => {
+    process.argv = ['node', 'script.js', '--forever'];
+    const settings = createTestMergedSettings({});
+    const argv = await parseArguments(settings);
+    expect(argv.forever).toBe(true);
+  });
 });
 
 describe('loadCliConfig', () => {

@@ -8,6 +8,7 @@ import type { Config } from '../config/config.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { PromptProvider } from '../prompts/promptProvider.js';
 import { resolvePathFromEnv as resolvePathFromEnvImpl } from '../prompts/utils.js';
+export { CONFUCIUS_PROMPT } from '../prompts/snippets.js';
 
 /**
  * Resolves a path or switch value from an environment variable.
@@ -24,12 +25,9 @@ export function getCoreSystemPrompt(
   config: Config,
   userMemory?: string | HierarchicalMemory,
   interactiveOverride?: boolean,
+  provider: PromptProvider = new PromptProvider(),
 ): string {
-  return new PromptProvider().getCoreSystemPrompt(
-    config,
-    userMemory,
-    interactiveOverride,
-  );
+  return provider.getCoreSystemPrompt(config, userMemory, interactiveOverride);
 }
 
 /**
@@ -37,4 +35,11 @@ export function getCoreSystemPrompt(
  */
 export function getCompressionPrompt(config: Config): string {
   return new PromptProvider().getCompressionPrompt(config);
+}
+
+/**
+ * Provides the system prompt for the archive index generation process.
+ */
+export function getArchiveIndexPrompt(config: Config): string {
+  return new PromptProvider().getArchiveIndexPrompt(config);
 }

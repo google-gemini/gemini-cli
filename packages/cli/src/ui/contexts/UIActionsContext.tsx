@@ -20,6 +20,7 @@ import type { SessionInfo } from '../../utils/sessionUtils.js';
 import { type NewAgentsChoice } from '../components/NewAgentsNotification.js';
 
 export interface UIActions {
+  setIsOnboardingForeverMode: (value: boolean) => void;
   handleThemeSelect: (
     themeName: string,
     scope: LoadableSettingScope,

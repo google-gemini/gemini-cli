@@ -70,3 +70,9 @@ decision = "deny"
 priority = 65
 modes = ["plan"]
 deny_message = "You are in Plan Mode and cannot modify source code. You may ONLY use write_file or replace to save plans to the designated plans directory as .md files."
+
+[[rule]]
+toolName = "schedule_work"
+decision = "allow"
+priority = 70
+modes = ["plan"]
