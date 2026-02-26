@@ -931,12 +931,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 completion.completionMode === CompletionMode.AT &&
                 !suggestion.commandKind &&
                 // Heuristic to exclude MCP resources, which are not file paths.
-                !suggestion.label.includes(':')
+                !suggestion.label.includes('://')
               ) {
                 const absolutePath = path.resolve(
                   config.getTargetDir(),
                   suggestion.label,
                 );
+
+                if (!absolutePath.startsWith(config.getTargetDir())) {
+                  setQueueErrorMessage(
+                    'Access denied: Path is outside the project directory.',
+                  );
+                  return true;
+                }
+
                 if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
                   open(absolutePath).catch((e: Error) => {
                     setQueueErrorMessage(`Failed to open file: ${e.message}`);

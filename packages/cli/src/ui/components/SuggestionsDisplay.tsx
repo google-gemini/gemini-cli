@@ -132,19 +132,19 @@ export function SuggestionsDisplay({
         );
       })}
       {endIndex < suggestions.length && <Text color="gray">▼</Text>}
-      <Box flexDirection="row" gap={1} width="100%">
-        {suggestions.length > MAX_SUGGESTIONS_TO_SHOW && (
-          <Text color="gray">
-            ({activeIndex + 1}/{suggestions.length})
-          </Text>
-        )}
-        {showMentionShortcuts ? (
+      <Box flexDirection="row" justifyContent="space-between" width="100%">
+        <Box>
+          {suggestions.length > MAX_SUGGESTIONS_TO_SHOW && (
+            <Text color="gray">
+              ({activeIndex + 1}/{suggestions.length})
+            </Text>
+          )}
+        </Box>
+        {showMentionShortcuts && (
           <Text color="gray">
             <Text color={theme.text.accent}>Ctrl+X</Text> open external editor ·{' '}
             <Text color={theme.text.accent}>Alt+O</Text> open directory
           </Text>
-        ) : (
-          <Box /> // placeholder for flex space-between
         )}
       </Box>
     </Box>
