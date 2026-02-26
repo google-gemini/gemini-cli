@@ -43,22 +43,24 @@ export function useInputHistory({
   >({});
 
   // Stores user-edited drafts of historical prompts across navigation sessions.
-  // Keyed by original message content rather than by history index, because indices
-  // shift whenever a new message is submitted. This ensures a draft stays associated
-  // with the correct history entry even after the user sends additional messages.
-  const persistentDraftsRef = useRef<Record<string, string>>({});
+  // Keyed by the stable originalIndex (position in userMessages) rather than
+  // message content, so duplicate messages are handled independently.
+  // Uses a null-prototype object to avoid Object Property Injection risks.
+  const persistentDraftsRef = useRef<Record<number, string>>(
+    Object.create(null),
+  );
 
   const resetHistoryNav = useCallback(() => {
     // Before clearing the session cache, persist any history entries the user
-    // edited but didn't submit. Keyed by original content so drafts survive
-    // index shifts caused by new submissions.
+    // edited but did not submit. Keyed by originalIndex which is stable since
+    // userMessages is append-only — existing entries never shift position.
     Object.entries(historyCacheRef.current).forEach(([idx, cached]) => {
       const index = Number(idx);
       if (index >= 0) {
         const originalIndex = userMessages.length - 1 - index;
         const original = userMessages[originalIndex];
         if (original !== undefined && cached.text !== original) {
-          persistentDraftsRef.current[original] = cached.text;
+          persistentDraftsRef.current[originalIndex] = cached.text;
         }
       }
     });
@@ -118,8 +120,9 @@ export function useInputHistory({
         } else {
           // Check for a draft persisted from a previous navigation session
           // before falling back to the original message.
-          const original = userMessages[userMessages.length - 1 - nextIndex];
-          const persistedDraft = persistentDraftsRef.current[original];
+          const originalIndex = userMessages.length - 1 - nextIndex;
+          const original = userMessages[originalIndex];
+          const persistedDraft = persistentDraftsRef.current[originalIndex];
           const newValue = persistedDraft ?? original;
           onChange(newValue, defaultCursor);
         }
