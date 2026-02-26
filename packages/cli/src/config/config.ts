@@ -802,6 +802,7 @@ export async function loadCliConfig(
     extensionLoader: extensionManager,
     extensionRegistryURI,
     enableExtensionReloading: settings.experimental?.extensionReloading,
+    plannerSubagent: settings.experimental?.plannerSubagent,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
     tracker: settings.experimental?.taskTracker,

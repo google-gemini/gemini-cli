@@ -103,7 +103,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly onActivity?: ActivityCallback;
   private readonly compressionService: ChatCompressionService;
   private readonly parentCallId?: string;
+  private readonly completionToolName: string;
   private hasFailedCompressionAttempt = false;
+
+  private usesCustomCompletionTool(): boolean {
+    return this.completionToolName !== TASK_COMPLETE_TOOL_NAME;
+  }
 
   private get config(): Config {
     return this.context.config;
@@ -264,6 +269,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.onActivity = onActivity;
     this.compressionService = new ChatCompressionService();
     this.parentCallId = parentCallId;
+    this.completionToolName =
+      definition.runConfig.completionToolName || TASK_COMPLETE_TOOL_NAME;
 
     const randomIdPart = Math.random().toString(36).slice(2, 8);
     // parentPromptId will be undefined if this agent is invoked directly
@@ -309,7 +316,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // If the model stops calling tools without calling complete_task, it's an error.
     if (functionCalls.length === 0) {
       this.emitActivity('ERROR', {
-        error: `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}' to finalize the session.`,
+        error: `Agent stopped calling tools but did not call '${this.completionToolName}' to finalize the session.`,
         context: 'protocol_violation',
       });
       return {
@@ -374,7 +381,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       default:
         throw new Error(`Unknown terminate reason: ${reason}`);
     }
-    return `${explanation} You have one final chance to complete the task with a short grace period. You MUST call \`${TASK_COMPLETE_TOOL_NAME}\` immediately with your best answer and explain that your investigation was interrupted. Do not call any other tools.`;
+    const explainInterrupted = this.usesCustomCompletionTool()
+      ? ''
+      : ' and explain that your investigation was interrupted';
+    return `${explanation} You have one final chance to complete the task with a short grace period. You MUST call \`${this.completionToolName}\` immediately with your best answer${explainInterrupted}. Do not call any other tools.`;
   }
 
   /**
@@ -641,7 +651,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             // The finalResult was already set by executeTurn, but we re-emit just in case.
             finalResult =
               finalResult ||
-              `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}'.`;
+              `Agent stopped calling tools but did not call '${this.completionToolName}'.`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'protocol_violation',
@@ -901,6 +911,54 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   }
 
   /**
+   * Validates and processes the final output of the agent.
+   */
+  private validateAndProcessOutput(outputValue: unknown): {
+    submittedOutput: string;
+    success: boolean;
+    error?: string;
+  } {
+    const { outputConfig, processOutput } = this.definition;
+
+    if (outputConfig) {
+      const validationResult = outputConfig.schema.safeParse(outputValue);
+
+      if (!validationResult.success) {
+        return {
+          submittedOutput: '',
+          success: false,
+          error: `Output validation failed: ${JSON.stringify(validationResult.error.flatten())}`,
+        };
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const validatedOutput = validationResult.data;
+      if (processOutput) {
+        return {
+          submittedOutput: processOutput(validatedOutput),
+          success: true,
+        };
+      } else {
+        return {
+          submittedOutput:
+            typeof validatedOutput === 'string'
+              ? validatedOutput
+              : JSON.stringify(validatedOutput, null, 2),
+          success: true,
+        };
+      }
+    }
+
+    return {
+      submittedOutput:
+        typeof outputValue === 'string'
+          ? outputValue
+          : JSON.stringify(outputValue, null, 2),
+      success: true,
+    };
+  }
+
+  /**
    * Executes function calls requested by the model and returns the results.
    *
    * @returns A new `Content` object for history, any submitted output, and completion status.
@@ -918,7 +976,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   }> {
     const allowedToolNames = new Set(this.toolRegistry.getAllToolNames());
     // Always allow the completion tool
-    allowedToolNames.add(TASK_COMPLETE_TOOL_NAME);
+    allowedToolNames.add(this.completionToolName);
 
     let submittedOutput: string | null = null;
     let taskCompleted = false;
@@ -959,7 +1017,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         callId,
       });
 
-      if (toolName === TASK_COMPLETE_TOOL_NAME) {
+      if (
+        toolName === TASK_COMPLETE_TOOL_NAME &&
+        !this.usesCustomCompletionTool()
+      ) {
         if (taskCompleted) {
           const error =
             'Task already marked complete in this turn. Ignoring duplicate call.';
@@ -983,13 +1044,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
         if (outputConfig) {
           const outputName = outputConfig.outputName;
-          if (args[outputName] !== undefined) {
-            const outputValue = args[outputName];
-            const validationResult = outputConfig.schema.safeParse(outputValue);
+          const outputValue = args[outputName];
+          if (outputValue !== undefined) {
+            const result = this.validateAndProcessOutput(outputValue);
 
-            if (!validationResult.success) {
+            if (!result.success) {
               taskCompleted = false; // Validation failed, revoke completion
-              const error = `Output validation failed: ${JSON.stringify(validationResult.error.flatten())}`;
+              const error = result.error!;
               syncResults.set(callId, {
                 functionResponse: {
                   name: TASK_COMPLETE_TOOL_NAME,
@@ -1005,16 +1066,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               continue;
             }
 
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            const validatedOutput = validationResult.data;
-            if (this.definition.processOutput) {
-              submittedOutput = this.definition.processOutput(validatedOutput);
-            } else {
-              submittedOutput =
-                typeof outputValue === 'string'
-                  ? outputValue
-                  : JSON.stringify(outputValue, null, 2);
-            }
+            submittedOutput = result.submittedOutput;
             syncResults.set(callId, {
               functionResponse: {
                 name: TASK_COMPLETE_TOOL_NAME,
@@ -1149,6 +1201,34 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             id: call.request.callId,
             output: call.response.resultDisplay,
           });
+
+          // Check if this was a custom completion tool and it signaled task completion
+          if (
+            toolName === this.completionToolName &&
+            call.response.isTaskCompletion
+          ) {
+            debugLogger.log(
+              `[LocalAgentExecutor] Custom completion tool '${toolName}' signaled task completion.`,
+            );
+            const outputValue = call.response.data;
+            const result = this.validateAndProcessOutput(outputValue);
+
+            if (result.success) {
+              taskCompleted = true;
+              submittedOutput = result.submittedOutput;
+            } else {
+              // If validation fails, we still mark it as completed but use the raw output
+              // and maybe log a warning.
+              debugLogger.warn(
+                `[LocalAgentExecutor] Custom completion tool '${toolName}' returned data that failed output validation: ${result.error}`,
+              );
+              taskCompleted = true;
+              submittedOutput =
+                typeof outputValue === 'string'
+                  ? outputValue
+                  : JSON.stringify(outputValue, null, 2);
+            }
+          }
         } else if (call.status === 'error') {
           this.emitActivity('ERROR', {
             context: 'tool_call',
@@ -1218,42 +1298,44 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       toolsList.push(...this.toolRegistry.getFunctionDeclarations());
     }
 
-    // Always inject complete_task.
-    // Configure its schema based on whether output is expected.
-    const completeTool: FunctionDeclaration = {
-      name: TASK_COMPLETE_TOOL_NAME,
-      description: outputConfig
-        ? 'Call this tool to submit your final answer and complete the task. This is the ONLY way to finish.'
-        : 'Call this tool to submit your final findings and complete the task. This is the ONLY way to finish.',
-      parameters: {
-        type: Type.OBJECT,
-        properties: {},
-        required: [],
-      },
-    };
-
-    if (outputConfig) {
-      const jsonSchema = zodToJsonSchema(outputConfig.schema);
-      const {
-        $schema: _$schema,
-        definitions: _definitions,
-        ...schema
-      } = jsonSchema;
-      completeTool.parameters!.properties![outputConfig.outputName] =
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        schema as Schema;
-      completeTool.parameters!.required!.push(outputConfig.outputName);
-    } else {
-      completeTool.parameters!.properties!['result'] = {
-        type: Type.STRING,
-        description:
-          'Your final results or findings to return to the orchestrator. ' +
-          'Ensure this is comprehensive and follows any formatting requested in your instructions.',
+    // Always inject completion tool if it's complete_task.
+    // If it's a custom tool, it should be in toolConfig.
+    if (!this.usesCustomCompletionTool()) {
+      const completeTool: FunctionDeclaration = {
+        name: TASK_COMPLETE_TOOL_NAME,
+        description: outputConfig
+          ? 'Call this tool to submit your final answer and complete the task. This is the ONLY way to finish.'
+          : 'Call this tool to submit your final findings and complete the task. This is the ONLY way to finish.',
+        parameters: {
+          type: Type.OBJECT,
+          properties: {},
+          required: [],
+        },
       };
-      completeTool.parameters!.required!.push('result');
-    }
 
-    toolsList.push(completeTool);
+      if (outputConfig) {
+        const jsonSchema = zodToJsonSchema(outputConfig.schema);
+        const {
+          $schema: _$schema,
+          definitions: _definitions,
+          ...schema
+        } = jsonSchema;
+        completeTool.parameters!.properties![outputConfig.outputName] =
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          schema as Schema;
+        completeTool.parameters!.required!.push(outputConfig.outputName);
+      } else {
+        completeTool.parameters!.properties!['result'] = {
+          type: Type.STRING,
+          description:
+            'Your final results or findings to return to the orchestrator. ' +
+            'Ensure this is comprehensive and follows any formatting requested in your instructions.',
+        };
+        completeTool.parameters!.required!.push('result');
+      }
+
+      toolsList.push(completeTool);
+    }
 
     return toolsList;
   }
@@ -1279,7 +1361,12 @@ Important Rules:
 * Work systematically using available tools to complete your task.
 * Always use absolute paths for file operations. Construct them using the provided "Environment Context".`;
 
-    if (this.definition.outputConfig) {
+    if (this.usesCustomCompletionTool()) {
+      finalPrompt += `
+* When you have completed your task, you MUST call the \`${this.completionToolName}\` tool to signal completion.
+* Do not call any other tools in the same turn as \`${this.completionToolName}\`.
+* This is the ONLY way to complete your mission. If you stop calling tools without calling this, you have failed.`;
+    } else if (this.definition.outputConfig) {
       finalPrompt += `
 * When you have completed your task, you MUST call the \`${TASK_COMPLETE_TOOL_NAME}\` tool with your structured output.
 * Do not call any other tools in the same turn as \`${TASK_COMPLETE_TOOL_NAME}\`.

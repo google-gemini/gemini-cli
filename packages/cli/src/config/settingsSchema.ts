@@ -1833,6 +1833,15 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      plannerSubagent: {
+        type: 'boolean',
+        label: 'Planner Subagent',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Use the new planner subagent for plan mode.',
+        showInDialog: false,
+      },
       enableAgents: {
         type: 'boolean',
         label: 'Enable Agents',

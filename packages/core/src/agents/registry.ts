@@ -12,6 +12,7 @@ import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
+import { PlannerAgent } from './planner.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
@@ -243,6 +244,9 @@ export class AgentRegistry {
     this.registerLocalAgent(CodebaseInvestigatorAgent(this.config));
     this.registerLocalAgent(CliHelpAgent(this.config));
     this.registerLocalAgent(GeneralistAgent(this.config));
+    if (this.config.isPlannerSubagentEnabled()) {
+      this.registerLocalAgent(PlannerAgent(this.config));
+    }
 
     // Register the browser agent if enabled in settings.
     // Tools are configured dynamically at invocation time via browserAgentFactory.

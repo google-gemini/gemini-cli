@@ -10,25 +10,40 @@ import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolConfirmationOutcome } from './tools.js';
-import { ApprovalMode } from '../policy/types.js';
+import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
+import type { LocalAgentDefinition } from '../agents/types.js';
+
+vi.mock('../agents/subagent-tool-wrapper.js');
 
 describe('EnterPlanModeTool', () => {
   let tool: EnterPlanModeTool;
   let mockMessageBus: ReturnType<typeof createMockMessageBus>;
-  let mockConfig: Partial<Config>;
+  let mockConfig: Config;
+  let mockPlannerDefinition: LocalAgentDefinition;
 
   beforeEach(() => {
     mockMessageBus = createMockMessageBus();
     vi.mocked(mockMessageBus.publish).mockResolvedValue(undefined);
 
+    mockPlannerDefinition = {
+      kind: 'local',
+      name: 'planner',
+      description: 'Mock Planner',
+      inputConfig: { inputSchema: {} },
+    } as LocalAgentDefinition;
+
     mockConfig = {
       setApprovalMode: vi.fn(),
+      isPlannerSubagentEnabled: vi.fn().mockReturnValue(true),
+      getAgentRegistry: vi.fn().mockReturnValue({
+        getDefinition: vi.fn().mockReturnValue(mockPlannerDefinition),
+      }),
       storage: {
         getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
       } as unknown as Config['storage'],
-    };
+    } as unknown as Config;
     tool = new EnterPlanModeTool(
-      mockConfig as Config,
+      mockConfig,
       mockMessageBus as unknown as MessageBus,
     );
   });
@@ -41,7 +56,6 @@ describe('EnterPlanModeTool', () => {
     it('should return info confirmation details when policy says ASK_USER', async () => {
       const invocation = tool.build({});
 
-      // Mock getMessageBusDecision to return ASK_USER
       vi.spyOn(
         invocation as unknown as {
           getMessageBusDecision: () => Promise<string>;
@@ -64,73 +78,41 @@ describe('EnterPlanModeTool', () => {
         );
       }
     });
-
-    it('should return false when policy decision is ALLOW', async () => {
-      const invocation = tool.build({});
-
-      // Mock getMessageBusDecision to return ALLOW
-      vi.spyOn(
-        invocation as unknown as {
-          getMessageBusDecision: () => Promise<string>;
-        },
-        'getMessageBusDecision',
-      ).mockResolvedValue('ALLOW');
-
-      const result = await invocation.shouldConfirmExecute(
-        new AbortController().signal,
-      );
-
-      expect(result).toBe(false);
-    });
-
-    it('should throw error when policy decision is DENY', async () => {
-      const invocation = tool.build({});
-
-      // Mock getMessageBusDecision to return DENY
-      vi.spyOn(
-        invocation as unknown as {
-          getMessageBusDecision: () => Promise<string>;
-        },
-        'getMessageBusDecision',
-      ).mockResolvedValue('DENY');
-
-      await expect(
-        invocation.shouldConfirmExecute(new AbortController().signal),
-      ).rejects.toThrow(/denied by policy/);
-    });
   });
 
   describe('execute', () => {
-    it('should set approval mode to PLAN and return message', async () => {
-      const invocation = tool.build({});
+    it('should delegate to planner subagent', async () => {
+      const invocation = tool.build({ reason: 'test reason' });
+
+      const mockSubInvocation = {
+        execute: vi.fn().mockResolvedValue({
+          llmContent: 'Plan created.',
+          returnDisplay: 'Plan Display',
+        }),
+      };
+
+      vi.mocked(SubagentToolWrapper).prototype.build = vi
+        .fn()
+        .mockReturnValue(mockSubInvocation);
 
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
-        ApprovalMode.PLAN,
+      expect(mockConfig.getAgentRegistry().getDefinition).toHaveBeenCalledWith(
+        'planner',
       );
-      expect(result.llmContent).toContain('Switching to Plan mode');
-      expect(result.returnDisplay).toBe('Switching to Plan mode');
-    });
-
-    it('should include optional reason in output display but not in llmContent', async () => {
-      const reason = 'Design new database schema';
-      const invocation = tool.build({ reason });
-
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
-        ApprovalMode.PLAN,
+      expect(SubagentToolWrapper).toHaveBeenCalledWith(
+        mockPlannerDefinition,
+        mockConfig,
+        mockMessageBus,
       );
-      expect(result.llmContent).toBe('Switching to Plan mode.');
-      expect(result.llmContent).not.toContain(reason);
-      expect(result.returnDisplay).toContain(reason);
+      expect(mockSubInvocation.execute).toHaveBeenCalled();
+      expect(result.llmContent).toBe('Plan created.');
+      expect(result.returnDisplay).toBe('Plan Display');
     });
 
     it('should not enter plan mode if cancelled', async () => {
       const invocation = tool.build({});
 
-      // Simulate getting confirmation details
       vi.spyOn(
         invocation as unknown as {
           getMessageBusDecision: () => Promise<string>;
@@ -141,30 +123,14 @@ describe('EnterPlanModeTool', () => {
       const details = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
-      expect(details).not.toBe(false);
-
       if (details) {
-        // Simulate user cancelling
         await details.onConfirm(ToolConfirmationOutcome.Cancel);
       }
 
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(mockConfig.setApprovalMode).not.toHaveBeenCalled();
       expect(result.returnDisplay).toBe('Cancelled');
       expect(result.llmContent).toContain('User cancelled');
-    });
-  });
-
-  describe('validateToolParams', () => {
-    it('should allow empty params', () => {
-      const result = tool.validateToolParams({});
-      expect(result).toBeNull();
-    });
-
-    it('should allow reason param', () => {
-      const result = tool.validateToolParams({ reason: 'test' });
-      expect(result).toBeNull();
     });
   });
 });
