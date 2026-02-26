@@ -16,27 +16,27 @@ exports[`Initial Theme Selection > should default to a dark theme when terminal 
 │    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
 │   10. ANSI Light                             │ 1 + print(f"Hello, {name}!")                    │ │
 │   11. Ayu Light                              │                                                 │ │
-│   12. Default Light                          │                                                 │ │
-│ ▼                                            │ How themes and terminals interact:              │ │
+│   12. Default Light                          └─────────────────────────────────────────────────┘ │
+│ ▼                                                                                                │
+│                                              ╭─────────────────────────────────────────────────╮ │
+│                                              │ DEVELOPER TOOLS (Not visible to users)          │ │
+│                                              │ How themes and terminals interact:              │ │
 │                                              │   • TrueColor (Hex): Modern terminals render    │ │
 │                                              │   hex codes exactly. They are not overridden by │ │
 │                                              │   terminal app themes.                          │ │
 │                                              │   • ANSI Names: Colors like 'red' or 'green'    │ │
-│                                              │   (used in our ANSI theme) are mapped to your   │ │
-│                                              │   terminal app's specific palette.              │ │
-│                                              │   • Default colors: When Name or Value is       │ │
-│                                              │   '(blank)', the app uses your terminal's       │ │
-│                                              │   default foreground/background.                │ │
+│                                              │   are mapped to your terminal app's specific    │ │
+│                                              │   palette.                                      │ │
+│                                              │   • Default colors: When Value is '(blank)',    │ │
+│                                              │   the app uses your terminal's default          │ │
+│                                              │   foreground/background.                        │ │
 │                                              │   • Compatibility: In terminals with limited    │ │
 │                                              │   color, hex colors are automatically           │ │
 │                                              │   approximated to the closest available ANSI    │ │
 │                                              │   color.                                        │ │
 │                                              │                                                 │ │
-│                                              │ ┌─────────────────────────────────────────────┐ │ │
-│                                              │ │ ValuName         Usage                      │ │ │
-│                                              │ │ e                                           │ │ │
-│                                              │ └─────────────────────────────────────────────┘ │ │
-│                                              │                                                 │ │
+│                                              │  ValuName          Usage                        │ │
+│                                              │  e                                              │ │
 │                                              │   #…  background.pMain terminal background      │ │
 │                                              │       rimary      color                         │ │
 │                                              │   …   backgroundSubtle background for message   │ │
@@ -81,9 +81,7 @@ exports[`Initial Theme Selection > should default to a dark theme when terminal 
 │                                              │  CE                                             │ │
 │                                              │  #C367                                          │ │
 │                                              │  7F                                             │ │
-│                                              │                                                 │ │
-│                                              │                                                 │ │
-│                                              └─────────────────────────────────────────────────┘ │
+│                                              ╰─────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
@@ -107,27 +105,27 @@ exports[`Initial Theme Selection > should default to a light theme when terminal
 │    9. Atom One Dark (Incompatible)           │ 1 - print("Hello, " + name)                     │ │
 │   10. Ayu Dark (Incompatible)                │ 1 + print(f"Hello, {name}!")                    │ │
 │   11. Default Dark (Incompatible)            │                                                 │ │
-│   12. Dracula Dark (Incompatible)            │                                                 │ │
-│ ▼                                            │ How themes and terminals interact:              │ │
+│   12. Dracula Dark (Incompatible)            └─────────────────────────────────────────────────┘ │
+│ ▼                                                                                                │
+│                                              ╭─────────────────────────────────────────────────╮ │
+│                                              │ DEVELOPER TOOLS (Not visible to users)          │ │
+│                                              │ How themes and terminals interact:              │ │
 │                                              │   • TrueColor (Hex): Modern terminals render    │ │
 │                                              │   hex codes exactly. They are not overridden by │ │
 │                                              │   terminal app themes.                          │ │
 │                                              │   • ANSI Names: Colors like 'red' or 'green'    │ │
-│                                              │   (used in our ANSI theme) are mapped to your   │ │
-│                                              │   terminal app's specific palette.              │ │
-│                                              │   • Default colors: When Name or Value is       │ │
-│                                              │   '(blank)', the app uses your terminal's       │ │
-│                                              │   default foreground/background.                │ │
+│                                              │   are mapped to your terminal app's specific    │ │
+│                                              │   palette.                                      │ │
+│                                              │   • Default colors: When Value is '(blank)',    │ │
+│                                              │   the app uses your terminal's default          │ │
+│                                              │   foreground/background.                        │ │
 │                                              │   • Compatibility: In terminals with limited    │ │
 │                                              │   color, hex colors are automatically           │ │
 │                                              │   approximated to the closest available ANSI    │ │
 │                                              │   color.                                        │ │
 │                                              │                                                 │ │
-│                                              │ ┌─────────────────────────────────────────────┐ │ │
-│                                              │ │ ValuName         Usage                      │ │ │
-│                                              │ │ e                                           │ │ │
-│                                              │ └─────────────────────────────────────────────┘ │ │
-│                                              │                                                 │ │
+│                                              │  ValuName          Usage                        │ │
+│                                              │  e                                              │ │
 │                                              │   #…  background.pMain terminal background      │ │
 │                                              │       rimary      color                         │ │
 │                                              │   …   backgroundSubtle background for message   │ │
@@ -172,9 +170,7 @@ exports[`Initial Theme Selection > should default to a light theme when terminal
 │                                              │  CE                                             │ │
 │                                              │  #C367                                          │ │
 │                                              │  7F                                             │ │
-│                                              │                                                 │ │
-│                                              │                                                 │ │
-│                                              └─────────────────────────────────────────────────┘ │
+│                                              ╰─────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
@@ -198,27 +194,27 @@ exports[`Initial Theme Selection > should use the theme from settings even if te
 │    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
 │   10. ANSI Light                             │ 1 + print(f"Hello, {name}!")                    │ │
 │   11. Ayu Light                              │                                                 │ │
-│   12. Default Light                          │                                                 │ │
-│ ▼                                            │ How themes and terminals interact:              │ │
+│   12. Default Light                          └─────────────────────────────────────────────────┘ │
+│ ▼                                                                                                │
+│                                              ╭─────────────────────────────────────────────────╮ │
+│                                              │ DEVELOPER TOOLS (Not visible to users)          │ │
+│                                              │ How themes and terminals interact:              │ │
 │                                              │   • TrueColor (Hex): Modern terminals render    │ │
 │                                              │   hex codes exactly. They are not overridden by │ │
 │                                              │   terminal app themes.                          │ │
 │                                              │   • ANSI Names: Colors like 'red' or 'green'    │ │
-│                                              │   (used in our ANSI theme) are mapped to your   │ │
-│                                              │   terminal app's specific palette.              │ │
-│                                              │   • Default colors: When Name or Value is       │ │
-│                                              │   '(blank)', the app uses your terminal's       │ │
-│                                              │   default foreground/background.                │ │
+│                                              │   are mapped to your terminal app's specific    │ │
+│                                              │   palette.                                      │ │
+│                                              │   • Default colors: When Value is '(blank)',    │ │
+│                                              │   the app uses your terminal's default          │ │
+│                                              │   foreground/background.                        │ │
 │                                              │   • Compatibility: In terminals with limited    │ │
 │                                              │   color, hex colors are automatically           │ │
 │                                              │   approximated to the closest available ANSI    │ │
 │                                              │   color.                                        │ │
 │                                              │                                                 │ │
-│                                              │ ┌─────────────────────────────────────────────┐ │ │
-│                                              │ │ ValuName         Usage                      │ │ │
-│                                              │ │ e                                           │ │ │
-│                                              │ └─────────────────────────────────────────────┘ │ │
-│                                              │                                                 │ │
+│                                              │  ValuName          Usage                        │ │
+│                                              │  e                                              │ │
 │                                              │   #…  background.pMain terminal background      │ │
 │                                              │       rimary      color                         │ │
 │                                              │   …   backgroundSubtle background for message   │ │
@@ -263,9 +259,7 @@ exports[`Initial Theme Selection > should use the theme from settings even if te
 │                                              │  CE                                             │ │
 │                                              │  #C367                                          │ │
 │                                              │  7F                                             │ │
-│                                              │                                                 │ │
-│                                              │                                                 │ │
-│                                              └─────────────────────────────────────────────────┘ │
+│                                              ╰─────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
@@ -303,27 +297,27 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
 │   10. ANSI Light                             │ 1 + print(f"Hello, {name}!")                    │ │
 │   11. Ayu Light                              │                                                 │ │
-│   12. Default Light                          │                                                 │ │
-│ ▼                                            │ How themes and terminals interact:              │ │
+│   12. Default Light                          └─────────────────────────────────────────────────┘ │
+│ ▼                                                                                                │
+│                                              ╭─────────────────────────────────────────────────╮ │
+│                                              │ DEVELOPER TOOLS (Not visible to users)          │ │
+│                                              │ How themes and terminals interact:              │ │
 │                                              │   • TrueColor (Hex): Modern terminals render    │ │
 │                                              │   hex codes exactly. They are not overridden by │ │
 │                                              │   terminal app themes.                          │ │
 │                                              │   • ANSI Names: Colors like 'red' or 'green'    │ │
-│                                              │   (used in our ANSI theme) are mapped to your   │ │
-│                                              │   terminal app's specific palette.              │ │
-│                                              │   • Default colors: When Name or Value is       │ │
-│                                              │   '(blank)', the app uses your terminal's       │ │
-│                                              │   default foreground/background.                │ │
+│                                              │   are mapped to your terminal app's specific    │ │
+│                                              │   palette.                                      │ │
+│                                              │   • Default colors: When Value is '(blank)',    │ │
+│                                              │   the app uses your terminal's default          │ │
+│                                              │   foreground/background.                        │ │
 │                                              │   • Compatibility: In terminals with limited    │ │
 │                                              │   color, hex colors are automatically           │ │
 │                                              │   approximated to the closest available ANSI    │ │
 │                                              │   color.                                        │ │
 │                                              │                                                 │ │
-│                                              │ ┌─────────────────────────────────────────────┐ │ │
-│                                              │ │ ValuName         Usage                      │ │ │
-│                                              │ │ e                                           │ │ │
-│                                              │ └─────────────────────────────────────────────┘ │ │
-│                                              │                                                 │ │
+│                                              │  ValuName          Usage                        │ │
+│                                              │  e                                              │ │
 │                                              │   #…  background.pMain terminal background      │ │
 │                                              │       rimary      color                         │ │
 │                                              │   …   backgroundSubtle background for message   │ │
@@ -368,9 +362,7 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │                                              │  CE                                             │ │
 │                                              │  #C367                                          │ │
 │                                              │  7F                                             │ │
-│                                              │                                                 │ │
-│                                              │                                                 │ │
-│                                              └─────────────────────────────────────────────────┘ │
+│                                              ╰─────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │

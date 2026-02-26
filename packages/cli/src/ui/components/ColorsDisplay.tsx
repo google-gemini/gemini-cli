@@ -134,57 +134,58 @@ export const ColorsDisplay: React.FC<ColorsDisplayProps> = ({
   ];
 
   return (
-    <Box flexDirection="column" paddingX={0} marginY={1}>
+    <Box
+      flexDirection="column"
+      paddingX={1}
+      paddingY={0}
+      borderStyle="round"
+      borderColor={theme.border.default}
+    >
       <Box marginBottom={1} flexDirection="column">
-        <Box flexDirection="column">
+        <Text bold color={theme.text.accent}>
+          DEVELOPER TOOLS (Not visible to users)
+        </Text>
+        <Text color={theme.text.primary}>
+          <Text bold>How themes and terminals interact:</Text>
+        </Text>
+        <Box marginLeft={2} flexDirection="column">
           <Text color={theme.text.primary}>
-            <Text bold>How themes and terminals interact:</Text>
+            • <Text bold>TrueColor (Hex):</Text> Modern terminals render hex
+            codes exactly. They are <Text italic>not</Text> overridden by
+            terminal app themes.
           </Text>
-          <Box marginLeft={2} flexDirection="column">
-            <Text color={theme.text.primary}>
-              • <Text bold>TrueColor (Hex):</Text> Modern terminals render hex
-              codes exactly. They are <Text italic>not</Text> overridden by
-              terminal app themes.
-            </Text>
-            <Text color={theme.text.primary}>
-              • <Text bold>ANSI Names:</Text> Colors like &apos;red&apos; or
-              &apos;green&apos; (used in our ANSI theme) <Text italic>are</Text>{' '}
-              mapped to your terminal app&apos;s specific palette.
-            </Text>
-            <Text color={theme.text.primary}>
-              • <Text bold>Default colors:</Text> When Name or Value is
-              &apos;(blank)&apos;, the app uses your terminal&apos;s default
-              foreground/background.
-            </Text>
-            <Text color={theme.text.primary}>
-              • <Text bold>Compatibility:</Text> In terminals with limited
-              color, hex colors are automatically approximated to the closest
-              available ANSI color.
-            </Text>
-          </Box>
+          <Text color={theme.text.primary}>
+            • <Text bold>ANSI Names:</Text> Colors like &apos;red&apos; or
+            &apos;green&apos; <Text italic>are</Text> mapped to your terminal
+            app&apos;s specific palette.
+          </Text>
+          <Text color={theme.text.primary}>
+            • <Text bold>Default colors:</Text> When Value is
+            &apos;(blank)&apos;, the app uses your terminal&apos;s default
+            foreground/background.
+          </Text>
+          <Text color={theme.text.primary}>
+            • <Text bold>Compatibility:</Text> In terminals with limited color,
+            hex colors are automatically approximated to the closest available
+            ANSI color.
+          </Text>
         </Box>
       </Box>
 
       {/* Header */}
-      <Box
-        flexDirection="row"
-        marginBottom={1}
-        borderStyle="single"
-        borderColor={theme.border.default}
-        paddingX={1}
-      >
+      <Box flexDirection="row" marginBottom={0} paddingX={1}>
         <Box width={VALUE_COLUMN_WIDTH}>
-          <Text bold color={theme.text.link}>
+          <Text bold color={theme.text.link} dimColor>
             Value
           </Text>
         </Box>
         <Box width={NAME_COLUMN_WIDTH}>
-          <Text bold color={theme.text.link}>
+          <Text bold color={theme.text.link} dimColor>
             Name
           </Text>
         </Box>
         <Box flexGrow={1}>
-          <Text bold color={theme.text.link}>
+          <Text bold color={theme.text.link} dimColor>
             Usage
           </Text>
         </Box>

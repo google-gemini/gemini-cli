@@ -247,6 +247,11 @@ export function ThemeDialog({
   // The code block is slightly longer than the diff, so give it more space.
   const codeBlockHeight = Math.ceil(availableHeightForPanes * 0.6);
   const diffHeight = Math.floor(availableHeightForPanes * 0.4);
+
+  const previewTheme =
+    themeManager.getTheme(highlightedThemeName || DEFAULT_THEME.name) ||
+    DEFAULT_THEME;
+
   return (
     <Box
       borderStyle="round"
@@ -330,58 +335,48 @@ export function ThemeDialog({
             <Text bold color={theme.text.primary}>
               Preview
             </Text>
-            {/* Get the Theme object for the highlighted theme, fall back to default if not found */}
-            {(() => {
-              const previewTheme =
-                themeManager.getTheme(
-                  highlightedThemeName || DEFAULT_THEME.name,
-                ) || DEFAULT_THEME;
-
-              return (
-                <Box
-                  borderStyle="single"
-                  borderColor={theme.border.default}
-                  paddingTop={includePadding ? 1 : 0}
-                  paddingBottom={includePadding ? 1 : 0}
-                  paddingLeft={1}
-                  paddingRight={1}
-                  flexDirection="column"
-                >
-                  {colorizeCode({
-                    code: `# function
+            <Box
+              borderStyle="single"
+              borderColor={theme.border.default}
+              paddingTop={includePadding ? 1 : 0}
+              paddingBottom={includePadding ? 1 : 0}
+              paddingLeft={1}
+              paddingRight={1}
+              flexDirection="column"
+            >
+              {colorizeCode({
+                code: `# function
 def fibonacci(n):
     a, b = 0, 1
     for _ in range(n):
         a, b = b, a + b
     return a`,
-                    language: 'python',
-                    availableHeight:
-                      isAlternateBuffer === false ? codeBlockHeight : undefined,
-                    maxWidth: colorizeCodeWidth,
-                    settings,
-                  })}
-                  <Box marginTop={1} />
-                  <DiffRenderer
-                    diffContent={`--- a/util.py
+                language: 'python',
+                availableHeight:
+                  isAlternateBuffer === false ? codeBlockHeight : undefined,
+                maxWidth: colorizeCodeWidth,
+                settings,
+              })}
+              <Box marginTop={1} />
+              <DiffRenderer
+                diffContent={`--- a/util.py
 +++ b/util.py
 @@ -1,2 +1,2 @@
 - print("Hello, " + name)
 + print(f"Hello, {name}!")
 `}
-                    availableTerminalHeight={
-                      isAlternateBuffer === false ? diffHeight : undefined
-                    }
-                    terminalWidth={colorizeCodeWidth}
-                    theme={previewTheme}
-                  />
-                  {isDevelopment && (
-                    <Box marginTop={1}>
-                      <ColorsDisplay activeTheme={previewTheme} />
-                    </Box>
-                  )}
-                </Box>
-              );
-            })()}
+                availableTerminalHeight={
+                  isAlternateBuffer === false ? diffHeight : undefined
+                }
+                terminalWidth={colorizeCodeWidth}
+                theme={previewTheme}
+              />
+            </Box>
+            {isDevelopment && (
+              <Box marginTop={1}>
+                <ColorsDisplay activeTheme={previewTheme} />
+              </Box>
+            )}
           </Box>
         </Box>
       ) : (
