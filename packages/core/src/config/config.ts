@@ -1697,6 +1697,11 @@ export class Config {
     this.mcpClientManager?.setUserInteractedWithMcp();
   }
 
+  /** @deprecated Use getMcpClientManager().getLastError() directly */
+  getLastMcpError(serverName: string): string | undefined {
+    return this.mcpClientManager?.getLastError(serverName);
+  }
+
   emitMcpDiagnostic(
     severity: 'info' | 'warning' | 'error',
     message: string,

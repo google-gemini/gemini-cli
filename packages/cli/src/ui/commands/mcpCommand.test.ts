@@ -114,6 +114,7 @@ describe('mcpCommand', () => {
         getAllResources: vi.fn().mockReturnValue([]),
       }),
       setUserInteractedWithMcp: vi.fn(),
+      getLastMcpError: vi.fn().mockReturnValue(undefined),
     };
 
     mockContext = createMockCommandContext({
