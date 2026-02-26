@@ -1230,7 +1230,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     async (submittedValue: string) => {
       reset();
       // Explicitly hide the expansion hint and clear its x-second timer when a new turn begins.
-      triggerExpandHint(false);
+      triggerExpandHint(null);
       if (!constrainHeight) {
         setConstrainHeight(true);
         if (!isAlternateBuffer) {
