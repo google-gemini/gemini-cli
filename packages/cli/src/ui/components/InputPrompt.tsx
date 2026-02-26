@@ -942,25 +942,32 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                     setQueueErrorMessage(`Failed to open file: ${e.message}`);
                   });
                 } else {
-                  let dirPath = absolutePath;
-                  // If it's not a directory, open its parent
-                  if (
-                    !suggestion.label.endsWith('/') &&
-                    !suggestion.label.endsWith('\\')
-                  ) {
-                    try {
-                      const stat = fs.statSync(absolutePath);
-                      if (!stat.isDirectory()) {
+                  // Use an async IIFE to avoid blocking the input handler with sync file I/O.
+                  (async () => {
+                    let dirPath = absolutePath;
+                    // If it's not a directory, open its parent
+                    if (
+                      !suggestion.label.endsWith('/') &&
+                      !suggestion.label.endsWith('\\')
+                    ) {
+                      try {
+                        const stat = await fs.promises.stat(absolutePath);
+                        if (!stat.isDirectory()) {
+                          dirPath = path.dirname(absolutePath);
+                        }
+                      } catch {
                         dirPath = path.dirname(absolutePath);
                       }
-                    } catch {
-                      dirPath = path.dirname(absolutePath);
                     }
-                  }
 
-                  open(dirPath).catch((e: Error) => {
+                    open(dirPath).catch((e: Error) => {
+                      setQueueErrorMessage(
+                        `Failed to open directory: ${e.message}`,
+                      );
+                    });
+                  })().catch((e: Error) => {
                     setQueueErrorMessage(
-                      `Failed to open directory: ${e.message}`,
+                      `Failed to process directory action: ${e.message}`,
                     );
                   });
                 }
