@@ -42,11 +42,31 @@ export function useInputHistory({
     Record<number, { text: string; offset: number }>
   >({});
 
+  // Stores user-edited drafts of historical prompts across navigation sessions.
+  // Keyed by original message content rather than by history index, because indices
+  // shift whenever a new message is submitted. This ensures a draft stays associated
+  // with the correct history entry even after the user sends additional messages.
+  const persistentDraftsRef = useRef<Record<string, string>>({});
+
   const resetHistoryNav = useCallback(() => {
+    // Before clearing the session cache, persist any history entries the user
+    // edited but didn't submit. Keyed by original content so drafts survive
+    // index shifts caused by new submissions.
+    Object.entries(historyCacheRef.current).forEach(([idx, cached]) => {
+      const index = Number(idx);
+      if (index >= 0) {
+        const originalIndex = userMessages.length - 1 - index;
+        const original = userMessages[originalIndex];
+        if (original !== undefined && cached.text !== original) {
+          persistentDraftsRef.current[original] = cached.text;
+        }
+      }
+    });
+
     setHistoryIndex(-1);
     previousHistoryIndexRef.current = undefined;
     historyCacheRef.current = {};
-  }, []);
+  }, [userMessages]);
 
   const handleSubmit = useCallback(
     (value: string) => {
@@ -96,7 +116,11 @@ export function useInputHistory({
         if (saved) {
           onChange(saved.text, defaultCursor);
         } else {
-          const newValue = userMessages[userMessages.length - 1 - nextIndex];
+          // Check for a draft persisted from a previous navigation session
+          // before falling back to the original message.
+          const original = userMessages[userMessages.length - 1 - nextIndex];
+          const persistedDraft = persistentDraftsRef.current[original];
+          const newValue = persistedDraft ?? original;
           onChange(newValue, defaultCursor);
         }
       }
