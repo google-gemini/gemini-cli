@@ -53,6 +53,8 @@
     "ajv-formats": "^3.0.0",
     "chardet": "^2.1.0",
     "diff": "^8.0.3",
+    "dotenv": "^17.2.4",
+    "dotenv-expand": "^12.0.3",
     "fast-levenshtein": "^2.0.6",
     "fdir": "^6.4.6",
     "fzf": "^0.5.2",

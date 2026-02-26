@@ -13,6 +13,7 @@ import type {
   TokenStorageInitializationEvent,
   KeychainAvailabilityEvent,
 } from '../telemetry/types.js';
+import { debugLogger } from './debugLogger.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -353,6 +354,10 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
    * Notifies subscribers that progress has been made on an MCP tool call.
    */
   emitMcpProgress(payload: McpProgressPayload): void {
+    if (!Number.isFinite(payload.progress) || payload.progress < 0) {
+      debugLogger.log(`Invalid progress value: ${payload.progress}`);
+      return;
+    }
     this.emit(CoreEvent.McpProgress, payload);
   }
 
