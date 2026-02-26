@@ -66,6 +66,11 @@ export interface QuotaState {
   validationRequest: ValidationDialogRequest | null;
 }
 
+export interface StatusBadge {
+  text: string;
+  color?: string;
+}
+
 export interface UIState {
   history: HistoryItem[];
   historyManager: UseHistoryManagerReturn;
@@ -191,6 +196,7 @@ export interface UIState {
     text: string;
     type: TransientMessageType;
   } | null;
+  statusBadges: StatusBadge[];
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

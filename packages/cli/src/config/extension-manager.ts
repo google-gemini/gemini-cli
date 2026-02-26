@@ -886,6 +886,7 @@ Would you like to attempt to install via "git clone" instead?`,
         themes: config.themes,
         rules,
         checkers,
+        ui: config.ui,
       };
     } catch (e) {
       debugLogger.error(

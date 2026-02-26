@@ -95,6 +95,14 @@ export const Footer: React.FC = () => {
               )}
             </Text>
           )}
+          {uiState.statusBadges.map((badge, i) => (
+            <Text key={i}>
+              {' '}
+              <Text color={badge.color || theme.text.accent}>
+                {badge.text}
+              </Text>
+            </Text>
+          ))}
           {debugMode && (
             <Text color={theme.status.error}>
               {' ' + (debugMessage || '--debug')}
