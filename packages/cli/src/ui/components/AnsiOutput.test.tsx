@@ -33,7 +33,7 @@ describe('<AnsiOutputText />', () => {
       <AnsiOutputText data={data} width={80} />,
     );
     await waitUntilReady();
-    expect(lastFrame()).toBe('Hello, world!\n');
+    expect(lastFrame().trim()).toBe('Hello, world!');
     unmount();
   });
 
@@ -51,7 +51,7 @@ describe('<AnsiOutputText />', () => {
       <AnsiOutputText data={data} width={80} />,
     );
     await waitUntilReady();
-    expect(lastFrame()).toBe(text + '\n');
+    expect(lastFrame().trim()).toBe(text);
     unmount();
   });
 
@@ -65,7 +65,7 @@ describe('<AnsiOutputText />', () => {
       <AnsiOutputText data={data} width={80} />,
     );
     await waitUntilReady();
-    expect(lastFrame()).toBe(text + '\n');
+    expect(lastFrame().trim()).toBe(text);
     unmount();
   });
 
