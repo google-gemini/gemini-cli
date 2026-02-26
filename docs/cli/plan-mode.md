@@ -119,6 +119,7 @@ These are the only allowed tools:
 - **Planning (Write):** [`write_file`] and [`replace`] only allowed for `.md`
   files in the `~/.gemini/tmp/<project>/<session-id>/plans/` directory or your
   [custom plans directory](#custom-plan-directory-and-policies).
+- **Memory:** [`save_memory`]
 - **Skills:** [`activate_skill`] (allows loading specialized instructions and
   resources in a read-only manner)
 
@@ -277,6 +278,7 @@ performance. You can disable this automatic switching in your settings:
 [`google_web_search`]: /docs/tools/web-search.md
 [`replace`]: /docs/tools/file-system.md#6-replace-edit
 [MCP tools]: /docs/tools/mcp-server.md
+[`save_memory`]: /docs/tools/memory.md
 [`activate_skill`]: /docs/cli/skills.md
 [subagents]: /docs/core/subagents.md
 [policy engine]: /docs/reference/policy-engine.md

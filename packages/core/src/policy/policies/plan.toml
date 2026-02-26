@@ -50,7 +50,7 @@ priority = 70
 modes = ["plan"]
 
 [[rule]]
-toolName = ["ask_user", "exit_plan_mode"]
+toolName = ["ask_user", "exit_plan_mode", "save_memory"]
 decision = "ask_user"
 priority = 70
 modes = ["plan"]
