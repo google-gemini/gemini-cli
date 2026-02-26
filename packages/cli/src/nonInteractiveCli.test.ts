@@ -2033,6 +2033,10 @@ describe('runNonInteractive', () => {
             session_id: 'test-session-id',
             response: 'Partial content',
             stats: MOCK_SESSION_METRICS,
+            error: {
+              type: 'AgentExecutionStopped',
+              message: 'Agent execution stopped: Stopped by hook',
+            },
           },
           null,
           2,
@@ -2068,6 +2072,8 @@ describe('runNonInteractive', () => {
       const output = getWrittenOutput();
       expect(output).toContain('"type":"result"');
       expect(output).toContain('"status":"success"');
+      expect(output).toContain('"AgentExecutionStopped"');
+      expect(output).toContain('Agent execution stopped: Stopped by hook');
     });
 
     it('should handle AgentExecutionBlocked event', async () => {
