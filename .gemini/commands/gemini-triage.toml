@@ -1,0 +1,16 @@
+description = "Triages a single GitHub issue using Gemini CLI"
+prompt = """
+## Task
+Analyze the GitHub issue below and determine the single most appropriate 
+`area/` label.
+
+## Instructions
+1.  Activate expertise: `activate_skill(name="issue-triage")`.
+2.  Use the available labels: !{echo $AVAILABLE_LABELS}.
+3.  Select exactly one `area/` label.
+4.  Output ONLY a JSON markdown code block containing `labels_to_set`.
+
+## Issue Context
+Title: !{echo $ISSUE_TITLE}
+Body: !{echo $ISSUE_BODY}
+"""

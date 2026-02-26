@@ -39,18 +39,6 @@ jobs:
           private-key: '${{ secrets.PRIVATE_KEY }}'
           permission-issues: 'write'
 
-      - name: 'Get issue from event'
-        if: |-
-          ${{ github.event_name == 'issues' }}
-        id: 'get_issue_from_event'
-        env:
-          ISSUE_EVENT: '${{ toJSON(github.event.issue) }}'
-        run: |
-          set -euo pipefail
-          ISSUE_JSON=$(echo "$ISSUE_EVENT" | jq -c '[{number: .number, title: .title, body: .body}]')
-          echo "issues_to_triage=${ISSUE_JSON}" >> "${GITHUB_OUTPUT}"
-          echo "✅ Found issue #${{ github.event.issue.number }} from event to triage! 🎯"
-
       - name: 'Find untriaged issues'
         if: |-
           ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
@@ -63,23 +51,16 @@ jobs:
 
           echo '🔍 Finding issues missing area labels...'
           NO_AREA_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:area/core -label:area/agent -label:area/enterprise -label:area/non-interactive -label:area/security -label:area/platform -label:area/extensions -label:area/unknown' --limit 100 --json number,title,body)"
+            --search 'is:open is:issue -label:area/core -label:area/agent -label:area/enterprise -label:area/non-interactive -label:area/security -label:area/platform -label:area/extensions -label:area/unknown' --limit 25 --json number,title,body)"
 
-          echo '🔍 Finding issues missing kind labels...'
-          NO_KIND_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:kind/bug -label:kind/enhancement -label:kind/customer-issue -label:kind/question' --limit 100 --json number,title,body)"
+          ISSUES="${NO_AREA_ISSUES}"
 
-          echo '🏷️ Finding issues missing priority labels...'
-          NO_PRIORITY_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:priority/p0 -label:priority/p1 -label:priority/p2 -label:priority/p3 -label:priority/unknown' --limit 100 --json number,title,body)"
-
-          echo '🔄 Merging and deduplicating issues...'
-          ISSUES="$(echo "${NO_AREA_ISSUES}" "${NO_KIND_ISSUES}" "${NO_PRIORITY_ISSUES}" | jq -c -s 'add | unique_by(.number)')"
-
-          echo '📝 Setting output for GitHub Actions...'
-          echo "issues_to_triage=${ISSUES}" >> "${GITHUB_OUTPUT}"
+          echo "${ISSUES}" > issues-to-triage.json
 
           ISSUE_COUNT="$(echo "${ISSUES}" | jq 'length')"
+          if [ "${ISSUE_COUNT}" -gt 0 ]; then
+            echo "has_issues=true" >> "${GITHUB_OUTPUT}"
+          fi
           echo "✅ Found ${ISSUE_COUNT} unique issues to triage! 🎯"
 
       - name: 'Get Repository Labels'
@@ -97,15 +78,23 @@ jobs:
             core.info(`Found ${labelNames.length} labels: ${labelNames.join(', ')}`);
             return labelNames;
 
+      - name: 'Prepare Issues for Event'
+        if: |-
+          ${{ github.event_name == 'issues' }}
+        id: 'prepare_event_issue'
+        env:
+          ISSUE_EVENT: '${{ toJSON(github.event.issue) }}'
+        run: |
+          echo "$ISSUE_EVENT" | jq -c '[{number: .number, title: .title, body: .body}]' > issues-to-triage.json
+          echo "has_issues=true" >> "${GITHUB_OUTPUT}"
+
       - name: 'Run Gemini Issue Analysis'
         if: |-
-          (steps.get_issue_from_event.outputs.issues_to_triage != '' && steps.get_issue_from_event.outputs.issues_to_triage != '[]') ||
-          (steps.find_issues.outputs.issues_to_triage != '' && steps.find_issues.outputs.issues_to_triage != '[]')
-        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+          ${{ steps.find_issues.outputs.has_issues == 'true' || steps.prepare_event_issue.outputs.has_issues == 'true' }}
+        uses: 'google-github-actions/run-gemini-cli@v0'
         id: 'gemini_issue_analysis'
         env:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
-          ISSUES_TO_TRIAGE: '${{ steps.get_issue_from_event.outputs.issues_to_triage || steps.find_issues.outputs.issues_to_triage }}'
           REPOSITORY: '${{ github.repository }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
         with:
@@ -114,6 +103,7 @@ jobs:
           gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          gemini_model: 'gemini-3-flash-preview'
           use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
           use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
           settings: |-
@@ -127,93 +117,7 @@ jobs:
                 "target": "gcp"
               }
             }
-          prompt: |-
-            ## Role
-
-            You are an issue triage assistant. Analyze issues and identify
-            appropriate labels. Use the available tools to gather information;
-            do not ask for information to be provided.
-
-            ## Steps
-
-            1. You are only able to use the echo command. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
-            2. Check environment variable for issues to triage: $ISSUES_TO_TRIAGE (JSON array of issues)
-            3. Review the issue title, body and any comments provided in the environment variables.
-            4. Identify the most relevant labels from the existing labels, specifically focusing on area/*, kind/* and priority/*.
-            5. Label Policy:
-               - If the issue already has a kind/ label, do not change it.
-               - If the issue already has a priority/ label, do not change it.
-               - If the issue already has an area/ label, do not change it.
-               - If any of these are missing, select exactly ONE appropriate label for the missing category.
-            6. Identify other applicable labels based on the issue content, such as status/*, help wanted, good first issue, etc.
-            7. Give me a single short explanation about why you are selecting each label in the process.
-            8. Output a JSON array of objects, each containing the issue number
-               and the labels to add and remove, along with an explanation. For example:
-               ```
-               [
-                 {
-                   "issue_number": 123,
-                   "labels_to_add": ["area/core", "kind/bug", "priority/p2"],
-                   "labels_to_remove": ["status/need-triage"],
-                   "explanation": "This issue is a UI bug that needs to be addressed with medium priority."
-                 }
-               ]
-               ```
-              If an issue cannot be classified, do not include it in the output array.
-            9. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5
-              - Anything more than 6 versions older than the most recent should add the status/need-retesting label
-            10. If you see that the issue doesn't look like it has sufficient information recommend the status/need-information label and leave a comment politely requesting the relevant information, eg.. if repro steps are missing request for repro steps. if version information is missing request for version information into the explanation section below.
-            11. If you think an issue might be a Priority/P0 do not apply the priority/p0 label. Instead apply a status/manual-triage label and include a note in your explanation.
-            12. If you are uncertain about a category, use the area/unknown, kind/question, or priority/unknown labels as appropriate. If you are extremely uncertain, apply the status/manual-triage label.
-
-            ## Guidelines
-
-            - Output only valid JSON format
-            - Do not include any explanation or additional text, just the JSON
-            - Only use labels that already exist in the repository.
-              - Do not add comments or modify the issue content.
-              - Do not remove the following labels maintainer, help wanted or good first issue.
-              - Triage only the current issue.
-              - Identify only one area/ label.
-              - Identify only one kind/ label (Do not apply kind/duplicate or kind/parent-issue)
-              - Identify only one priority/ label.
-              - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.
-
-            Categorization Guidelines (Priority):
-            P0 - Urgent Blocking Issues:
-              - DO NOT APPLY THIS LABEL AUTOMATICALLY. Use status/manual-triage instead.
-              - Definition: Urgent, block a significant percentage of the user base, and prevent frequent use of the Gemini CLI.
-              - This includes core stability blockers (e.g., authentication failures, broken upgrades), critical crashes, and P0 security vulnerabilities.
-              - Impact: Blocks development or testing for the entire team; Major security vulnerability; Causes data loss or corruption with no workaround; Crashes the application or makes a core feature completely unusable for all or most users.
-              - Qualifier: Is the main function of the software broken?
-            P1 - High-Impact Issues:
-              - Definition: Affect a large number of users, blocking them from using parts of the Gemini CLI, or make the CLI frequently unusable even with workarounds available.
-              - Impact: A core feature is broken or behaving incorrectly for a large number of users or use cases; Severe performance degradation; No straightforward workaround exists.
-              - Qualifier: Is a key feature unusable or giving very wrong results?
-            P2 - Significant Issues:
-              - Definition: Affect some users significantly, such as preventing the use of certain features or authentication types.
-              - Can also be issues that many users complain about, causing annoyance or hindering daily use.
-              - Impact: Affects a non-critical feature or a smaller, specific subset of users; An inconvenient but functional workaround is available; Noticeable UI/UX problems that look unprofessional.
-              - Qualifier: Is it an annoying but non-blocking problem?
-            P3 - Low-Impact Issues:
-              - Definition: Typically usability issues that cause annoyance to a limited user base.
-              - Includes feature requests that could be addressed in the near future and may be suitable for community contributions.
-              - Impact: Minor cosmetic issues; An edge-case bug that is very difficult to reproduce and affects a tiny fraction of users.
-              - Qualifier: Is it a "nice-to-fix" issue?
-
-            Categorization Guidelines (Area):
-            area/agent: Core Agent, Tools, Memory, Sub-Agents, Hooks, Agent Quality
-            area/core: User Interface, OS Support, Core Functionality
-            area/enterprise: Telemetry, Policy, Quota / Licensing
-            area/extensions: Gemini CLI extensions capability
-            area/non-interactive: GitHub Actions, SDK, 3P Integrations, Shell Scripting, Command line automation
-            area/platform: Build infra, Release mgmt, Testing, Eval infra, Capacity, Quota mgmt
-            area/security: security related issues
-
-            Additional Context:
-            - If users are talking about issues where the model gets downgraded from pro to flash then i want you to categorize that as a performance issue.
-            - This product is designed to use different models eg.. using pro, downgrading to flash etc.
-            - When users report that they dont expect the model to change those would be categorized as feature requests.
+          prompt: '/gemini-scheduled-triage'
 
       - name: 'Apply Labels to Issues'
         if: |-
@@ -226,31 +130,47 @@ jobs:
         with:
           github-token: '${{ steps.generate_token.outputs.token }}'
           script: |-
-            const rawLabels = process.env.LABELS_OUTPUT;
-            core.info(`Raw labels JSON: ${rawLabels}`);
-            let parsedLabels;
+            const rawOutput = process.env.LABELS_OUTPUT;
+            core.info(`Raw output from model: ${rawOutput}`);
+            
+            let parsed;
             try {
-              const jsonMatch = rawLabels.match(/```json\s*([\s\S]*?)\s*```/);
-              if (!jsonMatch || !jsonMatch[1]) {
-                throw new Error("Could not find a ```json ... ``` block in the output.");
+              // 1. Try extracting from markdown block first (safest)
+              const jsonMatch = rawOutput.match(/```json\s*([\s\S]*?)\s*```/) || rawOutput.match(/```\s*([\s\S]*?)\s*```/);
+              const jsonString = jsonMatch ? jsonMatch[1].trim() : rawOutput.trim();
+              
+              // 2. If no block, try parsing the whole thing (maybe it is pure JSON)
+              // 3. If that fails, try to find the first '[' and last ']'
+              let toParse = jsonString;
+              if (!jsonMatch) {
+                const start = rawOutput.indexOf('[');
+                const end = rawOutput.lastIndexOf(']');
+                if (start !== -1 && end !== -1 && end > start) {
+                  toParse = rawOutput.substring(start, end + 1);
+                }
               }
-              const jsonString = jsonMatch[1].trim();
-              parsedLabels = JSON.parse(jsonString);
-              core.info(`Parsed labels JSON: ${JSON.stringify(parsedLabels)}`);
+              
+              parsed = JSON.parse(toParse);
             } catch (err) {
-              core.setFailed(`Failed to parse labels JSON from Gemini output: ${err.message}\nRaw output: ${rawLabels}`);
+              core.setFailed(`Failed to parse triage result. Error: ${err.message}\nRaw output: ${rawOutput}`);
               return;
             }
 
-            for (const entry of parsedLabels) {
+            if (!Array.isArray(parsed)) {
+               core.setFailed(`Expected JSON array but got: ${typeof parsed}`);
+               return;
+            }
+
+            core.info(`Parsed ${parsed.length} labels entries.`);
+
+            for (const entry of parsed) {
               const issueNumber = entry.issue_number;
               if (!issueNumber) {
                 core.info(`Skipping entry with no issue number: ${JSON.stringify(entry)}`);
                 continue;
               }
 
-              const labelsToAdd = entry.labels_to_add || [];
-              labelsToAdd.push('status/bot-triaged');
+              const labelsToAdd = entry.labels_to_set || [];
 
               if (labelsToAdd.length > 0) {
                 await github.rest.issues.addLabels({
@@ -259,20 +179,6 @@ jobs:
                   issue_number: issueNumber,
                   labels: labelsToAdd
                 });
-                const explanation = entry.explanation ? ` - ${entry.explanation}` : '';
-                core.info(`Successfully added labels for #${issueNumber}: ${labelsToAdd.join(', ')}${explanation}`);
-              }
-
-              if (entry.explanation) {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: issueNumber,
-                  body: entry.explanation,
-                });
-              }
-
-              if ((!entry.labels_to_add || entry.labels_to_add.length === 0) && (!entry.labels_to_remove || entry.labels_to_remove.length === 0)) {
-                core.info(`No labels to add or remove for #${issueNumber}, leaving as is`);
+                core.info(`Successfully added labels for #${issueNumber}: ${labelsToAdd.join(', ')}`);
               }
             }
