@@ -6,15 +6,17 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
+import Gradient from 'ink-gradient';
 import { themeManager } from '../themes/theme-manager.js';
 import { theme } from '../semantic-colors.js';
 
 const COLOR_DESCRIPTIONS: Record<string, string> = {
-  'text.primary': 'Primary text color',
+  'text.primary': 'Primary text color (uses terminal default if blank)',
   'text.secondary': 'Secondary/dimmed text color',
   'text.link': 'Hyperlink and highlighting color',
   'text.accent': 'Accent color for emphasis',
-  'text.response': 'Color for model response text',
+  'text.response':
+    'Color for model response text (uses terminal default if blank)',
   'background.primary': 'Main terminal background color',
   'background.message': 'Subtle background for message blocks',
   'background.input': 'Background for the input prompt',
@@ -49,12 +51,13 @@ interface BackgroundColorRow {
   value: string;
 }
 
+type ColorRow = StandardColorRow | GradientColorRow | BackgroundColorRow;
+
 export const ColorsDisplay: React.FC = () => {
   const semanticColors = themeManager.getSemanticColors();
   const activeTheme = themeManager.getActiveTheme();
 
-  const standardRows: StandardColorRow[] = [];
-  const backgroundRows: BackgroundColorRow[] = [];
+  const allRows: ColorRow[] = [];
   const gradientRow: GradientColorRow | null =
     semanticColors.ui.gradient && semanticColors.ui.gradient.length > 0
       ? {
@@ -67,7 +70,7 @@ export const ColorsDisplay: React.FC = () => {
   // Flatten and categorize the SemanticColors object
   for (const [category, subColors] of Object.entries(semanticColors)) {
     if (category === 'ui' && 'gradient' in subColors) {
-      // Handled separately
+      // Handled separately or later
       continue;
     }
 
@@ -82,13 +85,13 @@ export const ColorsDisplay: React.FC = () => {
         for (const [diffName, diffValue] of Object.entries(value)) {
           if (typeof diffValue === 'string') {
             if (category === 'background') {
-              backgroundRows.push({
+              allRows.push({
                 type: 'background',
                 name: `${fullName}.${diffName}`,
                 value: diffValue,
               });
             } else {
-              standardRows.push({
+              allRows.push({
                 type: 'standard',
                 name: `${fullName}.${diffName}`,
                 value: diffValue,
@@ -98,13 +101,13 @@ export const ColorsDisplay: React.FC = () => {
         }
       } else if (typeof value === 'string') {
         if (category === 'background') {
-          backgroundRows.push({
+          allRows.push({
             type: 'background',
             name: fullName,
             value,
           });
         } else {
-          standardRows.push({
+          allRows.push({
             type: 'standard',
             name: fullName,
             value,
@@ -112,6 +115,11 @@ export const ColorsDisplay: React.FC = () => {
         }
       }
     }
+  }
+
+  // Add gradient row if it exists
+  if (gradientRow) {
+    allRows.push(gradientRow);
   }
 
   return (
@@ -162,26 +170,14 @@ export const ColorsDisplay: React.FC = () => {
         </Box>
       </Box>
 
-      {/* Standard Section */}
-      <Box flexDirection="column" marginBottom={1}>
-        {standardRows.map((row) => renderStandardRow(row))}
-      </Box>
-
-      {/* Gradient Section */}
-      {gradientRow && (
-        <Box flexDirection="column" marginBottom={1}>
-          {renderGradientRow(gradientRow)}
-        </Box>
-      )}
-
-      {/* Background Section */}
-      <Box flexDirection="column" marginTop={1}>
-        <Box marginBottom={1}>
-          <Text bold color={theme.text.accent}>
-            Background Colors
-          </Text>
-        </Box>
-        {backgroundRows.map((row) => renderBackgroundRow(row))}
+      {/* All Rows */}
+      <Box flexDirection="column">
+        {allRows.map((row) => {
+          if (row.type === 'standard') return renderStandardRow(row);
+          if (row.type === 'gradient') return renderGradientRow(row);
+          if (row.type === 'background') return renderBackgroundRow(row);
+          return null;
+        })}
       </Box>
     </Box>
   );
@@ -190,14 +186,15 @@ export const ColorsDisplay: React.FC = () => {
 function renderStandardRow({ name, value }: StandardColorRow) {
   const description = COLOR_DESCRIPTIONS[name] || '';
   const isHex = value.startsWith('#');
+  const displayColor = isHex ? value : theme.text.primary;
 
   return (
     <Box key={name} flexDirection="row" paddingX={1}>
       <Box width="15%">
-        <Text color={isHex ? value : theme.text.primary}>{value}</Text>
+        <Text color={displayColor}>{value || '(blank)'}</Text>
       </Box>
       <Box width="30%">
-        <Text color={theme.text.primary}>{name}</Text>
+        <Text color={displayColor}>{name}</Text>
       </Box>
       <Box flexGrow={1}>
         <Text color={theme.text.secondary}>{description}</Text>
@@ -211,16 +208,17 @@ function renderGradientRow({ name, value }: GradientColorRow) {
 
   return (
     <Box key={name} flexDirection="row" paddingX={1}>
-      <Box width="15%" flexDirection="row">
+      <Box width="15%" flexDirection="column">
         {value.map((c, i) => (
           <Text key={i} color={c}>
             {c}
-            {i < value.length - 1 ? ', ' : ''}
           </Text>
         ))}
       </Box>
       <Box width="30%">
-        <Text color={theme.text.primary}>{name}</Text>
+        <Gradient colors={value}>
+          <Text>{name}</Text>
+        </Gradient>
       </Box>
       <Box flexGrow={1}>
         <Text color={theme.text.secondary}>{description}</Text>
@@ -233,7 +231,7 @@ function renderBackgroundRow({ name, value }: BackgroundColorRow) {
   const description = COLOR_DESCRIPTIONS[name] || '';
 
   return (
-    <Box key={name} flexDirection="row" paddingX={1} marginBottom={1}>
+    <Box key={name} flexDirection="row" paddingX={1} marginY={1}>
       <Box
         width="15%"
         backgroundColor={value}
@@ -245,7 +243,7 @@ function renderBackgroundRow({ name, value }: BackgroundColorRow) {
         </Text>
       </Box>
       <Box width="30%" paddingLeft={1}>
-        <Text color={theme.text.primary}>{name}</Text>
+        <Text color={value}>{name}</Text>
       </Box>
       <Box flexGrow={1}>
         <Text color={theme.text.secondary}>{description}</Text>

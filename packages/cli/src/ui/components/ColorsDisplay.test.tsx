@@ -70,9 +70,6 @@ describe('ColorsDisplay', () => {
     expect(output).toContain('/colors - Theme Colors Demo');
     expect(output).toContain('visualize how colors are used');
 
-    // Check for Background section
-    expect(output).toContain('Background Colors');
-
     // Check for active theme name
     expect(output).toContain('Test Theme');
 
@@ -87,7 +84,7 @@ describe('ColorsDisplay', () => {
     // Check for some descriptions
     expect(output).toContain('Primary text color');
     expect(output).toContain('Standard border color');
-
+    expect(output).toContain('Main terminal background color');
     unmount();
   });
 });
