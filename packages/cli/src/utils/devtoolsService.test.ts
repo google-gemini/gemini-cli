@@ -54,6 +54,7 @@ const mockDevToolsInstance = vi.hoisted(() => ({
   start: vi.fn(),
   stop: vi.fn(),
   getPort: vi.fn(),
+  getToken: vi.fn().mockReturnValue('test-token-abc123'),
 }));
 
 const mockActivityLoggerInstance = vi.hoisted(() => ({
@@ -155,6 +156,7 @@ describe('devtoolsService', () => {
         config,
         '127.0.0.1',
         25417,
+        null, // No token when connecting to existing server
         expect.any(Function),
       );
       expect(
@@ -223,6 +225,7 @@ describe('devtoolsService', () => {
         config,
         '127.0.0.1',
         25417,
+        'test-token-abc123',
         expect.any(Function),
       );
       expect(
@@ -360,10 +363,12 @@ describe('devtoolsService', () => {
 
       expect(mockDevToolsInstance.stop).toHaveBeenCalled();
       expect(url).toBe('http://localhost:25417');
+      // Default is ALLOW — transport is added even without token (token file may not exist in tests)
       expect(mockAddNetworkTransport).toHaveBeenCalledWith(
         config,
         '127.0.0.1',
         25417,
+        null, // No token file in tests
         expect.any(Function),
       );
     });
@@ -396,6 +401,7 @@ describe('devtoolsService', () => {
         config,
         '127.0.0.1',
         25418,
+        'test-token-abc123',
         expect.any(Function),
       );
     });
@@ -419,7 +425,7 @@ describe('devtoolsService', () => {
 
       // Extract onReconnectFailed callback
       const initCall = mockAddNetworkTransport.mock.calls[0];
-      const onReconnectFailed = initCall[3];
+      const onReconnectFailed = initCall[4];
       expect(onReconnectFailed).toBeDefined();
 
       // Trigger promotion MAX_PROMOTION_ATTEMPTS + 1 times
