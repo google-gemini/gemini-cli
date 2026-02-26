@@ -34,9 +34,6 @@ import { AdminSettingsChangedDialog } from './AdminSettingsChangedDialog.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 import { NewAgentsNotification } from './NewAgentsNotification.js';
 import { AgentConfigDialog } from './AgentConfigDialog.js';
-import { SessionRetentionWarningDialog } from './SessionRetentionWarningDialog.js';
-import { useCallback } from 'react';
-import { SettingScope } from '../../config/settings.js';
 import { PolicyUpdateDialog } from './PolicyUpdateDialog.js';
 
 interface DialogManagerProps {
@@ -59,55 +56,7 @@ export const DialogManager = ({
     terminalHeight,
     staticExtraHeight,
     terminalWidth: uiTerminalWidth,
-    shouldShowRetentionWarning,
-    sessionsToDeleteCount,
   } = uiState;
-
-  const handleKeep120Days = useCallback(() => {
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.warningAcknowledged',
-      true,
-    );
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.enabled',
-      true,
-    );
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.maxAge',
-      '120d',
-    );
-  }, [settings]);
-
-  const handleKeep30Days = useCallback(() => {
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.warningAcknowledged',
-      true,
-    );
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.enabled',
-      true,
-    );
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.maxAge',
-      '30d',
-    );
-  }, [settings]);
-
-  if (shouldShowRetentionWarning && sessionsToDeleteCount !== undefined) {
-    return (
-      <SessionRetentionWarningDialog
-        onKeep120Days={handleKeep120Days}
-        onKeep30Days={handleKeep30Days}
-        sessionsToDeleteCount={sessionsToDeleteCount ?? 0}
-      />
-    );
-  }
 
   if (uiState.adminSettingsChanged) {
     return <AdminSettingsChangedDialog />;
