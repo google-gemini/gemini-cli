@@ -16,6 +16,7 @@ import { resolveClassifierModel, isGemini3Model } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 import { LlmRole } from '../../telemetry/types.js';
 import { AuthType } from '../../core/contentGenerator.js';
 
@@ -133,6 +134,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
     context: RoutingContext,
     config: Config,
     baseLlmClient: BaseLlmClient,
+    _localLiteRtLmClient: LocalLiteRtLmClient,
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
     try {
