@@ -137,22 +137,7 @@ async function calculateExactReplacement(
   const normalizedSearch = old_string.replace(/\r\n/g, '\n');
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
 
-  const matchRanges: Array<{ start: number; end: number }> = [];
-  let index = normalizedCode.indexOf(normalizedSearch);
-  while (index !== -1) {
-    const startLine = normalizedCode
-      .substring(0, index)
-      .split(String.fromCharCode(10)).length;
-    const endLine =
-      startLine + normalizedSearch.split(String.fromCharCode(10)).length - 1;
-    matchRanges.push({ start: startLine, end: endLine });
-    index = normalizedCode.indexOf(
-      normalizedSearch,
-      index + normalizedSearch.length,
-    );
-  }
-
-  const exactOccurrences = matchRanges.length;
+  const exactOccurrences = normalizedCode.split(normalizedSearch).length - 1;
 
   if (!params.allow_multiple && exactOccurrences > 1) {
     return {
@@ -160,8 +145,6 @@ async function calculateExactReplacement(
       occurrences: exactOccurrences,
       finalOldString: normalizedSearch,
       finalNewString: normalizedReplace,
-      strategy: 'exact',
-      matchRanges,
     };
   }
 
@@ -177,8 +160,6 @@ async function calculateExactReplacement(
       occurrences: exactOccurrences,
       finalOldString: normalizedSearch,
       finalNewString: normalizedReplace,
-      strategy: 'exact',
-      matchRanges,
     };
   }
 
@@ -257,11 +238,11 @@ async function calculateRegexReplacement(
 
   let processedString = normalizedSearch;
   for (const delim of delimiters) {
-    processedString = processedString.split('\n').join(` ${delim} `);
+    processedString = processedString.split(delim).join(` ${delim} `);
   }
 
   // Split by any whitespace and remove empty strings.
-  const tokens = processedString.split(String.fromCharCode(10)).filter(Boolean);
+  const tokens = processedString.split(/\s+/).filter(Boolean);
 
   if (tokens.length === 0) {
     return null;
@@ -566,7 +547,6 @@ class EditToolInvocation
       error: undefined,
       originalLineEnding,
       strategy: secondAttemptResult.strategy,
-      matchRanges: secondAttemptResult.matchRanges,
     };
   }
 
@@ -679,7 +659,6 @@ class EditToolInvocation
         error: undefined,
         originalLineEnding,
         strategy: replacementResult.strategy,
-        matchRanges: replacementResult.matchRanges,
       };
     }
 
