@@ -78,6 +78,7 @@ export * from './utils/authConsent.js';
 export * from './utils/googleQuotaErrors.js';
 export * from './utils/fileUtils.js';
 export * from './utils/planUtils.js';
+export * from './utils/approvalModeUtils.js';
 export * from './utils/fileDiffUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
@@ -107,6 +108,7 @@ export * from './utils/secure-browser-launcher.js';
 export * from './utils/apiConversionUtils.js';
 export * from './utils/channel.js';
 export * from './utils/constants.js';
+export * from './utils/sessionUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

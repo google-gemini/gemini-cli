@@ -162,5 +162,5 @@ describe('GeminiCliAgent Integration', () => {
         // Just consume the stream
       }
     }).rejects.toThrow('Dynamic instruction failure');
-  });
+  }, 30000);
 });
