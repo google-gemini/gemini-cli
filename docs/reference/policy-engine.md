@@ -198,9 +198,9 @@ flag-based overrides when a central system policy has already been established.
 
 #### Security Requirements
 
-To prevent privilege escalation, the CLI enforces strict security checks on
-**all** admin directories (standard and supplemental). If checks fail, the
-policies in that directory are **ignored**.
+To prevent privilege escalation, the CLI enforces strict security checks on the
+**standard system policy directory**. If checks fail, the policies in that
+directory are **ignored**.
 
 - **Linux / macOS:** Must be owned by `root` (UID 0) and NOT writable by group
   or others (e.g., `chmod 755`).
@@ -209,6 +209,11 @@ policies in that directory are **ignored**.
   see a security warning, use the folder properties to remove write permissions
   for non-admin groups. You may need to "Disable inheritance" in Advanced
   Security Settings._
+
+**Note:** Supplemental admin policies (provided via `--admin-policy` or
+`adminPolicyPaths` settings) are **NOT** subject to these strict ownership
+checks, as they are explicitly provided by the user or administrator in their
+current execution context.
 
 ### TOML rule schema
 

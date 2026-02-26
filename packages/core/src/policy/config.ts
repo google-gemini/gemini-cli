@@ -171,27 +171,24 @@ export function formatPolicyError(error: PolicyFileError): string {
 }
 
 /**
- * Filters out insecure policy directories (specifically the system policy directory
- * and supplemental admin policy paths).
+ * Filters out insecure policy directories (specifically the system policy directory).
+ * Supplemental admin policy paths are NOT subject to strict security checks as they
+ * are explicitly provided by the user/administrator via flags or settings.
  * Emits warnings if insecure directories are found.
  */
 async function filterSecurePolicyDirectories(
   dirs: string[],
   systemPoliciesDir: string,
-  adminPolicyPaths?: Set<string>,
 ): Promise<string[]> {
   const results = await Promise.all(
     dirs.map(async (dir) => {
       const normalizedDir = path.resolve(dir);
-      const isAdminPolicy =
-        normalizedDir === systemPoliciesDir ||
-        adminPolicyPaths?.has(normalizedDir);
+      const isSystemPolicy = normalizedDir === systemPoliciesDir;
 
-      if (isAdminPolicy) {
+      if (isSystemPolicy) {
         const { secure, reason } = await isDirectorySecure(dir);
         if (!secure) {
-          const tier = normalizedDir === systemPoliciesDir ? 'system' : 'admin';
-          const msg = `Security Warning: Skipping ${tier} policies from ${dir}: ${reason}`;
+          const msg = `Security Warning: Skipping system policies from ${dir}: ${reason}`;
           emitWarningOnce(msg);
           return null;
         }
@@ -246,7 +243,6 @@ export async function createPolicyEngineConfig(
   const securePolicyDirs = await filterSecurePolicyDirectories(
     policyDirs,
     systemPoliciesDir,
-    adminPolicyPathsSet,
   );
 
   const tierContext = {

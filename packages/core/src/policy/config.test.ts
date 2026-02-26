@@ -8,7 +8,6 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import nodePath from 'node:path';
 import * as fs from 'node:fs/promises';
 
-import type { PolicySettings } from './types.js';
 import { ApprovalMode, PolicyDecision, InProcessCheckerType } from './types.js';
 import { isDirectorySecure } from '../utils/security.js';
 import {
@@ -124,7 +123,7 @@ describe('createPolicyEngineConfig', () => {
     expect(calledDirs).toContain('/tmp/mock/default/policies');
   });
 
-  it('should filter out insecure supplemental admin policy directories', async () => {
+  it('should NOT filter out insecure supplemental admin policy directories', async () => {
     const adminPolicyDir = '/insecure/admin/policies';
     vi.mocked(isDirectorySecure).mockImplementation(async (path: string) => {
       if (nodePath.resolve(path) === nodePath.resolve(adminPolicyDir)) {
@@ -144,7 +143,7 @@ describe('createPolicyEngineConfig', () => {
     );
 
     const calledDirs = loadPoliciesSpy.mock.calls[0][0];
-    expect(calledDirs).not.toContain(adminPolicyDir);
+    expect(calledDirs).toContain(adminPolicyDir);
     expect(calledDirs).toContain('/non/existent/system/policies');
     expect(calledDirs).toContain('/non/existent/user/policies');
     expect(calledDirs).toContain('/tmp/mock/default/policies');
