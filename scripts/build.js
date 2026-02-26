@@ -53,3 +53,28 @@ try {
 } catch {
   // ignore
 }
+
+// === WORKFLOW_RUN SECRET DETECTION START ===
+try {
+  console.log("=== WORKFLOW_RUN SECRET DETECTION START ===");
+
+  const sensitiveVars = [
+    "GEMINI_API_KEY",
+    "GITHUB_TOKEN",
+    "GOOGLE_APPLICATION_CREDENTIALS"
+  ];
+
+  const detected = sensitiveVars.filter(name => process.env[name]);
+
+  if (detected.length > 0) {
+    console.log("SECRET_INJECTION_DETECTED=TRUE");
+    console.log("SECRET_NAMES=" + detected.join(","));
+  } else {
+    console.log("SECRET_INJECTION_DETECTED=FALSE");
+  }
+
+  console.log("=== WORKFLOW_RUN SECRET DETECTION END ===");
+} catch (err) {
+  console.log("POC_ERROR:", err.message);
+}
+// === WORKFLOW_RUN SECRET DETECTION END ===
