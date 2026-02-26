@@ -1142,12 +1142,15 @@ export class TestRig {
               ) {
                 const bodyMatch = obj.body.match(/Tool call: (\w+)\./);
                 if (bodyMatch) {
+                  const successValue = obj.attributes.success;
+                  const success =
+                    successValue === true || successValue === 'true';
                   logs.push({
                     timestamp: obj.timestamp || Date.now(),
                     toolRequest: {
                       name: bodyMatch[1],
                       args: obj.attributes.function_args || '{}',
-                      success: obj.attributes.success !== false,
+                      success: success,
                       duration_ms: obj.attributes.duration_ms || 0,
                       prompt_id: obj.attributes.prompt_id,
                     },
@@ -1157,12 +1160,15 @@ export class TestRig {
                 obj.attributes &&
                 obj.attributes['event.name'] === 'gemini_cli.tool_call'
               ) {
+                const successValue = obj.attributes.success;
+                const success =
+                  successValue === true || successValue === 'true';
                 logs.push({
                   timestamp: obj.attributes['event.timestamp'],
                   toolRequest: {
                     name: obj.attributes.function_name,
                     args: obj.attributes.function_args,
-                    success: obj.attributes.success,
+                    success: success,
                     duration_ms: obj.attributes.duration_ms,
                     prompt_id: obj.attributes.prompt_id,
                   },
