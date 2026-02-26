@@ -237,9 +237,9 @@ To add policies, create a `policies/` directory in your extension's root and
 place your `.toml` policy files inside it. Gemini CLI automatically loads all
 `.toml` files from this directory.
 
-Rules contributed by extensions run in the **Workspace Tier** (Tier 2),
-alongside workspace-defined policies. This tier has higher priority than the
-default rules but lower priority than user or admin policies.
+Rules contributed by extensions run in their own tier (tier 2), alongside
+workspace-defined policies. This tier has higher priority than the default rules
+but lower priority than user or admin policies.
 
 > **Warning:** For security, Gemini CLI ignores any `allow` decisions or `yolo`
 > mode configurations in extension policies. This ensures that an extension
