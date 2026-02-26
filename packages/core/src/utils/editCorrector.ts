@@ -203,8 +203,7 @@ export async function ensureCorrectEdit(
         abortSignal,
       );
     }
-  } else if (occurrences > 1 && !allowMultiple) {
-    // If user doesn't allow multiple but found multiple, return as-is (will fail validation later)
+
     const result: CorrectedEditResult = {
       params: { ...originalParams },
       occurrences,

@@ -28,6 +28,8 @@ import {
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
 import { killProcessGroup } from '../utils/process-utils.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { isNodeError } from '../utils/errors.js';
 const { Terminal } = pkg;
 
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
@@ -937,7 +939,14 @@ export class ShellExecutionService {
     if (this.activeChildProcesses.has(pid)) {
       try {
         return process.kill(pid, 0);
-      } catch {
+      } catch (e: unknown) {
+        if (isNodeError(e) && e.code === 'ESRCH') {
+          // Expected error when the process doesn't exist; safe to ignore.
+        } else if (e instanceof Error) {
+          debugLogger.warn(
+            `Unexpected error checking child process: ${e.message}`,
+          );
+        }
         return false;
       }
     }
@@ -946,7 +955,12 @@ export class ShellExecutionService {
       // process.kill with signal 0 is a way to check for the existence of a process.
       // It doesn't actually send a signal.
       return process.kill(pid, 0);
-    } catch (_) {
+    } catch (e: unknown) {
+      if (isNodeError(e) && e.code === 'ESRCH') {
+        // Expected error when the process doesn't exist; safe to ignore.
+      } else if (e instanceof Error) {
+        debugLogger.warn(`Unexpected error checking PTY process: ${e.message}`);
+      }
       return false;
     }
   }
