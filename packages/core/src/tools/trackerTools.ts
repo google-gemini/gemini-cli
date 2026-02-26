@@ -393,14 +393,17 @@ class TrackerAddDependencyInvocation extends BaseTrackerInvocation<
   }
 
   override async execute(_signal: AbortSignal): Promise<ToolResult> {
-    const task = await this.service.getTask(this.params.taskId);
+    const [task, dep] = await Promise.all([
+      this.service.getTask(this.params.taskId),
+      this.service.getTask(this.params.dependencyId),
+    ]);
+
     if (!task) {
       return {
         llmContent: `Task ${this.params.taskId} not found.`,
         returnDisplay: 'Task not found.',
       };
     }
-    const dep = await this.service.getTask(this.params.dependencyId);
     if (!dep) {
       return {
         llmContent: `Dependency task ${this.params.dependencyId} not found.`,
@@ -494,9 +497,20 @@ class TrackerVisualizeInvocation extends BaseTrackerInvocation<
       bug: '[BUG]',
     };
 
-    // Simple list-based visualization for now (can enhance to tree later if needed)
-    // We'll organize by epic/parent
-    const roots = tasks.filter((t) => !t.parentId);
+    const childrenMap = new Map<string, TrackerTask[]>();
+    const roots: TrackerTask[] = [];
+
+    for (const task of tasks) {
+      if (task.parentId) {
+        if (!childrenMap.has(task.parentId)) {
+          childrenMap.set(task.parentId, []);
+        }
+        childrenMap.get(task.parentId)!.push(task);
+      } else {
+        roots.push(task);
+      }
+    }
+
     let output = 'Task Tracker Graph:\n';
 
     const renderTask = (task: TrackerTask, depth: number) => {
@@ -505,7 +519,7 @@ class TrackerVisualizeInvocation extends BaseTrackerInvocation<
       if (task.dependencies.length > 0) {
         output += `${indent}  └─ Depends on: ${task.dependencies.join(', ')}\n`;
       }
-      const children = tasks.filter((t) => t.parentId === task.id);
+      const children = childrenMap.get(task.id) ?? [];
       for (const child of children) {
         renderTask(child, depth + 1);
       }

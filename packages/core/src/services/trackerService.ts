@@ -132,7 +132,12 @@ export class TrackerService {
     id: string,
     updates: Partial<TrackerTask>,
   ): Promise<TrackerTask> {
-    const task = await this.getTask(id);
+    const allTasks = await this.listTasks();
+    const taskMap = new Map<string, TrackerTask>(
+      allTasks.map((t) => [t.id, t]),
+    );
+    const task = taskMap.get(id);
+
     if (!task) {
       throw new Error(`Task with ID ${id} not found.`);
     }
@@ -144,12 +149,13 @@ export class TrackerService {
       updatedTask.status === TaskStatus.CLOSED &&
       task.status !== TaskStatus.CLOSED
     ) {
-      await this.validateCanClose(updatedTask);
+      this.validateCanClose(updatedTask, taskMap);
     }
 
     // Validate circular dependencies if dependencies changed
     if (updates.dependencies) {
-      await this.validateNoCircularDependencies(updatedTask);
+      taskMap.set(updatedTask.id, updatedTask);
+      this.validateNoCircularDependencies(updatedTask, taskMap);
     }
 
     await this.saveTask(updatedTask);
@@ -167,9 +173,12 @@ export class TrackerService {
   /**
    * Validates that a task can be closed (all dependencies must be closed).
    */
-  private async validateCanClose(task: TrackerTask): Promise<void> {
+  private validateCanClose(
+    task: TrackerTask,
+    taskMap: Map<string, TrackerTask>,
+  ): void {
     for (const depId of task.dependencies) {
-      const dep = await this.getTask(depId);
+      const dep = taskMap.get(depId);
       if (!dep) {
         throw new Error(`Dependency ${depId} not found for task ${task.id}.`);
       }
@@ -184,15 +193,10 @@ export class TrackerService {
   /**
    * Validates that there are no circular dependencies.
    */
-  private async validateNoCircularDependencies(
+  private validateNoCircularDependencies(
     task: TrackerTask,
-  ): Promise<void> {
-    const allTasks = await this.listTasks();
-    const taskMap = new Map<string, TrackerTask>(
-      allTasks.map((t) => [t.id, t]),
-    );
-    // Ensure the current (possibly unsaved) task state is used
-    taskMap.set(task.id, task);
+    taskMap: Map<string, TrackerTask>,
+  ): void {
 
     const visited = new Set<string>();
     const stack = new Set<string>();
