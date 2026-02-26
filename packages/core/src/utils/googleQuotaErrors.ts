@@ -219,7 +219,7 @@ export function classifyGoogleError(error: unknown): unknown {
 
   if (
     !googleApiError ||
-    googleApiError.code !== 429 ||
+    (googleApiError.code !== 429 && googleApiError.code !== 499) ||
     googleApiError.details.length === 0
   ) {
     // Fallback: try to parse the error message for a retry delay
@@ -233,27 +233,27 @@ export function classifyGoogleError(error: unknown): unknown {
         return new RetryableQuotaError(
           errorMessage,
           googleApiError ?? {
-            code: 429,
+            code: status ?? 429,
             message: errorMessage,
             details: [],
           },
           retryDelaySeconds,
         );
       }
-    } else if (status === 429) {
-      // Fallback: If it is a 429 but doesn't have a specific "retry in" message,
+    } else if (status === 429 || status === 499) {
+      // Fallback: If it is a 429 or 499 but doesn't have a specific "retry in" message,
       // assume it is a temporary rate limit and retry after 5 sec (same as DEFAULT_RETRY_OPTIONS).
       return new RetryableQuotaError(
         errorMessage,
         googleApiError ?? {
-          code: 429,
+          code: status,
           message: errorMessage,
           details: [],
         },
       );
     }
 
-    return error; // Not a 429 error we can handle with structured details or a parsable retry message.
+    return error; // Not a retryable error we can handle with structured details or a parsable retry message.
   }
 
   const quotaFailure = googleApiError.details.find(
@@ -353,15 +353,15 @@ export function classifyGoogleError(error: unknown): unknown {
     }
   }
 
-  // If we reached this point and the status is still 429, we return retryable.
-  if (status === 429) {
+  // If we reached this point and the status is still 429 or 499, we return retryable.
+  if (status === 429 || status === 499) {
     const errorMessage =
       googleApiError?.message ||
       (error instanceof Error ? error.message : String(error));
     return new RetryableQuotaError(
       errorMessage,
       googleApiError ?? {
-        code: 429,
+        code: status,
         message: errorMessage,
         details: [],
       },
