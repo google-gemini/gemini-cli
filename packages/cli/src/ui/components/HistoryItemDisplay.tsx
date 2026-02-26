@@ -36,6 +36,7 @@ import { HooksList } from './views/HooksList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
 import { ThinkingMessage } from './messages/ThinkingMessage.js';
 import { HintMessage } from './messages/HintMessage.js';
+import { ColorsDisplay } from './ColorsDisplay.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 
@@ -124,6 +125,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           tier={itemForDisplay.tier}
         />
       )}
+      {itemForDisplay.type === 'colors' && <ColorsDisplay />}
       {itemForDisplay.type === 'help' && commands && (
         <Help commands={commands} />
       )}
