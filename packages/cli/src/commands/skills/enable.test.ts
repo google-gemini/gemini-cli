@@ -5,7 +5,6 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { format } from 'node:util';
 import { handleEnable, enableCommand } from './enable.js';
 import {
   loadSettings,
@@ -13,12 +12,12 @@ import {
   type LoadedSettings,
 } from '../../config/settings.js';
 
-const emitConsoleLog = vi.hoisted(() => vi.fn());
-const debugLogger = vi.hoisted(() => ({
-  log: vi.fn((message, ...args) => {
-    emitConsoleLog('log', format(message, ...args));
-  }),
-}));
+const { emitConsoleLog, debugLogger } = await vi.hoisted(async () => {
+  const { createMockDebugLogger } = await import(
+    '../../test-utils/mockDebugLogger.js'
+  );
+  return createMockDebugLogger({ stripAnsi: true });
+});
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
