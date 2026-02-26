@@ -1,138 +1,145 @@
 # Codebase understanding
 
-This document provides a detailed overview of the Gemini CLI architecture, its
-core components, and how they interact to provide an agentic terminal
-experience.
+This document provides an in-depth technical overview of the Gemini CLI
+architecture. It is intended for developers who want to understand the system's
+inner workings, from startup to advanced agentic orchestration.
 
-## Repository overview
+## Repository structure
 
-Gemini CLI is structured as a monorepo using npm workspaces. The codebase is
-divided into several specialized packages that separate the user interface from
-the agentic orchestration logic.
+Gemini CLI is a monorepo managed with npm workspaces. It strictly separates
+concerns across packages:
 
-### Core packages
+- **`packages/cli`**: The terminal user interface (TUI) layer. Built with React
+  and Ink, it handles user interaction, rendering, and terminal state.
+- **`packages/core`**: The engine containing all business logic. It is entirely
+  UI-agnostic and manages the agent's lifecycle, Gemini API interactions, and
+  tool systems.
+- **`packages/devtools`**: A suite for inspection. It provides a Chrome-like
+  Network and Console inspector for real-time debugging.
+- **`packages/sdk`**: A library for building third-party extensions.
+- **`packages/vscode-ide-companion`**: Bridges the editor and CLI, providing
+  real-time IDE context to the agent.
 
-- **`packages/cli`**: Contains the terminal user interface (TUI) implemented
-  with React and Ink. It handles terminal-specific logic like keybindings,
-  mouse events, and layout rendering.
-- **`packages/core`**: The central engine of the application. It is UI-agnostic
-  and manages the Gemini API communication, tool orchestration, conversation
-  history, and policy enforcement.
-- **`packages/devtools`**: Provides a developer-focused inspector (similar to
-  Chrome DevTools) for monitoring network traffic and console logs in real-time.
-- **`packages/sdk`**: A library for building extensions and custom tools that
-  integrate with Gemini CLI.
-- **`packages/vscode-ide-companion`**: A VS Code extension that connects the
-  editor state to the CLI, enabling the agent to read open files and cursor
-  positions.
+---
 
-## Application lifecycle
+## 1. Application lifecycle
 
-The application follows a structured startup and execution flow to ensure
-security and environment consistency.
+### Startup and initialization
+The entry point is `packages/cli/src/gemini.tsx`. The startup sequence involves:
+1.  **Standard I/O patching**: The CLI patches `process.stdout` and
+    `process.stderr` to capture all output, ensuring it can be redirected to the
+    TUI or debug logs without garbling the terminal display.
+2.  **Sandboxing and relaunch**: If `advanced.sandbox` is enabled, the CLI
+    re-launches itself in a restricted environment. It also uses a relaunch
+    mechanism to automatically configure Node.js memory limits (e.g.,
+    `--max-old-space-size`).
+3.  **Authentication**: Credentials are validated early. The CLI supports
+    multiple auth types, including API Keys, OAuth2, and Vertex AI.
 
-### Startup and sandboxing
+### Execution modes
+The CLI operates in two distinct modes:
+- **Interactive (TUI)**: Uses the `render` function from Ink to start a
+  persistent React application in the terminal.
+- **Non-interactive (CLI)**: A streamlined execution loop in
+  `nonInteractiveCli.ts` that runs until the agent completes its task,
+  supporting piped input and output redirection.
 
-When you launch Gemini CLI, the entry point in `packages/cli/src/gemini.tsx`
-manages several initialization steps:
+---
 
-1.  **Configuration loading**: Loads user and workspace settings, parsing
-    command-line arguments.
-2.  **Authentication**: Validates credentials and refreshes OAuth tokens.
-3.  **Sandboxing**: If configured, the application relaunches itself in a
-    restricted child process using a "sandbox" environment to isolate tool
-    execution.
-4.  **Mode selection**: Determines whether to start the interactive TUI or run
-    in non-interactive mode based on input and terminal state.
+## 2. Model routing engine
 
-### Interactive vs. non-interactive modes
+The `ModelRouterService` (`packages/core/src/routing`) is responsible for
+selecting the most appropriate model for every request.
 
-- **Interactive mode**: Renders the TUI using Ink. The state is managed via
-  React contexts (Settings, Mouse, Keypress, Terminal) and a central
-  `AppContainer`.
-- **Non-interactive mode**: Executes a single prompt or command. It uses a
-  focused loop in `packages/cli/src/nonInteractiveCli.ts` that continues until
-  the agent completes its task or requires user intervention that cannot be
-  provided.
+### Composite strategy
+The router uses a "Composite Strategy" that evaluates multiple sub-strategies in
+priority order:
+1.  **Fallback**: Switches models if a quota error or API failure occurs.
+2.  **Override**: Respects user-specified model overrides (e.g., `--model`).
+3.  **Approval Mode**: Selects specialized models for `Plan Mode`.
+4.  **Classifier**: A lightweight LLM call that analyzes the user's request
+    against a rubric (Strategic Planning, Complexity, Ambiguity) to choose
+    between a "Pro" (complex) or "Flash" (simple) model.
+5.  **Numerical Classifier**: A deterministic classifier based on token counts
+    and history depth.
 
-## Agent orchestration
+---
 
-The orchestration of the agent's behavior happens primarily within
-`packages/core/src/core`.
+## 3. Intelligent context management
 
-### GeminiClient
+Managing the model's context window is critical for long-running sessions. This
+is handled by two primary services in `packages/core/src/services`:
 
-The `GeminiClient` is the primary interface for the rest of the application. It
-coordinates:
+### ChatCompressionService
+When history exceeds a threshold (default 50% of the context window), the
+compression service triggers:
+1.  **Split point detection**: It identifies a safe point in history to begin
+    summarization, ensuring recent turns remain in high-fidelity.
+2.  **State snapshot generation**: The LLM generates a `<state_snapshot>`—a
+    structured summary of established constraints, technical details, and
+    progress.
+3.  **The "Probe" (Self-Correction)**: A second model call "probes" the generated
+    summary against the original history to ensure no critical constraints or
+    paths were omitted, correcting the summary if necessary.
 
-- **Session management**: Initializing, resuming, and persisting chat sessions.
-- **Model routing**: Deciding which Gemini model to use based on the task and
-  configuration.
-- **Context compression**: Summarizing long histories using the
-  `ChatCompressionService` to stay within context window limits.
-- **IDE integration**: Injecting editor context (open files, selections) into
-  the prompt.
+### ToolOutputMaskingService
+To prevent bulky tool outputs (like long log files) from clogging the context,
+this service detects large `functionResponse` blocks and replaces them with
+concise summaries or pointers to temporary files, preserving the model's ability
+to reason about the data without consuming thousands of tokens.
 
-### GeminiChat and Turn
+---
 
-- **`GeminiChat`**: Manages the low-level API communication. It handles
-  streaming responses, retries for transient network errors, and records the
-  conversation history.
-- **`Turn`**: Represents a single agentic exchange. A turn may involve multiple
-  API calls if the model decides to use tools. It yields events for content,
-  thoughts, and tool requests.
+## 4. Advanced tool execution
 
-## Tool system and scheduler
+Tool execution is orchestrated by the `Scheduler`
+(`packages/core/src/scheduler`), which operates as an event-driven state
+machine.
 
-The tool system allows the agent to interact with the external world. It is
-built on a secure, policy-driven framework.
+### State management
+Every tool call moves through a structured lifecycle managed by the
+`SchedulerStateManager`:
+`Validating` → `AwaitingApproval` → `Scheduled` → `Executing` → `Success`/`Error`
 
-### Tool registry
+### Key features
+- **Policy Engine**: A granular system that determines if a tool is safe to run.
+  Policies can be "Always", "Ask", or "Never" based on the tool name, arguments,
+  or folder location.
+- **Tail Calls**: If a tool's output requires immediate follow-up (like a shell
+  command that produced a specific error code), the scheduler can "tail call"
+  another tool (e.g., a "fixer" or "retry") without ending the current turn.
+- **Parallel execution**: The scheduler can execute multiple non-conflicting
+  read-only tools in parallel while enforcing sequential execution for
+  modifying tools.
 
-The `ToolRegistry` in `packages/core/src/tools` maintains a list of all
-available tools. It supports several types:
+---
 
-- **Built-in tools**: Native TypeScript implementations for file system
-  operations, shell commands, and web fetching.
-- **Discovered tools**: Local scripts or commands identified in the project
-  root.
-- **MCP tools**: Tools provided by external servers via the Model Context
-  Protocol.
+## 5. UI architecture
 
-### Scheduler
+The `packages/cli/src/ui` directory implements a sophisticated React-based
+terminal interface.
 
-The `Scheduler` in `packages/core/src/scheduler` manages the lifecycle of a
-tool call:
+### Rendering and layout
+- **Ink**: Provides React components for terminal output (`Box`, `Text`).
+- **AppContainer**: The root component that coordinates the display of multiple
+  screens (Chat, Debug Console, Settings, Auth).
+- **ConsolePatcher**: Intercepts `console.log` and redirects them to the
+  internal "Debug Console" accessible via `ctrl+d`.
 
-1.  **Validation**: Ensures the tool exists and the arguments match the schema.
-2.  **Policy check**: Consults the Policy Engine to determine if the tool is
-    allowed to run automatically, requires user confirmation, or is denied.
-3.  **Confirmation**: If required, it pauses execution and uses the
-    `MessageBus` to request user approval through the UI.
-4.  **Execution**: Runs the tool and captures the output, including live
-    updates for long-running processes.
-5.  **Feedback**: Sends the tool result back to the model to continue the
-    agentic loop.
+### State providers
+Global state is managed through specialized providers:
+- **`KeypressProvider`**: Captures and routes terminal keyboard events,
+  supporting complex shortcuts and Vim-style navigation.
+- **`TerminalProvider`**: Tracks the terminal size and window state using a
+  custom `ResizeObserver`.
+- **`VimModeProvider`**: Enables Vim-like keybindings for navigating through
+  conversation history and multi-line input fields.
 
-## UI architecture
+## Testing and quality assurance
 
-The UI is built with React components rendered to the terminal via Ink. Key
-design patterns include:
-
-- **Providers**: Global state like settings, theme, and terminal size is
-  provided through React Contexts to avoid prop drilling.
-- **Console patching**: Standard `console.log` calls are intercepted and
-  redirected to the TUI's debug console or the `devtools` server.
-- **Event-driven updates**: The UI listens to `coreEvents` from the orchestrator
-  to update its state (e.g., streaming text, tool progress, or errors).
-
-## Testing and quality
-
-The project maintains high standards through several testing tiers:
-
-- **Unit tests**: Located alongside the source code (e.g., `*.test.ts`), using
-  Vitest.
-- **Integration tests**: E2E tests in the `integration-tests/` directory that
-  run the compiled CLI against mocked and real API endpoints.
-- **Evals**: Specialized evaluation scripts in `evals/` that measure the
-  agent's performance on specific tasks like tool use and codebase navigation.
+The repo employs a three-tier testing strategy:
+1.  **Unit tests**: Fast, isolated tests for core logic (Vitest).
+2.  **Integration tests**: Verify full system flows, including mock Gemini API
+    responses and real file system operations.
+3.  **Evals**: Performance benchmarks in `evals/` that measure the agent's
+    reasoning accuracy and tool-use efficiency over time.
