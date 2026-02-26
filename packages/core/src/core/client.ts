@@ -574,7 +574,7 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
-    const compressed = await this.tryCompressChat(prompt_id, false);
+    const compressed = await this.tryCompressChat(prompt_id, false, signal);
 
     if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
@@ -1049,11 +1049,16 @@ export class GeminiClient {
   async tryCompressChat(
     prompt_id: string,
     force: boolean = false,
+    abortSignal?: AbortSignal,
   ): Promise<ChatCompressionInfo> {
     // If the model is 'auto', we will use a placeholder model to check.
     // Compression occurs before we choose a model, so calling `count_tokens`
     // before the model is chosen would result in an error.
     const model = this._getActiveModelForCurrentTurn();
+
+    // Use the provided signal, or create a no-op signal as a fallback for
+    // callers that don't have one (e.g. the /compress command).
+    const signal = abortSignal ?? new AbortController().signal;
 
     const { newHistory, info } = await this.compressionService.compress(
       this.getChat(),
@@ -1062,6 +1067,7 @@ export class GeminiClient {
       model,
       this.config,
       this.hasFailedCompressionAttempt,
+      signal,
     );
 
     if (
