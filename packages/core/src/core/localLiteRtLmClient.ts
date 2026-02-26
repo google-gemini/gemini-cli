@@ -83,6 +83,7 @@ export class LocalLiteRtLmClient {
         );
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return JSON.parse(result.text);
     } catch (error) {
       debugLogger.error(

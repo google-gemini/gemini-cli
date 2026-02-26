@@ -130,13 +130,14 @@ describe('ModelRouterService', () => {
     const compositeStrategyArgs = vi.mocked(CompositeStrategy).mock.calls[0];
     const childStrategies = compositeStrategyArgs[0];
 
-    expect(childStrategies.length).toBe(6);
+    expect(childStrategies.length).toBe(7);
     expect(childStrategies[0]).toBeInstanceOf(FallbackStrategy);
     expect(childStrategies[1]).toBeInstanceOf(OverrideStrategy);
-    expect(childStrategies[2]).toBeInstanceOf(GemmaClassifierStrategy);
-    expect(childStrategies[3]).toBeInstanceOf(ClassifierStrategy);
-    expect(childStrategies[4]).toBeInstanceOf(NumericalClassifierStrategy);
-    expect(childStrategies[5]).toBeInstanceOf(DefaultStrategy);
+    expect(childStrategies[2]).toBeInstanceOf(ApprovalModeStrategy);
+    expect(childStrategies[3]).toBeInstanceOf(GemmaClassifierStrategy);
+    expect(childStrategies[4]).toBeInstanceOf(ClassifierStrategy);
+    expect(childStrategies[5]).toBeInstanceOf(NumericalClassifierStrategy);
+    expect(childStrategies[6]).toBeInstanceOf(DefaultStrategy);
     expect(compositeStrategyArgs[1]).toBe('agent-router');
   });
 
