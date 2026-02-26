@@ -125,6 +125,8 @@ async function startOrJoinDevTools(
     // We won the port — we are the server.
     // Persist the token so other CLI instances can authenticate.
     writeTokenFile(actualPort, token);
+    // Clean up the token file when the process exits
+    process.on('exit', () => removeTokenFile(actualPort));
     debugLogger.log(`DevTools available at: ${url}`);
     return { host: defaultHost, port: actualPort, token };
   }
@@ -147,6 +149,7 @@ async function startOrJoinDevTools(
 
   // Winner isn’t responding — keep ours.
   writeTokenFile(actualPort, token);
+  process.on('exit', () => removeTokenFile(actualPort));
   debugLogger.log(`DevTools available at: ${url}`);
   return { host: defaultHost, port: actualPort, token };
 }
