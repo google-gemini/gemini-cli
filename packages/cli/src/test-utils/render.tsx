@@ -607,6 +607,7 @@ const mockUIActions: UIActions = {
   onHintSubmit: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
+  getPreferredEditor: vi.fn(),
 };
 
 let capturedOverflowState: OverflowState | undefined;

@@ -2554,6 +2554,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
         setNewAgents(null);
       },
+      getPreferredEditor,
     }),
     [
       handleThemeSelect,
@@ -2605,6 +2606,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       newAgents,
       config,
       historyManager,
+      getPreferredEditor,
     ],
   );
 

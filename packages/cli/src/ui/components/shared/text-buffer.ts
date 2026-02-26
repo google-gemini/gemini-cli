@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import pathMod from 'node:path';
@@ -13,12 +12,9 @@ import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
 import { LRUCache } from 'mnemonist';
 import {
   coreEvents,
-  CoreEvent,
   debugLogger,
   unescapePath,
   type EditorType,
-  getEditorCommand,
-  isGuiEditor,
 } from '@google/gemini-cli-core';
 import {
   toCodePoints,
@@ -33,6 +29,7 @@ import { keyMatchers, Command } from '../../keyMatchers.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
+import { openFileInEditor } from '../../utils/editorUtils.js';
 
 export const LARGE_PASTE_LINE_THRESHOLD = 5;
 export const LARGE_PASTE_CHAR_THRESHOLD = 500;
@@ -3095,36 +3092,15 @@ export function useTextBuffer({
     );
     fs.writeFileSync(filePath, expandedText, 'utf8');
 
-    let command: string | undefined = undefined;
-    const args = [filePath];
-
-    const preferredEditorType = getPreferredEditor?.();
-    if (!command && preferredEditorType) {
-      command = getEditorCommand(preferredEditorType);
-      if (isGuiEditor(preferredEditorType)) {
-        args.unshift('--wait');
-      }
-    }
-
-    if (!command) {
-      command =
-        process.env['VISUAL'] ??
-        process.env['EDITOR'] ??
-        (process.platform === 'win32' ? 'notepad' : 'vi');
-    }
-
     dispatch({ type: 'create_undo_snapshot' });
 
-    const wasRaw = stdin?.isRaw ?? false;
     try {
-      setRawMode?.(false);
-      const { status, error } = spawnSync(command, args, {
-        stdio: 'inherit',
-        shell: process.platform === 'win32',
-      });
-      if (error) throw error;
-      if (typeof status === 'number' && status !== 0)
-        throw new Error(`External editor exited with status ${status}`);
+      await openFileInEditor(
+        filePath,
+        stdin,
+        setRawMode,
+        getPreferredEditor?.(),
+      );
 
       let newText = fs.readFileSync(filePath, 'utf8');
       newText = newText.replace(/\r\n?/g, '\n');
@@ -3147,8 +3123,6 @@ export function useTextBuffer({
         err,
       );
     } finally {
-      coreEvents.emit(CoreEvent.ExternalEditorClosed);
-      if (wasRaw) setRawMode?.(true);
       try {
         fs.unlinkSync(filePath);
       } catch {

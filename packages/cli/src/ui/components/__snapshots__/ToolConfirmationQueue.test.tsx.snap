@@ -85,7 +85,7 @@ exports[`ToolConfirmationQueue > renders ExitPlanMode tool confirmation with Suc
 │       Approves plan but requires confirmation for each tool                  │
 │   3.  Type your feedback...                                                  │
 │                                                                              │
-│ Enter to select · ↑/↓ to navigate · Esc to cancel                            │
+│ Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel      │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 "
 `;

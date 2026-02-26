@@ -15,6 +15,8 @@ export interface DialogFooterProps {
   navigationActions?: string;
   /** Exit shortcut (defaults to "Esc to cancel") */
   cancelAction?: string;
+  /** Custom keyboard shortcut hints (e.g., ["Ctrl+P to edit"]) */
+  extraParts?: string[];
 }
 
 /**
@@ -25,11 +27,13 @@ export const DialogFooter: React.FC<DialogFooterProps> = ({
   primaryAction,
   navigationActions,
   cancelAction = 'Esc to cancel',
+  extraParts = [],
 }) => {
   const parts = [primaryAction];
   if (navigationActions) {
     parts.push(navigationActions);
   }
+  parts.push(...extraParts);
   parts.push(cancelAction);
 
   return (

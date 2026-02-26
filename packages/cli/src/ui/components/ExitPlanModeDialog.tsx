@@ -5,25 +5,32 @@
  */
 
 import type React from 'react';
-import { useEffect, useState } from 'react';
-import { Box, Text } from 'ink';
+import { useEffect, useState, useCallback } from 'react';
+import { Box, Text, useStdin } from 'ink';
 import {
   ApprovalMode,
   validatePlanPath,
   validatePlanContent,
   QuestionType,
   type Config,
+  type EditorType,
   processSingleFileContent,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { AskUserDialog } from './AskUserDialog.js';
+import { openFileInEditor } from '../utils/editorUtils.js';
+import { useKeypress } from '../hooks/useKeypress.js';
+import { keyMatchers, Command } from '../keyMatchers.js';
+import { formatCommand } from '../utils/keybindingUtils.js';
 
 export interface ExitPlanModeDialogProps {
   planPath: string;
   onApprove: (approvalMode: ApprovalMode) => void;
   onFeedback: (feedback: string) => void;
   onCancel: () => void;
+  getPreferredEditor: () => EditorType | undefined;
   width: number;
   availableHeight?: number;
 }
@@ -38,6 +45,7 @@ interface PlanContentState {
   status: PlanStatus;
   content?: string;
   error?: string;
+  refresh: () => void;
 }
 
 enum ApprovalOption {
@@ -53,9 +61,14 @@ const StatusMessage: React.FC<{
 }> = ({ children }) => <Box paddingX={1}>{children}</Box>;
 
 function usePlanContent(planPath: string, config: Config): PlanContentState {
-  const [state, setState] = useState<PlanContentState>({
+  const [version, setVersion] = useState(0);
+  const [state, setState] = useState<Omit<PlanContentState, 'refresh'>>({
     status: PlanStatus.Loading,
   });
+
+  const refresh = useCallback(() => {
+    setVersion((v) => v + 1);
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -120,9 +133,9 @@ function usePlanContent(planPath: string, config: Config): PlanContentState {
     return () => {
       ignore = true;
     };
-  }, [planPath, config]);
+  }, [planPath, config, version]);
 
-  return state;
+  return { ...state, refresh };
 }
 
 export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
@@ -130,12 +143,35 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   onApprove,
   onFeedback,
   onCancel,
+  getPreferredEditor,
   width,
   availableHeight,
 }) => {
   const config = useConfig();
+  const { stdin, setRawMode } = useStdin();
   const planState = usePlanContent(planPath, config);
+  const { refresh } = planState;
   const [showLoading, setShowLoading] = useState(false);
+
+  const handleOpenEditor = useCallback(async () => {
+    try {
+      await openFileInEditor(planPath, stdin, setRawMode, getPreferredEditor());
+      refresh();
+    } catch (err) {
+      debugLogger.error('Failed to open plan in editor:', err);
+    }
+  }, [planPath, stdin, setRawMode, getPreferredEditor, refresh]);
+
+  useKeypress(
+    (key) => {
+      if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
+        void handleOpenEditor();
+        return true;
+      }
+      return false;
+    },
+    { isActive: true, priority: true },
+  );
 
   useEffect(() => {
     if (planState.status !== PlanStatus.Loading) {
@@ -183,6 +219,8 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
     );
   }
 
+  const editHint = formatCommand(Command.OPEN_EXTERNAL_EDITOR);
+
   return (
     <Box flexDirection="column" width={width}>
       <AskUserDialog
@@ -220,6 +258,7 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
         onCancel={onCancel}
         width={width}
         availableHeight={availableHeight}
+        extraParts={[`${editHint} to edit plan`]}
       />
     </Box>
   );
