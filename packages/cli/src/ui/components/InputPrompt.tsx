@@ -254,6 +254,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   >(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const innerBoxRef = useRef<DOMElement>(null);
+  const hasUserNavigatedSuggestions = useRef(false);
 
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
   const [commandSearchActive, setCommandSearchActive] = useState(false);
@@ -609,6 +610,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         setSuppressCompletion(
           isHistoryNav || isCursorMovement || keyMatchers[Command.ESCAPE](key),
         );
+        hasUserNavigatedSuggestions.current = false;
       }
 
       // TODO(jacobr): this special case is likely not needed anymore.
@@ -642,7 +644,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         Boolean(completion.promptCompletion.text) ||
         reverseSearchActive ||
         commandSearchActive;
-      if (isPlainTab) {
+
+      if (isPlainTab && shellModeActive) {
+        resetPlainTabPress();
+        if (!completion.showSuggestions) {
+          setSuppressCompletion(false);
+        }
+      } else if (isPlainTab) {
         if (!hasTabCompletionInteraction) {
           if (registerPlainTabPress() === 2) {
             toggleCleanUiDetailsVisible();
@@ -902,11 +910,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         if (completion.suggestions.length > 1) {
           if (keyMatchers[Command.COMPLETION_UP](key)) {
             completion.navigateUp();
+            hasUserNavigatedSuggestions.current = true;
             setExpandedSuggestionIndex(-1); // Reset expansion when navigating
             return true;
           }
           if (keyMatchers[Command.COMPLETION_DOWN](key)) {
             completion.navigateDown();
+            hasUserNavigatedSuggestions.current = true;
             setExpandedSuggestionIndex(-1); // Reset expansion when navigating
             return true;
           }
@@ -923,6 +933,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               const suggestion = completion.suggestions[targetIndex];
 
               const isEnterKey = key.name === 'return' && !key.ctrl;
+
+              if (isEnterKey && shellModeActive) {
+                if (hasUserNavigatedSuggestions.current) {
+                  completion.handleAutocomplete(
+                    completion.activeSuggestionIndex,
+                  );
+                  setExpandedSuggestionIndex(-1);
+                  hasUserNavigatedSuggestions.current = false;
+                  return true;
+                }
+                completion.resetCompletionState();
+                setExpandedSuggestionIndex(-1);
+                hasUserNavigatedSuggestions.current = false;
+                if (buffer.text.trim()) {
+                  handleSubmit(buffer.text);
+                }
+                return true;
+              }
 
               if (isEnterKey && buffer.text.startsWith('/')) {
                 const { isArgumentCompletion, leafCommand } =
@@ -1380,7 +1408,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         scrollOffset={activeCompletion.visibleStartIndex}
         userInput={buffer.text}
         mode={
-          completion.completionMode === CompletionMode.AT
+          completion.completionMode === CompletionMode.AT ||
+          completion.completionMode === CompletionMode.SHELL
             ? 'reverse'
             : buffer.text.startsWith('/') &&
                 !reverseSearchActive &&
