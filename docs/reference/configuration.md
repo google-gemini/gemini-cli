@@ -322,6 +322,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"tips"`
   - **Values:** `"tips"`, `"witty"`, `"all"`, `"off"`
 
+- **`ui.errorVerbosity`** (enum):
+  - **Description:** Controls whether recoverable errors are hidden (low) or
+    fully shown (full).
+  - **Default:** `"low"`
+  - **Values:** `"low"`, `"full"`
+
 - **`ui.customWittyPhrases`** (array):
   - **Description:** Custom witty phrases to display during loading. When
     provided, the CLI cycles through these instead of the defaults.

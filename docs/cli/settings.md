@@ -72,6 +72,7 @@ they appear in the UI.
 | Incremental Rendering                | `ui.incrementalRendering`              | Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled. | `true`   |
 | Show Spinner                         | `ui.showSpinner`                       | Show the spinner during operations.                                                                                                                               | `true`   |
 | Loading Phrases                      | `ui.loadingPhrases`                    | What to show while the model is working: tips, witty comments, both, or nothing.                                                                                  | `"tips"` |
+| Error Verbosity                      | `ui.errorVerbosity`                    | Controls whether recoverable errors are hidden (low) or fully shown (full).                                                                                       | `"low"`  |
 | Screen Reader Mode                   | `ui.accessibility.screenReader`        | Render output in plain-text to be more screen reader accessible                                                                                                   | `false`  |
 
 ### IDE
