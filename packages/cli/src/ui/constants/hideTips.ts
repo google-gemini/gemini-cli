@@ -5,7 +5,7 @@
  */
 
 export const INFORMATIVE_TIPS = [
-  //Settings tips start here
+  //Settings hideTips start here
   'Set your preferred editor for opening files (/settings)…',
   'Toggle Vim mode for a modal editing experience (/settings)…',
   'Disable automatic updates if you prefer manual control (/settings)…',
@@ -15,8 +15,8 @@ export const INFORMATIVE_TIPS = [
   'Personalize your CLI with a new color theme (/settings)…',
   'Create and use your own custom themes (settings.json)…',
   'Hide window title for a more minimal UI (/settings)…',
-  "Don't like these tips? You can hide them (/settings)…",
-  'Hide the startup banner for a cleaner launch (/settings)…',
+  "Don't like these hideTips? You can hide them (/settings)…",
+  'Hide the startup hideBanner for a cleaner launch (/settings)…',
   'Hide the context summary above the input (/settings)…',
   'Reclaim vertical space by hiding the footer (/settings)…',
   'Hide individual footer elements like CWD or sandbox status (/settings)…',
@@ -24,7 +24,7 @@ export const INFORMATIVE_TIPS = [
   'Show memory usage for performance monitoring (/settings)…',
   'Show line numbers in the chat for easier reference (/settings)…',
   'Show citations to see where the model gets information (/settings)…',
-  'Customize loading phrases: tips, witty, all, or off (/settings)…',
+  'Customize loading phrases: hideTips, witty, all, or off (/settings)…',
   'Add custom witty phrases to the loading screen (settings.json)…',
   'Use alternate screen buffer to preserve shell history (/settings)…',
   'Choose a specific Gemini model for conversations (/settings)…',
@@ -79,8 +79,8 @@ export const INFORMATIVE_TIPS = [
   'Enable experimental subagents for task delegation (/settings)…',
   'Enable extension management features (settings.json)…',
   'Enable extension reloading within the CLI session (settings.json)…',
-  //Settings tips end here
-  // Keyboard shortcut tips start here
+  //Settings hideTips end here
+  // Keyboard shortcut hideTips start here
   'Close dialogs and suggestions with Esc…',
   'Cancel a request with Ctrl+C, or press twice to exit…',
   'Exit the app with Ctrl+D on an empty line…',
@@ -117,8 +117,8 @@ export const INFORMATIVE_TIPS = [
   "If you're using an IDE, see the context with Ctrl+G…",
   'Toggle background shells with Ctrl+B or /shells...',
   'Toggle the background shell process list with Ctrl+L...',
-  // Keyboard shortcut tips end here
-  // Command tips start here
+  // Keyboard shortcut hideTips end here
+  // Command hideTips start here
   'Show version info with /about…',
   'Change your authentication method with /auth…',
   'File a bug report directly with /bug…',
@@ -161,5 +161,5 @@ export const INFORMATIVE_TIPS = [
   'Configure terminal keybindings for multiline input with /terminal-setup…',
   'Find relevant documentation with /find-docs…',
   'Execute any shell command with !<command>…',
-  // Command tips end here
+  // Command hideTips end here
 ];

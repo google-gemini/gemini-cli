@@ -50,7 +50,7 @@ describe('ExtensionManager theme loading', () => {
     extensionManager = new ExtensionManager({
       settings: createTestMergedSettings({
         experimental: { extensionConfig: true },
-        security: { gitExtensionsEnabled: true },
+        security: { blockGitExtensions: true },
         admin: { extensions: { enabled: true }, mcp: { enabled: true } },
       }),
       requestConsent: async () => true,

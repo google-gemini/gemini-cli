@@ -14,7 +14,7 @@ describe('Banner', () => {
     ['info mode', false, 'Info Message'],
   ])('renders in %s', async (_, isWarning, text) => {
     const { lastFrame, waitUntilReady, unmount } = render(
-      <Banner bannerText={text} isWarning={isWarning} width={80} />,
+      <Banner hideBannerText={text} isWarning={isWarning} width={80} />,
     );
     await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
@@ -24,7 +24,7 @@ describe('Banner', () => {
   it('handles newlines in text', async () => {
     const text = 'Line 1\\nLine 2';
     const { lastFrame, waitUntilReady, unmount } = render(
-      <Banner bannerText={text} isWarning={false} width={80} />,
+      <Banner hideBannerText={text} isWarning={false} width={80} />,
     );
     await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();

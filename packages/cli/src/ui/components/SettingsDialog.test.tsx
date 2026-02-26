@@ -134,8 +134,10 @@ vi.mock('../../utils/settingsUtils.js', async (importOriginal) => {
           categories[category].push(definition);
         });
 
-      const ordered: Record<string, Array<SettingDefinition & { key: string }>> =
-        {};
+      const ordered: Record<
+        string,
+        Array<SettingDefinition & { key: string }>
+      > = {};
       CATEGORY_ORDER.forEach((cat) => {
         if (categories[cat]) ordered[cat] = categories[cat];
       });
@@ -856,13 +858,13 @@ describe('SettingsDialog', () => {
     it('should show correct display values for settings with different states', async () => {
       const settings = createMockSettings({
         user: {
-          settings: { vimMode: true, tips: true },
-          originalSettings: { vimMode: true, tips: true },
+          settings: { vimMode: true, hideTips: true },
+          originalSettings: { vimMode: true, hideTips: true },
           path: '',
         },
         system: {
-          settings: { windowTitle: false },
-          originalSettings: { windowTitle: false },
+          settings: { hideWindowTitle: false },
+          originalSettings: { hideWindowTitle: false },
           path: '',
         },
         workspace: {
@@ -895,7 +897,7 @@ describe('SettingsDialog', () => {
       );
       await waitUntilReady();
 
-      // Toggle a non-restart-required setting (like tips)
+      // Toggle a non-restart-required setting (like hideTips)
       await act(async () => {
         stdin.write(TerminalKeys.ENTER as string); // Enter - toggle current setting
       });
@@ -944,8 +946,8 @@ describe('SettingsDialog', () => {
     it('should show correct values for inherited settings', async () => {
       const settings = createMockSettings({
         system: {
-          settings: { vimMode: true, windowTitle: true },
-          originalSettings: { vimMode: true, windowTitle: true },
+          settings: { vimMode: true, hideWindowTitle: true },
+          originalSettings: { vimMode: true, hideWindowTitle: true },
           path: '',
         },
       });
@@ -1677,8 +1679,8 @@ describe('SettingsDialog', () => {
             debugKeystrokeLogging: true,
           },
           ui: {
-            windowTitle: false,
-            tips: false,
+            hideWindowTitle: false,
+            hideTips: false,
             showMemoryUsage: true,
             showLineNumbers: true,
             showCitations: true,
@@ -1722,7 +1724,7 @@ describe('SettingsDialog', () => {
           },
           ui: {
             showMemoryUsage: true,
-            windowTitle: true,
+            hideWindowTitle: true,
           },
           tools: {
             truncateToolOutputThreshold: 50000,
@@ -1732,7 +1734,7 @@ describe('SettingsDialog', () => {
           },
           model: {
             maxSessionTurns: 100,
-            nextSpeakerCheck: true,
+            skipNextSpeakerCheck: true,
           },
         },
         systemSettings: {},
@@ -1806,7 +1808,7 @@ describe('SettingsDialog', () => {
           },
           model: {
             maxSessionTurns: 50,
-            nextSpeakerCheck: false,
+            skipNextSpeakerCheck: false,
           },
         },
         systemSettings: {},
@@ -1822,8 +1824,8 @@ describe('SettingsDialog', () => {
             debugKeystrokeLogging: false,
           },
           ui: {
-            windowTitle: true,
-            tips: true,
+            hideWindowTitle: true,
+            hideTips: true,
             showMemoryUsage: false,
             showLineNumbers: false,
             showCitations: false,

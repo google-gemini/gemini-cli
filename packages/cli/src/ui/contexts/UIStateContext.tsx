@@ -138,7 +138,7 @@ export interface UIState {
   commandConfirmationRequest: ConfirmationRequest | null;
   authConsentRequest: ConfirmationRequest | null;
   confirmUpdateExtensionRequests: ConfirmationRequest[];
-  loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
+  disableLoopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
   permissionConfirmationRequest: PermissionConfirmationRequest | null;
   geminiMdFileCount: number;
   streamingState: StreamingState;
@@ -208,11 +208,11 @@ export interface UIState {
   showDebugProfiler: boolean;
   showFullTodos: boolean;
   copyModeEnabled: boolean;
-  bannerData: {
+  hideBannerData: {
     defaultText: string;
     warningText: string;
   };
-  bannerVisible: boolean;
+  hideBannerVisible: boolean;
   customDialog: React.ReactNode | null;
   terminalBackgroundColor: TerminalBackgroundColor;
   settingsNonce: number;

@@ -36,7 +36,7 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
   }
 
   const showContextSummary =
-    settings.merged.ui.contextSummary && !forceHideContextSummary;
+    !settings.merged.ui.hideContextSummary && !forceHideContextSummary;
 
   if (showContextSummary) {
     return (

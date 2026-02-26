@@ -503,21 +503,21 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.security?.folderTrust?.enabled).toBe(true); // System setting should be used
     });
 
-    it('should not allow user or workspace to override system yoloModeAllowed', () => {
+    it('should not allow user or workspace to override system disableYoloMode', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {
         security: {
-          yoloModeAllowed: true,
+          disableYoloMode: true,
         },
       };
       const workspaceSettingsContent = {
         security: {
-          yoloModeAllowed: true, // This should be ignored
+          disableYoloMode: true, // This should be ignored
         },
       };
       const systemSettingsContent = {
         security: {
-          yoloModeAllowed: false,
+          disableYoloMode: false,
         },
       };
 
@@ -534,7 +534,7 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.security?.yoloModeAllowed).toBe(false); // System setting should be used
+      expect(settings.merged.security?.disableYoloMode).toBe(false); // System setting should be used
     });
 
     it.each([
@@ -1980,11 +1980,11 @@ describe('Settings Loading and Merging', () => {
       expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'general',
-        expect.objectContaining({ enableAutoUpdate: false }),
+        expect.objectContaining({ disableAutoUpdate: false }),
       );
     });
 
-    it('should migrate tools.approvalMode to tools.defaultApprovalMode', () => {
+    it('should migrate tools.approvalMode to tools.approvalMode', () => {
       const userSettingsContent = {
         tools: {
           approvalMode: 'plan',
@@ -2007,7 +2007,7 @@ describe('Settings Loading and Merging', () => {
       expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
         'tools',
-        expect.objectContaining({ defaultApprovalMode: 'plan' }),
+        expect.objectContaining({ approvalMode: 'plan' }),
       );
 
       // Verify removal
@@ -2048,7 +2048,7 @@ describe('Settings Loading and Merging', () => {
           disableLLMCorrection: true,
         },
         security: {
-          yoloModeAllowed: false,
+          disableYoloMode: false,
           blockGitExtensions: false,
         },
         context: {
@@ -2076,8 +2076,8 @@ describe('Settings Loading and Merging', () => {
         SettingScope.User,
         'general',
         expect.objectContaining({
-          enableAutoUpdate: true,
-          enableAutoUpdateNotification: false,
+          disableAutoUpdate: true,
+          disableUpdateNag: false,
         }),
       );
 
@@ -2086,16 +2086,16 @@ describe('Settings Loading and Merging', () => {
         SettingScope.User,
         'ui',
         expect.objectContaining({
-          windowTitle: false,
-          tips: true,
-          banner: false,
-          contextSummary: true,
-          footerEnabled: false,
+          hideWindowTitle: false,
+          hideTips: true,
+          hideBanner: false,
+          hideContextSummary: true,
+          hideFooter: false,
           footer: expect.objectContaining({
-            cwd: false,
-            sandboxStatus: true,
-            modelInfo: false,
-            contextPercentage: true,
+            hideCWD: false,
+            hideSandboxStatus: true,
+            hideModelInfo: false,
+            hideContextPercentage: true,
           }),
         }),
       );
@@ -2105,8 +2105,8 @@ describe('Settings Loading and Merging', () => {
         SettingScope.User,
         'model',
         expect.objectContaining({
-          loopDetection: false,
-          nextSpeakerCheck: true,
+          disableLoopDetection: false,
+          skipNextSpeakerCheck: true,
         }),
       );
 
@@ -2115,7 +2115,7 @@ describe('Settings Loading and Merging', () => {
         SettingScope.User,
         'tools',
         expect.objectContaining({
-          llmCorrection: false,
+          disableLLMCorrection: false,
         }),
       );
 
@@ -2124,8 +2124,8 @@ describe('Settings Loading and Merging', () => {
         SettingScope.User,
         'security',
         expect.objectContaining({
-          yoloModeAllowed: false,
-          gitExtensionsEnabled: true,
+          disableYoloMode: false,
+          blockGitExtensions: true,
         }),
       );
 
@@ -2215,7 +2215,7 @@ describe('Settings Loading and Merging', () => {
       const userSettingsContent = {
         general: {
           disableAutoUpdate: true,
-          enableAutoUpdate: true, // Trust this (true) over disableAutoUpdate (true -> false)
+          disableAutoUpdate: true, // Trust this (true) over disableAutoUpdate (true -> false)
         },
         context: {
           fileFiltering: {
@@ -2247,9 +2247,9 @@ describe('Settings Loading and Merging', () => {
       // 2. removeDeprecated = true
       migrateDeprecatedSettings(loadedSettings, true);
 
-      // Should remove disableAutoUpdate and trust enableAutoUpdate: true
+      // Should remove disableAutoUpdate and trust disableAutoUpdate: true
       expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'general', {
-        enableAutoUpdate: true,
+        disableAutoUpdate: true,
       });
 
       // Should remove disableFuzzySearch and trust enableFuzzySearch: false
@@ -2284,7 +2284,7 @@ describe('Settings Loading and Merging', () => {
       expect(updateSettingsFilePreservingFormat).toHaveBeenCalledWith(
         USER_SETTINGS_PATH,
         expect.objectContaining({
-          general: expect.objectContaining({ enableAutoUpdate: false }),
+          general: expect.objectContaining({ disableAutoUpdate: false }),
         }),
       );
     });

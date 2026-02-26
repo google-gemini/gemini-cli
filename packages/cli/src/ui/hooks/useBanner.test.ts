@@ -63,10 +63,10 @@ describe('useBanner', () => {
 
     const { result } = renderHook(() => useBanner(data));
 
-    expect(result.current.bannerText).toBe('Critical Error');
+    expect(result.current.hideBannerText).toBe('Critical Error');
   });
 
-  it('should hide banner if show count exceeds max limit (Legacy format)', () => {
+  it('should hide hideBanner if show count exceeds max limit (Legacy format)', () => {
     mockedPersistentStateGet.mockReturnValue({
       [crypto
         .createHash('sha256')
@@ -76,10 +76,10 @@ describe('useBanner', () => {
 
     const { result } = renderHook(() => useBanner(defaultBannerData));
 
-    expect(result.current.bannerText).toBe('');
+    expect(result.current.hideBannerText).toBe('');
   });
 
-  it('should increment the persistent count when banner is shown', () => {
+  it('should increment the persistent count when hideBanner is shown', () => {
     const data = { defaultText: 'Tracker', warningText: '' };
 
     // Current count is 1
@@ -103,7 +103,7 @@ describe('useBanner', () => {
 
     renderHook(() => useBanner(data));
 
-    // Since warning text takes precedence, default banner logic (and increment) is skipped
+    // Since warning text takes precedence, default hideBanner logic (and increment) is skipped
     expect(mockedPersistentStateSet).not.toHaveBeenCalled();
   });
 
@@ -112,6 +112,6 @@ describe('useBanner', () => {
 
     const { result } = renderHook(() => useBanner(data));
 
-    expect(result.current.bannerText).toBe('Line1\nLine2');
+    expect(result.current.hideBannerText).toBe('Line1\nLine2');
   });
 });

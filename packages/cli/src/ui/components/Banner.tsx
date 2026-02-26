@@ -41,16 +41,16 @@ export function getFormattedBannerContent(
 }
 
 interface BannerProps {
-  bannerText: string;
+  hideBannerText: string;
   isWarning: boolean;
   width: number;
 }
 
-export const Banner = ({ bannerText, isWarning, width }: BannerProps) => {
+export const Banner = ({ hideBannerText, isWarning, width }: BannerProps) => {
   const subsequentLineColor = theme.text.primary;
 
   const formattedBannerContent = getFormattedBannerContent(
-    bannerText,
+    hideBannerText,
     isWarning,
     subsequentLineColor,
   );

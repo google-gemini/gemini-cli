@@ -165,7 +165,7 @@ export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
 }
 
-export type LoadingPhrasesMode = 'tips' | 'witty' | 'all' | 'off';
+export type LoadingPhrasesMode = 'hideTips' | 'witty' | 'all' | 'off';
 
 export interface AccessibilitySettings {
   /** @deprecated Use ui.loadingPhrases instead. */
@@ -880,6 +880,22 @@ export function migrateDeprecatedSettings(
           true,
         ) || modified;
 
+      // Handle the move from general.approvalMode to tools.approvalMode
+      if (newGeneral['approvalMode'] !== undefined) {
+        const toolsSettings =
+          (settings.tools as Record<string, unknown> | undefined) || {};
+        const newTools = { ...toolsSettings };
+        if (newTools['approvalMode'] === undefined) {
+          newTools['approvalMode'] = newGeneral['approvalMode'];
+          loadedSettings.setValue(scope, 'tools', newTools);
+          modified = true;
+        }
+        if (removeDeprecated) {
+          delete newGeneral['approvalMode'];
+          modified = true;
+        }
+      }
+
       if (modified) {
         loadedSettings.setValue(scope, 'general', newGeneral);
         if (!settingsFile.readOnly) {
@@ -894,12 +910,12 @@ export function migrateDeprecatedSettings(
       const newUi = { ...uiSettings };
       let modified = false;
 
-      // Positive logic migrations
+      // Positive logic migrations (REVERTED)
       modified =
         migrateBoolean(
           newUi,
           'hideWindowTitle',
-          'windowTitle',
+          'hideWindowTitle',
           'ui',
           foundDeprecated,
           true,
@@ -908,7 +924,7 @@ export function migrateDeprecatedSettings(
         migrateBoolean(
           newUi,
           'hideTips',
-          'tips',
+          'hideTips',
           'ui',
           foundDeprecated,
           true,
@@ -917,7 +933,7 @@ export function migrateDeprecatedSettings(
         migrateBoolean(
           newUi,
           'hideBanner',
-          'banner',
+          'hideBanner',
           'ui',
           foundDeprecated,
           true,
@@ -926,7 +942,7 @@ export function migrateDeprecatedSettings(
         migrateBoolean(
           newUi,
           'hideContextSummary',
-          'contextSummary',
+          'hideContextSummary',
           'ui',
           foundDeprecated,
           true,
@@ -935,7 +951,7 @@ export function migrateDeprecatedSettings(
         migrateBoolean(
           newUi,
           'hideFooter',
-          'footerEnabled',
+          'hideFooter',
           'ui',
           foundDeprecated,
           true,
@@ -952,8 +968,8 @@ export function migrateDeprecatedSettings(
         footerModified =
           migrateBoolean(
             newFooter,
-            'hideCWD',
             'cwd',
+            'hideCWD',
             'ui.footer',
             foundDeprecated,
             true,
@@ -961,8 +977,8 @@ export function migrateDeprecatedSettings(
         footerModified =
           migrateBoolean(
             newFooter,
-            'hideSandboxStatus',
             'sandboxStatus',
+            'hideSandboxStatus',
             'ui.footer',
             foundDeprecated,
             true,
@@ -970,8 +986,8 @@ export function migrateDeprecatedSettings(
         footerModified =
           migrateBoolean(
             newFooter,
-            'hideModelInfo',
             'modelInfo',
+            'hideModelInfo',
             'ui.footer',
             foundDeprecated,
             true,
@@ -979,8 +995,8 @@ export function migrateDeprecatedSettings(
         footerModified =
           migrateBoolean(
             newFooter,
-            'hideContextPercentage',
             'contextPercentage',
+            'hideContextPercentage',
             'ui.footer',
             foundDeprecated,
             true,
@@ -1045,7 +1061,7 @@ export function migrateDeprecatedSettings(
         migrateBoolean(
           newModel,
           'disableLoopDetection',
-          'loopDetection',
+          'disableLoopDetection',
           'model',
           foundDeprecated,
           true,
@@ -1054,7 +1070,7 @@ export function migrateDeprecatedSettings(
         migrateBoolean(
           newModel,
           'skipNextSpeakerCheck',
-          'nextSpeakerCheck',
+          'skipNextSpeakerCheck',
           'model',
           foundDeprecated,
           true,
@@ -1078,7 +1094,7 @@ export function migrateDeprecatedSettings(
         migrateBoolean(
           newTools,
           'disableLLMCorrection',
-          'llmCorrection',
+          'disableLLMCorrection',
           'tools',
           foundDeprecated,
           true,
@@ -1087,9 +1103,8 @@ export function migrateDeprecatedSettings(
       if (toolsSettings['approvalMode'] !== undefined) {
         foundDeprecated.push('tools.approvalMode');
 
-        // Map tools.approvalMode to tools.defaultApprovalMode
-        if (newTools['defaultApprovalMode'] === undefined) {
-          newTools['defaultApprovalMode'] = toolsSettings['approvalMode'];
+        if (newTools['approvalMode'] === undefined) {
+          newTools['approvalMode'] = toolsSettings['approvalMode'];
           modified = true;
         }
 
@@ -1118,7 +1133,7 @@ export function migrateDeprecatedSettings(
         migrateBoolean(
           newSecurity,
           'disableYoloMode',
-          'yoloModeAllowed',
+          'disableYoloMode',
           'security',
           foundDeprecated,
           true,
@@ -1127,7 +1142,7 @@ export function migrateDeprecatedSettings(
         migrateBoolean(
           newSecurity,
           'blockGitExtensions',
-          'gitExtensionsEnabled',
+          'blockGitExtensions',
           'security',
           foundDeprecated,
           true,

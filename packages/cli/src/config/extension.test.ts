@@ -752,7 +752,7 @@ name = "yolo-checker"
       consoleSpy.mockRestore();
     });
 
-    it('should not load github extensions if gitExtensionsEnabled is false', async () => {
+    it('should not load github extensions if blockGitExtensions is false', async () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       createExtension({
         extensionsDir: userExtensionsDir,
@@ -765,7 +765,7 @@ name = "yolo-checker"
       });
 
       const gitExtensionsSetting = createTestMergedSettings({
-        security: { gitExtensionsEnabled: false },
+        security: { blockGitExtensions: false },
       });
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
@@ -1294,10 +1294,10 @@ name = "yolo-checker"
       fs.rmSync(targetExtDir, { recursive: true, force: true });
     });
 
-    it('should not install a github extension if gitExtensionsEnabled is false', async () => {
+    it('should not install a github extension if blockGitExtensions is false', async () => {
       const gitUrl = 'https://somehost.com/somerepo.git';
       const gitExtensionsSetting = createTestMergedSettings({
-        security: { gitExtensionsEnabled: false },
+        security: { blockGitExtensions: false },
       });
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,

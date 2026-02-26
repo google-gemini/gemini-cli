@@ -544,8 +544,8 @@ export async function loadCliConfig(
   const rawApprovalMode =
     argv.approvalMode ||
     (argv.yolo ? 'yolo' : undefined) ||
-    ((settings.tools?.defaultApprovalMode as string) !== 'yolo'
-      ? settings.tools?.defaultApprovalMode
+    ((settings.tools?.approvalMode as string) !== 'yolo'
+      ? settings.tools?.approvalMode
       : undefined);
 
   if (rawApprovalMode) {
@@ -579,10 +579,7 @@ export async function loadCliConfig(
   }
 
   // Override approval mode if disableYoloMode is true.
-  if (
-    !settings.security?.yoloModeAllowed ||
-    settings.admin?.secureModeEnabled
-  ) {
+  if (settings.security?.disableYoloMode || settings.admin?.secureModeEnabled) {
     if (approvalMode === ApprovalMode.YOLO) {
       if (settings.admin?.secureModeEnabled) {
         debugLogger.error(
@@ -590,7 +587,7 @@ export async function loadCliConfig(
         );
       } else {
         debugLogger.error(
-          'YOLO mode is disabled by the "yoloModeAllowed" setting.',
+          'YOLO mode is disabled by the "disableYoloMode" setting.',
         );
       }
       throw new FatalConfigError(
@@ -800,7 +797,7 @@ export async function loadCliConfig(
     geminiMdFilePaths: filePaths,
     approvalMode,
     disableYoloMode:
-      !settings.security?.yoloModeAllowed || settings.admin?.secureModeEnabled,
+      settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,
@@ -840,7 +837,7 @@ export async function loadCliConfig(
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
-    disableLoopDetection: !settings.model?.loopDetection,
+    disableLoopDetection: settings.model?.disableLoopDetection,
     compressionThreshold: settings.model?.compressionThreshold,
     folderTrust,
     interactive,
@@ -852,7 +849,7 @@ export async function loadCliConfig(
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
-    skipNextSpeakerCheck: !settings.model?.nextSpeakerCheck,
+    skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
@@ -866,7 +863,7 @@ export async function loadCliConfig(
     retryFetchErrors: settings.general?.retryFetchErrors,
     maxAttempts: settings.general?.maxAttempts,
     ptyInfo: ptyInfo?.name,
-    disableLLMCorrection: !settings.tools?.llmCorrection,
+    disableLLMCorrection: settings.tools?.disableLLMCorrection,
     rawOutput: argv.rawOutput,
     acceptRawOutputRisk: argv.acceptRawOutputRisk,
     modelConfigServiceConfig: settings.modelConfigs,

@@ -14,7 +14,7 @@ import {
   INTERACTIVE_SHELL_WAITING_PHRASE,
 } from './usePhraseCycler.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
-import { INFORMATIVE_TIPS } from '../constants/tips.js';
+import { INFORMATIVE_TIPS } from '../constants/hideTips.js';
 import type { RetryAttemptPayload } from '@google/gemini-cli-core';
 import type { LoadingPhrasesMode } from '../../config/settings.js';
 

@@ -817,9 +817,9 @@ export async function main() {
 }
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
-  if (settings.merged.ui.windowTitle) {
+  if (!settings.merged.ui.hideWindowTitle) {
     // Initial state before React loop starts
-    const windowTitle = computeTerminalTitle({
+    const hideWindowTitle = computeTerminalTitle({
       streamingState: StreamingState.Idle,
       isConfirming: false,
       isSilentWorking: false,
@@ -827,7 +827,7 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
       showThoughts: !!settings.merged.ui.showStatusInTitle,
       useDynamicTitle: settings.merged.ui.dynamicWindowTitle,
     });
-    writeToStdout(`\x1b]0;${windowTitle}\x07`);
+    writeToStdout(`\x1b]0;${hideWindowTitle}\x07`);
 
     process.on('exit', () => {
       writeToStdout(`\x1b]0;\x07`);

@@ -168,10 +168,10 @@ vi.mock('./hooks/useInputHistoryStore.js');
 vi.mock('./hooks/atCommandProcessor.js');
 vi.mock('./hooks/useHookDisplayState.js');
 vi.mock('./hooks/useBanner.js', () => ({
-  useBanner: vi.fn((bannerData) => ({
-    bannerText: (
-      bannerData.warningText ||
-      bannerData.defaultText ||
+  useBanner: vi.fn((hideBannerData) => ({
+    hideBannerText: (
+      hideBannerData.warningText ||
+      hideBannerData.defaultText ||
       ''
     ).replace(/\\n/g, '\n'),
   })),
@@ -320,7 +320,7 @@ describe('AppContainer State Management', () => {
     cancelOngoingRequest: vi.fn(),
     handleApprovalModeChange: vi.fn(),
     activePtyId: null,
-    loopDetectionConfirmationRequest: null,
+    disableLoopDetectionConfirmationRequest: null,
     backgroundShellCount: 0,
     isBackgroundShellVisible: false,
     toggleBackgroundShell: vi.fn(),
@@ -477,11 +477,11 @@ describe('AppContainer State Management', () => {
         ...defaultMergedSettings,
         ui: {
           ...defaultMergedSettings.ui,
-          banner: true,
-          footerEnabled: true,
-          tips: true,
+          hideBanner: true,
+          hideFooter: true,
+          hideTips: true,
           showStatusInTitle: false,
-          windowTitle: true,
+          hideWindowTitle: true,
           useAlternateBuffer: false,
         },
         showMemoryUsage: false,
@@ -999,9 +999,9 @@ describe('AppContainer State Management', () => {
       const settingsAllHidden = {
         merged: {
           ...defaultMergedSettings,
-          banner: false,
-          footerEnabled: false,
-          tips: false,
+          hideBanner: false,
+          hideFooter: false,
+          hideTips: false,
           showMemoryUsage: false,
         },
       } as unknown as LoadedSettings;
@@ -1020,9 +1020,9 @@ describe('AppContainer State Management', () => {
       const settingsWithMemory = {
         merged: {
           ...defaultMergedSettings,
-          banner: true,
-          footerEnabled: true,
-          tips: true,
+          hideBanner: true,
+          hideFooter: true,
+          hideTips: true,
           showMemoryUsage: true,
         },
       } as unknown as LoadedSettings;
@@ -1493,7 +1493,7 @@ describe('AppContainer State Management', () => {
           ui: {
             ...defaultMergedSettings.ui,
             showStatusInTitle: false,
-            windowTitle: true,
+            hideWindowTitle: true,
           },
         },
       } as unknown as LoadedSettings;
@@ -1531,7 +1531,7 @@ describe('AppContainer State Management', () => {
           ui: {
             ...mockSettings.merged.ui,
             dynamicWindowTitle: false,
-            windowTitle: true,
+            hideWindowTitle: true,
           },
         },
       } as unknown as LoadedSettings;
@@ -1560,8 +1560,8 @@ describe('AppContainer State Management', () => {
       unmount();
     });
 
-    it('should not update terminal title when windowTitle is false', () => {
-      // Arrange: Set up mock settings with windowTitle disabled
+    it('should not update terminal title when hideWindowTitle is false', () => {
+      // Arrange: Set up mock settings with hideWindowTitle disabled
       const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleFalse = {
         ...mockSettings,
@@ -1570,7 +1570,7 @@ describe('AppContainer State Management', () => {
           ui: {
             ...defaultMergedSettings.ui,
             showStatusInTitle: true,
-            windowTitle: false,
+            hideWindowTitle: false,
           },
         },
       } as unknown as LoadedSettings;
@@ -1599,7 +1599,7 @@ describe('AppContainer State Management', () => {
           ui: {
             ...defaultMergedSettings.ui,
             showStatusInTitle: true,
-            windowTitle: true,
+            hideWindowTitle: true,
           },
         },
       } as unknown as LoadedSettings;
@@ -1639,7 +1639,7 @@ describe('AppContainer State Management', () => {
           ui: {
             ...defaultMergedSettings.ui,
             showStatusInTitle: true,
-            windowTitle: true,
+            hideWindowTitle: true,
           },
         },
       } as unknown as LoadedSettings;
@@ -1674,7 +1674,7 @@ describe('AppContainer State Management', () => {
           ui: {
             ...defaultMergedSettings.ui,
             showStatusInTitle: true,
-            windowTitle: true,
+            hideWindowTitle: true,
           },
         },
       } as unknown as LoadedSettings;
@@ -1736,7 +1736,7 @@ describe('AppContainer State Management', () => {
             ui: {
               ...mockSettings.merged.ui,
               showStatusInTitle: true,
-              windowTitle: true,
+              hideWindowTitle: true,
             },
           },
         } as unknown as LoadedSettings;
@@ -1795,7 +1795,7 @@ describe('AppContainer State Management', () => {
             ui: {
               ...mockSettings.merged.ui,
               showStatusInTitle: true,
-              windowTitle: true,
+              hideWindowTitle: true,
             },
           },
         } as unknown as LoadedSettings;
@@ -1865,7 +1865,7 @@ describe('AppContainer State Management', () => {
             ui: {
               ...mockSettings.merged.ui,
               showStatusInTitle: true,
-              windowTitle: true,
+              hideWindowTitle: true,
             },
           },
         } as unknown as LoadedSettings;
@@ -1915,7 +1915,7 @@ describe('AppContainer State Management', () => {
             ui: {
               ...mockSettings.merged.ui,
               showStatusInTitle: true,
-              windowTitle: true,
+              hideWindowTitle: true,
             },
           },
         } as unknown as LoadedSettings;
@@ -2000,7 +2000,7 @@ describe('AppContainer State Management', () => {
           ui: {
             ...defaultMergedSettings.ui,
             showStatusInTitle: true,
-            windowTitle: true,
+            hideWindowTitle: true,
           },
         },
       } as unknown as LoadedSettings;
@@ -2041,7 +2041,7 @@ describe('AppContainer State Management', () => {
           ui: {
             ...defaultMergedSettings.ui,
             showStatusInTitle: true,
-            windowTitle: true,
+            hideWindowTitle: true,
           },
         },
       } as unknown as LoadedSettings;
@@ -2079,7 +2079,7 @@ describe('AppContainer State Management', () => {
           ui: {
             ...mockSettings.merged.ui,
             showStatusInTitle: false,
-            windowTitle: true,
+            hideWindowTitle: true,
           },
         },
       } as unknown as LoadedSettings;
@@ -3280,7 +3280,7 @@ describe('AppContainer State Management', () => {
     });
   });
   describe('Banner Text', () => {
-    it('should render placeholder banner text for USE_GEMINI auth type', async () => {
+    it('should render placeholder hideBanner text for USE_GEMINI auth type', async () => {
       const config = makeFakeConfig();
       vi.spyOn(config, 'getContentGeneratorConfig').mockReturnValue({
         authType: AuthType.USE_GEMINI,
@@ -3292,7 +3292,7 @@ describe('AppContainer State Management', () => {
         unmount = result.unmount;
       });
       await waitFor(() => {
-        expect(capturedUIState.bannerData.defaultText).toBeDefined();
+        expect(capturedUIState.hideBannerData.defaultText).toBeDefined();
         unmount!();
       });
     });
@@ -3417,8 +3417,8 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Regression Tests', () => {
-    it('does not refresh static on startup if banner text is empty', async () => {
-      // Mock banner text to be empty strings
+    it('does not refresh static on startup if hideBanner text is empty', async () => {
+      // Mock hideBanner text to be empty strings
       vi.spyOn(mockConfig, 'getBannerTextNoCapacityIssues').mockResolvedValue(
         '',
       );

@@ -92,7 +92,7 @@ describe('Gradient Crash Regression Tests', () => {
 
   it('<Banner /> should not crash when theme.ui.gradient is empty', async () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <Banner bannerText="Test Banner" isWarning={false} width={80} />,
+      <Banner hideBannerText="Test Banner" isWarning={false} width={80} />,
       {
         width: 120,
       },

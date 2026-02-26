@@ -15,10 +15,10 @@ interface BannerData {
   warningText: string;
 }
 
-export function useBanner(bannerData: BannerData) {
-  const { defaultText, warningText } = bannerData;
+export function useBanner(hideBannerData: BannerData) {
+  const { defaultText, warningText } = hideBannerData;
 
-  const [bannerCounts] = useState(
+  const [hideBannerCounts] = useState(
     () => persistentState.get('defaultBannerShownCount') || {},
   );
 
@@ -27,13 +27,13 @@ export function useBanner(bannerData: BannerData) {
     .update(defaultText)
     .digest('hex');
 
-  const currentBannerCount = bannerCounts[hashedText] || 0;
+  const currentBannerCount = hideBannerCounts[hashedText] || 0;
 
   const showDefaultBanner =
     warningText === '' && currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT;
 
   const rawBannerText = showDefaultBanner ? defaultText : warningText;
-  const bannerText = rawBannerText.replace(/\\n/g, '\n');
+  const hideBannerText = rawBannerText.replace(/\\n/g, '\n');
 
   const lastIncrementedKey = useRef<string | null>(null);
 
@@ -54,6 +54,6 @@ export function useBanner(bannerData: BannerData) {
   }, [showDefaultBanner, defaultText, hashedText]);
 
   return {
-    bannerText,
+    hideBannerText,
   };
 }

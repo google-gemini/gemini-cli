@@ -23,9 +23,10 @@ interface AppHeaderProps {
 export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
-  const { nightly, terminalWidth, bannerData, bannerVisible } = useUIState();
+  const { nightly, terminalWidth, hideBannerData, hideBannerVisible } =
+    useUIState();
 
-  const { bannerText } = useBanner(bannerData);
+  const { hideBannerText } = useBanner(hideBannerData);
   const { showTips } = useTips();
 
   if (!showDetails) {
@@ -38,14 +39,14 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
 
   return (
     <Box flexDirection="column">
-      {settings.merged.ui.banner && !config.getScreenReader() && (
+      {!settings.merged.ui.hideBanner && !config.getScreenReader() && (
         <>
           <Header version={version} nightly={nightly} />
-          {bannerVisible && bannerText && (
+          {hideBannerVisible && hideBannerText && (
             <Banner
               width={terminalWidth}
-              bannerText={bannerText}
-              isWarning={bannerData.warningText !== ''}
+              hideBannerText={hideBannerText}
+              isWarning={hideBannerData.warningText !== ''}
             />
           )}
         </>
@@ -53,9 +54,9 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
       {settings.merged.ui.showUserIdentity !== false && (
         <UserIdentity config={config} />
       )}
-      {settings.merged.ui.tips && !config.getScreenReader() && showTips && (
-        <Tips config={config} />
-      )}
+      {!settings.merged.ui.hideTips &&
+        !config.getScreenReader() &&
+        showTips && <Tips config={config} />}
     </Box>
   );
 };

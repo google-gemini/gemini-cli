@@ -381,7 +381,7 @@ describe('SettingsUtils', () => {
       it('should return true for settings marked to show in dialog', () => {
         expect(shouldShowInDialog('ui.requiresRestart')).toBe(true);
         expect(shouldShowInDialog('general.vimMode')).toBe(true);
-        expect(shouldShowInDialog('ui.windowTitle')).toBe(true);
+        expect(shouldShowInDialog('ui.hideWindowTitle')).toBe(true);
       });
 
       it('should return false for settings marked to hide from dialog', () => {
@@ -678,12 +678,12 @@ describe('SettingsUtils', () => {
       it('should set top-level setting value', () => {
         const pendingSettings = makeMockSettings({});
         const result = setPendingSettingValue(
-          'ui.windowTitle',
+          'ui.hideWindowTitle',
           true,
           pendingSettings,
         );
 
-        expect(result.ui?.windowTitle).toBe(true);
+        expect(result.ui?.hideWindowTitle).toBe(true);
       });
 
       it('should set nested setting value', () => {
@@ -751,7 +751,10 @@ describe('SettingsUtils', () => {
       });
 
       it('should return empty array when no settings require restart', () => {
-        const modifiedSettings = new Set<string>(['requiresRestart', 'tips']);
+        const modifiedSettings = new Set<string>([
+          'requiresRestart',
+          'hideTips',
+        ]);
         const result = getRestartRequiredFromModified(modifiedSettings);
 
         expect(result).toEqual([]);

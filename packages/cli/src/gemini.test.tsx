@@ -331,7 +331,7 @@ describe('gemini.tsx main function', () => {
 });
 
 describe('setWindowTitle', () => {
-  it('should set window title when windowTitle is true', async () => {
+  it('should set window title when hideWindowTitle is true', async () => {
     // setWindowTitle is not exported, but we can test its effect if we had a way to call it.
     // Since we can't easily call it directly without exporting it, we skip direct testing
     // and rely on startInteractiveUI tests which call it.
@@ -1187,7 +1187,7 @@ describe('startInteractiveUI', () => {
   const mockSettings = {
     merged: {
       ui: {
-        windowTitle: true,
+        hideWindowTitle: true,
         useAlternateBuffer: true,
         incrementalRendering: true,
       },

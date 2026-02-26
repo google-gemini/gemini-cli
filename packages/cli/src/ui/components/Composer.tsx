@@ -80,7 +80,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     Boolean(uiState.commandConfirmationRequest) ||
     Boolean(uiState.authConsentRequest) ||
     (uiState.confirmUpdateExtensionRequests?.length ?? 0) > 0 ||
-    Boolean(uiState.loopDetectionConfirmationRequest) ||
+    Boolean(uiState.disableLoopDetectionConfirmationRequest) ||
     Boolean(uiState.quota.proQuotaRequest) ||
     Boolean(uiState.quota.validationRequest) ||
     Boolean(uiState.customDialog);
@@ -143,7 +143,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const hasMinimalStatusBleedThrough = shouldShowToast(uiState);
 
   const showMinimalContextBleedThrough =
-    settings.merged.ui.footer.contextPercentage &&
+    settings.merged.ui.footer.hideContextPercentage &&
     isContextUsageHigh(
       uiState.sessionStats.lastPromptTokenCount,
       typeof uiState.currentModel === 'string'
@@ -338,7 +338,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         {showUiDetails && (
           <Box
             justifyContent={
-              !settings.merged.ui.contextSummary
+              settings.merged.ui.hideContextSummary
                 ? 'flex-start'
                 : 'space-between'
             }
@@ -472,7 +472,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       )}
 
       {showUiDetails &&
-        settings.merged.ui.footerEnabled &&
+        !settings.merged.ui.hideFooter &&
         !isScreenReaderEnabled && <Footer />}
     </Box>
   );
