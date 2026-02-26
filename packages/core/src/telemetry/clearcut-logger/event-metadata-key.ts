@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 167
+  // Next ID: 172
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -136,6 +136,21 @@ export enum EventMetadataKey {
 
   // Logs the tool use token count of the API call.
   GEMINI_CLI_API_RESPONSE_TOOL_TOKEN_COUNT = 29,
+
+  // Logs the token count for system instructions.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_SYSTEM_INSTRUCTIONS = 167,
+
+  // Logs the token count for tool definitions.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_DEFINITIONS = 168,
+
+  // Logs the token count for conversation history.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_HISTORY = 169,
+
+  // Logs the token count for tool calls (JSON map of tool name to tokens).
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_CALLS = 170,
+
+  // Logs the token count from MCP servers (tool definitions + tool inputs/outputs).
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_MCP_SERVERS = 171,
 
   // ==========================================================================
   // GenAI API Error Event Keys

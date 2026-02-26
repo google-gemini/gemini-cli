@@ -499,6 +499,7 @@ describe('Server Config (config.ts)', () => {
       expect(createContentGeneratorConfig).toHaveBeenCalledWith(
         config,
         authType,
+        undefined,
       );
       // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
@@ -1928,7 +1929,7 @@ describe('Config getHooks', () => {
     const mockHooks = {
       BeforeTool: [
         {
-          hooks: [{ type: HookType.Command, command: 'echo 1' }],
+          hooks: [{ type: HookType.Command, command: 'echo 1' } as const],
         },
       ],
     };
@@ -2235,7 +2236,7 @@ describe('Hooks configuration', () => {
     const initialHooks = {
       BeforeAgent: [
         {
-          hooks: [{ type: HookType.Command, command: 'initial' }],
+          hooks: [{ type: HookType.Command as const, command: 'initial' }],
         },
       ],
     };
@@ -2531,6 +2532,29 @@ describe('Config Quota & Preview Model Access', () => {
         plan: false,
       });
       expect(config.isPlanEnabled()).toBe(false);
+    });
+  });
+
+  describe('getPlanModeRoutingEnabled', () => {
+    it('should default to true when not provided', async () => {
+      const config = new Config(baseParams);
+      expect(await config.getPlanModeRoutingEnabled()).toBe(true);
+    });
+
+    it('should return true when explicitly enabled in planSettings', async () => {
+      const config = new Config({
+        ...baseParams,
+        planSettings: { modelRouting: true },
+      });
+      expect(await config.getPlanModeRoutingEnabled()).toBe(true);
+    });
+
+    it('should return false when explicitly disabled in planSettings', async () => {
+      const config = new Config({
+        ...baseParams,
+        planSettings: { modelRouting: false },
+      });
+      expect(await config.getPlanModeRoutingEnabled()).toBe(false);
     });
   });
 });
