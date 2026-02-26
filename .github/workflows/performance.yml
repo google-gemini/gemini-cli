@@ -1,0 +1,66 @@
+name: 'Performance Regression Check'
+
+on:
+  pull_request:
+    branches:
+      - 'main'
+  workflow_dispatch:
+    inputs:
+      threshold_ms:
+        description: 'Startup time threshold in milliseconds'
+        required: false
+        default: '5000'
+        type: 'string'
+
+permissions:
+  contents: 'read'
+  pull-requests: 'write'
+
+jobs:
+  startup-benchmark:
+    name: 'Startup Time Benchmark'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Run startup benchmark'
+        id: benchmark
+        run: |
+          THRESHOLD=${{ github.event.inputs.threshold_ms || '5000' }}
+          npx tsx scripts/performance-benchmark.ts --threshold-ms=$THRESHOLD 2>&1 | tee benchmark-output.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: 'Comment on PR'
+        if: github.event_name == 'pull_request'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('benchmark-output.txt', 'utf8');
+
+            const comment = `## 📊 Performance Benchmark Results
+
+            \`\`\`
+            ${output}
+            \`\`\`
+            `;
+
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });

@@ -148,3 +148,4 @@ export {
 } from './metrics.js';
 export { runInDevTraceSpan, type SpanMetadata } from './trace.js';
 export { startupProfiler, StartupProfiler } from './startupProfiler.js';
+export { type StartupPhaseStats } from './types.js';
