@@ -15,16 +15,21 @@ vi.mock('../../utils/skillUtils.js', () => ({
   linkSkill: mockLinkSkill,
 }));
 
+const { debugLogger } = await vi.hoisted(async () => {
+  const { createMockDebugLogger } = await import(
+    '../../test-utils/mockDebugLogger.js'
+  );
+  return createMockDebugLogger({ stripAnsi: false });
+});
+
 vi.mock('@google/gemini-cli-core', () => ({
-  debugLogger: { log: vi.fn(), error: vi.fn() },
+  debugLogger,
 }));
 
 vi.mock('../../config/extensions/consent.js', () => ({
   requestConsentNonInteractive: mockRequestConsentNonInteractive,
   skillsConsentString: mockSkillsConsentString,
 }));
-
-import { debugLogger } from '@google/gemini-cli-core';
 
 describe('skills link command', () => {
   beforeEach(() => {
