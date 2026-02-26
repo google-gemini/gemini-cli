@@ -6,15 +6,16 @@
 
 import React, { useMemo } from 'react';
 import { Text, Box } from 'ink';
-import {
-  type StyledChar,
+import type { StyledChar } from 'ink';
+import * as ink from 'ink';
+const {
   toStyledCharacters,
   styledCharsToString,
   styledCharsWidth,
   wordBreakStyledChars,
   wrapStyledChars,
   widestLineFromStyledChars,
-} from 'ink';
+} = ink;
 import { theme } from '../semantic-colors.js';
 import { RenderInline } from './InlineMarkdownRenderer.js';
 import { stripUnsafeCharacters } from './textUtils.js';
