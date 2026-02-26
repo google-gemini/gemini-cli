@@ -26,6 +26,7 @@ export * from './commands/extensions.js';
 export * from './commands/restore.js';
 export * from './commands/init.js';
 export * from './commands/memory.js';
+export * from './commands/new.js';
 export * from './commands/types.js';
 
 // Export Core Logic

@@ -13,7 +13,6 @@ import {
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
 import { MessageType } from '../types.js';
-import { randomUUID } from 'node:crypto';
 
 export const clearCommand: SlashCommand = {
   name: 'clear',
@@ -46,10 +45,9 @@ export const clearCommand: SlashCommand = {
     // Reset user steering hints
     config?.userHintService.clear();
 
-    // Start a new conversation recording with a new session ID
+    // Re-initialize the recording service with the SAME session ID.
+    // This will empty the current session file.
     if (config && chatRecordingService) {
-      const newSessionId = randomUUID();
-      config.setSessionId(newSessionId);
       chatRecordingService.initialize();
     }
 

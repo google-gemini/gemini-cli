@@ -43,8 +43,17 @@ export interface SubmitPromptActionReturn {
   content: PartListUnion;
 }
 
+/**
+ * The return type for a command action that results in clearing
+ * the entire session (resetting chat and generating a new session ID).
+ */
+export interface ClearSessionActionReturn {
+  type: 'clear_session';
+}
+
 export type CommandActionReturn<HistoryType = unknown> =
   | ToolActionReturn
   | MessageActionReturn
   | LoadHistoryActionReturn<HistoryType>
-  | SubmitPromptActionReturn;
+  | SubmitPromptActionReturn
+  | ClearSessionActionReturn;

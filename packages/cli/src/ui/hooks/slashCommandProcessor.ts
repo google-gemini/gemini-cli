@@ -35,6 +35,7 @@ import {
   removeMCPStatusChangeListener,
   MCPDiscoveryState,
   CoreToolCallStatus,
+  createSessionId,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
@@ -654,6 +655,15 @@ export const useSlashCommandProcessor = (
                 }
                 case 'custom_dialog': {
                   setCustomDialog(result.component);
+                  return { type: 'handled' };
+                }
+                case 'clear_session': {
+                  const newSessionId = createSessionId();
+                  config?.setSessionId(newSessionId);
+                  await config?.getGeminiClient()?.resetChat();
+                  fullCommandContext.ui.clear();
+                  setSessionShellAllowlist(new Set());
+                  setPendingItem(null);
                   return { type: 'handled' };
                 }
                 default: {
