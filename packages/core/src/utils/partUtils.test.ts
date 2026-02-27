@@ -90,6 +90,11 @@ describe('partUtils', () => {
       expect(partToString(part, verboseOptions)).toBe('[Thought: thinking]');
     });
 
+    it('should handle thought part with undefined text', () => {
+      const part: Part = { thought: true };
+      expect(partToString(part, verboseOptions)).toBe('[Thought: ]');
+    });
+
     it('should return descriptive string for codeExecutionResult part', () => {
       const part = { codeExecutionResult: {} } as Part;
       expect(partToString(part, verboseOptions)).toBe(
