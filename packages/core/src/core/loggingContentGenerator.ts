@@ -274,6 +274,24 @@ export class LoggingContentGenerator implements ContentGenerator {
     logApiResponse(this.config, event);
   }
 
+  private _parseGaxiosErrorData(error: unknown): void {
+    // Fix for raw ASCII buffer strings appearing in dev with the latest
+    // Gaxios updates.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const gError = error as { response?: { data?: unknown } };
+    const data = gError.response?.data;
+    if (typeof data === 'string' && data.includes(',')) {
+      try {
+        const charCodes = data.split(',').map(Number);
+        if (charCodes.every((code) => !isNaN(code))) {
+          gError.response!.data = String.fromCharCode(...charCodes);
+        }
+      } catch (_e) {
+        // If parsing fails, just leave it alone
+      }
+    }
+  }
+
   private _logApiError(
     durationMs: number,
     error: unknown,
@@ -381,21 +399,7 @@ export class LoggingContentGenerator implements ContentGenerator {
           spanMetadata.error = error;
           const durationMs = Date.now() - startTime;
 
-          // Fix for raw ASCII buffer strings appearing in dev with the latest
-          // Gaxios updates.
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const gError = error as { response?: { data?: unknown } };
-          const data = gError.response?.data;
-          if (typeof data === 'string' && data.includes(',')) {
-            try {
-              const charCodes = data.split(',').map(Number);
-              if (charCodes.every((code) => !isNaN(code))) {
-                gError.response!.data = String.fromCharCode(...charCodes);
-              }
-            } catch (_e) {
-              // If parsing fails, just leave it alone
-            }
-          }
+          this._parseGaxiosErrorData(error);
 
           this._logApiError(
             durationMs,
@@ -465,21 +469,8 @@ export class LoggingContentGenerator implements ContentGenerator {
         } catch (error) {
           const durationMs = Date.now() - startTime;
 
-          // Fix for raw ASCII buffer strings appearing in dev with the latest
-          // Gaxios updates.
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const gError = error as { response?: { data?: unknown } };
-          const data = gError.response?.data;
-          if (typeof data === 'string' && data.includes(',')) {
-            try {
-              const charCodes = data.split(',').map(Number);
-              if (charCodes.every((code) => !isNaN(code))) {
-                gError.response!.data = String.fromCharCode(...charCodes);
-              }
-            } catch (_e) {
-              // If parsing fails, just leave it alone
-            }
-          }
+          this._parseGaxiosErrorData(error);
+
           this._logApiError(
             durationMs,
             error,

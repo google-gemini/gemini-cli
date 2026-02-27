@@ -256,16 +256,17 @@ describe('LoggingContentGenerator', () => {
 
         vi.mocked(wrapped.generateContent).mockRejectedValue(gaxiosError);
 
-        try {
-          await loggingContentGenerator.generateContent(
+        await expect(
+          loggingContentGenerator.generateContent(
             req,
             'prompt-123',
             LlmRole.MAIN,
-          );
-        } catch (error: unknown) {
+          ),
+        ).rejects.toSatisfy((error: unknown) => {
           const gError = error as { response: { data: unknown } };
           expect(gError.response.data).toBe('Hello');
-        }
+          return true;
+        });
       });
 
       it('should leave data alone if it is not a comma-separated string', async () => {
@@ -278,16 +279,17 @@ describe('LoggingContentGenerator', () => {
 
         vi.mocked(wrapped.generateContent).mockRejectedValue(gaxiosError);
 
-        try {
-          await loggingContentGenerator.generateContent(
+        await expect(
+          loggingContentGenerator.generateContent(
             req,
             'prompt-123',
             LlmRole.MAIN,
-          );
-        } catch (error: unknown) {
+          ),
+        ).rejects.toSatisfy((error: unknown) => {
           const gError = error as { response: { data: unknown } };
           expect(gError.response.data).toBe(normalData);
-        }
+          return true;
+        });
       });
 
       it('should leave data alone if parsing fails', async () => {
@@ -300,16 +302,17 @@ describe('LoggingContentGenerator', () => {
 
         vi.mocked(wrapped.generateContent).mockRejectedValue(gaxiosError);
 
-        try {
-          await loggingContentGenerator.generateContent(
+        await expect(
+          loggingContentGenerator.generateContent(
             req,
             'prompt-123',
             LlmRole.MAIN,
-          );
-        } catch (error: unknown) {
+          ),
+        ).rejects.toSatisfy((error: unknown) => {
           const gError = error as { response: { data: unknown } };
           expect(gError.response.data).toBe(invalidAscii);
-        }
+          return true;
+        });
       });
     });
   });
