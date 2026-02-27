@@ -169,6 +169,8 @@ describe('useQuotaAndFallback', () => {
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
           errorVerbosity: 'low',
         }),
       );
@@ -195,6 +197,8 @@ describe('useQuotaAndFallback', () => {
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
           errorVerbosity: 'low',
         }),
       );
