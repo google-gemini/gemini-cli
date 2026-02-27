@@ -76,8 +76,6 @@ To learn more about selecting a model and routing, refer to
 
 If you're using Gemini Code Assist Standard or Gemini Code Assist Enterprise,
 enabling Gemini 3 Pro on Gemini CLI requires configuring your release channels.
-Using Gemini 3 Pro will require two steps: administrative enablement and user
-enablement.
 
 To learn more about these settings, refer to
 [Configure Gemini Code Assist release channels](https://developers.google.com/gemini-code-assist/docs/configure-release-channels).
@@ -99,11 +97,13 @@ these directions:
 Wait for two to three minutes after your administrator has enabled **Preview**,
 then:
 
-- Open Gemini CLI.
-- Use the `/settings` command.
-- Set **Preview Features** to `true`.
+- Restart your Gemini CLI.
+- Ensure you are running the latest version of the CLI
+  (`npm install -g @google/gemini-cli@latest`).
 
-Restart Gemini CLI and you should have access to Gemini 3.
+As of v0.29.0, Gemini 3 is the default model family in the CLI and no longer
+requires a manual feature flag. You should now have access to Gemini 3
+automatically.
 
 ## Need help?
 

@@ -19,30 +19,27 @@ Use the following command in Gemini CLI:
 
 Running this command will open a dialog with your options:
 
-| Option            | Description                                                    | Models                                                                 |
-| ----------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Auto (Gemini 3)   | Let the system choose the best Gemini 3 model for your task.   | gemini-3-pro-preview (if enabled), gemini-3-flash-preview (if enabled) |
-| Auto (Gemini 2.5) | Let the system choose the best Gemini 2.5 model for your task. | gemini-2.5-pro, gemini-2.5-flash                                       |
-| Manual            | Select a specific model.                                       | Any available model.                                                   |
+| Option            | Description                                                    | Models                                       |
+| ----------------- | -------------------------------------------------------------- | -------------------------------------------- |
+| Auto (Gemini 3)   | Let the system choose the best Gemini 3 model for your task.   | gemini-3-pro-preview, gemini-3-flash-preview |
+| Auto (Gemini 2.5) | Let the system choose the best Gemini 2.5 model for your task. | gemini-2.5-pro, gemini-2.5-flash             |
+| Manual            | Select a specific model.                                       | Any available model.                         |
 
 We recommend selecting one of the above **Auto** options. However, you can
 select **Manual** to select a specific model from those available.
 
-### Gemini 3 and preview features
+### Gemini 3 Default
 
 > **Note:** Gemini 3 is not currently available on all account types. To learn
 > more about Gemini 3 access, refer to
 > [Gemini 3 on Gemini CLI](../get-started/gemini-3.md).
 
-To enable Gemini 3 Pro and Gemini 3 Flash (if available), enable
-[**Preview Features** by using the `settings` command](../cli/settings.md).
+As of v0.29.0, Gemini 3 is the default model family in the CLI and no longer
+requires a manual feature flag.
 
 You can also use the `--model` flag to specify a particular Gemini model on
 startup. For more details, refer to the
 [configuration documentation](../reference/configuration.md).
-
-Changes to these settings will be applied to all subsequent interactions with
-Gemini CLI.
 
 ## Best practices for model selection
 
