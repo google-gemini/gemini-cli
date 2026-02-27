@@ -12,6 +12,16 @@ interface GaxiosError {
   };
 }
 
+function isGaxiosError(error: unknown): error is GaxiosError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as { response: unknown }).response === 'object' &&
+    (error as { response: unknown }).response !== null
+  );
+}
+
 export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error;
 }
@@ -26,6 +36,15 @@ export function getErrorMessage(error: unknown): string {
   } catch {
     return 'Failed to get error details';
   }
+}
+
+export function getErrorType(error: unknown): string {
+  if (!(error instanceof Error)) return 'unknown';
+
+  // Return constructor name if the generic 'Error' name is used (for custom errors)
+  return error.name === 'Error'
+    ? (error.constructor?.name ?? 'Error')
+    : error.name;
 }
 
 export class FatalError extends Error {
@@ -110,12 +129,6 @@ interface ResponseData {
 }
 
 export function toFriendlyError(error: unknown): unknown {
-<<<<<<< HEAD
-  if (error && typeof error === 'object' && 'response' in error) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const gaxiosError = error as GaxiosError;
-    const data = parseResponseData(gaxiosError);
-=======
   // First, try structured parsing for TOS_VIOLATION detection.
   const googleApiError = parseGoogleApiError(error);
   if (googleApiError && googleApiError.code === 403) {
@@ -136,7 +149,6 @@ export function toFriendlyError(error: unknown): unknown {
   // Fall back to basic Gaxios error parsing for other HTTP errors.
   if (isGaxiosError(error)) {
     const data = parseResponseData(error);
->>>>>>> ea48bd941 (feat: better error messages (#20577))
     if (data && data.error && data.error.message && data.error.code) {
       switch (data.error.code) {
         case 400:

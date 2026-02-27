@@ -13,6 +13,14 @@ import {
   ForbiddenError,
   AccountSuspendedError,
   getErrorMessage,
+  getErrorType,
+  FatalAuthenticationError,
+  FatalCancellationError,
+  FatalConfigError,
+  FatalInputError,
+  FatalSandboxError,
+  FatalToolExecutionError,
+  FatalTurnLimitedError,
 } from './errors.js';
 
 describe('getErrorMessage', () => {
@@ -279,8 +287,6 @@ describe('toFriendlyError', () => {
     expect(toFriendlyError(error)).toBe(error);
   });
 });
-<<<<<<< HEAD
-=======
 
 describe('getErrorType', () => {
   it('should return error name for standard errors', () => {
@@ -325,4 +331,3 @@ describe('getErrorType', () => {
     expect(getErrorType(undefined)).toBe('unknown');
   });
 });
->>>>>>> ea48bd941 (feat: better error messages (#20577))
