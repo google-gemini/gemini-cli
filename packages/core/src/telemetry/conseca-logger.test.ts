@@ -39,6 +39,7 @@ describe('conseca-logger', () => {
       getTelemetryLogPromptsEnabled: vi.fn().mockReturnValue(true),
       isInteractive: vi.fn().mockReturnValue(true),
       getExperiments: vi.fn().mockReturnValue({ experimentIds: [] }),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({ authType: 'oauth' }),
     } as unknown as Config;
 
     mockLogger = {

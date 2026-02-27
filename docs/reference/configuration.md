@@ -357,6 +357,15 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+#### `billing`
+
+- **`billing.overageStrategy`** (enum):
+  - **Description:** How to handle quota exhaustion when AI credits are
+    available. 'ask' prompts each time, 'always' automatically uses credits,
+    'never' disables credit usage.
+  - **Default:** `"ask"`
+  - **Values:** `"ask"`, `"always"`, `"never"`
+
 #### `model`
 
 - **`model.name`** (string):

@@ -52,6 +52,7 @@ export interface UserData {
   projectId: string;
   userTier: UserTierId;
   userTierName?: string;
+  paidTier?: GeminiUserTier;
 }
 
 /**
@@ -146,6 +147,7 @@ export async function setupUser(
             loadRes.currentTier.id ??
             UserTierId.STANDARD,
           userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
+          paidTier: loadRes.paidTier ?? undefined,
         };
       }
 
@@ -157,6 +159,7 @@ export async function setupUser(
       userTier:
         loadRes.paidTier?.id ?? loadRes.currentTier.id ?? UserTierId.STANDARD,
       userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
+      paidTier: loadRes.paidTier ?? undefined,
     };
   }
 

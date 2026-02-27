@@ -520,6 +520,24 @@
       "markdownDescription": "Telemetry configuration.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
       "$ref": "#/$defs/TelemetrySettings"
     },
+    "billing": {
+      "title": "Billing",
+      "description": "Billing and AI credits settings.",
+      "markdownDescription": "Billing and AI credits settings.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "overageStrategy": {
+          "title": "Overage Strategy",
+          "description": "How to handle quota exhaustion when AI credits are available. 'ask' prompts each time, 'always' automatically uses credits, 'never' disables credit usage.",
+          "markdownDescription": "How to handle quota exhaustion when AI credits are available. 'ask' prompts each time, 'always' automatically uses credits, 'never' disables credit usage.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `ask`",
+          "default": "ask",
+          "type": "string",
+          "enum": ["ask", "always", "never"]
+        }
+      },
+      "additionalProperties": false
+    },
     "model": {
       "title": "Model",
       "description": "Settings related to the generative model.",
