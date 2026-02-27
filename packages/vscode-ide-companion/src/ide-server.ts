@@ -346,9 +346,11 @@ export class IDEServer {
           try {
             const portDir = path.join(tmpdir(), 'gemini', 'ide');
             await fs.mkdir(portDir, { recursive: true });
-            portFile = path.join(
-              portDir,
-              `gemini-ide-server-${process.ppid}-${this.port}.json`,
+            portFile = path.resolve(
+              path.join(
+                portDir,
+                `gemini-ide-server-${process.ppid}-${this.port}.json`,
+              ),
             );
             this.portFile = portFile;
           } catch (err) {
