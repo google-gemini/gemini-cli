@@ -17,7 +17,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    getErrorMessage: (e: unknown) => (e as Error).message,
   };
 });
 
@@ -32,7 +31,7 @@ describe('auth', () => {
 
   it('should return null if authType is undefined', async () => {
     const result = await performInitialAuth(mockConfig, undefined);
-    expect(result).toBeNull();
+    expect(result).toEqual({ authError: null, accountSuspensionInfo: null });
     expect(mockConfig.refreshAuth).not.toHaveBeenCalled();
   });
 
@@ -41,7 +40,7 @@ describe('auth', () => {
       mockConfig,
       AuthType.LOGIN_WITH_GOOGLE,
     );
-    expect(result).toBeNull();
+    expect(result).toEqual({ authError: null, accountSuspensionInfo: null });
     expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
       AuthType.LOGIN_WITH_GOOGLE,
     );
@@ -54,7 +53,10 @@ describe('auth', () => {
       mockConfig,
       AuthType.LOGIN_WITH_GOOGLE,
     );
-    expect(result).toBe('Failed to login. Message: Auth failed');
+    expect(result).toEqual({
+      authError: 'Failed to login. Message: Auth failed',
+      accountSuspensionInfo: null,
+    });
     expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
       AuthType.LOGIN_WITH_GOOGLE,
     );
@@ -68,7 +70,48 @@ describe('auth', () => {
       mockConfig,
       AuthType.LOGIN_WITH_GOOGLE,
     );
-    expect(result).toBeNull();
+    expect(result).toEqual({ authError: null, accountSuspensionInfo: null });
+    expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+  });
+
+  it('should return accountSuspensionInfo for 403 TOS_VIOLATION error', async () => {
+    vi.mocked(mockConfig.refreshAuth).mockRejectedValue({
+      response: {
+        data: {
+          error: {
+            code: 403,
+            message:
+              'This service has been disabled for violation of Terms of Service.',
+            details: [
+              {
+                '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+                reason: 'TOS_VIOLATION',
+                domain: 'example.googleapis.com',
+                metadata: {
+                  appeal_url: 'https://example.com/appeal',
+                  appeal_url_link_text: 'Appeal Here',
+                },
+              },
+            ],
+          },
+        },
+      },
+    });
+    const result = await performInitialAuth(
+      mockConfig,
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+    expect(result).toEqual({
+      authError: null,
+      accountSuspensionInfo: {
+        message:
+          'This service has been disabled for violation of Terms of Service.',
+        appealUrl: 'https://example.com/appeal',
+        appealLinkText: 'Appeal Here',
+      },
+    });
     expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
       AuthType.LOGIN_WITH_GOOGLE,
     );
