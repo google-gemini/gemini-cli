@@ -187,10 +187,10 @@ export function getTerminalCapabilities(
 
   // Alternate Buffer Overrides
   const forceAltBuffer =
-    settings.forceAltBuffer ||
+    settings.forceAltBuffer ??
     processEnv['GEMINI_CLI_FORCE_ALT_BUFFER'] === '1';
   const disableAltBuffer =
-    settings.disableAltBuffer ||
+    settings.disableAltBuffer ??
     processEnv['GEMINI_CLI_DISABLE_ALT_BUFFER'] === '1';
 
   if (disableAltBuffer) {
@@ -208,7 +208,7 @@ export function getTerminalCapabilities(
 
   // Mouse Overrides
   const disableMouse =
-    settings.disableMouse || processEnv['GEMINI_CLI_DISABLE_MOUSE'] === '1';
+    settings.disableMouse ?? processEnv['GEMINI_CLI_DISABLE_MOUSE'] === '1';
   if (disableMouse) {
     capabilities.supportsMouse = false;
     reasons.supportsMouse = 'Disabled via configuration.';
@@ -216,7 +216,7 @@ export function getTerminalCapabilities(
 
   // Trusted Terminal Override
   const assumeTrusted =
-    settings.assumeTrustedTerminal ||
+    settings.assumeTrustedTerminal ??
     processEnv['GEMINI_CLI_ASSUME_TRUSTED_TERMINAL'] === '1';
   if (assumeTrusted) {
     capabilities.supportsAltBuffer = true;

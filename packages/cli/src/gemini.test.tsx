@@ -460,6 +460,7 @@ describe('gemini.tsx main function kitty protocol', () => {
         isInteractive: () => true,
         getQuestion: () => '',
         getSandbox: () => undefined,
+        getUiCompatibility: () => ({}),
       }),
     );
     vi.mocked(loadSettings).mockReturnValue(

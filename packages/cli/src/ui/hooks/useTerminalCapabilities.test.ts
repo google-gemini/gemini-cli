@@ -13,11 +13,8 @@ import {
   getTerminalCapabilities,
   type TerminalEnvironment,
 } from '@google/gemini-cli-core';
-import type {
-  LoadedSettings} from '../../config/settings.js';
-import {
-  createTestMergedSettings,
-} from '../../config/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
+import { createTestMergedSettings } from '../../config/settings.js';
 
 vi.mock('../contexts/SettingsContext.js', () => ({
   useSettings: vi.fn(),

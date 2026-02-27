@@ -87,7 +87,12 @@ export * from './utils/shell-utils.js';
 export { PolicyDecision, ApprovalMode } from './policy/types.js';
 export * from './utils/tool-utils.js';
 export * from './utils/terminalSerializer.js';
-export * from './utils/terminalEnvironment.js';
+export {
+  detectTerminalEnvironment,
+  getTerminalCapabilities,
+  type TerminalCapabilities,
+  type TerminalEnvironment,
+} from './utils/terminalEnvironment.js';
 export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
 export * from './utils/formatters.js';
@@ -205,7 +210,24 @@ export * from './agents/types.js';
 
 // Export stdio utils
 export * from './utils/stdio.js';
-export * from './utils/terminal.js';
+export {
+  disableMouseTracking,
+  enableMouseEvents,
+  disableMouseEvents,
+  enableKittyKeyboardProtocol,
+  disableKittyKeyboardProtocol,
+  enableModifyOtherKeys,
+  disableModifyOtherKeys,
+  enableBracketedPasteMode,
+  disableBracketedPasteMode,
+  enableLineWrapping,
+  disableLineWrapping,
+  enterAlternateScreen,
+  exitAlternateScreen,
+  clearScreen,
+  clearScrollback,
+  shouldEnterAlternateScreen,
+} from './utils/terminal.js';
 
 // Export types from @google/genai
 export type { Content, Part, FunctionCall } from '@google/genai';

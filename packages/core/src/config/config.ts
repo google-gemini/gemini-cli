@@ -579,6 +579,12 @@ export interface ConfigParameters {
   billing?: {
     overageStrategy?: OverageStrategy;
   };
+  uiCompatibility?: {
+    forceAltBuffer?: boolean;
+    disableAltBuffer?: boolean;
+    disableMouse?: boolean;
+    assumeTrustedTerminal?: boolean;
+  };
 }
 
 export class Config implements McpContext {
@@ -607,6 +613,12 @@ export class Config implements McpContext {
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
   readonly enableConseca: boolean;
+  private readonly uiCompatibility: {
+    forceAltBuffer?: boolean;
+    disableAltBuffer?: boolean;
+    disableMouse?: boolean;
+    assumeTrustedTerminal?: boolean;
+  };
 
   private readonly coreTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
@@ -798,6 +810,7 @@ export class Config implements McpContext {
     this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
     this.question = params.question;
+    this.uiCompatibility = params.uiCompatibility ?? {};
 
     this.coreTools = params.coreTools;
     this.allowedTools = params.allowedTools;
@@ -1327,6 +1340,10 @@ export class Config implements McpContext {
 
   getLatestApiRequest(): GenerateContentParameters | undefined {
     return this.latestApiRequest;
+  }
+
+  getUiCompatibility() {
+    return this.uiCompatibility;
   }
 
   setLatestApiRequest(req: GenerateContentParameters): void {
@@ -1979,103 +1996,17 @@ export class Config implements McpContext {
     }
 
     const currentMode = this.getApprovalMode();
-    if (currentMode !== mode) {
-      this.logCurrentModeDuration(currentMode);
-      logApprovalModeSwitch(
-        this,
-        new ApprovalModeSwitchEvent(currentMode, mode),
-      );
-    }
-
-    this.policyEngine.setApprovalMode(mode);
-
-    const isPlanModeTransition =
-      currentMode !== mode &&
-      (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
-    const isYoloModeTransition =
-      currentMode !== mode &&
-      (currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO);
-
-    if (isPlanModeTransition || isYoloModeTransition) {
-      this.syncPlanModeTools();
-      this.updateSystemInstructionIfInitialized();
-    }
-  }
-
-  /**
-   * Synchronizes enter/exit plan mode tools based on current mode.
-   */
-  syncPlanModeTools(): void {
-    const registry = this.getToolRegistry();
-    if (!registry) {
+    if (currentMode === mode) {
       return;
     }
-    const approvalMode = this.getApprovalMode();
-    const isPlanMode = approvalMode === ApprovalMode.PLAN;
-    const isYoloMode = approvalMode === ApprovalMode.YOLO;
 
-    if (isPlanMode) {
-      if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-        registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
-      }
-      if (!registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
-        registry.registerTool(new ExitPlanModeTool(this, this.messageBus));
-      }
-    } else {
-      if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
-        registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
-      }
-      if (this.planEnabled && !isYoloMode) {
-        if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-          registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
-        }
-      } else {
-        if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-          registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
-        }
-      }
-    }
+    this.logCurrentModeDuration(currentMode);
 
-    if (this.geminiClient?.isInitialized()) {
-      this.geminiClient.setTools().catch((err) => {
-        debugLogger.error('Failed to update tools', err);
-      });
-    }
-  }
-
-  /**
-   * Logs the duration of the current approval mode.
-   */
-  logCurrentModeDuration(mode: ApprovalMode): void {
-    const now = performance.now();
-    const duration = now - this.lastModeSwitchTime;
-    if (duration > 0) {
-      logApprovalModeDuration(
-        this,
-        new ApprovalModeDurationEvent(mode, duration),
-      );
-    }
-    this.lastModeSwitchTime = now;
-  }
-
-  isYoloModeDisabled(): boolean {
-    return this.disableYoloMode || !this.isTrustedFolder();
-  }
-
-  getRawOutput(): boolean {
-    return this.rawOutput;
-  }
-
-  getAcceptRawOutputRisk(): boolean {
-    return this.acceptRawOutputRisk;
-  }
-
-  getPendingIncludeDirectories(): string[] {
-    return this.pendingIncludeDirectories;
-  }
-
-  clearPendingIncludeDirectories(): void {
-    this.pendingIncludeDirectories = [];
+    logApprovalModeSwitch(
+      this,
+      new ApprovalModeSwitchEvent(currentMode, mode),
+    );
+    this.policyEngine.setApprovalMode(mode);
   }
 
   getShowMemoryUsage(): boolean {
@@ -2086,509 +2017,248 @@ export class Config implements McpContext {
     return this.accessibility;
   }
 
-  getTelemetryEnabled(): boolean {
-    return this.telemetrySettings.enabled ?? false;
+  getScreenReader(): boolean {
+    return this.accessibility.screenReader ?? false;
   }
 
-  getTelemetryLogPromptsEnabled(): boolean {
-    return this.telemetrySettings.logPrompts ?? true;
+  getLoadingPhrasesEnabled(): boolean {
+    return this.accessibility.enableLoadingPhrases ?? true;
   }
 
-  getTelemetryOtlpEndpoint(): string {
-    return this.telemetrySettings.otlpEndpoint ?? DEFAULT_OTLP_ENDPOINT;
-  }
-
-  getTelemetryOtlpProtocol(): 'grpc' | 'http' {
-    return this.telemetrySettings.otlpProtocol ?? 'grpc';
-  }
-
-  getTelemetryTarget(): TelemetryTarget {
-    return this.telemetrySettings.target ?? DEFAULT_TELEMETRY_TARGET;
-  }
-
-  getTelemetryOutfile(): string | undefined {
-    return this.telemetrySettings.outfile;
-  }
-
-  getBillingSettings(): { overageStrategy: OverageStrategy } {
-    return this.billing;
-  }
-
-  /**
-   * Updates the overage strategy at runtime.
-   * Used to switch from 'ask' to 'always' after the user accepts credits
-   * via the overage dialog, so subsequent API calls auto-include credits.
-   */
-  setOverageStrategy(strategy: OverageStrategy): void {
-    this.billing.overageStrategy = strategy;
-  }
-
-  getTelemetryUseCollector(): boolean {
-    return this.telemetrySettings.useCollector ?? false;
-  }
-
-  getTelemetryUseCliAuth(): boolean {
-    return this.telemetrySettings.useCliAuth ?? false;
-  }
-
-  getGeminiClient(): GeminiClient {
-    return this.geminiClient;
-  }
-
-  /**
-   * Updates the system instruction with the latest user memory.
-   * Whenever the user memory (GEMINI.md files) is updated.
-   */
-  updateSystemInstructionIfInitialized(): void {
-    const geminiClient = this.getGeminiClient();
-    if (geminiClient?.isInitialized()) {
-      geminiClient.updateSystemInstruction();
-    }
-  }
-
-  getModelRouterService(): ModelRouterService {
-    return this.modelRouterService;
-  }
-
-  getModelAvailabilityService(): ModelAvailabilityService {
-    return this.modelAvailabilityService;
-  }
-
-  getEnableRecursiveFileSearch(): boolean {
-    return this.fileFiltering.enableRecursiveFileSearch;
-  }
-
-  getFileFilteringEnableFuzzySearch(): boolean {
-    return this.fileFiltering.enableFuzzySearch;
-  }
-
-  getFileFilteringRespectGitIgnore(): boolean {
-    return this.fileFiltering.respectGitIgnore;
-  }
-
-  getFileFilteringRespectGeminiIgnore(): boolean {
-    return this.fileFiltering.respectGeminiIgnore;
-  }
-
-  getCustomIgnoreFilePaths(): string[] {
-    return this.fileFiltering.customIgnoreFilePaths;
-  }
-
-  getFileFilteringOptions(): FileFilteringOptions {
-    return {
-      respectGitIgnore: this.fileFiltering.respectGitIgnore,
-      respectGeminiIgnore: this.fileFiltering.respectGeminiIgnore,
-      maxFileCount: this.fileFiltering.maxFileCount,
-      searchTimeout: this.fileFiltering.searchTimeout,
-      customIgnoreFilePaths: this.fileFiltering.customIgnoreFilePaths,
-    };
-  }
-
-  /**
-   * Gets custom file exclusion patterns from configuration.
-   * TODO: This is a placeholder implementation. In the future, this could
-   * read from settings files, CLI arguments, or environment variables.
-   */
-  getCustomExcludes(): string[] {
-    // Placeholder implementation - returns empty array for now
-    // Future implementation could read from:
-    // - User settings file
-    // - Project-specific configuration
-    // - Environment variables
-    // - CLI arguments
-    return [];
-  }
-
-  getCheckpointingEnabled(): boolean {
-    return this.checkpointing;
-  }
-
-  getProxy(): string | undefined {
-    return this.proxy;
-  }
-
-  getWorkingDir(): string {
-    return this.cwd;
-  }
-
-  getBugCommand(): BugCommandSettings | undefined {
-    return this.bugCommand;
-  }
-
-  getFileService(): FileDiscoveryService {
-    if (!this.fileDiscoveryService) {
-      this.fileDiscoveryService = new FileDiscoveryService(this.targetDir, {
-        respectGitIgnore: this.fileFiltering.respectGitIgnore,
-        respectGeminiIgnore: this.fileFiltering.respectGeminiIgnore,
-        customIgnoreFilePaths: this.fileFiltering.customIgnoreFilePaths,
-      });
-    }
-    return this.fileDiscoveryService;
+  getTelemetrySettings(): TelemetrySettings {
+    return this.telemetrySettings;
   }
 
   getUsageStatisticsEnabled(): boolean {
     return this.usageStatisticsEnabled;
   }
 
-  getExperimentalZedIntegration(): boolean {
-    return this.experimentalZedIntegration;
+  getProxy(): string | undefined {
+    return this.proxy;
   }
 
-  getListExtensions(): boolean {
-    return this.listExtensions;
+  getCwd(): string {
+    return this.cwd;
   }
 
-  getListSessions(): boolean {
-    return this.listSessions;
+  getFileSystemService(): FileSystemService {
+    return this.fileSystemService;
   }
 
-  getDeleteSession(): string | undefined {
-    return this.deleteSession;
+  getFileService(): FileDiscoveryService {
+    if (this.fileDiscoveryService) {
+      return this.fileDiscoveryService;
+    }
+
+    const { respectGitIgnore, respectGeminiIgnore } = this.fileFiltering;
+    this.fileDiscoveryService = new FileDiscoveryService(
+      this.targetDir,
+      {
+        respectGitIgnore,
+        respectGeminiIgnore,
+      },
+      this.fileExclusions,
+    );
+
+    return this.fileDiscoveryService;
   }
 
-  getExtensionManagement(): boolean {
-    return this.extensionManagement;
+  getGitService(): GitService {
+    if (this.gitService) {
+      return this.gitService;
+    }
+
+    this.gitService = new GitService(this.targetDir);
+    return this.gitService;
   }
 
-  getExtensions(): GeminiCLIExtension[] {
-    return this._extensionLoader.getExtensions();
+  getCheckpointingEnabled(): boolean {
+    return this.checkpointing;
   }
 
-  getExtensionLoader(): ExtensionLoader {
-    return this._extensionLoader;
+  getBugCommandUrl(): string | undefined {
+    if (!this.bugCommand) {
+      return;
+    }
+
+    const { urlTemplate } = this.bugCommand;
+
+    const osInfo = `OS: ${os.platform()} ${os.release()}`;
+    const geminiCliVersion = `Gemini CLI version: ${this.getClientVersion()}`;
+
+    const body = encodeURIComponent(
+      `\n\n------------------\n${osInfo}\n${geminiCliVersion}\nSession ID: ${this.sessionId}`,
+    );
+    return urlTemplate.replace('{body}', body);
   }
 
-  // The list of explicitly enabled extensions, if any were given, may contain
-  // the string "none".
-  getEnabledExtensions(): string[] {
-    return this._enabledExtensions;
-  }
-
-  getEnableExtensionReloading(): boolean {
-    return this.enableExtensionReloading;
-  }
-
-  getDisableLLMCorrection(): boolean {
-    return this.disableLLMCorrection;
-  }
-
-  isPlanEnabled(): boolean {
-    return this.planEnabled;
-  }
-
-  getApprovedPlanPath(): string | undefined {
-    return this.approvedPlanPath;
-  }
-
-  getDirectWebFetch(): boolean {
-    return this.directWebFetch;
-  }
-
-  setApprovedPlanPath(path: string | undefined): void {
-    this.approvedPlanPath = path;
-  }
-
-  isAgentsEnabled(): boolean {
-    return this.enableAgents;
-  }
-
-  isEventDrivenSchedulerEnabled(): boolean {
-    return this.enableEventDrivenScheduler;
+  getClientVersion(): string {
+    return this.clientVersion;
   }
 
   getNoBrowser(): boolean {
-    return this.noBrowser;
+    return this.noBrowser || !shouldAttemptBrowserLaunch();
   }
 
-  getAgentsSettings(): AgentSettings {
-    return this.agents;
+  getSummarizeToolOutput(toolName: string): SummarizeToolOutputSettings {
+    return this.summarizeToolOutput?.[toolName] ?? {};
   }
 
-  isBrowserLaunchSuppressed(): boolean {
-    return this.getNoBrowser() || !shouldAttemptBrowserLaunch();
+  async onReloadRequest(): Promise<void> {
+    if (!this.onReload) {
+      debugLogger.warn('onReloadRequest called but no onReload handler set');
+      return;
+    }
+    const {
+      disabledSkills,
+      adminSkillsEnabled,
+      agents = {},
+    } = await this.onReload();
+
+    this.getSkillManager().setAdminSettings(adminSkillsEnabled);
+    if (adminSkillsEnabled) {
+      await this.getSkillManager().discoverSkills(
+        this.storage,
+        this.getExtensions(),
+        this.isTrustedFolder(),
+      );
+      this.getSkillManager().setDisabledSkills(disabledSkills ?? []);
+      // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
+      if (this.getSkillManager().getSkills().length > 0) {
+        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
+        this.getToolRegistry().registerTool(
+          new ActivateSkillTool(this, this.messageBus),
+        );
+      }
+    }
+
+    this.agents = { ...this.agents, ...agents };
+    await this.agentRegistry.initialize();
   }
 
-  getSummarizeToolOutputConfig():
-    | Record<string, SummarizeToolOutputSettings>
-    | undefined {
-    return this.summarizeToolOutput;
+  onAgentsRefreshed = async () => {
+    // Re-register SubagentTool to update its schema with the discovered enabled agents
+    if (this.agentRegistry.getAgentCount() > 0) {
+      this.getToolRegistry().unregisterTool(SubagentTool.Name);
+      this.getToolRegistry().registerTool(
+        new SubagentTool(
+          this,
+          this.messageBus,
+          this.acknowledgedAgentsService,
+          this.agentRegistry,
+        ),
+      );
+    }
+
+    if (this.geminiClient?.isInitialized()) {
+      await this.geminiClient.setTools();
+      this.geminiClient.updateSystemInstruction();
+    }
+  };
+
+  validatePathAccess(filePath: string): string | null {
+    if (!this.folderTrust) {
+      return 'The current folder is not trusted, so file access is disabled.';
+    }
+
+    if (!isSubpath(this.getProjectRoot(), filePath)) {
+      return 'The specified file is outside the project root.';
+    }
+
+    return null;
+  }
+
+  isTrustedFolder(): boolean {
+    // If folderTrust is enabled, but the user hasn't explicitly trusted the folder,
+    // we should treat it as untrusted.
+    return this.folderTrust && this.trustedFolder === true;
   }
 
   getIdeMode(): boolean {
     return this.ideMode;
   }
 
-  /**
-   * Returns 'true' if the folder trust feature is enabled.
-   */
-  getFolderTrust(): boolean {
-    return this.folderTrust;
+  setIdeMode(enabled: boolean): void {
+    this.ideMode = enabled;
   }
 
-  /**
-   * Returns 'true' if the workspace is considered "trusted".
-   * 'false' for untrusted.
-   */
-  isTrustedFolder(): boolean {
-    const context = ideContextStore.get();
-    if (context?.workspaceState?.isTrusted !== undefined) {
-      return context.workspaceState.isTrusted;
+  private async createToolRegistry(): Promise<ToolRegistry> {
+    const toolRegistry = new ToolRegistry();
+    const coreTools = new Set(this.coreTools ?? []);
+    if (coreTools.size === 0 || coreTools.has('edit')) {
+      toolRegistry.registerTool(new EditTool(this.messageBus));
     }
-
-    // Default to untrusted if folder trust is enabled and no explicit value is set.
-    return this.folderTrust ? (this.trustedFolder ?? false) : true;
-  }
-
-  setIdeMode(value: boolean): void {
-    this.ideMode = value;
-  }
-
-  /**
-   * Get the current FileSystemService
-   */
-  getFileSystemService(): FileSystemService {
-    return this.fileSystemService;
-  }
-
-  /**
-   * Checks if a given absolute path is allowed for file system operations.
-   * A path is allowed if it's within the workspace context or the project's temporary directory.
-   *
-   * @param absolutePath The absolute path to check.
-   * @returns true if the path is allowed, false otherwise.
-   */
-  isPathAllowed(absolutePath: string): boolean {
-    const realpath = (p: string) => {
-      let resolved: string;
-      try {
-        resolved = fs.realpathSync(p);
-      } catch {
-        resolved = path.resolve(p);
-      }
-      return os.platform() === 'win32' ? resolved.toLowerCase() : resolved;
-    };
-
-    const resolvedPath = realpath(absolutePath);
-
-    const workspaceContext = this.getWorkspaceContext();
-    if (workspaceContext.isPathWithinWorkspace(resolvedPath)) {
-      return true;
+    if (coreTools.size === 0 || coreTools.has('ls')) {
+      toolRegistry.registerTool(new LSTool(this, this.messageBus));
     }
-
-    const projectTempDir = this.storage.getProjectTempDir();
-    const resolvedTempDir = realpath(projectTempDir);
-
-    return isSubpath(resolvedTempDir, resolvedPath);
-  }
-
-  /**
-   * Validates if a path is allowed and returns a detailed error message if not.
-   *
-   * @param absolutePath The absolute path to validate.
-   * @param checkType The type of access to check ('read' or 'write'). Defaults to 'write' for safety.
-   * @returns An error message string if the path is disallowed, null otherwise.
-   */
-  validatePathAccess(
-    absolutePath: string,
-    checkType: 'read' | 'write' = 'write',
-  ): string | null {
-    // For read operations, check read-only paths first
-    if (checkType === 'read') {
-      if (this.getWorkspaceContext().isPathReadable(absolutePath)) {
-        return null;
-      }
+    if (coreTools.size === 0 || coreTools.has('read_file')) {
+      toolRegistry.registerTool(new ReadFileTool(this.messageBus));
     }
-
-    // Then check standard allowed paths (Workspace + Temp)
-    // This covers 'write' checks and acts as a fallback/temp-dir check for 'read'
-    if (this.isPathAllowed(absolutePath)) {
-      return null;
-    }
-
-    const workspaceDirs = this.getWorkspaceContext().getDirectories();
-    const projectTempDir = this.storage.getProjectTempDir();
-    return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
-  }
-
-  /**
-   * Set a custom FileSystemService
-   */
-  setFileSystemService(fileSystemService: FileSystemService): void {
-    this.fileSystemService = fileSystemService;
-  }
-
-  async getCompressionThreshold(): Promise<number | undefined> {
-    if (this.compressionThreshold) {
-      return this.compressionThreshold;
-    }
-
-    await this.ensureExperimentsLoaded();
-
-    const remoteThreshold =
-      this.experiments?.flags[ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]
-        ?.floatValue;
-    if (remoteThreshold === 0) {
-      return undefined;
-    }
-    return remoteThreshold;
-  }
-
-  async getUserCaching(): Promise<boolean | undefined> {
-    await this.ensureExperimentsLoaded();
-
-    return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
-  }
-
-  async getPlanModeRoutingEnabled(): Promise<boolean> {
-    return this.planModeRoutingEnabled;
-  }
-
-  async getNumericalRoutingEnabled(): Promise<boolean> {
-    await this.ensureExperimentsLoaded();
-
-    return !!this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]
-      ?.boolValue;
-  }
-
-  async getClassifierThreshold(): Promise<number | undefined> {
-    await this.ensureExperimentsLoaded();
-
-    const flag = this.experiments?.flags[ExperimentFlags.CLASSIFIER_THRESHOLD];
-    if (flag?.intValue !== undefined) {
-      return parseInt(flag.intValue, 10);
-    }
-    return flag?.floatValue;
-  }
-
-  async getBannerTextNoCapacityIssues(): Promise<string> {
-    await this.ensureExperimentsLoaded();
-    return (
-      this.experiments?.flags[ExperimentFlags.BANNER_TEXT_NO_CAPACITY_ISSUES]
-        ?.stringValue ?? ''
-    );
-  }
-
-  async getBannerTextCapacityIssues(): Promise<string> {
-    await this.ensureExperimentsLoaded();
-    return (
-      this.experiments?.flags[ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES]
-        ?.stringValue ?? ''
-    );
-  }
-
-  /**
-   * Returns whether Gemini 3.1 has been launched.
-   * This method is async and ensures that experiments are loaded before returning the result.
-   */
-  async getGemini31Launched(): Promise<boolean> {
-    await this.ensureExperimentsLoaded();
-    return this.getGemini31LaunchedSync();
-  }
-
-  /**
-   * Returns whether Gemini 3.1 has been launched.
-   *
-   * Note: This method should only be called after startup, once experiments have been loaded.
-   * If you need to call this during startup or from an async context, use
-   * getGemini31Launched instead.
-   */
-  getGemini31LaunchedSync(): boolean {
-    const authType = this.contentGeneratorConfig?.authType;
-    if (
-      authType === AuthType.USE_GEMINI ||
-      authType === AuthType.USE_VERTEX_AI
-    ) {
-      return true;
-    }
-    return (
-      this.experiments?.flags[ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]
-        ?.boolValue ?? false
-    );
-  }
-
-  private async ensureExperimentsLoaded(): Promise<void> {
-    if (!this.experimentsPromise) {
-      return;
-    }
-    try {
-      await this.experimentsPromise;
-    } catch (e) {
-      debugLogger.debug('Failed to fetch experiments', e);
-    }
-  }
-
-  isInteractiveShellEnabled(): boolean {
-    return (
-      this.interactive &&
-      this.ptyInfo !== 'child_process' &&
-      this.enableInteractiveShell
-    );
-  }
-
-  isSkillsSupportEnabled(): boolean {
-    return this.skillsSupport;
-  }
-
-  /**
-   * Reloads skills by re-discovering them from extensions and local directories.
-   */
-  async reloadSkills(): Promise<void> {
-    if (!this.skillsSupport) {
-      return;
-    }
-
-    if (this.onReload) {
-      const refreshed = await this.onReload();
-      this.disabledSkills = refreshed.disabledSkills ?? [];
-      this.getSkillManager().setAdminSettings(
-        refreshed.adminSkillsEnabled ?? this.adminSkillsEnabled,
-      );
-    }
-
-    if (this.getSkillManager().isAdminEnabled()) {
-      await this.getSkillManager().discoverSkills(
-        this.storage,
-        this.getExtensions(),
-        this.isTrustedFolder(),
-      );
-      this.getSkillManager().setDisabledSkills(this.disabledSkills);
-
-      // Re-register ActivateSkillTool to update its schema with the newly discovered skills
-      if (this.getSkillManager().getSkills().length > 0) {
-        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
-        this.getToolRegistry().registerTool(
-          new ActivateSkillTool(this, this.messageBus),
-        );
+    if (coreTools.size === 0 || coreTools.has('grep')) {
+      if (this.useRipgrep && (await canUseRipgrep())) {
+        toolRegistry.registerTool(new RipGrepTool(this.messageBus));
       } else {
-        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
-      }
-    } else {
-      this.getSkillManager().clearSkills();
-      this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
-    }
-
-    // Notify the client that system instructions might need updating
-    this.updateSystemInstructionIfInitialized();
-  }
-
-  /**
-   * Reloads agent settings.
-   */
-  async reloadAgents(): Promise<void> {
-    if (this.onReload) {
-      const refreshed = await this.onReload();
-      if (refreshed.agents) {
-        this.agents = refreshed.agents;
+        toolRegistry.registerTool(new GrepTool(this.messageBus));
+        logRipgrepFallback(
+          this,
+          new RipgrepFallbackEvent(
+            this.getContentGeneratorConfig()?.authType ?? AuthType.UNKNOWN,
+          ),
+        );
       }
     }
+    if (coreTools.size === 0 || coreTools.has('glob')) {
+      toolRegistry.registerTool(new GlobTool(this.messageBus));
+    }
+    if (coreTools.size === 0 || coreTools.has('shell')) {
+      toolRegistry.registerTool(new ShellTool(this.messageBus));
+    }
+    if (coreTools.size === 0 || coreTools.has('write_file')) {
+      toolRegistry.registerTool(new WriteFileTool(this.messageBus));
+    }
+    if (coreTools.size === 0 || coreTools.has('web_fetch')) {
+      toolRegistry.registerTool(new WebFetchTool(this, this.messageBus));
+    }
+    if (coreTools.size === 0 || coreTools.has('google_web_search')) {
+      toolRegistry.registerTool(new WebSearchTool(this, this.messageBus));
+    }
+    if (coreTools.size === 0 || coreTools.has('ask_user')) {
+      toolRegistry.registerTool(new AskUserTool(this.messageBus));
+    }
+    if (coreTools.size === 0 || coreTools.has('write_todos')) {
+      toolRegistry.registerTool(new WriteTodosTool(this.messageBus));
+    }
+    if (coreTools.size === 0 || coreTools.has('memory')) {
+      toolRegistry.registerTool(new MemoryTool(this, this.messageBus));
+    }
+    if (
+      this.skillsSupport &&
+      (coreTools.size === 0 || coreTools.has('activate_skill'))
+    ) {
+      toolRegistry.registerTool(new ActivateSkillTool(this, this.messageBus));
+    }
+    if (this.enableAgents) {
+      toolRegistry.registerTool(
+        new SubagentTool(
+          this,
+          this.messageBus,
+          this.acknowledgedAgentsService,
+          this.agentRegistry,
+        ),
+      );
+    }
+    toolRegistry.registerTool(new ExitPlanModeTool(this.messageBus));
+    toolRegistry.registerTool(new EnterPlanModeTool(this.messageBus));
+
+    return toolRegistry;
   }
 
   isInteractive(): boolean {
     return this.interactive;
   }
 
-  getUseRipgrep(): boolean {
-    return this.useRipgrep;
+  getPtyInfo(): string {
+    return this.ptyInfo;
   }
 
   getUseBackgroundColor(): boolean {
@@ -2603,8 +2273,76 @@ export class Config implements McpContext {
     return this.enableInteractiveShell;
   }
 
+  getShellExecutionConfig(): ShellExecutionConfig {
+    return this.shellExecutionConfig;
+  }
+
+  setShellExecutionSanitizationConfig(
+    sanitizationConfig: EnvironmentSanitizationConfig,
+  ): void {
+    this.shellExecutionConfig.sanitizationConfig = sanitizationConfig;
+  }
+
   getSkipNextSpeakerCheck(): boolean {
     return this.skipNextSpeakerCheck;
+  }
+
+  getTruncateToolOutputThreshold(): number {
+    return this.truncateToolOutputThreshold;
+  }
+
+  getCompressionThreshold(): number | undefined {
+    return this.compressionThreshold;
+  }
+
+  getCompressionTruncationCounter(): number {
+    return this.compressionTruncationCounter;
+  }
+
+  incrementCompressionTruncationCounter() {
+    this.compressionTruncationCounter++;
+  }
+
+  getFileExclusions(): FileExclusions {
+    return this.fileExclusions;
+  }
+
+  getEventEmitter(): EventEmitter | undefined {
+    return this.eventEmitter;
+  }
+
+  getMessageBus(): MessageBus {
+    return this.messageBus;
+  }
+
+  getPolicyEngine(): PolicyEngine {
+    return this.policyEngine;
+  }
+
+  getUseWriteTodos(): boolean {
+    return this.useWriteTodos;
+  }
+
+  getOutputFormat(): OutputFormat {
+    return this.outputSettings.format ?? OutputFormat.TEXT;
+  }
+
+  getGemmaModelRouterEnabled(): boolean {
+    return this.gemmaModelRouter.enabled ?? false;
+  }
+
+  getGemmaModelRouterClassifierHost(): string {
+    return (
+      this.gemmaModelRouter.classifier?.host ?? 'http://localhost:9379'
+    );
+  }
+
+  getGemmaModelRouterClassifierModel(): string {
+    return this.gemmaModelRouter.classifier?.model ?? 'gemma3-1b-gpu-custom';
+  }
+
+  getDisableModelRouterForAuth(): AuthType[] {
+    return this.gemmaModelRouter.enabled ? [] : [];
   }
 
   getContinueOnFailedApiCall(): boolean {
@@ -2627,68 +2365,16 @@ export class Config implements McpContext {
     return this.shellToolInactivityTimeout;
   }
 
-  getShellExecutionConfig(): ShellExecutionConfig {
-    return this.shellExecutionConfig;
+  getDisableYoloMode(): boolean {
+    return this.disableYoloMode;
   }
 
-  setShellExecutionConfig(config: ShellExecutionConfig): void {
-    this.shellExecutionConfig = {
-      terminalWidth:
-        config.terminalWidth ?? this.shellExecutionConfig.terminalWidth,
-      terminalHeight:
-        config.terminalHeight ?? this.shellExecutionConfig.terminalHeight,
-      showColor: config.showColor ?? this.shellExecutionConfig.showColor,
-      pager: config.pager ?? this.shellExecutionConfig.pager,
-      sanitizationConfig:
-        config.sanitizationConfig ??
-        this.shellExecutionConfig.sanitizationConfig,
-    };
-  }
-  getScreenReader(): boolean {
-    return this.accessibility.screenReader ?? false;
+  getRawOutput(): boolean {
+    return this.rawOutput;
   }
 
-  getTruncateToolOutputThreshold(): number {
-    return Math.min(
-      // Estimate remaining context window in characters (1 token ~= 4 chars).
-      4 *
-        (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
-      this.truncateToolOutputThreshold,
-    );
-  }
-
-  getNextCompressionTruncationId(): number {
-    return ++this.compressionTruncationCounter;
-  }
-
-  getUseWriteTodos(): boolean {
-    return this.useWriteTodos;
-  }
-
-  getOutputFormat(): OutputFormat {
-    return this.outputSettings?.format
-      ? this.outputSettings.format
-      : OutputFormat.TEXT;
-  }
-
-  async getGitService(): Promise<GitService> {
-    if (!this.gitService) {
-      this.gitService = new GitService(this.targetDir, this.storage);
-      await this.gitService.initialize();
-    }
-    return this.gitService;
-  }
-
-  getFileExclusions(): FileExclusions {
-    return this.fileExclusions;
-  }
-
-  getMessageBus(): MessageBus {
-    return this.messageBus;
-  }
-
-  getPolicyEngine(): PolicyEngine {
-    return this.policyEngine;
+  getAcceptRawOutputRisk(): boolean {
+    return this.acceptRawOutputRisk;
   }
 
   getEnableHooks(): boolean {
@@ -2699,298 +2385,153 @@ export class Config implements McpContext {
     return this.enableHooksUI;
   }
 
-  getGemmaModelRouterEnabled(): boolean {
-    return this.gemmaModelRouter.enabled ?? false;
-  }
-
-  getGemmaModelRouterSettings(): GemmaModelRouterSettings {
-    return this.gemmaModelRouter;
-  }
-
-  /**
-   * Get override settings for a specific agent.
-   * Reads from agents.overrides.<agentName>.
-   */
-  getAgentOverride(agentName: string): AgentOverride | undefined {
-    return this.getAgentsSettings()?.overrides?.[agentName];
-  }
-
-  /**
-   * Get browser agent configuration.
-   * Combines generic AgentOverride fields with browser-specific customConfig.
-   * This is the canonical way to access browser agent settings.
-   */
-  getBrowserAgentConfig(): {
-    enabled: boolean;
-    model?: string;
-    customConfig: BrowserAgentCustomConfig;
-  } {
-    const override = this.getAgentOverride('browser_agent');
-    const customConfig = this.getAgentsSettings()?.browser ?? {};
-    return {
-      enabled: override?.enabled ?? false,
-      model: override?.modelConfig?.model,
-      customConfig: {
-        sessionMode: customConfig.sessionMode ?? 'persistent',
-        headless: customConfig.headless ?? false,
-        profilePath: customConfig.profilePath,
-        visualModel: customConfig.visualModel,
-      },
-    };
-  }
-
-  async createToolRegistry(): Promise<ToolRegistry> {
-    const registry = new ToolRegistry(this, this.messageBus);
-
-    // helper to create & register core tools that are enabled
-    const maybeRegister = (
-      toolClass: { name: string; Name?: string },
-      registerFn: () => void,
-    ) => {
-      const className = toolClass.name;
-      const toolName = toolClass.Name || className;
-      const coreTools = this.getCoreTools();
-      // On some platforms, the className can be minified to _ClassName.
-      const normalizedClassName = className.replace(/^_+/, '');
-
-      let isEnabled = true; // Enabled by default if coreTools is not set.
-      if (coreTools) {
-        isEnabled = coreTools.some(
-          (tool) =>
-            tool === toolName ||
-            tool === normalizedClassName ||
-            tool.startsWith(`${toolName}(`) ||
-            tool.startsWith(`${normalizedClassName}(`),
-        );
-      }
-
-      if (isEnabled) {
-        registerFn();
-      }
-    };
-
-    maybeRegister(LSTool, () =>
-      registry.registerTool(new LSTool(this, this.messageBus)),
-    );
-    maybeRegister(ReadFileTool, () =>
-      registry.registerTool(new ReadFileTool(this, this.messageBus)),
-    );
-
-    if (this.getUseRipgrep()) {
-      let useRipgrep = false;
-      let errorString: undefined | string = undefined;
-      try {
-        useRipgrep = await canUseRipgrep();
-      } catch (error: unknown) {
-        errorString = String(error);
-      }
-      if (useRipgrep) {
-        maybeRegister(RipGrepTool, () =>
-          registry.registerTool(new RipGrepTool(this, this.messageBus)),
-        );
-      } else {
-        logRipgrepFallback(this, new RipgrepFallbackEvent(errorString));
-        maybeRegister(GrepTool, () =>
-          registry.registerTool(new GrepTool(this, this.messageBus)),
-        );
-      }
-    } else {
-      maybeRegister(GrepTool, () =>
-        registry.registerTool(new GrepTool(this, this.messageBus)),
-      );
-    }
-
-    maybeRegister(GlobTool, () =>
-      registry.registerTool(new GlobTool(this, this.messageBus)),
-    );
-    maybeRegister(ActivateSkillTool, () =>
-      registry.registerTool(new ActivateSkillTool(this, this.messageBus)),
-    );
-    maybeRegister(EditTool, () =>
-      registry.registerTool(new EditTool(this, this.messageBus)),
-    );
-    maybeRegister(WriteFileTool, () =>
-      registry.registerTool(new WriteFileTool(this, this.messageBus)),
-    );
-    maybeRegister(WebFetchTool, () =>
-      registry.registerTool(new WebFetchTool(this, this.messageBus)),
-    );
-    maybeRegister(ShellTool, () =>
-      registry.registerTool(new ShellTool(this, this.messageBus)),
-    );
-    maybeRegister(MemoryTool, () =>
-      registry.registerTool(new MemoryTool(this.messageBus)),
-    );
-    maybeRegister(WebSearchTool, () =>
-      registry.registerTool(new WebSearchTool(this, this.messageBus)),
-    );
-    maybeRegister(AskUserTool, () =>
-      registry.registerTool(new AskUserTool(this.messageBus)),
-    );
-    if (this.getUseWriteTodos()) {
-      maybeRegister(WriteTodosTool, () =>
-        registry.registerTool(new WriteTodosTool(this.messageBus)),
-      );
-    }
-    if (this.isPlanEnabled()) {
-      maybeRegister(ExitPlanModeTool, () =>
-        registry.registerTool(new ExitPlanModeTool(this, this.messageBus)),
-      );
-      maybeRegister(EnterPlanModeTool, () =>
-        registry.registerTool(new EnterPlanModeTool(this, this.messageBus)),
-      );
-    }
-
-    // Register Subagents as Tools
-    this.registerSubAgentTools(registry);
-
-    await registry.discoverAllTools();
-    registry.sortTools();
-    return registry;
-  }
-
-  /**
-   * Registers SubAgentTools for all available agents.
-   */
-  private registerSubAgentTools(registry: ToolRegistry): void {
-    const agentsOverrides = this.getAgentsSettings().overrides ?? {};
-    if (
-      this.isAgentsEnabled() ||
-      agentsOverrides['codebase_investigator']?.enabled !== false ||
-      agentsOverrides['cli_help']?.enabled !== false
-    ) {
-      const definitions = this.agentRegistry.getAllDefinitions();
-
-      for (const definition of definitions) {
-        try {
-          const tool = new SubagentTool(definition, this, this.getMessageBus());
-          registry.registerTool(tool);
-        } catch (e: unknown) {
-          debugLogger.warn(
-            `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
-          );
-        }
-      }
-    }
-  }
-
-  /**
-   * Get the hook system instance
-   */
   getHookSystem(): HookSystem | undefined {
     return this.hookSystem;
   }
 
-  /**
-   * Get hooks configuration
-   */
   getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
     return this.hooks;
   }
 
-  /**
-   * Get project-specific hooks configuration
-   */
-  getProjectHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
+  getProjectHooks():
+    | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
+    | undefined {
     return this.projectHooks;
   }
 
-  /**
-   * Update the list of disabled hooks dynamically.
-   * This is used to keep the running system in sync with settings changes
-   * without risk of loading new hook definitions into memory.
-   */
-  updateDisabledHooks(disabledHooks: string[]): void {
-    this.disabledHooks = disabledHooks;
-  }
-
-  /**
-   * Get disabled hooks list
-   */
-  getDisabledHooks(): string[] {
+  getDisabledHooks(): string[] | undefined {
     return this.disabledHooks;
   }
 
-  /**
-   * Get experiments configuration
-   */
   getExperiments(): Experiments | undefined {
     return this.experiments;
   }
 
-  /**
-   * Set experiments configuration
-   */
-  setExperiments(experiments: Experiments): void {
+  setExperiments(experiments: Experiments | undefined): void {
     this.experiments = experiments;
-    const flagSummaries = Object.entries(experiments.flags ?? {})
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([flagId, flag]) => {
-        const summary: Record<string, unknown> = { flagId };
-        if (flag.boolValue !== undefined) {
-          summary['boolValue'] = flag.boolValue;
-        }
-        if (flag.floatValue !== undefined) {
-          summary['floatValue'] = flag.floatValue;
-        }
-        if (flag.intValue !== undefined) {
-          summary['intValue'] = flag.intValue;
-        }
-        if (flag.stringValue !== undefined) {
-          summary['stringValue'] = flag.stringValue;
-        }
-        const int32Length = flag.int32ListValue?.values?.length ?? 0;
-        if (int32Length > 0) {
-          summary['int32ListLength'] = int32Length;
-        }
-        const stringListLength = flag.stringListValue?.values?.length ?? 0;
-        if (stringListLength > 0) {
-          summary['stringListLength'] = stringListLength;
-        }
-        return summary;
-      });
-    const summary = {
-      experimentIds: experiments.experimentIds ?? [],
-      flags: flagSummaries,
-    };
-    const summaryString = inspect(summary, {
-      depth: null,
-      maxArrayLength: null,
-      maxStringLength: null,
-      breakLength: 80,
-      compact: false,
-    });
-    debugLogger.debug('Experiments loaded', summaryString);
   }
 
-  private onAgentsRefreshed = async () => {
-    if (this.toolRegistry) {
-      this.registerSubAgentTools(this.toolRegistry);
+  async ensureExperimentsLoaded(): Promise<void> {
+    if (this.experimentsPromise) {
+      await this.experimentsPromise;
     }
-    // Propagate updates to the active chat session
-    const client = this.getGeminiClient();
-    if (client?.isInitialized()) {
-      await client.setTools();
-      client.updateSystemInstruction();
+  }
+
+  getExtensionLoader(): ExtensionLoader {
+    return this._extensionLoader;
+  }
+
+  getExtensions(): GeminiCLIExtension[] {
+    return this.getExtensionLoader().getExtensions();
+  }
+
+  getEnabledExtensions(): string[] {
+    return this._enabledExtensions;
+  }
+
+  getExtension(id: string): GeminiCLIExtension | undefined {
+    return this.getExtensions().find((e) => e.id === id);
+  }
+
+  isExtensionEnabled(extension: GeminiCLIExtension | string): boolean {
+    const id = typeof extension === 'string' ? extension : extension.id;
+    return this._enabledExtensions.includes(id);
+  }
+
+  isExtensionManagementEnabled(): boolean {
+    return this.extensionManagement;
+  }
+
+  isExtensionReloadingEnabled(): boolean {
+    return this.enableExtensionReloading;
+  }
+
+  getAgents(): AgentSettings {
+    return this.agents;
+  }
+
+  isAgentsEnabled(): boolean {
+    return this.enableAgents;
+  }
+
+  isEventDrivenSchedulerEnabled(): boolean {
+    return this.enableEventDrivenScheduler;
+  }
+
+  getOverageStrategy(): OverageStrategy {
+    return this.billing.overageStrategy;
+  }
+
+  getGemini31LaunchedSync(): boolean {
+    return (
+      this.experiments?.flags[ExperimentFlags.GEMINI_3_1_LAUNCHED]?.boolValue ??
+      false
+    );
+  }
+
+  getPlanEnabled(): boolean {
+    return this.planEnabled;
+  }
+
+  getPlanModeRoutingEnabled(): boolean {
+    return this.planModeRoutingEnabled;
+  }
+
+  getApprovedPlanPath(): string | undefined {
+    return this.approvedPlanPath;
+  }
+
+  setApprovedPlanPath(planPath: string | undefined): void {
+    this.approvedPlanPath = planPath;
+  }
+
+  syncPlanModeTools(): void {
+    if (!this.geminiClient?.isInitialized()) return;
+    const toolRegistry = this.getToolRegistry();
+
+    const planMode =
+      this.policyEngine.getApprovalMode() === ApprovalMode.PLAN_ONLY;
+    const planToolEnabled =
+      toolRegistry.getTool(ENTER_PLAN_MODE_TOOL_NAME) !== undefined;
+
+    if (this.planEnabled) {
+      if (planMode && planToolEnabled) {
+        // We're in plan mode, but the enter plan mode tool is enabled.
+        // It should be disabled.
+        toolRegistry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
+      } else if (!planMode && !planToolEnabled) {
+        // We're not in plan mode, but the enter plan mode tool is disabled.
+        // It should be enabled.
+        toolRegistry.registerTool(new EnterPlanModeTool(this.messageBus));
+      }
+
+      if (!planMode) {
+        // We are not in plan mode, so we should always unregister the exit tool.
+        toolRegistry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
+      } else {
+        // We are in plan mode, we need to check if the exit tool is registered.
+        if (!toolRegistry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
+          toolRegistry.registerTool(new ExitPlanModeTool(this.messageBus));
+        }
+      }
     } else {
-      debugLogger.debug(
-        '[Config] GeminiClient not initialized; skipping live prompt/tool refresh.',
+      // Plan mode is disabled, so we should unregister both tools.
+      toolRegistry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
+      toolRegistry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
+    }
+  }
+  /**
+   * Logs the duration of the current approval mode.
+   */
+  logCurrentModeDuration(mode: ApprovalMode): void {
+    const now = performance.now();
+    const duration = now - this.lastModeSwitchTime;
+    if (duration > 0) {
+      logApprovalModeDuration(
+        this,
+        new ApprovalModeDurationEvent(mode, duration),
       );
     }
-  };
-
-  /**
-   * Disposes of resources and removes event listeners.
-   */
-  async dispose(): Promise<void> {
-    this.logCurrentModeDuration(this.getApprovalMode());
-    coreEvents.off(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
-    this.agentRegistry?.dispose();
-    this.geminiClient?.dispose();
-    if (this.mcpClientManager) {
-      await this.mcpClientManager.stop();
-    }
+    this.lastModeSwitchTime = now;
   }
 }
-// Export model constants for use in CLI
-export { DEFAULT_GEMINI_FLASH_MODEL };

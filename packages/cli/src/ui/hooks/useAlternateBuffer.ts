@@ -5,7 +5,6 @@
  */
 
 import { useConfig } from '../contexts/ConfigContext.js';
-import type { MergedSettings } from '../../config/settings.js';
 import type { Config, TerminalCapabilities } from '@google/gemini-cli-core';
 import {
   detectTerminalEnvironment,
@@ -21,11 +20,7 @@ export const isAlternateBufferEnabled = (
   config: Config,
   capabilities?: TerminalCapabilities,
 ): boolean => {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const settings = config.getSettings() as unknown as {
-    merged: MergedSettings;
-  };
-  const compatibility = settings.merged.ui.compatibility;
+  const compatibility = config.getUiCompatibility();
   const caps =
     capabilities ??
     getTerminalCapabilities(detectTerminalEnvironment(), process.env, {

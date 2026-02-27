@@ -21,6 +21,7 @@ describe('ui-sizing', () => {
       (expected, width, altBuffer) => {
         const mockConfig = {
           getUseAlternateBuffer: () => altBuffer,
+          getUiCompatibility: () => ({}),
         } as unknown as Config;
         expect(calculateMainAreaWidth(width, mockConfig)).toBe(expected);
       },

@@ -89,6 +89,7 @@ describe('terminalEnvironment', () => {
       isVSCode: false,
       isITerm2: false,
       isGhostty: false,
+      isAppleTerminal: false,
       isWindows10: false,
       supports256Colors: true,
       supportsTrueColor: true,
