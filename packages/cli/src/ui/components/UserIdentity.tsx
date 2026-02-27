@@ -29,9 +29,10 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
     }
   }, [authType]);
 
-  const tierName = useMemo(() => {
-    return authType ? config.getUserTierName() : undefined;
-  }, [config, authType]);
+  const tierName = useMemo(
+    () => (authType ? config.getUserTierName() : undefined),
+    [config, authType],
+  );
 
   if (!authType) {
     return null;

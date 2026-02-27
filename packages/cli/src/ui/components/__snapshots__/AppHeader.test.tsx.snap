@@ -4,8 +4,8 @@ exports[`<AppHeader /> > should not render the banner when no flags are set 1`] 
 "
   ▝▜▄     Gemini CLI v1.0.0
     ▝▜▄
-   ▗▟▀
-  ▝▀
+   ▗▟▀ 
+  ▝▀    
 
 
 Tips for getting started:
@@ -19,8 +19,8 @@ exports[`<AppHeader /> > should not render the default banner if shown count is 
 "
   ▝▜▄     Gemini CLI v1.0.0
     ▝▜▄
-   ▗▟▀
-  ▝▀
+   ▗▟▀ 
+  ▝▀    
 
 
 Tips for getting started:
@@ -34,8 +34,8 @@ exports[`<AppHeader /> > should render the banner with default text 1`] = `
 "
   ▝▜▄     Gemini CLI v1.0.0
     ▝▜▄
-   ▗▟▀
-  ▝▀
+   ▗▟▀ 
+  ▝▀    
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ This is the default banner                                                                       │
@@ -52,8 +52,8 @@ exports[`<AppHeader /> > should render the banner with warning text 1`] = `
 "
   ▝▜▄     Gemini CLI v1.0.0
     ▝▜▄
-   ▗▟▀
-  ▝▀
+   ▗▟▀ 
+  ▝▀    
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ There are capacity issues                                                                        │

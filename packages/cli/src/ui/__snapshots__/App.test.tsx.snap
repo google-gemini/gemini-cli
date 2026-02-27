@@ -4,8 +4,8 @@ exports[`App > Snapshots > renders default layout correctly 1`] = `
 "
   ▝▜▄     Gemini CLI v1.2.3
     ▝▜▄
-   ▗▟▀
-  ▝▀
+   ▗▟▀ 
+  ▝▀    
 
 
 Tips for getting started:
@@ -49,8 +49,8 @@ Footer
 
   ▝▜▄     Gemini CLI v1.2.3
     ▝▜▄
-   ▗▟▀
-  ▝▀
+   ▗▟▀ 
+  ▝▀    
 
 
 Tips for getting started:
@@ -65,8 +65,8 @@ exports[`App > Snapshots > renders with dialogs visible 1`] = `
 "
   ▝▜▄     Gemini CLI v1.2.3
     ▝▜▄
-   ▗▟▀
-  ▝▀
+   ▗▟▀ 
+  ▝▀    
 
 
 
@@ -108,8 +108,8 @@ exports[`App > should render ToolConfirmationQueue along with Composer when tool
 "
   ▝▜▄     Gemini CLI v1.2.3
     ▝▜▄
-   ▗▟▀
-  ▝▀
+   ▗▟▀ 
+  ▝▀    
 
 
 Tips for getting started:
