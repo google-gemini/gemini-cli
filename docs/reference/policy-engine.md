@@ -10,9 +10,19 @@ confirmation.
 To create your first policy:
 
 1.  **Create the policy directory** if it doesn't exist:
+
+    **macOS/Linux**
+
     ```bash
     mkdir -p ~/.gemini/policies
     ```
+
+    **Windows (PowerShell)**
+
+    ```powershell
+    New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\policies"
+    ```
+
 2.  **Create a new policy file** (e.g., `~/.gemini/policies/my-rules.toml`). You
     can use any filename ending in `.toml`; all such files in this directory
     will be loaded and combined:

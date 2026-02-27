@@ -28,6 +28,8 @@ Create a directory for hooks and a simple logging script.
 > This example uses `jq` to parse JSON. If you don't have it installed, you can
 > perform similar logic using Node.js or Python.
 
+**macOS/Linux**
+
 ```bash
 mkdir -p .gemini/hooks
 cat > .gemini/hooks/log-tools.sh << 'EOF'
@@ -50,6 +52,28 @@ exit 0
 EOF
 
 chmod +x .gemini/hooks/log-tools.sh
+```
+
+**Windows (PowerShell)**
+
+```powershell
+New-Item -ItemType Directory -Force -Path ".gemini\hooks"
+@"
+# Read hook input from stdin
+`$inputJson = `$input | Out-String | ConvertFrom-Json
+
+# Extract tool name
+`$toolName = `$inputJson.tool_name
+
+# Log to stderr (visible in terminal if hook fails, or captured in logs)
+[Console]::Error.WriteLine("Logging tool: `$toolName")
+
+# Log to file
+"[`$(Get-Date -Format 'o')] Tool executed: `$toolName" | Out-File -FilePath ".gemini\tool-log.txt" -Append -Encoding utf8
+
+# Return success with empty JSON
+"{}"
+"@ | Out-File -FilePath ".gemini\hooks\log-tools.ps1" -Encoding utf8
 ```
 
 ## Exit Code Strategies

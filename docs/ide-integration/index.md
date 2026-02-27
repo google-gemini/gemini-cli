@@ -177,8 +177,16 @@ standalone terminal and want to manually associate it with a specific IDE
 instance, you can set the `GEMINI_CLI_IDE_PID` environment variable to the
 process ID (PID) of your IDE.
 
+**macOS/Linux**
+
 ```bash
 export GEMINI_CLI_IDE_PID=12345
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:GEMINI_CLI_IDE_PID=12345
 ```
 
 When this variable is set, Gemini CLI will skip automatic detection and attempt

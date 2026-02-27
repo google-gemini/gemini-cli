@@ -167,6 +167,8 @@ try {
 Run hook scripts manually with sample JSON input to verify they behave as
 expected before hooking them up to the CLI.
 
+**macOS/Linux**
+
 ```bash
 # Create test input
 cat > test-input.json << 'EOF'
@@ -187,7 +189,30 @@ cat test-input.json | .gemini/hooks/my-hook.sh
 
 # Check exit code
 echo "Exit code: $?"
+```
 
+**Windows (PowerShell)**
+
+```powershell
+# Create test input
+@"
+{
+  "session_id": "test-123",
+  "cwd": "C:\\temp\\test",
+  "hook_event_name": "BeforeTool",
+  "tool_name": "write_file",
+  "tool_input": {
+    "file_path": "test.txt",
+    "content": "Test content"
+  }
+}
+"@ | Out-File -FilePath test-input.json -Encoding utf8
+
+# Test the hook
+Get-Content test-input.json | .\.gemini\hooks\my-hook.ps1
+
+# Check exit code
+Write-Host "Exit code: $LASTEXITCODE"
 ```
 
 ### Check exit codes
@@ -333,13 +358,17 @@ tool_name=$(echo "$input" | jq -r '.tool_name')
 
 ### Make scripts executable
 
-Always make hook scripts executable:
+Always make hook scripts executable on macOS/Linux:
 
 ```bash
 chmod +x .gemini/hooks/*.sh
 chmod +x .gemini/hooks/*.js
 
 ```
+
+**Windows Note**: On Windows, PowerShell scripts (`.ps1`) don't use `chmod`, but
+you may need to ensure your execution policy allows them to run (e.g.,
+`Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`).
 
 ### Version control
 
@@ -480,6 +509,9 @@ has execution permissions:
 ls -la .gemini/hooks/my-hook.sh
 chmod +x .gemini/hooks/my-hook.sh
 ```
+
+**Windows Note**: On Windows, ensure your execution policy allows running
+scripts (e.g., `Get-ExecutionPolicy`).
 
 **Verify script path:** Ensure the path in `settings.json` resolves correctly.
 
