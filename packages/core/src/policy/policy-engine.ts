@@ -641,9 +641,24 @@ export class PolicyEngine {
     const processedTools = new Set<string>();
     let globalVerdict: PolicyDecision | undefined;
 
+    const normalizeDecision = (
+      decision: PolicyDecision,
+      isHeadless: boolean,
+    ): PolicyDecision => {
+      if (isHeadless && decision === PolicyDecision.ASK_USER) {
+        return PolicyDecision.DENY;
+      }
+      return decision;
+    };
+
     for (const rule of this.rules) {
+      const normalizedDecision = normalizeDecision(
+        rule.decision,
+        this.nonInteractive,
+      );
+
       if (rule.argsPattern) {
-        if (rule.toolName && rule.decision !== PolicyDecision.DENY) {
+        if (rule.toolName && normalizedDecision !== PolicyDecision.DENY) {
           processedTools.add(rule.toolName);
         }
         continue;
@@ -702,7 +717,7 @@ export class PolicyEngine {
           if (globalVerdict !== undefined) {
             decision = globalVerdict;
           } else {
-            decision = rule.decision;
+            decision = normalizedDecision;
           }
           if (decision === PolicyDecision.DENY) {
             excludedTools.add(toolName);
@@ -715,10 +730,8 @@ export class PolicyEngine {
       // Handle Global Rules
       if (!rule.toolName) {
         if (globalVerdict === undefined) {
-          globalVerdict = rule.decision;
-          const effectiveGlobalVerdict =
-            this.applyNonInteractiveMode(globalVerdict);
-          if (effectiveGlobalVerdict !== PolicyDecision.DENY) {
+          globalVerdict = normalizedDecision;
+          if (globalVerdict !== PolicyDecision.DENY) {
             // Global ALLOW/ASK found.
             // Since rules are sorted by priority, this overrides any lower-priority rules.
             // We can stop processing because nothing else will be excluded.
@@ -761,9 +774,9 @@ export class PolicyEngine {
       // Determine decision
       let decision: PolicyDecision;
       if (globalVerdict !== undefined) {
-        decision = this.applyNonInteractiveMode(globalVerdict);
+        decision = globalVerdict;
       } else {
-        decision = this.applyNonInteractiveMode(rule.decision);
+        decision = normalizedDecision;
       }
 
       if (decision === PolicyDecision.DENY) {
