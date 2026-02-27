@@ -271,6 +271,11 @@ export function useCommandCompletion({
           }
         }
 
+        // Prevent showing ghost text if the text to insert exactly matches what the user typed
+        if (textToInsert === query) {
+          return basePromptCompletion;
+        }
+
         const newText =
           currentLine.substring(0, start) +
           textToInsert +

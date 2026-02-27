@@ -524,6 +524,25 @@ describe('useCommandCompletion', () => {
 
       expect(result.current.textBuffer.text).toBe('@src\\components\\');
     });
+
+    it('should not show ghost text if the typed text extends past the common prefix', async () => {
+      // "ls " is already typed. The common prefix is "ls".
+      // Since "ls" length <= "ls " length, no ghost text should be shown.
+      const text = 'ls ';
+      const cursorOffset = text.length;
+
+      const { result } = renderCommandCompletionHook(
+        text,
+        cursorOffset,
+        true, // shellModeActive
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      expect(result.current.promptCompletion.text).toBe('');
+    });
   });
 
   describe('prompt completion filtering', () => {
