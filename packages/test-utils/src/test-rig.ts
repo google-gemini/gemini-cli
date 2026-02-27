@@ -76,10 +76,6 @@ export function createToolCallErrorMessage(
   );
 }
 
-function isSuccess(value: unknown): boolean {
-  return value === true || value === 'true';
-}
-
 // Helper to print debug information when tests fail
 export function printDebugInfo(
   rig: TestRig,
@@ -1070,7 +1066,7 @@ export class TestRig {
 
     for (const match of matches) {
       const toolName = match[1];
-      const success = isSuccess(match[2]);
+      const success = match[2] === 'true';
       const duration = parseInt(match[3], 10);
 
       // Try to find function_args nearby
@@ -1151,7 +1147,7 @@ export class TestRig {
                     toolRequest: {
                       name: bodyMatch[1],
                       args: obj.attributes.function_args || '{}',
-                      success: isSuccess(obj.attributes.success),
+                      success: obj.attributes.success !== false,
                       duration_ms: obj.attributes.duration_ms || 0,
                       prompt_id: obj.attributes.prompt_id,
                     },
@@ -1166,7 +1162,7 @@ export class TestRig {
                   toolRequest: {
                     name: obj.attributes.function_name,
                     args: obj.attributes.function_args,
-                    success: isSuccess(obj.attributes.success),
+                    success: obj.attributes.success,
                     duration_ms: obj.attributes.duration_ms,
                     prompt_id: obj.attributes.prompt_id,
                   },
@@ -1276,7 +1272,7 @@ export class TestRig {
           toolRequest: {
             name: toolName,
             args: logData.attributes.function_args ?? '{}',
-            success: isSuccess(logData.attributes.success),
+            success: logData.attributes.success ?? false,
             duration_ms: logData.attributes.duration_ms ?? 0,
             prompt_id: logData.attributes.prompt_id,
             error: logData.attributes.error,
@@ -1436,7 +1432,7 @@ export class TestRig {
             stdout: logData.attributes.stdout ?? '',
             stderr: logData.attributes.stderr ?? '',
             duration_ms: logData.attributes.duration_ms ?? 0,
-            success: isSuccess(logData.attributes.success),
+            success: logData.attributes.success ?? false,
             error: logData.attributes.error ?? '',
           },
         });
