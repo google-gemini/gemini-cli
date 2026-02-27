@@ -58,7 +58,7 @@ Policies control how strictly a test is validated.
 **All new behavioral evaluations must be created with the `USUALLY_PASSES`
 policy.** A subset that prove to be highly stable over time may be promoted to
 `ALWAYS_PASSES`. For more information, see
-[Test promotion process](#deflaking-process).
+[Test promotion process](#test-promotion-process).
 
 #### `EvalCase` Properties
 
