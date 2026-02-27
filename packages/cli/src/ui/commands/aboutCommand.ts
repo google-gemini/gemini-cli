@@ -14,6 +14,7 @@ import {
   debugLogger,
   getVersion,
 } from '@google/gemini-cli-core';
+import { loadAuthState } from '../../config/authState.js';
 
 export const aboutCommand: SlashCommand = {
   name: 'about',
@@ -32,8 +33,7 @@ export const aboutCommand: SlashCommand = {
     }
     const modelVersion = context.services.config?.getModel() || 'Unknown';
     const cliVersion = await getVersion();
-    const selectedAuthType =
-      context.services.settings.merged.security.auth.selectedType || '';
+    const selectedAuthType = loadAuthState().selectedType || '';
     const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'] || '';
     const ideClient = await getIdeClientName(context);
 

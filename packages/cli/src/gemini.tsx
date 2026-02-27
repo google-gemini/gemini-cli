@@ -21,7 +21,12 @@ import {
   loadTrustedFolders,
   type TrustedFoldersError,
 } from './config/trustedFolders.js';
-import { loadSettings, SettingScope } from './config/settings.js';
+import { loadSettings } from './config/settings.js';
+import {
+  loadAuthState,
+  parseAuthType,
+  saveAuthState,
+} from './config/authState.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
@@ -426,20 +431,16 @@ export async function main() {
     validateDnsResolutionOrder(settings.merged.advanced.dnsResolutionOrder),
   );
 
+  let selectedAuthType = parseAuthType(loadAuthState().selectedType);
+
   // Set a default auth type if one isn't set or is set to a legacy type
-  if (
-    !settings.merged.security.auth.selectedType ||
-    settings.merged.security.auth.selectedType === AuthType.LEGACY_CLOUD_SHELL
-  ) {
+  if (!selectedAuthType || selectedAuthType === AuthType.LEGACY_CLOUD_SHELL) {
     if (
       process.env['CLOUD_SHELL'] === 'true' ||
       process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true'
     ) {
-      settings.setValue(
-        SettingScope.User,
-        'security.auth.selectedType',
-        AuthType.COMPUTE_ADC,
-      );
+      saveAuthState(AuthType.COMPUTE_ADC);
+      selectedAuthType = AuthType.COMPUTE_ADC;
     }
   }
 
@@ -454,23 +455,16 @@ export async function main() {
   let initialAuthFailed = false;
   if (!settings.merged.security.auth.useExternal) {
     try {
-      if (
-        partialConfig.isInteractive() &&
-        settings.merged.security.auth.selectedType
-      ) {
-        const err = validateAuthMethod(
-          settings.merged.security.auth.selectedType,
-        );
+      if (partialConfig.isInteractive() && selectedAuthType) {
+        const err = validateAuthMethod(selectedAuthType);
         if (err) {
           throw new Error(err);
         }
 
-        await partialConfig.refreshAuth(
-          settings.merged.security.auth.selectedType,
-        );
+        await partialConfig.refreshAuth(selectedAuthType);
       } else if (!partialConfig.isInteractive()) {
         const authType = await validateNonInteractiveAuth(
-          settings.merged.security.auth.selectedType,
+          selectedAuthType,
           settings.merged.security.auth.useExternal,
           partialConfig,
           settings,
@@ -619,7 +613,7 @@ export async function main() {
     // Handle --list-sessions flag
     if (config.getListSessions()) {
       // Attempt auth for summary generation (gracefully skips if not configured)
-      const authType = settings.merged.security.auth.selectedType;
+      const authType = selectedAuthType;
       if (authType) {
         try {
           await config.refreshAuth(authType);
@@ -664,12 +658,11 @@ export async function main() {
     initAppHandle?.end();
 
     if (
-      settings.merged.security.auth.selectedType ===
-        AuthType.LOGIN_WITH_GOOGLE &&
+      selectedAuthType === AuthType.LOGIN_WITH_GOOGLE &&
       config.isBrowserLaunchSuppressed()
     ) {
       // Do oauth before app renders to make copying the link possible.
-      await getOauthClient(settings.merged.security.auth.selectedType, config);
+      await getOauthClient(selectedAuthType, config);
     }
 
     if (config.getExperimentalZedIntegration()) {
@@ -790,7 +783,7 @@ export async function main() {
     );
 
     const authType = await validateNonInteractiveAuth(
-      settings.merged.security.auth.selectedType,
+      selectedAuthType,
       settings.merged.security.auth.useExternal,
       config,
       settings,

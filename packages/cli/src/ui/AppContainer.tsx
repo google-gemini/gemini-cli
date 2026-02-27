@@ -167,6 +167,11 @@ import { shouldDismissShortcutsHelpOnHotkey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
 import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
+import {
+  loadAuthState,
+  parseAuthType,
+  saveAuthState,
+} from '../config/authState.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -216,6 +221,10 @@ const SHELL_WIDTH_FRACTION = 0.89;
  * for the shell. This provides vertical padding and space for other UI elements.
  */
 const SHELL_HEIGHT_PADDING = 10;
+
+function getSelectedAuthType(): AuthType | undefined {
+  return parseAuthType(loadAuthState().selectedType);
+}
 
 export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
@@ -693,9 +702,16 @@ export const AppContainer = (props: AppContainerProps) => {
     apiKeyDefaultValue,
     reloadApiKey,
   } = useAuthCommand(settings, config, initializationResult.authError);
+  const [selectedAuthType, setSelectedAuthType] = useState<
+    AuthType | undefined
+  >(() => getSelectedAuthType());
   const [authContext, setAuthContext] = useState<{ requiresRestart?: boolean }>(
     {},
   );
+
+  useEffect(() => {
+    setSelectedAuthType(getSelectedAuthType());
+  }, [authState]);
 
   useEffect(() => {
     if (authState === AuthState.Authenticated && authContext.requiresRestart) {
@@ -750,7 +766,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // Create handleAuthSelect wrapper for backward compatibility
   const handleAuthSelect = useCallback(
-    async (authType: AuthType | undefined, scope: LoadableSettingScope) => {
+    async (authType: AuthType | undefined, _scope: LoadableSettingScope) => {
       if (authType) {
         if (authType === AuthType.LOGIN_WITH_GOOGLE) {
           setAuthContext({ requiresRestart: true });
@@ -758,7 +774,8 @@ export const AppContainer = (props: AppContainerProps) => {
           setAuthContext({});
         }
         await clearCachedCredentialFile();
-        settings.setValue(scope, 'security.auth.selectedType', authType);
+        saveAuthState(authType);
+        setSelectedAuthType(authType);
 
         try {
           config.setRemoteAdminSettings(undefined);
@@ -789,7 +806,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
       setAuthState(AuthState.Authenticated);
     },
-    [settings, config, setAuthState, onAuthError, setAuthContext],
+    [config, setAuthState, onAuthError, setAuthContext],
   );
 
   const handleApiKeySubmit = useCallback(
@@ -833,33 +850,27 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useEffect(() => {
     if (
       settings.merged.security.auth.enforcedType &&
-      settings.merged.security.auth.selectedType &&
-      settings.merged.security.auth.enforcedType !==
-        settings.merged.security.auth.selectedType
+      selectedAuthType &&
+      settings.merged.security.auth.enforcedType !== selectedAuthType
     ) {
       onAuthError(
-        `Authentication is enforced to be ${settings.merged.security.auth.enforcedType}, but you are currently using ${settings.merged.security.auth.selectedType}.`,
+        `Authentication is enforced to be ${settings.merged.security.auth.enforcedType}, but you are currently using ${selectedAuthType}.`,
       );
-    } else if (
-      settings.merged.security.auth.selectedType &&
-      !settings.merged.security.auth.useExternal
-    ) {
+    } else if (selectedAuthType && !settings.merged.security.auth.useExternal) {
       // We skip validation for Gemini API key here because it might be stored
       // in the keychain, which we can't check synchronously.
       // The useAuth hook handles validation for this case.
-      if (settings.merged.security.auth.selectedType === AuthType.USE_GEMINI) {
+      if (selectedAuthType === AuthType.USE_GEMINI) {
         return;
       }
 
-      const error = validateAuthMethod(
-        settings.merged.security.auth.selectedType,
-      );
+      const error = validateAuthMethod(selectedAuthType);
       if (error) {
         onAuthError(error);
       }
     }
   }, [
-    settings.merged.security.auth.selectedType,
+    selectedAuthType,
     settings.merged.security.auth.enforcedType,
     settings.merged.security.auth.useExternal,
     onAuthError,

@@ -50,7 +50,8 @@ function hasMeta(obj: unknown): obj is { _meta?: Record<string, unknown> } {
 }
 import type { Content, Part, FunctionCall } from '@google/genai';
 import type { LoadedSettings } from '../config/settings.js';
-import { SettingScope, loadSettings } from '../config/settings.js';
+import { loadSettings } from '../config/settings.js';
+import { loadAuthState, saveAuthState } from '../config/authState.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
@@ -150,7 +151,7 @@ export class GeminiAgent {
   async authenticate(req: acp.AuthenticateRequest): Promise<void> {
     const { methodId } = req;
     const method = z.nativeEnum(AuthType).parse(methodId);
-    const selectedAuthType = this.settings.merged.security.auth.selectedType;
+    const selectedAuthType = loadAuthState().selectedType;
 
     // Only clear credentials when switching to a different auth method
     if (selectedAuthType && selectedAuthType !== method) {
@@ -172,11 +173,7 @@ export class GeminiAgent {
     } catch (e) {
       throw new acp.RequestError(-32000, getAcpErrorMessage(e));
     }
-    this.settings.setValue(
-      SettingScope.User,
-      'security.auth.selectedType',
-      method,
-    );
+    saveAuthState(method);
   }
 
   async newSession({
@@ -192,8 +189,12 @@ export class GeminiAgent {
       loadedSettings,
     );
 
-    const authType =
-      loadedSettings.merged.security.auth.selectedType || AuthType.USE_GEMINI;
+    const loadedAuthType = z
+      .nativeEnum(AuthType)
+      .safeParse(loadAuthState().selectedType);
+    const authType = loadedAuthType.success
+      ? loadedAuthType.data
+      : AuthType.USE_GEMINI;
 
     let isAuthenticated = false;
     let authErrorMessage = '';
@@ -311,7 +312,12 @@ export class GeminiAgent {
     cwd: string,
     mcpServers: acp.McpServer[],
   ): Promise<Config> {
-    const selectedAuthType = this.settings.merged.security.auth.selectedType;
+    const loadedAuthType = z
+      .nativeEnum(AuthType)
+      .safeParse(loadAuthState().selectedType);
+    const selectedAuthType = loadedAuthType.success
+      ? loadedAuthType.data
+      : undefined;
     if (!selectedAuthType) {
       throw acp.RequestError.authRequired();
     }

@@ -180,6 +180,23 @@ vi.mock('./config/settings.js', async (importOriginal) => {
   };
 });
 
+vi.mock('./config/authState.js', () => ({
+  loadAuthState: vi.fn(() => ({ selectedType: AuthType.LOGIN_WITH_GOOGLE })),
+  parseAuthType: vi.fn((value: unknown) => {
+    switch (value) {
+      case AuthType.LOGIN_WITH_GOOGLE:
+      case AuthType.USE_GEMINI:
+      case AuthType.USE_VERTEX_AI:
+      case AuthType.LEGACY_CLOUD_SHELL:
+      case AuthType.COMPUTE_ADC:
+        return value;
+      default:
+        return undefined;
+    }
+  }),
+  saveAuthState: vi.fn(),
+}));
+
 vi.mock('./ui/utils/terminalCapabilityManager.js', () => ({
   terminalCapabilityManager: {
     detectCapabilities: vi.fn(),

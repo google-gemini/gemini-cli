@@ -17,10 +17,10 @@ import {
   type SlashCommand,
   CommandKind,
 } from './types.js';
+import { loadAuthState } from '../../config/authState.js';
 
 function getUserIdentity(context: CommandContext) {
-  const selectedAuthType =
-    context.services.settings.merged.security.auth.selectedType || '';
+  const selectedAuthType = loadAuthState().selectedType || '';
 
   const userAccountManager = new UserAccountManager();
   const cachedAccount = userAccountManager.getCachedGoogleAccount();
