@@ -70,12 +70,12 @@ describe('Plan Mode', () => {
           experimental: { plan: true },
           tools: {
             core: ['write_file', 'read_file', 'list_directory'],
-            allowed: ['write_file'],
+            allowed: ['write_file']
           },
           general: {
             defaultApprovalMode: 'plan',
             plan: {
-              directory: '.gemini/tmp/session/v1/plans', // does this need to be changed on windows?
+              directory: '.gemini/tmp/v1/session/plans',
             },
           },
         },
@@ -84,7 +84,7 @@ describe('Plan Mode', () => {
 
     // We ask the agent to create a plan for a feature, which should trigger a write_file in the plans directory.
     // Verify that write_file outside of plan directory fails
-    await rig.run({
+    const output = await rig.run({
       approvalMode: 'plan',
       stdin:
         'Create a file called plan.md in the plans directory. Then create a file called hello.txt in the current directory',
@@ -107,8 +107,7 @@ describe('Plan Mode', () => {
 
     // Model is undeterministic, sometimes a blocked write appears in tool logs and sometimes it doesn't
     if (blockedWrite) {
-      // no content should be written because model understands that it can't write outside of plans directory
-      expect(blockedWrite?.toolRequest.args).include('content": ""');
+      expect(blockedWrite?.toolRequest.success).toBe(false);
     }
 
     expect(planWrite?.toolRequest.success).toBe(true);

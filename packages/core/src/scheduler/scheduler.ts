@@ -116,7 +116,12 @@ export class Scheduler {
     this.state = new SchedulerStateManager(
       this.messageBus,
       this.schedulerId,
-      (call) => logToolCall(this.config, new ToolCallEvent(call)),
+      (call) => {
+        if (process.env['DEBUG_SCHEDULER']) {
+          console.log(`>>> [DEBUG] Terminal call: ${call.request.name} status=${call.status}`);
+        }
+        logToolCall(this.config, new ToolCallEvent(call));
+      },
     );
     this.executor = new ToolExecutor(this.config);
     this.modifier = new ToolModificationHandler();
@@ -659,6 +664,11 @@ export class Scheduler {
           },
         }),
     );
+
+    if (process.env['DEBUG_SCHEDULER']) {
+      console.log('>>> [DEBUG] Tool execution result status:', result.status);
+      console.log('>>> [DEBUG] Tool execution result response:', JSON.stringify(result.response, null, 2));
+    }
 
     if (
       (result.status === CoreToolCallStatus.Success ||

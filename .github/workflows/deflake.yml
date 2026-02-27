@@ -7,6 +7,11 @@ on:
         description: 'Branch to run on (defaults to selected branch)'
         required: false
         type: 'string'
+      test_filter:
+        description: 'Test name pattern to run (passed to vitest -t)'
+        required: false
+        default: 'should allow write_file only in the plans directory in plan mode'
+        type: 'string'
       runs:
         description: 'The number of runs'
         required: false
@@ -56,16 +61,23 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          DEBUG_SCHEDULER: 'true'
           IS_DOCKER: "${{ matrix.sandbox == 'sandbox:docker' }}"
           KEEP_OUTPUT: 'true'
           RUNS: '${{ github.event.inputs.runs }}'
+          TEST_FILTER: '${{ github.event.inputs.test_filter }}'
           VERBOSE: 'true'
         shell: 'bash'
         run: |
+          EXTRA_ARGS=""
+          if [[ -n "${TEST_FILTER}" ]]; then
+            EXTRA_ARGS="-t \"${TEST_FILTER}\""
+          fi
+
           if [[ "${IS_DOCKER}" == "true" ]]; then
-            npm run deflake:test:integration:sandbox:docker -- --runs="${RUNS}"
+            npm run deflake:test:integration:sandbox:docker -- --runs="${RUNS}" ${EXTRA_ARGS}
           else
-            npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}"
+            npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}" ${EXTRA_ARGS}
           fi
 
   deflake_e2e_mac:
@@ -97,12 +109,18 @@ jobs:
         if: "runner.os != 'Windows'"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          DEBUG_SCHEDULER: 'true'
           KEEP_OUTPUT: 'true'
           RUNS: '${{ github.event.inputs.runs }}'
           SANDBOX: 'sandbox:none'
+          TEST_FILTER: '${{ github.event.inputs.test_filter }}'
           VERBOSE: 'true'
         run: |
-          npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}"
+          EXTRA_ARGS=""
+          if [[ -n "${TEST_FILTER}" ]]; then
+            EXTRA_ARGS="-t \"${TEST_FILTER}\""
+          fi
+          npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}" ${EXTRA_ARGS}
 
   deflake_e2e_windows:
     name: 'Slow E2E - Win'
@@ -150,6 +168,7 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          DEBUG_SCHEDULER: 'true'
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
@@ -157,6 +176,11 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
           RUNS: '${{ github.event.inputs.runs }}'
+          TEST_FILTER: '${{ github.event.inputs.test_filter }}'
         shell: 'pwsh'
         run: |
-          npm run deflake:test:integration:sandbox:none -- --runs="$env:RUNS"
+          $ExtraArgs = ""
+          if ($env:TEST_FILTER) {
+            $ExtraArgs = "-t `"$env:TEST_FILTER`""
+          }
+          Invoke-Expression "npm run deflake:test:integration:sandbox:none -- --runs=$env:RUNS $ExtraArgs"
