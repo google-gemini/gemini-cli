@@ -36,6 +36,7 @@ import {
   CoreToolCallStatus,
   buildUserSteeringHintPrompt,
   generateSteeringAckMessage,
+  GeminiCliOperation,
   getPlanModeExitMessage,
 } from '@google/gemini-cli-core';
 import type {
@@ -1266,7 +1267,11 @@ export const useGeminiStream = (
       prompt_id?: string,
     ) =>
       runInDevTraceSpan(
-        { name: 'submitQuery' },
+        {
+          operation: options?.isContinuation
+            ? GeminiCliOperation.SystemPrompt
+            : GeminiCliOperation.UserPrompt,
+        },
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
 
