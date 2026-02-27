@@ -1,6 +1,6 @@
-# Latest stable release: v0.30.0
+# Latest stable release: v0.30.1
 
-Released: February 25, 2026
+Released: February 27, 2026
 
 For most users, our latest stable release is the recommended release. Install
 the latest stable version with:
@@ -28,6 +28,9 @@ npm install -g @google/gemini-cli
 
 ## What's Changed
 
+- fix(patch): cherry-pick 58df1c6 to release/v0.30.0-pr-20374 [CONFLICTS] by
+  @gemini-cli-robot in
+  [#20567](https://github.com/google-gemini/gemini-cli/pull/20567)
 - feat(ux): added text wrapping capabilities to markdown tables by @devr0306 in
   [#18240](https://github.com/google-gemini/gemini-cli/pull/18240)
 - Revert "fix(mcp): ensure MCP transport is closed to prevent memory leaks" by
@@ -330,4 +333,4 @@ npm install -g @google/gemini-cli
   [#20112](https://github.com/google-gemini/gemini-cli/pull/20112)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.29.7...v0.30.0
+https://github.com/google-gemini/gemini-cli/compare/v0.29.7...v0.30.1
