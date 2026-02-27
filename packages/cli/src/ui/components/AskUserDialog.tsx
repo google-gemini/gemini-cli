@@ -32,6 +32,7 @@ import { RenderInline } from '../utils/InlineMarkdownRenderer.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { UIStateContext } from '../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { useDialogHistorySearch } from '../hooks/useDialogHistorySearch.js';
 
 /** Padding for dialog content to prevent text from touching edges. */
 const DIALOG_PADDING = 4;
@@ -271,6 +272,7 @@ interface TextQuestionViewProps {
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
+  chatHistoryForSearch?: readonly string[];
 }
 
 const TextQuestionView: React.FC<TextQuestionViewProps> = ({
@@ -283,6 +285,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   initialAnswer,
   progressHeader,
   keyboardHints,
+  chatHistoryForSearch = [],
 }) => {
   const isAlternateBuffer = useAlternateBuffer();
   const prefix = '> ';
@@ -298,6 +301,15 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
 
   const { text: textValue } = buffer;
 
+  const suggestionsWidth = Math.max(20, availableWidth - DIALOG_PADDING);
+  const { handleSearchKeys, suggestionsNode, promptPrefix } =
+    useDialogHistorySearch(
+      buffer,
+      chatHistoryForSearch,
+      true,
+      suggestionsWidth,
+    );
+
   // Sync state change with parent - only when it actually changes
   const lastTextValueRef = useRef(textValue);
   useEffect(() => {
@@ -307,9 +319,11 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
     }
   }, [textValue, onSelectionChange]);
 
-  // Handle Ctrl+C to clear all text
   const handleExtraKeys = useCallback(
     (key: Key) => {
+      if (handleSearchKeys(key)) return true;
+
+      // Ctrl+C to clear text
       if (keyMatchers[Command.QUIT](key)) {
         if (textValue === '') {
           return false;
@@ -319,7 +333,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       }
       return false;
     },
-    [buffer, textValue],
+    [buffer, textValue, handleSearchKeys],
   );
 
   useKeypress(handleExtraKeys, { isActive: true, priority: true });
@@ -368,13 +382,15 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       </Box>
 
       <Box flexDirection="row" marginBottom={1}>
-        <Text color={theme.status.success}>{'> '}</Text>
+        <Text color={promptPrefix.color}>{promptPrefix.text}</Text>
         <TextInput
           buffer={buffer}
           placeholder={placeholder}
           onSubmit={handleSubmit}
         />
       </Box>
+
+      {suggestionsNode}
 
       {keyboardHints}
     </Box>
@@ -468,6 +484,7 @@ interface ChoiceQuestionViewProps {
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
+  chatHistoryForSearch?: readonly string[];
 }
 
 const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
@@ -480,6 +497,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   initialAnswer,
   progressHeader,
   keyboardHints,
+  chatHistoryForSearch = [],
 }) => {
   const isAlternateBuffer = useAlternateBuffer();
   const numOptions =
@@ -574,6 +592,14 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
   const customOptionText = customBuffer.text;
 
+  const suggestionsWidth = Math.max(20, availableWidth - DIALOG_PADDING);
+  const { handleSearchKeys, suggestionsNode } = useDialogHistorySearch(
+    customBuffer,
+    chatHistoryForSearch,
+    isCustomOptionFocused,
+    suggestionsWidth,
+  );
+
   // Helper to build answer string from selections
   const buildAnswerString = useCallback(
     (
@@ -615,16 +641,20 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     onSelectionChange,
   ]);
 
-  // Handle "Type-to-Jump" and Ctrl+C for custom buffer
+  // Handle Ctrl+R search, "Type-to-Jump", and Ctrl+C for custom buffer
   const handleExtraKeys = useCallback(
     (key: Key) => {
-      // If focusing custom option, handle Ctrl+C
-      if (isCustomOptionFocused && keyMatchers[Command.QUIT](key)) {
-        if (customOptionText === '') {
-          return false;
+      if (isCustomOptionFocused) {
+        if (handleSearchKeys(key)) return true;
+
+        // Ctrl+C to clear text
+        if (keyMatchers[Command.QUIT](key)) {
+          if (customOptionText === '') {
+            return false;
+          }
+          customBuffer.setText('');
+          return true;
         }
-        customBuffer.setText('');
-        return true;
       }
 
       // Don't jump if a navigation or selection key is pressed
@@ -658,8 +688,6 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       if (isPrintable && !isCustomOptionFocused) {
         dispatch({ type: 'SET_CUSTOM_FOCUSED', payload: { focused: true } });
         onEditingCustomOption?.(true);
-        // For IME or multi-char sequences, we want to capture the whole thing.
-        // If it's a single char, we start the buffer with it.
         customBuffer.setText(key.sequence);
         return true;
       }
@@ -670,6 +698,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       customBuffer,
       onEditingCustomOption,
       customOptionText,
+      handleSearchKeys,
     ],
   );
 
@@ -920,6 +949,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
           );
         }}
       />
+
+      {isCustomOptionFocused && suggestionsNode}
+
       {keyboardHints}
     </Box>
   );
@@ -940,6 +972,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     (uiState?.constrainHeight !== false
       ? uiState?.availableTerminalHeight
       : undefined);
+  const chatHistoryForSearch: readonly string[] = uiState?.userMessages ?? [];
 
   const [state, dispatch] = useReducer(askUserDialogReducerLogic, initialState);
   const { answers, isEditingCustomOption, submitted } = state;
@@ -1136,20 +1169,21 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
 
   if (!currentQuestion) return null;
 
+  const isTextInput = currentQuestion.type === 'text' || isEditingCustomOption;
+  const hasSearchHistory = chatHistoryForSearch.length > 0;
+  const searchHint =
+    hasSearchHistory && isTextInput ? '  Ctrl+R search history' : '';
+
   const keyboardHints = (
     <DialogFooter
-      primaryAction={
-        currentQuestion.type === 'text' || isEditingCustomOption
-          ? 'Enter to submit'
-          : 'Enter to select'
-      }
+      primaryAction={isTextInput ? 'Enter to submit' : 'Enter to select'}
       navigationActions={
         questions.length > 1
-          ? currentQuestion.type === 'text' || isEditingCustomOption
-            ? 'Tab/Shift+Tab to switch questions'
+          ? isTextInput
+            ? `Tab/Shift+Tab to switch questions${searchHint}`
             : '←/→ to switch questions'
-          : currentQuestion.type === 'text' || isEditingCustomOption
-            ? undefined
+          : isTextInput
+            ? searchHint.trim() || undefined
             : '↑/↓ to navigate'
       }
       extraParts={extraParts}
@@ -1169,6 +1203,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         initialAnswer={answers[currentQuestionIndex]}
         progressHeader={progressHeader}
         keyboardHints={keyboardHints}
+        chatHistoryForSearch={chatHistoryForSearch}
       />
     ) : (
       <ChoiceQuestionView
@@ -1182,6 +1217,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         initialAnswer={answers[currentQuestionIndex]}
         progressHeader={progressHeader}
         keyboardHints={keyboardHints}
+        chatHistoryForSearch={chatHistoryForSearch}
       />
     );
 
