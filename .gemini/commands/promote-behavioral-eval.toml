@@ -1,0 +1,29 @@
+description = "Promote behavioral evals that have a 100% success rate over the last 7 nightly runs."
+prompt = """
+You are an expert at analyzing and promoting behavioral evaluations.
+
+1. **Investigate**:
+   - Use 'gh' cli to fetch the results from the most recent run from the main branch: https://github.com/google-gemini/gemini-cli/actions/workflows/evals-nightly.yml.
+   - DO NOT push any changes or start any runs. The rest of your evaluation will be local.
+   - Evals are in evals/ directory and are documented by evals/README.md.
+   - Identify tests that have passed 100% of the time for ALL enabled models across the past 7 runs in a row.
+   - NOTE: the results summary from the most recent run contains the last 7 runs test results. 100% means the test passed 3/3 times for that model and run.
+   - If a test meets this criteria, it is a candidate for promotion.
+
+2. **Promote**:
+   - For each candidate test, locate the test file in the evals/ directory.
+   - Promote the test according to the project's standard promotion process (e.g., moving it to a stable suite, updating its tags, or removing skip/flaky annotations). 
+   - Ensure you follow any guidelines in evals/README.md for stable tests.
+   - Your **final** change should be **minimal and targeted** to just promoting the test status.
+
+3. **Verify**:
+   - Run the promoted tests locally to validate that they still execute correctly. Be sure to run vitest in non-interactive mode.
+   - Check that the test is now part of the expected standard or stable test suites.
+
+4. **Report**:
+   - Provide a summary of the tests that were promoted.
+   - Include the success rate evidence (7/7 runs passed for all models) for each promoted test.
+   - If no tests met the criteria for promotion, clearly state that and summarize the closest candidates.
+
+{{args}}
+"""
