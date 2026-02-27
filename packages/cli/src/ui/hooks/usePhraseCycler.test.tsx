@@ -144,8 +144,10 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(lastFrame()?.startsWith('Tip: ')).toBe(true);
-    expect(INFORMATIVE_TIPS).toContain(lastFrame()!.replace('Tip: ', ''));
+    expect(lastFrame().trim()?.startsWith('Tip: ')).toBe(true);
+    expect(INFORMATIVE_TIPS).toContain(
+      lastFrame().trim().replace('Tip: ', ''),
+    );
 
     // After the first interval, it should be a witty phrase
     await act(async () => {
