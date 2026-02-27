@@ -994,6 +994,33 @@ describe('runNonInteractive', () => {
     expect(getWrittenOutput()).toBe('Response from command\n');
   });
 
+  it('should return early without calling the model when slash command is handled locally', async () => {
+    const nonInteractiveCliCommands = await import(
+      './nonInteractiveCliCommands.js'
+    );
+    const handleSlashCommandSpy = vi.spyOn(
+      nonInteractiveCliCommands,
+      'handleSlashCommand',
+    );
+    handleSlashCommandSpy.mockResolvedValue('handled');
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: '/stats',
+      prompt_id: 'prompt-id-stats',
+    });
+
+    expect(handleSlashCommandSpy).toHaveBeenCalledWith(
+      '/stats',
+      expect.any(AbortController),
+      mockConfig,
+      mockSettings,
+    );
+    expect(mockGeminiClient.sendMessageStream).not.toHaveBeenCalled();
+    handleSlashCommandSpy.mockRestore();
+  });
+
   it('should handle slash commands', async () => {
     const nonInteractiveCliCommands = await import(
       './nonInteractiveCliCommands.js'
