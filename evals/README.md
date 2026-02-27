@@ -3,7 +3,7 @@
 Behavioral evaluations (evals) are tests designed to validate the agent's
 behavior in response to specific prompts. They serve as a critical feedback loop
 for changes to system prompts, tool definitions, and other model-steering
-mechanisms.
+mechanisms, and as a tool for assessing feature reliability by model, and preventing regressions.
 
 ## Why Behavioral Evals?
 
@@ -29,6 +29,24 @@ CLI's features.
   We distinguish between behaviors that should be robust (`ALWAYS_PASSES`) and
   those that are generally reliable but might occasionally vary
   (`USUALLY_PASSES`).
+
+## Best Practices
+
+When designing behavioral evals, aim for scenarios that accurately reflect real-world usage while remaining small and maintainable.
+
+- **Realistic Complexity**: Evals should be complicated enough to be "realistic." They should operate on actual files and a source directory, mirroring how a real agent interacts with a workspace. Remember that the agent may behave differently in a larger codebase, so we want to avoid scenarios that are too simple to be realistic.
+  - *Good*: An eval that provides a small, functional React component and asks the agent to add a specific feature, requiring it to read the file, understand the context, and write the correct changes.
+  - *Bad*: An eval that simply asks the agent a trivia question or asks it to write a generic script without providing any local workspace context.
+- **Maintainable Size**: Evals should be small enough to reason about and maintain. We probably can't check in an entire repo as a test case, though over time we will want these evals to mature into more and more realistic scenarios.
+  - *Good*: A test setup with 2-3 files (e.g., a source file, a config file, and a test file) that isolates the specific behavior being evaluated.
+  - *Bad*: A test setup containing dozens of files from a complex framework where the setup logic itself is prone to breaking.
+- **Unambiguous and Reliable Assertions**: Assertions must be clear and specific to ensure the test passes for the right reason.
+  - *Good*: Checking that a modified file contains a specific AST node or exact string, or verifying that a tool was called with with the right parameters.
+  - *Bad*: Only checking for a tool call, which could happen for an unrelated reason. Expecting specific LLM output.
+- **Fail First**: Have tests that failed before your prompt or tool change. We want to be sure the test fails before your "fix". It's pretty easy to accidentally create a passing test that asserts behaviors we get for free. In general, every eval should be accompanied by prompt change, and most prompt changes should be accompanied by an eval.
+  - *Good*: Observing a failure, writing an eval that reliably reproduces the failure, modifying the prompt/tool, and then verifying the eval passes.
+  - *Bad*: Writing an eval that passes on the first run and assuming your new prompt change was responsible.
+- **Less is More**: Prefer fewer, more realistic tests that assert the major paths vs. more tests that are more unit-test like. These are evals, so the value is in testing how the agent works in a semi-realistic scenario.
 
 ## Creating an Evaluation
 
