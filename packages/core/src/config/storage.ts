@@ -374,7 +374,6 @@ export class Storage {
     }
   }
 
-
   getExtensionsDir(): string {
     return path.join(this.getGeminiDir(), 'extensions');
   }

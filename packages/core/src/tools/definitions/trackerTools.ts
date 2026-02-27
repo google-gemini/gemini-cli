@@ -14,8 +14,6 @@ import {
   TRACKER_VISUALIZE_TOOL_NAME,
 } from '../tool-names.js';
 
-
-
 export const TRACKER_CREATE_TASK_DEFINITION: ToolDefinition = {
   base: {
     name: TRACKER_CREATE_TASK_TOOL_NAME,
