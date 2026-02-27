@@ -43,6 +43,8 @@ import {
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
+  DomainFilterAction,
+  type NetworkProxyConfig,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -881,6 +883,7 @@ export async function loadCliConfig(
       };
     },
     enableConseca: settings.security?.enableConseca,
+    networkProxy: buildNetworkProxyConfig(settings),
   });
 }
 
@@ -893,4 +896,48 @@ function mergeExcludeTools(
     ...extraExcludes,
   ]);
   return Array.from(allExcludeTools);
+}
+
+/**
+ * Builds NetworkProxyConfig from user settings.
+ * Converts the allowedDomains/blockedDomains arrays into ordered rules.
+ */
+function buildNetworkProxyConfig(
+  settings: MergedSettings,
+): NetworkProxyConfig | undefined {
+  const proxySettings = settings.security?.networkProxy;
+  if (!proxySettings?.enabled) {
+    return undefined;
+  }
+
+  // Build rules from allowedDomains and blockedDomains.
+  // Allowed domains come first so they take priority over blocked domains.
+  const rules: Array<{ pattern: string; action: DomainFilterAction }> = [];
+
+  const allowed = proxySettings.allowedDomains ?? [];
+  for (const pattern of allowed) {
+    rules.push({ pattern, action: DomainFilterAction.ALLOW });
+  }
+
+  const blocked = proxySettings.blockedDomains ?? [];
+  for (const pattern of blocked) {
+    rules.push({ pattern, action: DomainFilterAction.DENY });
+  }
+
+  const defaultActionStr = proxySettings.defaultAction ?? 'prompt';
+  const defaultAction = defaultActionStr === 'allow'
+    ? DomainFilterAction.ALLOW
+    : defaultActionStr === 'deny'
+      ? DomainFilterAction.DENY
+      : DomainFilterAction.PROMPT;
+
+  return {
+    enabled: true,
+    httpPort: proxySettings.httpPort ?? 0,
+    socksPort: proxySettings.socksPort ?? 0,
+    defaultAction,
+    rules,
+    enableLogging: proxySettings.enableLogging ?? false,
+    maxLogEntries: 1000,
+  };
 }

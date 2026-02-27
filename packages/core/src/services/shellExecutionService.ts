@@ -107,6 +107,12 @@ export interface ShellExecutionConfig {
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
   maxSerializedLines?: number;
+  /**
+   * Additional environment variables for network proxy configuration.
+   * When the network proxy is active, this includes HTTP_PROXY, HTTPS_PROXY,
+   * ALL_PROXY, etc. to route child process traffic through the proxy.
+   */
+  proxyEnvironment?: Record<string, string>;
 }
 
 /**
@@ -253,6 +259,7 @@ export class ShellExecutionService {
       onOutputEvent,
       abortSignal,
       shellExecutionConfig.sanitizationConfig,
+      shellExecutionConfig.proxyEnvironment,
     );
   }
 
@@ -299,6 +306,7 @@ export class ShellExecutionService {
     onOutputEvent: (event: ShellOutputEvent) => void,
     abortSignal: AbortSignal,
     sanitizationConfig: EnvironmentSanitizationConfig,
+    proxyEnvironment?: Record<string, string>,
   ): ShellExecutionHandle {
     try {
       const isWindows = os.platform() === 'win32';
@@ -319,6 +327,7 @@ export class ShellExecutionService {
           TERM: 'xterm-256color',
           PAGER: 'cat',
           GIT_PAGER: 'cat',
+          ...(proxyEnvironment ?? {}),
         },
       });
 
@@ -583,6 +592,7 @@ export class ShellExecutionService {
           TERM: 'xterm-256color',
           PAGER: shellExecutionConfig.pager ?? 'cat',
           GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
+          ...(shellExecutionConfig.proxyEnvironment ?? {}),
         },
         handleFlowControl: true,
       });
