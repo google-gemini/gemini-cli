@@ -23,7 +23,7 @@ import {
   ResourceListChangedNotificationSchema,
   ToolListChangedNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { ApprovalMode, PolicyDecision } from '../policy/types.js';
+import type { DiscoveredMCPTool } from './mcp-tool.js';
 
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import {
@@ -392,7 +392,7 @@ describe('mcp-client', () => {
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
     });
 
-    it('should register tool with readOnlyHint and add policy rule', async () => {
+    it('should register tool with readOnlyHint and preserve annotations', async () => {
       const mockedClient = {
         connect: vi.fn(),
         discover: vi.fn(),
@@ -462,17 +462,18 @@ describe('mcp-client', () => {
       // Verify tool registration
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
 
-      // Verify policy rule addition
-      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith({
-        toolName: 'test-server__readOnlyTool',
-        decision: PolicyDecision.ASK_USER,
-        priority: 50,
-        modes: [ApprovalMode.PLAN],
-        source: 'MCP Annotation (readOnlyHint) - test-server',
-      });
+      // Verify addRule is NOT called (annotation-based rules are in plan.toml now)
+      expect(mockPolicyEngine.addRule).not.toHaveBeenCalled();
+
+      // Verify annotations are preserved on the registered tool
+      const registeredTool = (
+        mockedToolRegistry.registerTool as ReturnType<typeof vi.fn>
+      ).mock.calls[0][0] as DiscoveredMCPTool;
+      expect(registeredTool.toolAnnotations).toEqual({ readOnlyHint: true });
+      expect(registeredTool.isReadOnly).toBe(true);
     });
 
-    it('should not add policy rule for tool without readOnlyHint', async () => {
+    it('should preserve undefined annotations for tool without readOnlyHint', async () => {
       const mockedClient = {
         connect: vi.fn(),
         discover: vi.fn(),
@@ -541,6 +542,93 @@ describe('mcp-client', () => {
 
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
       expect(mockPolicyEngine.addRule).not.toHaveBeenCalled();
+
+      // Verify annotations are undefined for tools without annotations
+      const registeredTool = (
+        mockedToolRegistry.registerTool as ReturnType<typeof vi.fn>
+      ).mock.calls[0][0] as DiscoveredMCPTool;
+      expect(registeredTool.toolAnnotations).toBeUndefined();
+    });
+
+    it('should preserve full annotations object with multiple hints', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'multiAnnotationTool',
+              description: 'A tool with multiple annotations',
+              inputSchema: { type: 'object', properties: {} },
+              annotations: {
+                readOnlyHint: true,
+                destructiveHint: false,
+                idempotentHint: true,
+              },
+            },
+          ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+
+      const mockConfig = {
+        getPolicyEngine: vi.fn().mockReturnValue({ addRule: vi.fn() }),
+      } as unknown as Config;
+
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+        removeMcpToolsByServer: vi.fn(),
+      } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
+
+      const client = new McpClient(
+        'test-server',
+        { command: 'test-command' },
+        mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+        workspaceContext,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        false,
+        '0.0.1',
+      );
+
+      await client.connect();
+      await client.discover(mockConfig);
+
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
+
+      const registeredTool = (
+        mockedToolRegistry.registerTool as ReturnType<typeof vi.fn>
+      ).mock.calls[0][0] as DiscoveredMCPTool;
+      expect(registeredTool.toolAnnotations).toEqual({
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      });
+      expect(registeredTool.isReadOnly).toBe(true);
     });
 
     it('should discover tools with $defs and $ref in schema', async () => {
@@ -1763,6 +1851,40 @@ describe('mcp-client', () => {
       const callArgs = mockedTransport.mock.calls[0][0];
       expect(callArgs.env).toBeDefined();
       expect(callArgs.env!['GEMINI_CLI_EXT_VAR']).toBeUndefined();
+    });
+
+    it('should expand environment variables in mcpServerConfig.env and not redact them', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      const originalEnv = process.env;
+      process.env = {
+        ...originalEnv,
+        GEMINI_TEST_VAR: 'expanded-value',
+      };
+
+      try {
+        await createTransport(
+          'test-server',
+          {
+            command: 'test-command',
+            env: {
+              TEST_EXPANDED: 'Value is $GEMINI_TEST_VAR',
+              SECRET_KEY: 'intentional-secret-123',
+            },
+          },
+          false,
+          EMPTY_CONFIG,
+        );
+
+        const callArgs = mockedTransport.mock.calls[0][0];
+        expect(callArgs.env).toBeDefined();
+        expect(callArgs.env!['TEST_EXPANDED']).toBe('Value is expanded-value');
+        expect(callArgs.env!['SECRET_KEY']).toBe('intentional-secret-123');
+      } finally {
+        process.env = originalEnv;
+      }
     });
 
     describe('useGoogleCredentialProvider', () => {

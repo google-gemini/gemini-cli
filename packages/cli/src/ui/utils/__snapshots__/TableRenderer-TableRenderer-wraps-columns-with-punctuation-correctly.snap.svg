@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="190" viewBox="0 0 920 190">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="190" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="19" fill="#333333" textLength="495" lengthAdjust="spacingAndGlyphs">┌───────────────────┬───────────────┬─────────────────┐</text>
+    <text x="0" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="36" fill="#89b4fa" textLength="117" lengthAdjust="spacingAndGlyphs">Punctuation 1</text>
+    <text x="180" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="198" y="36" fill="#89b4fa" textLength="117" lengthAdjust="spacingAndGlyphs">Punctuation 2</text>
+    <text x="324" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="342" y="36" fill="#89b4fa" textLength="117" lengthAdjust="spacingAndGlyphs">Punctuation 3</text>
+    <text x="486" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="53" fill="#333333" textLength="495" lengthAdjust="spacingAndGlyphs">├───────────────────┼───────────────┼─────────────────┤</text>
+    <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="70" fill="#ffffff" textLength="171" lengthAdjust="spacingAndGlyphs"> Start. Stop.      </text>
+    <text x="180" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="189" y="70" fill="#ffffff" textLength="135" lengthAdjust="spacingAndGlyphs"> Semi; colon:  </text>
+    <text x="324" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="333" y="70" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs"> At@ Hash#       </text>
+    <text x="486" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="87" fill="#ffffff" textLength="171" lengthAdjust="spacingAndGlyphs"> Comma, separated. </text>
+    <text x="180" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="189" y="87" fill="#ffffff" textLength="135" lengthAdjust="spacingAndGlyphs"> Pipe| Slash/  </text>
+    <text x="324" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="333" y="87" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs"> Dollar$         </text>
+    <text x="486" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="104" fill="#ffffff" textLength="171" lengthAdjust="spacingAndGlyphs"> Exclamation!      </text>
+    <text x="180" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="189" y="104" fill="#ffffff" textLength="135" lengthAdjust="spacingAndGlyphs"> Backslash\    </text>
+    <text x="324" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="333" y="104" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs"> Percent% Caret^ </text>
+    <text x="486" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="121" fill="#ffffff" textLength="171" lengthAdjust="spacingAndGlyphs"> Question?         </text>
+    <text x="180" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="324" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="333" y="121" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs"> Ampersand&amp;      </text>
+    <text x="486" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="138" fill="#ffffff" textLength="171" lengthAdjust="spacingAndGlyphs"> hyphen-ated       </text>
+    <text x="180" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="324" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="333" y="138" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs"> Asterisk*       </text>
+    <text x="486" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="155" fill="#333333" textLength="495" lengthAdjust="spacingAndGlyphs">└───────────────────┴───────────────┴─────────────────┘</text>
+  </g>
+</svg>
