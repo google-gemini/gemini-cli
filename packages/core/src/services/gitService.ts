@@ -13,6 +13,9 @@ import { simpleGit, CheckRepoActions } from 'simple-git';
 import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
+export const SHADOW_REPO_AUTHOR_NAME = 'Gemini CLI';
+export const SHADOW_REPO_AUTHOR_EMAIL = 'gemini-cli@google.com';
+
 export class GitService {
   private projectRoot: string;
   private storage: Storage;
@@ -59,6 +62,13 @@ export class GitService {
       // Prevent git from using the user's global git config.
       GIT_CONFIG_GLOBAL: gitConfigPath,
       GIT_CONFIG_SYSTEM: systemConfigPath,
+      // Explicitly provide identity to prevent "Author identity unknown" errors
+      // inside sandboxed environments like Docker where the gitconfig might not
+      // be picked up properly.
+      GIT_AUTHOR_NAME: SHADOW_REPO_AUTHOR_NAME,
+      GIT_AUTHOR_EMAIL: SHADOW_REPO_AUTHOR_EMAIL,
+      GIT_COMMITTER_NAME: SHADOW_REPO_AUTHOR_NAME,
+      GIT_COMMITTER_EMAIL: SHADOW_REPO_AUTHOR_EMAIL,
     };
   }
 
@@ -74,8 +84,7 @@ export class GitService {
 
     // We don't want to inherit the user's name, email, or gpg signing
     // preferences for the shadow repository, so we create a dedicated gitconfig.
-    const gitConfigContent =
-      '[user]\n  name = Gemini CLI\n  email = gemini-cli@google.com\n[commit]\n  gpgsign = false\n';
+    const gitConfigContent = `[user]\n  name = ${SHADOW_REPO_AUTHOR_NAME}\n  email = ${SHADOW_REPO_AUTHOR_EMAIL}\n[commit]\n  gpgsign = false\n`;
     await fs.writeFile(gitConfigPath, gitConfigContent);
 
     const shadowRepoEnv = this.getShadowRepoEnv(repoDir);
