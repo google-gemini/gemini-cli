@@ -51,3 +51,6 @@ export const COMPLETED_SHELL_MAX_LINES = 15;
 
 /** Minimum terminal width required to show the full context used label */
 export const MIN_TERMINAL_WIDTH_FOR_FULL_LABEL = 100;
+
+/** Default context usage fraction at which to trigger compression */
+export const DEFAULT_COMPRESSION_THRESHOLD = 0.5;
