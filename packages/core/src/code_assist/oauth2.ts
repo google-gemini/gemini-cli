@@ -19,6 +19,10 @@ import { EventEmitter } from 'node:events';
 import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
+import {
+  recordOnboardingStart,
+  recordOnboardingEnd,
+} from '../telemetry/metrics.js';
 import type { Config } from '../config/config.js';
 import {
   getErrorMessage,
@@ -111,6 +115,12 @@ async function initOauthClient(
   authType: AuthType,
   config: Config,
 ): Promise<AuthClient> {
+  const recordOnboardingEndIfApplicable = () => {
+    if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+      recordOnboardingEnd(config);
+    }
+  };
+
   const credentials = await fetchCachedCredentials();
 
   if (
@@ -140,6 +150,11 @@ async function initOauthClient(
       proxy: config.getProxy(),
     },
   });
+
+  if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+    recordOnboardingStart(config);
+  }
+
   const useEncryptedStorage = getUseEncryptedStorageFlag();
 
   if (
@@ -150,6 +165,7 @@ async function initOauthClient(
       access_token: process.env['GOOGLE_CLOUD_ACCESS_TOKEN'],
     });
     await fetchAndCacheUserInfo(client);
+    recordOnboardingEndIfApplicable();
     return client;
   }
 
@@ -186,6 +202,7 @@ async function initOauthClient(
         debugLogger.log('Loaded cached credentials.');
         await triggerPostAuthCallbacks(credentials as Credentials);
 
+        recordOnboardingEndIfApplicable();
         return client;
       }
     } catch (error) {
@@ -270,6 +287,7 @@ async function initOauthClient(
     }
 
     await triggerPostAuthCallbacks(client.credentials);
+    recordOnboardingEndIfApplicable();
   } else {
     // In Zed integration, we skip the interactive consent and directly open the browser
     if (!config.getExperimentalZedIntegration()) {
@@ -376,6 +394,7 @@ async function initOauthClient(
     });
 
     await triggerPostAuthCallbacks(client.credentials);
+    recordOnboardingEndIfApplicable();
   }
 
   return client;
