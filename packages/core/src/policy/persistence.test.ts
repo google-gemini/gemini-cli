@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import {
   createPolicyUpdater,
@@ -16,8 +17,6 @@ import { MessageBusType } from '../confirmation-bus/types.js';
 import { Storage, AUTO_SAVED_POLICY_FILENAME } from '../config/storage.js';
 import { ApprovalMode } from './types.js';
 import { vol, fs as memfs } from 'memfs';
-// Import after vi.mock so this resolves to the memfs replacement, enabling vi.spyOn on individual methods.
-import * as fs from 'node:fs/promises';
 import { coreEvents } from '../utils/events.js';
 
 // Use memfs for all fs operations in this test
@@ -69,8 +68,6 @@ describe('createPolicyUpdater', () => {
       persist: true,
     });
 
-    // Policy updater handles persistence asynchronously in a promise queue.
-    // We use advanceTimersByTimeAsync to yield to the microtask queue.
     await vi.advanceTimersByTimeAsync(100);
 
     const fileExists = memfs.existsSync(policyFile);
@@ -213,9 +210,6 @@ decision = "deny"
 
     const writtenContent = memfs.readFileSync(policyFile, 'utf-8') as string;
 
-    // Verify escaping - should be valid TOML and contain the values
-    // Note: @iarna/toml optimizes for shortest representation, so it may use single quotes 'foo"bar'
-    // instead of "foo\"bar\"" if there are no single quotes in the string.
     try {
       expect(writtenContent).toContain('mcpName = "my\\"jira\\"server"');
     } catch {
@@ -279,12 +273,12 @@ decision = "deny"
     });
 
     await vi.runAllTimersAsync();
-
-    expect(feedbackSpy).toHaveBeenCalledWith(
-      'error',
-      expect.stringContaining('Permission denied'),
-      expect.any(Error),
-    );
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('Permission denied'),
+        expect.any(Error),
+      );
+    
   });
 
   it('should clean up tmp file on write failure', async () => {
@@ -316,8 +310,8 @@ decision = "deny"
     });
 
     await vi.runAllTimersAsync();
-
-    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
+      expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
+    
   });
 
   it('should abort persistence on non-ENOENT read errors', async () => {
@@ -345,13 +339,13 @@ decision = "deny"
     });
 
     await vi.runAllTimersAsync();
-
-    expect(openSpy).not.toHaveBeenCalled();
-    expect(feedbackSpy).toHaveBeenCalledWith(
-      'error',
-      expect.stringContaining('Permission denied'),
-      expect.any(Error),
-    );
+      expect(openSpy).not.toHaveBeenCalled();
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('Permission denied'),
+        expect.any(Error),
+      );
+    
   });
 
   it('should fall back to copy+unlink when rename fails with EXDEV', async () => {
@@ -385,12 +379,12 @@ decision = "deny"
     });
 
     await vi.runAllTimersAsync();
-
-    expect(fs.copyFile).toHaveBeenCalledWith(
-      expect.stringMatching(/\.tmp$/),
-      policyFile,
-    );
-    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
+      expect(fs.copyFile).toHaveBeenCalledWith(
+        expect.stringMatching(/\.tmp$/),
+        policyFile,
+      );
+      expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
+    
   });
 
   it('should include modes if provided', async () => {
