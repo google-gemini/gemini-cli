@@ -157,7 +157,7 @@ export class ToolExecutor {
         } catch (executionError: unknown) {
           spanMetadata.error = executionError;
           if (signal.aborted) {
-            completedToolCall = this.createCancelledResult(
+            completedToolCall = await this.createCancelledResult(
               call,
               'User cancelled tool execution.',
             );
