@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import {
   createPolicyUpdater,
@@ -67,8 +68,6 @@ describe('createPolicyUpdater', () => {
       persist: true,
     });
 
-    // Policy updater handles persistence asynchronously in a promise queue.
-    // We use advanceTimersByTimeAsync to yield to the microtask queue.
     await vi.advanceTimersByTimeAsync(100);
 
     const fileExists = memfs.existsSync(policyFile);
@@ -191,9 +190,6 @@ decision = "deny"
 
     const writtenContent = memfs.readFileSync(policyFile, 'utf-8') as string;
 
-    // Verify escaping - should be valid TOML and contain the values
-    // Note: @iarna/toml optimizes for shortest representation, so it may use single quotes 'foo"bar'
-    // instead of "foo\"bar\"" if there are no single quotes in the string.
     try {
       expect(writtenContent).toContain('mcpName = "my\\"jira\\"server"');
     } catch {
@@ -245,9 +241,7 @@ decision = "deny"
       workspacePoliciesDir,
     );
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
-    (fs.mkdir as unknown as Mock).mockRejectedValue(
-      new Error('Permission denied'),
-    );
+    vi.mocked(fs.mkdir).mockRejectedValue(new Error('Permission denied'));
 
     const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
 
@@ -257,13 +251,13 @@ decision = "deny"
       persist: true,
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(feedbackSpy).toHaveBeenCalledWith(
-      'error',
-      expect.stringContaining('Permission denied'),
-      expect.any(Error),
-    );
+    await vi.waitFor(() => {
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('Permission denied'),
+        expect.any(Error),
+      );
+    });
   });
 
   it('should clean up tmp file on write failure', async () => {
@@ -278,8 +272,8 @@ decision = "deny"
       workspacePoliciesDir,
     );
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
-    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
-    (fs.readFile as unknown as Mock).mockRejectedValue(
+    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+    vi.mocked(fs.readFile).mockRejectedValue(
       makeNodeError('ENOENT: no such file or directory', 'ENOENT'),
     );
 
@@ -287,8 +281,8 @@ decision = "deny"
       writeFile: vi.fn().mockRejectedValue(new Error('Disk full')),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
-    (fs.unlink as unknown as Mock).mockResolvedValue(undefined);
+    vi.mocked(fs.open).mockResolvedValue(mockFileHandle);
+    vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
@@ -296,10 +290,9 @@ decision = "deny"
       persist: true,
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    // Should attempt to clean up the tmp file
-    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
+    await vi.waitFor(() => {
+      expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
+    });
   });
 
   it('should abort persistence on non-ENOENT read errors', async () => {
@@ -314,9 +307,8 @@ decision = "deny"
       workspacePoliciesDir,
     );
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
-    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
-    // Simulate EACCES when reading the existing policy file
-    (fs.readFile as unknown as Mock).mockRejectedValue(
+    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+    vi.mocked(fs.readFile).mockRejectedValue(
       makeNodeError('Permission denied', 'EACCES'),
     );
 
@@ -328,16 +320,14 @@ decision = "deny"
       persist: true,
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    // Should NOT attempt to write a new file
-    expect(fs.open).not.toHaveBeenCalled();
-    // Should report the error with details
-    expect(feedbackSpy).toHaveBeenCalledWith(
-      'error',
-      expect.stringContaining('Permission denied'),
-      expect.any(Error),
-    );
+    await vi.waitFor(() => {
+      expect(fs.open).not.toHaveBeenCalled();
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('Permission denied'),
+        expect.any(Error),
+      );
+    });
   });
 
   it('should fall back to copy+unlink when rename fails with EXDEV', async () => {
@@ -352,8 +342,8 @@ decision = "deny"
       workspacePoliciesDir,
     );
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
-    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
-    (fs.readFile as unknown as Mock).mockRejectedValue(
+    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+    vi.mocked(fs.readFile).mockRejectedValue(
       makeNodeError('ENOENT: no such file or directory', 'ENOENT'),
     );
 
@@ -361,13 +351,12 @@ decision = "deny"
       writeFile: vi.fn().mockResolvedValue(undefined),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
-    // Simulate cross-device link error
-    (fs.rename as unknown as Mock).mockRejectedValue(
+    vi.mocked(fs.open).mockResolvedValue(mockFileHandle);
+    vi.mocked(fs.rename).mockRejectedValue(
       makeNodeError('EXDEV: cross-device link not permitted', 'EXDEV'),
     );
-    (fs.copyFile as unknown as Mock).mockResolvedValue(undefined);
-    (fs.unlink as unknown as Mock).mockResolvedValue(undefined);
+    vi.mocked(fs.copyFile).mockResolvedValue(undefined);
+    vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
@@ -375,13 +364,12 @@ decision = "deny"
       persist: true,
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    // Should fall back to copy + unlink
-    expect(fs.copyFile).toHaveBeenCalledWith(
-      expect.stringMatching(/\.tmp$/),
-      policyFile,
-    );
-    expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
+    await vi.waitFor(() => {
+      expect(fs.copyFile).toHaveBeenCalledWith(
+        expect.stringMatching(/\.tmp$/),
+        policyFile,
+      );
+      expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
+    });
   });
 });
