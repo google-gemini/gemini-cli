@@ -352,6 +352,7 @@ export class CodeAssistServer implements ContentGenerator {
       responseType: 'stream',
       body: JSON.stringify(req),
       signal,
+      retry: false,
     });
 
     return (async function* (): AsyncGenerator<T> {

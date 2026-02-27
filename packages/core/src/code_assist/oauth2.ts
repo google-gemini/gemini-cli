@@ -138,6 +138,7 @@ async function initOauthClient(
     clientSecret: OAUTH_CLIENT_SECRET,
     transporterOptions: {
       proxy: config.getProxy(),
+      retry: false,
     },
   });
   const useEncryptedStorage = getUseEncryptedStorageFlag();
