@@ -1,6 +1,6 @@
 # Gemini CLI installation, execution, and releases
 
-This document provides an overview of Gemini CLI's sytem requriements,
+This document provides an overview of Gemini CLI's system requirements,
 installation methods, and release types.
 
 ## Recommended system specifications
