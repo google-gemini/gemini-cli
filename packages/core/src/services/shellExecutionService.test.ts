@@ -31,6 +31,9 @@ const mockPlatform = vi.hoisted(() => vi.fn());
 const mockGetPty = vi.hoisted(() => vi.fn());
 const mockSerializeTerminalToObject = vi.hoisted(() => vi.fn());
 const mockResolveExecutable = vi.hoisted(() => vi.fn());
+const mockRealpath = vi.hoisted(() => vi.fn());
+const mockOpen = vi.hoisted(() => vi.fn());
+const mockGetCommandRoot = vi.hoisted(() => vi.fn());
 
 // Top-level Mocks
 vi.mock('@lydell/node-pty', () => ({
@@ -42,6 +45,7 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
   return {
     ...actual,
     resolveExecutable: mockResolveExecutable,
+    getCommandRoot: mockGetCommandRoot,
   };
 });
 vi.mock('node:child_process', async (importOriginal) => {
@@ -87,6 +91,26 @@ vi.mock('../utils/terminalSerializer.js', () => ({
 vi.mock('../utils/systemEncoding.js', () => ({
   getCachedEncodingForBuffer: vi.fn().mockReturnValue('utf-8'),
 }));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    promises: {
+      ...actual.promises,
+      realpath: mockRealpath,
+      open: mockOpen,
+    },
+    // Mock default export as well for `import fs from ...`
+    default: {
+      ...actual,
+      promises: {
+        ...actual.promises,
+        realpath: mockRealpath,
+        open: mockOpen,
+      },
+    },
+  };
+});
 
 const mockProcessKill = vi
   .spyOn(process, 'kill')
@@ -1399,6 +1423,99 @@ describe('ShellExecutionService execution method selection', () => {
     expect(mockPtySpawn).not.toHaveBeenCalled();
     expect(mockCpSpawn).toHaveBeenCalled();
     expect(result.executionMethod).toBe('child_process');
+  });
+
+  it('should force child_process when detecting WSL Windows binary via path', async () => {
+    mockPlatform.mockReturnValue('linux');
+    mockGetPty.mockResolvedValue({
+      module: { spawn: mockPtySpawn },
+      name: 'mock-pty',
+    });
+
+    mockGetCommandRoot.mockReturnValue('pwsh');
+    mockResolveExecutable.mockResolvedValue('/usr/bin/pwsh');
+    mockRealpath.mockResolvedValue(
+      '/mnt/c/Program Files/PowerShell/7/pwsh.exe',
+    );
+
+    // Mock magic byte reading for the fallback
+    const mockFileHandle = {
+      read: vi.fn().mockResolvedValue({
+        bytesRead: 2,
+        buffer: Buffer.from('MZ'),
+      }),
+      close: vi.fn(),
+    };
+    mockOpen.mockResolvedValue(mockFileHandle);
+
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'pwsh --version',
+      '/tmp',
+      onOutputEventMock,
+      abortController.signal,
+      true, // request PTY
+      shellExecutionConfig,
+    );
+
+    mockChildProcess.emit('exit', 0, null);
+    const result = await handle.result;
+
+    expect(mockPtySpawn).not.toHaveBeenCalled();
+    expect(mockCpSpawn).toHaveBeenCalled();
+    expect(result.executionMethod).toBe('child_process');
+
+    mockGetCommandRoot.mockReset();
+    mockResolveExecutable.mockReset();
+    mockResolveExecutable.mockImplementation(async (exe: string) => exe);
+    mockRealpath.mockReset();
+  });
+
+  it('should force child_process when detecting WSL Windows binary via magic bytes', async () => {
+    mockPlatform.mockReturnValue('linux');
+    mockGetPty.mockResolvedValue({
+      module: { spawn: mockPtySpawn },
+      name: 'mock-pty',
+    });
+
+    mockGetCommandRoot.mockReturnValue('custom-pwsh');
+    mockResolveExecutable.mockResolvedValue('/usr/local/bin/custom-pwsh');
+    mockRealpath.mockResolvedValue('/opt/custom-mount/pwsh.exe');
+
+    const mockFileHandle = {
+      read: vi.fn().mockResolvedValue({
+        bytesRead: 2,
+        buffer: Buffer.from('MZ'),
+      }),
+      close: vi.fn(),
+    };
+    mockOpen.mockResolvedValue(mockFileHandle);
+
+    const abortController = new AbortController();
+    const handle = await ShellExecutionService.execute(
+      'custom-pwsh --version',
+      '/tmp',
+      onOutputEventMock,
+      abortController.signal,
+      true, // request PTY
+      shellExecutionConfig,
+    );
+
+    mockChildProcess.emit('exit', 0, null);
+    const result = await handle.result;
+
+    expect(mockPtySpawn).not.toHaveBeenCalled();
+    expect(mockCpSpawn).toHaveBeenCalled();
+    expect(result.executionMethod).toBe('child_process');
+
+    expect(mockOpen).toHaveBeenCalledWith('/opt/custom-mount/pwsh.exe', 'r');
+    expect(mockFileHandle.close).toHaveBeenCalled();
+
+    mockGetCommandRoot.mockReset();
+    mockResolveExecutable.mockReset();
+    mockResolveExecutable.mockImplementation(async (exe: string) => exe);
+    mockRealpath.mockReset();
+    mockOpen.mockReset();
   });
 });
 

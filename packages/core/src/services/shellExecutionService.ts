@@ -10,12 +10,14 @@ import { getPty } from '../utils/getPty.js';
 import { spawn as cpSpawn, type ChildProcess } from 'node:child_process';
 import { TextDecoder } from 'node:util';
 import os from 'node:os';
+import fs from 'node:fs';
 import type { IPty } from '@lydell/node-pty';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import {
   getShellConfiguration,
   resolveExecutable,
   type ShellType,
+  getCommandRoot,
 } from '../utils/shell-utils.js';
 import { isBinary } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
@@ -28,6 +30,7 @@ import {
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
 import { killProcessGroup } from '../utils/process-utils.js';
+import { debugLogger } from '../utils/debugLogger.js';
 const { Terminal } = pkg;
 
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
@@ -229,6 +232,10 @@ export class ShellExecutionService {
     shouldUseNodePty: boolean,
     shellExecutionConfig: ShellExecutionConfig,
   ): Promise<ShellExecutionHandle> {
+    if (shouldUseNodePty && (await this.isWslWindowsBinary(commandToExecute))) {
+      shouldUseNodePty = false;
+    }
+
     if (shouldUseNodePty) {
       const ptyInfo = await getPty();
       if (ptyInfo) {
@@ -1191,6 +1198,51 @@ export class ShellExecutionService {
           throw e;
         }
       }
+    }
+  }
+
+  private static async isWslWindowsBinary(
+    commandToExecute: string,
+  ): Promise<boolean> {
+    if (os.platform() !== 'linux') return false;
+
+    const rootCommand = getCommandRoot(commandToExecute);
+    if (!rootCommand) return false;
+
+    const executablePath = await resolveExecutable(rootCommand).catch(
+      () => undefined,
+    );
+    if (!executablePath) return false;
+
+    const canonicalPath = await fs.promises
+      .realpath(executablePath)
+      .catch(() => undefined);
+    if (!canonicalPath) return false;
+
+    const isWindows = await this.hasWindowsMagicBytes(canonicalPath);
+
+    if (isWindows) {
+      debugLogger.log(
+        `WSL Windows binary detected via magic bytes (${canonicalPath}), disabling PTY`,
+      );
+    }
+
+    return isWindows;
+  }
+
+  private static async hasWindowsMagicBytes(
+    filePath: string,
+  ): Promise<boolean> {
+    const fd = await fs.promises.open(filePath, 'r').catch(() => undefined);
+    if (!fd) return false;
+
+    try {
+      const { bytesRead, buffer } = await fd.read(Buffer.alloc(2), 0, 2, 0);
+      return bytesRead === 2 && buffer.toString() === 'MZ';
+    } catch {
+      return false;
+    } finally {
+      await fd.close();
     }
   }
 }
