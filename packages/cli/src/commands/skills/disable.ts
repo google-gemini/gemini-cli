@@ -11,6 +11,12 @@ import { exitCli } from '../utils.js';
 import { disableSkill } from '../../utils/skillSettings.js';
 import { renderSkillActionFeedback } from '../../utils/skillUtils.js';
 import chalk from 'chalk';
+import { z } from 'zod';
+
+const disableArgsSchema = z.object({
+  name: z.string(),
+  scope: z.enum(['user', 'workspace']).default('workspace'),
+});
 
 interface DisableArgs {
   name: string;
@@ -48,13 +54,13 @@ export const disableCommand: CommandModule = {
         choices: ['user', 'workspace'],
       }),
   handler: async (argv) => {
+    const parsedArgs = disableArgsSchema.parse(argv);
     const scope =
-      argv['scope'] === 'workspace'
+      parsedArgs.scope === 'workspace'
         ? SettingScope.Workspace
         : SettingScope.User;
     await handleDisable({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      name: argv['name'] as string,
+      name: parsedArgs.name,
       scope,
     });
     await exitCli();

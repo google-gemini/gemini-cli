@@ -9,6 +9,12 @@ import type { CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
 import { debugLogger } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
+import { z } from 'zod';
+
+const removeArgsSchema = z.object({
+  name: z.string(),
+  scope: z.enum(['user', 'project']).default('project'),
+});
 
 async function removeMcpServer(
   name: string,
@@ -55,10 +61,9 @@ export const removeCommand: CommandModule = {
         choices: ['user', 'project'],
       }),
   handler: async (argv) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    await removeMcpServer(argv['name'] as string, {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      scope: argv['scope'] as string,
+    const parsedArgs = removeArgsSchema.parse(argv);
+    await removeMcpServer(parsedArgs.name, {
+      scope: parsedArgs.scope,
     });
     await exitCli();
   },

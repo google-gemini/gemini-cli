@@ -11,10 +11,11 @@ import { debugLogger, getErrorMessage } from '@google/gemini-cli-core';
 import { loadSettings, SettingScope } from '../../config/settings.js';
 import { exitCli } from '../utils.js';
 import stripJsonComments from 'strip-json-comments';
+import { z } from 'zod';
 
-interface MigrateArgs {
-  fromClaude: boolean;
-}
+const migrateArgsSchema = z.object({
+  'from-claude': z.boolean().default(false),
+});
 
 /**
  * Mapping from Claude Code event names to Gemini event names
@@ -265,9 +266,8 @@ export const migrateCommand: CommandModule = {
       default: false,
     }),
   handler: async (argv) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const args = argv as unknown as MigrateArgs;
-    if (args.fromClaude) {
+    const parsedArgs = migrateArgsSchema.parse(argv);
+    if (parsedArgs['from-claude']) {
       await handleMigrateFromClaude();
     } else {
       debugLogger.log(

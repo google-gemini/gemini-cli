@@ -16,6 +16,11 @@ import { requestConsentNonInteractive } from '../../config/extensions/consent.js
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { loadSettings } from '../../config/settings.js';
 import { exitCli } from '../utils.js';
+import { z } from 'zod';
+
+const validateArgsSchema = z.object({
+  path: z.string(),
+});
 
 interface ValidateArgs {
   path: string;
@@ -98,10 +103,10 @@ export const validateCommand: CommandModule = {
       type: 'string',
       demandOption: true,
     }),
-  handler: async (args) => {
+  handler: async (argv) => {
+    const parsedArgs = validateArgsSchema.parse(argv);
     await handleValidate({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      path: args['path'] as string,
+      path: parsedArgs.path,
     });
     await exitCli();
   },

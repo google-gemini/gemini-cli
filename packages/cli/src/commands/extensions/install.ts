@@ -29,6 +29,15 @@ import {
 } from '../../config/trustedFolders.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
+import { z } from 'zod';
+
+const installArgsSchema = z.object({
+  source: z.string(),
+  ref: z.string().optional(),
+  'auto-update': z.boolean().optional(),
+  'pre-release': z.boolean().optional(),
+  consent: z.boolean().optional(),
+});
 
 interface InstallArgs {
   source: string;
@@ -197,17 +206,13 @@ export const installCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const parsedArgs = installArgsSchema.parse(argv);
     await handleInstall({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      source: argv['source'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      ref: argv['ref'] as string | undefined,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      autoUpdate: argv['auto-update'] as boolean | undefined,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      allowPreRelease: argv['pre-release'] as boolean | undefined,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      consent: argv['consent'] as boolean | undefined,
+      source: parsedArgs.source,
+      ref: parsedArgs.ref,
+      autoUpdate: parsedArgs['auto-update'],
+      allowPreRelease: parsedArgs['pre-release'],
+      consent: parsedArgs.consent,
     });
     await exitCli();
   },

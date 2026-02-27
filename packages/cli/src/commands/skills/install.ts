@@ -14,6 +14,14 @@ import {
   requestConsentNonInteractive,
   skillsConsentString,
 } from '../../config/extensions/consent.js';
+import { z } from 'zod';
+
+const installArgsSchema = z.object({
+  source: z.string(),
+  scope: z.enum(['user', 'workspace']).default('user'),
+  path: z.string().optional(),
+  consent: z.boolean().optional(),
+});
 
 interface InstallArgs {
   source: string;
@@ -101,15 +109,12 @@ export const installCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const parsedArgs = installArgsSchema.parse(argv);
     await handleInstall({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      source: argv['source'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      scope: argv['scope'] as 'user' | 'workspace',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      path: argv['path'] as string | undefined,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      consent: argv['consent'] as boolean | undefined,
+      source: parsedArgs.source,
+      scope: parsedArgs.scope,
+      path: parsedArgs.path,
+      consent: parsedArgs.consent,
     });
     await exitCli();
   },

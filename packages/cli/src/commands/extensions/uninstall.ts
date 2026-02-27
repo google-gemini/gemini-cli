@@ -12,6 +12,11 @@ import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings } from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
+import { z } from 'zod';
+
+const uninstallArgsSchema = z.object({
+  names: z.array(z.string()).nonempty(),
+});
 
 interface UninstallArgs {
   names: string[]; // can be extension names or source URLs.
@@ -70,9 +75,9 @@ export const uninstallCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const parsedArgs = uninstallArgsSchema.parse(argv);
     await handleUninstall({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      names: argv['names'] as string[],
+      names: parsedArgs.names,
     });
     await exitCli();
   },

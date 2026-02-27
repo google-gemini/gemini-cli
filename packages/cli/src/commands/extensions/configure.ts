@@ -5,7 +5,7 @@
  */
 
 import type { CommandModule } from 'yargs';
-import type { ExtensionSettingScope } from '../../config/extensions/extensionSettings.js';
+import { ExtensionSettingScope } from '../../config/extensions/extensionSettings.js';
 import {
   configureAllExtensions,
   configureExtension,
@@ -15,6 +15,15 @@ import {
 import { loadSettings } from '../../config/settings.js';
 import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
+import { z } from 'zod';
+
+const configureArgsSchema = z.object({
+  name: z.string().optional(),
+  setting: z.string().optional(),
+  scope: z
+    .nativeEnum(ExtensionSettingScope)
+    .default(ExtensionSettingScope.USER),
+});
 
 interface ConfigureArgs {
   name?: string;
@@ -41,7 +50,8 @@ export const configureCommand: CommandModule<object, ConfigureArgs> = {
         choices: ['user', 'workspace'],
         default: 'user',
       }),
-  handler: async (args) => {
+  handler: async (argv) => {
+    const args = configureArgsSchema.parse(argv);
     const { name, setting, scope } = args;
     const settings = loadSettings(process.cwd()).merged;
 
@@ -67,30 +77,15 @@ export const configureCommand: CommandModule<object, ConfigureArgs> = {
 
     // Case 1: Configure specific setting for an extension
     if (name && setting) {
-      await configureSpecificSetting(
-        extensionManager,
-        name,
-        setting,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        scope as ExtensionSettingScope,
-      );
+      await configureSpecificSetting(extensionManager, name, setting, scope);
     }
     // Case 2: Configure all settings for an extension
     else if (name) {
-      await configureExtension(
-        extensionManager,
-        name,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        scope as ExtensionSettingScope,
-      );
+      await configureExtension(extensionManager, name, scope);
     }
     // Case 3: Configure all extensions
     else {
-      await configureAllExtensions(
-        extensionManager,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        scope as ExtensionSettingScope,
-      );
+      await configureAllExtensions(extensionManager, scope);
     }
 
     await exitCli();
