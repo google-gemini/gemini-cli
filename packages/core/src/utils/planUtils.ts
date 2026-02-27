@@ -13,8 +13,8 @@ import { isSubpath, resolveToRealPath } from './paths.js';
  * Shared between backend tools and CLI UI for consistency.
  */
 export const PlanErrorMessages = {
-  PATH_ACCESS_DENIED:
-    'Access denied: plan path must be within the designated plans directory.',
+  PATH_ACCESS_DENIED: (allowedDir: string) =>
+    `Access denied: plan path must be within the designated plans directory: ${allowedDir}.`,
   FILE_NOT_FOUND: (path: string) =>
     `Plan file does not exist: ${path}. You must create the plan file before requesting approval.`,
   FILE_EMPTY:
@@ -39,7 +39,7 @@ export async function validatePlanPath(
   const realPlansDir = resolveToRealPath(plansDir);
 
   if (!isSubpath(realPlansDir, realPath)) {
-    return PlanErrorMessages.PATH_ACCESS_DENIED;
+    return PlanErrorMessages.PATH_ACCESS_DENIED(plansDir);
   }
 
   if (!(await fileExists(resolvedPath))) {

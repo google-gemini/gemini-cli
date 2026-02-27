@@ -119,9 +119,13 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
     }
 
     this.config.setApprovalMode(ApprovalMode.PLAN);
+    const plansDir = this.config.storage.getPlansDir();
 
     return {
-      llmContent: 'Switching to Plan mode.',
+      llmContent: `Switching to Plan mode.
+      
+IMPORTANT: You MUST write your implementation plan to the designated plans directory: ${plansDir}/
+Example: \`${plansDir}/my-feature-plan.md\``,
       returnDisplay: this.params.reason
         ? `Switching to Plan mode: ${this.params.reason}`
         : 'Switching to Plan mode',

@@ -132,6 +132,9 @@ class RecursiveFileSearch implements FileSearch {
     }
 
     pattern = unescapePath(pattern) || '*';
+    if (process.platform === 'win32') {
+      pattern = pattern.replace(/\\(.)/g, '$1');
+    }
 
     let filteredCandidates;
     const { files: candidates, isExactMatch } =
@@ -218,7 +221,10 @@ class DirectoryFileSearch implements FileSearch {
     if (!this.ignore) {
       throw new Error('Engine not initialized. Call initialize() first.');
     }
-    pattern = pattern || '*';
+    pattern = unescapePath(pattern) || '*';
+    if (process.platform === 'win32') {
+      pattern = pattern.replace(/\\(.)/g, '$1');
+    }
 
     const dir = pattern.endsWith('/') ? pattern : path.dirname(pattern);
     const results = await crawl({

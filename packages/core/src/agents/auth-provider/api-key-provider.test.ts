@@ -7,6 +7,24 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { ApiKeyAuthProvider } from './api-key-provider.js';
 
+vi.mock('../../utils/shell-utils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../utils/shell-utils.js')>();
+  return {
+    ...actual,
+    spawnAsync: vi.fn().mockImplementation((_exe, args: string[]) => {
+      const command = args[args.length - 1];
+      if (command.includes('echo refreshed-key')) {
+        return Promise.resolve({ stdout: 'refreshed-key', stderr: '' });
+      }
+      if (command.includes('echo rotating-key')) {
+        return Promise.resolve({ stdout: 'rotating-key', stderr: '' });
+      }
+      return Promise.resolve({ stdout: 'mock-key', stderr: '' });
+    }),
+  };
+});
+
 describe('ApiKeyAuthProvider', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
