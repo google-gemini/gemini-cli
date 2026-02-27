@@ -528,6 +528,24 @@
       "markdownDescription": "Telemetry configuration.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
       "$ref": "#/$defs/TelemetrySettings"
     },
+    "billing": {
+      "title": "Billing",
+      "description": "Billing and AI credits settings.",
+      "markdownDescription": "Billing and AI credits settings.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "overageStrategy": {
+          "title": "Overage Strategy",
+          "description": "How to handle quota exhaustion when AI credits are available. 'ask' prompts each time, 'always' automatically uses credits, 'never' disables credit usage.",
+          "markdownDescription": "How to handle quota exhaustion when AI credits are available. 'ask' prompts each time, 'always' automatically uses credits, 'never' disables credit usage.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `ask`",
+          "default": "ask",
+          "type": "string",
+          "enum": ["ask", "always", "never"]
+        }
+      },
+      "additionalProperties": false
+    },
     "model": {
       "title": "Model",
       "description": "Settings related to the generative model.",
@@ -1702,6 +1720,47 @@
           "markdownDescription": "Enable web fetch behavior that bypasses LLM summarization.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "gemmaModelRouter": {
+          "title": "Gemma Model Router",
+          "description": "Enable Gemma model router (experimental).",
+          "markdownDescription": "Enable Gemma model router (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Gemma Model Router",
+              "description": "Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.",
+              "markdownDescription": "Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "classifier": {
+              "title": "Classifier",
+              "description": "Classifier configuration.",
+              "markdownDescription": "Classifier configuration.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "host": {
+                  "title": "Host",
+                  "description": "The host of the classifier.",
+                  "markdownDescription": "The host of the classifier.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `http://localhost:9379`",
+                  "default": "http://localhost:9379",
+                  "type": "string"
+                },
+                "model": {
+                  "title": "Model",
+                  "description": "The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.",
+                  "markdownDescription": "The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemma3-1b-gpu-custom`",
+                  "default": "gemma3-1b-gpu-custom",
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

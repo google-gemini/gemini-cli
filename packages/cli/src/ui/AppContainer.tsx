@@ -47,6 +47,7 @@ import {
   type IdeInfo,
   type IdeContext,
   type UserTierId,
+  type GeminiUserTier,
   type UserFeedbackPayload,
   type AgentDefinition,
   type ApprovalMode,
@@ -82,6 +83,8 @@ import {
   CoreToolCallStatus,
   generateSteeringAckMessage,
   buildUserSteeringHintPrompt,
+  logBillingEvent,
+  ApiKeyUpdatedEvent,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -145,7 +148,6 @@ import { useSessionResume } from './hooks/useSessionResume.js';
 import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
 import { useSessionRetentionCheck } from './hooks/useSessionRetentionCheck.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
-import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
@@ -228,7 +230,7 @@ export const AppContainer = (props: AppContainerProps) => {
   });
 
   useMemoryMonitor(historyManager);
-  const isAlternateBuffer = useAlternateBuffer();
+  const isAlternateBuffer = config.getUseAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
   const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
@@ -264,14 +266,16 @@ export const AppContainer = (props: AppContainerProps) => {
     () => isWorkspaceTrusted(settings.merged).isTrusted,
   );
 
-  const [queueErrorMessage, setQueueErrorMessage] = useState<string | null>(
-    null,
+  const [queueErrorMessage, setQueueErrorMessage] = useTimedMessage<string>(
+    QUEUE_ERROR_DISPLAY_DURATION_MS,
   );
 
   const [newAgents, setNewAgents] = useState<AgentDefinition[] | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
-  const [showIsExpandableHint, setShowIsExpandableHint] = useState(false);
-  const expandHintTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [expandHintTrigger, triggerExpandHint] = useTimedMessage<boolean>(
+    EXPAND_HINT_DURATION_MS,
+  );
+  const showIsExpandableHint = Boolean(expandHintTrigger);
   const overflowState = useOverflowState();
   const overflowingIdsSize = overflowState?.overflowingIds.size ?? 0;
   const hasOverflowState = overflowingIdsSize > 0 || !constrainHeight;
@@ -284,39 +288,15 @@ export const AppContainer = (props: AppContainerProps) => {
    * boolean dependency (hasOverflowState) to ensure the timer only resets on
    * genuine state transitions, preventing it from infinitely resetting during
    * active text streaming.
+   *
+   * In alternate buffer mode, we don't trigger the hint automatically on overflow
+   * to avoid noise, but the user can still trigger it manually with Ctrl+O.
    */
   useEffect(() => {
-    if (isAlternateBuffer) {
-      setShowIsExpandableHint(false);
-      if (expandHintTimerRef.current) {
-        clearTimeout(expandHintTimerRef.current);
-      }
-      return;
+    if (hasOverflowState && !isAlternateBuffer) {
+      triggerExpandHint(true);
     }
-
-    if (hasOverflowState) {
-      setShowIsExpandableHint(true);
-      if (expandHintTimerRef.current) {
-        clearTimeout(expandHintTimerRef.current);
-      }
-      expandHintTimerRef.current = setTimeout(() => {
-        setShowIsExpandableHint(false);
-      }, EXPAND_HINT_DURATION_MS);
-    }
-  }, [hasOverflowState, isAlternateBuffer, constrainHeight]);
-
-  /**
-   * Safe cleanup to ensure the expansion hint timer is cancelled when the
-   * component unmounts, preventing memory leaks.
-   */
-  useEffect(
-    () => () => {
-      if (expandHintTimerRef.current) {
-        clearTimeout(expandHintTimerRef.current);
-      }
-    },
-    [],
-  );
+  }, [hasOverflowState, isAlternateBuffer, triggerExpandHint]);
 
   const [defaultBannerText, setDefaultBannerText] = useState('');
   const [warningBannerText, setWarningBannerText] = useState('');
@@ -414,6 +394,9 @@ export const AppContainer = (props: AppContainerProps) => {
       ? { remaining, limit, resetTime }
       : undefined;
   });
+  const [paidTier, setPaidTier] = useState<GeminiUserTier | undefined>(
+    undefined,
+  );
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
 
@@ -567,7 +550,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();
 
-  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, settings);
+  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, config);
   // Derive widths for InputPrompt using shared helper
   const { inputWidth, suggestionsWidth } = useMemo(() => {
     const { inputWidth, suggestionsWidth } =
@@ -709,10 +692,17 @@ export const AppContainer = (props: AppContainerProps) => {
     handleProQuotaChoice,
     validationRequest,
     handleValidationChoice,
+    // G1 AI Credits
+    overageMenuRequest,
+    handleOverageMenuChoice,
+    emptyWalletRequest,
+    handleEmptyWalletChoice,
   } = useQuotaAndFallback({
     config,
     historyManager,
     userTier,
+    paidTier,
+    settings,
     setModelSwitchedFromQuotaError,
     onShowAuthSelection: () => setAuthState(AuthState.Updating),
     errorVerbosity: settings.merged.ui.errorVerbosity,
@@ -753,6 +743,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const handleAuthSelect = useCallback(
     async (authType: AuthType | undefined, scope: LoadableSettingScope) => {
       if (authType) {
+        const previousAuthType =
+          config.getContentGeneratorConfig()?.authType ?? 'unknown';
         if (authType === AuthType.LOGIN_WITH_GOOGLE) {
           setAuthContext({ requiresRestart: true });
         } else {
@@ -765,6 +757,10 @@ export const AppContainer = (props: AppContainerProps) => {
           config.setRemoteAdminSettings(undefined);
           await config.refreshAuth(authType);
           setAuthState(AuthState.Authenticated);
+          logBillingEvent(
+            config,
+            new ApiKeyUpdatedEvent(previousAuthType, authType),
+          );
         } catch (e) {
           if (e instanceof ChangeAuthRequestedError) {
             return;
@@ -827,6 +823,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     // Only sync when not currently authenticating
     if (authState === AuthState.Authenticated) {
       setUserTier(config.getUserTier());
+      setPaidTier(config.getUserPaidTier());
     }
   }, [config, authState]);
 
@@ -1253,10 +1250,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     async (submittedValue: string) => {
       reset();
       // Explicitly hide the expansion hint and clear its x-second timer when a new turn begins.
-      setShowIsExpandableHint(false);
-      if (expandHintTimerRef.current) {
-        clearTimeout(expandHintTimerRef.current);
-      }
+      triggerExpandHint(null);
       if (!constrainHeight) {
         setConstrainHeight(true);
         if (!isAlternateBuffer) {
@@ -1328,16 +1322,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
       refreshStatic,
       reset,
       handleHintSubmit,
+      triggerExpandHint,
     ],
   );
 
   const handleClearScreen = useCallback(() => {
     reset();
     // Explicitly hide the expansion hint and clear its x-second timer when clearing the screen.
-    setShowIsExpandableHint(false);
-    if (expandHintTimerRef.current) {
-      clearTimeout(expandHintTimerRef.current);
-    }
+    triggerExpandHint(null);
     historyManager.clearItems();
     clearConsoleMessagesState();
     refreshStatic();
@@ -1346,7 +1338,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     clearConsoleMessagesState,
     refreshStatic,
     reset,
-    setShowIsExpandableHint,
+    triggerExpandHint,
   ]);
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
@@ -1634,17 +1626,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [ideNeedsRestart]);
 
   useEffect(() => {
-    if (queueErrorMessage) {
-      const timer = setTimeout(() => {
-        setQueueErrorMessage(null);
-      }, QUEUE_ERROR_DISPLAY_DURATION_MS);
-
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [queueErrorMessage, setQueueErrorMessage]);
-
-  useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       return;
@@ -1750,13 +1731,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setConstrainHeight(true);
         if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
           // If the user manually collapses the view, show the hint and reset the x-second timer.
-          setShowIsExpandableHint(true);
-          if (expandHintTimerRef.current) {
-            clearTimeout(expandHintTimerRef.current);
-          }
-          expandHintTimerRef.current = setTimeout(() => {
-            setShowIsExpandableHint(false);
-          }, EXPAND_HINT_DURATION_MS);
+          triggerExpandHint(true);
         }
         if (!isAlternateBuffer) {
           refreshStatic();
@@ -1805,13 +1780,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ) {
         setConstrainHeight(false);
         // If the user manually expands the view, show the hint and reset the x-second timer.
-        setShowIsExpandableHint(true);
-        if (expandHintTimerRef.current) {
-          clearTimeout(expandHintTimerRef.current);
-        }
-        expandHintTimerRef.current = setTimeout(() => {
-          setShowIsExpandableHint(false);
-        }, EXPAND_HINT_DURATION_MS);
+        triggerExpandHint(true);
         if (!isAlternateBuffer) {
           refreshStatic();
         }
@@ -1916,6 +1885,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       showTransientMessage,
       settings.merged.general.devtools,
       showErrorDetails,
+      triggerExpandHint,
     ],
   );
 
@@ -2058,6 +2028,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     showIdeRestartPrompt ||
     !!proQuotaRequest ||
     !!validationRequest ||
+    !!overageMenuRequest ||
+    !!emptyWalletRequest ||
     isSessionBrowserOpen ||
     authState === AuthState.AwaitingApiKeyInput ||
     !!newAgents;
@@ -2085,6 +2057,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     hasLoopDetectionConfirmationRequest ||
     !!proQuotaRequest ||
     !!validationRequest ||
+    !!overageMenuRequest ||
+    !!emptyWalletRequest ||
     !!customDialog;
 
   const allowPlanMode =
@@ -2295,6 +2269,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
         stats: quotaStats,
         proQuotaRequest,
         validationRequest,
+        // G1 AI Credits dialog state
+        overageMenuRequest,
+        emptyWalletRequest,
       },
       contextFileNames,
       errorCount,
@@ -2419,6 +2396,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       quotaStats,
       proQuotaRequest,
       validationRequest,
+      overageMenuRequest,
+      emptyWalletRequest,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -2500,6 +2479,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleClearScreen,
       handleProQuotaChoice,
       handleValidationChoice,
+      // G1 AI Credits handlers
+      handleOverageMenuChoice,
+      handleEmptyWalletChoice,
       openSessionBrowser,
       closeSessionBrowser,
       handleResumeSession,
@@ -2586,6 +2568,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleClearScreen,
       handleProQuotaChoice,
       handleValidationChoice,
+      handleOverageMenuChoice,
+      handleEmptyWalletChoice,
       openSessionBrowser,
       closeSessionBrowser,
       handleResumeSession,

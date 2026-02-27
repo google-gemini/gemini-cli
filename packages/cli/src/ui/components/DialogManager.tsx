@@ -18,6 +18,8 @@ import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
 import { ValidationDialog } from './ValidationDialog.js';
+import { OverageMenuDialog } from './OverageMenuDialog.js';
+import { EmptyWalletDialog } from './EmptyWalletDialog.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
 import { SessionBrowser } from './SessionBrowser.js';
@@ -135,6 +137,7 @@ export const DialogManager = ({
         isModelNotFoundError={
           !!uiState.quota.proQuotaRequest.isModelNotFoundError
         }
+        authType={uiState.quota.proQuotaRequest.authType}
         onChoice={uiActions.handleProQuotaChoice}
       />
     );
@@ -148,6 +151,28 @@ export const DialogManager = ({
         }
         learnMoreUrl={uiState.quota.validationRequest.learnMoreUrl}
         onChoice={uiActions.handleValidationChoice}
+      />
+    );
+  }
+  if (uiState.quota.overageMenuRequest) {
+    return (
+      <OverageMenuDialog
+        failedModel={uiState.quota.overageMenuRequest.failedModel}
+        fallbackModel={uiState.quota.overageMenuRequest.fallbackModel}
+        resetTime={uiState.quota.overageMenuRequest.resetTime}
+        creditBalance={uiState.quota.overageMenuRequest.creditBalance}
+        onChoice={uiActions.handleOverageMenuChoice}
+      />
+    );
+  }
+  if (uiState.quota.emptyWalletRequest) {
+    return (
+      <EmptyWalletDialog
+        failedModel={uiState.quota.emptyWalletRequest.failedModel}
+        fallbackModel={uiState.quota.emptyWalletRequest.fallbackModel}
+        resetTime={uiState.quota.emptyWalletRequest.resetTime}
+        onGetCredits={uiState.quota.emptyWalletRequest.onGetCredits}
+        onChoice={uiActions.handleEmptyWalletChoice}
       />
     );
   }
