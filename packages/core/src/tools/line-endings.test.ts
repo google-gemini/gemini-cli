@@ -25,10 +25,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { GeminiClient } from '../core/client.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
-import {
-  ensureCorrectEdit,
-  ensureCorrectFileContent,
-} from '../utils/editCorrector.js';
+import { ensureCorrectFileContent } from '../utils/editCorrector.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import {
@@ -52,7 +49,6 @@ vi.mock('../ide/ide-client.js', () => ({
 
 let mockGeminiClientInstance: Mocked<GeminiClient>;
 let mockBaseLlmClientInstance: Mocked<BaseLlmClient>;
-const mockEnsureCorrectEdit = vi.fn<typeof ensureCorrectEdit>();
 const mockEnsureCorrectFileContent = vi.fn<typeof ensureCorrectFileContent>();
 
 // Mock Config
@@ -81,6 +77,7 @@ const mockConfigInternal = {
   getGeminiMdFileCount: () => 0,
   setGeminiMdFileCount: vi.fn(),
   getDisableLLMCorrection: vi.fn(() => false),
+  getActiveModel: () => 'test-model',
   validatePathAccess: vi.fn().mockReturnValue(null),
   getToolRegistry: () =>
     ({
@@ -120,7 +117,6 @@ describe('Line Ending Preservation', () => {
       generateJson: vi.fn(),
     } as unknown as Mocked<BaseLlmClient>;
 
-    vi.mocked(ensureCorrectEdit).mockImplementation(mockEnsureCorrectEdit);
     vi.mocked(ensureCorrectFileContent).mockImplementation(
       mockEnsureCorrectFileContent,
     );
@@ -177,14 +173,7 @@ describe('Line Ending Preservation', () => {
       const proposedContent = 'line1\nline2\nline3\n';
 
       // Mock corrections to return proposed content as-is (but usually normalized)
-      mockEnsureCorrectEdit.mockResolvedValue({
-        params: {
-          file_path: filePath,
-          old_string: originalContent,
-          new_string: proposedContent,
-        },
-        occurrences: 1,
-      });
+      mockEnsureCorrectFileContent.mockResolvedValue(proposedContent);
 
       const params = { file_path: filePath, content: proposedContent };
       const invocation = tool.build(params);
