@@ -8,13 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import {
-  resolveWorkspacePolicyState,
-  autoAcceptWorkspacePolicies,
-  setAutoAcceptWorkspacePolicies,
-  disableWorkspacePolicies,
-  setDisableWorkspacePolicies,
-} from './policy.js';
+import { resolveWorkspacePolicyState } from './policy.js';
 import { writeToStderr } from '@google/gemini-cli-core';
 
 // Mock debugLogger to avoid noise in test output
@@ -47,9 +41,6 @@ describe('resolveWorkspacePolicyState', () => {
     fs.mkdirSync(workspaceDir);
     policiesDir = path.join(workspaceDir, '.gemini', 'policies');
 
-    // Enable policies for these tests to verify loading logic
-    setDisableWorkspacePolicies(false);
-
     vi.clearAllMocks();
   });
 
@@ -70,13 +61,6 @@ describe('resolveWorkspacePolicyState', () => {
       workspacePoliciesDir: undefined,
       policyUpdateConfirmationRequest: undefined,
     });
-  });
-
-  it('should have disableWorkspacePolicies set to true by default', () => {
-    // We explicitly set it to false in beforeEach for other tests,
-    // so here we test that setting it to true works.
-    setDisableWorkspacePolicies(true);
-    expect(disableWorkspacePolicies).toBe(true);
   });
 
   it('should return policy directory if integrity matches', async () => {
@@ -123,33 +107,26 @@ describe('resolveWorkspacePolicyState', () => {
     expect(result.policyUpdateConfirmationRequest).toBeUndefined();
   });
 
-  it('should return confirmation request if changed in interactive mode when AUTO_ACCEPT is false', async () => {
-    const originalValue = autoAcceptWorkspacePolicies;
-    setAutoAcceptWorkspacePolicies(false);
+  it('should return confirmation request if changed in interactive mode', async () => {
+    fs.mkdirSync(policiesDir, { recursive: true });
+    fs.writeFileSync(path.join(policiesDir, 'policy.toml'), 'rules = []');
 
-    try {
-      fs.mkdirSync(policiesDir, { recursive: true });
-      fs.writeFileSync(path.join(policiesDir, 'policy.toml'), 'rules = []');
+    const result = await resolveWorkspacePolicyState({
+      cwd: workspaceDir,
+      trustedFolder: true,
+      interactive: true,
+    });
 
-      const result = await resolveWorkspacePolicyState({
-        cwd: workspaceDir,
-        trustedFolder: true,
-        interactive: true,
-      });
-
-      expect(result.workspacePoliciesDir).toBeUndefined();
-      expect(result.policyUpdateConfirmationRequest).toEqual({
-        scope: 'workspace',
-        identifier: workspaceDir,
-        policyDir: policiesDir,
-        newHash: expect.any(String),
-      });
-    } finally {
-      setAutoAcceptWorkspacePolicies(originalValue);
-    }
+    expect(result.workspacePoliciesDir).toBeUndefined();
+    expect(result.policyUpdateConfirmationRequest).toEqual({
+      scope: 'workspace',
+      identifier: workspaceDir,
+      policyDir: policiesDir,
+      newHash: expect.any(String),
+    });
   });
 
-  it('should warn and auto-accept if changed in non-interactive mode when AUTO_ACCEPT is true', async () => {
+  it('should warn and auto-accept if changed in non-interactive mode', async () => {
     fs.mkdirSync(policiesDir, { recursive: true });
     fs.writeFileSync(path.join(policiesDir, 'policy.toml'), 'rules = []');
 
@@ -164,30 +141,6 @@ describe('resolveWorkspacePolicyState', () => {
     expect(writeToStderr).toHaveBeenCalledWith(
       expect.stringContaining('Automatically accepting and loading'),
     );
-  });
-
-  it('should warn and auto-accept if changed in non-interactive mode when AUTO_ACCEPT is false', async () => {
-    const originalValue = autoAcceptWorkspacePolicies;
-    setAutoAcceptWorkspacePolicies(false);
-
-    try {
-      fs.mkdirSync(policiesDir, { recursive: true });
-      fs.writeFileSync(path.join(policiesDir, 'policy.toml'), 'rules = []');
-
-      const result = await resolveWorkspacePolicyState({
-        cwd: workspaceDir,
-        trustedFolder: true,
-        interactive: false,
-      });
-
-      expect(result.workspacePoliciesDir).toBe(policiesDir);
-      expect(result.policyUpdateConfirmationRequest).toBeUndefined();
-      expect(writeToStderr).toHaveBeenCalledWith(
-        expect.stringContaining('Automatically accepting and loading'),
-      );
-    } finally {
-      setAutoAcceptWorkspacePolicies(originalValue);
-    }
   });
 
   it('should not return workspace policies if cwd is the home directory', async () => {
@@ -206,26 +159,7 @@ describe('resolveWorkspacePolicyState', () => {
     expect(result.policyUpdateConfirmationRequest).toBeUndefined();
   });
 
-  it('should return empty state if disableWorkspacePolicies is true even if folder is trusted', async () => {
-    setDisableWorkspacePolicies(true);
-
-    // Set up policies directory with a file
-    fs.mkdirSync(policiesDir, { recursive: true });
-    fs.writeFileSync(path.join(policiesDir, 'policy.toml'), 'rules = []');
-
-    const result = await resolveWorkspacePolicyState({
-      cwd: workspaceDir,
-      trustedFolder: true,
-      interactive: true,
-    });
-
-    expect(result).toEqual({
-      workspacePoliciesDir: undefined,
-      policyUpdateConfirmationRequest: undefined,
-    });
-  });
-
-  it('should return empty state if cwd is a symlink to the home directory', async () => {
+  it('should not return workspace policies if cwd is a symlink to the home directory', async () => {
     const policiesDir = path.join(tempDir, '.gemini', 'policies');
     fs.mkdirSync(policiesDir, { recursive: true });
     fs.writeFileSync(path.join(policiesDir, 'policy.toml'), 'rules = []');
