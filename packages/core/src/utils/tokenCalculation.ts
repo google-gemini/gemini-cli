@@ -28,7 +28,7 @@ const AUDIO_TOKENS_PER_SECOND = 32;
 // Used to convert raw file size to an approximate duration.
 const COMPRESSED_AUDIO_BYTES_PER_SECOND = 16_000;
 // Default audio token estimate when base64 data is unavailable (~2 min).
-const DEFAULT_AUDIO_TOKEN_ESTIMATE = 3840;
+const DEFAULT_AUDIO_TOKEN_ESTIMATE = 120 * AUDIO_TOKENS_PER_SECOND;
 
 // Video token estimation constants.
 // Video frames are tokenized at 258 tokens/frame at 1 fps, plus the audio
@@ -38,7 +38,7 @@ const VIDEO_TOKENS_PER_SECOND = 258 + AUDIO_TOKENS_PER_SECOND;
 // Conservative bitrate for compressed video duration estimation (~2 Mbps).
 const COMPRESSED_VIDEO_BYTES_PER_SECOND = 250_000;
 // Default video token estimate when base64 data is unavailable (~1 min).
-const DEFAULT_VIDEO_TOKEN_ESTIMATE = 17_400;
+const DEFAULT_VIDEO_TOKEN_ESTIMATE = 60 * VIDEO_TOKENS_PER_SECOND;
 
 // Maximum number of characters to process with the full character-by-character heuristic.
 // Above this, we use a faster approximation to avoid performance bottlenecks.
