@@ -517,9 +517,7 @@ export function BaseSettingsDialog({
                   <Box marginX={1} flexDirection="row" alignItems="flex-start">
                     <Box minWidth={2} flexShrink={0}>
                       <Text
-                        color={
-                          isActive ? theme.status.success : theme.text.secondary
-                        }
+                        color={isActive ? theme.ui.focus : theme.text.secondary}
                       >
                         {isActive ? '●' : ''}
                       </Text>
@@ -536,9 +534,7 @@ export function BaseSettingsDialog({
                         minWidth={0}
                       >
                         <Text
-                          color={
-                            isActive ? theme.status.success : theme.text.primary
-                          }
+                          color={isActive ? theme.ui.focus : theme.text.primary}
                         >
                           {item.label}
                           {item.scopeMessage && (
@@ -557,7 +553,7 @@ export function BaseSettingsDialog({
                         <Text
                           color={
                             isActive
-                              ? theme.status.success
+                              ? theme.ui.focus
                               : item.isGreyedOut
                                 ? theme.text.secondary
                                 : theme.text.primary

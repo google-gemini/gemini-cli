@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lightTheme, darkTheme } from './theme.js';
+import { lightTheme, darkTheme, ansiTheme } from './theme.js';
 
 export interface SemanticColors {
   text: {
@@ -29,6 +29,7 @@ export interface SemanticColors {
     comment: string;
     symbol: string;
     dark: string;
+    focus: string;
     gradient: string[] | undefined;
   };
   status: {
@@ -61,6 +62,7 @@ export const lightSemanticColors: SemanticColors = {
     comment: lightTheme.Comment,
     symbol: lightTheme.Gray,
     dark: lightTheme.DarkGray,
+    focus: lightTheme.AccentBlue,
     gradient: lightTheme.GradientColors,
   },
   status: {
@@ -93,11 +95,45 @@ export const darkSemanticColors: SemanticColors = {
     comment: darkTheme.Comment,
     symbol: darkTheme.Gray,
     dark: darkTheme.DarkGray,
+    focus: darkTheme.AccentBlue,
     gradient: darkTheme.GradientColors,
   },
   status: {
     error: darkTheme.AccentRed,
     success: darkTheme.AccentGreen,
     warning: darkTheme.AccentYellow,
+  },
+};
+
+export const ansiSemanticColors: SemanticColors = {
+  text: {
+    primary: ansiTheme.Foreground,
+    secondary: ansiTheme.Gray,
+    link: ansiTheme.AccentBlue,
+    accent: ansiTheme.AccentPurple,
+    response: ansiTheme.Foreground,
+  },
+  background: {
+    primary: ansiTheme.Background,
+    diff: {
+      added: ansiTheme.DiffAdded,
+      removed: ansiTheme.DiffRemoved,
+    },
+  },
+  border: {
+    default: ansiTheme.Gray,
+    focused: ansiTheme.AccentBlue,
+  },
+  ui: {
+    comment: ansiTheme.Comment,
+    symbol: ansiTheme.Gray,
+    dark: ansiTheme.DarkGray,
+    focus: ansiTheme.AccentBlue,
+    gradient: ansiTheme.GradientColors,
+  },
+  status: {
+    error: ansiTheme.AccentRed,
+    success: ansiTheme.AccentGreen,
+    warning: ansiTheme.AccentYellow,
   },
 };

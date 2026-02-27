@@ -106,6 +106,7 @@ describe('<Header />', () => {
         comment: '',
         symbol: '',
         dark: '',
+        focus: '',
         gradient: undefined,
       },
       status: {

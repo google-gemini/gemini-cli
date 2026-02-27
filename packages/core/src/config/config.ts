@@ -233,6 +233,7 @@ export interface CustomTheme {
   ui?: {
     comment?: string;
     symbol?: string;
+    focus?: string;
     gradient?: string[];
   };
   status?: {

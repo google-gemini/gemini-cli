@@ -8,6 +8,7 @@ import type React from 'react';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import path from 'node:path';
@@ -436,7 +437,7 @@ const SessionItem = ({
     if (isDisabled) {
       return Colors.Gray;
     }
-    return isActive ? Colors.AccentPurple : c;
+    return isActive ? theme.ui.focus : c;
   };
 
   const prefix = isActive ? '❯ ' : '  ';
