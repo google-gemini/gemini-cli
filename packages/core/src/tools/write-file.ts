@@ -103,6 +103,14 @@ export async function getCorrectedFileContent(
     if (isNodeError(err) && err.code === 'ENOENT') {
       fileExists = false;
       originalContent = '';
+    } else if (
+      // ACP-delegated errors may lose their `code` property during JSON-RPC
+      // serialization. Fall back to checking the error message for ENOENT.
+      err instanceof Error &&
+      err.message.includes('ENOENT')
+    ) {
+      fileExists = false;
+      originalContent = '';
     } else {
       // File exists but could not be read (permissions, etc.)
       fileExists = true; // Mark as existing but problematic
@@ -441,8 +449,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
  */
 export class WriteFileTool
   extends BaseDeclarativeTool<WriteFileToolParams, ToolResult>
-  implements ModifiableDeclarativeTool<WriteFileToolParams>
-{
+  implements ModifiableDeclarativeTool<WriteFileToolParams> {
   static readonly Name = WRITE_FILE_TOOL_NAME;
 
   constructor(
@@ -485,9 +492,8 @@ export class WriteFileTool
         }
       }
     } catch (statError: unknown) {
-      return `Error accessing path properties for validation: ${resolvedPath}. Reason: ${
-        statError instanceof Error ? statError.message : String(statError)
-      }`;
+      return `Error accessing path properties for validation: ${resolvedPath}. Reason: ${statError instanceof Error ? statError.message : String(statError)
+        }`;
     }
 
     return null;

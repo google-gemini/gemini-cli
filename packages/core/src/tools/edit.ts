@@ -413,8 +413,7 @@ interface CalculatedEdit {
 
 class EditToolInvocation
   extends BaseToolInvocation<EditToolParams, ToolResult>
-  implements ToolInvocation<EditToolParams, ToolResult>
-{
+  implements ToolInvocation<EditToolParams, ToolResult> {
   constructor(
     private readonly config: Config,
     params: EditToolParams,
@@ -562,7 +561,11 @@ class EditToolInvocation
       currentContent = currentContent.replace(/\r\n/g, '\n');
       fileExists = true;
     } catch (err: unknown) {
-      if (!isNodeError(err) || err.code !== 'ENOENT') {
+      // ACP-delegated errors may lose their `code` property during JSON-RPC
+      // serialization. Fall back to checking the error message for ENOENT.
+      const isEnoent = (isNodeError(err) && err.code === 'ENOENT')
+        || (err instanceof Error && err.message.includes('ENOENT'));
+      if (!isEnoent) {
         throw err;
       }
       fileExists = false;
@@ -929,8 +932,7 @@ ${snippet}`);
  */
 export class EditTool
   extends BaseDeclarativeTool<EditToolParams, ToolResult>
-  implements ModifiableDeclarativeTool<EditToolParams>
-{
+  implements ModifiableDeclarativeTool<EditToolParams> {
   static readonly Name = EDIT_TOOL_NAME;
 
   constructor(
@@ -1001,7 +1003,9 @@ export class EditTool
             .getFileSystemService()
             .readTextFile(params.file_path);
         } catch (err) {
-          if (!isNodeError(err) || err.code !== 'ENOENT') throw err;
+          const isEnoent = (isNodeError(err) && err.code === 'ENOENT')
+            || (err instanceof Error && err.message.includes('ENOENT'));
+          if (!isEnoent) throw err;
           return '';
         }
       },
@@ -1017,7 +1021,9 @@ export class EditTool
             params.old_string === '' && currentContent === '',
           );
         } catch (err) {
-          if (!isNodeError(err) || err.code !== 'ENOENT') throw err;
+          const isEnoent = (isNodeError(err) && err.code === 'ENOENT')
+            || (err instanceof Error && err.message.includes('ENOENT'));
+          if (!isEnoent) throw err;
           return '';
         }
       },

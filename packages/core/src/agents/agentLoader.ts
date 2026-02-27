@@ -60,7 +60,8 @@ interface FrontmatterRemoteAgentDefinition
   extends FrontmatterBaseAgentDefinition {
   kind: 'remote';
   description?: string;
-  agent_card_url: string;
+  agent_card_url?: string;
+  endpoint?: string;
   auth?: FrontmatterAuthConfig;
 }
 
@@ -181,10 +182,15 @@ const remoteAgentSchema = z
     name: nameSchema,
     description: z.string().optional(),
     display_name: z.string().optional(),
-    agent_card_url: z.string().url(),
+    agent_card_url: z.string().url().optional(),
+    endpoint: z.string().url().optional(),
     auth: authConfigSchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine((data) => data.agent_card_url || data.endpoint, {
+    message: "Either 'agent_card_url' or 'endpoint' must be provided",
+    path: ["agent_card_url"],
+  });
 
 // Use a Zod union to automatically discriminate between local and remote
 // agent types.
@@ -431,7 +437,7 @@ export function markdownToAgentDefinition(
       name: markdown.name,
       description: markdown.description || '(Loading description...)',
       displayName: markdown.display_name,
-      agentCardUrl: markdown.agent_card_url,
+      agentCardUrl: (markdown.agent_card_url || markdown.endpoint) as string,
       auth: markdown.auth
         ? convertFrontmatterAuthToConfig(markdown.auth)
         : undefined,
@@ -465,8 +471,8 @@ export function markdownToAgentDefinition(
     },
     toolConfig: markdown.tools
       ? {
-          tools: markdown.tools,
-        }
+        tools: markdown.tools,
+      }
       : undefined,
     inputConfig,
     metadata,
@@ -484,6 +490,7 @@ export function markdownToAgentDefinition(
 export async function loadAgentsFromDirectory(
   dir: string,
 ): Promise<AgentLoadResult> {
+  console.log(`[DEBUG] loadAgentsFromDirectory called for dir: ${dir}`);
   const result: AgentLoadResult = {
     agents: [],
     errors: [],
@@ -492,7 +499,9 @@ export async function loadAgentsFromDirectory(
   let dirEntries: Dirent[];
   try {
     dirEntries = await fs.readdir(dir, { withFileTypes: true });
+    console.log(`[DEBUG] loadAgentsFromDirectory found entries: ${dirEntries.map(e => e.name).join(', ')}`);
   } catch (error) {
+    console.error(`[DEBUG] loadAgentsFromDirectory error reading dir:`, error);
     // If directory doesn't exist, just return empty
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {

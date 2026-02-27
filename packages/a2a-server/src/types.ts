@@ -47,7 +47,6 @@ export interface AgentSettings {
   kind: CoderAgentEvent.StateAgentSettingsEvent;
   workspacePath: string;
   autoExecute?: boolean;
-  model?: string;
 }
 
 export interface ToolCallConfirmation {

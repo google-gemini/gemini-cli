@@ -98,8 +98,8 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     }
     // Safe to pass strict object to super
     super(
-      { 
-        query, 
+      {
+        query,
         async: typeof params['async'] === 'boolean' ? params['async'] : undefined,
         subscribe: typeof params['subscribe'] === 'boolean' ? params['subscribe'] : undefined,
         sessionId: typeof params['sessionId'] === 'string' ? params['sessionId'] : undefined
@@ -134,7 +134,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     // or we rely on ADC.
     try {
       const isAsync = this.params.async === true;
-      
+
       // Only reuse session state for synchronous conversational turns.
       // Async tasks (parallel workers) should get a fresh context to avoid blocking each other
       // and to allow the proxy to track them as separate sub-agent instances.
@@ -175,8 +175,11 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         this.contextId = uuidv4();
       }
 
-      if (isAsync && isSubscribe && pushNotificationUrl) {        const callerName = process.env['CODER_AGENT_NAME'] || 'unknown';
-        pushNotificationUrl = `${pushNotificationUrl}?caller=${encodeURIComponent(callerName)}&callee=${encodeURIComponent(baseName)}`;
+      if (isAsync && isSubscribe && pushNotificationUrl) {
+        const callerName = process.env['CODER_AGENT_NAME'] || 'unknown';
+        const callerPort = process.env['CODER_AGENT_PORT'] || '4321';
+        const callerEndpoint = `http://127.0.0.1:${callerPort}`;
+        pushNotificationUrl = `${pushNotificationUrl}?caller=${encodeURIComponent(callerName)}&callee=${encodeURIComponent(baseName)}&caller_endpoint=${encodeURIComponent(callerEndpoint)}`;
       }
 
       console.log(`[RemoteAgentInvocation] Calling sendMessage to ${baseName} (as ${this.definition.name}), async: ${isAsync}, subscribe: ${isSubscribe}`);
