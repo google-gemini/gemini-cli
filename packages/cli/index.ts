@@ -6,6 +6,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// important to keep this as the very first import
+import './src/utils/suppressPunycodeWarnings.js';
 import { main } from './src/gemini.js';
 import { FatalError, writeToStderr } from '@google/gemini-cli-core';
 import { runExitCleanup } from './src/utils/cleanup.js';
