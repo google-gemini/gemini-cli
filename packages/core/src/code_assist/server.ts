@@ -38,6 +38,7 @@ import * as readline from 'node:readline';
 import { Readable } from 'node:stream';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import { UserTierId } from './types.js';
+import { Agent } from 'undici';
 import type {
   CaCountTokenResponse,
   CaGenerateContentResponse,
@@ -71,6 +72,10 @@ export class CodeAssistServer implements ContentGenerator {
     readonly sessionId?: string,
     readonly userTier?: UserTierId,
     readonly userTierName?: string,
+    private readonly httpsAgent = new Agent({
+      headersTimeout: 60000,
+      bodyTimeout: 300000,
+    }),
   ) {}
 
   async generateContentStream(
@@ -305,6 +310,7 @@ export class CodeAssistServer implements ContentGenerator {
       responseType: 'json',
       body: JSON.stringify(req),
       signal,
+      httpsAgent: this.httpsAgent,
     });
     return res.data;
   }
@@ -322,6 +328,7 @@ export class CodeAssistServer implements ContentGenerator {
       },
       responseType: 'json',
       signal,
+      httpsAgent: this.httpsAgent,
     });
     return res.data;
   }
@@ -352,6 +359,7 @@ export class CodeAssistServer implements ContentGenerator {
       responseType: 'stream',
       body: JSON.stringify(req),
       signal,
+      httpsAgent: this.httpsAgent,
     });
 
     return (async function* (): AsyncGenerator<T> {
