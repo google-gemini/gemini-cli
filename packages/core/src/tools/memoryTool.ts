@@ -285,6 +285,9 @@ export class MemoryTool
       messageBus,
       true,
       false,
+      undefined,
+      undefined,
+      true,
     );
   }
 

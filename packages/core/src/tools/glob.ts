@@ -96,8 +96,17 @@ class GlobToolInvocation extends BaseToolInvocation<
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    isSensitive?: boolean,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+      undefined,
+      undefined,
+      isSensitive,
+    );
   }
 
   getDescription(): string {
@@ -278,6 +287,9 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
       messageBus,
       true,
       false,
+      undefined,
+      undefined,
+      true,
     );
   }
 
@@ -328,6 +340,7 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    isSensitive?: boolean,
   ): ToolInvocation<GlobToolParams, ToolResult> {
     return new GlobToolInvocation(
       this.config,
@@ -335,6 +348,7 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
       messageBus,
       _toolName,
       _toolDisplayName,
+      isSensitive,
     );
   }
 

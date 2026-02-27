@@ -1324,6 +1324,8 @@ function toPermissionOptions(
  */
 function toAcpToolKind(kind: Kind): acp.ToolKind {
   switch (kind) {
+    case Kind.Write:
+      return 'edit';
     case Kind.Read:
     case Kind.Edit:
     case Kind.Execute:

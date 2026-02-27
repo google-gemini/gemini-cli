@@ -914,6 +914,32 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       200,
     );
   });
+
+  it('should have autoAddPolicy enabled by default', async () => {
+    const settings = createTestMergedSettings();
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getAutoAddPolicy()).toBe(true);
+  });
+
+  it('should allow disabling autoAddPolicy via settings', async () => {
+    const settings = createTestMergedSettings({
+      security: { autoAddPolicy: false },
+    });
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getAutoAddPolicy()).toBe(false);
+  });
+
+  it('should disable autoAddPolicy if secureModeEnabled is true', async () => {
+    const settings = createTestMergedSettings({
+      security: { autoAddPolicy: true },
+      admin: { secureModeEnabled: true },
+    });
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getAutoAddPolicy()).toBe(false);
+  });
 });
 
 describe('mergeMcpServers', () => {

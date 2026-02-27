@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -104,5 +104,7 @@ export async function loadSandboxConfig(
   const image =
     process.env['GEMINI_SANDBOX_IMAGE'] ?? packageJson?.config?.sandboxImageUri;
 
-  return command && image ? { command, image } : undefined;
+  const flags = settings.tools?.sandboxFlags;
+
+  return command && image ? { command, image, flags } : undefined;
 }

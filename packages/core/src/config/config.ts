@@ -415,6 +415,7 @@ export enum AuthProviderType {
 export interface SandboxConfig {
   command: 'docker' | 'podman' | 'sandbox-exec';
   image: string;
+  flags?: string;
 }
 
 /**
@@ -485,6 +486,7 @@ export interface ConfigParameters {
   experimentalZedIntegration?: boolean;
   listSessions?: boolean;
   deleteSession?: string;
+  autoAddPolicy?: boolean;
   listExtensions?: boolean;
   extensionLoader?: ExtensionLoader;
   enabledExtensions?: string[];
@@ -637,6 +639,7 @@ export class Config {
 
   private _activeModel: string;
   private readonly maxSessionTurns: number;
+  private readonly autoAddPolicy: boolean;
   private readonly listSessions: boolean;
   private readonly deleteSession: string | undefined;
   private readonly listExtensions: boolean;
@@ -867,6 +870,7 @@ export class Config {
       params.experimentalZedIntegration ?? false;
     this.listSessions = params.listSessions ?? false;
     this.deleteSession = params.deleteSession;
+    this.autoAddPolicy = params.autoAddPolicy ?? false;
     this.listExtensions = params.listExtensions ?? false;
     this._extensionLoader =
       params.extensionLoader ?? new SimpleExtensionLoader([]);
@@ -2126,6 +2130,18 @@ export class Config {
 
   getBugCommand(): BugCommandSettings | undefined {
     return this.bugCommand;
+  }
+
+  getAutoAddPolicy(): boolean {
+    if (this.disableYoloMode) {
+      return false;
+    }
+    return this.autoAddPolicy;
+  }
+
+  setAutoAddPolicy(value: boolean): void {
+    // @ts-expect-error - readonly property
+    this.autoAddPolicy = value;
   }
 
   getFileService(): FileDiscoveryService {
