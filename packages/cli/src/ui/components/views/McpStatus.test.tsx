@@ -47,6 +47,7 @@ describe('McpStatus', () => {
         isPersistentDisabled: false,
       },
     },
+    errors: {},
     discoveryInProgress: false,
     connectingServers: [],
     showDescriptions: true,
@@ -202,6 +203,18 @@ describe('McpStatus', () => {
   it('renders correctly with a connecting server', async () => {
     const { lastFrame, unmount, waitUntilReady } = render(
       <McpStatus {...baseProps} connectingServers={['server-1']} />,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders correctly with a server error', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
+      <McpStatus
+        {...baseProps}
+        errors={{ 'server-1': 'Failed to connect to server' }}
+      />,
     );
     await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();

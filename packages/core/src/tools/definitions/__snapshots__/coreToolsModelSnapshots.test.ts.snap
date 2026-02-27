@@ -568,8 +568,6 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 {
   "description": "This tool executes a given shell command as \`bash -c <command>\`. To run a command in the background, set the \`is_background\` parameter to true. Do NOT use \`&\` to background commands. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
 
-      The CLI will automatically prompt the user for confirmation before executing any command provided by this tool, so you MUST NOT ask for permission or confirmation separately (e.g., using ask_user).
-
       Efficiency Guidelines:
       - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
       - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
@@ -861,7 +859,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: ask_user 1`] = `
 {
-  "description": "Ask the user one or more questions to gather preferences, clarify requirements, or make decisions. DO NOT use this tool to ask for permission to run shell commands; the run_shell_command tool has built-in confirmation. When using this tool, prefer providing multiple-choice options with detailed descriptions and enable multi-select where appropriate to provide maximum flexibility.",
+  "description": "Ask the user one or more questions to gather preferences, clarify requirements, or make decisions. When using this tool, prefer providing multiple-choice options with detailed descriptions and enable multi-select where appropriate to provide maximum flexibility.",
   "name": "ask_user",
   "parametersJsonSchema": {
     "properties": {
@@ -1332,8 +1330,6 @@ The user has the ability to modify the \`new_string\` content. If modified, this
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: run_shell_command 1`] = `
 {
   "description": "This tool executes a given shell command as \`bash -c <command>\`. To run a command in the background, set the \`is_background\` parameter to true. Do NOT use \`&\` to background commands. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
-
-      The CLI will automatically prompt the user for confirmation before executing any command provided by this tool, so you MUST NOT ask for permission or confirmation separately (e.g., using ask_user).
 
       Efficiency Guidelines:
       - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.

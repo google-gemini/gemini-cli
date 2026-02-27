@@ -60,6 +60,18 @@ A test server
 "
 `;
 
+exports[`McpStatus > renders correctly with a server error 1`] = `
+"Configured MCP servers:
+
+🟢 server-1 - Ready (1 tool)
+  Error: Failed to connect to server
+A test server
+  Tools:
+  - tool-1
+    A test tool
+"
+`;
+
 exports[`McpStatus > renders correctly with authenticated OAuth status 1`] = `
 "Configured MCP servers:
 
