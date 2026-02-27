@@ -51,6 +51,7 @@ import {
   saveModelChange,
   loadSettings,
   getDefaultsFromSchema,
+  getMergeStrategyForPath,
 } from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -69,6 +70,7 @@ import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
+import { customDeepMerge } from '../utils/deepMerge.js';
 
 export interface CliArgs {
   query: string | undefined;
@@ -844,14 +846,15 @@ export async function loadCliConfig(
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
     directWebFetch: settings.experimental?.directWebFetch,
-    planSettings: {
-      ...(getDefaultsFromSchema().general?.plan ?? {}),
-      ...(extensionPlanSettings ?? {}),
-      ...(loadedSettings?.systemDefaults?.settings?.general?.plan ?? {}),
-      ...(loadedSettings?.user?.settings?.general?.plan ?? {}),
-      ...(loadedSettings?.workspace?.settings?.general?.plan ?? {}),
-      ...(loadedSettings?.system?.settings?.general?.plan ?? {}),
-    },
+    planSettings: customDeepMerge(
+      (path: string[]) => getMergeStrategyForPath(['general', 'plan', ...path]),
+      getDefaultsFromSchema().general?.plan ?? {},
+      extensionPlanSettings ?? {},
+      loadedSettings?.systemDefaults?.settings?.general?.plan ?? {},
+      loadedSettings?.user?.settings?.general?.plan ?? {},
+      loadedSettings?.workspace?.settings?.general?.plan ?? {},
+      loadedSettings?.system?.settings?.general?.plan ?? {},
+    ),
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
