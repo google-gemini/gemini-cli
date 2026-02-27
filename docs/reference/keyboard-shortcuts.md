@@ -87,12 +87,12 @@ available combinations.
 
 #### Text Input
 
-| Action                                         | Keys                                                                                      |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Submit the current prompt.                     | `Enter (no Shift, Alt, Ctrl, Cmd)`                                                        |
-| Insert a newline without submitting.           | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Alt + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
-| Open the current prompt in an external editor. | `Ctrl + X`                                                                                |
-| Paste from the clipboard.                      | `Ctrl + V`<br />`Cmd + V`<br />`Alt + V`                                                  |
+| Action                                                     | Keys                                                                                      |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Submit the current prompt.                                 | `Enter (no Shift, Alt, Ctrl, Cmd)`                                                        |
+| Insert a newline without submitting.                       | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Alt + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
+| Open the current prompt or the plan in an external editor. | `Ctrl + X`                                                                                |
+| Paste from the clipboard.                                  | `Ctrl + V`<br />`Cmd + V`<br />`Alt + V`                                                  |
 
 #### App Controls
 

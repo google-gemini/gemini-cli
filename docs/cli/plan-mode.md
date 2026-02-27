@@ -107,6 +107,10 @@ structure, and consultation level are proportional to the task's complexity:
     and formally request approval.
     - **Approve:** Exit Plan Mode and start implementation.
     - **Iterate:** Provide feedback to refine the plan.
+    - **Refine manually:** Press **Ctrl + X** to open the plan file in your
+      [preferred external editor]. This allows you to manually refine the plan
+      steps before approval. The CLI will automatically refresh and show the
+      updated plan after you save and close the editor.
 
 For more complex or specialized planning tasks, you can
 [customize the planning workflow with skills](#customizing-planning-with-skills).
@@ -305,3 +309,4 @@ performance. You can disable this automatic switching in your settings:
   https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/policy/policies/plan.toml
 [auto model]: /docs/reference/configuration.md#model-settings
 [model routing]: /docs/cli/telemetry.md#model-routing
+[preferred external editor]: /docs/reference/configuration.md#general
