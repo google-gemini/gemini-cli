@@ -527,6 +527,7 @@ export interface ConfigParameters {
   truncateToolOutputThreshold?: number;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
+  useAskUser?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
   directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
@@ -712,6 +713,7 @@ export class Config {
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useWriteTodos: boolean;
+  private readonly useAskUser: boolean;
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private policyUpdateConfirmationRequest:
@@ -916,6 +918,7 @@ export class Config {
     this.useWriteTodos = isPreviewModel(this.model)
       ? false
       : (params.useWriteTodos ?? true);
+    this.useAskUser = params.useAskUser ?? true;
     this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? true;
     this.disabledHooks = params.disabledHooks ?? [];
@@ -2587,6 +2590,10 @@ export class Config {
     return this.useWriteTodos;
   }
 
+  getUseAskUser(): boolean {
+    return this.useAskUser;
+  }
+
   getOutputFormat(): OutputFormat {
     return this.outputSettings?.format
       ? this.outputSettings.format
@@ -2746,9 +2753,11 @@ export class Config {
     maybeRegister(WebSearchTool, () =>
       registry.registerTool(new WebSearchTool(this, this.messageBus)),
     );
-    maybeRegister(AskUserTool, () =>
-      registry.registerTool(new AskUserTool(this.messageBus)),
-    );
+    if (this.getUseAskUser()) {
+      maybeRegister(AskUserTool, () =>
+        registry.registerTool(new AskUserTool(this.messageBus)),
+      );
+    }
     if (this.getUseWriteTodos()) {
       maybeRegister(WriteTodosTool, () =>
         registry.registerTool(new WriteTodosTool(this.messageBus)),
