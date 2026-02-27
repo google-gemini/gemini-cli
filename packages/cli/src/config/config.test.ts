@@ -1318,12 +1318,12 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME); // Should be allowed in auto_edit
   });
 
-  it('should throw an error if YOLO mode is attempted when disableYoloMode is false', async () => {
+  it('should throw an error if YOLO mode is attempted when disableYoloMode is true', async () => {
     process.argv = ['node', 'script.js', '--yolo'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
       security: {
-        disableYoloMode: false,
+        disableYoloMode: true,
       },
     });
 
@@ -3377,17 +3377,17 @@ describe('loadCliConfig disableYoloMode', () => {
     process.argv = ['node', 'script.js', '--approval-mode=auto_edit'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
-      security: { disableYoloMode: false },
+      security: { disableYoloMode: true },
     });
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getApprovalMode()).toBe(ApprovalMode.AUTO_EDIT);
   });
 
-  it('should throw if YOLO mode is attempted when disableYoloMode is false', async () => {
+  it('should throw if YOLO mode is attempted when disableYoloMode is true', async () => {
     process.argv = ['node', 'script.js', '--yolo'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
-      security: { disableYoloMode: false },
+      security: { disableYoloMode: true },
     });
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
       'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',

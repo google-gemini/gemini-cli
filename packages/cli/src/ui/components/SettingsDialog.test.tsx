@@ -374,9 +374,9 @@ describe('SettingsDialog', () => {
       // 'general.vimMode' has description 'Enable Vim keybindings' in settingsSchema.ts
       expect(output).toContain('Vim Mode');
       expect(output).toContain('Enable Vim keybindings');
-      // 'general.enableAutoUpdate' has description 'Enable automatic updates.'
+      // 'general.disableAutoUpdate' has description 'Disable automatic updates.'
       expect(output).toContain('Auto Update');
-      expect(output).toContain('Enable automatic updates.');
+      expect(output).toContain('Disable automatic updates.');
       unmount();
     });
   });
@@ -858,8 +858,8 @@ describe('SettingsDialog', () => {
     it('should show correct display values for settings with different states', async () => {
       const settings = createMockSettings({
         user: {
-          settings: { vimMode: true, hideTips: true },
-          originalSettings: { vimMode: true, hideTips: true },
+          settings: { vimMode: true, hideTips: false },
+          originalSettings: { vimMode: true, hideTips: false },
           path: '',
         },
         system: {
@@ -946,8 +946,8 @@ describe('SettingsDialog', () => {
     it('should show correct values for inherited settings', async () => {
       const settings = createMockSettings({
         system: {
-          settings: { vimMode: true, hideWindowTitle: true },
-          originalSettings: { vimMode: true, hideWindowTitle: true },
+          settings: { vimMode: true, hideWindowTitle: false },
+          originalSettings: { vimMode: true, hideWindowTitle: false },
           path: '',
         },
       });
@@ -1675,7 +1675,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: true,
-            enableAutoUpdate: false,
+            disableAutoUpdate: false,
             debugKeystrokeLogging: true,
           },
           ui: {
@@ -1720,11 +1720,11 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            enableAutoUpdate: false,
+            disableAutoUpdate: false,
           },
           ui: {
             showMemoryUsage: true,
-            hideWindowTitle: true,
+            hideWindowTitle: false,
           },
           tools: {
             truncateToolOutputThreshold: 50000,
@@ -1820,12 +1820,12 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            enableAutoUpdate: true,
+            disableAutoUpdate: true,
             debugKeystrokeLogging: false,
           },
           ui: {
-            hideWindowTitle: true,
-            hideTips: true,
+            hideWindowTitle: false,
+            hideTips: false,
             showMemoryUsage: false,
             showLineNumbers: false,
             showCitations: false,

@@ -85,7 +85,7 @@ describe('App', () => {
     history: [],
     pendingHistoryItems: [],
     pendingGeminiHistoryItems: [],
-    hideBannerData: {
+    bannerData: {
       defaultText: 'Mock Banner Text',
       warningText: '',
     },

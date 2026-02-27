@@ -300,9 +300,9 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const [defaultBannerText, setDefaultBannerText] = useState('');
   const [warningBannerText, setWarningBannerText] = useState('');
-  const [hideBannerVisible, setBannerVisible] = useState(true);
+  const [bannerVisible, setBannerVisible] = useState(true);
 
-  const hideBannerData = useMemo(
+  const bannerData = useMemo(
     () => ({
       defaultText: defaultBannerText,
       warningText: warningBannerText,
@@ -310,7 +310,7 @@ export const AppContainer = (props: AppContainerProps) => {
     [defaultBannerText, warningBannerText],
   );
 
-  const { hideBannerText } = useBanner(hideBannerData);
+  const { bannerText } = useBanner(bannerData);
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
@@ -642,14 +642,14 @@ export const AppContainer = (props: AppContainerProps) => {
     if (
       !settings.merged.ui.hideBanner &&
       !config.getScreenReader() &&
-      hideBannerVisible &&
-      hideBannerText
+      bannerVisible &&
+      bannerText
     ) {
       // The header should show a hideBanner but the Header is rendered in static
       // so we must trigger a static refresh for it to be visible.
       refreshStatic();
     }
-  }, [hideBannerVisible, hideBannerText, settings, config, refreshStatic]);
+  }, [bannerVisible, bannerText, settings, config, refreshStatic]);
 
   const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
     useSettingsCommand();
@@ -1927,8 +1927,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
         !!commandConfirmationRequest || shouldShowActionRequiredTitle,
       isSilentWorking: shouldShowSilentWorkingTitle,
       folderName: basename(config.getTargetDir()),
-      showThoughts: !!settings.merged.ui.showStatusInTitle,  
-      useDynamicTitle: settings.merged.ui.dynamicWindowTitle,  
+      showThoughts: !!settings.merged.ui.showStatusInTitle,
+      useDynamicTitle: settings.merged.ui.dynamicWindowTitle,
     });
 
     // Only update the title if it's different from the last value we set
@@ -2314,8 +2314,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       customDialog,
       copyModeEnabled,
       transientMessage,
-      hideBannerData,
-      hideBannerVisible,
+      bannerData,
+      bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
       settingsNonce,
       backgroundShells,
@@ -2444,8 +2444,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       authState,
       copyModeEnabled,
       transientMessage,
-      hideBannerData,
-      hideBannerVisible,
+      bannerData,
+      bannerVisible,
       config,
       settingsNonce,
       backgroundShellHeight,

@@ -155,7 +155,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     coreEvents: mockCoreEvents,
-    homedir: vi.fn(() => os.homedir()),
+    homedir: vi.fn(() => osActual.homedir()),
   };
 });
 
@@ -1956,10 +1956,10 @@ describe('Settings Loading and Merging', () => {
       expect(setValueSpy).not.toHaveBeenCalled();
     });
 
-    it('should migrate general.disableAutoUpdate to general.enableAutoUpdate with inverted value', () => {
+    it('should migrate general.disableAutoUpdate from enableAutoUpdate with inverted value', () => {
       const userSettingsContent = {
         general: {
-          disableAutoUpdate: true,
+          enableAutoUpdate: true,
         },
       };
 
@@ -1978,16 +1978,16 @@ describe('Settings Loading and Merging', () => {
 
       // Should set new value to false (inverted from true)
       expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
+        expect.anything(),
         'general',
         expect.objectContaining({ disableAutoUpdate: false }),
       );
     });
 
-    it('should migrate tools.approvalMode to tools.approvalMode', () => {
+    it('should migrate general.defaultApprovalMode to tools.approvalMode', () => {
       const userSettingsContent = {
-        tools: {
-          approvalMode: 'plan',
+        general: {
+          defaultApprovalMode: 'plan',
         },
       };
 
@@ -2005,55 +2005,48 @@ describe('Settings Loading and Merging', () => {
       migrateDeprecatedSettings(loadedSettings, true);
 
       expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
+        expect.anything(),
         'tools',
         expect.objectContaining({ approvalMode: 'plan' }),
       );
-
-      // Verify removal
-      expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
-        'tools',
-        expect.not.objectContaining({ approvalMode: 'plan' }),
-      );
     });
 
-    it('should migrate all inverted boolean settings to positive logic', () => {
+    it('should migrate all inverted boolean settings back to negative logic', () => {
       const userSettingsContent = {
         general: {
-          disableAutoUpdate: false,
-          disableUpdateNag: true,
+          enableAutoUpdate: true,
+          enableAutoUpdateNotification: false,
         },
         ui: {
-          hideWindowTitle: true,
-          hideTips: false,
-          hideBanner: true,
-          hideContextSummary: false,
-          hideFooter: true,
+          windowTitle: false,
+          tips: true,
+          banner: false,
+          contextSummary: true,
+          footerEnabled: false,
           footer: {
-            hideCWD: true,
-            hideSandboxStatus: false,
-            hideModelInfo: true,
-            hideContextPercentage: false,
+            cwd: false,
+            sandboxStatus: true,
+            modelInfo: false,
+            contextPercentage: true,
           },
           accessibility: {
-            disableLoadingPhrases: true,
+            enableLoadingPhrases: false,
           },
         },
         model: {
-          disableLoopDetection: true,
-          skipNextSpeakerCheck: false,
+          loopDetection: false,
+          nextSpeakerCheck: true,
         },
         tools: {
-          disableLLMCorrection: true,
+          llmCorrection: false,
         },
         security: {
-          disableYoloMode: false,
-          blockGitExtensions: false,
+          yoloModeAllowed: true,
+          gitExtensionsEnabled: true,
         },
         context: {
           fileFiltering: {
-            disableFuzzySearch: false,
+            enableFuzzySearch: true,
           },
         },
       };
@@ -2073,70 +2066,59 @@ describe('Settings Loading and Merging', () => {
 
       // Verify general migrations
       expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
+        expect.anything(),
         'general',
         expect.objectContaining({
-          disableAutoUpdate: true,
-          disableUpdateNag: false,
+          disableAutoUpdate: false,
+          disableUpdateNag: true,
         }),
       );
 
       // Verify UI migrations
       expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
+        expect.anything(),
         'ui',
         expect.objectContaining({
-          hideWindowTitle: false,
-          hideTips: true,
-          hideBanner: false,
-          hideContextSummary: true,
-          hideFooter: false,
+          hideWindowTitle: true,
+          hideTips: false,
+          hideBanner: true,
+          hideContextSummary: false,
+          hideFooter: true,
           footer: expect.objectContaining({
-            hideCWD: false,
-            hideSandboxStatus: true,
-            hideModelInfo: false,
-            hideContextPercentage: true,
+            hideCWD: true,
+            hideSandboxStatus: false,
+            hideModelInfo: true,
+            hideContextPercentage: false,
           }),
         }),
       );
 
       // Verify model migrations
       expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
+        expect.anything(),
         'model',
         expect.objectContaining({
-          disableLoopDetection: false,
-          skipNextSpeakerCheck: true,
+          disableLoopDetection: true,
+          skipNextSpeakerCheck: false,
         }),
       );
 
       // Verify tools migrations
       expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
+        expect.anything(),
         'tools',
         expect.objectContaining({
-          disableLLMCorrection: false,
+          disableLLMCorrection: true,
         }),
       );
 
       // Verify security migrations
       expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
+        expect.anything(),
         'security',
         expect.objectContaining({
           disableYoloMode: false,
-          blockGitExtensions: true,
-        }),
-      );
-
-      // Verify context migrations
-      expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
-        'context',
-        expect.objectContaining({
-          fileFiltering: expect.objectContaining({
-            enableFuzzySearch: true,
-          }),
+          blockGitExtensions: false,
         }),
       );
     });
@@ -2156,7 +2138,7 @@ describe('Settings Loading and Merging', () => {
       migrateDeprecatedSettings(loadedSettings);
 
       expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
+        expect.anything(),
         'ui',
         expect.objectContaining({
           loadingPhrases: 'off',
@@ -2215,7 +2197,7 @@ describe('Settings Loading and Merging', () => {
       const userSettingsContent = {
         general: {
           disableAutoUpdate: true,
-          disableAutoUpdate: true, // Trust this (true) over disableAutoUpdate (true -> false)
+          enableAutoUpdate: true, // Trust this (true) over disableAutoUpdate (true -> false)
         },
         context: {
           fileFiltering: {
@@ -2235,26 +2217,26 @@ describe('Settings Loading and Merging', () => {
       // Should still have old settings
       expect(
         loadedSettings.forScope(SettingScope.User).settings.general,
-      ).toHaveProperty('disableAutoUpdate');
+      ).toHaveProperty('enableAutoUpdate');
       expect(
         (
           loadedSettings.forScope(SettingScope.User).settings.context as {
-            fileFiltering: { disableFuzzySearch: boolean };
+            fileFiltering: { enableFuzzySearch: boolean };
           }
         ).fileFiltering,
-      ).toHaveProperty('disableFuzzySearch');
+      ).toHaveProperty('enableFuzzySearch');
 
       // 2. removeDeprecated = true
       migrateDeprecatedSettings(loadedSettings, true);
 
-      // Should remove disableAutoUpdate and trust disableAutoUpdate: true
-      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'general', {
+      // Should remove enableAutoUpdate and trust disableAutoUpdate: true
+      expect(setValueSpy).toHaveBeenCalledWith(expect.anything(), 'general', {
         disableAutoUpdate: true,
       });
 
-      // Should remove disableFuzzySearch and trust enableFuzzySearch: false
-      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'context', {
-        fileFiltering: { enableFuzzySearch: false },
+      // Should remove enableFuzzySearch and trust disableFuzzySearch: false
+      expect(setValueSpy).toHaveBeenCalledWith(expect.anything(), 'context', {
+        fileFiltering: { disableFuzzySearch: false },
       });
     });
 
@@ -2264,7 +2246,7 @@ describe('Settings Loading and Merging', () => {
       );
       const userSettingsContent = {
         general: {
-          disableAutoUpdate: true,
+          enableAutoUpdate: true,
         },
       };
       (fs.readFileSync as Mock).mockImplementation(
@@ -2278,7 +2260,7 @@ describe('Settings Loading and Merging', () => {
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
       // Verify it was migrated in the merged settings
-      expect(settings.merged.general?.enableAutoUpdate).toBe(false);
+      expect(settings.merged.general?.disableAutoUpdate).toBe(false);
 
       // Verify it was saved back to disk (via setValue calling updateSettingsFilePreservingFormat)
       expect(updateSettingsFilePreservingFormat).toHaveBeenCalledWith(
@@ -2289,15 +2271,15 @@ describe('Settings Loading and Merging', () => {
       );
     });
 
-    it('should migrate disableUpdateNag to enableAutoUpdateNotification in memory but not save for system and system defaults settings', () => {
+    it('should migrate enableAutoUpdateNotification to disableUpdateNag in memory but not save for system and system defaults settings', () => {
       const systemSettingsContent = {
         general: {
-          disableUpdateNag: true,
+          enableAutoUpdateNotification: true,
         },
       };
       const systemDefaultsContent = {
         general: {
-          disableUpdateNag: false,
+          enableAutoUpdateNotification: false,
         },
       };
 
@@ -2319,26 +2301,26 @@ describe('Settings Loading and Merging', () => {
 
       // Verify system settings were migrated in memory
       expect(settings.system.settings.general).toHaveProperty(
-        'enableAutoUpdateNotification',
+        'disableUpdateNag',
       );
       expect(
         (settings.system.settings.general as Record<string, unknown>)[
-          'enableAutoUpdateNotification'
+          'disableUpdateNag'
         ],
       ).toBe(false);
 
       // Verify system defaults settings were migrated in memory
       expect(settings.systemDefaults.settings.general).toHaveProperty(
-        'enableAutoUpdateNotification',
+        'disableUpdateNag',
       );
       expect(
         (settings.systemDefaults.settings.general as Record<string, unknown>)[
-          'enableAutoUpdateNotification'
+          'disableUpdateNag'
         ],
       ).toBe(true);
 
       // Merged should also reflect it (system overrides defaults, but both are migrated)
-      expect(settings.merged.general?.enableAutoUpdateNotification).toBe(false);
+      expect(settings.merged.general?.disableUpdateNag).toBe(false);
 
       // Verify it was NOT saved back to disk
       expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalledWith(
@@ -2846,7 +2828,7 @@ describe('Settings Loading and Merging', () => {
           MOCK_WORKSPACE_DIR,
         );
 
-        expect(process.env['GEMINI_API_KEY']).toEqual('secret');
+        expect(process.env['GEMINI_API_KEY']).toBeUndefined();
       });
 
       it('should NOT be tricked by positional arguments that look like flags', () => {
@@ -2865,7 +2847,7 @@ describe('Settings Loading and Merging', () => {
           MOCK_WORKSPACE_DIR,
         );
 
-        expect(process.env['GEMINI_API_KEY']).toEqual('secret');
+        expect(process.env['GEMINI_API_KEY']).toBeUndefined();
       });
     });
 

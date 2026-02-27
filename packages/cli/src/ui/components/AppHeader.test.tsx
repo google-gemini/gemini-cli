@@ -22,11 +22,11 @@ describe('<AppHeader />', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
-      hideBannerData: {
+      bannerData: {
         defaultText: 'This is the default hideBanner',
         warningText: '',
       },
-      hideBannerVisible: true,
+      bannerVisible: true,
     };
 
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
@@ -47,11 +47,11 @@ describe('<AppHeader />', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
-      hideBannerData: {
+      bannerData: {
         defaultText: 'This is the default hideBanner',
         warningText: 'There are capacity issues',
       },
-      hideBannerVisible: true,
+      bannerVisible: true,
     };
 
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
@@ -72,7 +72,7 @@ describe('<AppHeader />', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
-      hideBannerData: {
+      bannerData: {
         defaultText: '',
         warningText: '',
       },
@@ -96,7 +96,7 @@ describe('<AppHeader />', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
-      hideBannerData: {
+      bannerData: {
         defaultText: 'This is the default hideBanner',
         warningText: '',
       },
@@ -106,7 +106,7 @@ describe('<AppHeader />', () => {
       defaultBannerShownCount: {
         [crypto
           .createHash('sha256')
-          .update(uiState.hideBannerData.defaultText)
+          .update(uiState.bannerData.defaultText)
           .digest('hex')]: 5,
       },
     });
@@ -129,7 +129,7 @@ describe('<AppHeader />', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
-      hideBannerData: {
+      bannerData: {
         defaultText: 'This is the default hideBanner',
         warningText: '',
       },
@@ -153,7 +153,7 @@ describe('<AppHeader />', () => {
       {
         [crypto
           .createHash('sha256')
-          .update(uiState.hideBannerData.defaultText)
+          .update(uiState.bannerData.defaultText)
           .digest('hex')]: 1,
       },
     );
@@ -164,11 +164,11 @@ describe('<AppHeader />', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
-      hideBannerData: {
+      bannerData: {
         defaultText: 'First line\\nSecond line',
         warningText: '',
       },
-      hideBannerVisible: true,
+      bannerVisible: true,
     };
 
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
@@ -188,11 +188,11 @@ describe('<AppHeader />', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
-      hideBannerData: {
+      bannerData: {
         defaultText: 'First line\\nSecond line',
         warningText: '',
       },
-      hideBannerVisible: true,
+      bannerVisible: true,
     };
 
     persistentStateMock.setData({ hideTipsShown: 5 });
@@ -234,11 +234,11 @@ describe('<AppHeader />', () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
-      hideBannerData: {
+      bannerData: {
         defaultText: 'First line\\nSecond line',
         warningText: '',
       },
-      hideBannerVisible: true,
+      bannerVisible: true,
     };
 
     // First session

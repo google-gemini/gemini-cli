@@ -18,7 +18,7 @@ export const INTERACTIVE_SHELL_WAITING_PHRASE =
  * @param isActive Whether the phrase cycling should be active.
  * @param isWaiting Whether to show a specific waiting phrase.
  * @param shouldShowFocusHint Whether to show the shell focus hint.
- * @param loadingPhrasesMode Which phrases to show: hideTips, witty, all, or off.
+ * @param loadingPhrasesMode Which phrases to show: tips, witty, all, or off.
  * @param customPhrases Optional list of custom phrases to use instead of built-in witty phrases.
  * @returns The current loading phrase.
  */
@@ -26,7 +26,7 @@ export const usePhraseCycler = (
   isActive: boolean,
   isWaiting: boolean,
   shouldShowFocusHint: boolean,
-  loadingPhrasesMode: LoadingPhrasesMode = 'hideTips',
+  loadingPhrasesMode: LoadingPhrasesMode = 'tips',
   customPhrases?: string[],
 ) => {
   const [currentLoadingPhrase, setCurrentLoadingPhrase] = useState<
@@ -67,7 +67,7 @@ export const usePhraseCycler = (
       let phraseList: readonly string[];
 
       switch (loadingPhrasesMode) {
-        case 'hideTips':
+        case 'tips':
           phraseList = INFORMATIVE_TIPS;
           break;
         case 'witty':

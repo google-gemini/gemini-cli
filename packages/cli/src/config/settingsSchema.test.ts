@@ -209,7 +209,7 @@ describe('SettingsSchema', () => {
         true,
       );
       expect(
-        getSettingsSchema().general.properties.enableAutoUpdate.showInDialog,
+        getSettingsSchema().general.properties.disableAutoUpdate.showInDialog,
       ).toBe(true);
       expect(
         getSettingsSchema().ui.properties.hideWindowTitle.showInDialog,

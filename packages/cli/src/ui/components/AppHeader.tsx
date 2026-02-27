@@ -23,10 +23,9 @@ interface AppHeaderProps {
 export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
-  const { nightly, terminalWidth, hideBannerData, hideBannerVisible } =
-    useUIState();
+  const { nightly, terminalWidth, bannerData, bannerVisible } = useUIState();
 
-  const { hideBannerText } = useBanner(hideBannerData);
+  const { bannerText } = useBanner(bannerData);
   const { showTips } = useTips();
 
   if (!showDetails) {
@@ -42,11 +41,11 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
       {!settings.merged.ui.hideBanner && !config.getScreenReader() && (
         <>
           <Header version={version} nightly={nightly} />
-          {hideBannerVisible && hideBannerText && (
+          {bannerVisible && bannerText && (
             <Banner
               width={terminalWidth}
-              hideBannerText={hideBannerText}
-              isWarning={hideBannerData.warningText !== ''}
+              bannerText={bannerText}
+              isWarning={bannerData.warningText !== ''}
             />
           )}
         </>

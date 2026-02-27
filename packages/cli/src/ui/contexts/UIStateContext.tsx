@@ -208,11 +208,11 @@ export interface UIState {
   showDebugProfiler: boolean;
   showFullTodos: boolean;
   copyModeEnabled: boolean;
-  hideBannerData: {
+  bannerData: {
     defaultText: string;
     warningText: string;
   };
-  hideBannerVisible: boolean;
+  bannerVisible: boolean;
   customDialog: React.ReactNode | null;
   terminalBackgroundColor: TerminalBackgroundColor;
   settingsNonce: number;

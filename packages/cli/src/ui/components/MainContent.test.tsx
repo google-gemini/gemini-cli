@@ -299,8 +299,8 @@ describe('MainContent', () => {
     embeddedShellFocused: false,
     historyRemountKey: 0,
     cleanUiDetailsVisible: true,
-    hideBannerData: { defaultText: '', warningText: '' },
-    hideBannerVisible: false,
+    bannerData: { defaultText: '', warningText: '' },
+    bannerVisible: false,
     copyModeEnabled: false,
     terminalWidth: 100,
   };
@@ -571,11 +571,11 @@ describe('MainContent', () => {
           slashCommands: [],
           historyRemountKey: 0,
           cleanUiDetailsVisible: true,
-          hideBannerData: {
+          bannerData: {
             defaultText: '',
             warningText: '',
           },
-          hideBannerVisible: false,
+          bannerVisible: false,
         };
 
         const { lastFrame, waitUntilReady, unmount } = renderWithProviders(

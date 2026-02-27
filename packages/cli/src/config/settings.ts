@@ -165,7 +165,7 @@ export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
 }
 
-export type LoadingPhrasesMode = 'hideTips' | 'witty' | 'all' | 'off';
+export type LoadingPhrasesMode = 'tips' | 'witty' | 'all' | 'off';
 
 export interface AccessibilitySettings {
   /** @deprecated Use ui.loadingPhrases instead. */
@@ -864,8 +864,8 @@ export function migrateDeprecatedSettings(
       modified =
         migrateBoolean(
           newGeneral,
-          'disableAutoUpdate',
           'enableAutoUpdate',
+          'disableAutoUpdate',
           'general',
           foundDeprecated,
           true,
@@ -873,34 +873,32 @@ export function migrateDeprecatedSettings(
       modified =
         migrateBoolean(
           newGeneral,
-          'disableUpdateNag',
           'enableAutoUpdateNotification',
+          'disableUpdateNag',
           'general',
           foundDeprecated,
           true,
         ) || modified;
 
-      // Handle the move from general.approvalMode to tools.approvalMode
-      if (newGeneral['approvalMode'] !== undefined) {
+      // Handle the move from general.defaultApprovalMode back to tools.approvalMode
+      if (newGeneral['defaultApprovalMode'] !== undefined) {
         const toolsSettings =
           (settings.tools as Record<string, unknown> | undefined) || {};
         const newTools = { ...toolsSettings };
         if (newTools['approvalMode'] === undefined) {
-          newTools['approvalMode'] = newGeneral['approvalMode'];
+          newTools['approvalMode'] = newGeneral['defaultApprovalMode'];
           loadedSettings.setValue(scope, 'tools', newTools);
-          modified = true;
+          anyModified = true;
         }
         if (removeDeprecated) {
-          delete newGeneral['approvalMode'];
+          delete newGeneral['defaultApprovalMode'];
           modified = true;
         }
       }
 
       if (modified) {
         loadedSettings.setValue(scope, 'general', newGeneral);
-        if (!settingsFile.readOnly) {
-          anyModified = true;
-        }
+        anyModified = true;
       }
     }
 
@@ -914,8 +912,8 @@ export function migrateDeprecatedSettings(
       modified =
         migrateBoolean(
           newUi,
+          'windowTitle',
           'hideWindowTitle',
-          'hideWindowTitle',
           'ui',
           foundDeprecated,
           true,
@@ -923,8 +921,8 @@ export function migrateDeprecatedSettings(
       modified =
         migrateBoolean(
           newUi,
+          'tips',
           'hideTips',
-          'hideTips',
           'ui',
           foundDeprecated,
           true,
@@ -932,8 +930,8 @@ export function migrateDeprecatedSettings(
       modified =
         migrateBoolean(
           newUi,
+          'banner',
           'hideBanner',
-          'hideBanner',
           'ui',
           foundDeprecated,
           true,
@@ -941,7 +939,7 @@ export function migrateDeprecatedSettings(
       modified =
         migrateBoolean(
           newUi,
-          'hideContextSummary',
+          'contextSummary',
           'hideContextSummary',
           'ui',
           foundDeprecated,
@@ -950,7 +948,7 @@ export function migrateDeprecatedSettings(
       modified =
         migrateBoolean(
           newUi,
-          'hideFooter',
+          'footerEnabled',
           'hideFooter',
           'ui',
           foundDeprecated,
@@ -1019,7 +1017,7 @@ export function migrateDeprecatedSettings(
         if (
           migrateBoolean(
             newAccessibility,
-            'disableLoadingPhrases',
+            'enableLoadingPhrases',
             'enableLoadingPhrases',
             'ui.accessibility',
             foundDeprecated,
@@ -1046,9 +1044,7 @@ export function migrateDeprecatedSettings(
 
       if (modified) {
         loadedSettings.setValue(scope, 'ui', newUi);
-        if (!settingsFile.readOnly) {
-          anyModified = true;
-        }
+        anyModified = true;
       }
     }
 
@@ -1060,7 +1056,7 @@ export function migrateDeprecatedSettings(
       modified =
         migrateBoolean(
           newModel,
-          'disableLoopDetection',
+          'loopDetection',
           'disableLoopDetection',
           'model',
           foundDeprecated,
@@ -1069,7 +1065,7 @@ export function migrateDeprecatedSettings(
       modified =
         migrateBoolean(
           newModel,
-          'skipNextSpeakerCheck',
+          'nextSpeakerCheck',
           'skipNextSpeakerCheck',
           'model',
           foundDeprecated,
@@ -1078,9 +1074,7 @@ export function migrateDeprecatedSettings(
 
       if (modified) {
         loadedSettings.setValue(scope, 'model', newModel);
-        if (!settingsFile.readOnly) {
-          anyModified = true;
-        }
+        anyModified = true;
       }
     }
 
@@ -1093,32 +1087,16 @@ export function migrateDeprecatedSettings(
       modified =
         migrateBoolean(
           newTools,
-          'disableLLMCorrection',
+          'llmCorrection',
           'disableLLMCorrection',
           'tools',
           foundDeprecated,
           true,
         ) || modified;
 
-      if (toolsSettings['approvalMode'] !== undefined) {
-        foundDeprecated.push('tools.approvalMode');
-
-        if (newTools['approvalMode'] === undefined) {
-          newTools['approvalMode'] = toolsSettings['approvalMode'];
-          modified = true;
-        }
-
-        if (removeDeprecated) {
-          delete newTools['approvalMode'];
-          modified = true;
-        }
-      }
-
       if (modified) {
         loadedSettings.setValue(scope, 'tools', newTools);
-        if (!settingsFile.readOnly) {
-          anyModified = true;
-        }
+        anyModified = true;
       }
     }
 
@@ -1132,7 +1110,7 @@ export function migrateDeprecatedSettings(
       modified =
         migrateBoolean(
           newSecurity,
-          'disableYoloMode',
+          'yoloModeAllowed',
           'disableYoloMode',
           'security',
           foundDeprecated,
@@ -1141,7 +1119,7 @@ export function migrateDeprecatedSettings(
       modified =
         migrateBoolean(
           newSecurity,
-          'blockGitExtensions',
+          'gitExtensionsEnabled',
           'blockGitExtensions',
           'security',
           foundDeprecated,
@@ -1150,9 +1128,7 @@ export function migrateDeprecatedSettings(
 
       if (modified) {
         loadedSettings.setValue(scope, 'security', newSecurity);
-        if (!settingsFile.readOnly) {
-          anyModified = true;
-        }
+        anyModified = true;
       }
     }
 
@@ -1173,7 +1149,7 @@ export function migrateDeprecatedSettings(
         if (
           migrateBoolean(
             newFileFiltering,
-            'disableFuzzySearch',
+            'enableFuzzySearch',
             'enableFuzzySearch',
             'context.fileFiltering',
             foundDeprecated,
@@ -1187,9 +1163,7 @@ export function migrateDeprecatedSettings(
 
       if (modified) {
         loadedSettings.setValue(scope, 'context', newContext);
-        if (!settingsFile.readOnly) {
-          anyModified = true;
-        }
+        anyModified = true;
       }
     }
 
@@ -1204,9 +1178,7 @@ export function migrateDeprecatedSettings(
     );
 
     if (experimentalModified) {
-      if (!settingsFile.readOnly) {
-        anyModified = true;
-      }
+      anyModified = true;
     }
 
     if (settingsFile.readOnly && foundDeprecated.length > 0) {
@@ -1280,7 +1252,7 @@ function migrateExperimentalSettings(
   scope: LoadableSettingScope,
   removeDeprecated: boolean,
   foundDeprecated: string[] | undefined,
-  readOnly: boolean,
+  _readOnly: boolean,
 ): boolean {
   const experimentalSettings = settings.experimental as
     | Record<string, unknown>
@@ -1356,9 +1328,7 @@ function migrateExperimentalSettings(
 
     if (modified) {
       loadedSettings.setValue(scope, 'experimental', newExperimental);
-      if (!readOnly) {
-        return true;
-      }
+      return true;
     }
   }
   return false;

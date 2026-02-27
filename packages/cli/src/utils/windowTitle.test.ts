@@ -8,7 +8,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   computeTerminalTitle,
   type TerminalTitleOptions,
-} from './hideWindowTitle.js';
+} from './windowTitle.js';
 import { StreamingState } from '../ui/types.js';
 
 describe('computeTerminalTitle', () => {

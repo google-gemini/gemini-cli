@@ -2344,7 +2344,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         description: 'Environment variables to set for the server process.',
         additionalProperties: { type: 'string' },
       },
-      cwd: {
+      hideCWD: {
         type: 'string',
         description: 'Working directory for the server process.',
       },

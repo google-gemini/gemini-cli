@@ -119,7 +119,7 @@ describe('settings-validation', () => {
           hideWindowTitle: false,
           footer: {
             cwd: true,
-            modelInfo: false,
+            hideModelInfo: false,
           },
         },
         tools: {

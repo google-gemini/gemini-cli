@@ -63,7 +63,7 @@ describe('useBanner', () => {
 
     const { result } = renderHook(() => useBanner(data));
 
-    expect(result.current.hideBannerText).toBe('Critical Error');
+    expect(result.current.bannerText).toBe('Critical Error');
   });
 
   it('should hide hideBanner if show count exceeds max limit (Legacy format)', () => {
@@ -76,7 +76,7 @@ describe('useBanner', () => {
 
     const { result } = renderHook(() => useBanner(defaultBannerData));
 
-    expect(result.current.hideBannerText).toBe('');
+    expect(result.current.bannerText).toBe('');
   });
 
   it('should increment the persistent count when hideBanner is shown', () => {
@@ -112,6 +112,6 @@ describe('useBanner', () => {
 
     const { result } = renderHook(() => useBanner(data));
 
-    expect(result.current.hideBannerText).toBe('Line1\nLine2');
+    expect(result.current.bannerText).toBe('Line1\nLine2');
   });
 });

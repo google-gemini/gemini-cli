@@ -3,7 +3,7 @@
 exports[`SessionRetentionWarningDialog > should match snapshot 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│                                        Keep chat history                                         │
+│                                      Chat history retention                                      │
 │                                                                                                  │
 │ To keep your workspace clean, we are introducing a limit on how long chat sessions are stored.   │
 │ Please choose a retention period for your existing chats:                                        │
@@ -14,7 +14,7 @@ exports[`SessionRetentionWarningDialog > should match snapshot 1`] = `
 │ ● 2. Keep for 120 days                                                                           │
 │      No sessions will be deleted at this time                                                    │
 │                                                                                                  │
-│ Set a custom limit /settings and change "Keep chat history".                                     │
+│ Set a custom limit /settings and change "Chat history retention".                                │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "

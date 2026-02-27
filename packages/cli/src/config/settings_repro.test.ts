@@ -69,6 +69,7 @@ vi.mock('./extension.js');
 
 const mockCoreEvents = vi.hoisted(() => ({
   emitFeedback: vi.fn(),
+  emitSettingsChanged: vi.fn(),
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -169,8 +170,8 @@ describe('Settings Repro', () => {
         showCitations: true,
         useInkScrolling: true,
         footer: {
-          contextPercentage: true,
-          modelInfo: true,
+          hideContextPercentage: true,
+          hideModelInfo: true,
         },
       },
       useWriteTodos: true,

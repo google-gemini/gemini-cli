@@ -34,7 +34,7 @@ describe('SessionRetentionWarningDialog', () => {
     );
     await waitUntilReady();
 
-    expect(lastFrame()).toContain('Keep chat history');
+    expect(lastFrame()).toContain('Chat history retention');
     expect(lastFrame()).toContain(
       'introducing a limit on how long chat sessions are stored',
     );

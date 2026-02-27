@@ -1187,7 +1187,7 @@ describe('startInteractiveUI', () => {
   const mockSettings = {
     merged: {
       ui: {
-        hideWindowTitle: true,
+        hideWindowTitle: false,
         useAlternateBuffer: true,
         incrementalRendering: true,
       },
