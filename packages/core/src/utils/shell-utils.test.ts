@@ -22,6 +22,7 @@ import {
   stripShellWrapper,
   hasRedirection,
   resolveExecutable,
+  stripEnvPrefix,
 } from './shell-utils.js';
 import path from 'node:path';
 
@@ -564,5 +565,31 @@ describe('resolveExecutable', () => {
     mockAccess.mockRejectedValue(new Error('ENOENT'));
 
     expect(await resolveExecutable('unknown')).toBeUndefined();
+  });
+});
+
+describe('stripEnvPrefix', async () => {
+  it('should strip single env var prefix', () => {
+    expect(stripEnvPrefix('CI=true npm test')).toBe('npm test');
+  });
+
+  it('should strip multiple env var prefixes', () => {
+    expect(stripEnvPrefix('CI=true NODE_ENV=prod npm test')).toBe('npm test');
+  });
+
+  it('should return the original command when no prefix exists', () => {
+    expect(stripEnvPrefix('npm test')).toBe('npm test');
+  });
+
+  it('should handle PATH-style env vars', () => {
+    expect(stripEnvPrefix('PATH=/usr/bin git status')).toBe('git status');
+  });
+
+  it('should return undefined for unparseable commands', () => {
+    expect(stripEnvPrefix('')).toBeUndefined();
+  });
+
+  it('should handle env vars with complex values', () => {
+    expect(stripEnvPrefix('FOO="bar baz" ls -la')).toBe('ls -la');
   });
 });

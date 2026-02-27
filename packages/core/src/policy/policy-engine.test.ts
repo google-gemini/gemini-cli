@@ -3029,4 +3029,296 @@ describe('PolicyEngine', () => {
       expect(hookCheckers[1].priority).toBe(5);
     });
   });
+
+  describe('hasRuleForTool', () => {
+    beforeEach(() => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'read',
+            decision: PolicyDecision.ALLOW,
+            source: 'User Config',
+          },
+          {
+            toolName: 'write',
+            decision: PolicyDecision.DENY,
+            source: 'AgentRegistry (Dynamic)',
+          },
+          {
+            toolName: 'execute',
+            decision: PolicyDecision.ASK_USER,
+            source: 'System Default',
+          },
+        ],
+      });
+    });
+
+    it('should return true if a rule exists for the tool', () => {
+      expect(engine.hasRuleForTool('read')).toBe(true);
+      expect(engine.hasRuleForTool('write')).toBe(true);
+      expect(engine.hasRuleForTool('execute')).toBe(true);
+    });
+
+    it('should return false if no rule exists for the tool', () => {
+      expect(engine.hasRuleForTool('nonexistent')).toBe(false);
+    });
+
+    it('should ignore dynamic rules when ignoreDynamic is true', () => {
+      expect(engine.hasRuleForTool('write', false)).toBe(true);
+      expect(engine.hasRuleForTool('write', true)).toBe(false);
+    });
+
+    it('should not ignore non-dynamic rules when ignoreDynamic is true', () => {
+      expect(engine.hasRuleForTool('read', true)).toBe(true);
+      expect(engine.hasRuleForTool('execute', true)).toBe(true);
+    });
+
+    it('should handle tools with multiple rules', () => {
+      engine.addRule({
+        toolName: 'read',
+        decision: PolicyDecision.DENY,
+        priority: 10,
+      });
+      expect(engine.hasRuleForTool('read')).toBe(true);
+    });
+  });
+
+  describe('getHookCheckers and addHookChecker', () => {
+    it('should start with empty hook checkers', () => {
+      expect(engine.getHookCheckers()).toHaveLength(0);
+    });
+
+    it('should add a hook checker', () => {
+      const hookChecker = {
+        eventName: 'before-tool-call',
+        checker: {
+          type: 'in-process' as const,
+          name: InProcessCheckerType.ALLOWED_PATH,
+        },
+        priority: 10,
+      };
+
+      engine.addHookChecker(hookChecker);
+
+      const checkers = engine.getHookCheckers();
+      expect(checkers).toHaveLength(1);
+      expect(checkers[0].eventName).toBe('before-tool-call');
+      expect(checkers[0].priority).toBe(10);
+    });
+
+    it('should sort hook checkers by priority', () => {
+      engine.addHookChecker({
+        eventName: 'event1',
+        checker: {
+          type: 'in-process' as const,
+          name: InProcessCheckerType.ALLOWED_PATH,
+        },
+        priority: 5,
+      });
+
+      engine.addHookChecker({
+        eventName: 'event2',
+        checker: {
+          type: 'in-process' as const,
+          name: InProcessCheckerType.CONSECA,
+        },
+        priority: 15,
+      });
+
+      engine.addHookChecker({
+        eventName: 'event3',
+        checker: {
+          type: 'in-process' as const,
+          name: InProcessCheckerType.ALLOWED_PATH,
+        },
+        priority: 10,
+      });
+
+      const checkers = engine.getHookCheckers();
+      expect(checkers).toHaveLength(3);
+      expect(checkers[0].priority).toBe(15);
+      expect(checkers[1].priority).toBe(10);
+      expect(checkers[2].priority).toBe(5);
+    });
+
+    it('should handle hook checkers without priority', () => {
+      engine.addHookChecker({
+        eventName: 'no-priority',
+        checker: {
+          type: 'in-process' as const,
+          name: InProcessCheckerType.ALLOWED_PATH,
+        },
+      });
+
+      const checkers = engine.getHookCheckers();
+      expect(checkers).toHaveLength(1);
+      expect(checkers[0].priority).toBeUndefined();
+    });
+
+    it('should add multiple hook checkers for the same event', () => {
+      engine.addHookChecker({
+        eventName: 'shared-event',
+        checker: {
+          type: 'in-process' as const,
+          name: InProcessCheckerType.ALLOWED_PATH,
+        },
+        priority: 5,
+      });
+
+      engine.addHookChecker({
+        eventName: 'shared-event',
+        checker: {
+          type: 'in-process' as const,
+          name: InProcessCheckerType.CONSECA,
+        },
+        priority: 10,
+      });
+
+      const checkers = engine.getHookCheckers();
+      expect(checkers).toHaveLength(2);
+      expect(
+        checkers.filter((c) => c.eventName === 'shared-event'),
+      ).toHaveLength(2);
+    });
+
+    it('should support hook checkers with hookSource filter', () => {
+      engine.addHookChecker({
+        eventName: 'filtered-event',
+        hookSource: 'project',
+        checker: {
+          type: 'external' as const,
+          name: 'custom-checker',
+        },
+        priority: 10,
+      });
+
+      const checkers = engine.getHookCheckers();
+      expect(checkers).toHaveLength(1);
+      expect(checkers[0].hookSource).toBe('project');
+    });
+
+    it('should return readonly array of hook checkers', () => {
+      engine.addHookChecker({
+        eventName: 'test-event',
+        checker: {
+          type: 'in-process' as const,
+          name: InProcessCheckerType.ALLOWED_PATH,
+        },
+      });
+
+      const checkers = engine.getHookCheckers();
+      expect(checkers).toHaveLength(1);
+      // Verify it's readonly by checking the type would prevent mutations
+      // (TypeScript compile-time check, not runtime)
+    });
+  });
+
+  describe('edge cases and robustness', () => {
+    it('should handle empty tool name gracefully', async () => {
+      const { decision } = await engine.check({ name: '' }, undefined);
+      expect(decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should handle undefined tool name', async () => {
+      const { decision } = await engine.check(
+        { name: undefined as unknown as string },
+        undefined,
+      );
+      expect(decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should handle tool with no args', async () => {
+      engine.addRule({
+        toolName: 'no-args-tool',
+        decision: PolicyDecision.ALLOW,
+      });
+
+      const { decision } = await engine.check(
+        { name: 'no-args-tool' },
+        undefined,
+      );
+      expect(decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should handle args pattern on tool with no args', async () => {
+      engine.addRule({
+        toolName: 'test-tool',
+        argsPattern: /required-arg/,
+        decision: PolicyDecision.ALLOW,
+      });
+
+      // Tool call without args should not match the pattern
+      const { decision } = await engine.check({ name: 'test-tool' }, undefined);
+      expect(decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should handle complex nested args patterns', async () => {
+      engine.addRule({
+        toolName: 'complex-tool',
+        argsPattern: /"nested":\s*\{\s*"value":\s*true\s*\}/,
+        decision: PolicyDecision.DENY,
+      });
+
+      const dangerousCall = {
+        name: 'complex-tool',
+        args: {
+          nested: { value: true },
+        },
+      };
+
+      const { decision } = await engine.check(dangerousCall, undefined);
+      expect(decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should handle wildcard in middle position', async () => {
+      // Test that wildcard only works at start/end
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: 'server__*__suffix',
+            decision: PolicyDecision.DENY,
+          },
+        ],
+        defaultDecision: PolicyDecision.ALLOW,
+      });
+
+      // This should not match because wildcard is in middle
+      const { decision } = await engine.check(
+        { name: 'server__tool__suffix' },
+        'server',
+      );
+      expect(decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should maintain rule priority after multiple additions and removals', () => {
+      engine.addRule({
+        toolName: 'tool1',
+        decision: PolicyDecision.ALLOW,
+        priority: 5,
+      });
+      engine.addRule({
+        toolName: 'tool2',
+        decision: PolicyDecision.DENY,
+        priority: 15,
+      });
+      engine.addRule({
+        toolName: 'tool3',
+        decision: PolicyDecision.ASK_USER,
+        priority: 10,
+      });
+
+      engine.removeRulesForTool('tool2');
+
+      engine.addRule({
+        toolName: 'tool4',
+        decision: PolicyDecision.ALLOW,
+        priority: 20,
+      });
+
+      const rules = engine.getRules();
+      expect(rules[0].priority).toBe(20);
+      expect(rules[1].priority).toBe(10);
+      expect(rules[2].priority).toBe(5);
+    });
+  });
 });
