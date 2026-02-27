@@ -5,10 +5,21 @@
  */
 
 import { render } from '../../test-utils/render.js';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { QuotaDisplay } from './QuotaDisplay.js';
 
 describe('QuotaDisplay', () => {
+  const MOCK_NOW = new Date('2026-02-27T10:00:00Z').getTime();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(MOCK_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('should not render when remaining is undefined', async () => {
     const { lastFrame, waitUntilReady, unmount } = render(
       <QuotaDisplay remaining={undefined} limit={100} />,

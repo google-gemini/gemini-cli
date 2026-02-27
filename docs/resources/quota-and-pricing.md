@@ -10,14 +10,14 @@ Terms of Service.
 > **Note:** Published prices are list price; additional negotiated commercial
 > discounting may apply.
 
-This article outlines the specific quotas and pricing applicable to Gemini CLI
-when using different authentication methods.
+This article outlines the specific usage limits and pricing structures (quotas)
+applicable to Gemini CLI when using different authentication methods.
 
 Generally, there are three categories to choose from:
 
 - Free Usage: Ideal for experimentation and light use.
 - Paid Tier (fixed price): For individual developers or enterprises who need
-  more generous daily quotas and predictable costs.
+  more generous daily usage limits and predictable costs.
 - Pay-As-You-Go: The most flexible option for professional use, long-running
   tasks, or when you need full control over your usage.
 
@@ -99,9 +99,9 @@ Gemini CLI by upgrading to one of the following subscriptions:
 
 ## Pay as you go
 
-If you hit your daily request limits or exhaust your Gemini Pro quota even after
-upgrading, the most flexible solution is to switch to a pay-as-you-go model,
-where you pay for the specific amount of processing you use. This is the
+If you hit your daily request limits or exhaust your Gemini Pro usage limits
+even after upgrading, the most flexible solution is to switch to a pay-as-you-go
+model, where you pay for the specific amount of processing you use. This is the
 recommended path for uninterrupted access.
 
 To do this, log in using a Gemini API key or Vertex AI.
@@ -125,7 +125,7 @@ Learn more at
 
 It’s important to highlight that when using an API key, you pay per token/call.
 This can be more expensive for many small calls with few tokens, but it's the
-only way to ensure your workflow isn't interrupted by quota limits.
+only way to ensure your workflow isn't interrupted by usage limits.
 
 ## Gemini for workspace plans
 
@@ -135,11 +135,11 @@ Flow video editor). These plans do not apply to the API usage which powers the
 Gemini CLI. Supporting these plans is under active consideration for future
 support.
 
-## Check usage and quota
+## Check usage limits
 
-You can check your current token usage and quota information using the
+You can check your current token usage and usage limits information using the
 `/stats model` command. This command provides a snapshot of your current
-session's token usage, as well as your overall quota and usage for the supported
+session's token usage, as well as your overall usage limits for the supported
 models.
 
 For more information on the `/stats` command and its subcommands, see the
