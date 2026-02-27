@@ -50,10 +50,14 @@ describe('ToolResultDisplay Overflow', () => {
 
     await waitUntilReady();
 
-    // ResizeObserver might take a tick, though ToolGroupMessage calculates overflow synchronously
+    // In ASB mode the overflow hint can render before the scroll position
+    // settles. Wait for both the hint and the tail of the content so this
+    // snapshot is deterministic across slower CI runners.
     await waitFor(() => {
       const frame = lastFrame();
-      expect(frame.toLowerCase()).toContain('press ctrl+o to show more lines');
+      expect(frame).toBeDefined();
+      expect(frame?.toLowerCase()).toContain('press ctrl+o to show more lines');
+      expect(frame).toContain('line 50');
     });
 
     const frame = lastFrame();
