@@ -861,7 +861,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: ask_user 1`] = `
 {
-  "description": "Ask the user one or more questions to gather preferences, clarify requirements, or make decisions. DO NOT use this tool to ask for permission to run shell commands; the run_shell_command tool has built-in confirmation.",
+  "description": "Ask the user one or more questions to gather preferences, clarify requirements, or make decisions. DO NOT use this tool to ask for permission to run shell commands; the run_shell_command tool has built-in confirmation. When using this tool, prefer providing multiple-choice options with detailed descriptions and enable multi-select where appropriate to provide maximum flexibility.",
   "name": "ask_user",
   "parametersJsonSchema": {
     "properties": {

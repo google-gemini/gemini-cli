@@ -558,7 +558,7 @@ The agent did not use the todo list because this task could be completed by a ti
   ask_user: {
     name: ASK_USER_TOOL_NAME,
     description:
-      'Ask the user one or more questions to gather preferences, clarify requirements, or make decisions. DO NOT use this tool to ask for permission to run shell commands; the run_shell_command tool has built-in confirmation.',
+      'Ask the user one or more questions to gather preferences, clarify requirements, or make decisions. DO NOT use this tool to ask for permission to run shell commands; the run_shell_command tool has built-in confirmation. When using this tool, prefer providing multiple-choice options with detailed descriptions and enable multi-select where appropriate to provide maximum flexibility.',
     parametersJsonSchema: {
       type: 'object',
       required: ['questions'],
