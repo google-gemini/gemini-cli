@@ -63,14 +63,22 @@ All hooks receive these common fields via `stdin`:
 
 Most hooks support these fields in their `stdout` JSON:
 
-| Field            | Type      | Description                                                                    |
-| :--------------- | :-------- | :----------------------------------------------------------------------------- |
-| `systemMessage`  | `string`  | Displayed immediately to the user in the terminal.                             |
-| `suppressOutput` | `boolean` | If `true`, hides internal hook metadata from logs/telemetry.                   |
-| `continue`       | `boolean` | If `false`, stops the entire agent loop immediately.                           |
-| `stopReason`     | `string`  | Displayed to the user when `continue` is `false`.                              |
-| `decision`       | `string`  | `"allow"` or `"deny"` (alias `"block"`). Specific impact depends on the event. |
-| `reason`         | `string`  | The feedback/error message provided when a `decision` is `"deny"`.             |
+| Field            | Type      | Description                                          |
+| :--------------- | :-------- | :--------------------------------------------------- |
+| `systemMessage`  | `string`  | Displayed immediately to the user in the terminal.   |
+| `suppressOutput` | `boolean` | If `true`, hides hook metadata from logs/telemetry.  |
+| `continue`       | `boolean` | If `false`, stops the agent loop immediately.        |
+| `stopReason`     | `string`  | Displayed to the user when `continue` is `false`.    |
+| `decision`       | `string`  | `"allow"`, `"deny"` (or `"block"`), or `"ask_user"`. |
+| `reason`         | `string`  | Explanation for `"deny"` or `"ask_user"` decisions.  |
+
+### Decision behavior
+
+- **`"allow"`**: Permits the action to proceed.
+- **`"deny"` / `"block"`**: Blocks the action. The `reason` is sent to the model
+  as an error.
+- **`"ask_user"`**: Prompts the user for confirmation before proceeding. The
+  `reason` explains why confirmation is needed.
 
 ---
 
