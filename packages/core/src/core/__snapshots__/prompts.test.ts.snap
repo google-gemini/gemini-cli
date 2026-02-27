@@ -123,7 +123,7 @@ Plan Mode uses an adaptive planning workflow where the research depth, plan stru
 Analyze requirements and use search/read tools to explore the codebase. Systematically map affected modules, trace data flow, and identify dependencies.
 
 ### 2. Consult
-The depth of your consultation should be proportional to the task's complexity:
+The depth of your consultation should be proportional to the task's complexity. Use multi-select to offer flexibility and include detailed descriptions for each option to help the user understand the implications of their choice.
 - **Simple Tasks:** Skip consultation and proceed directly to drafting.
 - **Standard Tasks:** If multiple viable approaches exist, present a concise summary (including pros/cons and your recommendation) via \`ask_user\` and wait for a decision.
 - **Complex Tasks:** You MUST present at least two viable approaches with detailed trade-offs via \`ask_user\` and obtain approval before drafting the plan.
@@ -291,7 +291,7 @@ Plan Mode uses an adaptive planning workflow where the research depth, plan stru
 Analyze requirements and use search/read tools to explore the codebase. Systematically map affected modules, trace data flow, and identify dependencies.
 
 ### 2. Consult
-The depth of your consultation should be proportional to the task's complexity:
+The depth of your consultation should be proportional to the task's complexity. Use multi-select to offer flexibility and include detailed descriptions for each option to help the user understand the implications of their choice.
 - **Simple Tasks:** Skip consultation and proceed directly to drafting.
 - **Standard Tasks:** If multiple viable approaches exist, present a concise summary (including pros/cons and your recommendation) via \`ask_user\` and wait for a decision.
 - **Complex Tasks:** You MUST present at least two viable approaches with detailed trade-offs via \`ask_user\` and obtain approval before drafting the plan.
@@ -578,7 +578,7 @@ Plan Mode uses an adaptive planning workflow where the research depth, plan stru
 Analyze requirements and use search/read tools to explore the codebase. Systematically map affected modules, trace data flow, and identify dependencies.
 
 ### 2. Consult
-The depth of your consultation should be proportional to the task's complexity:
+The depth of your consultation should be proportional to the task's complexity. Use multi-select to offer flexibility and include detailed descriptions for each option to help the user understand the implications of their choice.
 - **Simple Tasks:** Skip consultation and proceed directly to drafting.
 - **Standard Tasks:** If multiple viable approaches exist, present a concise summary (including pros/cons and your recommendation) via \`ask_user\` and wait for a decision.
 - **Complex Tasks:** You MUST present at least two viable approaches with detailed trade-offs via \`ask_user\` and obtain approval before drafting the plan.
