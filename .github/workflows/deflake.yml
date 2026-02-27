@@ -69,16 +69,20 @@ jobs:
           VERBOSE: 'true'
         shell: 'bash'
         run: |
-          EXTRA_ARGS=""
-          if [[ -n "${TEST_FILTER}" ]]; then
-            EXTRA_ARGS="-t \"${TEST_FILTER}\""
+          # Construct the inner command
+          if [[ "${IS_DOCKER}" == "true" ]]; then
+            INNER_CMD="npm run test:integration:sandbox:docker -- --retry=0"
+          else
+            INNER_CMD="npm run test:integration:sandbox:none -- --retry=0"
           fi
 
-          if [[ "${IS_DOCKER}" == "true" ]]; then
-            npm run deflake:test:integration:sandbox:docker -- --runs="${RUNS}" ${EXTRA_ARGS}
-          else
-            npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}" ${EXTRA_ARGS}
+          # Append test filter if provided
+          if [[ -n "${TEST_FILTER}" ]]; then
+            INNER_CMD="${INNER_CMD} -t \"${TEST_FILTER}\""
           fi
+
+          # Run deflake script directly
+          node scripts/deflake.js --command="${INNER_CMD}" --runs="${RUNS}"
 
   deflake_e2e_mac:
     name: 'E2E Test (macOS)'
@@ -116,11 +120,11 @@ jobs:
           TEST_FILTER: '${{ github.event.inputs.test_filter }}'
           VERBOSE: 'true'
         run: |
-          EXTRA_ARGS=""
+          INNER_CMD="npm run test:integration:sandbox:none -- --retry=0"
           if [[ -n "${TEST_FILTER}" ]]; then
-            EXTRA_ARGS="-t \"${TEST_FILTER}\""
+            INNER_CMD="${INNER_CMD} -t \"${TEST_FILTER}\""
           fi
-          npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}" ${EXTRA_ARGS}
+          node scripts/deflake.js --command="${INNER_CMD}" --runs="${RUNS}"
 
   deflake_e2e_windows:
     name: 'Slow E2E - Win'
@@ -179,8 +183,8 @@ jobs:
           TEST_FILTER: '${{ github.event.inputs.test_filter }}'
         shell: 'pwsh'
         run: |
-          $ExtraArgs = ""
+          $InnerCmd = "npm run test:integration:sandbox:none -- --retry=0"
           if ($env:TEST_FILTER) {
-            $ExtraArgs = "-t `"$env:TEST_FILTER`""
+            $InnerCmd = "$InnerCmd -t `"$env:TEST_FILTER`""
           }
-          Invoke-Expression "npm run deflake:test:integration:sandbox:none -- --runs=$env:RUNS $ExtraArgs"
+          node scripts/deflake.js --command "$InnerCmd" --runs $env:RUNS
