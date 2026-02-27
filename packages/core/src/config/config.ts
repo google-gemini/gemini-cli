@@ -370,10 +370,6 @@ import { McpClientManager } from '../tools/mcp-client-manager.js';
 import { type McpContext } from '../tools/mcp-client.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getErrorMessage } from '../utils/errors.js';
-import {
-  ENTER_PLAN_MODE_TOOL_NAME,
-  EXIT_PLAN_MODE_TOOL_NAME,
-} from '../tools/tool-names.js';
 
 export type { FileFilteringOptions };
 export {
@@ -1171,7 +1167,6 @@ export class Config implements McpContext {
     }
 
     await this.geminiClient.initialize();
-    this.syncPlanModeTools();
     this.initialized = true;
   }
 
@@ -1997,49 +1992,12 @@ export class Config implements McpContext {
       (currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO);
 
     if (isPlanModeTransition || isYoloModeTransition) {
-      this.syncPlanModeTools();
+      if (this.geminiClient?.isInitialized()) {
+        this.geminiClient.setTools().catch((err) => {
+          debugLogger.error('Failed to update tools', err);
+        });
+      }
       this.updateSystemInstructionIfInitialized();
-    }
-  }
-
-  /**
-   * Synchronizes enter/exit plan mode tools based on current mode.
-   */
-  syncPlanModeTools(): void {
-    const registry = this.getToolRegistry();
-    if (!registry) {
-      return;
-    }
-    const approvalMode = this.getApprovalMode();
-    const isPlanMode = approvalMode === ApprovalMode.PLAN;
-    const isYoloMode = approvalMode === ApprovalMode.YOLO;
-
-    if (isPlanMode) {
-      if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-        registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
-      }
-      if (!registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
-        registry.registerTool(new ExitPlanModeTool(this, this.messageBus));
-      }
-    } else {
-      if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
-        registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
-      }
-      if (this.planEnabled && !isYoloMode) {
-        if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-          registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
-        }
-      } else {
-        if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-          registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
-        }
-      }
-    }
-
-    if (this.geminiClient?.isInitialized()) {
-      this.geminiClient.setTools().catch((err) => {
-        debugLogger.error('Failed to update tools', err);
-      });
     }
   }
 
