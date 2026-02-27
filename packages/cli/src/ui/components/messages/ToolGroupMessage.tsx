@@ -27,6 +27,7 @@ import {
   calculateToolContentMaxLines,
 } from '../../utils/toolLayoutUtils.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
+import { CopySafeBox } from '../shared/CopySafeBox.js';
 
 interface ToolGroupMessageProps {
   item: HistoryItem | HistoryItemWithoutId;
@@ -40,7 +41,7 @@ interface ToolGroupMessageProps {
 }
 
 // Main component renders the border and maps the tools using ToolMessage
-const TOOL_MESSAGE_HORIZONTAL_MARGIN = 4;
+const TOOL_MESSAGE_HORIZONTAL_MARGIN = 3;
 
 export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   item,
@@ -132,7 +133,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       )
     : undefined;
 
-  const contentWidth = terminalWidth - TOOL_MESSAGE_HORIZONTAL_MARGIN;
+  const contentWidth = terminalWidth - 1 - TOOL_MESSAGE_HORIZONTAL_MARGIN;
 
   /*
    * ToolGroupMessage calculates its own overflow state locally and passes
@@ -217,8 +218,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       Ink to render the border of the box incorrectly and span multiple lines and even
       cause tearing.
     */
-      width={terminalWidth}
+      width={terminalWidth - 1}
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
+      marginLeft={1}
     >
       {visibleToolCalls.map((tool, index) => {
         const isFirst = index === 0;
@@ -251,7 +253,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               <ToolMessage {...commonProps} />
             )}
             {tool.outputFile && (
-              <Box
+              <CopySafeBox
                 borderLeft={true}
                 borderRight={true}
                 borderTop={false}
@@ -268,7 +270,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                     Output too long and was saved to: {tool.outputFile}
                   </Text>
                 </Box>
-              </Box>
+              </CopySafeBox>
             )}
           </Box>
         );
@@ -279,7 +281,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             drawn over by the sticky header directly inside it.
            */
         (visibleToolCalls.length > 0 || borderBottomOverride !== undefined) && (
-          <Box
+          <CopySafeBox
             height={0}
             width={contentWidth}
             borderLeft={true}

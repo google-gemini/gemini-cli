@@ -13,6 +13,7 @@ import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme as semanticTheme } from '../../semantic-colors.js';
 import type { Theme } from '../../themes/theme.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
+import { CopySafeBox } from '../shared/CopySafeBox.js';
 
 interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
@@ -130,13 +131,13 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
 
     if (parsedLines.length === 0) {
       return (
-        <Box
+        <CopySafeBox
           borderStyle="round"
           borderColor={semanticTheme.border.default}
           padding={1}
         >
           <Text dimColor>No changes detected.</Text>
-        </Box>
+        </CopySafeBox>
       );
     }
     if (screenReaderEnabled) {
@@ -215,13 +216,13 @@ const renderDiffContent = (
 
   if (displayableLines.length === 0) {
     return (
-      <Box
+      <CopySafeBox
         borderStyle="round"
         borderColor={semanticTheme.border.default}
         padding={1}
       >
         <Text dimColor>No changes detected.</Text>
-      </Box>
+      </CopySafeBox>
     );
   }
 
@@ -278,14 +279,15 @@ const renderDiffContent = (
       ) {
         acc.push(
           <Box key={`gap-${index}`}>
-            <Box
+            <CopySafeBox
               borderStyle="double"
               borderLeft={false}
               borderRight={false}
               borderBottom={false}
               width={terminalWidth}
               borderColor={semanticTheme.text.secondary}
-            ></Box>
+              paddingX={0}
+            />
           </Box>,
         );
       }

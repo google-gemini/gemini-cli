@@ -7,6 +7,7 @@
 import type React from 'react';
 import { Box, type DOMElement } from 'ink';
 import { theme } from '../semantic-colors.js';
+import { CopySafeBox } from './shared/CopySafeBox.js';
 
 export interface StickyHeaderProps {
   children: React.ReactNode;
@@ -24,53 +25,45 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
   borderColor,
   borderDimColor,
   containerRef,
-}) => (
-  <Box
-    ref={containerRef}
-    sticky
-    minHeight={1}
-    flexShrink={0}
-    width={width}
-    stickyChildren={
-      <Box
-        borderStyle="round"
-        flexDirection="column"
-        width={width}
-        opaque
-        borderColor={borderColor}
-        borderDimColor={borderDimColor}
-        borderBottom={false}
-        borderTop={isFirst}
-        paddingTop={isFirst ? 0 : 1}
-      >
-        <Box paddingX={1}>{children}</Box>
-        {/* Dark border to separate header from content. */}
-        <Box
-          width={width - 2}
-          borderColor={theme.ui.dark}
-          borderStyle="single"
-          borderTop={false}
-          borderBottom={true}
-          borderLeft={false}
-          borderRight={false}
-        ></Box>
-      </Box>
-    }
-  >
+}) => {
+  const commonProps = {
+    borderStyle: 'round' as const,
+    flexDirection: 'column' as const,
+    width,
+    borderColor,
+    borderDimColor,
+    borderBottom: false,
+    borderTop: isFirst,
+    paddingTop: isFirst ? 0 : 1,
+    paddingX: 1,
+  };
+
+  return (
     <Box
-      borderStyle="round"
+      ref={containerRef}
+      sticky
+      minHeight={1}
+      flexShrink={0}
       width={width}
-      borderColor={borderColor}
-      borderDimColor={borderDimColor}
-      borderBottom={false}
-      borderTop={isFirst}
-      borderLeft={true}
-      borderRight={true}
-      paddingX={1}
-      paddingBottom={1}
-      paddingTop={isFirst ? 0 : 1}
+      stickyChildren={
+        <CopySafeBox {...commonProps} opaque>
+          {children}
+          {/* Dark border to separate header from content. */}
+          <CopySafeBox
+            width="100%"
+            borderColor={theme.ui.dark}
+            borderStyle="single"
+            borderTop={false}
+            borderBottom={true}
+            borderLeft={false}
+            borderRight={false}
+          />
+        </CopySafeBox>
+      }
     >
-      {children}
+      <CopySafeBox {...commonProps} borderLeft={true} borderRight={true}>
+        {children}
+      </CopySafeBox>
     </Box>
-  </Box>
-);
+  );
+};

@@ -76,6 +76,22 @@ describe('<Scrollable />', () => {
     unmount();
   });
 
+  it('disables scrolling and removes padding in copy mode', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <Scrollable hasFocus={false} height={5}>
+        <Text>Line 1</Text>
+        <Text>Line 2</Text>
+        <Text>Line 3</Text>
+      </Scrollable>,
+      { uiState: { copyModeEnabled: true } },
+    );
+    await waitUntilReady();
+    // In copy mode, right padding should be gone.
+    // The snapshot will verify overflowY="hidden" and paddingRight=0.
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
   it('updates scroll position correctly when scrollBy is called multiple times in the same tick', async () => {
     let capturedEntry: ScrollProviderModule.ScrollableEntry | undefined;
     vi.spyOn(ScrollProviderModule, 'useScrollable').mockImplementation(
