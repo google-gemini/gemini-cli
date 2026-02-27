@@ -55,6 +55,13 @@ decision = "ask_user"
 priority = 70
 modes = ["plan"]
 
+[[rule]]
+toolName = "enter_plan_mode"
+decision = "deny"
+priority = 70
+modes = ["plan"]
+deny_message = "You are already in Plan Mode."
+
 # Allow write_file and replace for .md files in the plans directory (cross-platform)
 [[rule]]
 toolName = ["write_file", "replace"]

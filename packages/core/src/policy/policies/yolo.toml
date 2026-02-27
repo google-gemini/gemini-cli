@@ -36,6 +36,12 @@ decision = "ask_user"
 priority = 999
 modes = ["yolo"]
 
+[[rule]]
+toolName = ["enter_plan_mode", "exit_plan_mode"]
+decision = "deny"
+priority = 999
+modes = ["yolo"]
+
 # Allow everything else in YOLO mode
 [[rule]]
 decision = "allow"
