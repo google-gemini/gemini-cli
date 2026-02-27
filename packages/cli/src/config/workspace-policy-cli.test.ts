@@ -54,6 +54,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    Policy.setDisableWorkspacePolicies(false);
     // Default to MATCH for existing tests
     mockCheckIntegrity.mockResolvedValue({
       status: 'match',
