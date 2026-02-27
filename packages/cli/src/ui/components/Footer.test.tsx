@@ -8,7 +8,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { Footer } from './Footer.js';
-import { tildeifyPath, ToolCallDecision } from '@google/gemini-cli-core';
+import {
+  makeFakeConfig,
+  tildeifyPath,
+  ToolCallDecision,
+} from '@google/gemini-cli-core';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -177,6 +181,8 @@ describe('<Footer />', () => {
             },
             proQuotaRequest: null,
             validationRequest: null,
+            overageMenuRequest: null,
+            emptyWalletRequest: null,
           },
         },
       },
@@ -203,6 +209,8 @@ describe('<Footer />', () => {
             },
             proQuotaRequest: null,
             validationRequest: null,
+            overageMenuRequest: null,
+            emptyWalletRequest: null,
           },
         },
       },
@@ -229,6 +237,8 @@ describe('<Footer />', () => {
             },
             proQuotaRequest: null,
             validationRequest: null,
+            overageMenuRequest: null,
+            emptyWalletRequest: null,
           },
         },
       },
@@ -494,6 +504,75 @@ describe('<Footer />', () => {
       );
       await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot('complete-footer-narrow');
+      unmount();
+    });
+  });
+
+  describe('error summary visibility', () => {
+    it('hides error summary in low verbosity mode', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            errorCount: 2,
+            showErrorDetails: false,
+          },
+          settings: createMockSettings({
+            merged: { ui: { errorVerbosity: 'low' } },
+          }),
+        },
+      );
+      await waitUntilReady();
+      expect(lastFrame()).not.toContain('F12 for details');
+      expect(lastFrame()).not.toContain('2 errors');
+      unmount();
+    });
+
+    it('shows error summary in full verbosity mode', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            errorCount: 2,
+            showErrorDetails: false,
+          },
+          settings: createMockSettings({
+            merged: { ui: { errorVerbosity: 'full' } },
+          }),
+        },
+      );
+      await waitUntilReady();
+      expect(lastFrame()).toContain('F12 for details');
+      expect(lastFrame()).toContain('2 errors');
+      unmount();
+    });
+
+    it('shows error summary in debug mode even when verbosity is low', async () => {
+      const debugConfig = makeFakeConfig();
+      vi.spyOn(debugConfig, 'getDebugMode').mockReturnValue(true);
+
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          config: debugConfig,
+          uiState: {
+            sessionStats: mockSessionStats,
+            errorCount: 1,
+            showErrorDetails: false,
+          },
+          settings: createMockSettings({
+            merged: { ui: { errorVerbosity: 'low' } },
+          }),
+        },
+      );
+      await waitUntilReady();
+      expect(lastFrame()).toContain('F12 for details');
+      expect(lastFrame()).toContain('1 error');
       unmount();
     });
   });
