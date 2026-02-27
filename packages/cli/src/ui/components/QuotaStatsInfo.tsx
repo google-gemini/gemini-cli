@@ -14,11 +14,19 @@ import {
   QUOTA_THRESHOLD_MEDIUM,
 } from '../utils/displayUtils.js';
 
+import {
+  type RetrieveUserQuotaResponse,
+  isActiveModel,
+} from '@google/gemini-cli-core';
+
 interface QuotaStatsInfoProps {
   remaining: number | undefined;
   limit: number | undefined;
   resetTime?: string;
   showDetails?: boolean;
+  quotas?: RetrieveUserQuotaResponse;
+  useGemini3_1?: boolean;
+  useCustomToolModel?: boolean;
 }
 
 export const QuotaStatsInfo: React.FC<QuotaStatsInfoProps> = ({
@@ -26,38 +34,68 @@ export const QuotaStatsInfo: React.FC<QuotaStatsInfoProps> = ({
   limit,
   resetTime,
   showDetails = true,
+  quotas,
+  useGemini3_1 = false,
+  useCustomToolModel = false,
 }) => {
-  if (remaining === undefined || limit === undefined || limit === 0) {
+  let displayPercentage =
+    limit && limit > 0 && remaining !== undefined && remaining !== null
+      ? (remaining / limit) * 100
+      : undefined;
+
+  let displayResetTime = resetTime;
+
+  // Fallback to individual bucket if pooled data is missing
+  if (displayPercentage === undefined && quotas?.buckets) {
+    const activeBuckets = quotas.buckets.filter(
+      (b) =>
+        b.modelId &&
+        isActiveModel(b.modelId, useGemini3_1, useCustomToolModel) &&
+        b.remainingFraction !== undefined,
+    );
+    if (activeBuckets.length > 0) {
+      // Use the most restrictive bucket as representative
+      const representative = activeBuckets.reduce((prev, curr) =>
+        prev.remainingFraction! < curr.remainingFraction! ? prev : curr,
+      );
+      displayPercentage = representative.remainingFraction! * 100;
+      displayResetTime = representative.resetTime;
+    }
+  }
+
+  if (displayPercentage === undefined && !showDetails) {
     return null;
   }
 
-  const percentage = (remaining / limit) * 100;
-  const color = getStatusColor(percentage, {
-    green: QUOTA_THRESHOLD_HIGH,
-    yellow: QUOTA_THRESHOLD_MEDIUM,
-  });
+  const color =
+    displayPercentage !== undefined
+      ? getStatusColor(displayPercentage, {
+          green: QUOTA_THRESHOLD_HIGH,
+          yellow: QUOTA_THRESHOLD_MEDIUM,
+        })
+      : theme.text.primary;
 
   return (
     <Box flexDirection="column" marginTop={0} marginBottom={0}>
-      <Text color={color}>
-        {remaining === 0
-          ? `Limit reached`
-          : `${percentage.toFixed(0)}% usage remaining`}
-        {resetTime && `, ${formatResetTime(resetTime)}`}
-      </Text>
+      {displayPercentage !== undefined && (
+        <Text color={color}>
+          <Text bold>
+            {displayPercentage === 0
+              ? `Limit reached`
+              : `${displayPercentage.toFixed(0)}%`}
+          </Text>
+          {displayPercentage !== 0 && <Text> usage remaining</Text>}
+          {displayResetTime && `, ${formatResetTime(displayResetTime)}`}
+        </Text>
+      )}
       {showDetails && (
         <>
           <Text color={theme.text.primary}>
-            Usage limit: {limit.toLocaleString()}
-          </Text>
-          <Text color={theme.text.primary}>
             Usage limits span all sessions and reset daily.
           </Text>
-          {remaining === 0 && (
-            <Text color={theme.text.primary}>
-              Please /auth to upgrade or switch to an API key to continue.
-            </Text>
-          )}
+          <Text color={theme.text.primary}>
+            /auth to upgrade or switch to API key.
+          </Text>
         </>
       )}
     </Box>

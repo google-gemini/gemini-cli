@@ -1455,8 +1455,8 @@ export class Config {
       // For reset time, take the one that is furthest in the future (most conservative)
       const resetTime = [proQuota?.resetTime, flashQuota?.resetTime]
         .filter((t): t is string => !!t)
-        .sort()
-        .reverse()[0];
+        .map((t) => ({ original: t, date: new Date(t) }))
+        .sort((a, b) => b.date.getTime() - a.date.getTime())[0]?.original;
 
       return {
         remaining: (proQuota?.remaining ?? 0) + (flashQuota?.remaining ?? 0),

@@ -23,9 +23,12 @@ import {
   getDisplayString,
   isAutoModel,
   LlmRole,
+  AuthType,
+  type RetrieveUserQuotaResponse,
 } from '@google/gemini-cli-core';
 import type { QuotaStats } from '../types.js';
 import { QuotaStatsInfo } from './QuotaStatsInfo.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 
 interface StatRowData {
   metric: string;
@@ -43,6 +46,7 @@ interface ModelStatsDisplayProps {
   tier?: string;
   currentModel?: string;
   quotaStats?: QuotaStats;
+  quotas?: RetrieveUserQuotaResponse;
 }
 
 export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
@@ -51,8 +55,14 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
   tier,
   currentModel,
   quotaStats,
+  quotas,
 }) => {
   const { stats } = useSessionStats();
+  const config = useConfig();
+  const useGemini3_1 = config.getGemini31LaunchedSync?.() ?? false;
+  const useCustomToolModel =
+    useGemini3_1 &&
+    config.getContentGeneratorConfig().authType === AuthType.USE_GEMINI;
 
   const pooledRemaining = quotaStats?.remaining;
   const pooledLimit = quotaStats?.limit;
@@ -64,21 +74,6 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
   const activeModels = Object.entries(models).filter(
     ([, metrics]) => metrics.api.totalRequests > 0,
   );
-
-  if (activeModels.length === 0) {
-    return (
-      <Box
-        borderStyle="round"
-        borderColor={theme.border.default}
-        paddingTop={1}
-        paddingX={2}
-      >
-        <Text color={theme.text.primary}>
-          No API calls have been made in this session.
-        </Text>
-      </Box>
-    );
-  }
 
   const modelNames = activeModels.map(([name]) => name);
 
@@ -354,19 +349,23 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
           <Text color={theme.text.primary}>{tier}</Text>
         </Box>
       )}
-      {isAuto &&
-        pooledRemaining !== undefined &&
-        pooledLimit !== undefined &&
-        pooledLimit > 0 && (
-          <QuotaStatsInfo
-            remaining={pooledRemaining}
-            limit={pooledLimit}
-            resetTime={pooledResetTime}
-          />
-        )}
+      <QuotaStatsInfo
+        remaining={pooledRemaining}
+        limit={pooledLimit}
+        resetTime={pooledResetTime}
+        quotas={quotas}
+        useGemini3_1={useGemini3_1}
+        useCustomToolModel={useCustomToolModel}
+      />
       {(showUserIdentity || isAuto) && <Box height={1} />}
 
-      <Table data={rows} columns={columns} />
+      {activeModels.length === 0 ? (
+        <Text color={theme.text.primary}>
+          No API calls have been made in this session.
+        </Text>
+      ) : (
+        <Table data={rows} columns={columns} />
+      )}
     </Box>
   );
 };
