@@ -527,6 +527,45 @@ describe('Session', () => {
     expect(result).toEqual({ stopReason: 'end_turn' });
   });
 
+  it('should extract and emit plan events from thought chunks', async () => {
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: '- [TODO] First task\n- [x] Done task',
+                    thought: true,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'plan',
+        entries: [
+          { content: 'First task', status: 'pending', priority: 'medium' },
+          { content: 'Done task', status: 'completed', priority: 'medium' },
+        ],
+      },
+    });
+  });
+
   it('should handle tool calls', async () => {
     const stream1 = createMockStream([
       {

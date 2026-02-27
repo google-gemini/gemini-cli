@@ -42,6 +42,7 @@ import {
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
+import { extractPlanEntries } from './planParser.js';
 import { getAcpErrorMessage } from './acpErrors.js';
 import { Readable, Writable } from 'node:stream';
 
@@ -460,8 +461,22 @@ export class Session {
       } else if (msg.type === 'gemini') {
         // Thoughts
         if (msg.thoughts) {
+          let currentPlanStr = '';
           for (const thought of msg.thoughts) {
             const thoughtText = `**${thought.subject}**\n${thought.description}`;
+
+            const entries = extractPlanEntries(thoughtText);
+            if (entries) {
+              const newPlanStr = JSON.stringify(entries);
+              if (newPlanStr !== currentPlanStr) {
+                currentPlanStr = newPlanStr;
+                await this.sendUpdate({
+                  sessionUpdate: 'plan',
+                  entries,
+                });
+              }
+            }
+
             await this.sendUpdate({
               sessionUpdate: 'agent_thought_chunk',
               content: { type: 'text', text: thoughtText },
@@ -550,6 +565,9 @@ export class Session {
         );
         nextMessage = null;
 
+        let currentTurnPlanStr = '';
+        let currentThoughtTextBuffer = '';
+
         for await (const resp of responseStream) {
           if (pendingSend.signal.aborted) {
             return { stopReason: CoreToolCallStatus.Cancelled };
@@ -566,13 +584,27 @@ export class Session {
                 continue;
               }
 
+              if (part.thought) {
+                currentThoughtTextBuffer += part.text;
+                const entries = extractPlanEntries(currentThoughtTextBuffer);
+                if (entries) {
+                  const newPlanStr = JSON.stringify(entries);
+                  if (newPlanStr !== currentTurnPlanStr) {
+                    currentTurnPlanStr = newPlanStr;
+                    await this.sendUpdate({
+                      sessionUpdate: 'plan',
+                      entries,
+                    });
+                  }
+                }
+              }
+
               const content: acp.ContentBlock = {
                 type: 'text',
                 text: part.text,
               };
 
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
-              this.sendUpdate({
+              await this.sendUpdate({
                 sessionUpdate: part.thought
                   ? 'agent_thought_chunk'
                   : 'agent_message_chunk',
