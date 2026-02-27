@@ -675,7 +675,14 @@ export const AppContainer = (props: AppContainerProps) => {
     onAuthError,
     apiKeyDefaultValue,
     reloadApiKey,
-  } = useAuthCommand(settings, config, initializationResult.authError);
+    accountSuspensionInfo,
+    setAccountSuspensionInfo,
+  } = useAuthCommand(
+    settings,
+    config,
+    initializationResult.authError,
+    initializationResult.accountSuspensionInfo,
+  );
   const [authContext, setAuthContext] = useState<{ requiresRestart?: boolean }>(
     {},
   );
@@ -2197,6 +2204,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isAuthenticating,
       isConfigInitialized,
       authError,
+      accountSuspensionInfo,
       isAuthDialogOpen,
       isAwaitingApiKeyInput: authState === AuthState.AwaitingApiKeyInput,
       apiKeyDefaultValue,
@@ -2328,6 +2336,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isAuthenticating,
       isConfigInitialized,
       authError,
+      accountSuspensionInfo,
       isAuthDialogOpen,
       editorError,
       isEditorDialogOpen,
@@ -2537,6 +2546,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setNewAgents(null);
       },
       getPreferredEditor,
+      clearAccountSuspension: () => {
+        setAccountSuspensionInfo(null);
+        setAuthState(AuthState.Updating);
+      },
     }),
     [
       handleThemeSelect,
@@ -2587,6 +2600,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setActiveBackgroundShellPid,
       setIsBackgroundShellListOpen,
       setAuthContext,
+      setAccountSuspensionInfo,
       newAgents,
       config,
       historyManager,

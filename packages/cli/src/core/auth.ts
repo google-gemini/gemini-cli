@@ -9,20 +9,28 @@ import {
   type Config,
   getErrorMessage,
   ValidationRequiredError,
+  isAccountSuspendedError,
 } from '@google/gemini-cli-core';
+
+import type { AccountSuspensionInfo } from '../ui/contexts/UIStateContext.js';
+
+export interface InitialAuthResult {
+  authError: string | null;
+  accountSuspensionInfo: AccountSuspensionInfo | null;
+}
 
 /**
  * Handles the initial authentication flow.
  * @param config The application config.
  * @param authType The selected auth type.
- * @returns An error message if authentication fails, otherwise null.
+ * @returns The auth result with error message and account suspension status.
  */
 export async function performInitialAuth(
   config: Config,
   authType: AuthType | undefined,
-): Promise<string | null> {
+): Promise<InitialAuthResult> {
   if (!authType) {
-    return null;
+    return { authError: null, accountSuspensionInfo: null };
   }
 
   try {
@@ -33,10 +41,24 @@ export async function performInitialAuth(
     if (e instanceof ValidationRequiredError) {
       // Don't treat validation required as a fatal auth error during startup.
       // This allows the React UI to load and show the ValidationDialog.
-      return null;
+      return { authError: null, accountSuspensionInfo: null };
     }
-    return `Failed to login. Message: ${getErrorMessage(e)}`;
+    const suspendedError = isAccountSuspendedError(e);
+    if (suspendedError) {
+      return {
+        authError: null,
+        accountSuspensionInfo: {
+          message: suspendedError.message,
+          appealUrl: suspendedError.appealUrl,
+          appealLinkText: suspendedError.appealLinkText,
+        },
+      };
+    }
+    return {
+      authError: `Failed to login. Message: ${getErrorMessage(e)}`,
+      accountSuspensionInfo: null,
+    };
   }
 
-  return null;
+  return { authError: null, accountSuspensionInfo: null };
 }
