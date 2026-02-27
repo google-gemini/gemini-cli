@@ -49,7 +49,7 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Con
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊷  Shell Command Running a long command...                                                   │
 │                                                                                              │
-│ ... first 11 lines hidden ...                                                                │
+│ ... first 11 lines hidden (Ctrl+O to show) ...                                               │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
 │ Line 14                                                                                      │

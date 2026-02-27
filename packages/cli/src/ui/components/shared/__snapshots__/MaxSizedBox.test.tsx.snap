@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`<MaxSizedBox /> > accounts for additionalHiddenLinesCount 1`] = `
-"... first 7 lines hidden ...
+"... first 7 lines hidden (Ctrl+O to show) ...
 Line 3
 "
 `;
@@ -16,12 +16,12 @@ Line 6
 Line 7
 Line 8
 Line 9
-... last 21 lines hidden ...
+... last 21 lines hidden (Ctrl+O to show) ...
 "
 `;
 
 exports[`<MaxSizedBox /> > clips a long single text child from the top 1`] = `
-"... first 21 lines hidden ...
+"... first 21 lines hidden (Ctrl+O to show) ...
 Line 22
 Line 23
 Line 24
@@ -39,7 +39,7 @@ exports[`<MaxSizedBox /> > does not leak content after hidden indicator with bot
 
  - Step 1: Do something important
  - Step 2: Do something important
-... last 18 lines hidden ...
+... last 18 lines hidden (Ctrl+O to show) ...
 "
 `;
 
@@ -58,12 +58,12 @@ Line 3 direct child
 
 exports[`<MaxSizedBox /> > hides lines at the end when content exceeds maxHeight and overflowDirection is bottom 1`] = `
 "Line 1
-... last 2 lines hidden ...
+... last 2 lines hidden (Ctrl+O to show) ...
 "
 `;
 
 exports[`<MaxSizedBox /> > hides lines when content exceeds maxHeight 1`] = `
-"... first 2 lines hidden ...
+"... first 2 lines hidden (Ctrl+O to show) ...
 Line 3
 "
 `;
@@ -74,13 +74,13 @@ exports[`<MaxSizedBox /> > renders children without truncation when they fit 1`]
 `;
 
 exports[`<MaxSizedBox /> > shows plural "lines" when more than one line is hidden 1`] = `
-"... first 2 lines hidden ...
+"... first 2 lines hidden (Ctrl+O to show) ...
 Line 3
 "
 `;
 
 exports[`<MaxSizedBox /> > shows singular "line" when exactly one line is hidden 1`] = `
-"... first 1 line hidden ...
+"... first 1 line hidden (Ctrl+O to show) ...
 Line 1
 "
 `;
