@@ -74,6 +74,15 @@ export const ToastDisplay: React.FC = () => {
     return <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>;
   }
 
+  if (
+    uiState.transientMessage?.type === TransientMessageType.Info &&
+    uiState.transientMessage.text
+  ) {
+    return (
+      <Text color={theme.text.accent}>{uiState.transientMessage.text}</Text>
+    );
+  }
+
   if (uiState.showIsExpandableHint) {
     const action = uiState.constrainHeight ? 'show more' : 'collapse';
     return (

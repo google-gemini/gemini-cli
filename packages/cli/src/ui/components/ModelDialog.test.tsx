@@ -50,12 +50,17 @@ describe('<ModelDialog />', () => {
   const mockGetHasAccessToPreviewModel = vi.fn();
   const mockGetGemini31LaunchedSync = vi.fn();
 
+  const mockGetFavoriteModels = vi.fn();
+  const mockToggleFavoriteModel = vi.fn();
+
   interface MockConfig extends Partial<Config> {
     setModel: (model: string, isTemporary?: boolean) => void;
     getModel: () => string;
     getHasAccessToPreviewModel: () => boolean;
     getIdeMode: () => boolean;
     getGemini31LaunchedSync: () => boolean;
+    getFavoriteModels: () => string[];
+    toggleFavoriteModel: (model: string) => void;
   }
 
   const mockConfig: MockConfig = {
@@ -64,6 +69,8 @@ describe('<ModelDialog />', () => {
     getHasAccessToPreviewModel: mockGetHasAccessToPreviewModel,
     getIdeMode: () => false,
     getGemini31LaunchedSync: mockGetGemini31LaunchedSync,
+    getFavoriteModels: mockGetFavoriteModels,
+    toggleFavoriteModel: mockToggleFavoriteModel,
   };
 
   beforeEach(() => {
@@ -71,6 +78,7 @@ describe('<ModelDialog />', () => {
     mockGetModel.mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
     mockGetHasAccessToPreviewModel.mockReturnValue(false);
     mockGetGemini31LaunchedSync.mockReturnValue(false);
+    mockGetFavoriteModels.mockReturnValue([]);
 
     // Default implementation for getDisplayString
     mockGetDisplayString.mockImplementation((val: string) => {

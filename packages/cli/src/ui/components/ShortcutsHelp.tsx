@@ -31,6 +31,8 @@ const buildShortcutItems = (): ShortcutItem[] => {
     { key: `${altLabel}+M`, description: 'raw markdown mode' },
     { key: 'Ctrl+R', description: 'reverse-search history' },
     { key: 'Ctrl+X', description: 'open external editor' },
+    { key: `${altLabel}+C`, description: 'cycle model' },
+    { key: `${altLabel}+X`, description: 'cycle model backward' },
   ];
 };
 
@@ -63,6 +65,8 @@ export const ShortcutsHelp: React.FC = () => {
         items[8],
         items[9],
         items[3],
+        items[10],
+        items[11],
       ];
 
   return (

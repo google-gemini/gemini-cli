@@ -165,6 +165,16 @@ export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
 }
 
+export interface ModelSettings {
+  name?: string;
+  maxSessionTurns?: number;
+  disableLoopDetection?: boolean;
+  compressionThreshold?: number;
+  skipNextSpeakerCheck?: boolean;
+  favoriteModels?: string[];
+  summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
+}
+
 export type LoadingPhrasesMode = 'tips' | 'witty' | 'all' | 'off';
 
 export interface AccessibilitySettings {

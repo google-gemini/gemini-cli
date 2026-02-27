@@ -51,7 +51,7 @@ describe('useSelectionList', () => {
   const pressKey = (
     name: string,
     sequence: string = name,
-    options: { shift?: boolean; ctrl?: boolean } = {},
+    options: { shift?: boolean; ctrl?: boolean; alt?: boolean } = {},
   ) => {
     act(() => {
       if (activeKeypressHandler) {
@@ -60,7 +60,7 @@ describe('useSelectionList', () => {
           sequence,
           ctrl: options.ctrl ?? false,
           cmd: false,
-          alt: false,
+          alt: options.alt ?? false,
           shift: options.shift ?? false,
           insertable: false,
         };
@@ -275,7 +275,7 @@ describe('useSelectionList', () => {
       pressKey('down');
       await waitUntilReady();
       expect(mockOnHighlight).toHaveBeenCalledTimes(1);
-      expect(mockOnHighlight).toHaveBeenCalledWith('C');
+      expect(mockOnHighlight).toHaveBeenCalledWith('C', 2);
     });
 
     it('should not move or call onHighlight if navigation results in the same index (e.g., single item)', async () => {
@@ -420,8 +420,8 @@ describe('useSelectionList', () => {
       expect(result.current.activeIndex).toBe(3);
 
       expect(mockOnHighlight).toHaveBeenCalledTimes(2);
-      expect(mockOnHighlight).toHaveBeenNthCalledWith(1, 'C');
-      expect(mockOnHighlight).toHaveBeenNthCalledWith(2, 'D');
+      expect(mockOnHighlight).toHaveBeenNthCalledWith(1, 'C', 2);
+      expect(mockOnHighlight).toHaveBeenNthCalledWith(2, 'D', 3);
 
       expect(mockOnSelect).toHaveBeenCalledTimes(1);
       expect(mockOnSelect).toHaveBeenCalledWith('D');
@@ -463,7 +463,7 @@ describe('useSelectionList', () => {
 
       expect(result.current.activeIndex).toBe(3);
 
-      expect(mockOnHighlight).toHaveBeenCalledWith('D');
+      expect(mockOnHighlight).toHaveBeenCalledWith('D', 3);
       expect(mockOnSelect).toHaveBeenCalledTimes(1);
       expect(mockOnSelect).toHaveBeenCalledWith('D');
     });
@@ -562,7 +562,7 @@ describe('useSelectionList', () => {
       await waitUntilReady();
 
       expect(result.current.activeIndex).toBe(2);
-      expect(mockOnHighlight).toHaveBeenCalledWith('C');
+      expect(mockOnHighlight).toHaveBeenCalledWith('C', 2);
       expect(mockOnSelect).toHaveBeenCalledTimes(1);
       expect(mockOnSelect).toHaveBeenCalledWith('C');
       expect(vi.getTimerCount()).toBe(0);
@@ -581,7 +581,7 @@ describe('useSelectionList', () => {
       await waitUntilReady();
 
       expect(result.current.activeIndex).toBe(0);
-      expect(mockOnHighlight).toHaveBeenCalledWith('Item 1');
+      expect(mockOnHighlight).toHaveBeenCalledWith('Item 1', 0);
 
       expect(mockOnSelect).not.toHaveBeenCalled();
       expect(vi.getTimerCount()).toBe(1);
@@ -691,7 +691,7 @@ describe('useSelectionList', () => {
       await waitUntilReady();
 
       expect(result.current.activeIndex).toBe(1);
-      expect(mockOnHighlight).toHaveBeenCalledWith('B');
+      expect(mockOnHighlight).toHaveBeenCalledWith('B', 1);
 
       // Should not select immediately, even though 20 > 4
       expect(mockOnSelect).not.toHaveBeenCalled();

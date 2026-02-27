@@ -50,6 +50,7 @@ import type { McpClientManager } from '../tools/mcp-client-manager.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import {
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
 } from './models.js';
@@ -3143,5 +3144,77 @@ describe('Model Persistence Bug Fix (#19864)', () => {
     // Verify onModelChange was called to persist the model
     expect(onModelChange).toHaveBeenCalledWith(PREVIEW_GEMINI_3_1_MODEL);
     expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
+  });
+
+  describe('cycleModel()', () => {
+    it('should cycle through available models', () => {
+      const config = new Config({
+        ...baseParams,
+        model: DEFAULT_GEMINI_MODEL_AUTO,
+      });
+      config.setHasAccessToPreviewModel(true);
+
+      const models = config.getCycleableModels();
+      expect(models.length).toBeGreaterThan(1);
+
+      // Cycle through all models and verify they match
+      for (let i = 1; i < models.length; i++) {
+        const nextModel = config.cycleModel();
+        expect(nextModel).toBe(models[i]);
+      }
+
+      // Cycle back to the first one
+      const backToFirst = config.cycleModel();
+      expect(backToFirst).toBe(models[0]);
+    });
+
+    it('should fall back to first model if current model is not cycleable', () => {
+      const config = new Config({
+        ...baseParams,
+        model: 'some-random-model',
+      });
+
+      const nextModel = config.cycleModel();
+      expect(nextModel).toBe(config.getCycleableModels()[0]);
+    });
+
+    it('should cycle through favorite models if set', () => {
+      const config = new Config({
+        ...baseParams,
+        model: DEFAULT_GEMINI_MODEL,
+        favoriteModels: [DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_FLASH_MODEL],
+      });
+
+      expect(config.getCycleableModels()).toEqual([
+        DEFAULT_GEMINI_MODEL,
+        DEFAULT_GEMINI_FLASH_MODEL,
+      ]);
+
+      const nextModel = config.cycleModel();
+      expect(nextModel).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+
+      const backToFirst = config.cycleModel();
+      expect(backToFirst).toBe(DEFAULT_GEMINI_MODEL);
+    });
+  });
+
+  describe('toggleFavoriteModel()', () => {
+    it('should add/remove favorites and call callback', () => {
+      const onFavoriteModelsChange = vi.fn();
+      const config = new Config({
+        ...baseParams,
+        onFavoriteModelsChange,
+      });
+
+      config.toggleFavoriteModel(DEFAULT_GEMINI_MODEL);
+      expect(config.getFavoriteModels()).toContain(DEFAULT_GEMINI_MODEL);
+      expect(onFavoriteModelsChange).toHaveBeenCalledWith([
+        DEFAULT_GEMINI_MODEL,
+      ]);
+
+      config.toggleFavoriteModel(DEFAULT_GEMINI_MODEL);
+      expect(config.getFavoriteModels()).not.toContain(DEFAULT_GEMINI_MODEL);
+      expect(onFavoriteModelsChange).toHaveBeenCalledWith([]);
+    });
   });
 });

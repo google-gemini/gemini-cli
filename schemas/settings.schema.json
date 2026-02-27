@@ -569,6 +569,16 @@
           "markdownDescription": "Skip the next speaker check.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
+        },
+        "favoriteModels": {
+          "title": "Favorite Models",
+          "description": "A list of models to cycle through when using the cycle model shortcut. If empty, all available models will be cycled.",
+          "markdownDescription": "A list of models to cycle through when using the cycle model shortcut. If empty, all available models will be cycled.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
