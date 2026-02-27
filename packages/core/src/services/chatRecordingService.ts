@@ -154,6 +154,13 @@ export class ChatRecordingService {
   ): void {
     try {
       this.kind = kind;
+
+      // Subagents must use their own unique session ID to avoid colliding
+      // with the parent session's file name and session data.
+      if (kind === 'subagent' && !resumedSessionData) {
+        this.sessionId = randomUUID();
+      }
+
       if (resumedSessionData) {
         // Resume from existing session
         this.conversationFile = resumedSessionData.filePath;
