@@ -69,9 +69,7 @@ import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
-import {
-  logRipgrepFallback,
-  logFlashFallback,
+import { logRipgrepFallback, logFlashFallback ,
   logApprovalModeSwitch,
   logApprovalModeDuration,
 } from '../telemetry/loggers.js';
@@ -114,11 +112,7 @@ import {
   type SafetyCheckerRule,
 } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
-import type {
-  UserTierId,
-  RetrieveUserQuotaResponse,
-  AdminControlsSettings,
-} from '../code_assist/types.js';
+import type { UserTierId , RetrieveUserQuotaResponse , AdminControlsSettings } from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
@@ -1022,27 +1016,23 @@ export class Config {
     this.geminiClient = new GeminiClient(this);
     this.modelRouterService = new ModelRouterService(this);
 
-    // HACK: The settings loading logic doesn't currently merge the default
-    // generation config with the user's settings. This means if a user provides
-    // any `generation` settings (e.g., just `overrides`), the default `aliases`
-    // are lost. This hack manually merges the default aliases back in if they
-    // are missing from the user's config.
-    // TODO(12593): Fix the settings loading logic to properly merge defaults and
-    // remove this hack.
+    // Properly merge user-provided model config with defaults.
+    // Ensures that user settings (e.g., `overrides`) don't cause default
+    // `aliases` (or vice versa) to be lost.
     let modelConfigServiceConfig = params.modelConfigServiceConfig;
     if (modelConfigServiceConfig) {
-      if (!modelConfigServiceConfig.aliases) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          aliases: DEFAULT_MODEL_CONFIGS.aliases,
-        };
-      }
-      if (!modelConfigServiceConfig.overrides) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          overrides: DEFAULT_MODEL_CONFIGS.overrides,
-        };
-      }
+      modelConfigServiceConfig = {
+        ...DEFAULT_MODEL_CONFIGS,
+        ...modelConfigServiceConfig,
+        aliases: {
+          ...(DEFAULT_MODEL_CONFIGS.aliases ?? {}),
+          ...(modelConfigServiceConfig.aliases ?? {}),
+        },
+        overrides: [
+          ...(DEFAULT_MODEL_CONFIGS.overrides ?? []),
+          ...(modelConfigServiceConfig.overrides ?? []),
+        ],
+      };
     }
 
     this.modelConfigService = new ModelConfigService(
