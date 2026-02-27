@@ -29,6 +29,16 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
  */
 export const MCP_QUALIFIED_NAME_SEPARATOR = '__';
 
+/**
+ * Returns true if `name` matches the MCP qualified name format: "server__tool",
+ * i.e. exactly two non-empty parts separated by the MCP_QUALIFIED_NAME_SEPARATOR.
+ */
+export function isMcpToolName(name: string): boolean {
+  if (!name.includes(MCP_QUALIFIED_NAME_SEPARATOR)) return false;
+  const parts = name.split(MCP_QUALIFIED_NAME_SEPARATOR);
+  return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
+}
+
 type ToolParams = Record<string, unknown>;
 
 // Discriminated union for MCP Content Blocks to ensure type safety.
@@ -82,6 +92,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     private readonly cliConfig?: Config,
     private readonly toolDescription?: string,
     private readonly toolParameterSchema?: unknown,
+    toolAnnotationsData?: Record<string, unknown>,
   ) {
     // Use composite format for policy checks: serverName__toolName
     // This enables server wildcards (e.g., "google-workspace__*")
@@ -93,6 +104,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${serverToolName}`,
       displayName,
       serverName,
+      toolAnnotationsData,
     );
   }
 
@@ -257,6 +269,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     private readonly cliConfig?: Config,
     override readonly extensionName?: string,
     override readonly extensionId?: string,
+    private readonly _toolAnnotations?: Record<string, unknown>,
   ) {
     super(
       nameOverride ?? generateValidName(serverToolName),
@@ -282,6 +295,10 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     return super.isReadOnly;
   }
 
+  override get toolAnnotations(): Record<string, unknown> | undefined {
+    return this._toolAnnotations;
+  }
+
   getFullyQualifiedPrefix(): string {
     return `${this.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}`;
   }
@@ -304,6 +321,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.cliConfig,
       this.extensionName,
       this.extensionId,
+      this._toolAnnotations,
     );
   }
 
@@ -324,6 +342,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.cliConfig,
       this.description,
       this.parameterSchema,
+      this._toolAnnotations,
     );
   }
 }
