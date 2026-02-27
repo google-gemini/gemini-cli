@@ -203,6 +203,15 @@ with the actual Gemini CLI process, which inherits the environment variable.
 This makes it significantly more difficult for a user to bypass the enforced
 settings.
 
+**PowerShell Profile (Windows alternative):**
+
+On Windows, administrators can achieve similar results by adding the environment
+variable to the system-wide or user-specific PowerShell profile:
+
+```powershell
+Add-Content -Path $PROFILE -Value '$env:GEMINI_CLI_SYSTEM_SETTINGS_PATH="C:\ProgramData\gemini-cli\settings.json"'
+```
+
 ## User isolation in shared environments
 
 In shared compute environments (like ML experiment runners or shared build
@@ -214,9 +223,19 @@ use the `GEMINI_CLI_HOME` environment variable to point to a unique directory
 for a specific user or job. The CLI will create a `.gemini` folder inside the
 specified path.
 
+**macOS/Linux**
+
 ```bash
 # Isolate state for a specific job
 export GEMINI_CLI_HOME="/tmp/gemini-job-123"
+gemini
+```
+
+**Windows (PowerShell)**
+
+```powershell
+# Isolate state for a specific job
+$env:GEMINI_CLI_HOME="C:\temp\gemini-job-123"
 gemini
 ```
 
