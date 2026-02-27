@@ -269,13 +269,22 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       };
     }
 
-    const { nextMessage, submittedOutput, taskCompleted } =
+    const { nextMessage, submittedOutput, taskCompleted, aborted } =
       await this.processFunctionCalls(
         functionCalls,
         combinedSignal,
         promptId,
         onWaitingForConfirmation,
       );
+
+    if (aborted) {
+      return {
+        status: 'stop',
+        terminateReason: AgentTerminateMode.ABORTED,
+        finalResult: null,
+      };
+    }
+
     if (taskCompleted) {
       const finalResult = submittedOutput ?? 'Task completed successfully.';
       return {
@@ -857,6 +866,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     nextMessage: Content;
     submittedOutput: string | null;
     taskCompleted: boolean;
+    aborted: boolean;
   }> {
     const allowedToolNames = new Set(this.toolRegistry.getAllToolNames());
     // Always allow the completion tool
@@ -864,6 +874,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     let submittedOutput: string | null = null;
     let taskCompleted = false;
+    let aborted = false;
 
     // We'll separate complete_task from other tools
     const toolRequests: ToolCallRequestInfo[] = [];
@@ -878,8 +889,24 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const toolName = functionCall.name as string;
 
+      let displayName = toolName;
+      let description: string | undefined = undefined;
+
+      try {
+        const tool = this.toolRegistry.getTool(toolName);
+        if (tool) {
+          displayName = tool.displayName ?? toolName;
+          const invocation = tool.build(args);
+          description = invocation.getDescription();
+        }
+      } catch {
+        // Ignore errors during formatting for activity emission
+      }
+
       this.emitActivity('TOOL_CALL_START', {
         name: toolName,
+        displayName,
+        description,
         args,
       });
 
@@ -1077,8 +1104,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           this.emitActivity('ERROR', {
             context: 'tool_call',
             name: toolName,
-            error: 'Tool call was cancelled.',
+            error: 'Request cancelled.',
           });
+          aborted = true;
         }
 
         // Add result to syncResults to preserve order later
@@ -1111,6 +1139,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       nextMessage: { role: 'user', parts: toolResponseParts },
       submittedOutput,
       taskCompleted,
+      aborted,
     };
   }
 

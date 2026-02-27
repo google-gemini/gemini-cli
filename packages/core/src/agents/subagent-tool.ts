@@ -12,8 +12,8 @@ import {
   BaseToolInvocation,
   type ToolCallConfirmationDetails,
   isTool,
+  type ToolLiveOutput,
 } from '../tools/tools.js';
-import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
@@ -155,7 +155,7 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
 
   async execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
     const validationError = SchemaValidator.validate(
       this.definition.inputConfig.inputSchema,

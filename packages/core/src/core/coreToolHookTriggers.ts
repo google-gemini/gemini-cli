@@ -10,10 +10,11 @@ import type {
   ToolResult,
   AnyDeclarativeTool,
   AnyToolInvocation,
+  ToolLiveOutput,
 } from '../tools/tools.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import type { AnsiOutput, ShellExecutionConfig } from '../index.js';
+import type { ShellExecutionConfig } from '../index.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
 
@@ -71,7 +72,7 @@ export async function executeToolWithHooks(
   toolName: string,
   signal: AbortSignal,
   tool: AnyDeclarativeTool,
-  liveOutputCallback?: (outputChunk: string | AnsiOutput) => void,
+  liveOutputCallback?: (outputChunk: ToolLiveOutput) => void,
   shellExecutionConfig?: ShellExecutionConfig,
   setPidCallback?: (pid: number) => void,
   config?: Config,
