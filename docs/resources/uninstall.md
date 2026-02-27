@@ -23,7 +23,7 @@ rm -rf "$(npm config get cache)/_npx"
 
 ```powershell
 # The path is typically $env:LocalAppData\npm-cache\_npx
-rmdir -Recurse -Force "$env:LocalAppData\npm-cache\_npx"
+Remove-Item -Path (Join-Path $env:LocalAppData "npm-cache\_npx") -Recurse -Force
 ```
 
 ## Method 2: Using npm (global install)
