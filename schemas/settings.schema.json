@@ -1432,13 +1432,6 @@
           "default": false,
           "type": "boolean"
         },
-        "autoAddPolicy": {
-          "title": "Auto-add to Policy",
-          "description": "Automatically add \"Proceed always\" approvals to your persistent policy.",
-          "markdownDescription": "Automatically add \"Proceed always\" approvals to your persistent policy.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `true`",
-          "default": true,
-          "type": "boolean"
-        },
         "blockGitExtensions": {
           "title": "Blocks extensions from Git",
           "description": "Blocks installing and loading extensions from Git.",
