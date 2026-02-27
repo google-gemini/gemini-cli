@@ -52,6 +52,13 @@ export const SCROLLBACK_LIMIT = 300000;
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
 const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
 
+interface ShellExecutionPlan {
+  executable: string;
+  args: string[];
+  shell: ShellType;
+  cwd?: string;
+}
+
 function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
   if (shell !== 'bash') {
     return command;
@@ -63,6 +70,73 @@ function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
   }
 
   return `${BASH_SHOPT_GUARD} ${command}`;
+}
+
+function tryParseWslUncPath(
+  cwd: string,
+): { distro: string; linuxPath: string } | null {
+  const normalizedUnc = cwd.replace(/\//g, '\\');
+  if (
+    !normalizedUnc.startsWith('\\\\wsl\\') &&
+    !normalizedUnc.startsWith('\\\\wsl.localhost\\')
+  ) {
+    return null;
+  }
+
+  const parts = normalizedUnc.split('\\').filter(Boolean);
+  if (parts.length < 2) {
+    return null;
+  }
+
+  const host = parts[0]?.toLowerCase();
+  if (host !== 'wsl' && host !== 'wsl.localhost') {
+    return null;
+  }
+
+  const distro = parts[1];
+  if (!distro) {
+    return null;
+  }
+
+  const normalized = parts.slice(2).join('/');
+  const linuxPath = normalized ? `/${normalized}` : '/';
+  return { distro, linuxPath };
+}
+
+function getShellExecutionPlan(
+  commandToExecute: string,
+  cwd: string,
+): ShellExecutionPlan {
+  const isWindows = os.platform() === 'win32';
+  const { executable, argsPrefix, shell } = getShellConfiguration();
+
+  if (isWindows) {
+    const wslPath = tryParseWslUncPath(cwd);
+    if (wslPath) {
+      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, 'bash');
+      return {
+        executable: 'wsl.exe',
+        args: [
+          '-d',
+          wslPath.distro,
+          '--cd',
+          wslPath.linuxPath,
+          'bash',
+          '-lc',
+          guardedCommand,
+        ],
+        shell: 'bash',
+      };
+    }
+  }
+
+  const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
+  return {
+    executable,
+    args: [...argsPrefix, guardedCommand],
+    shell,
+    cwd,
+  };
 }
 
 /** A structured result from a shell command execution. */
@@ -302,12 +376,10 @@ export class ShellExecutionService {
   ): ShellExecutionHandle {
     try {
       const isWindows = os.platform() === 'win32';
-      const { executable, argsPrefix, shell } = getShellConfiguration();
-      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const spawnArgs = [...argsPrefix, guardedCommand];
+      const plan = getShellExecutionPlan(commandToExecute, cwd);
 
-      const child = cpSpawn(executable, spawnArgs, {
-        cwd,
+      const child = cpSpawn(plan.executable, plan.args, {
+        cwd: plan.cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsVerbatimArguments: isWindows ? false : undefined,
         shell: false,
@@ -556,21 +628,18 @@ export class ShellExecutionService {
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
-      const { executable, argsPrefix, shell } = getShellConfiguration();
+      const plan = getShellExecutionPlan(commandToExecute, cwd);
 
-      const resolvedExecutable = await resolveExecutable(executable);
+      const resolvedExecutable = await resolveExecutable(plan.executable);
       if (!resolvedExecutable) {
         throw new Error(
-          `Shell executable "${executable}" not found in PATH or at absolute location. Please ensure the shell is installed and available in your environment.`,
+          `Shell executable "${plan.executable}" not found in PATH or at absolute location. Please ensure the shell is installed and available in your environment.`,
         );
       }
 
-      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const args = [...argsPrefix, guardedCommand];
-
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const ptyProcess = ptyInfo.module.spawn(executable, args, {
-        cwd,
+      const ptyProcess = ptyInfo.module.spawn(plan.executable, plan.args, {
+        cwd: plan.cwd,
         name: 'xterm-256color',
         cols,
         rows,

@@ -26,6 +26,7 @@ import {
   isFunctionResponse,
 } from '../utils/messageInspectors.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { stripShellWrapper } from '../utils/shell-utils.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
@@ -136,10 +137,44 @@ export class LoopDetectionService {
     );
   }
 
-  private getToolCallKey(toolCall: { name: string; args: object }): string {
-    const argsString = JSON.stringify(toolCall.args);
+  private getToolCallKey(toolCall: {
+    name: string;
+    args: Record<string, unknown>;
+  }): string {
+    const normalizedArgs = this.normalizeToolCallArgs(
+      toolCall.name,
+      toolCall.args,
+    );
+    const argsString = JSON.stringify(normalizedArgs);
     const keyString = `${toolCall.name}:${argsString}`;
     return createHash('sha256').update(keyString).digest('hex');
+  }
+
+  private normalizeToolCallArgs(
+    toolName: string,
+    args: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const shellToolNames = new Set(['run_shell_command', 'ShellTool']);
+    if (!shellToolNames.has(toolName)) {
+      return args;
+    }
+
+    const params = args;
+    const command =
+      typeof params['command'] === 'string' ? params['command'] : '';
+    const dirPath =
+      typeof params['dir_path'] === 'string' ? params['dir_path'] : '';
+    const isBackground = Boolean(params['is_background']);
+
+    const normalizedCommand = stripShellWrapper(command)
+      .trim()
+      .replace(/\s+/g, ' ');
+
+    return {
+      command: normalizedCommand,
+      dir_path: dirPath.trim(),
+      is_background: isBackground,
+    };
   }
 
   /**
@@ -199,7 +234,10 @@ export class LoopDetectionService {
     return false;
   }
 
-  private checkToolCallLoop(toolCall: { name: string; args: object }): boolean {
+  private checkToolCallLoop(toolCall: {
+    name: string;
+    args: Record<string, unknown>;
+  }): boolean {
     const key = this.getToolCallKey(toolCall);
     if (this.lastToolCallKey === key) {
       this.toolCallRepetitionCount++;
