@@ -19,7 +19,7 @@ import {
   type Question,
 } from '../confirmation-bus/types.js';
 import { type ApprovalMode } from '../policy/types.js';
-import type { SubagentProgress } from '../agents/types.js';
+import type { SubagentProgress } from 'src/agents/types.js';
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -65,7 +65,7 @@ export interface ToolInvocation<
    */
   execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<TResult>;
 }
@@ -277,7 +277,7 @@ export abstract class BaseToolInvocation<
 
   abstract execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<TResult>;
 }
@@ -423,7 +423,7 @@ export abstract class DeclarativeTool<
   async buildAndExecute(
     params: TParams,
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<TResult> {
     const invocation = this.build(params);
@@ -688,6 +688,8 @@ export function hasCycleInSchema(schema: object): boolean {
 export interface TodoList {
   todos: Todo[];
 }
+
+export type ToolLiveOutput = string | AnsiOutput | SubagentProgress;
 
 export type ToolResultDisplay =
   | string

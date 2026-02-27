@@ -16,8 +16,11 @@
 
 import type { Config } from '../../config/config.js';
 import { LocalAgentExecutor } from '../local-executor.js';
-import type { AnsiOutput } from '../../utils/terminalSerializer.js';
-import { BaseToolInvocation, type ToolResult } from '../../tools/tools.js';
+import {
+  BaseToolInvocation,
+  type ToolResult,
+  type ToolLiveOutput,
+} from '../../tools/tools.js';
 import { ToolErrorType } from '../../tools/tool-error.js';
 import type { AgentInputs, SubagentActivityEvent } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
@@ -82,7 +85,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
    */
   async execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
     let browserManager;
 

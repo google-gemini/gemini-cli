@@ -17,6 +17,7 @@ import type {
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
   PolicyUpdateOptions,
+  ToolLiveOutput,
 } from './tools.js';
 import {
   BaseDeclarativeTool,
@@ -149,7 +150,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
   async execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
     setPidCallback?: (pid: number) => void,
   ): Promise<ToolResult> {

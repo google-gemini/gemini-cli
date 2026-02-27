@@ -9,8 +9,8 @@ import type {
   ToolCallResponseInfo,
   ToolResult,
   Config,
-  AnsiOutput,
   ToolResultDisplay,
+  ToolLiveOutput,
 } from '../index.js';
 import {
   ToolErrorType,
@@ -39,7 +39,7 @@ import { CoreToolCallStatus } from './types.js';
 export interface ToolExecutionContext {
   call: ToolCall;
   signal: AbortSignal;
-  outputUpdateHandler?: (callId: string, output: string | AnsiOutput) => void;
+  outputUpdateHandler?: (callId: string, output: ToolLiveOutput) => void;
   onUpdateToolCall: (updatedCall: ToolCall) => void;
 }
 
@@ -62,7 +62,7 @@ export class ToolExecutor {
     // Setup live output handling
     const liveOutputCallback =
       tool.canUpdateOutput && outputUpdateHandler
-        ? (outputChunk: string | AnsiOutput) => {
+        ? (outputChunk: ToolLiveOutput) => {
             outputUpdateHandler(callId, outputChunk);
           }
         : undefined;

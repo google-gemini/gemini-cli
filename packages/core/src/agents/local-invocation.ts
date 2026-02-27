@@ -6,8 +6,11 @@
 
 import type { Config } from '../config/config.js';
 import { LocalAgentExecutor } from './local-executor.js';
-import type { AnsiOutput } from '../utils/terminalSerializer.js';
-import { BaseToolInvocation, type ToolResult } from '../tools/tools.js';
+import {
+  BaseToolInvocation,
+  type ToolResult,
+  type ToolLiveOutput,
+} from '../tools/tools.js';
 import {
   type LocalAgentDefinition,
   type AgentInputs,
@@ -84,7 +87,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
    */
   async execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
     let recentActivity: SubagentActivityItem[] = [];
 
@@ -97,7 +100,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           recentActivity: [],
           state: 'running',
         };
-        updateOutput(initialProgress as unknown as AnsiOutput);
+        updateOutput(initialProgress);
       }
 
       // Create an activity callback to bridge the executor's events to the
@@ -178,7 +181,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
             state: 'running',
           };
 
-          updateOutput(progress as unknown as AnsiOutput);
+          updateOutput(progress);
         }
       };
 
@@ -199,7 +202,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         };
 
         if (updateOutput) {
-          updateOutput(progress as unknown as AnsiOutput);
+          updateOutput(progress);
         }
 
         return {
@@ -266,7 +269,7 @@ ${output.result}
       };
 
       if (updateOutput) {
-        updateOutput(progress as unknown as AnsiOutput);
+        updateOutput(progress);
       }
 
       return {
