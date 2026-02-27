@@ -221,6 +221,21 @@ const mockUIActions: UIActions = {
   setAuthContext: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
+<<<<<<< HEAD
+=======
+  getPreferredEditor: vi.fn(),
+  clearAccountSuspension: vi.fn(),
+};
+
+let capturedOverflowState: OverflowState | undefined;
+let capturedOverflowActions: OverflowActions | undefined;
+const ContextCapture: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  capturedOverflowState = useOverflowState();
+  capturedOverflowActions = useOverflowActions();
+  return <>{children}</>;
+>>>>>>> ea48bd941 (feat: better error messages (#20577))
 };
 
 export const renderWithProviders = (
