@@ -2,7 +2,6 @@ name: 'User Research Insight'
 description: 'Share findings from user research, usability testing, or user interviews'
 labels:
   - 'status/need-triage'
-type: 'Feature'
 body:
   - type: 'markdown'
     attributes:
