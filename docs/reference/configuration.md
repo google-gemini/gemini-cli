@@ -238,8 +238,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`ui.hideTips`** (boolean):
-  - **Description:** Hide helpful tips in the UI
+- **`ui.hideStarterTips`** (boolean):
+  - **Description:** Hide starter tips in the UI. Note: Tips automatically hide
+    after 10 sessions.
   - **Default:** `false`
 
 - **`ui.showShortcutsHint`** (boolean):
@@ -1221,7 +1222,7 @@ of v0.3.0:
   "ui": {
     "theme": "GitHub",
     "hideBanner": true,
-    "hideTips": false,
+    "hideStarterTips": false,
     "customWittyPhrases": [
       "You forget a thousand things every day. Make sure this is one of ’em",
       "Connecting to AGI"

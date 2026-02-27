@@ -820,6 +820,7 @@ export function migrateDeprecatedSettings(
     newKey: string,
     prefix: string,
     foundDeprecated?: string[],
+    invert = true,
   ): boolean => {
     let modified = false;
     const oldValue = settings[oldKey];
@@ -836,8 +837,8 @@ export function migrateDeprecatedSettings(
           modified = true;
         }
       } else {
-        // Only old exists, migrate to new (inverted)
-        settings[newKey] = !oldValue;
+        // Only old exists
+        settings[newKey] = invert ? !oldValue : oldValue;
         if (removeDeprecated) {
           delete settings[oldKey];
         }
@@ -889,6 +890,21 @@ export function migrateDeprecatedSettings(
     const uiSettings = settings.ui as Record<string, unknown> | undefined;
     if (uiSettings) {
       const newUi = { ...uiSettings };
+      let uiChanged = false;
+
+      if (
+        migrateBoolean(
+          newUi,
+          'hideTips',
+          'hideStarterTips',
+          'ui',
+          foundDeprecated,
+          false,
+        )
+      ) {
+        uiChanged = true;
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const accessibilitySettings = newUi['accessibility'] as
         | Record<string, unknown>
@@ -906,10 +922,7 @@ export function migrateDeprecatedSettings(
           )
         ) {
           newUi['accessibility'] = newAccessibility;
-          loadedSettings.setValue(scope, 'ui', newUi);
-          if (!settingsFile.readOnly) {
-            anyModified = true;
-          }
+          uiChanged = true;
         }
 
         // Migrate enableLoadingPhrases: false → loadingPhrases: 'off'
@@ -920,12 +933,16 @@ export function migrateDeprecatedSettings(
         ) {
           if (!enableLP) {
             newUi['loadingPhrases'] = 'off';
-            loadedSettings.setValue(scope, 'ui', newUi);
-            if (!settingsFile.readOnly) {
-              anyModified = true;
-            }
+            uiChanged = true;
           }
           foundDeprecated.push('ui.accessibility.enableLoadingPhrases');
+        }
+      }
+
+      if (uiChanged) {
+        loadedSettings.setValue(scope, 'ui', newUi);
+        if (!settingsFile.readOnly) {
+          anyModified = true;
         }
       }
     }

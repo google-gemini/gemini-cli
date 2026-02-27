@@ -477,7 +477,7 @@ describe('AppContainer State Management', () => {
         ...defaultMergedSettings,
         hideBanner: false,
         hideFooter: false,
-        hideTips: false,
+        hideStarterTips: false,
         showMemoryUsage: false,
         theme: 'default',
         ui: {
@@ -1001,7 +1001,7 @@ describe('AppContainer State Management', () => {
           ...defaultMergedSettings,
           hideBanner: true,
           hideFooter: true,
-          hideTips: true,
+          hideStarterTips: true,
           showMemoryUsage: false,
         },
       } as unknown as LoadedSettings;
@@ -1022,7 +1022,7 @@ describe('AppContainer State Management', () => {
           ...defaultMergedSettings,
           hideBanner: false,
           hideFooter: false,
-          hideTips: false,
+          hideStarterTips: false,
           showMemoryUsage: true,
         },
       } as unknown as LoadedSettings;
