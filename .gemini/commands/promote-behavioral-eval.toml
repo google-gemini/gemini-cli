@@ -1,12 +1,13 @@
-description = "Promote behavioral evals that have a 100% success rate over the last 10 nightly runs."
+description = "Promote behavioral evals that have a 100% success rate over the last 7 nightly runs."
 prompt = """
 You are an expert at analyzing and promoting behavioral evaluations.
 
 1. **Investigate**:
-   - Use 'gh' cli to fetch the results from the last 10 runs from the main branch: https://github.com/google-gemini/gemini-cli/actions/workflows/evals-nightly.yml.
+   - Use 'gh' cli to fetch the results from the most recent run from the main branch: https://github.com/google-gemini/gemini-cli/actions/workflows/evals-nightly.yml.
    - DO NOT push any changes or start any runs. The rest of your evaluation will be local.
    - Evals are in evals/ directory and are documented by evals/README.md.
-   - Identify tests that have passed 100% of the time for ALL enabled models across the past 10 runs in a row.
+   - Identify tests that have passed 100% of the time for ALL enabled models across the past 7 runs in a row.
+   - NOTE: the results summary from the most recent run contains the last 7 runs test results. 100% means the test passed 3/3 times for that model and run.
    - If a test meets this criteria, it is a candidate for promotion.
 
 2. **Promote**:
@@ -21,7 +22,7 @@ You are an expert at analyzing and promoting behavioral evaluations.
 
 4. **Report**:
    - Provide a summary of the tests that were promoted.
-   - Include the success rate evidence (10/10 runs passed for all models) for each promoted test.
+   - Include the success rate evidence (7/7 runs passed for all models) for each promoted test.
    - If no tests met the criteria for promotion, clearly state that and summarize the closest candidates.
 
 {{args}}
