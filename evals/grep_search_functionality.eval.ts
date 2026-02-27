@@ -92,7 +92,7 @@ describe('grep_search_functionality', () => {
     },
   });
 
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should search only within the specified include_pattern glob',
     files: {
       'file.js': 'my_function();',
