@@ -214,5 +214,37 @@ describe('editCorrector', () => {
 
       expect(result).toBe(correctedContent);
     });
+
+    it('should return unescaped content when LLM is disabled and aggressiveUnescape is true', async () => {
+      const content = 'LaTeX command \\\\title{Example}';
+      // unescapeStringForGeminiBug would change \\\\title to \title (literal tab and "itle")
+      const expected = 'LaTeX command \title{Example}';
+
+      const result = await ensureCorrectFileContent(
+        content,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        true, // disableLLMCorrection
+        true, // aggressiveUnescape
+      );
+
+      expect(result).toBe(expected);
+      expect(mockGenerateJson).not.toHaveBeenCalled();
+    });
+
+    it('should return original content when LLM is disabled and aggressiveUnescape is false', async () => {
+      const content = 'LaTeX command \\\\title{Example}';
+
+      const result = await ensureCorrectFileContent(
+        content,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        true, // disableLLMCorrection
+        false, // aggressiveUnescape
+      );
+
+      expect(result).toBe(content);
+      expect(mockGenerateJson).not.toHaveBeenCalled();
+    });
   });
 });

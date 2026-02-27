@@ -351,6 +351,34 @@ describe('WriteFileTool', () => {
       expect(result.error).toBeUndefined();
     });
 
+    it('should set aggressiveUnescape to false for gemini-3 models', async () => {
+      const filePath = path.join(rootDir, 'gemini3_file.txt');
+      const proposedContent = 'Proposed new content.';
+      const abortSignal = new AbortController().signal;
+
+      const mockGemini3Config = {
+        ...mockConfig,
+        getActiveModel: () => 'gemini-3.0-pro',
+      } as unknown as Config;
+
+      mockEnsureCorrectFileContent.mockResolvedValue('Corrected new content.');
+
+      await getCorrectedFileContent(
+        mockGemini3Config,
+        filePath,
+        proposedContent,
+        abortSignal,
+      );
+
+      expect(mockEnsureCorrectFileContent).toHaveBeenCalledWith(
+        proposedContent,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        true,
+        false, // aggressiveUnescape
+      );
+    });
+
     it('should call ensureCorrectFileContent for an existing file', async () => {
       const filePath = path.join(rootDir, 'existing_corrected_file.txt');
       const originalContent = 'Original existing content.';
