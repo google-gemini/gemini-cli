@@ -85,6 +85,15 @@ export interface SubagentProgress {
   state?: 'running' | 'completed' | 'error' | 'cancelled';
 }
 
+export function isSubagentProgress(obj: unknown): obj is SubagentProgress {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'isSubagentProgress' in obj &&
+    obj.isSubagentProgress === true
+  );
+}
+
 /**
  * The base definition for an agent.
  * @template TOutput The specific Zod schema for the agent's final output object.

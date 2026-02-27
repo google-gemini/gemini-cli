@@ -11,7 +11,11 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText, AnsiLineText } from '../AnsiOutput.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme } from '../../semantic-colors.js';
-import type { AnsiOutput, AnsiLine, SubagentProgress } from '@google/gemini-cli-core';
+import {
+  type AnsiOutput,
+  type AnsiLine,
+  isSubagentProgress,
+} from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
@@ -38,14 +42,6 @@ export interface ToolResultDisplayProps {
 interface FileDiffResult {
   fileDiff: string;
   fileName: string;
-}
-
-function isSubagentProgress(obj: unknown): obj is SubagentProgress {
-  return (
-    typeof obj === 'object' &&
-    obj !== null &&
-    (obj as SubagentProgress).isSubagentProgress === true
-  );
 }
 
 export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
