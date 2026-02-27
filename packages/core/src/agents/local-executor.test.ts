@@ -28,6 +28,7 @@ import {
   StreamEventType,
   type StreamEvent,
 } from '../core/geminiChat.js';
+import { createSessionId } from '../utils/session.js';
 import {
   type FunctionCall,
   type Part,
@@ -140,6 +141,11 @@ vi.mock('../telemetry/clearcut-logger/clearcut-logger.js', () => ({
   ClearcutLogger: class {
     log() {}
   },
+}));
+
+vi.mock('../utils/session.js', () => ({
+  createSessionId: vi.fn(() => 'test-subagent-session-id'),
+  sessionId: 'mock-parent-session-id',
 }));
 
 vi.mock('../utils/promptIdContext.js', async (importOriginal) => {
@@ -549,6 +555,39 @@ describe('LocalAgentExecutor', () => {
       ).rejects.toThrow(/must be requested with its server prefix/);
 
       getToolSpy.mockRestore();
+    });
+
+    it('should provide a unique session ID to subagents via Proxy', async () => {
+      const definition = createTestDefinition([]);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Call createChatObject (it's private)
+      // @ts-expect-error - testing private method
+      await executor.createChatObject({ goal: 'test' }, []);
+
+      // Check that GeminiChat was instantiated with the proxied config
+      expect(MockedGeminiChat).toHaveBeenCalled();
+      expect(createSessionId).toHaveBeenCalled();
+      const passedConfig = MockedGeminiChat.mock.calls[0][0];
+
+      // Verify it's a proxy/different object but same base behavior
+      expect(passedConfig).not.toBe(mockConfig);
+
+      // Verify getSessionId returns the new session ID
+      expect(passedConfig.getSessionId()).toBe('test-subagent-session-id');
+
+      // Verify other properties still work
+      expect(passedConfig.getMessageBus()).toBe(mockConfig.getMessageBus());
+
+      // Verify referential equality for methods
+      const bus1 = passedConfig.getMessageBus();
+      const bus2 = passedConfig.getMessageBus();
+      expect(bus1).toBe(bus2);
+      expect(bus1).toBeDefined();
     });
   });
 

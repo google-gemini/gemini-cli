@@ -25,6 +25,7 @@ import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
+import { createSessionId } from '../utils/session.js';
 import {
   logAgentStart,
   logAgentFinish,
@@ -822,8 +823,31 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       : undefined;
 
     try {
+      const subagentSessionId = createSessionId();
+      const boundFunctionCache = new Map<object, object>();
+      const subagentConfig = new Proxy(this.runtimeContext, {
+        get(target, prop, receiver) {
+          if (prop === 'getSessionId') {
+            return () => subagentSessionId;
+          }
+          const value: unknown = Reflect.get(target, prop, receiver);
+          if (typeof value === 'function') {
+            // Cache bound functions to ensure referential equality.
+            const cached = boundFunctionCache.get(value);
+            if (cached) {
+              return cached;
+            }
+            const boundFunc = (...args: unknown[]) =>
+              Reflect.apply(value, target, args) as unknown;
+            boundFunctionCache.set(value, boundFunc);
+            return boundFunc;
+          }
+          return value;
+        },
+      });
+
       return new GeminiChat(
-        this.runtimeContext,
+        subagentConfig,
         systemInstruction,
         [{ functionDeclarations: tools }],
         startHistory,
