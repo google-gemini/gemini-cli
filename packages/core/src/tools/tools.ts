@@ -19,7 +19,7 @@ import {
   type Question,
 } from '../confirmation-bus/types.js';
 import { type ApprovalMode } from '../policy/types.js';
-import type { SubagentProgress } from 'src/agents/types.js';
+import type { SubagentProgress } from '../agents/types.js';
 
 /**
  * Represents a validated and ready-to-execute tool call.
