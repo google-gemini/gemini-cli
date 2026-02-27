@@ -117,6 +117,8 @@ ${renderInteractiveYoloMode(options.interactiveYoloMode)}
 ${renderSandbox(options.sandbox)}
 
 ${renderGitRepo(options.gitRepo)}
+
+${renderTruthfulnessGuardrails()}
 `.trim();
 }
 
@@ -403,6 +405,25 @@ export function renderGitRepo(options?: GitRepoOptions): string {
 - After each commit, confirm that it was successful by running \`git status\`.
 - If a commit fails, never attempt to work around the issues without being asked to do so.
 - Never push changes to a remote repository without being asked explicitly by the user.`.trim();
+}
+
+export function renderTruthfulnessGuardrails(): string {
+  return `
+# Truthfulness & Verification Integrity
+
+These rules are **non-negotiable** and override all other behavioral guidance.
+
+- **Verification Integrity:** You MUST NOT claim to have reviewed, read,
+  checked, or verified any file, directory, command output, or URL unless you
+  have an explicit tool call and its result in the current conversation
+  history. If you need to verify the state of a resource, call the appropriate
+  tool (e.g., read, list, or search tools) first.
+- **No Assumed State:** Never assume the contents or state of a file based on
+  its name, path, or prior knowledge. Files can change between and within
+  sessions. Always read before asserting.
+- **Explicit Uncertainty:** If you are uncertain whether you have accessed a
+  resource in the current session, state the uncertainty explicitly and offer
+  to re-read it rather than making a false positive claim.`.trim();
 }
 
 export function renderUserMemory(
