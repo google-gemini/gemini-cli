@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import express from 'express';
+import express, { type Request } from 'express';
 
 import type { AgentCard, Message } from '@a2a-js/sdk';
 import {
@@ -13,8 +13,9 @@ import {
   InMemoryTaskStore,
   DefaultExecutionEventBus,
   type AgentExecutionEvent,
+  UnauthenticatedUser,
 } from '@a2a-js/sdk/server';
-import { A2AExpressApp } from '@a2a-js/sdk/server/express'; // Import server components
+import { A2AExpressApp, type UserBuilder } from '@a2a-js/sdk/server/express'; // Import server components
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
 import type { AgentSettings } from '../types.js';
@@ -55,8 +56,17 @@ const coderAgentCard: AgentCard = {
     pushNotifications: false,
     stateTransitionHistory: true,
   },
-  securitySchemes: undefined,
-  security: undefined,
+  securitySchemes: {
+    bearerAuth: {
+      type: 'http',
+      scheme: 'bearer',
+    },
+    basicAuth: {
+      type: 'http',
+      scheme: 'basic',
+    },
+  },
+  security: [{ bearerAuth: [] }, { basicAuth: [] }],
   defaultInputModes: ['text'],
   defaultOutputModes: ['text'],
   skills: [
@@ -80,6 +90,32 @@ const coderAgentCard: AgentCard = {
 export function updateCoderAgentCardUrl(port: number) {
   coderAgentCard.url = `http://localhost:${port}/`;
 }
+
+const customUserBuilder: UserBuilder = async (req: Request) => {
+  const auth = req.headers['authorization'];
+  if (auth) {
+    logger.info(`[customUserBuilder] Received Authorization header: ${auth}`);
+  }
+  if (!auth) return new UnauthenticatedUser();
+
+  // 1. Bearer Auth
+  if (auth.startsWith('Bearer ')) {
+    const token = auth.substring(7);
+    if (token === 'valid-token') {
+      return { userName: 'bearer-user', isAuthenticated: true };
+    }
+  }
+
+  // 2. Basic Auth
+  if (auth.startsWith('Basic ')) {
+    const credentials = Buffer.from(auth.substring(6), 'base64').toString();
+    if (credentials === 'admin:password') {
+      return { userName: 'basic-user', isAuthenticated: true };
+    }
+  }
+
+  return new UnauthenticatedUser();
+};
 
 async function handleExecuteCommand(
   req: express.Request,
@@ -204,7 +240,7 @@ export async function createApp() {
       requestStorage.run({ req }, next);
     });
 
-    const appBuilder = new A2AExpressApp(requestHandler);
+    const appBuilder = new A2AExpressApp(requestHandler, customUserBuilder);
     expressApp = appBuilder.setupRoutes(expressApp, '');
     expressApp.use(express.json());
 

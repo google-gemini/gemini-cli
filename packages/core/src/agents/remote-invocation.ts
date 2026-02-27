@@ -24,6 +24,7 @@ import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { SendMessageResult } from './a2a-client-manager.js';
+import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 
 /**
  * Authentication handler implementation using Google Application Default Credentials (ADC).
@@ -79,7 +80,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
   // TODO: See if we can reuse the singleton from AppContainer or similar, but for now use getInstance directly
   // as per the current pattern in the codebase.
   private readonly clientManager = A2AClientManager.getInstance();
-  private readonly authHandler = new ADCHandler();
+  private authHandler: AuthenticationHandler | undefined;
 
   constructor(
     private readonly definition: RemoteAgentDefinition,
@@ -105,6 +106,29 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
   getDescription(): string {
     return `Calling remote agent ${this.definition.displayName ?? this.definition.name}`;
+  }
+
+  private async getAuthHandler(): Promise<AuthenticationHandler> {
+    if (this.authHandler) {
+      return this.authHandler;
+    }
+
+    if (this.definition.auth) {
+      const provider = await A2AAuthProviderFactory.create({
+        authConfig: this.definition.auth,
+        agentName: this.definition.name,
+      });
+      if (provider) {
+        this.authHandler = provider;
+      }
+    }
+
+    if (!this.authHandler) {
+      // Fallback to ADC if no auth is configured
+      this.authHandler = new ADCHandler();
+    }
+
+    return this.authHandler;
   }
 
   protected override async getConfirmationDetails(
@@ -138,11 +162,13 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         this.taskId = priorState.taskId;
       }
 
+      const authHandler = await this.getAuthHandler();
+
       if (!this.clientManager.getClient(this.definition.name)) {
         await this.clientManager.loadAgent(
           this.definition.name,
           this.definition.agentCardUrl,
-          this.authHandler,
+          authHandler,
         );
       }
 

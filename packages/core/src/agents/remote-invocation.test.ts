@@ -20,14 +20,22 @@ import {
 } from './a2a-client-manager.js';
 import type { RemoteAgentDefinition } from './types.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { A2AAuthProviderFactory } from './auth-provider/factory.js';
+import type { A2AAuthProvider } from './auth-provider/types.js';
 
 // Mock A2AClientManager
-vi.mock('./a2a-client-manager.js', () => {
-  const A2AClientManager = {
+vi.mock('./a2a-client-manager.js', () => ({
+  A2AClientManager: {
     getInstance: vi.fn(),
-  };
-  return { A2AClientManager };
-});
+  },
+}));
+
+// Mock A2AAuthProviderFactory
+vi.mock('./auth-provider/factory.js', () => ({
+  A2AAuthProviderFactory: {
+    create: vi.fn(),
+  },
+}));
 
 describe('RemoteAgentInvocation', () => {
   const mockDefinition: RemoteAgentDefinition = {
@@ -147,6 +155,54 @@ describe('RemoteAgentInvocation', () => {
           headers: expect.any(Function),
           shouldRetryWithHeaders: expect.any(Function),
         }),
+      );
+    });
+
+    it('should use A2AAuthProviderFactory when auth is present in definition', async () => {
+      const mockAuth = {
+        type: 'http' as const,
+        scheme: 'Basic' as const,
+        username: 'admin',
+        password: 'password',
+      };
+      const authDefinition: RemoteAgentDefinition = {
+        ...mockDefinition,
+        auth: mockAuth,
+      };
+
+      const mockHandler = {
+        type: 'http' as const,
+        headers: vi.fn().mockResolvedValue({ Authorization: 'Basic dGVzdA==' }),
+        shouldRetryWithHeaders: vi.fn(),
+      } as unknown as A2AAuthProvider;
+      (A2AAuthProviderFactory.create as Mock).mockResolvedValue(mockHandler);
+      mockClientManager.getClient.mockReturnValue(undefined);
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Hello' }],
+          };
+        },
+      );
+
+      const invocation = new RemoteAgentInvocation(
+        authDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      await invocation.execute(new AbortController().signal);
+
+      expect(A2AAuthProviderFactory.create).toHaveBeenCalledWith({
+        authConfig: mockAuth,
+        agentName: 'test-agent',
+      });
+      expect(mockClientManager.loadAgent).toHaveBeenCalledWith(
+        'test-agent',
+        'http://test-agent/card',
+        mockHandler,
       );
     });
 
