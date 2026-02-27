@@ -227,7 +227,7 @@ describe('ToolConfirmationQueue', () => {
     // availableContentHeight = Math.max(9 - 6, 4) = 4
     // MaxSizedBox in ToolConfirmationMessage will use 4
     // It should show truncation message
-    await waitFor(() => expect(lastFrame()).toContain('first 49 lines hidden'));
+    await waitFor(() => expect(lastFrame()).toContain('49 hidden (Ctrl+O)'));
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });

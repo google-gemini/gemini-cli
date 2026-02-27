@@ -10,7 +10,7 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
 `;
 
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = false > should correctly render a diff with multiple hunks and a gap indicator > with terminalWidth 30 and height 6 1`] = `
-"... first 10 lines hidden ...
+"... 10 hidden (Ctrl+O) ...
    'test';
 21 + const anotherNew =
    'test';
@@ -20,7 +20,7 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
 `;
 
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = false > should correctly render a diff with multiple hunks and a gap indicator > with terminalWidth 80 and height 6 1`] = `
-"... first 4 lines hidden ...
+"... first 4 lines hidden (Ctrl+O to show) ...
 ════════════════════════════════════════════════════════════════════════════════
 20   console.log('second hunk');
 21 - const anotherOld = 'test';
@@ -103,7 +103,7 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
 `;
 
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = true > should correctly render a diff with multiple hunks and a gap indicator > with terminalWidth 30 and height 6 1`] = `
-"... first 10 lines hidden ...
+"... 10 hidden (Ctrl+O) ...
    'test';
 21 + const anotherNew =
    'test';
@@ -113,7 +113,7 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
 `;
 
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = true > should correctly render a diff with multiple hunks and a gap indicator > with terminalWidth 80 and height 6 1`] = `
-"... first 4 lines hidden ...
+"... first 4 lines hidden (Ctrl+O to show) ...
 ════════════════════════════════════════════════════════════════════════════════
 20   console.log('second hunk');
 21 - const anotherOld = 'test';
