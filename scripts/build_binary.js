@@ -64,7 +64,7 @@ function runCommand(command, args, options = {}) {
       throw result.error;
     }
     throw new Error(
-      `Command failed with exit code ${result.status}: ${command} ${args.join(' ')}`,
+      `Command failed with exit code ${result.status}: ${command}`,
     );
   }
 
