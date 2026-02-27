@@ -50,8 +50,8 @@ describe('createPolicyUpdater', () => {
 
     messageBus = new MessageBus(policyEngine);
     mockStorage = new Storage('/mock/project');
-    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
-      '/mock/project/.gemini/policies',
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(
+      '/mock/user/.gemini/policies/auto-saved.toml',
     );
   });
 
