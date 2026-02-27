@@ -11,6 +11,7 @@ import type { ToolInvocation, ToolLocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
+import type { PartUnion } from '@google/genai';
 import {
   processSingleFileContent,
   getSpecificMimeType,
@@ -44,29 +45,20 @@ export interface ReadFileToolParams {
    */
   end_line?: number;
 }
+
 class ReadFileToolInvocation extends BaseToolInvocation<
   ReadFileToolParams,
   ToolResult
 > {
   private readonly resolvedPath: string;
-
   constructor(
-    private readonly config: Config,
+    private config: Config,
     params: ReadFileToolParams,
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
-    isSensitive?: boolean,
   ) {
-    super(
-      params,
-      messageBus,
-      _toolName,
-      _toolDisplayName,
-      undefined,
-      undefined,
-      isSensitive,
-    );
+    super(params, messageBus, _toolName, _toolDisplayName);
     this.resolvedPath = path.resolve(
       this.config.getTargetDir(),
       this.params.file_path,
@@ -105,80 +97,66 @@ class ReadFileToolInvocation extends BaseToolInvocation<
         },
       };
     }
-    try {
-      const result = await processSingleFileContent(
-        this.resolvedPath,
-        this.config.getTargetDir(),
-        this.config.getFileSystemService(),
-        this.params.start_line,
-        this.params.end_line,
-      );
 
-      if (result.error) {
-        return {
-          llmContent: result.llmContent,
-          returnDisplay: result.returnDisplay || 'Error reading file',
-          error: {
-            message: result.error,
-            type: result.errorType,
-          },
-        };
-      }
+    const result = await processSingleFileContent(
+      this.resolvedPath,
+      this.config.getTargetDir(),
+      this.config.getFileSystemService(),
+      this.params.start_line,
+      this.params.end_line,
+    );
 
-      let llmContent = result.llmContent;
-
-      if (result.isTruncated && typeof llmContent === 'string') {
-        const [startLine, endLine] = result.linesShown || [1, 0];
-        llmContent = `
-IMPORTANT: The file content has been truncated.
-Status: Showing lines ${startLine}-${endLine} of ${result.originalLineCount} total lines.
-Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use start_line: ${
-          endLine + 1
-        }.
-
---- FILE CONTENT (truncated) ---
-${llmContent}
-`;
-      }
-
-      const programming_language = getProgrammingLanguage({
-        file_path: this.resolvedPath,
-      });
-
-      logFileOperation(
-        this.config,
-        new FileOperationEvent(
-          this._toolName || READ_FILE_TOOL_NAME,
-          FileOperation.READ,
-          result.originalLineCount,
-          getSpecificMimeType(this.resolvedPath),
-          path.extname(this.resolvedPath),
-          programming_language,
-        ),
-      );
-
-      const finalResult: ToolResult = {
-        llmContent,
-        returnDisplay: result.returnDisplay || '',
-      };
-      return finalResult;
-    } catch (err: unknown) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      const errorMessage = String(error.message);
-      const toolResult: ToolResult = {
-        llmContent: [
-          {
-            text: `Error reading file: ${errorMessage}`,
-          },
-        ],
-        returnDisplay: `Error: ${errorMessage}`,
+    if (result.error) {
+      return {
+        llmContent: result.llmContent,
+        returnDisplay: result.returnDisplay || 'Error reading file',
         error: {
-          message: errorMessage,
-          type: ToolErrorType.EXECUTION_FAILED,
+          message: result.error,
+          type: result.errorType,
         },
       };
-      return toolResult;
     }
+
+    let llmContent: PartUnion;
+    if (result.isTruncated) {
+      const [start, end] = result.linesShown!;
+      const total = result.originalLineCount!;
+
+      llmContent = `
+IMPORTANT: The file content has been truncated.
+Status: Showing lines ${start}-${end} of ${total} total lines.
+Action: To read more of the file, you can use the 'start_line' and 'end_line' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use start_line: ${end + 1}.
+
+--- FILE CONTENT (truncated) ---
+${result.llmContent}`;
+    } else {
+      llmContent = result.llmContent || '';
+    }
+
+    const lines =
+      typeof result.llmContent === 'string'
+        ? result.llmContent.split('\n').length
+        : undefined;
+    const mimetype = getSpecificMimeType(this.resolvedPath);
+    const programming_language = getProgrammingLanguage({
+      file_path: this.resolvedPath,
+    });
+    logFileOperation(
+      this.config,
+      new FileOperationEvent(
+        READ_FILE_TOOL_NAME,
+        FileOperation.READ,
+        lines,
+        mimetype,
+        path.extname(this.resolvedPath),
+        programming_language,
+      ),
+    );
+
+    return {
+      llmContent,
+      returnDisplay: result.returnDisplay || '',
+    };
   }
 }
 
@@ -205,9 +183,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
       messageBus,
       true,
       false,
-      undefined,
-      undefined,
-      true,
     );
     this.fileDiscoveryService = new FileDiscoveryService(
       config.getTargetDir(),
@@ -218,36 +193,35 @@ export class ReadFileTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: ReadFileToolParams,
   ): string | null {
-    if (!params.file_path) {
+    if (params.file_path.trim() === '') {
       return "The 'file_path' parameter must be non-empty.";
-    }
-
-    if (params.start_line !== undefined && params.start_line < 1) {
-      return 'start_line must be at least 1';
-    }
-
-    if (params.end_line !== undefined && params.end_line < 1) {
-      return 'end_line must be at least 1';
-    }
-
-    if (
-      params.start_line !== undefined &&
-      params.end_line !== undefined &&
-      params.start_line > params.end_line
-    ) {
-      return 'start_line cannot be greater than end_line';
     }
 
     const resolvedPath = path.resolve(
       this.config.getTargetDir(),
       params.file_path,
     );
+
     const validationError = this.config.validatePathAccess(
       resolvedPath,
       'read',
     );
     if (validationError) {
       return validationError;
+    }
+
+    if (params.start_line !== undefined && params.start_line < 1) {
+      return 'start_line must be at least 1';
+    }
+    if (params.end_line !== undefined && params.end_line < 1) {
+      return 'end_line must be at least 1';
+    }
+    if (
+      params.start_line !== undefined &&
+      params.end_line !== undefined &&
+      params.start_line > params.end_line
+    ) {
+      return 'start_line cannot be greater than end_line';
     }
 
     const fileFilteringOptions = this.config.getFileFilteringOptions();
@@ -268,7 +242,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
-    isSensitive?: boolean,
   ): ToolInvocation<ReadFileToolParams, ToolResult> {
     return new ReadFileToolInvocation(
       this.config,
@@ -276,7 +249,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
       messageBus,
       _toolName,
       _toolDisplayName,
-      isSensitive,
     );
   }
 
