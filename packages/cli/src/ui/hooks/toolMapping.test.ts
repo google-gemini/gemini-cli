@@ -325,5 +325,33 @@ describe('toolMapping', () => {
       const result = mapToDisplay(toolCall);
       expect(result.tools[0].originalRequestName).toBe('original_tool');
     });
+
+    it('propagates isClientInitiated from tool request', () => {
+      const clientInitiatedTool: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: {
+          ...mockRequest,
+          callId: 'call-client',
+          isClientInitiated: true,
+        },
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+
+      const modelInitiatedTool: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: {
+          ...mockRequest,
+          callId: 'call-model',
+          isClientInitiated: false,
+        },
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+
+      const result = mapToDisplay([clientInitiatedTool, modelInitiatedTool]);
+      expect(result.tools[0].isClientInitiated).toBe(true);
+      expect(result.tools[1].isClientInitiated).toBe(false);
+    });
   });
 });

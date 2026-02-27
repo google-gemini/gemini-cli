@@ -6,7 +6,18 @@
 
 import { getErrorMessage, isNodeError } from './errors.js';
 import { URL } from 'node:url';
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
+import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
+
+const DEFAULT_HEADERS_TIMEOUT = 60000; // 60 seconds
+const DEFAULT_BODY_TIMEOUT = 300000; // 5 minutes
+
+// Configure default global dispatcher with higher timeouts
+setGlobalDispatcher(
+  new Agent({
+    headersTimeout: DEFAULT_HEADERS_TIMEOUT,
+    bodyTimeout: DEFAULT_BODY_TIMEOUT,
+  }),
+);
 
 const PRIVATE_IP_RANGES = [
   /^10\./,
@@ -73,5 +84,11 @@ export async function fetchWithTimeout(
 }
 
 export function setGlobalProxy(proxy: string) {
-  setGlobalDispatcher(new ProxyAgent(proxy));
+  setGlobalDispatcher(
+    new ProxyAgent({
+      uri: proxy,
+      headersTimeout: DEFAULT_HEADERS_TIMEOUT,
+      bodyTimeout: DEFAULT_BODY_TIMEOUT,
+    }),
+  );
 }

@@ -102,6 +102,8 @@ export interface IndividualToolCallDisplay {
   description: string;
   resultDisplay: ToolResultDisplay | undefined;
   status: CoreToolCallStatus;
+  // True when the tool was initiated directly by the user (slash/@/shell flows).
+  isClientInitiated?: boolean;
   confirmationDetails: SerializableConfirmationDetails | undefined;
   renderOutputAsMarkdown?: boolean;
   ptyId?: number;
@@ -201,6 +203,7 @@ export type HistoryItemStats = HistoryItemQuotaBase & {
   type: 'stats';
   duration: string;
   quotas?: RetrieveUserQuotaResponse;
+  creditBalance?: number;
 };
 
 export type HistoryItemModelStats = HistoryItemQuotaBase & {

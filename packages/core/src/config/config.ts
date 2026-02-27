@@ -13,6 +13,7 @@ import type {
   ContentGenerator,
   ContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import type { OverageStrategy } from '../billing/billing.js';
 import {
   AuthType,
   createContentGenerator,
@@ -38,6 +39,7 @@ import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
+import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
@@ -106,10 +108,16 @@ import { FileExclusions } from '../utils/ignorePatterns.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
-import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
+import {
+  ApprovalMode,
+  type PolicyEngineConfig,
+  type PolicyRule,
+  type SafetyCheckerRule,
+} from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type {
   UserTierId,
+  GeminiUserTier,
   RetrieveUserQuotaResponse,
   AdminControlsSettings,
 } from '../code_assist/types.js';
@@ -176,6 +184,14 @@ export interface ToolOutputMaskingConfig {
   toolProtectionThreshold: number;
   minPrunableTokensThreshold: number;
   protectLatestTurn: boolean;
+}
+
+export interface GemmaModelRouterSettings {
+  enabled?: boolean;
+  classifier?: {
+    host?: string;
+    model?: string;
+  };
 }
 
 export interface ExtensionSetting {
@@ -315,6 +331,14 @@ export interface GeminiCLIExtension {
    * These themes will be registered when the extension is activated.
    */
   themes?: CustomTheme[];
+  /**
+   * Policy rules contributed by this extension.
+   */
+  rules?: PolicyRule[];
+  /**
+   * Safety checkers contributed by this extension.
+   */
+  checkers?: SafetyCheckerRule[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -497,6 +521,7 @@ export interface ConfigParameters {
   interactive?: boolean;
   trustedFolder?: boolean;
   useBackgroundColor?: boolean;
+  useAlternateBuffer?: boolean;
   useRipgrep?: boolean;
   enableInteractiveShell?: boolean;
   skipNextSpeakerCheck?: boolean;
@@ -509,6 +534,7 @@ export interface ConfigParameters {
   directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
+  gemmaModelRouter?: GemmaModelRouterSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
@@ -549,6 +575,9 @@ export interface ConfigParameters {
     agents?: AgentSettings;
   }>;
   enableConseca?: boolean;
+  billing?: {
+    overageStrategy?: OverageStrategy;
+  };
 }
 
 export class Config {
@@ -599,6 +628,7 @@ export class Config {
   private readonly usageStatisticsEnabled: boolean;
   private geminiClient!: GeminiClient;
   private baseLlmClient!: BaseLlmClient;
+  private localLiteRtLmClient?: LocalLiteRtLmClient;
   private modelRouterService: ModelRouterService;
   private readonly modelAvailabilityService: ModelAvailabilityService;
   private readonly fileFiltering: {
@@ -678,6 +708,7 @@ export class Config {
   private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private readonly useBackgroundColor: boolean;
+  private readonly useAlternateBuffer: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly truncateToolOutputThreshold: number;
@@ -694,6 +725,9 @@ export class Config {
     | PolicyUpdateConfirmationRequest
     | undefined;
   private readonly outputSettings: OutputSettings;
+
+  private readonly gemmaModelRouter: GemmaModelRouterSettings;
+
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly maxAttempts: number;
@@ -724,6 +758,10 @@ export class Config {
         agents?: AgentSettings;
       }>)
     | undefined;
+
+  private readonly billing: {
+    overageStrategy: OverageStrategy;
+  };
 
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
@@ -873,6 +911,7 @@ export class Config {
     this.directWebFetch = params.directWebFetch ?? false;
     this.useRipgrep = params.useRipgrep ?? true;
     this.useBackgroundColor = params.useBackgroundColor ?? true;
+    this.useAlternateBuffer = params.useAlternateBuffer ?? false;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
@@ -942,6 +981,15 @@ export class Config {
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
+    this.gemmaModelRouter = {
+      enabled: params.gemmaModelRouter?.enabled ?? false,
+      classifier: {
+        host:
+          params.gemmaModelRouter?.classifier?.host ?? 'http://localhost:9379',
+        model:
+          params.gemmaModelRouter?.classifier?.model ?? 'gemma3-1b-gpu-custom',
+      },
+    };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.maxAttempts = Math.min(
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
@@ -961,6 +1009,10 @@ export class Config {
     this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
     this.onReload = params.onReload;
+
+    this.billing = {
+      overageStrategy: params.billing?.overageStrategy ?? 'ask',
+    };
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -1225,6 +1277,10 @@ export class Config {
     return this.contentGenerator?.userTierName;
   }
 
+  getUserPaidTier(): GeminiUserTier | undefined {
+    return this.contentGenerator?.paidTier;
+  }
+
   /**
    * Provides access to the BaseLlmClient for stateless LLM operations.
    */
@@ -1243,6 +1299,13 @@ export class Config {
       }
     }
     return this.baseLlmClient;
+  }
+
+  getLocalLiteRtLmClient(): LocalLiteRtLmClient {
+    if (!this.localLiteRtLmClient) {
+      this.localLiteRtLmClient = new LocalLiteRtLmClient(this);
+    }
+    return this.localLiteRtLmClient;
   }
 
   getSessionId(): string {
@@ -1530,6 +1593,19 @@ export class Config {
 
   setHasAccessToPreviewModel(hasAccess: boolean | null): void {
     this.hasAccessToPreviewModel = hasAccess;
+  }
+
+  async refreshAvailableCredits(): Promise<void> {
+    const codeAssistServer = getCodeAssistServer(this);
+    if (!codeAssistServer) {
+      return;
+    }
+    try {
+      await codeAssistServer.refreshAvailableCredits();
+    } catch {
+      // Non-fatal: proceed even if refresh fails.
+      // The actual credit balance will be verified server-side.
+    }
   }
 
   async refreshUserQuota(): Promise<RetrieveUserQuotaResponse | undefined> {
@@ -2006,6 +2082,19 @@ export class Config {
     return this.telemetrySettings.outfile;
   }
 
+  getBillingSettings(): { overageStrategy: OverageStrategy } {
+    return this.billing;
+  }
+
+  /**
+   * Updates the overage strategy at runtime.
+   * Used to switch from 'ask' to 'always' after the user accepts credits
+   * via the overage dialog, so subsequent API calls auto-include credits.
+   */
+  setOverageStrategy(strategy: OverageStrategy): void {
+    this.billing.overageStrategy = strategy;
+  }
+
   getTelemetryUseCollector(): boolean {
     return this.telemetrySettings.useCollector ?? false;
   }
@@ -2478,6 +2567,10 @@ export class Config {
     return this.useBackgroundColor;
   }
 
+  getUseAlternateBuffer(): boolean {
+    return this.useAlternateBuffer;
+  }
+
   getEnableInteractiveShell(): boolean {
     return this.enableInteractiveShell;
   }
@@ -2576,6 +2669,14 @@ export class Config {
 
   getEnableHooksUI(): boolean {
     return this.enableHooksUI;
+  }
+
+  getGemmaModelRouterEnabled(): boolean {
+    return this.gemmaModelRouter.enabled ?? false;
+  }
+
+  getGemmaModelRouterSettings(): GemmaModelRouterSettings {
+    return this.gemmaModelRouter;
   }
 
   /**
