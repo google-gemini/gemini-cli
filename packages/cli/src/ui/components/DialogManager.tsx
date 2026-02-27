@@ -13,6 +13,7 @@ import { ThemeDialog } from './ThemeDialog.js';
 import { SettingsDialog } from './SettingsDialog.js';
 import { AuthInProgress } from '../auth/AuthInProgress.js';
 import { AuthDialog } from '../auth/AuthDialog.js';
+import { BannedAccountDialog } from '../auth/BannedAccountDialog.js';
 import { ApiAuthDialog } from '../auth/ApiAuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
@@ -320,6 +321,21 @@ export const DialogManager = ({
       </Box>
     );
   }
+  if (uiState.accountSuspensionInfo) {
+    return (
+      <Box flexDirection="column">
+        <BannedAccountDialog
+          accountSuspensionInfo={uiState.accountSuspensionInfo}
+          onExit={() => {
+            process.exit(1);
+          }}
+          onChangeAuth={() => {
+            uiActions.clearAccountSuspension();
+          }}
+        />
+      </Box>
+    );
+  }
   if (uiState.isAuthenticating) {
     return (
       <AuthInProgress
@@ -342,6 +358,7 @@ export const DialogManager = ({
       </Box>
     );
   }
+
   if (uiState.isAuthDialogOpen) {
     return (
       <Box flexDirection="column">
