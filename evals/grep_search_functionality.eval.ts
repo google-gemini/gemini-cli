@@ -32,7 +32,7 @@ describe('grep_search_functionality', () => {
     },
   });
 
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: 'should perform a case-sensitive search',
     files: {
       'test.txt': `Hello
@@ -92,7 +92,7 @@ describe('grep_search_functionality', () => {
     },
   });
 
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: 'should search only within the specified include_pattern glob',
     files: {
       'file.js': 'my_function();',
