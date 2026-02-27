@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../../test-utils/render.js';
+import { render, cleanup } from '../../../test-utils/render.js';
 import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
 import type { SubagentProgress } from '@google/gemini-cli-core';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Text } from 'ink';
 
 vi.mock('ink-spinner', () => ({
@@ -15,7 +15,12 @@ vi.mock('ink-spinner', () => ({
 }));
 
 describe('<SubagentProgressDisplay />', () => {
-  it('renders correctly with description in args', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    cleanup();
+  });
+
+  it('renders correctly with description in args', async () => {
     const progress: SubagentProgress = {
       isSubagentProgress: true,
       agentName: 'TestAgent',
@@ -29,17 +34,14 @@ describe('<SubagentProgressDisplay />', () => {
       ],
     };
 
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady } = render(
       <SubagentProgressDisplay progress={progress} />,
     );
-    const frame = lastFrame();
-    expect(frame).toContain('Subagent TestAgent is working...');
-    expect(frame).toContain('run_shell_command');
-    expect(frame).toContain('Say hello');
-    expect(frame).not.toContain('{"command": "echo hello"');
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders correctly with command fallback', () => {
+  it('renders correctly with command fallback', async () => {
     const progress: SubagentProgress = {
       isSubagentProgress: true,
       agentName: 'TestAgent',
@@ -53,14 +55,14 @@ describe('<SubagentProgressDisplay />', () => {
       ],
     };
 
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady } = render(
       <SubagentProgressDisplay progress={progress} />,
     );
-    const frame = lastFrame();
-    expect(frame).toContain('echo hello');
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders correctly with file_path', () => {
+  it('renders correctly with file_path', async () => {
     const progress: SubagentProgress = {
       isSubagentProgress: true,
       agentName: 'TestAgent',
@@ -74,15 +76,14 @@ describe('<SubagentProgressDisplay />', () => {
       ],
     };
 
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady } = render(
       <SubagentProgressDisplay progress={progress} />,
     );
-    const frame = lastFrame();
-    expect(frame).toContain('/tmp/test.txt');
-    expect(frame).not.toContain('"content": "foo"');
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('truncates long args', () => {
+  it('truncates long args', async () => {
     const longDesc =
       'This is a very long description that should definitely be truncated because it exceeds the limit of sixty characters.';
     const progress: SubagentProgress = {
@@ -98,18 +99,14 @@ describe('<SubagentProgressDisplay />', () => {
       ],
     };
 
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady } = render(
       <SubagentProgressDisplay progress={progress} />,
     );
-    const frame = lastFrame();
-    expect(frame).toContain('This is a very long description');
-    expect(frame).toContain('...');
-    // slice(0, 60)
-    // "This is a very long description that should definitely be tr"
-    expect(frame).not.toContain('sixty characters');
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders thought bubbles correctly', () => {
+  it('renders thought bubbles correctly', async () => {
     const progress: SubagentProgress = {
       isSubagentProgress: true,
       agentName: 'TestAgent',
@@ -122,14 +119,14 @@ describe('<SubagentProgressDisplay />', () => {
       ],
     };
 
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady } = render(
       <SubagentProgressDisplay progress={progress} />,
     );
-    const frame = lastFrame();
-    expect(frame).toContain('💭 Thinking about life');
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders cancelled state correctly', () => {
+  it('renders cancelled state correctly', async () => {
     const progress: SubagentProgress = {
       isSubagentProgress: true,
       agentName: 'TestAgent',
@@ -137,10 +134,10 @@ describe('<SubagentProgressDisplay />', () => {
       state: 'cancelled',
     };
 
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady } = render(
       <SubagentProgressDisplay progress={progress} />,
     );
-    const frame = lastFrame();
-    expect(frame).toContain('Subagent TestAgent was cancelled.');
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
   });
 });

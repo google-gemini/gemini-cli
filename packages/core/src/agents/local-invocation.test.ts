@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mocked,
+} from 'vitest';
 import type {
   LocalAgentDefinition,
   SubagentActivityEvent,
@@ -69,6 +77,10 @@ describe('LocalSubagentInvocation', () => {
     MockLocalAgentExecutor.create.mockResolvedValue(
       mockExecutorInstance as unknown as LocalAgentExecutor<z.ZodTypeAny>,
     );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('should pass the messageBus to the parent constructor', () => {
