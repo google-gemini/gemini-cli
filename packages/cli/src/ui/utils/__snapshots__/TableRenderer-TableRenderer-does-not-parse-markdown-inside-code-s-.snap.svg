@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="156" viewBox="0 0 920 156">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="156" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="19" fill="#333333" textLength="549" lengthAdjust="spacingAndGlyphs">┌─────────────────┬──────────────────────┬──────────────────┐</text>
+    <text x="0" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="36" fill="#89b4fa" textLength="45" lengthAdjust="spacingAndGlyphs">Col 1</text>
+    <text x="162" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="180" y="36" fill="#89b4fa" textLength="45" lengthAdjust="spacingAndGlyphs">Col 2</text>
+    <text x="369" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="387" y="36" fill="#89b4fa" textLength="45" lengthAdjust="spacingAndGlyphs">Col 3</text>
+    <text x="540" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="53" fill="#333333" textLength="549" lengthAdjust="spacingAndGlyphs">├─────────────────┼──────────────────────┼──────────────────┤</text>
+    <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="70" fill="#cba6f7" textLength="108" lengthAdjust="spacingAndGlyphs">**not bold**</text>
+    <text x="162" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="180" y="70" fill="#cba6f7" textLength="108" lengthAdjust="spacingAndGlyphs">_not italic_</text>
+    <text x="369" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="387" y="70" fill="#cba6f7" textLength="126" lengthAdjust="spacingAndGlyphs">~~not strike~~</text>
+    <text x="540" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="87" fill="#cba6f7" textLength="135" lengthAdjust="spacingAndGlyphs">[not link](url)</text>
+    <text x="162" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="180" y="87" fill="#cba6f7" textLength="180" lengthAdjust="spacingAndGlyphs">&lt;u&gt;not underline&lt;/u&gt;</text>
+    <text x="369" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="387" y="87" fill="#cba6f7" textLength="144" lengthAdjust="spacingAndGlyphs">https://not.link</text>
+    <text x="540" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="104" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs"> Normal Text     </text>
+    <text x="162" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="171" y="104" fill="#ffffff" textLength="108" lengthAdjust="spacingAndGlyphs"> More Code: </text>
+    <text x="279" y="104" fill="#cba6f7" textLength="54" lengthAdjust="spacingAndGlyphs">*test*</text>
+    <text x="369" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="387" y="104" fill="#cba6f7" textLength="108" lengthAdjust="spacingAndGlyphs">***nested***</text>
+    <text x="540" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="121" fill="#333333" textLength="549" lengthAdjust="spacingAndGlyphs">└─────────────────┴──────────────────────┴──────────────────┘</text>
+  </g>
+</svg>

@@ -6,13 +6,13 @@
   <g transform="translate(10, 10)">
     <text x="0" y="19" fill="#333333" textLength="171" lengthAdjust="spacingAndGlyphs">┌────────┬────────┐</text>
     <text x="0" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="72" y="36" fill="#333333" textLength="27" lengthAdjust="spacingAndGlyphs"> │ </text>
+    <text x="81" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="162" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="53" fill="#333333" textLength="171" lengthAdjust="spacingAndGlyphs">├────────┼────────┤</text>
     <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="9" y="70" fill="#ffffff" textLength="63" lengthAdjust="spacingAndGlyphs"> Data 1</text>
-    <text x="72" y="70" fill="#333333" textLength="27" lengthAdjust="spacingAndGlyphs"> │ </text>
-    <text x="99" y="70" fill="#ffffff" textLength="63" lengthAdjust="spacingAndGlyphs">Data 2 </text>
+    <text x="9" y="70" fill="#ffffff" textLength="72" lengthAdjust="spacingAndGlyphs"> Data 1 </text>
+    <text x="81" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="90" y="70" fill="#ffffff" textLength="72" lengthAdjust="spacingAndGlyphs"> Data 2 </text>
     <text x="162" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="87" fill="#333333" textLength="171" lengthAdjust="spacingAndGlyphs">└────────┴────────┘</text>
   </g>

@@ -267,7 +267,6 @@ describe('TableRenderer', () => {
     await waitUntilReady();
 
     const output = lastFrame();
-
     expect(output).toContain('Comprehensive Architectural');
     expect(output).toContain('protocol buffers');
     expect(output).toContain('exponential backoff');
@@ -378,4 +377,134 @@ describe('TableRenderer', () => {
     await expect(renderResult).toMatchSvgSnapshot();
     unmount();
   });
+
+  it.each([
+    {
+      name: 'renders complex markdown in rows and calculates widths correctly',
+      headers: ['Feature', 'Markdown'],
+      rows: [
+        ['Bold', '**Bold Text**'],
+        ['Italic', '_Italic Text_'],
+        ['Combined', '***Bold and Italic***'],
+        ['Link', '[Google](https://google.com)'],
+        ['Code', '`const x = 1`'],
+        ['Strikethrough', '~~Strike~~'],
+        ['Underline', '<u>Underline</u>'],
+      ],
+      terminalWidth: 80,
+      waitForText: 'Bold Text',
+      assertions: (output: string) => {
+        expect(output).not.toContain('**Bold Text**');
+        expect(output).toContain('Bold Text');
+        expect(output).not.toContain('_Italic Text_');
+        expect(output).toContain('Italic Text');
+        expect(output).toContain('Bold and Italic');
+        expect(output).toContain('Google');
+        expect(output).toContain('https://google.com');
+        expect(output).toContain('(https://google.com)');
+        expect(output).toContain('const x = 1');
+        expect(output).not.toContain('`const x = 1`');
+        expect(output).toContain('Strike');
+        expect(output).toContain('Underline');
+      },
+    },
+    {
+      name: 'calculates column widths based on rendered text, not raw markdown',
+      headers: ['Col 1', 'Col 2', 'Col 3'],
+      rows: [
+        ['**123456**', 'Normal', 'Short'],
+        ['Short', '**123456**', 'Normal'],
+        ['Normal', 'Short', '**123456**'],
+      ],
+      terminalWidth: 40,
+      waitForText: '123456',
+      assertions: (output: string) => {
+        expect(output).toContain('123456');
+        const dataLines = output.split('\n').filter((l) => /123456/.test(l));
+        expect(dataLines.length).toBe(3);
+      },
+    },
+    {
+      name: 'handles nested markdown styles recursively',
+      headers: ['Header 1', 'Header 2', 'Header 3'],
+      rows: [
+        ['**Bold with _Italic_ and ~~Strike~~**', 'Normal', 'Short'],
+        ['Short', '**Bold with _Italic_ and ~~Strike~~**', 'Normal'],
+        ['Normal', 'Short', '**Bold with _Italic_ and ~~Strike~~**'],
+      ],
+      terminalWidth: 100,
+      waitForText: 'Bold with Italic and Strike',
+      assertions: (output: string) => {
+        expect(output).not.toContain('**');
+        expect(output).not.toContain('_');
+        expect(output).not.toContain('~~');
+        expect(output).toContain('Bold with Italic and Strike');
+      },
+    },
+    {
+      name: 'calculates width correctly for content with URLs and styles',
+      headers: ['Col 1', 'Col 2', 'Col 3'],
+      rows: [
+        ['Visit [Google](https://google.com)', 'Plain Text', 'More Info'],
+        ['Info Here', 'Visit [Bing](https://bing.com)', 'Links'],
+        ['Check This', 'Search', 'Visit [Yahoo](https://yahoo.com)'],
+      ],
+      terminalWidth: 120,
+      waitForText: 'Visit Google',
+      assertions: (output: string) => {
+        expect(output).toContain('Visit Google');
+        expect(output).toContain('Visit Bing');
+        expect(output).toContain('Visit Yahoo');
+        expect(output).toContain('https://google.com');
+        expect(output).toContain('https://bing.com');
+        expect(output).toContain('https://yahoo.com');
+        expect(output).toContain('(https://google.com)');
+        const dataLine = output
+          .split('\n')
+          .find((l) => l.includes('Visit Google'));
+        expect(dataLine).toContain('Visit Google');
+      },
+    },
+    {
+      name: 'does not parse markdown inside code snippets',
+      headers: ['Col 1', 'Col 2', 'Col 3'],
+      rows: [
+        ['`**not bold**`', '`_not italic_`', '`~~not strike~~`'],
+        ['`[not link](url)`', '`<u>not underline</u>`', '`https://not.link`'],
+        ['Normal Text', 'More Code: `*test*`', '`***nested***`'],
+      ],
+      terminalWidth: 100,
+      waitForText: '**not bold**',
+      assertions: (output: string) => {
+        expect(output).toContain('**not bold**');
+        expect(output).toContain('_not italic_');
+        expect(output).toContain('~~not strike~~');
+        expect(output).toContain('[not link](url)');
+        expect(output).toContain('<u>not underline</u>');
+        expect(output).toContain('https://not.link');
+        expect(output).toContain('***nested***');
+      },
+    },
+  ])(
+    '$name',
+    async ({ headers, rows, terminalWidth, waitForText, assertions }) => {
+      const renderResult = renderWithProviders(
+        <TableRenderer
+          headers={headers}
+          rows={rows}
+          terminalWidth={terminalWidth}
+        />,
+        { width: terminalWidth },
+      );
+      const { lastFrame, waitUntilReady, unmount } = renderResult;
+      await waitUntilReady();
+
+      const output = lastFrame();
+      expect(output).toBeDefined();
+      expect(output).toContain(waitForText);
+      assertions(output);
+      await expect(renderResult).toMatchSvgSnapshot();
+      unmount();
+    },
+  );
 });
