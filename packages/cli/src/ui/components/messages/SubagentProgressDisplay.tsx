@@ -55,7 +55,7 @@ const formatToolArgs = (args?: string): string => {
 export const SubagentProgressDisplay: React.FC<
   SubagentProgressDisplayProps
 > = ({ progress }) => {
-  let headerText = `Subagent ${progress.agentName} is working...`;
+  let headerText: string | undefined;
   let headerColor = theme.text.secondary;
 
   if (progress.state === 'cancelled') {
@@ -71,11 +71,13 @@ export const SubagentProgressDisplay: React.FC<
 
   return (
     <Box flexDirection="column" paddingY={0}>
-      <Box marginBottom={1}>
-        <Text color={headerColor} italic>
-          {headerText}
-        </Text>
-      </Box>
+      {headerText && (
+        <Box marginBottom={1}>
+          <Text color={headerColor} italic>
+            {headerText}
+          </Text>
+        </Box>
+      )}
       <Box flexDirection="column" marginLeft={0} gap={0}>
         {progress.recentActivity.map((item: SubagentActivityItem) => {
           if (item.type === 'thought') {
