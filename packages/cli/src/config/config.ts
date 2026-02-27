@@ -33,7 +33,6 @@ import {
   getVersion,
   PREVIEW_GEMINI_MODEL_AUTO,
   type HierarchicalMemory,
-  type PlanSettings,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
   getAdminErrorMessage,
@@ -50,8 +49,6 @@ import {
   type MergedSettings,
   saveModelChange,
   loadSettings,
-  getDefaultsFromSchema,
-  getMergeStrategyForPath,
 } from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -70,7 +67,6 @@ import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
-import { customDeepMerge } from '../utils/deepMerge.js';
 
 export interface CliArgs {
   query: string | undefined;
@@ -515,21 +511,6 @@ export async function loadCliConfig(
   });
   await extensionManager.loadExtensions();
 
-  // Filter active extensions that define a plan directory
-  const activeExtensionsWithPlan = extensionManager
-    .getExtensions()
-    .filter((e) => e.isActive && e.plan?.directory);
-
-  let extensionPlanSettings: PlanSettings | undefined;
-  if (activeExtensionsWithPlan.length > 0) {
-    if (activeExtensionsWithPlan.length > 1) {
-      debugLogger.warn(
-        `Multiple active extensions define a plan directory. Using plan directory from extension: "${activeExtensionsWithPlan[0].name}"`,
-      );
-    }
-    extensionPlanSettings = activeExtensionsWithPlan[0].plan;
-  }
-
   const experimentalJitContext = settings.experimental?.jitContext ?? false;
 
   let memoryContent: string | HierarchicalMemory = '';
@@ -846,15 +827,7 @@ export async function loadCliConfig(
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
     directWebFetch: settings.experimental?.directWebFetch,
-    planSettings: customDeepMerge(
-      (path: string[]) => getMergeStrategyForPath(['general', 'plan', ...path]),
-      getDefaultsFromSchema().general?.plan ?? {},
-      extensionPlanSettings ?? {},
-      loadedSettings?.systemDefaults?.settings?.general?.plan ?? {},
-      loadedSettings?.user?.settings?.general?.plan ?? {},
-      loadedSettings?.workspace?.settings?.general?.plan ?? {},
-      loadedSettings?.system?.settings?.general?.plan ?? {},
-    ),
+    planSettings: settings.general?.plan,
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
