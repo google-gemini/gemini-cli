@@ -641,6 +641,56 @@ describe('HookEventHandler', () => {
 
       expect(result).toBe(mockAggregated);
     });
+
+    it('should fire Notification event with ShellInteraction type and context', async () => {
+      const mockPlan = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: './shell-notify.sh',
+          } as HookConfig,
+          eventName: HookEventName.Notification,
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 0,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.Notification,
+        hookConfigs: mockPlan.map((p) => p.hookConfig),
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue([]);
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      await hookEventHandler.fireNotificationEvent(
+        NotificationType.ShellInteraction,
+        'Interactive shell waiting for user input',
+        { pid: 12345 },
+      );
+
+      expect(mockHookPlanner.createExecutionPlan).toHaveBeenCalledWith(
+        HookEventName.Notification,
+        { trigger: NotificationType.ShellInteraction },
+      );
+      expect(mockHookRunner.executeHooksParallel).toHaveBeenCalledWith(
+        [mockPlan[0].hookConfig],
+        HookEventName.Notification,
+        expect.objectContaining({
+          notification_type: 'ShellInteraction',
+          message: 'Interactive shell waiting for user input',
+          details: { pid: 12345 },
+        }),
+        expect.any(Function),
+        expect.any(Function),
+      );
+    });
   });
 
   describe('fireSessionStartEvent', () => {

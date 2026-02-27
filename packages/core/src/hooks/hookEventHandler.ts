@@ -146,7 +146,8 @@ export class HookEventHandler {
       details,
     };
 
-    return this.executeHooks(HookEventName.Notification, input);
+    const context: HookEventContext = { trigger: type };
+    return this.executeHooks(HookEventName.Notification, input, context);
   }
 
   /**
