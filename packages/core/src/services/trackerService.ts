@@ -19,19 +19,18 @@ import { type z } from 'zod';
 export class TrackerService {
   private readonly tasksDir: string;
 
-  private initPromise: Promise<void> | null = null;
+  private initialized = false;
 
   constructor(readonly trackerDir: string) {
     this.tasksDir = trackerDir;
   }
 
-  private ensureInitialized(): Promise<void> {
-    if (!this.initPromise) {
-      this.initPromise = fs.mkdir(this.tasksDir, { recursive: true });
+  private async ensureInitialized(): Promise<void> {
+    if (!this.initialized) {
+      await fs.mkdir(this.tasksDir, { recursive: true });
+      this.initialized = true;
     }
-    return this.initPromise;
   }
-
   /**
    * Generates a 6-character hex ID.
    */
@@ -209,7 +208,6 @@ export class TrackerService {
     task: TrackerTask,
     taskMap: Map<string, TrackerTask>,
   ): void {
-
     const visited = new Set<string>();
     const stack = new Set<string>();
 
