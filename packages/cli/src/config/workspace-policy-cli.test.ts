@@ -10,6 +10,7 @@ import { loadCliConfig, type CliArgs } from './config.js';
 import { createTestMergedSettings } from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
+import { setDisableWorkspacePolicies } from './policy.js';
 
 // Mock dependencies
 vi.mock('./trustedFolders.js', () => ({
@@ -53,6 +54,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    setDisableWorkspacePolicies(false);
     // Default to MATCH for existing tests
     mockCheckIntegrity.mockResolvedValue({
       status: 'match',

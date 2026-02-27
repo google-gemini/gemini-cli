@@ -20,6 +20,34 @@ import {
 } from '@google/gemini-cli-core';
 import { type Settings } from './settings.js';
 
+/**
+ * Temporary flag to automatically accept workspace policies to reduce friction.
+ * Exported as 'let' to allow monkey patching in tests via the setter.
+ */
+export let autoAcceptWorkspacePolicies = true;
+
+/**
+ * Sets the autoAcceptWorkspacePolicies flag.
+ * Used primarily for testing purposes.
+ */
+export function setAutoAcceptWorkspacePolicies(value: boolean) {
+  autoAcceptWorkspacePolicies = value;
+}
+
+/**
+ * Temporary flag to disable workspace level policies altogether.
+ * Exported as 'let' to allow monkey patching in tests via the setter.
+ */
+export let disableWorkspacePolicies = true;
+
+/**
+ * Sets the disableWorkspacePolicies flag.
+ * Used primarily for testing purposes.
+ */
+export function setDisableWorkspacePolicies(value: boolean) {
+  disableWorkspacePolicies = value;
+}
+
 export async function createPolicyEngineConfig(
   settings: Settings,
   approvalMode: ApprovalMode,
@@ -66,7 +94,7 @@ export async function resolveWorkspacePolicyState(options: {
     | PolicyUpdateConfirmationRequest
     | undefined;
 
-  if (trustedFolder) {
+  if (trustedFolder && !disableWorkspacePolicies) {
     const storage = new Storage(cwd);
 
     // If we are in the home directory (or rather, our target Gemini dir is the global one),
