@@ -27,6 +27,7 @@ export interface ExtensionSetting {
   envVar: string;
   // NOTE: If no value is set, this setting will be considered NOT sensitive.
   sensitive?: boolean;
+  defaultValue?: string;
 }
 
 const getKeychainStorageName = (
@@ -164,6 +165,7 @@ export async function promptForSetting(
     type: setting.sensitive ? 'password' : 'text',
     name: 'value',
     message: `${setting.name}\n${setting.description}`,
+    initial: setting.defaultValue,
   });
   // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return response.value;
