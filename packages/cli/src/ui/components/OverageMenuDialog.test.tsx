@@ -4,16 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { act } from 'react';
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OverageMenuDialog } from './OverageMenuDialog.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 
-// Mock the child component to make it easier to test the parent
-vi.mock('./shared/RadioButtonSelect.js', () => ({
-  RadioButtonSelect: vi.fn(),
-}));
+const writeKey = (stdin: { write: (data: string) => void }, key: string) => {
+  act(() => {
+    stdin.write(key);
+  });
+};
 
 describe('OverageMenuDialog', () => {
   const mockOnChoice = vi.fn();
@@ -22,9 +23,13 @@ describe('OverageMenuDialog', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('rendering', () => {
-    it('should render with correct menu options when fallback is available', async () => {
-      const { unmount, waitUntilReady } = render(
+    it('should match snapshot with fallback available', async () => {
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           fallbackModel="gemini-3-flash-preview"
@@ -35,38 +40,12 @@ describe('OverageMenuDialog', () => {
       );
       await waitUntilReady();
 
-      expect(RadioButtonSelect).toHaveBeenCalledWith(
-        expect.objectContaining({
-          items: [
-            {
-              label: 'Use AI Credits - Continue this request (Overage)',
-              value: 'use_credits',
-              key: 'use_credits',
-            },
-            {
-              label: 'Manage - View balance and purchase more credits',
-              value: 'manage',
-              key: 'manage',
-            },
-            {
-              label: 'Switch to gemini-3-flash-preview',
-              value: 'use_fallback',
-              key: 'use_fallback',
-            },
-            {
-              label: 'Stop - Abort request',
-              value: 'stop',
-              key: 'stop',
-            },
-          ],
-        }),
-        undefined,
-      );
+      expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
-    it('should omit fallback option when fallbackModel is not provided', async () => {
-      const { unmount, waitUntilReady } = render(
+    it('should match snapshot without fallback', async () => {
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={500}
@@ -75,33 +54,12 @@ describe('OverageMenuDialog', () => {
       );
       await waitUntilReady();
 
-      expect(RadioButtonSelect).toHaveBeenCalledWith(
-        expect.objectContaining({
-          items: [
-            {
-              label: 'Use AI Credits - Continue this request (Overage)',
-              value: 'use_credits',
-              key: 'use_credits',
-            },
-            {
-              label: 'Manage - View balance and purchase more credits',
-              value: 'manage',
-              key: 'manage',
-            },
-            {
-              label: 'Stop - Abort request',
-              value: 'stop',
-              key: 'stop',
-            },
-          ],
-        }),
-        undefined,
-      );
+      expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
     it('should display the credit balance', async () => {
-      const { lastFrame, unmount, waitUntilReady } = render(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={200}
@@ -117,7 +75,7 @@ describe('OverageMenuDialog', () => {
     });
 
     it('should display the model name', async () => {
-      const { lastFrame, unmount, waitUntilReady } = render(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
@@ -133,7 +91,7 @@ describe('OverageMenuDialog', () => {
     });
 
     it('should display reset time when provided', async () => {
-      const { lastFrame, unmount, waitUntilReady } = render(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           resetTime="3:45 PM"
@@ -150,7 +108,7 @@ describe('OverageMenuDialog', () => {
     });
 
     it('should not display reset time when not provided', async () => {
-      const { lastFrame, unmount, waitUntilReady } = render(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
@@ -165,7 +123,7 @@ describe('OverageMenuDialog', () => {
     });
 
     it('should display slash command hints', async () => {
-      const { lastFrame, unmount, waitUntilReady } = render(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
@@ -184,7 +142,8 @@ describe('OverageMenuDialog', () => {
 
   describe('onChoice handling', () => {
     it('should call onChoice with use_credits when selected', async () => {
-      const { unmount, waitUntilReady } = render(
+      // use_credits is the first item, so just press Enter
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
@@ -193,17 +152,17 @@ describe('OverageMenuDialog', () => {
       );
       await waitUntilReady();
 
-      const onSelect = (RadioButtonSelect as Mock).mock.calls[0][0].onSelect;
-      await act(async () => {
-        onSelect('use_credits');
-      });
+      writeKey(stdin, '\r');
 
-      expect(mockOnChoice).toHaveBeenCalledWith('use_credits');
+      await waitFor(() => {
+        expect(mockOnChoice).toHaveBeenCalledWith('use_credits');
+      });
       unmount();
     });
 
     it('should call onChoice with manage when selected', async () => {
-      const { unmount, waitUntilReady } = render(
+      // manage is the second item: Down + Enter
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
@@ -212,17 +171,19 @@ describe('OverageMenuDialog', () => {
       );
       await waitUntilReady();
 
-      const onSelect = (RadioButtonSelect as Mock).mock.calls[0][0].onSelect;
-      await act(async () => {
-        onSelect('manage');
-      });
+      writeKey(stdin, '\x1b[B'); // Down arrow
+      writeKey(stdin, '\r');
 
-      expect(mockOnChoice).toHaveBeenCalledWith('manage');
+      await waitFor(() => {
+        expect(mockOnChoice).toHaveBeenCalledWith('manage');
+      });
       unmount();
     });
 
     it('should call onChoice with use_fallback when selected', async () => {
-      const { unmount, waitUntilReady } = render(
+      // With fallback: items are [use_credits, manage, use_fallback, stop]
+      // use_fallback is the third item: Down x2 + Enter
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           fallbackModel="gemini-3-flash-preview"
@@ -232,17 +193,20 @@ describe('OverageMenuDialog', () => {
       );
       await waitUntilReady();
 
-      const onSelect = (RadioButtonSelect as Mock).mock.calls[0][0].onSelect;
-      await act(async () => {
-        onSelect('use_fallback');
-      });
+      writeKey(stdin, '\x1b[B'); // Down arrow
+      writeKey(stdin, '\x1b[B'); // Down arrow
+      writeKey(stdin, '\r');
 
-      expect(mockOnChoice).toHaveBeenCalledWith('use_fallback');
+      await waitFor(() => {
+        expect(mockOnChoice).toHaveBeenCalledWith('use_fallback');
+      });
       unmount();
     });
 
     it('should call onChoice with stop when selected', async () => {
-      const { unmount, waitUntilReady } = render(
+      // Without fallback: items are [use_credits, manage, stop]
+      // stop is the third item: Down x2 + Enter
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <OverageMenuDialog
           failedModel="gemini-2.5-pro"
           creditBalance={100}
@@ -251,12 +215,13 @@ describe('OverageMenuDialog', () => {
       );
       await waitUntilReady();
 
-      const onSelect = (RadioButtonSelect as Mock).mock.calls[0][0].onSelect;
-      await act(async () => {
-        onSelect('stop');
-      });
+      writeKey(stdin, '\x1b[B'); // Down arrow
+      writeKey(stdin, '\x1b[B'); // Down arrow
+      writeKey(stdin, '\r');
 
-      expect(mockOnChoice).toHaveBeenCalledWith('stop');
+      await waitFor(() => {
+        expect(mockOnChoice).toHaveBeenCalledWith('stop');
+      });
       unmount();
     });
   });

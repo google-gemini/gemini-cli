@@ -4,24 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { act } from 'react';
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-  type Mock,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EmptyWalletDialog } from './EmptyWalletDialog.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 
-// Mock the child component to make it easier to test the parent
-vi.mock('./shared/RadioButtonSelect.js', () => ({
-  RadioButtonSelect: vi.fn(),
-}));
+const writeKey = (stdin: { write: (data: string) => void }, key: string) => {
+  act(() => {
+    stdin.write(key);
+  });
+};
 
 describe('EmptyWalletDialog', () => {
   const mockOnChoice = vi.fn();
@@ -36,8 +29,8 @@ describe('EmptyWalletDialog', () => {
   });
 
   describe('rendering', () => {
-    it('should render with correct menu options when fallback is available', async () => {
-      const { unmount, waitUntilReady } = render(
+    it('should match snapshot with fallback available', async () => {
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           fallbackModel="gemini-3-flash-preview"
@@ -47,33 +40,12 @@ describe('EmptyWalletDialog', () => {
       );
       await waitUntilReady();
 
-      expect(RadioButtonSelect).toHaveBeenCalledWith(
-        expect.objectContaining({
-          items: [
-            {
-              label: 'Get AI Credits - Open browser to purchase credits',
-              value: 'get_credits',
-              key: 'get_credits',
-            },
-            {
-              label: 'Switch to gemini-3-flash-preview',
-              value: 'use_fallback',
-              key: 'use_fallback',
-            },
-            {
-              label: 'Stop - Abort request',
-              value: 'stop',
-              key: 'stop',
-            },
-          ],
-        }),
-        undefined,
-      );
+      expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
-    it('should omit fallback option when fallbackModel is not provided', async () => {
-      const { unmount, waitUntilReady } = render(
+    it('should match snapshot without fallback', async () => {
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
@@ -81,28 +53,12 @@ describe('EmptyWalletDialog', () => {
       );
       await waitUntilReady();
 
-      expect(RadioButtonSelect).toHaveBeenCalledWith(
-        expect.objectContaining({
-          items: [
-            {
-              label: 'Get AI Credits - Open browser to purchase credits',
-              value: 'get_credits',
-              key: 'get_credits',
-            },
-            {
-              label: 'Stop - Abort request',
-              value: 'stop',
-              key: 'stop',
-            },
-          ],
-        }),
-        undefined,
-      );
+      expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
     it('should display the model name and usage limit message', async () => {
-      const { lastFrame, unmount, waitUntilReady } = render(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
@@ -117,7 +73,7 @@ describe('EmptyWalletDialog', () => {
     });
 
     it('should display purchase prompt and credits update notice', async () => {
-      const { lastFrame, unmount, waitUntilReady } = render(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
@@ -134,7 +90,7 @@ describe('EmptyWalletDialog', () => {
     });
 
     it('should display reset time when provided', async () => {
-      const { lastFrame, unmount, waitUntilReady } = render(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           resetTime="3:45 PM"
@@ -150,7 +106,7 @@ describe('EmptyWalletDialog', () => {
     });
 
     it('should not display reset time when not provided', async () => {
-      const { lastFrame, unmount, waitUntilReady } = render(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
@@ -164,7 +120,7 @@ describe('EmptyWalletDialog', () => {
     });
 
     it('should display slash command hints', async () => {
-      const { lastFrame, unmount, waitUntilReady } = render(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
@@ -182,7 +138,8 @@ describe('EmptyWalletDialog', () => {
 
   describe('onChoice handling', () => {
     it('should call onGetCredits and onChoice when get_credits is selected', async () => {
-      const { unmount, waitUntilReady } = render(
+      // get_credits is the first item, so just press Enter
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
@@ -191,19 +148,17 @@ describe('EmptyWalletDialog', () => {
       );
       await waitUntilReady();
 
-      const onSelect = (RadioButtonSelect as Mock).mock.calls[0][0].onSelect;
+      writeKey(stdin, '\r');
 
-      await act(async () => {
-        onSelect('get_credits');
+      await waitFor(() => {
+        expect(mockOnGetCredits).toHaveBeenCalled();
+        expect(mockOnChoice).toHaveBeenCalledWith('get_credits');
       });
-
-      expect(mockOnGetCredits).toHaveBeenCalled();
-      expect(mockOnChoice).toHaveBeenCalledWith('get_credits');
       unmount();
     });
 
     it('should call onChoice without onGetCredits when onGetCredits is not provided', async () => {
-      const { unmount, waitUntilReady } = render(
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
@@ -211,18 +166,18 @@ describe('EmptyWalletDialog', () => {
       );
       await waitUntilReady();
 
-      const onSelect = (RadioButtonSelect as Mock).mock.calls[0][0].onSelect;
+      writeKey(stdin, '\r');
 
-      await act(async () => {
-        onSelect('get_credits');
+      await waitFor(() => {
+        expect(mockOnChoice).toHaveBeenCalledWith('get_credits');
       });
-
-      expect(mockOnChoice).toHaveBeenCalledWith('get_credits');
       unmount();
     });
 
     it('should call onChoice with use_fallback when selected', async () => {
-      const { unmount, waitUntilReady } = render(
+      // With fallback: items are [get_credits, use_fallback, stop]
+      // use_fallback is the second item: Down + Enter
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           fallbackModel="gemini-3-flash-preview"
@@ -231,17 +186,19 @@ describe('EmptyWalletDialog', () => {
       );
       await waitUntilReady();
 
-      const onSelect = (RadioButtonSelect as Mock).mock.calls[0][0].onSelect;
-      await act(async () => {
-        onSelect('use_fallback');
-      });
+      writeKey(stdin, '\x1b[B'); // Down arrow
+      writeKey(stdin, '\r');
 
-      expect(mockOnChoice).toHaveBeenCalledWith('use_fallback');
+      await waitFor(() => {
+        expect(mockOnChoice).toHaveBeenCalledWith('use_fallback');
+      });
       unmount();
     });
 
     it('should call onChoice with stop when selected', async () => {
-      const { unmount, waitUntilReady } = render(
+      // Without fallback: items are [get_credits, stop]
+      // stop is the second item: Down + Enter
+      const { unmount, stdin, waitUntilReady } = renderWithProviders(
         <EmptyWalletDialog
           failedModel="gemini-2.5-pro"
           onChoice={mockOnChoice}
@@ -249,12 +206,12 @@ describe('EmptyWalletDialog', () => {
       );
       await waitUntilReady();
 
-      const onSelect = (RadioButtonSelect as Mock).mock.calls[0][0].onSelect;
-      await act(async () => {
-        onSelect('stop');
-      });
+      writeKey(stdin, '\x1b[B'); // Down arrow
+      writeKey(stdin, '\r');
 
-      expect(mockOnChoice).toHaveBeenCalledWith('stop');
+      await waitFor(() => {
+        expect(mockOnChoice).toHaveBeenCalledWith('stop');
+      });
       unmount();
     });
   });
