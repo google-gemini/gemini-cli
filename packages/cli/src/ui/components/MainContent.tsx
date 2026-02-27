@@ -62,19 +62,31 @@ export const MainContent = () => {
     return -1;
   }, [uiState.history]);
 
+  const augmentedHistory = useMemo(
+    () =>
+      uiState.history.map((item, index) => {
+        const isExpandable = index > lastUserPromptIndex;
+        const prevType =
+          index > 0 ? uiState.history[index - 1]?.type : undefined;
+        const isFirstThinking =
+          item.type === 'thinking' && prevType !== 'thinking';
+        const isFirstAfterThinking =
+          item.type !== 'thinking' && prevType === 'thinking';
+
+        return {
+          item,
+          isExpandable,
+          isFirstThinking,
+          isFirstAfterThinking,
+        };
+      }),
+    [uiState.history, lastUserPromptIndex],
+  );
+
   const historyItems = useMemo(
     () =>
-      uiState.history.map((h, index) => {
-        const isExpandable = index > lastUserPromptIndex;
-        const isFirstThinking =
-          h.type === 'thinking' &&
-          (index === 0 || uiState.history[index - 1]?.type !== 'thinking');
-        const isLastThinking =
-          h.type === 'thinking' &&
-          (index === uiState.history.length - 1 ||
-            uiState.history[index + 1]?.type !== 'thinking');
-
-        return (
+      augmentedHistory.map(
+        ({ item, isExpandable, isFirstThinking, isFirstAfterThinking }) => (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
             availableTerminalHeight={
@@ -83,23 +95,22 @@ export const MainContent = () => {
                 : undefined
             }
             availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
-            key={h.id}
-            item={h}
+            key={item.id}
+            item={item}
             isPending={false}
             commands={uiState.slashCommands}
             isExpandable={isExpandable}
             isFirstThinking={isFirstThinking}
-            isLastThinking={isLastThinking}
+            isFirstAfterThinking={isFirstAfterThinking}
           />
-        );
-      }),
+        ),
+      ),
     [
-      uiState.history,
+      augmentedHistory,
       mainAreaWidth,
       staticAreaMaxItemHeight,
       uiState.slashCommands,
       uiState.constrainHeight,
-      lastUserPromptIndex,
     ],
   );
 
@@ -117,15 +128,14 @@ export const MainContent = () => {
     () => (
       <Box flexDirection="column">
         {pendingHistoryItems.map((item, i) => {
+          const prevType =
+            i === 0
+              ? uiState.history.at(-1)?.type
+              : pendingHistoryItems[i - 1]?.type;
           const isFirstThinking =
-            item.type === 'thinking' &&
-            (i === 0 || pendingHistoryItems[i - 1]?.type !== 'thinking') &&
-            (uiState.history.length === 0 ||
-              uiState.history.at(-1)?.type !== 'thinking');
-          const isLastThinking =
-            item.type === 'thinking' &&
-            (i === pendingHistoryItems.length - 1 ||
-              pendingHistoryItems[i + 1]?.type !== 'thinking');
+            item.type === 'thinking' && prevType !== 'thinking';
+          const isFirstAfterThinking =
+            item.type !== 'thinking' && prevType === 'thinking';
 
           return (
             <HistoryItemDisplay
@@ -138,7 +148,7 @@ export const MainContent = () => {
               isPending={true}
               isExpandable={true}
               isFirstThinking={isFirstThinking}
-              isLastThinking={isLastThinking}
+              isFirstAfterThinking={isFirstAfterThinking}
             />
           );
         })}
@@ -161,25 +171,18 @@ export const MainContent = () => {
   const virtualizedData = useMemo(
     () => [
       { type: 'header' as const },
-      ...uiState.history.map((item, index) => {
-        const isFirstThinking =
-          item.type === 'thinking' &&
-          (index === 0 || uiState.history[index - 1]?.type !== 'thinking');
-        const isLastThinking =
-          item.type === 'thinking' &&
-          (index === uiState.history.length - 1 ||
-            uiState.history[index + 1]?.type !== 'thinking');
-        return {
+      ...augmentedHistory.map(
+        ({ item, isExpandable, isFirstThinking, isFirstAfterThinking }) => ({
           type: 'history' as const,
           item,
-          isExpandable: index > lastUserPromptIndex,
+          isExpandable,
           isFirstThinking,
-          isLastThinking,
-        };
-      }),
+          isFirstAfterThinking,
+        }),
+      ),
       { type: 'pending' as const },
     ],
-    [uiState.history, lastUserPromptIndex],
+    [augmentedHistory],
   );
 
   const renderItem = useCallback(
@@ -208,7 +211,7 @@ export const MainContent = () => {
             commands={uiState.slashCommands}
             isExpandable={item.isExpandable}
             isFirstThinking={item.isFirstThinking}
-            isLastThinking={item.isLastThinking}
+            isFirstAfterThinking={item.isFirstAfterThinking}
           />
         );
       } else {

@@ -89,10 +89,7 @@ export const usePhraseCycler = (
       }
 
       const randomIndex = Math.floor(Math.random() * phraseList.length);
-      const phrase = phraseList[randomIndex];
-      setCurrentLoadingPhrase(
-        phraseList === INFORMATIVE_TIPS ? `Tip: ${phrase}` : phrase,
-      );
+      setCurrentLoadingPhrase(phraseList[randomIndex]);
     };
 
     // Select an initial random phrase

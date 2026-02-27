@@ -107,11 +107,9 @@ describe('useLoadingIndicator', () => {
     );
 
     // Initially should be witty phrase or tip
-    const possiblePhrases = [
-      ...WITTY_LOADING_PHRASES,
-      ...INFORMATIVE_TIPS.map((tip) => `Tip: ${tip}`),
-    ];
-    expect(possiblePhrases).toContain(result.current.currentLoadingPhrase);
+    expect([...WITTY_LOADING_PHRASES, ...INFORMATIVE_TIPS]).toContain(
+      result.current.currentLoadingPhrase,
+    );
 
     await act(async () => {
       rerender({

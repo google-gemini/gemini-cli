@@ -370,7 +370,7 @@ describe('Composer', () => {
       expect(output).toContain('LoadingIndicator: Processing');
     });
 
-    it('renders actual thought subject in loading indicator even when full inline thinking is enabled', async () => {
+    it('renders generic thinking text in loading indicator when full inline thinking is enabled', async () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         thought: {
