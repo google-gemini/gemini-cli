@@ -428,6 +428,7 @@ export enum AuthProviderType {
 export interface SandboxConfig {
   command: 'docker' | 'podman' | 'sandbox-exec';
   image: string;
+  flags?: string;
 }
 
 /**

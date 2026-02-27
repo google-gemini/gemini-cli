@@ -91,11 +91,21 @@ Built-in profiles (set via `SEATBELT_PROFILE` env var):
 ### Custom sandbox flags
 
 For container-based sandboxing, you can inject custom flags into the `docker` or
-`podman` command using the `SANDBOX_FLAGS` environment variable. This is useful
-for advanced configurations, such as disabling security features for specific
-use cases.
+`podman` command using the `tools.sandboxFlags` setting in your `settings.json`
+or the `SANDBOX_FLAGS` environment variable. This is useful for advanced
+configurations, such as disabling security features for specific use cases.
 
-**Example (Podman)**:
+**Example (`settings.json`)**:
+
+```json
+{
+  "tools": {
+    "sandboxFlags": "--security-opt label=disable"
+  }
+}
+```
+
+**Example (Environment variable)**:
 
 To disable SELinux labeling for volume mounts, you can set the following:
 
