@@ -8,7 +8,10 @@ import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { getContextUsagePercentage } from '../utils/contextUsage.js';
 import { useSettings } from '../contexts/SettingsContext.js';
-import { MIN_TERMINAL_WIDTH_FOR_FULL_LABEL } from '../constants.js';
+import {
+  MIN_TERMINAL_WIDTH_FOR_FULL_LABEL,
+  DEFAULT_COMPRESSION_THRESHOLD,
+} from '../constants.js';
 
 export const ContextUsageDisplay = ({
   promptTokenCount,
@@ -23,7 +26,9 @@ export const ContextUsageDisplay = ({
   const percentage = getContextUsagePercentage(promptTokenCount, model);
   const percentageUsed = (percentage * 100).toFixed(0);
 
-  const threshold = settings.merged.model?.compressionThreshold ?? 0.5;
+  const threshold =
+    settings.merged.model?.compressionThreshold ??
+    DEFAULT_COMPRESSION_THRESHOLD;
 
   let textColor = theme.text.secondary;
   if (percentage >= 1.0) {
