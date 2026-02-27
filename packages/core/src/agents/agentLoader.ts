@@ -50,10 +50,11 @@ interface FrontmatterAuthConfig {
   key?: string;
   name?: string;
   // HTTP
-  scheme?: 'Bearer' | 'Basic';
+  scheme?: string;
   token?: string;
   username?: string;
   password?: string;
+  value?: string;
 }
 
 interface FrontmatterRemoteAgentDefinition
@@ -139,16 +140,21 @@ const apiKeyAuthSchema = z.object({
 const httpAuthSchema = z.object({
   ...baseAuthFields,
   type: z.literal('http'),
-  scheme: z.enum(['Bearer', 'Basic']),
+  scheme: z.string().min(1),
   token: z.string().min(1).optional(),
   username: z.string().min(1).optional(),
   password: z.string().min(1).optional(),
+  value: z.string().min(1).optional(),
 });
 
 const authConfigSchema = z
   .discriminatedUnion('type', [apiKeyAuthSchema, httpAuthSchema])
   .superRefine((data, ctx) => {
     if (data.type === 'http') {
+      if (data.value) {
+        // Raw mode - only scheme and value are needed
+        return;
+      }
       if (data.scheme === 'Bearer' && !data.token) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -348,6 +354,14 @@ function convertFrontmatterAuthToConfig(
           'Internal error: HTTP scheme missing after validation.',
         );
       }
+      if (frontmatter.value) {
+        return {
+          ...base,
+          type: 'http',
+          scheme: frontmatter.scheme,
+          value: frontmatter.value,
+        };
+      }
       switch (frontmatter.scheme) {
         case 'Bearer':
           if (!frontmatter.token) {
@@ -375,8 +389,8 @@ function convertFrontmatterAuthToConfig(
             password: frontmatter.password,
           };
         default: {
-          const exhaustive: never = frontmatter.scheme;
-          throw new Error(`Unknown HTTP scheme: ${exhaustive}`);
+          // Other IANA schemes without a value should not reach here after validation
+          throw new Error(`Unknown HTTP scheme: ${frontmatter.scheme}`);
         }
       }
     }

@@ -15,6 +15,8 @@ import { GeneralistAgent } from './generalist-agent.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { ADCHandler } from './remote-invocation.js';
+import { A2AAuthProviderFactory } from './auth-provider/factory.js';
+import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isAutoModel } from '../config/models.js';
@@ -363,8 +365,19 @@ export class AgentRegistry {
     // Log remote A2A agent registration for visibility.
     try {
       const clientManager = A2AClientManager.getInstance();
-      // Use ADCHandler to ensure we can load agents hosted on secure platforms (e.g. Vertex AI)
-      const authHandler = new ADCHandler();
+      // Use definition auth if available, otherwise fallback to ADCHandler
+      let authHandler: AuthenticationHandler | undefined;
+      if (definition.auth) {
+        authHandler = await A2AAuthProviderFactory.create({
+          authConfig: definition.auth,
+          agentName: definition.name,
+        });
+      }
+
+      if (!authHandler) {
+        authHandler = new ADCHandler();
+      }
+
       const agentCard = await clientManager.loadAgent(
         definition.name,
         definition.agentCardUrl,
