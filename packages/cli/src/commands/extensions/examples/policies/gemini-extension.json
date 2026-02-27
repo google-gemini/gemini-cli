@@ -1,0 +1,5 @@
+{
+  "name": "policy-example",
+  "version": "1.0.0",
+  "description": "An example extension demonstrating Policy Engine support."
+}

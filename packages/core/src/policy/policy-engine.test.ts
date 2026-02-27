@@ -406,6 +406,40 @@ describe('PolicyEngine', () => {
       expect(remainingRules.some((r) => r.toolName === 'tool2')).toBe(true);
     });
 
+    it('should remove rules for specific tool and source', () => {
+      engine.addRule({
+        toolName: 'tool1',
+        decision: PolicyDecision.ALLOW,
+        source: 'source1',
+      });
+      engine.addRule({
+        toolName: 'tool1',
+        decision: PolicyDecision.DENY,
+        source: 'source2',
+      });
+      engine.addRule({
+        toolName: 'tool2',
+        decision: PolicyDecision.ALLOW,
+        source: 'source1',
+      });
+
+      expect(engine.getRules()).toHaveLength(3);
+
+      engine.removeRulesForTool('tool1', 'source1');
+
+      const rules = engine.getRules();
+      expect(rules).toHaveLength(2);
+      expect(
+        rules.some((r) => r.toolName === 'tool1' && r.source === 'source2'),
+      ).toBe(true);
+      expect(
+        rules.some((r) => r.toolName === 'tool2' && r.source === 'source1'),
+      ).toBe(true);
+      expect(
+        rules.some((r) => r.toolName === 'tool1' && r.source === 'source1'),
+      ).toBe(false);
+    });
+
     it('should handle removing non-existent tool', () => {
       engine.addRule({ toolName: 'existing', decision: PolicyDecision.ALLOW });
 
@@ -2836,6 +2870,34 @@ describe('PolicyEngine', () => {
     });
   });
 
+  describe('removeRulesBySource', () => {
+    it('should remove rules matching a specific source', () => {
+      engine.addRule({
+        toolName: 'rule1',
+        decision: PolicyDecision.ALLOW,
+        source: 'source1',
+      });
+      engine.addRule({
+        toolName: 'rule2',
+        decision: PolicyDecision.ALLOW,
+        source: 'source2',
+      });
+      engine.addRule({
+        toolName: 'rule3',
+        decision: PolicyDecision.ALLOW,
+        source: 'source1',
+      });
+
+      expect(engine.getRules()).toHaveLength(3);
+
+      engine.removeRulesBySource('source1');
+
+      const rules = engine.getRules();
+      expect(rules).toHaveLength(1);
+      expect(rules[0].toolName).toBe('rule2');
+    });
+  });
+
   describe('removeCheckersByTier', () => {
     it('should remove checkers matching a specific tier', () => {
       engine.addChecker({
@@ -2858,6 +2920,31 @@ describe('PolicyEngine', () => {
       const checkers = engine.getCheckers();
       expect(checkers).toHaveLength(1);
       expect(checkers[0].priority).toBe(2.5);
+    });
+  });
+
+  describe('removeCheckersBySource', () => {
+    it('should remove checkers matching a specific source', () => {
+      engine.addChecker({
+        checker: { type: 'external', name: 'c1' },
+        source: 'sourceA',
+      });
+      engine.addChecker({
+        checker: { type: 'external', name: 'c2' },
+        source: 'sourceB',
+      });
+      engine.addChecker({
+        checker: { type: 'external', name: 'c3' },
+        source: 'sourceA',
+      });
+
+      expect(engine.getCheckers()).toHaveLength(3);
+
+      engine.removeCheckersBySource('sourceA');
+
+      const checkers = engine.getCheckers();
+      expect(checkers).toHaveLength(1);
+      expect(checkers[0].checker.name).toBe('c2');
     });
   });
 
@@ -2922,6 +3009,24 @@ describe('PolicyEngine', () => {
           })
         ).decision,
       ).toBe(PolicyDecision.ALLOW);
+    });
+  });
+
+  describe('hook checkers', () => {
+    it('should add and retrieve hook checkers in priority order', () => {
+      engine.addHookChecker({
+        checker: { type: 'external', name: 'h1' },
+        priority: 5,
+      });
+      engine.addHookChecker({
+        checker: { type: 'external', name: 'h2' },
+        priority: 10,
+      });
+
+      const hookCheckers = engine.getHookCheckers();
+      expect(hookCheckers).toHaveLength(2);
+      expect(hookCheckers[0].priority).toBe(10);
+      expect(hookCheckers[1].priority).toBe(5);
     });
   });
 });

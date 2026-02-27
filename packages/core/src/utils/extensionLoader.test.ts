@@ -14,6 +14,7 @@ import {
   type MockInstance,
 } from 'vitest';
 import { SimpleExtensionLoader } from './extensionLoader.js';
+import { PolicyDecision } from '../policy/types.js';
 import type { Config, GeminiCLIExtension } from '../config/config.js';
 import { type McpClientManager } from '../tools/mcp-client-manager.js';
 import type { GeminiClient } from '../core/client.js';
@@ -38,6 +39,12 @@ describe('SimpleExtensionLoader', () => {
   let mockHookSystemInit: MockInstance;
   let mockAgentRegistryReload: MockInstance;
   let mockSkillsReload: MockInstance;
+  let mockPolicyEngine: {
+    addRule: MockInstance;
+    addChecker: MockInstance;
+    removeRulesBySource: MockInstance;
+    removeCheckersBySource: MockInstance;
+  };
 
   const activeExtension: GeminiCLIExtension = {
     name: 'test-extension',
@@ -47,7 +54,22 @@ describe('SimpleExtensionLoader', () => {
     contextFiles: [],
     excludeTools: ['some-tool'],
     id: '123',
+    rules: [
+      {
+        toolName: 'test-tool',
+        decision: PolicyDecision.ALLOW,
+        source: 'Extension (test-extension): policies.toml',
+      },
+    ],
+    checkers: [
+      {
+        toolName: 'test-tool',
+        checker: { type: 'external', name: 'test-checker' },
+        source: 'Extension (test-extension): policies.toml',
+      },
+    ],
   };
+
   const inactiveExtension: GeminiCLIExtension = {
     name: 'test-extension',
     isActive: false,
@@ -67,6 +89,12 @@ describe('SimpleExtensionLoader', () => {
     mockHookSystemInit = vi.fn();
     mockAgentRegistryReload = vi.fn();
     mockSkillsReload = vi.fn();
+    mockPolicyEngine = {
+      addRule: vi.fn(),
+      addChecker: vi.fn(),
+      removeRulesBySource: vi.fn(),
+      removeCheckersBySource: vi.fn(),
+    };
     mockConfig = {
       getMcpClientManager: () => mockMcpClientManager,
       getEnableExtensionReloading: () => extensionReloadingEnabled,
@@ -81,11 +109,35 @@ describe('SimpleExtensionLoader', () => {
         reload: mockAgentRegistryReload,
       }),
       reloadSkills: mockSkillsReload,
+      getPolicyEngine: () => mockPolicyEngine,
     } as unknown as Config;
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('should register policies when an extension starts', async () => {
+    const loader = new SimpleExtensionLoader([activeExtension]);
+    await loader.start(mockConfig);
+    expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+      activeExtension.rules![0],
+    );
+    expect(mockPolicyEngine.addChecker).toHaveBeenCalledWith(
+      activeExtension.checkers![0],
+    );
+  });
+
+  it('should unregister policies when an extension stops', async () => {
+    const loader = new TestingSimpleExtensionLoader([activeExtension]);
+    await loader.start(mockConfig);
+    await loader.stopExtension(activeExtension);
+    expect(mockPolicyEngine.removeRulesBySource).toHaveBeenCalledWith(
+      'Extension (test-extension): policies.toml',
+    );
+    expect(mockPolicyEngine.removeCheckersBySource).toHaveBeenCalledWith(
+      'Extension (test-extension): policies.toml',
+    );
   });
 
   it('should start active extensions', async () => {
