@@ -19,6 +19,7 @@ import {
   type SubagentActivityItem,
   AgentTerminateMode,
 } from './types.js';
+import { randomUUID } from 'node:crypto';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
@@ -114,10 +115,15 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           case 'THOUGHT_CHUNK': {
             const text = String(activity.data['text']);
             const lastItem = recentActivity[recentActivity.length - 1];
-            if (lastItem && lastItem.type === 'thought') {
+            if (
+              lastItem &&
+              lastItem.type === 'thought' &&
+              lastItem.status === 'running'
+            ) {
               lastItem.content += text;
             } else {
               recentActivity.push({
+                id: randomUUID(),
                 type: 'thought',
                 content: text,
                 status: 'running',
@@ -130,6 +136,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
             const name = String(activity.data['name']);
             const args = JSON.stringify(activity.data['args']);
             recentActivity.push({
+              id: randomUUID(),
               type: 'tool_call',
               content: name,
               args,
@@ -156,10 +163,30 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           }
           case 'ERROR': {
             const error = String(activity.data['error']);
+            const isCancellation = error === 'Request cancelled.';
+            const toolName = activity.data['name']
+              ? String(activity.data['name'])
+              : undefined;
+
+            if (toolName && isCancellation) {
+              for (let i = recentActivity.length - 1; i >= 0; i--) {
+                if (
+                  recentActivity[i].type === 'tool_call' &&
+                  recentActivity[i].content === toolName &&
+                  recentActivity[i].status === 'running'
+                ) {
+                  recentActivity[i].status = 'cancelled';
+                  updated = true;
+                  break;
+                }
+              }
+            }
+
             recentActivity.push({
+              id: randomUUID(),
               type: 'thought', // Treat errors as thoughts for now, or add an error type
-              content: `Error: ${error}`,
-              status: 'error',
+              content: isCancellation ? error : `Error: ${error}`,
+              status: isCancellation ? 'cancelled' : 'error',
             });
             updated = true;
             break;
@@ -240,7 +267,7 @@ ${output.result}
       // Mark any running items as error/cancelled
       for (const item of recentActivity) {
         if (item.status === 'running') {
-          item.status = 'error';
+          item.status = isAbort ? 'cancelled' : 'error';
         }
       }
 
@@ -250,6 +277,7 @@ ${output.result}
         const lastActivity = recentActivity[recentActivity.length - 1];
         if (!lastActivity || lastActivity.status !== 'error') {
           recentActivity.push({
+            id: randomUUID(),
             type: 'thought',
             content: `Error: ${errorMessage}`,
             status: 'error',

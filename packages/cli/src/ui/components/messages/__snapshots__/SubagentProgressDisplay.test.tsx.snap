@@ -1,5 +1,12 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`<SubagentProgressDisplay /> > renders "Request cancelled." with the info icon 1`] = `
+"Subagent TestAgent is working...
+
+ℹ  Request cancelled.
+"
+`;
+
 exports[`<SubagentProgressDisplay /> > renders cancelled state correctly 1`] = `
 "Subagent TestAgent was cancelled.
 "

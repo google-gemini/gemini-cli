@@ -26,6 +26,7 @@ describe('<SubagentProgressDisplay />', () => {
       agentName: 'TestAgent',
       recentActivity: [
         {
+          id: '1',
           type: 'tool_call',
           content: 'run_shell_command',
           args: '{"command": "echo hello", "description": "Say hello"}',
@@ -47,6 +48,7 @@ describe('<SubagentProgressDisplay />', () => {
       agentName: 'TestAgent',
       recentActivity: [
         {
+          id: '2',
           type: 'tool_call',
           content: 'run_shell_command',
           args: '{"command": "echo hello"}',
@@ -68,6 +70,7 @@ describe('<SubagentProgressDisplay />', () => {
       agentName: 'TestAgent',
       recentActivity: [
         {
+          id: '3',
           type: 'tool_call',
           content: 'write_file',
           args: '{"file_path": "/tmp/test.txt", "content": "foo"}',
@@ -91,6 +94,7 @@ describe('<SubagentProgressDisplay />', () => {
       agentName: 'TestAgent',
       recentActivity: [
         {
+          id: '4',
           type: 'tool_call',
           content: 'run_shell_command',
           args: JSON.stringify({ description: longDesc }),
@@ -112,6 +116,7 @@ describe('<SubagentProgressDisplay />', () => {
       agentName: 'TestAgent',
       recentActivity: [
         {
+          id: '5',
           type: 'thought',
           content: 'Thinking about life',
           status: 'running',
@@ -132,6 +137,27 @@ describe('<SubagentProgressDisplay />', () => {
       agentName: 'TestAgent',
       recentActivity: [],
       state: 'cancelled',
+    };
+
+    const { lastFrame, waitUntilReady } = render(
+      <SubagentProgressDisplay progress={progress} />,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('renders "Request cancelled." with the info icon', async () => {
+    const progress: SubagentProgress = {
+      isSubagentProgress: true,
+      agentName: 'TestAgent',
+      recentActivity: [
+        {
+          id: '6',
+          type: 'thought',
+          content: 'Request cancelled.',
+          status: 'error',
+        },
+      ],
     };
 
     const { lastFrame, waitUntilReady } = render(

@@ -72,10 +72,11 @@ export interface SubagentActivityEvent {
 }
 
 export interface SubagentActivityItem {
+  id: string;
   type: 'thought' | 'tool_call';
   content: string;
   args?: string;
-  status: 'running' | 'completed' | 'error';
+  status: 'running' | 'completed' | 'error' | 'cancelled';
 }
 
 export interface SubagentProgress {

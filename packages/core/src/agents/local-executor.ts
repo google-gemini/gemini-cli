@@ -1077,7 +1077,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           this.emitActivity('ERROR', {
             context: 'tool_call',
             name: toolName,
-            error: 'Tool call was cancelled.',
+            error: 'Request cancelled.',
           });
         }
 

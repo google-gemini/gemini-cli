@@ -98,6 +98,17 @@ describe('shouldHideToolCall', () => {
       ).toBe(!visible);
     },
   );
+
+  it('hides tool calls with a parentCallId', () => {
+    expect(
+      shouldHideToolCall({
+        displayName: 'any_tool',
+        status: CoreToolCallStatus.Success,
+        hasResultDisplay: true,
+        parentCallId: 'some-parent',
+      }),
+    ).toBe(true);
+  });
 });
 
 describe('getToolSuggestion', () => {

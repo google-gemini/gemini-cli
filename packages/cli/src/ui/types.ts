@@ -98,6 +98,7 @@ export interface ToolCallEvent {
 
 export interface IndividualToolCallDisplay {
   callId: string;
+  parentCallId?: string;
   name: string;
   description: string;
   resultDisplay: ToolResultDisplay | undefined;
