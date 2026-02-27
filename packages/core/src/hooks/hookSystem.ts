@@ -12,6 +12,7 @@ import { HookPlanner } from './hookPlanner.js';
 import { HookEventHandler } from './hookEventHandler.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
+  NotificationType,
   type SessionStartSource,
   type SessionEndReason,
   type PreCompressTrigger,
@@ -20,7 +21,9 @@ import {
   type AfterModelHookOutput,
   type BeforeToolSelectionHookOutput,
   type McpToolContext,
-  NotificationType,
+  type HookConfig,
+  type HookEventName,
+  type ConfigSource,
 } from './types.js';
 import type {
   GenerateContentParameters,
@@ -201,6 +204,17 @@ export class HookSystem {
   }
 
   /**
+   * Register a new hook programmatically
+   */
+  registerHook(
+    config: HookConfig,
+    eventName: HookEventName,
+    options?: { matcher?: string; sequential?: boolean; source?: ConfigSource },
+  ): void {
+    this.hookRegistry.registerHook(config, eventName, options);
+  }
+
+  /**
    * Fire hook events directly
    */
   async fireSessionStartEvent(
@@ -366,12 +380,14 @@ export class HookSystem {
     toolName: string,
     toolInput: Record<string, unknown>,
     mcpContext?: McpToolContext,
+    originalRequestName?: string,
   ): Promise<DefaultHookOutput | undefined> {
     try {
       const result = await this.hookEventHandler.fireBeforeToolEvent(
         toolName,
         toolInput,
         mcpContext,
+        originalRequestName,
       );
       return result.finalOutput;
     } catch (error) {
@@ -389,6 +405,7 @@ export class HookSystem {
       error: unknown;
     },
     mcpContext?: McpToolContext,
+    originalRequestName?: string,
   ): Promise<DefaultHookOutput | undefined> {
     try {
       const result = await this.hookEventHandler.fireAfterToolEvent(
@@ -396,6 +413,7 @@ export class HookSystem {
         toolInput,
         toolResponse as Record<string, unknown>,
         mcpContext,
+        originalRequestName,
       );
       return result.finalOutput;
     } catch (error) {

@@ -19,11 +19,7 @@ import {
   FinishReason,
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
-import {
-  retryWithBackoff,
-  isRetryableError,
-  DEFAULT_MAX_ATTEMPTS,
-} from '../utils/retry.js';
+import { retryWithBackoff, isRetryableError } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import type { Config } from '../config/config.js';
 import {
@@ -636,12 +632,12 @@ export class GeminiChat {
       authType: this.config.getContentGeneratorConfig()?.authType,
       retryFetchErrors: this.config.getRetryFetchErrors(),
       signal: abortSignal,
-      maxAttempts: availabilityMaxAttempts,
+      maxAttempts: availabilityMaxAttempts ?? this.config.getMaxAttempts(),
       getAvailabilityContext,
       onRetry: (attempt, error, delayMs) => {
         coreEvents.emitRetryAttempt({
           attempt,
-          maxAttempts: availabilityMaxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+          maxAttempts: availabilityMaxAttempts ?? this.config.getMaxAttempts(),
           delayMs,
           error: error instanceof Error ? error.message : String(error),
           model: lastModelToUse,

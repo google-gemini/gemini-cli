@@ -42,7 +42,9 @@ import {
   WebFetchFallbackAttemptEvent,
   HookCallEvent,
 } from '../types.js';
+import { HookType } from '../../hooks/types.js';
 import { AgentTerminateMode } from '../../agents/types.js';
+import { ApprovalMode } from '../../policy/types.js';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { InstallationManager } from '../../utils/installationManager.js';
@@ -910,6 +912,7 @@ describe('ClearcutLogger', () => {
         'some reasoning',
         false,
         undefined,
+        ApprovalMode.DEFAULT,
       );
 
       logger?.logModelRoutingEvent(event);
@@ -944,6 +947,7 @@ describe('ClearcutLogger', () => {
         'some reasoning',
         true,
         'Something went wrong',
+        ApprovalMode.DEFAULT,
       );
 
       logger?.logModelRoutingEvent(event);
@@ -982,6 +986,7 @@ describe('ClearcutLogger', () => {
         '[Score: 90 / Threshold: 80] reasoning',
         false,
         undefined,
+        ApprovalMode.DEFAULT,
         true,
         '80',
       );
@@ -1407,7 +1412,7 @@ describe('ClearcutLogger', () => {
 
       const event = new HookCallEvent(
         'before-tool',
-        'command',
+        HookType.Command,
         hookName,
         {}, // input
         150, // duration
