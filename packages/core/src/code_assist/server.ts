@@ -5,6 +5,7 @@
  */
 
 import type { AuthClient } from 'google-auth-library';
+import { Agent } from 'node:https';
 import type {
   CodeAssistGlobalUserSettingResponse,
   LoadCodeAssistRequest,
@@ -38,7 +39,6 @@ import * as readline from 'node:readline';
 import { Readable } from 'node:stream';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import { UserTierId } from './types.js';
-import { Agent } from 'undici';
 import type {
   CaCountTokenResponse,
   CaGenerateContentResponse,
@@ -55,6 +55,7 @@ import {
 } from './telemetry.js';
 import { getClientMetadata } from './experiments/client_metadata.js';
 import type { LlmRole } from '../telemetry/types.js';
+
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
   /** Additional HTTP headers to be sent with the request. */
@@ -73,8 +74,7 @@ export class CodeAssistServer implements ContentGenerator {
     readonly userTier?: UserTierId,
     readonly userTierName?: string,
     private readonly httpsAgent = new Agent({
-      headersTimeout: 60000,
-      bodyTimeout: 300000,
+      timeout: 300000,
     }),
   ) {}
 
@@ -310,7 +310,7 @@ export class CodeAssistServer implements ContentGenerator {
       responseType: 'json',
       body: JSON.stringify(req),
       signal,
-      httpsAgent: this.httpsAgent,
+      agent: this.httpsAgent,
     });
     return res.data;
   }
@@ -328,7 +328,7 @@ export class CodeAssistServer implements ContentGenerator {
       },
       responseType: 'json',
       signal,
-      httpsAgent: this.httpsAgent,
+      agent: this.httpsAgent,
     });
     return res.data;
   }
@@ -359,7 +359,7 @@ export class CodeAssistServer implements ContentGenerator {
       responseType: 'stream',
       body: JSON.stringify(req),
       signal,
-      httpsAgent: this.httpsAgent,
+      agent: this.httpsAgent,
     });
 
     return (async function* (): AsyncGenerator<T> {
