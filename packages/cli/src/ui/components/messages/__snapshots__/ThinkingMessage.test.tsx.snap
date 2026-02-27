@@ -1,8 +1,8 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ThinkingMessage > normalizes escaped newline tokens 1`] = `
-" │ 
- │  Matching the Blocks
- │  Some more text
+" │
+ │ Matching the Blocks
+ │ Some more text
 "
 `;
