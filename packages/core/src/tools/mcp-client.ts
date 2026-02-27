@@ -65,6 +65,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
+import { validateMcpPolicyToolNames } from '../policy/toml-loader.js';
 import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
@@ -216,6 +217,23 @@ export class McpClient implements McpProgressReporter {
       this.toolRegistry.registerTool(tool);
     }
     this.toolRegistry.sortTools();
+
+    // Validate MCP tool names in policy rules against discovered tools
+    try {
+      const discoveredToolNames = tools.map((t) => t.serverToolName);
+      const policyRules = cliConfig.getPolicyEngine().getRules();
+      const warnings = validateMcpPolicyToolNames(
+        this.serverName,
+        discoveredToolNames,
+        policyRules,
+      );
+      for (const warning of warnings) {
+        coreEvents.emitFeedback('warning', warning);
+      }
+    } catch {
+      // Policy engine may not be available in all contexts (e.g. tests).
+      // Validation is best-effort; skip silently if unavailable.
+    }
   }
 
   /**
