@@ -294,11 +294,23 @@ ${finalExclusionPatternsForDescription
             }
           }
 
+          const isDocxExtensionActive = this.config
+            .getExtensionLoader()
+            .getExtensions()
+            .some(
+              (e) =>
+                e.isActive &&
+                (e.id === 'usejunior/safe-docx' || e.name === 'safe-docx'),
+            );
+
           // Use processSingleFileContent for all file types now
           const fileReadResult = await processSingleFileContent(
             filePath,
             this.config.getTargetDir(),
             this.config.getFileSystemService(),
+            undefined,
+            undefined,
+            isDocxExtensionActive,
           );
 
           if (fileReadResult.error) {

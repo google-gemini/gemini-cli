@@ -336,8 +336,14 @@ export async function isBinaryFile(filePath: string): Promise<boolean> {
  */
 export async function detectFileType(
   filePath: string,
-): Promise<'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg'> {
+): Promise<
+  'text' | 'image' | 'pdf' | 'audio' | 'video' | 'binary' | 'svg' | 'docx'
+> {
   const ext = path.extname(filePath).toLowerCase();
+
+  if (ext === '.docx') {
+    return 'docx';
+  }
 
   // The mimetype for various TypeScript extensions (ts, mts, cts, tsx) can be
   // MPEG transport stream (a video format), but we want to assume these are
@@ -410,6 +416,7 @@ export async function processSingleFileContent(
   _fileSystemService: FileSystemService,
   startLine?: number,
   endLine?: number,
+  isDocxExtensionActive?: boolean,
 ): Promise<ProcessedFileReadResult> {
   try {
     if (!fs.existsSync(filePath)) {
@@ -453,6 +460,19 @@ export async function processSingleFileContent(
         return {
           llmContent: `Cannot display content of binary file: ${relativePathForDisplay}`,
           returnDisplay: `Skipped binary file: ${relativePathForDisplay}`,
+        };
+      }
+      case 'docx': {
+        const sanitizedPath = relativePathForDisplay.replace(/"/g, '\\"');
+        if (isDocxExtensionActive) {
+          return {
+            llmContent: `The file "${sanitizedPath}" is a Word document (.docx). Support for reading this document is provided via the 'safe-docx' extension, which is currently installed and active. You should use the 'safe-docx' tools to read or edit this file.`,
+            returnDisplay: `Detected Word document: ${relativePathForDisplay}. Support is provided via the active 'safe-docx' extension.`,
+          };
+        }
+        return {
+          llmContent: `The file "${sanitizedPath}" is a Word document (.docx). Support for reading this document is provided via the 'safe-docx' extension.`,
+          returnDisplay: `Detected Word document: ${relativePathForDisplay}. Support is provided via the 'safe-docx' extension.\nTo install it, run: gemini extensions install usejunior/safe-docx`,
         };
       }
       case 'svg': {
