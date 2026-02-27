@@ -28,6 +28,7 @@ on:
 
 jobs:
   verify-release:
+    if: "github.repository == 'google-gemini/gemini-cli'"
     environment: "${{ github.event.inputs.environment || 'prod' }}"
     strategy:
       fail-fast: false
