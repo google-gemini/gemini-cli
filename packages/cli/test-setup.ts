@@ -7,7 +7,7 @@
 import { vi, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
 import { coreEvents } from '@google/gemini-cli-core';
-import { themeManager, DEFAULT_THEME } from './src/ui/themes/theme-manager.js';
+import { themeManager } from './src/ui/themes/theme-manager.js';
 
 // Unset CI environment variable so that ink renders dynamically as it does in a real terminal
 if (process.env.CI !== undefined) {
@@ -34,11 +34,7 @@ let actWarnings: Array<{ message: string; stack: string }> = [];
 
 beforeEach(() => {
   // Reset themeManager state to ensure test isolation
-  themeManager.loadCustomThemes({});
-  themeManager.clearExtensionThemes();
-  themeManager.clearFileThemes();
-  themeManager.setActiveTheme(DEFAULT_THEME.name);
-  themeManager.setTerminalBackground(undefined);
+  themeManager.resetForTesting();
 
   actWarnings = [];
   consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation((...args) => {
