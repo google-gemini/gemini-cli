@@ -108,9 +108,9 @@ enum StreamProcessingStatus {
 }
 
 const SUPPRESSED_TOOL_ERRORS_NOTE =
-  'Some internal tool attempts failed before this final error. Press F12 for diagnostics, or set ui.errorVerbosity to full for full details.';
+  'Some internal tool attempts failed before this final error. Press F12 for diagnostics, or run /settings and change "Error Verbosity" to full for full details.';
 const LOW_VERBOSITY_FAILURE_NOTE =
-  'This request failed. Press F12 for diagnostics, or set ui.errorVerbosity to full for full details.';
+  'This request failed. Press F12 for diagnostics, or run /settings and change "Error Verbosity" to full for full details.';
 
 function isShellToolData(data: unknown): data is ShellToolData {
   if (typeof data !== 'object' || data === null) {
