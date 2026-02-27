@@ -52,6 +52,10 @@ import {
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
   CoreToolCallStatus,
+  loadExtensionPolicies,
+  isSubpath,
+  type PolicyRule,
+  type SafetyCheckerRule,
   HookType,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
@@ -764,9 +768,18 @@ Would you like to attempt to install via "git clone" instead?`,
       }
 
       const contextFiles = getContextFileNames(config)
-        .map((contextFileName) =>
-          path.join(effectiveExtensionPath, contextFileName),
-        )
+        .map((contextFileName) => {
+          const contextFilePath = path.join(
+            effectiveExtensionPath,
+            contextFileName,
+          );
+          if (!isSubpath(effectiveExtensionPath, contextFilePath)) {
+            throw new Error(
+              `Invalid context file path: "${contextFileName}". Context files must be within the extension directory.`,
+            );
+          }
+          return contextFilePath;
+        })
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
       const hydrationContext: VariableContext = {
@@ -820,6 +833,24 @@ Would you like to attempt to install via "git clone" instead?`,
         recursivelyHydrateStrings(skill, hydrationContext),
       );
 
+      let rules: PolicyRule[] | undefined;
+      let checkers: SafetyCheckerRule[] | undefined;
+
+      const policyDir = path.join(effectiveExtensionPath, 'policies');
+      if (fs.existsSync(policyDir)) {
+        const result = await loadExtensionPolicies(config.name, policyDir);
+        rules = result.rules;
+        checkers = result.checkers;
+
+        if (result.errors.length > 0) {
+          for (const error of result.errors) {
+            debugLogger.warn(
+              `[ExtensionManager] Error loading policies from ${config.name}: ${error.message}${error.details ? `\nDetails: ${error.details}` : ''}`,
+            );
+          }
+        }
+      }
+
       const agentLoadResult = await loadAgentsFromDirectory(
         path.join(effectiveExtensionPath, 'agents'),
       );
@@ -853,6 +884,8 @@ Would you like to attempt to install via "git clone" instead?`,
         skills,
         agents: agentLoadResult.agents,
         themes: config.themes,
+        rules,
+        checkers,
       };
     } catch (e) {
       debugLogger.error(

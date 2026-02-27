@@ -563,11 +563,27 @@ export class PolicyEngine {
   }
 
   /**
+   * Remove rules matching a specific source.
+   */
+  removeRulesBySource(source: string): void {
+    this.rules = this.rules.filter((rule) => rule.source !== source);
+  }
+
+  /**
    * Remove checkers matching a specific tier (priority band).
    */
   removeCheckersByTier(tier: number): void {
     this.checkers = this.checkers.filter(
       (checker) => Math.floor(checker.priority ?? 0) !== tier,
+    );
+  }
+
+  /**
+   * Remove checkers matching a specific source.
+   */
+  removeCheckersBySource(source: string): void {
+    this.checkers = this.checkers.filter(
+      (checker) => checker.source !== source,
     );
   }
 

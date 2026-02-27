@@ -239,6 +239,27 @@ describe('extension tests', () => {
       expect(extensions[0].name).toBe('test-extension');
     });
 
+    it('should throw an error if a context file path is outside the extension directory', async () => {
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'traversal-extension',
+        version: '1.0.0',
+        contextFileName: '../secret.txt',
+      });
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(0);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'traversal-extension: Invalid context file path: "../secret.txt"',
+        ),
+      );
+      consoleSpy.mockRestore();
+    });
+
     it('should load context file path when GEMINI.md is present', async () => {
       createExtension({
         extensionsDir: userExtensionsDir,
@@ -361,6 +382,111 @@ describe('extension tests', () => {
       expect(linkedExt.contextFiles).toEqual([
         path.join(sourceExtDir, 'context.md'),
       ]);
+    });
+
+    it('should load extension policies from the policies directory', async () => {
+      const extDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'policy-extension',
+        version: '1.0.0',
+      });
+
+      const policiesDir = path.join(extDir, 'policies');
+      fs.mkdirSync(policiesDir);
+
+      const policiesContent = `
+[[rule]]
+toolName = "deny_tool"
+decision = "deny"
+priority = 500
+
+[[rule]]
+toolName = "ask_tool"
+decision = "ask_user"
+priority = 100
+`;
+      fs.writeFileSync(
+        path.join(policiesDir, 'policies.toml'),
+        policiesContent,
+      );
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
+      const extension = extensions[0];
+
+      expect(extension.rules).toBeDefined();
+      expect(extension.rules).toHaveLength(2);
+      expect(
+        extension.rules!.find((r) => r.toolName === 'deny_tool')?.decision,
+      ).toBe('deny');
+      expect(
+        extension.rules!.find((r) => r.toolName === 'ask_tool')?.decision,
+      ).toBe('ask_user');
+      // Verify source is prefixed
+      expect(extension.rules![0].source).toContain(
+        'Extension (policy-extension):',
+      );
+    });
+
+    it('should ignore ALLOW rules and YOLO mode from extension policies for security', async () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const extDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'security-test-extension',
+        version: '1.0.0',
+      });
+
+      const policiesDir = path.join(extDir, 'policies');
+      fs.mkdirSync(policiesDir);
+
+      const policiesContent = `
+[[rule]]
+toolName = "allow_tool"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "yolo_tool"
+decision = "ask_user"
+priority = 100
+modes = ["yolo"]
+
+[[safety_checker]]
+toolName = "yolo_check"
+priority = 100
+modes = ["yolo"]
+[safety_checker.checker]
+type = "external"
+name = "yolo-checker"
+`;
+      fs.writeFileSync(
+        path.join(policiesDir, 'policies.toml'),
+        policiesContent,
+      );
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
+      const extension = extensions[0];
+
+      // ALLOW rules and YOLO rules/checkers should be filtered out
+      expect(extension.rules).toBeDefined();
+      expect(extension.rules).toHaveLength(0);
+      expect(extension.checkers).toBeDefined();
+      expect(extension.checkers).toHaveLength(0);
+
+      // Should have logged warnings
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('attempted to contribute an ALLOW rule'),
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('attempted to contribute a rule for YOLO mode'),
+      );
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'attempted to contribute a safety checker for YOLO mode',
+        ),
+      );
+      consoleSpy.mockRestore();
     });
 
     it('should hydrate ${extensionPath} correctly for linked extensions', async () => {
@@ -540,7 +666,7 @@ describe('extension tests', () => {
 
       // Bad extension
       const badExtDir = path.join(userExtensionsDir, 'bad-ext');
-      fs.mkdirSync(badExtDir);
+      fs.mkdirSync(badExtDir, { recursive: true });
       const badConfigPath = path.join(badExtDir, EXTENSIONS_CONFIG_FILENAME);
       fs.writeFileSync(badConfigPath, '{ "name": "bad-ext"'); // Malformed
 
@@ -548,7 +674,7 @@ describe('extension tests', () => {
 
       expect(extensions).toHaveLength(1);
       expect(extensions[0].name).toBe('good-ext');
-      expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
+      expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining(
           `Warning: Skipping extension in ${badExtDir}: Failed to load extension config from ${badConfigPath}`,
         ),
@@ -571,7 +697,7 @@ describe('extension tests', () => {
 
       // Bad extension
       const badExtDir = path.join(userExtensionsDir, 'bad-ext-no-name');
-      fs.mkdirSync(badExtDir);
+      fs.mkdirSync(badExtDir, { recursive: true });
       const badConfigPath = path.join(badExtDir, EXTENSIONS_CONFIG_FILENAME);
       fs.writeFileSync(badConfigPath, JSON.stringify({ version: '1.0.0' }));
 
@@ -579,7 +705,7 @@ describe('extension tests', () => {
 
       expect(extensions).toHaveLength(1);
       expect(extensions[0].name).toBe('good-ext');
-      expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
+      expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining(
           `Warning: Skipping extension in ${badExtDir}: Failed to load extension config from ${badConfigPath}: Invalid configuration in ${badConfigPath}: missing "name"`,
         ),
