@@ -258,10 +258,7 @@ export class ToolExecutor {
       response: {
         callId: call.request.callId,
         responseParts,
-        resultDisplay:
-          typeof toolResult?.returnDisplay === 'string'
-            ? toolResult.returnDisplay
-            : undefined,
+        resultDisplay: toolResult?.returnDisplay,
         error: undefined,
         errorType: undefined,
         outputFile,

@@ -30,6 +30,7 @@ import {
   MessageBusType,
   type SerializableConfirmationDetails,
 } from '../confirmation-bus/types.js';
+import { isToolCallResponseInfo } from '../utils/tool-utils.js';
 
 /**
  * Handler for terminal tool calls.
@@ -251,7 +252,7 @@ export class SchedulerStateManager {
   ): ToolCall {
     switch (newStatus) {
       case CoreToolCallStatus.Success: {
-        if (!this.isToolCallResponseInfo(auxiliaryData)) {
+        if (!isToolCallResponseInfo(auxiliaryData)) {
           throw new Error(
             `Invalid data for 'success' transition (callId: ${call.request.callId})`,
           );
@@ -259,7 +260,7 @@ export class SchedulerStateManager {
         return this.toSuccess(call, auxiliaryData);
       }
       case CoreToolCallStatus.Error: {
-        if (!this.isToolCallResponseInfo(auxiliaryData)) {
+        if (!isToolCallResponseInfo(auxiliaryData)) {
           throw new Error(
             `Invalid data for 'error' transition (callId: ${call.request.callId})`,
           );
@@ -279,7 +280,7 @@ export class SchedulerStateManager {
       case CoreToolCallStatus.Cancelled: {
         if (
           typeof auxiliaryData !== 'string' &&
-          !this.isToolCallResponseInfo(auxiliaryData)
+          !isToolCallResponseInfo(auxiliaryData)
         ) {
           throw new Error(
             `Invalid reason (string) or response for 'cancelled' transition (callId: ${call.request.callId})`,
@@ -305,15 +306,6 @@ export class SchedulerStateManager {
         return exhaustiveCheck;
       }
     }
-  }
-
-  private isToolCallResponseInfo(data: unknown): data is ToolCallResponseInfo {
-    return (
-      typeof data === 'object' &&
-      data !== null &&
-      'callId' in data &&
-      'responseParts' in data
-    );
   }
 
   private isExecutingToolCallPatch(
@@ -471,7 +463,7 @@ export class SchedulerStateManager {
       }
     }
 
-    if (this.isToolCallResponseInfo(reason)) {
+    if (isToolCallResponseInfo(reason)) {
       return {
         request: call.request,
         tool: call.tool,

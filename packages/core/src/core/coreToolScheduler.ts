@@ -20,7 +20,10 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import { ToolCallEvent } from '../telemetry/types.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { ToolModificationHandler } from '../scheduler/tool-modifier.js';
-import { getToolSuggestion } from '../utils/tool-utils.js';
+import {
+  getToolSuggestion,
+  isToolCallResponseInfo,
+} from '../utils/tool-utils.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -224,7 +227,7 @@ export class CoreToolScheduler {
           const durationMs = existingStartTime
             ? Date.now() - existingStartTime
             : undefined;
-          if (this.isToolCallResponseInfo(auxiliaryData)) {
+          if (isToolCallResponseInfo(auxiliaryData)) {
             return {
               request: currentCall.request,
               tool: toolInstance,
@@ -242,7 +245,7 @@ export class CoreToolScheduler {
           const durationMs = existingStartTime
             ? Date.now() - existingStartTime
             : undefined;
-          if (this.isToolCallResponseInfo(auxiliaryData)) {
+          if (isToolCallResponseInfo(auxiliaryData)) {
             return {
               request: currentCall.request,
               status: CoreToolCallStatus.Error,
@@ -283,7 +286,7 @@ export class CoreToolScheduler {
             ? Date.now() - existingStartTime
             : undefined;
 
-          if (this.isToolCallResponseInfo(auxiliaryData)) {
+          if (isToolCallResponseInfo(auxiliaryData)) {
             return {
               request: currentCall.request,
               tool: toolInstance,
@@ -1102,14 +1105,5 @@ export class CoreToolScheduler {
         outcome,
       };
     });
-  }
-
-  private isToolCallResponseInfo(data: unknown): data is ToolCallResponseInfo {
-    return (
-      typeof data === 'object' &&
-      data !== null &&
-      'callId' in data &&
-      'responseParts' in data
-    );
   }
 }

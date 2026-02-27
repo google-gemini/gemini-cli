@@ -9,12 +9,29 @@ import { isTool } from '../index.js';
 import { SHELL_TOOL_NAMES } from './shell-utils.js';
 import levenshtein from 'fast-levenshtein';
 import { ApprovalMode } from '../policy/types.js';
-import { CoreToolCallStatus } from '../scheduler/types.js';
+import {
+  CoreToolCallStatus,
+  type ToolCallResponseInfo,
+} from '../scheduler/types.js';
 import {
   ASK_USER_DISPLAY_NAME,
   WRITE_FILE_DISPLAY_NAME,
   EDIT_DISPLAY_NAME,
 } from '../tools/tool-names.js';
+
+/**
+ * Validates if an object is a ToolCallResponseInfo.
+ */
+export function isToolCallResponseInfo(
+  data: unknown,
+): data is ToolCallResponseInfo {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'callId' in data &&
+    'responseParts' in data
+  );
+}
 
 /**
  * Options for determining if a tool call should be hidden in the CLI history.
