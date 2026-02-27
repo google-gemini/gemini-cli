@@ -569,6 +569,21 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      // Ctrl+A (Home) / Ctrl+E (End)
+      const isHome =
+        key.name === 'home' ||
+        (key.ctrl && key.name === 'a') ||
+        keyMatchers[Command.HOME](key);
+      const isEnd =
+        key.name === 'end' ||
+        (key.ctrl && key.name === 'e') ||
+        keyMatchers[Command.END](key);
+
+      if (isHome || isEnd) {
+        setSuppressCompletion(true);
+        buffer.move(isHome ? 'home' : 'end');
+        return true;
+      }
       // Determine if this keypress is a history navigation command
       const isHistoryUp =
         !shellModeActive &&
@@ -613,7 +628,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         );
         hasUserNavigatedSuggestions.current = false;
       }
-
       // TODO(jacobr): this special case is likely not needed anymore.
       // We should probably stop supporting paste if the InputPrompt is not
       // focused.
@@ -1104,16 +1118,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             handleSubmit(buffer.text);
           }
         }
-        return true;
-      }
-
-      // Ctrl+A (Home) / Ctrl+E (End)
-      if (keyMatchers[Command.HOME](key)) {
-        buffer.move('home');
-        return true;
-      }
-      if (keyMatchers[Command.END](key)) {
-        buffer.move('end');
         return true;
       }
 
