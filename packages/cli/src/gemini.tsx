@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -60,6 +60,8 @@ import {
   patchStdio,
   writeToStdout,
   writeToStderr,
+  detectTerminalEnvironment,
+  getTerminalCapabilities,
   disableMouseEvents,
   enableMouseEvents,
   disableLineWrapping,
@@ -195,11 +197,20 @@ export async function startInteractiveUI(
   // as there is no benefit of alternate buffer mode when using a screen reader
   // and the Ink alternate buffer mode requires line wrapping harmful to
   // screen readers.
+  const termEnv = detectTerminalEnvironment();
+  const { capabilities } = getTerminalCapabilities(termEnv, process.env, {
+    forceAltBuffer: settings.merged.ui.compatibility?.forceAltBuffer,
+    disableAltBuffer: settings.merged.ui.compatibility?.disableAltBuffer,
+    disableMouse: settings.merged.ui.compatibility?.disableMouse,
+    assumeTrustedTerminal:
+      settings.merged.ui.compatibility?.assumeTrustedTerminal,
+  });
+
   const useAlternateBuffer = shouldEnterAlternateScreen(
-    isAlternateBufferEnabled(config),
+    isAlternateBufferEnabled(config, capabilities),
     config.getScreenReader(),
   );
-  const mouseEventsEnabled = useAlternateBuffer;
+  const mouseEventsEnabled = useAlternateBuffer && capabilities.supportsMouse;
   if (mouseEventsEnabled) {
     enableMouseEvents();
     registerCleanup(() => {
@@ -677,19 +688,44 @@ export async function main() {
     }
 
     let input = config.getQuestion();
+    const termEnv = detectTerminalEnvironment();
+    const { capabilities, warnings, reasons } = getTerminalCapabilities(
+      termEnv,
+      process.env,
+      {
+        forceAltBuffer: settings.merged.ui.compatibility?.forceAltBuffer,
+        disableAltBuffer: settings.merged.ui.compatibility?.disableAltBuffer,
+        disableMouse: settings.merged.ui.compatibility?.disableMouse,
+        assumeTrustedTerminal:
+          settings.merged.ui.compatibility?.assumeTrustedTerminal,
+      },
+    );
+
     const useAlternateBuffer = shouldEnterAlternateScreen(
-      isAlternateBufferEnabled(config),
+      isAlternateBufferEnabled(config, capabilities),
       config.getScreenReader(),
     );
     const rawStartupWarnings = await getStartupWarnings();
+
+    const capabilityWarnings: string[] = [...warnings];
+    for (const reason of Object.values(reasons)) {
+      if (reason) capabilityWarnings.push(reason);
+    }
+
     const startupWarnings: StartupWarning[] = [
       ...rawStartupWarnings.map((message) => ({
         id: `startup-${createHash('sha256').update(message).digest('hex').substring(0, 16)}`,
         message,
         priority: WarningPriority.High,
       })),
+      ...capabilityWarnings.map((message) => ({
+        id: `capability-${createHash('sha256').update(message).digest('hex').substring(0, 16)}`,
+        message,
+        priority: WarningPriority.Low,
+      })),
       ...(await getUserStartupWarnings(settings.merged, undefined, {
         isAlternateBuffer: useAlternateBuffer,
+        termEnv,
       })),
     ];
 

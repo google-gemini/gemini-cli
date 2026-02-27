@@ -421,6 +421,44 @@
           "default": true,
           "type": "boolean"
         },
+        "compatibility": {
+          "title": "Compatibility",
+          "description": "Terminal compatibility overrides.",
+          "markdownDescription": "Terminal compatibility overrides.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "forceAltBuffer": {
+              "title": "Force Alternate Buffer",
+              "description": "Force enable the alternate screen buffer even in potentially buggy terminals.",
+              "markdownDescription": "Force enable the alternate screen buffer even in potentially buggy terminals.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "disableAltBuffer": {
+              "title": "Disable Alternate Buffer",
+              "description": "Disable the alternate screen buffer globally.",
+              "markdownDescription": "Disable the alternate screen buffer globally.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "disableMouse": {
+              "title": "Disable Mouse Support",
+              "description": "Disable mouse event tracking.",
+              "markdownDescription": "Disable mouse event tracking.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "assumeTrustedTerminal": {
+              "title": "Assume Trusted Terminal",
+              "description": "Assume the terminal is fully capable and skip capability fallbacks.",
+              "markdownDescription": "Assume the terminal is fully capable and skip capability fallbacks.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "showSpinner": {
           "title": "Show Spinner",
           "description": "Show the spinner during operations.",

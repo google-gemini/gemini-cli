@@ -87,6 +87,7 @@ export * from './utils/shell-utils.js';
 export { PolicyDecision, ApprovalMode } from './policy/types.js';
 export * from './utils/tool-utils.js';
 export * from './utils/terminalSerializer.js';
+export * from './utils/terminalEnvironment.js';
 export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
 export * from './utils/formatters.js';

@@ -11,6 +11,8 @@ import {
   enableMouseEvents,
   enterAlternateScreen,
   exitAlternateScreen,
+  clearScreen,
+  clearScrollback,
   enableLineWrapping,
   disableLineWrapping,
 } from '@google/gemini-cli-core';
@@ -27,6 +29,9 @@ interface UseSuspendProps {
   refreshStatic: () => void;
   setForceRerenderKey: (updater: (prev: number) => number) => void;
   shouldUseAlternateScreen: boolean;
+  terminalCapabilities: {
+    supportsReliableBackbufferClear: boolean;
+  };
 }
 
 export function useSuspend({
@@ -35,6 +40,7 @@ export function useSuspend({
   refreshStatic,
   setForceRerenderKey,
   shouldUseAlternateScreen,
+  terminalCapabilities,
 }: UseSuspendProps) {
   const [ctrlZPressCount, setCtrlZPressCount] = useState(0);
   const ctrlZTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -70,7 +76,10 @@ export function useSuspend({
         // Leave alternate buffer before suspension so the shell stays usable.
         exitAlternateScreen();
         enableLineWrapping();
-        writeToStdout('\x1b[2J\x1b[H');
+        clearScreen();
+        if (terminalCapabilities.supportsReliableBackbufferClear) {
+          clearScrollback();
+        }
       }
 
       // Cleanup before suspend.
@@ -96,7 +105,10 @@ export function useSuspend({
           if (shouldUseAlternateScreen) {
             enterAlternateScreen();
             disableLineWrapping();
-            writeToStdout('\x1b[2J\x1b[H');
+            clearScreen();
+            if (terminalCapabilities.supportsReliableBackbufferClear) {
+              clearScrollback();
+            }
           }
 
           terminalCapabilityManager.enableSupportedModes();
@@ -145,6 +157,7 @@ export function useSuspend({
     refreshStatic,
     setForceRerenderKey,
     shouldUseAlternateScreen,
+    terminalCapabilities.supportsReliableBackbufferClear,
   ]);
 
   const handleSuspend = useCallback(() => {

@@ -73,6 +73,20 @@ export function exitAlternateScreen() {
   writeToStdout('\x1b[?1049l');
 }
 
+/**
+ * Clears the visible screen and moves the cursor to the top-left (home) position.
+ */
+export function clearScreen() {
+  writeToStdout('\x1b[2J\x1b[H');
+}
+
+/**
+ * Clears the terminal's scrollback buffer (backbuffer).
+ */
+export function clearScrollback() {
+  writeToStdout('\x1b[3J');
+}
+
 export function shouldEnterAlternateScreen(
   useAlternateBuffer: boolean,
   isScreenReader: boolean,

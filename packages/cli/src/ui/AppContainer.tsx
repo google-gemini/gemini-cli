@@ -96,6 +96,7 @@ import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { useModelCommand } from './hooks/useModelCommand.js';
+import { useTerminalCapabilities } from './hooks/useTerminalCapabilities.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import {
@@ -945,6 +946,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
+  const terminalCapabilities = useTerminalCapabilities();
+
   const {
     handleSlashCommand,
     slashCommands,
@@ -965,6 +968,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isConfigInitialized,
     setBannerVisible,
     setCustomDialog,
+    terminalCapabilities,
   );
 
   const [authConsentRequest, setAuthConsentRequest] =
@@ -1623,6 +1627,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     refreshStatic,
     setForceRerenderKey,
     shouldUseAlternateScreen,
+    terminalCapabilities,
   });
 
   useEffect(() => {
