@@ -42,19 +42,57 @@ export const GITHUB_COMMANDS_PATHS = [
 const REPO_DOWNLOAD_URL =
   'https://raw.githubusercontent.com/google-github-actions/run-gemini-cli';
 const SOURCE_DIR = 'examples/workflows';
+
+// Verifies if github name is command-execution safe
+export function isValidGitHubOwner(name: string): boolean {
+  return /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(name);
+}
+
+// does the same for repo name
+export function isValidGitHubRepoName(name: string): boolean {
+  if (name === '.' || name === '..') return false;
+  return /^[a-z0-9_.-]+$/i.test(name);
+}
+
 // Generate OS-specific commands to open the GitHub pages needed for setup.
-function getOpenUrlsCommands(readmeUrl: string): string[] {
+export function getOpenUrlsCommands(readmeUrl: string): string[] {
   // Determine the OS-specific command to open URLs, ex: 'open', 'xdg-open', etc
   const openCmd = getUrlOpenCommand();
 
   // Build a list of URLs to open
   const urlsToOpen = [readmeUrl];
 
-  const repoInfo = getGitHubRepoInfo();
-  if (repoInfo) {
+  let repoInfo: { owner: string; repo: string } | null = null;
+  try {
+    repoInfo = getGitHubRepoInfo();
+  } catch {
+    /* ignore */
+  }
+
+  if (!repoInfo) {
+    return [
+      `${openCmd} "${readmeUrl}"`,
+      `echo "\nℹ️  Gemini CLI: Could not determine repository info. Secrets page skipped."`,
+    ];
+  }
+
+  const UpstreamRepo = 'google-gemini/gemini-cli';
+  const isUpstream =
+    `${repoInfo.owner}/${repoInfo.repo}`.toLowerCase() === UpstreamRepo;
+  const isSafeRepo =
+    isValidGitHubOwner(repoInfo.owner) && isValidGitHubRepoName(repoInfo.repo);
+
+  // Only push the secrets URL if we are NOT in the upstream repo and the name is valid
+  if (!isUpstream && isSafeRepo) {
     urlsToOpen.push(
       `https://github.com/${repoInfo.owner}/${repoInfo.repo}/settings/secrets/actions`,
     );
+  } else {
+    // Skip secrets page if in upstream repo or invalid names
+    return [
+      `${openCmd} "${readmeUrl}"`,
+      `echo "\nℹ️  Gemini CLI: Secrets page skipped. (You are in the upstream repo or the repo info is invalid)."`,
+    ];
   }
 
   // Create and join the individual commands
