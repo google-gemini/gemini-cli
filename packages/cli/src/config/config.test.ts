@@ -2016,6 +2016,40 @@ describe('loadCliConfig useRipgrep', () => {
   });
 });
 
+describe('loadCliConfig directWebFetch', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should be false by default when directWebFetch is not set in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getDirectWebFetch()).toBe(false);
+  });
+
+  it('should be true when directWebFetch is set to true in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      experimental: {
+        directWebFetch: true,
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getDirectWebFetch()).toBe(true);
+  });
+});
+
 describe('screenReader configuration', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -2728,6 +2762,66 @@ describe('loadCliConfig approval mode', () => {
       const config = await loadCliConfig(settings, 'test-session', argv);
       expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
     });
+  });
+});
+
+describe('loadCliConfig gemmaModelRouter', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should have gemmaModelRouter disabled by default', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getGemmaModelRouterEnabled()).toBe(false);
+  });
+
+  it('should load gemmaModelRouter settings from merged settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      experimental: {
+        gemmaModelRouter: {
+          enabled: true,
+          classifier: {
+            host: 'http://custom:1234',
+            model: 'custom-gemma',
+          },
+        },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getGemmaModelRouterEnabled()).toBe(true);
+    const gemmaSettings = config.getGemmaModelRouterSettings();
+    expect(gemmaSettings.classifier?.host).toBe('http://custom:1234');
+    expect(gemmaSettings.classifier?.model).toBe('custom-gemma');
+  });
+
+  it('should handle partial gemmaModelRouter settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      experimental: {
+        gemmaModelRouter: {
+          enabled: true,
+        },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getGemmaModelRouterEnabled()).toBe(true);
+    const gemmaSettings = config.getGemmaModelRouterSettings();
+    expect(gemmaSettings.classifier?.host).toBe('http://localhost:9379');
+    expect(gemmaSettings.classifier?.model).toBe('gemma3-1b-gpu-custom');
   });
 });
 

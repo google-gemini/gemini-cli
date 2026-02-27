@@ -35,10 +35,39 @@ export class HookRegistry {
   }
 
   /**
+   * Register a new hook programmatically
+   */
+  registerHook(
+    config: HookConfig,
+    eventName: HookEventName,
+    options?: { matcher?: string; sequential?: boolean; source?: ConfigSource },
+  ): void {
+    const source = options?.source ?? ConfigSource.Runtime;
+
+    if (!this.validateHookConfig(config, eventName, source)) {
+      throw new Error(
+        `Invalid hook configuration for ${eventName} from ${source}`,
+      );
+    }
+
+    this.entries.push({
+      config,
+      source,
+      eventName,
+      matcher: options?.matcher,
+      sequential: options?.sequential,
+      enabled: true,
+    });
+  }
+
+  /**
    * Initialize the registry by processing hooks from config
    */
   async initialize(): Promise<void> {
-    this.entries = [];
+    const runtimeHooks = this.entries.filter(
+      (entry) => entry.source === ConfigSource.Runtime,
+    );
+    this.entries = [...runtimeHooks];
     this.processHooksFromConfig();
 
     debugLogger.debug(
@@ -93,7 +122,10 @@ export class HookRegistry {
   private getHookName(
     entry: HookRegistryEntry | { config: HookConfig },
   ): string {
-    return entry.config.name || entry.config.command || 'unknown-command';
+    if (entry.config.type === 'command') {
+      return entry.config.name || entry.config.command || 'unknown-command';
+    }
+    return entry.config.name || 'unknown-hook';
   }
 
   /**
@@ -261,7 +293,10 @@ please review the project settings (.gemini/settings.json) and remove them.`;
     eventName: HookEventName,
     source: ConfigSource,
   ): boolean {
-    if (!config.type || !['command', 'plugin'].includes(config.type)) {
+    if (
+      !config.type ||
+      !['command', 'plugin', 'runtime'].includes(config.type)
+    ) {
       debugLogger.warn(
         `Invalid hook ${eventName} from ${source} type: ${config.type}`,
       );
@@ -271,6 +306,13 @@ please review the project settings (.gemini/settings.json) and remove them.`;
     if (config.type === 'command' && !config.command) {
       debugLogger.warn(
         `Command hook ${eventName} from ${source} missing command field`,
+      );
+      return false;
+    }
+
+    if (config.type === 'runtime' && !config.name) {
+      debugLogger.warn(
+        `Runtime hook ${eventName} from ${source} missing name field`,
       );
       return false;
     }
@@ -292,6 +334,8 @@ please review the project settings (.gemini/settings.json) and remove them.`;
    */
   private getSourcePriority(source: ConfigSource): number {
     switch (source) {
+      case ConfigSource.Runtime:
+        return 0; // Highest
       case ConfigSource.Project:
         return 1;
       case ConfigSource.User:
