@@ -13,6 +13,22 @@ import { MessageType } from '../ui/types.js';
 import { spawnWrapper } from './spawnWrapper.js';
 import type { spawn } from 'node:child_process';
 
+let activeUpdatePromise: Promise<void> | null = null;
+
+/**
+ * Returns the active auto-update promise if an auto-update process is currently
+ * running, or `null` if no auto-update is in progress.
+ *
+ * This can be used by callers to await completion of an already-started
+ * auto-update without triggering a new update process.
+ *
+ * @returns {Promise<void> | null} The promise representing the running
+ * auto-update, or `null` if no update is currently running.
+ */
+export function getActiveUpdatePromise(): Promise<void> | null {
+  return activeUpdatePromise;
+}
+
 export function handleAutoUpdate(
   info: UpdateObject | null,
   settings: LoadedSettings,
@@ -20,6 +36,10 @@ export function handleAutoUpdate(
   spawnFn: typeof spawn = spawnWrapper,
 ) {
   if (!info) {
+    return;
+  }
+
+  if (activeUpdatePromise) {
     return;
   }
 
@@ -72,28 +92,36 @@ export function handleAutoUpdate(
     stdio: 'ignore',
     shell: true,
     detached: true,
+    timeout: 300000, // 5 minutes
   });
   // Un-reference the child process to allow the parent to exit independently.
   updateProcess.unref();
 
-  updateProcess.on('close', (code) => {
-    if (code === 0) {
-      updateEventEmitter.emit('update-success', {
-        message:
-          'Update successful! The new version will be used on your next run.',
-      });
-    } else {
+  activeUpdatePromise = new Promise<void>((resolve) => {
+    updateProcess.once('close', (code) => {
+      if (code === 0) {
+        updateEventEmitter.emit('update-success', {
+          message:
+            'Update successful! The new version will be used on your next run.',
+        });
+      } else {
+        updateEventEmitter.emit('update-failed', {
+          message: `Automatic update failed. Please try updating manually. (command: ${updateCommand})`,
+        });
+      }
+      resolve();
+    });
+
+    updateProcess.once('error', (err) => {
       updateEventEmitter.emit('update-failed', {
-        message: `Automatic update failed. Please try updating manually. (command: ${updateCommand})`,
+        message: `Automatic update failed. Please try updating manually. (error: ${err.message})`,
       });
-    }
+      resolve();
+    });
+  }).finally(() => {
+    activeUpdatePromise = null;
   });
 
-  updateProcess.on('error', (err) => {
-    updateEventEmitter.emit('update-failed', {
-      message: `Automatic update failed. Please try updating manually. (error: ${err.message})`,
-    });
-  });
   return updateProcess;
 }
 
