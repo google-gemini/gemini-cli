@@ -436,6 +436,14 @@
           "type": "string",
           "enum": ["tips", "witty", "all", "off"]
         },
+        "errorVerbosity": {
+          "title": "Error Verbosity",
+          "description": "Controls whether recoverable errors are hidden (low) or fully shown (full).",
+          "markdownDescription": "Controls whether recoverable errors are hidden (low) or fully shown (full).\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `low`",
+          "default": "low",
+          "type": "string",
+          "enum": ["low", "full"]
+        },
         "customWittyPhrases": {
           "title": "Custom Witty Phrases",
           "description": "Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.",

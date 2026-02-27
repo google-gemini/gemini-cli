@@ -719,6 +719,20 @@ const SETTINGS_SCHEMA = {
           { value: 'off', label: 'Off' },
         ],
       },
+      errorVerbosity: {
+        type: 'enum',
+        label: 'Error Verbosity',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'low',
+        description:
+          'Controls whether recoverable errors are hidden (low) or fully shown (full).',
+        showInDialog: true,
+        options: [
+          { value: 'low', label: 'Low' },
+          { value: 'full', label: 'Full' },
+        ],
+      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',

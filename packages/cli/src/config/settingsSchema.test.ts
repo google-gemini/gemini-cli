@@ -96,6 +96,14 @@ describe('SettingsSchema', () => {
       ]);
     });
 
+    it('should have errorVerbosity enum property', () => {
+      const definition = getSettingsSchema().ui?.properties?.errorVerbosity;
+      expect(definition).toBeDefined();
+      expect(definition?.type).toBe('enum');
+      expect(definition?.default).toBe('low');
+      expect(definition?.options?.map((o) => o.value)).toEqual(['low', 'full']);
+    });
+
     it('should have checkpointing nested properties', () => {
       expect(
         getSettingsSchema().general?.properties?.checkpointing.properties

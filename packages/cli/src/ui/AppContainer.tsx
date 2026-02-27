@@ -712,6 +712,7 @@ export const AppContainer = (props: AppContainerProps) => {
     settings,
     setModelSwitchedFromQuotaError,
     onShowAuthSelection: () => setAuthState(AuthState.Updating),
+    errorVerbosity: settings.merged.ui.errorVerbosity,
   });
 
   // Derive auth state variables for backward compatibility with UIStateContext
@@ -1688,6 +1689,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     retryStatus,
     loadingPhrasesMode: settings.merged.ui.loadingPhrases,
     customWittyPhrases: settings.merged.ui.customWittyPhrases,
+    errorVerbosity: settings.merged.ui.errorVerbosity,
   });
 
   const handleGlobalKeypress = useCallback(

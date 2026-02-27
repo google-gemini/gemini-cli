@@ -42,6 +42,7 @@ interface UseQuotaAndFallbackArgs {
   settings: LoadedSettings;
   setModelSwitchedFromQuotaError: (value: boolean) => void;
   onShowAuthSelection: () => void;
+  errorVerbosity?: 'low' | 'full';
 }
 
 export function useQuotaAndFallback({
@@ -52,6 +53,7 @@ export function useQuotaAndFallback({
   settings,
   setModelSwitchedFromQuotaError,
   onShowAuthSelection,
+  errorVerbosity = 'full',
 }: UseQuotaAndFallbackArgs) {
   const [proQuotaRequest, setProQuotaRequest] =
     useState<ProQuotaDialogRequest | null>(null);
@@ -165,6 +167,16 @@ export function useQuotaAndFallback({
         message = messageLines.join('\n');
       }
 
+      // In low verbosity mode, auto-retry transient capacity failures
+      // without interrupting with a dialog.
+      if (
+        errorVerbosity === 'low' &&
+        !isTerminalQuotaError &&
+        !isModelNotFoundError
+      ) {
+        return 'retry_once';
+      }
+
       setModelSwitchedFromQuotaError(true);
       config.setQuotaErrorOccurred(true);
 
@@ -200,6 +212,7 @@ export function useQuotaAndFallback({
     initialOverageStrategy,
     setModelSwitchedFromQuotaError,
     onShowAuthSelection,
+    errorVerbosity,
   ]);
 
   // Set up validation handler for 403 VALIDATION_REQUIRED errors
