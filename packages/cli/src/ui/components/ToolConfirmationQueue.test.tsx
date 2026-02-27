@@ -227,7 +227,7 @@ describe('ToolConfirmationQueue', () => {
     // availableContentHeight = Math.max(9 - 6, 4) = 4
     // MaxSizedBox in ToolConfirmationMessage will use 4
     // It should show truncation message
-    await waitFor(() => expect(lastFrame()).toContain('first 49 lines hidden'));
+    await waitFor(() => expect(lastFrame()).toContain('49 hidden (Ctrl+O)'));
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -255,7 +255,11 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const {
+      lastFrame,
+      waitUntilReady,
+      unmount = vi.fn(),
+    } = renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
