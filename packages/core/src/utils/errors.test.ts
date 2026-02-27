@@ -11,7 +11,16 @@ import {
   toFriendlyError,
   BadRequestError,
   ForbiddenError,
+  AccountSuspendedError,
   getErrorMessage,
+  getErrorType,
+  FatalAuthenticationError,
+  FatalCancellationError,
+  FatalConfigError,
+  FatalInputError,
+  FatalSandboxError,
+  FatalToolExecutionError,
+  FatalTurnLimitedError,
 } from './errors.js';
 
 describe('getErrorMessage', () => {
@@ -119,7 +128,84 @@ describe('toFriendlyError', () => {
     };
     const result = toFriendlyError(error);
     expect(result).toBeInstanceOf(ForbiddenError);
+    expect(result).not.toBeInstanceOf(AccountSuspendedError);
     expect((result as ForbiddenError).message).toBe('Forbidden');
+  });
+
+  it('should return AccountSuspendedError for 403 with TOS_VIOLATION reason in details', () => {
+    const error = {
+      response: {
+        data: {
+          error: {
+            code: 403,
+            message:
+              'This service has been disabled in this account for violation of Terms of Service.',
+            details: [
+              {
+                '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+                reason: 'TOS_VIOLATION',
+                domain: 'example.googleapis.com',
+                metadata: {
+                  uiMessage: 'true',
+                  appeal_url_link_text: 'Appeal Here',
+                  appeal_url: 'https://example.com/appeal',
+                },
+              },
+            ],
+          },
+        },
+      },
+    };
+    const result = toFriendlyError(error);
+    expect(result).toBeInstanceOf(AccountSuspendedError);
+    expect(result).toBeInstanceOf(ForbiddenError);
+    const suspended = result as AccountSuspendedError;
+    expect(suspended.message).toBe(
+      'This service has been disabled in this account for violation of Terms of Service.',
+    );
+    expect(suspended.appealUrl).toBe('https://example.com/appeal');
+    expect(suspended.appealLinkText).toBe('Appeal Here');
+  });
+
+  it('should return ForbiddenError for 403 with violation message but no TOS_VIOLATION detail', () => {
+    const error = {
+      response: {
+        data: {
+          error: {
+            code: 403,
+            message:
+              'This service has been disabled in this account for violation of Terms of Service.',
+          },
+        },
+      },
+    };
+    const result = toFriendlyError(error);
+    expect(result).toBeInstanceOf(ForbiddenError);
+    expect(result).not.toBeInstanceOf(AccountSuspendedError);
+  });
+
+  it('should return ForbiddenError for 403 with non-TOS_VIOLATION detail', () => {
+    const error = {
+      response: {
+        data: {
+          error: {
+            code: 403,
+            message: 'Forbidden',
+            details: [
+              {
+                '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+                reason: 'ACCESS_DENIED',
+                domain: 'googleapis.com',
+                metadata: {},
+              },
+            ],
+          },
+        },
+      },
+    };
+    const result = toFriendlyError(error);
+    expect(result).toBeInstanceOf(ForbiddenError);
+    expect(result).not.toBeInstanceOf(AccountSuspendedError);
   });
 
   it('should parse stringified JSON data', () => {
@@ -199,5 +285,49 @@ describe('toFriendlyError', () => {
   it('should return original error if not a Gaxios error object', () => {
     const error = new Error('Regular Error');
     expect(toFriendlyError(error)).toBe(error);
+  });
+});
+
+describe('getErrorType', () => {
+  it('should return error name for standard errors', () => {
+    expect(getErrorType(new Error('test'))).toBe('Error');
+    expect(getErrorType(new TypeError('test'))).toBe('TypeError');
+    expect(getErrorType(new SyntaxError('test'))).toBe('SyntaxError');
+  });
+
+  it('should return constructor name for custom errors', () => {
+    expect(getErrorType(new FatalAuthenticationError('test'))).toBe(
+      'FatalAuthenticationError',
+    );
+    expect(getErrorType(new FatalInputError('test'))).toBe('FatalInputError');
+    expect(getErrorType(new FatalSandboxError('test'))).toBe(
+      'FatalSandboxError',
+    );
+    expect(getErrorType(new FatalConfigError('test'))).toBe('FatalConfigError');
+    expect(getErrorType(new FatalTurnLimitedError('test'))).toBe(
+      'FatalTurnLimitedError',
+    );
+    expect(getErrorType(new FatalToolExecutionError('test'))).toBe(
+      'FatalToolExecutionError',
+    );
+    expect(getErrorType(new FatalCancellationError('test'))).toBe(
+      'FatalCancellationError',
+    );
+    expect(getErrorType(new ForbiddenError('test'))).toBe('ForbiddenError');
+    expect(getErrorType(new AccountSuspendedError('test'))).toBe(
+      'AccountSuspendedError',
+    );
+    expect(getErrorType(new UnauthorizedError('test'))).toBe(
+      'UnauthorizedError',
+    );
+    expect(getErrorType(new BadRequestError('test'))).toBe('BadRequestError');
+  });
+
+  it('should return "unknown" for non-Error objects', () => {
+    expect(getErrorType('string error')).toBe('unknown');
+    expect(getErrorType(123)).toBe('unknown');
+    expect(getErrorType({})).toBe('unknown');
+    expect(getErrorType(null)).toBe('unknown');
+    expect(getErrorType(undefined)).toBe('unknown');
   });
 });

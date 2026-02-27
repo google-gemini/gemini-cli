@@ -4,10 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { parseGoogleApiError, type ErrorInfo } from './googleErrors.js';
+
 interface GaxiosError {
   response?: {
     data?: unknown;
   };
+}
+
+function isGaxiosError(error: unknown): error is GaxiosError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as { response: unknown }).response === 'object' &&
+    (error as { response: unknown }).response !== null
+  );
 }
 
 export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
@@ -24,6 +36,15 @@ export function getErrorMessage(error: unknown): string {
   } catch {
     return 'Failed to get error details';
   }
+}
+
+export function getErrorType(error: unknown): string {
+  if (!(error instanceof Error)) return 'unknown';
+
+  // Return constructor name if the generic 'Error' name is used (for custom errors)
+  return error.name === 'Error'
+    ? (error.constructor?.name ?? 'Error')
+    : error.name;
 }
 
 export class FatalError extends Error {
@@ -79,6 +100,17 @@ export class CanceledError extends Error {
 }
 
 export class ForbiddenError extends Error {}
+export class AccountSuspendedError extends ForbiddenError {
+  readonly appealUrl?: string;
+  readonly appealLinkText?: string;
+
+  constructor(message: string, metadata?: Record<string, string>) {
+    super(message);
+    this.name = 'AccountSuspendedError';
+    this.appealUrl = metadata?.['appeal_url'];
+    this.appealLinkText = metadata?.['appeal_url_link_text'];
+  }
+}
 export class UnauthorizedError extends Error {}
 export class BadRequestError extends Error {}
 
@@ -97,10 +129,26 @@ interface ResponseData {
 }
 
 export function toFriendlyError(error: unknown): unknown {
-  if (error && typeof error === 'object' && 'response' in error) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const gaxiosError = error as GaxiosError;
-    const data = parseResponseData(gaxiosError);
+  // First, try structured parsing for TOS_VIOLATION detection.
+  const googleApiError = parseGoogleApiError(error);
+  if (googleApiError && googleApiError.code === 403) {
+    const tosDetail = googleApiError.details.find(
+      (d): d is ErrorInfo =>
+        d['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo' &&
+        'reason' in d &&
+        d.reason === 'TOS_VIOLATION',
+    );
+    if (tosDetail) {
+      return new AccountSuspendedError(
+        googleApiError.message,
+        tosDetail.metadata,
+      );
+    }
+  }
+
+  // Fall back to basic Gaxios error parsing for other HTTP errors.
+  if (isGaxiosError(error)) {
+    const data = parseResponseData(error);
     if (data && data.error && data.error.message && data.error.code) {
       switch (data.error.code) {
         case 400:
@@ -108,15 +156,19 @@ export function toFriendlyError(error: unknown): unknown {
         case 401:
           return new UnauthorizedError(data.error.message);
         case 403:
-          // It's import to pass the message here since it might
-          // explain the cause like "the cloud project you're
-          // using doesn't have code assist enabled".
           return new ForbiddenError(data.error.message);
         default:
       }
     }
   }
   return error;
+}
+
+export function isAccountSuspendedError(
+  error: unknown,
+): AccountSuspendedError | null {
+  const friendly = toFriendlyError(error);
+  return friendly instanceof AccountSuspendedError ? friendly : null;
 }
 
 function parseResponseData(error: GaxiosError): ResponseData | undefined {
