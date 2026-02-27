@@ -26,7 +26,7 @@ import {
   type ToolResult,
   ToolConfirmationOutcome,
 } from './tools.js';
-import { type EditToolParams } from './edit.js';
+import type { EditToolParams } from './edit.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { ToolRegistry } from './tool-registry.js';
@@ -36,6 +36,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { GeminiClient } from '../core/client.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
+ 
 import {
   type CorrectedEditResult,
   ensureCorrectEdit,

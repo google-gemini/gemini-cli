@@ -278,6 +278,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     it('should log a user prompt', () => {
@@ -317,6 +318,7 @@ describe('loggers', () => {
         isInteractive: () => false,
         getExperiments: () => undefined,
         getExperimentsAsync: async () => undefined,
+        getContentGeneratorConfig: () => undefined,
       } as unknown as Config;
       const event = new UserPromptEvent(
         11,
@@ -354,7 +356,8 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
-    } as Config;
+      getContentGeneratorConfig: () => undefined,
+    } as unknown as Config;
 
     const mockMetrics = {
       recordApiResponseMetrics: vi.fn(),
@@ -556,7 +559,8 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
-    } as Config;
+      getContentGeneratorConfig: () => undefined,
+    } as unknown as Config;
 
     const mockMetrics = {
       recordApiResponseMetrics: vi.fn(),
@@ -994,6 +998,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     it('should log flash fallback event', () => {
@@ -1023,6 +1028,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1119,7 +1125,8 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
-    } as Config;
+      getContentGeneratorConfig: () => undefined,
+    } as unknown as Config;
 
     const mockMetrics = {
       recordToolCallMetrics: vi.fn(),
@@ -1739,7 +1746,8 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
-    } as Config;
+      getContentGeneratorConfig: () => undefined,
+    } as unknown as Config;
 
     const mockMetrics = {
       recordFileOperationMetric: vi.fn(),
@@ -1801,6 +1809,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     it('should log a tool output truncated event', () => {
@@ -1840,6 +1849,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2097,6 +2107,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2144,6 +2155,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2191,6 +2203,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2229,6 +2242,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2282,6 +2296,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2320,6 +2335,7 @@ describe('loggers', () => {
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
       getTelemetryLogPromptsEnabled: () => false,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {

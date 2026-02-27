@@ -5,24 +5,26 @@
  */
 
 import type { AuthClient } from 'google-auth-library';
-import {
-  type CodeAssistGlobalUserSettingResponse,
-  type LoadCodeAssistRequest,
-  type LoadCodeAssistResponse,
-  type LongRunningOperationResponse,
-  type OnboardUserRequest,
-  type SetCodeAssistGlobalUserSettingRequest,
-  type ClientMetadata,
-  type RetrieveUserQuotaRequest,
-  type RetrieveUserQuotaResponse,
-  type FetchAdminControlsRequest,
-  type FetchAdminControlsResponse,
-  type ConversationOffered,
-  type ConversationInteraction,
-  type StreamingLatency,
-  type RecordCodeAssistMetricsRequest,
-  UserTierId,
+import type {
+  CodeAssistGlobalUserSettingResponse,
+  LoadCodeAssistRequest,
+  LoadCodeAssistResponse,
+  LongRunningOperationResponse,
+  OnboardUserRequest,
+  SetCodeAssistGlobalUserSettingRequest,
+  ClientMetadata,
+  RetrieveUserQuotaRequest,
+  RetrieveUserQuotaResponse,
+  FetchAdminControlsRequest,
+  FetchAdminControlsResponse,
+  ConversationOffered,
+  ConversationInteraction,
+  StreamingLatency,
+  RecordCodeAssistMetricsRequest,
+  GeminiUserTier,
+  Credits,
 } from './types.js';
+import { UserTierId } from './types.js';
 import type {
   ListExperimentsRequest,
   ListExperimentsResponse,
@@ -38,6 +40,15 @@ import type {
 import * as readline from 'node:readline';
 import { Readable } from 'node:stream';
 import type { ContentGenerator } from '../core/contentGenerator.js';
+import type { Config } from '../config/config.js';
+import {
+  G1_CREDIT_TYPE,
+  getG1CreditBalance,
+  isOverageEligibleModel,
+  shouldAutoUseCredits,
+} from '../billing/billing.js';
+import { logBillingEvent } from '../telemetry/loggers.js';
+import { CreditsUsedEvent } from '../telemetry/billingEvents.js';
 import {
   type CaCountTokenResponse,
   type CaGenerateContentResponse,
@@ -60,6 +71,7 @@ export interface HttpOptions {
 
 export const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
 export const CODE_ASSIST_API_VERSION = 'v1internal';
+const GENERATE_CONTENT_RETRY_DELAY_IN_MILLISECONDS = 1000;
 
 export class CodeAssistServer implements ContentGenerator {
   constructor(
@@ -69,6 +81,8 @@ export class CodeAssistServer implements ContentGenerator {
     readonly sessionId?: string,
     readonly userTier?: UserTierId,
     readonly userTierName?: string,
+    readonly paidTier?: GeminiUserTier,
+    readonly config?: Config,
   ) {}
 
   async generateContentStream(
@@ -77,6 +91,19 @@ export class CodeAssistServer implements ContentGenerator {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    const autoUse = this.config
+      ? shouldAutoUseCredits(
+          this.config.getBillingSettings().overageStrategy,
+          getG1CreditBalance(this.paidTier),
+        )
+      : false;
+    const modelIsEligible = isOverageEligibleModel(req.model);
+    const shouldEnableCredits = modelIsEligible && autoUse;
+
+    const enabledCreditTypes = shouldEnableCredits
+      ? ([G1_CREDIT_TYPE] as string[])
+      : undefined;
+
     const responses =
       await this.requestStreamingPost<CaGenerateContentResponse>(
         'streamGenerateContent',
@@ -85,6 +112,7 @@ export class CodeAssistServer implements ContentGenerator {
           userPromptId,
           this.projectId,
           this.sessionId,
+          enabledCreditTypes,
         ),
         req.config?.abortSignal,
       );
@@ -96,6 +124,9 @@ export class CodeAssistServer implements ContentGenerator {
     return (async function* (
       server: CodeAssistServer,
     ): AsyncGenerator<GenerateContentResponse> {
+      let totalConsumed = 0;
+      let lastRemaining = 0;
+
       for await (const response of responses) {
         if (isFirst) {
           streamingLatency.firstMessageLatency = formatProtoJsonDuration(
@@ -118,7 +149,37 @@ export class CodeAssistServer implements ContentGenerator {
           req.config?.abortSignal,
         );
 
+        if (response.consumedCredits) {
+          for (const credit of response.consumedCredits) {
+            if (credit.creditType === G1_CREDIT_TYPE && credit.creditAmount) {
+              totalConsumed += parseInt(credit.creditAmount, 10) || 0;
+            }
+          }
+        }
+        if (response.remainingCredits) {
+          // Sum all G1 credit entries for consistency with getG1CreditBalance
+          lastRemaining = response.remainingCredits.reduce((sum, credit) => {
+            if (credit.creditType === G1_CREDIT_TYPE && credit.creditAmount) {
+              return sum + (parseInt(credit.creditAmount, 10) || 0);
+            }
+            return sum;
+          }, 0);
+          server.updateCredits(response.remainingCredits);
+        }
+
         yield translatedResponse;
+      }
+
+      // Emit credits used telemetry after the stream completes
+      if (totalConsumed > 0 && server.config) {
+        logBillingEvent(
+          server.config,
+          new CreditsUsedEvent(
+            req.model ?? 'unknown',
+            totalConsumed,
+            lastRemaining,
+          ),
+        );
       }
     })(this);
   }
@@ -137,8 +198,10 @@ export class CodeAssistServer implements ContentGenerator {
         userPromptId,
         this.projectId,
         this.sessionId,
+        undefined,
       ),
       req.config?.abortSignal,
+      GENERATE_CONTENT_RETRY_DELAY_IN_MILLISECONDS,
     );
     const duration = formatProtoJsonDuration(Date.now() - start);
     const streamingLatency: StreamingLatency = {
@@ -156,7 +219,27 @@ export class CodeAssistServer implements ContentGenerator {
       req.config?.abortSignal,
     );
 
+    if (response.remainingCredits) {
+      this.updateCredits(response.remainingCredits);
+    }
+
     return translatedResponse;
+  }
+
+  private updateCredits(remainingCredits: Credits[]): void {
+    if (!this.paidTier) {
+      return;
+    }
+
+    // Replace the G1 credits entries with the latest remaining amounts.
+    // Non-G1 credits are preserved as-is.
+    const nonG1Credits = (this.paidTier.availableCredits ?? []).filter(
+      (c) => c.creditType !== G1_CREDIT_TYPE,
+    );
+    const updatedG1Credits = remainingCredits.filter(
+      (c) => c.creditType === G1_CREDIT_TYPE,
+    );
+    this.paidTier.availableCredits = [...nonG1Credits, ...updatedG1Credits];
   }
 
   async onboardUser(
@@ -185,6 +268,25 @@ export class CodeAssistServer implements ContentGenerator {
       } else {
         throw e;
       }
+    }
+  }
+
+  async refreshAvailableCredits(): Promise<void> {
+    if (!this.paidTier) {
+      return;
+    }
+    const res = await this.loadCodeAssist({
+      cloudaicompanionProject: this.projectId,
+      metadata: {
+        ideType: 'IDE_UNSPECIFIED',
+        platform: 'PLATFORM_UNSPECIFIED',
+        pluginType: 'GEMINI',
+        duetProject: this.projectId,
+      },
+      mode: 'HEALTH_CHECK',
+    });
+    if (res.paidTier?.availableCredits) {
+      this.paidTier.availableCredits = res.paidTier.availableCredits;
     }
   }
 
@@ -292,6 +394,7 @@ export class CodeAssistServer implements ContentGenerator {
     method: string,
     req: object,
     signal?: AbortSignal,
+    retryDelay: number = 100,
   ): Promise<T> {
     const res = await this.client.request<T>({
       url: this.getMethodUrl(method),
@@ -303,6 +406,16 @@ export class CodeAssistServer implements ContentGenerator {
       responseType: 'json',
       body: JSON.stringify(req),
       signal,
+      retryConfig: {
+        retryDelay,
+        retry: 3,
+        noResponseRetries: 3,
+        statusCodesToRetry: [
+          [429, 429],
+          [499, 499],
+          [500, 599],
+        ],
+      },
     });
     return res.data;
   }
@@ -350,6 +463,7 @@ export class CodeAssistServer implements ContentGenerator {
       responseType: 'stream',
       body: JSON.stringify(req),
       signal,
+      retry: false,
     });
 
     return (async function* (): AsyncGenerator<T> {

@@ -20,10 +20,18 @@ vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(),
 }));
 
+const runInDevTraceSpan = vi.hoisted(() =>
+  vi.fn(async (opts, fn) => {
+    const metadata = { attributes: opts.attributes || {} };
+    return fn({
+      metadata,
+      endSpan: vi.fn(),
+    });
+  }),
+);
+
 vi.mock('../telemetry/trace.js', () => ({
-  runInDevTraceSpan: vi.fn(async (_opts, fn) =>
-    fn({ metadata: { input: {}, output: {} } }),
-  ),
+  runInDevTraceSpan,
 }));
 
 import { logToolCall } from '../telemetry/loggers.js';
@@ -82,6 +90,7 @@ import {
   ROOT_SCHEDULER_ID,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
+import { GeminiCliOperation } from '../telemetry/constants.js';
 import * as ToolUtils from '../utils/tool-utils.js';
 import type { EditorType } from '../utils/editor.js';
 import {
@@ -367,6 +376,21 @@ describe('Scheduler (Orchestrator)', () => {
           }),
         ]),
       );
+
+      expect(runInDevTraceSpan).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: GeminiCliOperation.ScheduleToolCalls,
+        }),
+        expect.any(Function),
+      );
+
+      const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
+      const fn = spanArgs[1];
+      const metadata = { attributes: {} };
+      await fn({ metadata, endSpan: vi.fn() });
+      expect(metadata).toMatchObject({
+        input: [req1],
+      });
     });
 
     it('should set approvalMode to PLAN when config returns PLAN', async () => {

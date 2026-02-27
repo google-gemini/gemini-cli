@@ -53,7 +53,7 @@ export interface GrepToolParams {
   /**
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
    */
-  include?: string;
+  include_pattern?: string;
 
   /**
    * Optional: A regular expression pattern to exclude from the search results.
@@ -232,7 +232,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           const matches = await this.performGrepSearch({
             pattern: this.params.pattern,
             path: searchDir,
-            include: this.params.include,
+            include_pattern: this.params.include_pattern,
             exclude_pattern: this.params.exclude_pattern,
             maxMatches: remainingLimit,
             max_matches_per_file: this.params.max_matches_per_file,
@@ -322,7 +322,7 @@ class GrepToolInvocation extends BaseToolInvocation<
   private async performGrepSearch(options: {
     pattern: string;
     path: string; // Expects absolute path
-    include?: string;
+    include_pattern?: string;
     exclude_pattern?: string;
     maxMatches: number;
     max_matches_per_file?: number;
@@ -331,7 +331,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     const {
       pattern,
       path: absolutePath,
-      include,
+      include_pattern,
       exclude_pattern,
       maxMatches,
       max_matches_per_file,
@@ -361,8 +361,8 @@ class GrepToolInvocation extends BaseToolInvocation<
         if (max_matches_per_file) {
           gitArgs.push('--max-count', max_matches_per_file.toString());
         }
-        if (include) {
-          gitArgs.push('--', include);
+        if (include_pattern) {
+          gitArgs.push('--', include_pattern);
         }
 
         try {
@@ -429,8 +429,8 @@ class GrepToolInvocation extends BaseToolInvocation<
         if (max_matches_per_file) {
           grepArgs.push('--max-count', max_matches_per_file.toString());
         }
-        if (include) {
-          grepArgs.push(`--include=${include}`);
+        if (include_pattern) {
+          grepArgs.push(`--include=${include_pattern}`);
         }
         grepArgs.push(pattern);
         grepArgs.push('.');
@@ -476,7 +476,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         'GrepLogic: Falling back to JavaScript grep implementation.',
       );
       strategyUsed = 'javascript fallback';
-      const globPattern = include ? include : '**/*';
+      const globPattern = include_pattern ? include_pattern : '**/*';
       const ignorePatterns = this.fileExclusions.getGlobExcludes();
 
       const filesStream = globStream(globPattern, {
@@ -556,8 +556,8 @@ class GrepToolInvocation extends BaseToolInvocation<
 
   getDescription(): string {
     let description = `'${this.params.pattern}'`;
-    if (this.params.include) {
-      description += ` in ${this.params.include}`;
+    if (this.params.include_pattern) {
+      description += ` in ${this.params.include_pattern}`;
     }
     if (this.params.dir_path) {
       const resolvedPath = path.resolve(

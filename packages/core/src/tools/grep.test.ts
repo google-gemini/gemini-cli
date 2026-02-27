@@ -117,7 +117,7 @@ describe('GrepTool', () => {
       const params: GrepToolParams = {
         pattern: 'hello',
         dir_path: '.',
-        include: '*.txt',
+        include_pattern: '*.txt',
       };
       expect(grepTool.validateToolParams(params)).toBeNull();
     });
@@ -225,7 +225,10 @@ describe('GrepTool', () => {
     }, 30000);
 
     it('should find matches with an include glob', async () => {
-      const params: GrepToolParams = { pattern: 'hello', include: '*.js' };
+      const params: GrepToolParams = {
+        pattern: 'hello',
+        include_pattern: '*.js',
+      };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
@@ -246,7 +249,7 @@ describe('GrepTool', () => {
       const params: GrepToolParams = {
         pattern: 'hello',
         dir_path: 'sub',
-        include: '*.js',
+        include_pattern: '*.js',
       };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
@@ -571,7 +574,7 @@ describe('GrepTool', () => {
     it('should generate correct description with pattern and include', () => {
       const params: GrepToolParams = {
         pattern: 'testPattern',
-        include: '*.ts',
+        include_pattern: '*.ts',
       };
       const invocation = grepTool.build(params);
       expect(invocation.getDescription()).toBe("'testPattern' in *.ts");
@@ -617,7 +620,7 @@ describe('GrepTool', () => {
       await fs.mkdir(dirPath, { recursive: true });
       const params: GrepToolParams = {
         pattern: 'testPattern',
-        include: '*.ts',
+        include_pattern: '*.ts',
         dir_path: path.join('src', 'app'),
       };
       const invocation = grepTool.build(params);

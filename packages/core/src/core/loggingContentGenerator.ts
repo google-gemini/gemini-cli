@@ -25,7 +25,7 @@ import {
 } from '../telemetry/types.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 import type { Config } from '../config/config.js';
-import type { UserTierId } from '../code_assist/types.js';
+import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
 import {
   logApiError,
   logApiRequest,
@@ -38,6 +38,16 @@ import { isStructuredError } from '../utils/quotaErrorDetection.js';
 import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorType } from '../utils/errors.js';
+import {
+  GeminiCliOperation,
+  GEN_AI_PROMPT_NAME,
+  GEN_AI_REQUEST_MODEL,
+  GEN_AI_SYSTEM_INSTRUCTIONS,
+  GEN_AI_TOOL_DEFINITIONS,
+  GEN_AI_USAGE_INPUT_TOKENS,
+  GEN_AI_USAGE_OUTPUT_TOKENS,
+} from '../telemetry/constants.js';
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { isMcpToolName } from '../tools/mcp-tool.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 
@@ -152,6 +162,10 @@ export class LoggingContentGenerator implements ContentGenerator {
 
   get userTierName(): string | undefined {
     return this.wrapped.userTierName;
+  }
+
+  get paidTier(): GeminiUserTier | undefined {
+    return this.wrapped.paidTier;
   }
 
   private logApiRequest(
@@ -304,10 +318,18 @@ export class LoggingContentGenerator implements ContentGenerator {
   ): Promise<GenerateContentResponse> {
     return runInDevTraceSpan(
       {
-        name: 'generateContent',
+        operation: GeminiCliOperation.LLMCall,
+        attributes: {
+          [GEN_AI_REQUEST_MODEL]: req.model,
+          [GEN_AI_PROMPT_NAME]: userPromptId,
+          [GEN_AI_SYSTEM_INSTRUCTIONS]: safeJsonStringify(
+            req.config?.systemInstruction ?? [],
+          ),
+          [GEN_AI_TOOL_DEFINITIONS]: safeJsonStringify(req.config?.tools ?? []),
+        },
       },
       async ({ metadata: spanMetadata }) => {
-        spanMetadata.input = { request: req, userPromptId, model: req.model };
+        spanMetadata.input = req.contents;
 
         const startTime = Date.now();
         const contents: Content[] = toContents(req.contents);
@@ -327,10 +349,11 @@ export class LoggingContentGenerator implements ContentGenerator {
             userPromptId,
             role,
           );
-          spanMetadata.output = {
-            response,
-            usageMetadata: response.usageMetadata,
-          };
+          spanMetadata.output = response.candidates?.[0]?.content ?? null;
+          spanMetadata.attributes[GEN_AI_USAGE_INPUT_TOKENS] =
+            response.usageMetadata?.promptTokenCount ?? 0;
+          spanMetadata.attributes[GEN_AI_USAGE_OUTPUT_TOKENS] =
+            response.usageMetadata?.candidatesTokenCount ?? 0;
           const durationMs = Date.now() - startTime;
           this._logApiResponse(
             contents,
@@ -356,6 +379,7 @@ export class LoggingContentGenerator implements ContentGenerator {
             .catch((e) => debugLogger.debug('quota refresh failed', e));
           return response;
         } catch (error) {
+          spanMetadata.error = error;
           const durationMs = Date.now() - startTime;
           this._logApiError(
             durationMs,
@@ -380,11 +404,20 @@ export class LoggingContentGenerator implements ContentGenerator {
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     return runInDevTraceSpan(
       {
-        name: 'generateContentStream',
+        operation: GeminiCliOperation.LLMCall,
         noAutoEnd: true,
+        attributes: {
+          [GEN_AI_REQUEST_MODEL]: req.model,
+          [GEN_AI_PROMPT_NAME]: userPromptId,
+          [GEN_AI_SYSTEM_INSTRUCTIONS]: safeJsonStringify(
+            req.config?.systemInstruction ?? [],
+          ),
+          [GEN_AI_TOOL_DEFINITIONS]: safeJsonStringify(req.config?.tools ?? []),
+        },
       },
       async ({ metadata: spanMetadata, endSpan }) => {
-        spanMetadata.input = { request: req, userPromptId, model: req.model };
+        spanMetadata.input = req.contents;
+
         const startTime = Date.now();
         const serverDetails = this._getEndpointUrl(
           req,
@@ -489,13 +522,15 @@ export class LoggingContentGenerator implements ContentGenerator {
       this.config
         .refreshUserQuotaIfStale()
         .catch((e) => debugLogger.debug('quota refresh failed', e));
-      spanMetadata.output = {
-        streamChunks: responses.map((r) => ({
-          content: r.candidates?.[0]?.content ?? null,
-        })),
-        usageMetadata: lastUsageMetadata,
-        durationMs,
-      };
+      spanMetadata.output = responses.map(
+        (response) => response.candidates?.[0]?.content ?? null,
+      );
+      if (lastUsageMetadata) {
+        spanMetadata.attributes[GEN_AI_USAGE_INPUT_TOKENS] =
+          lastUsageMetadata.promptTokenCount ?? 0;
+        spanMetadata.attributes[GEN_AI_USAGE_OUTPUT_TOKENS] =
+          lastUsageMetadata.candidatesTokenCount ?? 0;
+      }
     } catch (error) {
       spanMetadata.error = error;
       const durationMs = Date.now() - startTime;
@@ -524,10 +559,13 @@ export class LoggingContentGenerator implements ContentGenerator {
   ): Promise<EmbedContentResponse> {
     return runInDevTraceSpan(
       {
-        name: 'embedContent',
+        operation: GeminiCliOperation.LLMCall,
+        attributes: {
+          [GEN_AI_REQUEST_MODEL]: req.model,
+        },
       },
       async ({ metadata: spanMetadata }) => {
-        spanMetadata.input = { request: req };
+        spanMetadata.input = req.contents;
         const output = await this.wrapped.embedContent(req);
         spanMetadata.output = output;
         return output;

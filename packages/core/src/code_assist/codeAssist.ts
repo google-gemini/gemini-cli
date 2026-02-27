@@ -34,6 +34,8 @@ export async function createCodeAssistContentGenerator(
       sessionId,
       userData.userTier,
       userData.userTierName,
+      userData.paidTier,
+      config,
     );
   }
 

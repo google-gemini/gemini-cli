@@ -5,6 +5,19 @@ problems encountered while using Gemini CLI.
 
 ## General issues
 
+This section addresses common questions about Gemini CLI usage, security, and
+troubleshooting general errors.
+
+### Why can't I use third-party software (e.g. Claude Code, OpenClaw, OpenCode) with Gemini CLI?
+
+Using third-party software, tools, or services to harvest or piggyback on Gemini
+CLI's OAuth authentication to access our backend services is a direct violation
+of our [applicable terms and policies](tos-privacy.md). Doing so bypasses our
+intended authentication and security structures, and such actions may be grounds
+for immediate suspension or termination of your account. If you would like to
+use a third-party coding agent with Gemini, the supported and secure method is
+to use a Vertex AI or Google AI Studio API key.
+
 ### Why am I getting an `API error: 429 - Resource exhausted`?
 
 This error indicates that you have exceeded your API request limit. The Gemini

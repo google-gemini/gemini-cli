@@ -30,6 +30,8 @@ import {
   HookSystem,
   PolicyDecision,
   ToolErrorType,
+  DiscoveredMCPTool,
+  GeminiCliOperation,
 } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import {
@@ -40,10 +42,20 @@ import {
 import * as modifiableToolModule from '../tools/modifiable-tool.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
-import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
 
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
+}));
+
+vi.mock('../telemetry/trace.js', () => ({
+  runInDevTraceSpan: vi.fn(async (opts, fn) => {
+    const metadata = { attributes: opts.attributes || {} };
+    return fn({
+      metadata,
+      endSpan: vi.fn(),
+    });
+  }),
 }));
 
 class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
@@ -359,6 +371,21 @@ describe('CoreToolScheduler', () => {
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
     expect(completedCalls[0].status).toBe(CoreToolCallStatus.Cancelled);
+
+    expect(runInDevTraceSpan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: GeminiCliOperation.ScheduleToolCalls,
+      }),
+      expect.any(Function),
+    );
+
+    const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
+    const fn = spanArgs[1];
+    const metadata: SpanMetadata = { name: '', attributes: {} };
+    await fn({ metadata, endSpan: vi.fn() });
+    expect(metadata).toMatchObject({
+      input: [request],
+    });
   });
 
   it('should cancel all tools when cancelAll is called', async () => {

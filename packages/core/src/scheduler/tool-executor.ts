@@ -32,6 +32,12 @@ import {
   type CancelledToolCall,
   CoreToolCallStatus,
 } from './types.js';
+import {
+  GeminiCliOperation,
+  GEN_AI_TOOL_CALL_ID,
+  GEN_AI_TOOL_DESCRIPTION,
+  GEN_AI_TOOL_NAME,
+} from '../telemetry/constants.js';
 
 export interface ToolExecutionContext {
   call: ToolCall;
@@ -68,11 +74,17 @@ export class ToolExecutor {
 
     return runInDevTraceSpan(
       {
-        name: tool.name,
-        attributes: { type: 'tool-call' },
+        operation: GeminiCliOperation.ToolCall,
+        attributes: {
+          [GEN_AI_TOOL_NAME]: toolName,
+          [GEN_AI_TOOL_CALL_ID]: callId,
+          [GEN_AI_TOOL_DESCRIPTION]: tool.description,
+        },
       },
       async ({ metadata: spanMetadata }) => {
-        spanMetadata.input = { request };
+        spanMetadata.input = request;
+
+        let completedToolCall: CompletedToolCall;
 
         try {
           let promise: Promise<ToolResult>;
@@ -114,21 +126,23 @@ export class ToolExecutor {
           }
 
           const toolResult: ToolResult = await promise;
-          spanMetadata.output = toolResult;
 
           if (signal.aborted) {
-            return this.createCancelledResult(
+            completedToolCall = this.createCancelledResult(
               call,
               'User cancelled tool execution.',
             );
           } else if (toolResult.error === undefined) {
-            return await this.createSuccessResult(call, toolResult);
+            completedToolCall = await this.createSuccessResult(
+              call,
+              toolResult,
+            );
           } else {
             const displayText =
               typeof toolResult.returnDisplay === 'string'
                 ? toolResult.returnDisplay
                 : undefined;
-            return this.createErrorResult(
+            completedToolCall = this.createErrorResult(
               call,
               new Error(toolResult.error.message),
               toolResult.error.type,
@@ -139,21 +153,25 @@ export class ToolExecutor {
         } catch (executionError: unknown) {
           spanMetadata.error = executionError;
           if (signal.aborted) {
-            return this.createCancelledResult(
+            completedToolCall = this.createCancelledResult(
               call,
               'User cancelled tool execution.',
             );
+          } else {
+            const error =
+              executionError instanceof Error
+                ? executionError
+                : new Error(String(executionError));
+            completedToolCall = this.createErrorResult(
+              call,
+              error,
+              ToolErrorType.UNHANDLED_EXCEPTION,
+            );
           }
-          const error =
-            executionError instanceof Error
-              ? executionError
-              : new Error(String(executionError));
-          return this.createErrorResult(
-            call,
-            error,
-            ToolErrorType.UNHANDLED_EXCEPTION,
-          );
         }
+
+        spanMetadata.output = completedToolCall;
+        return completedToolCall;
       },
     );
   }

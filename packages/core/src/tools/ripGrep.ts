@@ -108,7 +108,7 @@ export interface RipGrepToolParams {
   /**
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
    */
-  include?: string;
+  include_pattern?: string;
 
   /**
    * Optional: A regular expression pattern to exclude from the search results.
@@ -251,7 +251,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         allMatches = await this.performRipgrepSearch({
           pattern: this.params.pattern,
           path: searchDirAbs,
-          include: this.params.include,
+          include_pattern: this.params.include_pattern,
           exclude_pattern: this.params.exclude_pattern,
           case_sensitive: this.params.case_sensitive,
           fixed_strings: this.params.fixed_strings,
@@ -334,7 +334,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         pattern: this.params.pattern,
         path: uniqueFiles,
         basePath: searchDirAbs,
-        include: this.params.include,
+        include_pattern: this.params.include_pattern,
         exclude_pattern: this.params.exclude_pattern,
         case_sensitive: this.params.case_sensitive,
         fixed_strings: this.params.fixed_strings,
@@ -365,7 +365,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     pattern: string;
     path: string | string[];
     basePath?: string;
-    include?: string;
+    include_pattern?: string;
     exclude_pattern?: string;
     case_sensitive?: boolean;
     fixed_strings?: boolean;
@@ -381,7 +381,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       pattern,
       path,
       basePath,
-      include,
+      include_pattern,
       exclude_pattern,
       case_sensitive,
       fixed_strings,
@@ -424,8 +424,8 @@ class GrepToolInvocation extends BaseToolInvocation<
       rgArgs.push('--max-count', max_matches_per_file.toString());
     }
 
-    if (include) {
-      rgArgs.push('--glob', include);
+    if (include_pattern) {
+      rgArgs.push('--glob', include_pattern);
     }
 
     if (!no_ignore) {
@@ -548,8 +548,8 @@ class GrepToolInvocation extends BaseToolInvocation<
    */
   getDescription(): string {
     let description = `'${this.params.pattern}'`;
-    if (this.params.include) {
-      description += ` in ${this.params.include}`;
+    if (this.params.include_pattern) {
+      description += ` in ${this.params.include_pattern}`;
     }
     const pathParam = this.params.dir_path || '.';
     const resolvedPath = path.resolve(this.config.getTargetDir(), pathParam);

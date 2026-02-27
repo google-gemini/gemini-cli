@@ -28,10 +28,7 @@ import {
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
-import {
-  ensureCorrectEdit,
-  ensureCorrectFileContent,
-} from '../utils/editCorrector.js';
+import { ensureCorrectFileContent } from '../utils/editCorrector.js';
 import { detectLineEnding } from '../utils/textUtils.js';
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import { getDiffContextSnippet } from './diff-utils.js';
@@ -50,6 +47,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { WRITE_FILE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
+import { isGemini3Model } from '../config/models.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -115,35 +113,16 @@ export async function getCorrectedFileContent(
     }
   }
 
-  // If readError is set, we have returned.
-  // So, file was either read successfully (fileExists=true, originalContent set)
-  // or it was ENOENT (fileExists=false, originalContent='').
+  const aggressiveUnescape = !isGemini3Model(config.getActiveModel());
 
-  if (fileExists) {
-    // This implies originalContent is available
-    const { params: correctedParams } = await ensureCorrectEdit(
-      filePath,
-      originalContent,
-      {
-        old_string: originalContent, // Treat entire current content as old_string
-        new_string: proposedContent,
-        file_path: filePath,
-      },
-      config.getGeminiClient(),
-      config.getBaseLlmClient(),
-      abortSignal,
-      config.getDisableLLMCorrection(),
-    );
-    correctedContent = correctedParams.new_string;
-  } else {
-    // This implies new file (ENOENT)
-    correctedContent = await ensureCorrectFileContent(
-      proposedContent,
-      config.getBaseLlmClient(),
-      abortSignal,
-      config.getDisableLLMCorrection(),
-    );
-  }
+  correctedContent = await ensureCorrectFileContent(
+    proposedContent,
+    config.getBaseLlmClient(),
+    abortSignal,
+    config.getDisableLLMCorrection(),
+    aggressiveUnescape,
+  );
+
   return { originalContent, correctedContent, fileExists };
 }
 
