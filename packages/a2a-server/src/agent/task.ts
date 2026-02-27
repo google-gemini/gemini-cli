@@ -74,6 +74,8 @@ export class Task {
   currentPromptId: string | undefined;
   promptCount = 0;
   autoExecute: boolean;
+  /** Accumulated text content sent during the task, included in the final status event. */
+  accumulatedText = '';
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
@@ -290,6 +292,9 @@ export class Task {
         taskId: this.id,
         contextId: this.contextId,
       };
+    } else if (final && this.accumulatedText) {
+      // Include accumulated text in the final event so clients can extract it
+      message = this._createTextMessage(this.accumulatedText);
     }
 
     const event = this._createStatusUpdateEvent(
@@ -319,9 +324,9 @@ export class Task {
 
     logger.info(
       '[Task] Scheduler output update for tool call ' +
-        toolCallId +
-        ': ' +
-        outputAsText,
+      toolCallId +
+      ': ' +
+      outputAsText,
     );
     const artifact: Artifact = {
       artifactId: `tool-${toolCallId}-output`,
@@ -407,8 +412,8 @@ export class Task {
     ) {
       logger.info(
         '[Task] ' +
-          (this.autoExecute ? '' : 'YOLO mode enabled. ') +
-          'Auto-approving all tool calls.',
+        (this.autoExecute ? '' : 'YOLO mode enabled. ') +
+        'Auto-approving all tool calls.',
       );
       toolCalls.forEach((tc: ToolCall) => {
         if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
@@ -510,9 +515,24 @@ export class Task {
       ) as AnyDeclarativeTool;
     }
 
+    // ── ACP ToolCall spec compliance ──
+    // Map internal ToolCall fields to standard ACP ToolCall fields:
+    //   toolCallId = request.callId
+    //   title      = tool.displayName || tool.name || request.name
+    //   rawInput   = request.args
+    //   kind       = tool.kind || "execute"
+    const acpToolCall: Record<string, unknown> = {
+      ...(serializableToolCall as Record<string, unknown>),
+      toolCallId: tc.request.callId,
+      title:
+        tc.tool?.displayName || tc.tool?.name || tc.request.name || 'Tool Call',
+      rawInput: tc.request.args,
+      kind: tc.tool?.kind || 'execute',
+    };
+
     messageParts.push({
       kind: 'data',
-      data: serializableToolCall,
+      data: acpToolCall,
     } as Part);
 
     return {
@@ -815,9 +835,9 @@ export class Task {
         if (confirmationDetails.type === 'edit') {
           const payload = part.data['newContent']
             ? ({
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                newContent: part.data['newContent'] as string,
-              } as ToolConfirmationPayload)
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              newContent: part.data['newContent'] as string,
+            } as ToolConfirmationPayload)
             : undefined;
           this.skipFinalTrueAfterInlineEdit = !!payload;
           try {
@@ -912,7 +932,7 @@ export class Task {
     aborted: AbortSignal,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     if (completedToolCalls.length === 0) {
-      yield* (async function* () {})(); // Yield nothing
+      yield* (async function* () { })(); // Yield nothing
       return;
     }
 
@@ -1002,7 +1022,7 @@ export class Task {
         };
         this.setTaskStateAndPublishUpdate('working', stateChange); // Reflect potential background activity
       }
-      yield* (async function* () {})(); // Yield nothing
+      yield* (async function* () { })(); // Yield nothing
     } else {
       logger.info(
         '[Task] No relevant parts in user message for LLM interaction or tool confirmation.',
@@ -1010,7 +1030,7 @@ export class Task {
       // If there's no new text and no confirmations, and no pending tools,
       // it implies we might need to signal input required if nothing else is happening.
       // However, the agent.ts will make this determination after waitForPendingTools.
-      yield* (async function* () {})(); // Yield nothing
+      yield* (async function* () { })(); // Yield nothing
     }
   }
 
@@ -1018,6 +1038,8 @@ export class Task {
     if (content === '') {
       return;
     }
+    // Accumulate text for inclusion in the final status event
+    this.accumulatedText += content;
     logger.info('[Task] Sending text content to event bus.');
     const message = this._createTextMessage(content);
     const textContent: TextContent = {

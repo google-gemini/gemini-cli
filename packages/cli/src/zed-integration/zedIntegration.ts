@@ -92,7 +92,7 @@ export class GeminiAgent {
     private settings: LoadedSettings,
     private argv: CliArgs,
     private connection: acp.AgentSideConnection,
-  ) {}
+  ) { }
 
   async initialize(
     args: acp.InitializeRequest,
@@ -131,6 +131,13 @@ export class GeminiAgent {
         mcpCapabilities: {
           http: true,
           sse: true,
+        },
+        _meta: {
+          'ilhae.dev': {
+            skills: true,
+            mcpManagement: true,
+            modelSelection: true,
+          },
         },
       },
     };
@@ -241,6 +248,9 @@ export class GeminiAgent {
     const chat = await geminiClient.startChat();
     const session = new Session(sessionId, chat, config, this.connection);
     this.sessions.set(sessionId, session);
+    // Fire-and-forget: send available slash commands after session is ready (ACP spec)
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    session.sendAvailableCommands(config);
     const t4 = performance.now();
 
     console.log(`[Profile] newSession total: ${(t4 - t0).toFixed(2)}ms (newConfig: ${(t1 - t0).toFixed(2)}ms, auth: ${(t2 - t1).toFixed(2)}ms, initConfig(MCP): ${(t3 - t2).toFixed(2)}ms, startChat: ${(t4 - t3).toFixed(2)}ms, reused: ${reusedConfig})`);
@@ -255,7 +265,7 @@ export class GeminiAgent {
         availableModels: buildAvailableModels(),
         currentModelId: config.getModel(),
       },
-      configOptions: buildAvailableConfigOptions()
+      configOptions: buildAvailableConfigOptions(config.getModel())
     };
   }
 
@@ -297,7 +307,7 @@ export class GeminiAgent {
     const geminiClient = config.getGeminiClient();
     await geminiClient.initialize();
     const t3 = performance.now();
-    
+
     if (sessionData && sessionPath) {
       const { clientHistory } = convertSessionToHistoryFormats(
         sessionData.messages,
@@ -337,7 +347,7 @@ export class GeminiAgent {
         availableModels: buildAvailableModels(),
         currentModelId: config.getModel(),
       },
-      configOptions: buildAvailableConfigOptions()
+      configOptions: buildAvailableConfigOptions(config.getModel())
     };
   }
 
@@ -378,7 +388,7 @@ export class GeminiAgent {
       startupProfiler.flush(config);
     }
     const t3 = performance.now();
-    
+
     console.log(`[Profile] initializeSessionConfig total: ${(t3 - t0).toFixed(2)}ms (newConfig: ${(t1 - t0).toFixed(2)}ms, auth: ${(t2 - t1).toFixed(2)}ms, initConfig(MCP): ${(t3 - t2).toFixed(2)}ms, reused: ${reusedConfig})`);
 
     return config;
@@ -491,7 +501,7 @@ export class GeminiAgent {
         ? s.firstUserMessage.replace(/```[\s\S]*?```/g, '[Code Block]').replace(/\s+/g, ' ').trim()
         : 'Empty session';
 
-      const title = cleanedMessage.length > 120 
+      const title = cleanedMessage.length > 120
         ? cleanedMessage.substring(0, 117) + '...'
         : cleanedMessage;
 
@@ -597,19 +607,19 @@ export class GeminiAgent {
         if (!skillName || enable === undefined) {
           return { success: false, error: 'Missing name or enable param' };
         }
-        
+
         try {
           const { enableSkill, disableSkill } = await import('../utils/skillSettings.js');
           const { loadSettings, SettingScope } = await import('../config/settings.js');
           const workspaceDir = process.cwd();
           const settings = loadSettings(workspaceDir);
-          
+
           if (enable) {
             enableSkill(settings, skillName);
           } else {
             disableSkill(settings, skillName, SettingScope.User);
           }
-          
+
           await this.config.reloadSkills();
           return { success: true };
         } catch (e) {
@@ -625,8 +635,8 @@ export class GeminiAgent {
           const path = await import('path');
           const fs = await import('fs/promises');
 
-          const skillsDir = path.join(Storage.getGlobalAgentsDir() || path.join((await import('os')).homedir(), '.agents'), 'skills', skillName);          await fs.mkdir(skillsDir, { recursive: true });
-          
+          const skillsDir = path.join(Storage.getGlobalAgentsDir() || path.join((await import('os')).homedir(), '.agents'), 'skills', skillName); await fs.mkdir(skillsDir, { recursive: true });
+
           const skillPath = path.join(skillsDir, 'SKILL.md');
           const defaultContent = `---
 description: A short description of what ${skillName} does.
@@ -645,7 +655,7 @@ Describe how the agent should use this skill here.
           } catch {
             await fs.writeFile(skillPath, defaultContent, 'utf8');
           }
-          
+
           await this.config.reloadSkills();
           return { success: true, path: skillPath };
         } catch (e) {
@@ -662,7 +672,7 @@ Describe how the agent should use this skill here.
           const fs = await import('fs/promises');
           const skillsDir = path.join(Storage.getGlobalAgentsDir() || path.join((await import('os')).homedir(), '.agents'), 'skills', skillName);
           await fs.rm(skillsDir, { recursive: true, force: true });
-          
+
           await this.config.reloadSkills();
           return { success: true };
         } catch (e) {
@@ -677,12 +687,12 @@ Describe how the agent should use this skill here.
           const { Storage } = await import('@google/gemini-cli-core');
           const path = await import('path');
           const fs = await import('fs/promises');
-          const settingsPath = path.join(Storage.getGlobalGeminiDir(), 'settings.json');          let settingsObj: any = {};
+          const settingsPath = path.join(Storage.getGlobalGeminiDir(), 'settings.json'); let settingsObj: any = {};
           try {
             const data = await fs.readFile(settingsPath, 'utf8');
             settingsObj = JSON.parse(data);
-          } catch(e) {}
-          
+          } catch (e) { }
+
           if (settingsObj.mcp && settingsObj.mcp.servers && settingsObj.mcp.servers[mcpName]) {
             delete settingsObj.mcp.servers[mcpName];
             await fs.writeFile(settingsPath, JSON.stringify(settingsObj, null, 2), 'utf8');
@@ -701,11 +711,11 @@ Describe how the agent should use this skill here.
           const { Storage } = await import('@google/gemini-cli-core');
           const path = await import('path');
           const fs = await import('fs/promises');
-          const settingsPath = path.join(Storage.getGlobalGeminiDir(), 'mcp-server-enablement.json');          let settingsObj: any = {};
+          const settingsPath = path.join(Storage.getGlobalGeminiDir(), 'mcp-server-enablement.json'); let settingsObj: any = {};
           try {
             const data = await fs.readFile(settingsPath, 'utf8');
             settingsObj = JSON.parse(data);
-          } catch(e) {}
+          } catch (e) { }
 
           const normalizedName = mcpName.toLowerCase().trim();
           if (enable) {
@@ -723,7 +733,7 @@ Describe how the agent should use this skill here.
         }
       }
       case '_models/list': {
-        const models: Array<{id: string, name: string}> = [];
+        const models: Array<{ id: string, name: string }> = [];
         if (VALID_GEMINI_MODELS) {
           for (const modelId of VALID_GEMINI_MODELS) {
             const nameParts = modelId.split('-');
@@ -742,7 +752,7 @@ Describe how the agent should use this skill here.
           models.push({ id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' });
           models.push({ id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' });
         }
-        
+
         const uniqueModels = Array.from(new Map(models.map(m => [m.id, m])).values());
         return { models: uniqueModels };
       }
@@ -760,7 +770,7 @@ export class Session {
     private readonly chat: GeminiChat,
     private readonly config: Config,
     private readonly connection: acp.AgentSideConnection,
-  ) {}
+  ) { }
   async cancelPendingPrompt(): Promise<void> {
     if (!this.pendingPrompt) {
       throw new Error('Not currently generating');
@@ -809,10 +819,14 @@ export class Session {
   }
 
   setConfigOption(configId: string, value: unknown): acp.SetSessionConfigOptionResponse {
-    // In the future, this will handle custom CLI session configuration
-    debugLogger.warn(`Received request to set config option ${configId} to ${String(value)} - Not supported yet`);
+    if (configId === 'model' && typeof value === 'string') {
+      this.setModel(value);
+      debugLogger.warn(`[ACP] Config option ${configId} set to ${value}`);
+    } else {
+      debugLogger.warn(`[ACP] Unsupported config option: ${configId}=${String(value)}`);
+    }
     return {
-      configOptions: buildAvailableConfigOptions()
+      configOptions: buildAvailableConfigOptions(this.config.getModel())
     };
   }
 
@@ -877,6 +891,7 @@ export class Session {
                   ? 'completed'
                   : 'failed',
               title: toolCall.displayName || toolCall.name,
+              rawInput: toolCall.args,
               content: toolCallContent,
               kind: tool ? toAcpToolKind(tool.kind) : 'other',
             });
@@ -886,10 +901,90 @@ export class Session {
     }
   }
 
+  /**
+   * Handle ACP slash commands locally (ACP spec: /command sent via session/prompt).
+   * Returns PromptResponse if handled, or null to fall through to normal LLM processing.
+   */
+  async #handleSlashCommand(text: string): Promise<acp.PromptResponse | null> {
+    const spaceIdx = text.indexOf(' ');
+    const command = (spaceIdx > 0 ? text.slice(1, spaceIdx) : text.slice(1)).toLowerCase();
+    const args = spaceIdx > 0 ? text.slice(spaceIdx + 1).trim() : '';
+
+    switch (command) {
+      case 'clear': {
+        await this.clear();
+        await this.#sendCommandResponse('Conversation history cleared.');
+        return { stopReason: 'end_turn' };
+      }
+
+      case 'model': {
+        if (!args) {
+          const currentModel = this.config.getModel();
+          const available = buildAvailableModels().map((m) => m.modelId).join(', ');
+          await this.#sendCommandResponse(
+            `Current model: **${currentModel}**\nAvailable: ${available}`,
+          );
+        } else {
+          this.setModel(args);
+          await this.#sendCommandResponse(`Model switched to **${args}**`);
+        }
+        return { stopReason: 'end_turn' };
+      }
+
+      case 'tools': {
+        await this.#sendCommandResponse(
+          'Use the `/tools` command in the terminal CLI to list available tools and MCP servers.',
+        );
+        return { stopReason: 'end_turn' };
+      }
+
+      case 'stats': {
+        await this.#sendCommandResponse('Token usage stats are not available in ACP mode yet.');
+        return { stopReason: 'end_turn' };
+      }
+
+      case 'plan': {
+        if (this.config.isPlanEnabled()) {
+          return null; // Fall through to LLM with plan prompt
+        }
+        await this.#sendCommandResponse('Plan mode is not enabled for this session.');
+        return { stopReason: 'end_turn' };
+      }
+
+      default:
+        return null; // Unknown command — fall through to LLM
+    }
+  }
+
+  /**
+   * Send a short agent response for slash command results (no LLM call needed).
+   */
+  async #sendCommandResponse(message: string): Promise<void> {
+    await this.sendUpdate({
+      sessionUpdate: 'agent_message_chunk',
+      content: { type: 'text', text: message },
+    } as unknown as acp.SessionNotification['update']);
+  }
+
   async prompt(params: acp.PromptRequest): Promise<acp.PromptResponse> {
     this.pendingPrompt?.abort();
     const pendingSend = new AbortController();
     this.pendingPrompt = pendingSend;
+
+    // ── Slash command interception (ACP spec: /command sent via session/prompt) ──
+    const promptText = params.prompt
+      .filter((block): block is { type: 'text'; text: string } => 'type' in block && block.type === 'text')
+      .map((block) => block.text)
+      .join('')
+      .trim();
+
+    if (promptText.startsWith('/')) {
+      const result = await this.#handleSlashCommand(promptText);
+      if (result !== null) {
+        return result;
+      }
+      // Not a recognized command — fall through to normal LLM processing
+    }
 
     const promptId = Math.random().toString(16).slice(2);
     const chat = this.chat;
@@ -1028,12 +1123,26 @@ export class Session {
   private async sendUpdate(
     update: acp.SessionNotification['update'],
   ): Promise<void> {
+    // Diagnostic: verify rawInput is present before SDK serialization
+    if ('sessionUpdate' in update && (update as Record<string, unknown>)['sessionUpdate'] === 'tool_call') {
+      const u = update as Record<string, unknown>;
+      process.stderr.write(`[sendUpdate] tool_call id=${String(u['toolCallId'])} hasRawInput=${'rawInput' in u && u['rawInput'] != null} rawInputType=${typeof u['rawInput']}\n`);
+    }
     const params: acp.SessionNotification = {
       sessionId: this.id,
       update,
     };
 
     await this.connection.sessionUpdate(params);
+  }
+
+  async sendAvailableCommands(config: Config): Promise<void> {
+    const commands = buildAvailableSlashCommands(config);
+    if (commands.length === 0) return;
+    await this.sendUpdate({
+      sessionUpdate: 'available_commands_update',
+      availableCommands: commands,
+    } as unknown as acp.SessionNotification['update']);
   }
 
   private async runTool(
@@ -1106,6 +1215,19 @@ export class Session {
           });
         }
 
+        // ACP spec: send tool_call notification BEFORE requestPermission
+        // so clients can display rawInput immediately.
+        await this.sendUpdate({
+          sessionUpdate: 'tool_call',
+          toolCallId: callId,
+          status: 'pending',
+          title: invocation.getDescription(),
+          rawInput: args,
+          content,
+          locations: invocation.toolLocations(),
+          kind: toAcpToolKind(tool.kind),
+        });
+
         const params: acp.RequestPermissionRequest = {
           sessionId: this.id,
           options: toPermissionOptions(confirmationDetails),
@@ -1113,6 +1235,7 @@ export class Session {
             toolCallId: callId,
             status: 'pending',
             title: invocation.getDescription(),
+            rawInput: args,
             content,
             locations: invocation.toolLocations(),
             kind: toAcpToolKind(tool.kind),
@@ -1125,8 +1248,8 @@ export class Session {
           output.outcome.outcome === CoreToolCallStatus.Cancelled
             ? ToolConfirmationOutcome.Cancel
             : z
-                .nativeEnum(ToolConfirmationOutcome)
-                .parse(output.outcome.optionId);
+              .nativeEnum(ToolConfirmationOutcome)
+              .parse(output.outcome.optionId);
 
         await confirmationDetails.onConfirm(outcome);
 
@@ -1153,6 +1276,7 @@ export class Session {
           toolCallId: callId,
           status: 'in_progress',
           title: invocation.getDescription(),
+          rawInput: args,
           content: [],
           locations: invocation.toolLocations(),
           kind: toAcpToolKind(tool.kind),
@@ -1780,7 +1904,61 @@ function buildAvailableModels(): acp.ModelInfo[] {
   return Array.from(new Map(models.map((m) => [m.modelId, m])).values());
 }
 
-function buildAvailableConfigOptions(): acp.SessionConfigOption[] {
-  // Not used right now, but returns empty structure to satisfy ACP
-  return [];
+function buildAvailableConfigOptions(currentModel?: string): acp.SessionConfigOption[] {
+  const options: acp.SessionConfigOption[] = [];
+
+  // Model selection (category: "model")
+  const models = buildAvailableModels();
+  if (models.length > 0) {
+    // Use the configured model if provided, otherwise fall back to first available
+    const effectiveModel = (currentModel && models.some(m => m.modelId === currentModel))
+      ? currentModel
+      : models[0]!.modelId;
+    options.push({
+      id: 'model',
+      name: 'Model',
+      description: 'Active Gemini model',
+      type: 'select',
+      category: 'model',
+      currentValue: effectiveModel,
+      options: models.map((m) => ({
+        value: m.modelId,
+        name: m.name ?? m.modelId,
+      })),
+    });
+  }
+
+  return options;
+}
+
+function buildAvailableSlashCommands(config: Config): acp.AvailableCommand[] {
+  const commands: acp.AvailableCommand[] = [
+    {
+      name: 'clear',
+      description: 'Clear the current conversation history',
+    },
+    {
+      name: 'model',
+      description: 'Switch the active Gemini model',
+      input: { hint: 'model name (e.g. gemini-2.5-pro)' },
+    },
+    {
+      name: 'tools',
+      description: 'List available tools and MCP servers',
+    },
+    {
+      name: 'stats',
+      description: 'Show token usage and session statistics',
+    },
+  ];
+
+  if (config.isPlanEnabled()) {
+    commands.push({
+      name: 'plan',
+      description: 'Create a detailed implementation plan',
+      input: { hint: 'description of what to plan' },
+    });
+  }
+
+  return commands;
 }
