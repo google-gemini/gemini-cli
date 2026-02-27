@@ -96,9 +96,13 @@ describe('useQuotaAndFallback', () => {
   });
 
   describe('Fallback Handler Logic', () => {
-    // Helper function to render the hook and extract the registered handler
-    const getRegisteredHandler = (): FallbackModelHandler => {
-      renderHook(() =>
+    it('should show fallback dialog but omit switch to API key message if authType is not LOGIN_WITH_GOOGLE', async () => {
+      // Override the default mock from beforeEach for this specific test
+      vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+        authType: AuthType.USE_GEMINI,
+      });
+
+      const { result } = renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
@@ -107,20 +111,24 @@ describe('useQuotaAndFallback', () => {
           onShowAuthSelection: mockOnShowAuthSelection,
         }),
       );
-      return setFallbackHandlerSpy.mock.calls[0][0] as FallbackModelHandler;
-    };
 
-    it('should return null and take no action if authType is not LOGIN_WITH_GOOGLE', async () => {
-      // Override the default mock from beforeEach for this specific test
-      vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
-        authType: AuthType.USE_GEMINI,
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+
+      const error = new TerminalQuotaError(
+        'pro quota',
+        mockGoogleApiError,
+        1000 * 60 * 5,
+      );
+
+      act(() => {
+        void handler('gemini-pro', 'gemini-flash', error);
       });
 
-      const handler = getRegisteredHandler();
-      const result = await handler('gemini-pro', 'gemini-flash', new Error());
-
-      expect(result).toBeNull();
-      expect(mockHistoryManager.addItem).not.toHaveBeenCalled();
+      expect(result.current.proQuotaRequest).not.toBeNull();
+      expect(result.current.proQuotaRequest?.message).not.toContain(
+        '/auth to switch to API key.',
+      );
     });
 
     describe('Interactive Fallback', () => {
