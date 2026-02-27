@@ -26,6 +26,7 @@ import {
   SessionSelector,
   convertSessionToHistoryFormats,
 } from '../utils/sessionUtils.js';
+import { loadAuthState } from '../config/authState.js';
 import { convertSessionToClientHistory } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
 
@@ -42,6 +43,11 @@ vi.mock('../utils/sessionUtils.js', async (importOriginal) => {
     convertSessionToHistoryFormats: vi.fn(),
   };
 });
+
+vi.mock('../config/authState.js', () => ({
+  loadAuthState: vi.fn(),
+  saveAuthState: vi.fn(),
+}));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -107,6 +113,11 @@ describe('GeminiAgent Session Resume', () => {
     } as unknown as Mocked<acp.AgentSideConnection>;
 
     (loadCliConfig as Mock).mockResolvedValue(mockConfig);
+    (loadAuthState as Mock).mockReturnValue({
+      selectedType: AuthType.LOGIN_WITH_GOOGLE,
+      oauthToken: null,
+      oauthAccount: null,
+    });
 
     agent = new GeminiAgent(mockConfig, mockSettings, mockArgv, mockConnection);
   });

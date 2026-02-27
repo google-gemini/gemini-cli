@@ -27,15 +27,12 @@ import {
   type MessageBus,
   LlmRole,
 } from '@google/gemini-cli-core';
-import {
-  SettingScope,
-  type LoadedSettings,
-  loadSettings,
-} from '../config/settings.js';
+import { type LoadedSettings, loadSettings } from '../config/settings.js';
 import { loadCliConfig, type CliArgs } from '../config/config.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { ApprovalMode } from '@google/gemini-cli-core/src/policy/types.js';
+import { loadAuthState, saveAuthState } from '../config/authState.js';
 
 vi.mock('../config/config.js', () => ({
   loadCliConfig: vi.fn(),
@@ -48,6 +45,11 @@ vi.mock('../config/settings.js', async (importOriginal) => {
     loadSettings: vi.fn(),
   };
 });
+
+vi.mock('../config/authState.js', () => ({
+  loadAuthState: vi.fn(() => ({ selectedType: AuthType.LOGIN_WITH_GOOGLE })),
+  saveAuthState: vi.fn(),
+}));
 
 vi.mock('node:crypto', () => ({
   randomUUID: () => 'test-session-id',
@@ -165,6 +167,9 @@ describe('GeminiAgent', () => {
       },
       setValue: vi.fn(),
     }));
+    vi.mocked(loadAuthState).mockReturnValue({
+      selectedType: AuthType.LOGIN_WITH_GOOGLE,
+    });
 
     agent = new GeminiAgent(mockConfig, mockSettings, mockArgv, mockConnection);
   });
@@ -197,11 +202,7 @@ describe('GeminiAgent', () => {
       AuthType.LOGIN_WITH_GOOGLE,
       undefined,
     );
-    expect(mockSettings.setValue).toHaveBeenCalledWith(
-      SettingScope.User,
-      'security.auth.selectedType',
-      AuthType.LOGIN_WITH_GOOGLE,
-    );
+    expect(saveAuthState).toHaveBeenCalledWith(AuthType.LOGIN_WITH_GOOGLE);
   });
 
   it('should authenticate correctly with api-key in _meta', async () => {
@@ -216,11 +217,7 @@ describe('GeminiAgent', () => {
       AuthType.USE_GEMINI,
       'test-api-key',
     );
-    expect(mockSettings.setValue).toHaveBeenCalledWith(
-      SettingScope.User,
-      'security.auth.selectedType',
-      AuthType.USE_GEMINI,
-    );
+    expect(saveAuthState).toHaveBeenCalledWith(AuthType.USE_GEMINI);
   });
 
   it('should create a new session', async () => {
@@ -292,13 +289,9 @@ describe('GeminiAgent', () => {
   });
 
   it('should fail session creation if Gemini API key is missing', async () => {
-    (loadSettings as unknown as Mock).mockImplementation(() => ({
-      merged: {
-        security: { auth: { selectedType: AuthType.USE_GEMINI } },
-        mcpServers: {},
-      },
-      setValue: vi.fn(),
-    }));
+    vi.mocked(loadAuthState).mockReturnValue({
+      selectedType: AuthType.USE_GEMINI,
+    });
     mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
       apiKey: undefined,
     });

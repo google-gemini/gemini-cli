@@ -10,11 +10,13 @@ import {
   IdeClient,
   logIdeConnection,
   logCliConfiguration,
+  AuthType,
   type Config,
 } from '@google/gemini-cli-core';
 import { performInitialAuth } from './auth.js';
 import { validateTheme } from './theme.js';
 import { type LoadedSettings } from '../config/settings.js';
+import { loadAuthState } from '../config/authState.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -39,6 +41,22 @@ vi.mock('./theme.js', () => ({
   validateTheme: vi.fn(),
 }));
 
+vi.mock('../config/authState.js', () => ({
+  loadAuthState: vi.fn(),
+  parseAuthType: vi.fn((value: unknown) => {
+    switch (value) {
+      case AuthType.LOGIN_WITH_GOOGLE:
+      case AuthType.USE_GEMINI:
+      case AuthType.USE_VERTEX_AI:
+      case AuthType.LEGACY_CLOUD_SHELL:
+      case AuthType.COMPUTE_ADC:
+        return value;
+      default:
+        return undefined;
+    }
+  }),
+}));
+
 describe('initializer', () => {
   let mockConfig: {
     getToolRegistry: ReturnType<typeof vi.fn>;
@@ -61,7 +79,7 @@ describe('initializer', () => {
       merged: {
         security: {
           auth: {
-            selectedType: 'oauth',
+            selectedType: AuthType.LOGIN_WITH_GOOGLE,
           },
         },
       },
@@ -74,6 +92,9 @@ describe('initializer', () => {
     );
     vi.mocked(performInitialAuth).mockResolvedValue(null);
     vi.mocked(validateTheme).mockReturnValue(null);
+    vi.mocked(loadAuthState).mockReturnValue({
+      selectedType: AuthType.LOGIN_WITH_GOOGLE,
+    });
   });
 
   it('should initialize correctly in non-IDE mode', async () => {
@@ -88,7 +109,10 @@ describe('initializer', () => {
       shouldOpenAuthDialog: false,
       geminiMdFileCount: 5,
     });
-    expect(performInitialAuth).toHaveBeenCalledWith(mockConfig, 'oauth');
+    expect(performInitialAuth).toHaveBeenCalledWith(
+      mockConfig,
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
     expect(validateTheme).toHaveBeenCalledWith(mockSettings);
     expect(logCliConfiguration).toHaveBeenCalled();
     expect(IdeClient.getInstance).not.toHaveBeenCalled();
@@ -127,7 +151,7 @@ describe('initializer', () => {
   });
 
   it('should handle undefined auth type', async () => {
-    mockSettings.merged.security.auth.selectedType = undefined;
+    vi.mocked(loadAuthState).mockReturnValue({});
     const result = await initializeApp(
       mockConfig as unknown as Config,
       mockSettings,
