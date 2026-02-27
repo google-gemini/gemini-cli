@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
@@ -15,6 +15,7 @@ vi.mock('@google/gemini-cli-core', () => ({
   })),
   shutdownTelemetry: vi.fn(),
   isTelemetrySdkInitialized: vi.fn().mockReturnValue(false),
+  ExitCodes: { SUCCESS: 0 },
 }));
 
 vi.mock('node:fs', () => ({
@@ -30,6 +31,8 @@ import {
   runSyncCleanup,
   cleanupCheckpoints,
   resetCleanupForTesting,
+  setupSignalHandlers,
+  setupTtyCheck,
 } from './cleanup.js';
 
 describe('cleanup', () => {
@@ -120,6 +123,163 @@ describe('cleanup', () => {
     it('should ignore errors during checkpoint removal', async () => {
       vi.mocked(fs.rm).mockRejectedValue(new Error('Failed to remove'));
       await expect(cleanupCheckpoints()).resolves.not.toThrow();
+    });
+  });
+});
+
+describe('signal and TTY handling', () => {
+  let processOnHandlers: Map<
+    string,
+    Array<(...args: unknown[]) => void | Promise<void>>
+  >;
+
+  beforeEach(() => {
+    processOnHandlers = new Map();
+    resetCleanupForTesting();
+
+    vi.spyOn(process, 'on').mockImplementation(
+      (event: string | symbol, handler: (...args: unknown[]) => void) => {
+        if (typeof event === 'string') {
+          const handlers = processOnHandlers.get(event) || [];
+          handlers.push(handler);
+          processOnHandlers.set(event, handlers);
+        }
+        return process;
+      },
+    );
+
+    vi.spyOn(process, 'exit').mockImplementation((() => {
+      // Don't actually exit
+    }) as typeof process.exit);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    processOnHandlers.clear();
+  });
+
+  describe('setupSignalHandlers', () => {
+    it('should register handlers for SIGHUP, SIGTERM, and SIGINT', () => {
+      setupSignalHandlers();
+
+      expect(processOnHandlers.has('SIGHUP')).toBe(true);
+      expect(processOnHandlers.has('SIGTERM')).toBe(true);
+      expect(processOnHandlers.has('SIGINT')).toBe(true);
+    });
+
+    it('should gracefully shutdown when SIGHUP is received', async () => {
+      setupSignalHandlers();
+
+      const sighupHandlers = processOnHandlers.get('SIGHUP') || [];
+      expect(sighupHandlers.length).toBeGreaterThan(0);
+
+      await sighupHandlers[0]?.();
+
+      expect(process.exit).toHaveBeenCalledWith(0);
+    });
+
+    it('should register SIGTERM handler that can trigger shutdown', () => {
+      setupSignalHandlers();
+
+      const sigtermHandlers = processOnHandlers.get('SIGTERM') || [];
+      expect(sigtermHandlers.length).toBeGreaterThan(0);
+      expect(typeof sigtermHandlers[0]).toBe('function');
+    });
+  });
+
+  describe('setupTtyCheck', () => {
+    let originalStdinIsTTY: boolean | undefined;
+    let originalStdoutIsTTY: boolean | undefined;
+
+    beforeEach(() => {
+      originalStdinIsTTY = process.stdin.isTTY;
+      originalStdoutIsTTY = process.stdout.isTTY;
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalStdinIsTTY,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: originalStdoutIsTTY,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it('should return a cleanup function', () => {
+      const cleanup = setupTtyCheck();
+      expect(typeof cleanup).toBe('function');
+      cleanup();
+    });
+
+    it('should not exit when both stdin and stdout are TTY', async () => {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: true,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: true,
+        writable: true,
+        configurable: true,
+      });
+
+      const cleanup = setupTtyCheck();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(process.exit).not.toHaveBeenCalled();
+      cleanup();
+    });
+
+    it('should exit when both stdin and stdout are not TTY', async () => {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: false,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: false,
+        writable: true,
+        configurable: true,
+      });
+
+      const cleanup = setupTtyCheck();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(process.exit).toHaveBeenCalledWith(0);
+      cleanup();
+    });
+
+    it('should not check when SANDBOX env is set', async () => {
+      const originalSandbox = process.env['SANDBOX'];
+      process.env['SANDBOX'] = 'true';
+
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: false,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: false,
+        writable: true,
+        configurable: true,
+      });
+
+      const cleanup = setupTtyCheck();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(process.exit).not.toHaveBeenCalled();
+      cleanup();
+      process.env['SANDBOX'] = originalSandbox;
+    });
+
+    it('cleanup function should stop the interval', () => {
+      const cleanup = setupTtyCheck();
+      cleanup();
+      vi.advanceTimersByTime(10000);
+      expect(process.exit).not.toHaveBeenCalled();
     });
   });
 });
