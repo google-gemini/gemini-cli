@@ -5,7 +5,7 @@
  */
 
 import { renderWithProviders } from '../../test-utils/render.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StatsDisplay } from './StatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
@@ -68,6 +68,14 @@ const createTestMetrics = (
 });
 
 describe('<StatsDisplay />', () => {
+  beforeEach(() => {
+    vi.stubEnv('TZ', 'UTC');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('renders only the Performance section in its zero state', async () => {
     const zeroMetrics = createTestMetrics();
 

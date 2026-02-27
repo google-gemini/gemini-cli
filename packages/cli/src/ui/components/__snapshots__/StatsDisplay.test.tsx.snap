@@ -196,7 +196,7 @@ exports[`<StatsDisplay /> > Quota Display > renders quota information for unused
 │  Model Usage                                                                                     │
 │  Model                  Reqs    Model usage                                                      │
 │  ────────────────────────────────────────────────────────────────────────────────────────────────│
-│  gemini-2.5-flash          -    ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ 50% used (Limit resets in 2 hours at 6:00 AM│
+│  gemini-2.5-flash          -    ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬ 50% used (Limit resets in 2 hours at 2:00 PM│
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "

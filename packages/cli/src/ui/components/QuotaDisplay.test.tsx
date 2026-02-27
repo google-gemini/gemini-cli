@@ -14,10 +14,12 @@ describe('QuotaDisplay', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(MOCK_NOW);
+    vi.stubEnv('TZ', 'UTC');
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllEnvs();
   });
 
   it('should not render when remaining is undefined', async () => {
