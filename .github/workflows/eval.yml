@@ -44,5 +44,5 @@ jobs:
       - name: 'Run evaluation'
         working-directory: '/app'
         run: |
-          poetry run exp_run --experiment-mode=on-demand --branch-or-commit=${{ github.ref_name }} --model-name=gemini-2.5-pro --dataset=swebench_verified --concurrency=15
+          poetry run exp_run --experiment-mode=on-demand --branch-or-commit="${GITHUB_REF_NAME}" --model-name=gemini-2.5-pro --dataset=swebench_verified --concurrency=15
           poetry run python agent_prototypes/scripts/parse_gcli_logs_experiment.py --experiment_dir=experiments/adhoc/gcli_temp_exp --gcs-bucket="${EVAL_GCS_BUCKET}" --gcs-path=gh_action_artifacts

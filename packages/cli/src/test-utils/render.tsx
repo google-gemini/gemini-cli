@@ -51,6 +51,7 @@ import { SessionStatsProvider } from '../ui/contexts/SessionContext.js';
 import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { pickDefaultThemeName } from '../ui/themes/theme.js';
+import { generateSvgForTerminal } from './svg.js';
 
 export const persistentStateMock = new FakePersistentState();
 
@@ -105,7 +106,12 @@ class XtermStdout extends EventEmitter {
   private queue: { promise: Promise<void> };
   isTTY = true;
 
+  getColorDepth(): number {
+    return 24;
+  }
+
   private lastRenderOutput: string | undefined = undefined;
+  private lastRenderStaticContent: string | undefined = undefined;
 
   constructor(state: TerminalState, queue: { promise: Promise<void> }) {
     super();
@@ -138,6 +144,7 @@ class XtermStdout extends EventEmitter {
   clear = () => {
     this.state.terminal.reset();
     this.lastRenderOutput = undefined;
+    this.lastRenderStaticContent = undefined;
   };
 
   dispose = () => {
@@ -146,8 +153,30 @@ class XtermStdout extends EventEmitter {
 
   onRender = (staticContent: string, output: string) => {
     this.renderCount++;
+    this.lastRenderStaticContent = staticContent;
     this.lastRenderOutput = output;
     this.emit('render');
+  };
+
+  private normalizeFrame = (text: string): string =>
+    text.replace(/\r\n/g, '\n');
+
+  generateSvg = (): string => generateSvgForTerminal(this.state.terminal);
+
+  lastFrameRaw = (options: { allowEmpty?: boolean } = {}) => {
+    const result =
+      (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? '');
+
+    const normalized = this.normalizeFrame(result);
+
+    if (normalized === '' && !options.allowEmpty) {
+      throw new Error(
+        'lastFrameRaw() returned an empty string. If this is intentional, use lastFrameRaw({ allowEmpty: true }). ' +
+          'Otherwise, ensure you are calling await waitUntilReady() and that the component is rendering correctly.',
+      );
+    }
+
+    return normalized;
   };
 
   lastFrame = (options: { allowEmpty?: boolean } = {}) => {
@@ -163,9 +192,7 @@ class XtermStdout extends EventEmitter {
     }
     const result = trimmed.join('\n');
 
-    // Normalize for cross-platform snapshot stability:
-    // Normalize any \r\n to \n
-    const normalized = result.replace(/\r\n/g, '\n');
+    const normalized = this.normalizeFrame(result);
 
     if (normalized === '' && !options.allowEmpty) {
       throw new Error(
@@ -213,9 +240,11 @@ class XtermStdout extends EventEmitter {
       const currentFrame = stripAnsi(
         this.lastFrame({ allowEmpty: true }),
       ).trim();
-      const expectedFrame = stripAnsi(this.lastRenderOutput ?? '')
-        .trim()
-        .replace(/\r\n/g, '\n');
+      const expectedFrame = this.normalizeFrame(
+        stripAnsi(
+          (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? ''),
+        ),
+      ).trim();
 
       lastCurrent = currentFrame;
       lastExpected = expectedFrame;
@@ -340,6 +369,8 @@ export type RenderInstance = {
   stdin: XtermStdin;
   frames: string[];
   lastFrame: (options?: { allowEmpty?: boolean }) => string;
+  lastFrameRaw: (options?: { allowEmpty?: boolean }) => string;
+  generateSvg: () => string;
   terminal: Terminal;
   waitUntilReady: () => Promise<void>;
   capturedOverflowState: OverflowState | undefined;
@@ -424,6 +455,8 @@ export const render = (
     stdin,
     frames: stdout.frames,
     lastFrame: stdout.lastFrame,
+    lastFrameRaw: stdout.lastFrameRaw,
+    generateSvg: stdout.generateSvg,
     terminal: state.terminal,
     waitUntilReady: () => stdout.waitUntilReady(),
   };
@@ -514,6 +547,11 @@ const baseMockUiState = {
   },
   hintMode: false,
   hintBuffer: '',
+  bannerData: {
+    defaultText: '',
+    warningText: '',
+  },
+  bannerVisible: false,
 };
 
 export const mockAppState: AppState = {
@@ -574,6 +612,7 @@ const mockUIActions: UIActions = {
   onHintSubmit: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
+  getPreferredEditor: vi.fn(),
 };
 
 let capturedOverflowState: OverflowState | undefined;
@@ -767,6 +806,7 @@ export function renderHook<Result, Props>(
   rerender: (props?: Props) => void;
   unmount: () => void;
   waitUntilReady: () => Promise<void>;
+  generateSvg: () => string;
 } {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { current: undefined as unknown as Result };
@@ -789,6 +829,7 @@ export function renderHook<Result, Props>(
   let inkRerender: (tree: React.ReactElement) => void = () => {};
   let unmount: () => void = () => {};
   let waitUntilReady: () => Promise<void> = async () => {};
+  let generateSvg: () => string = () => '';
 
   act(() => {
     const renderResult = render(
@@ -799,6 +840,7 @@ export function renderHook<Result, Props>(
     inkRerender = renderResult.rerender;
     unmount = renderResult.unmount;
     waitUntilReady = renderResult.waitUntilReady;
+    generateSvg = renderResult.generateSvg;
   });
 
   function rerender(props?: Props) {
@@ -815,7 +857,7 @@ export function renderHook<Result, Props>(
     });
   }
 
-  return { result, rerender, unmount, waitUntilReady };
+  return { result, rerender, unmount, waitUntilReady, generateSvg };
 }
 
 export function renderHookWithProviders<Result, Props>(
@@ -837,6 +879,7 @@ export function renderHookWithProviders<Result, Props>(
   rerender: (props?: Props) => void;
   unmount: () => void;
   waitUntilReady: () => Promise<void>;
+  generateSvg: () => string;
 } {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { current: undefined as unknown as Result };
@@ -887,5 +930,6 @@ export function renderHookWithProviders<Result, Props>(
       });
     },
     waitUntilReady: () => renderResult.waitUntilReady(),
+    generateSvg: () => renderResult.generateSvg(),
   };
 }
