@@ -392,7 +392,10 @@ describe('editor utils', () => {
         );
       });
 
-      it(`should reject if ${editor} exits with non-zero code`, async () => {
+      it(`should resolve and log debug message if ${editor} exits with non-zero code`, async () => {
+        const debugSpy = vi
+          .spyOn(debugLogger, 'debug')
+          .mockImplementation(() => {});
         const mockSpawnOn = vi.fn((event, cb) => {
           if (event === 'close') {
             cb(1);
@@ -400,9 +403,12 @@ describe('editor utils', () => {
         });
         (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
 
-        await expect(openDiff('old.txt', 'new.txt', editor)).rejects.toThrow(
-          `${editor} exited with code 1`,
-        );
+        // Should resolve, not reject - GUI editors may exit with non-zero codes
+        // for various non-error reasons (e.g., Zed exits with code 1)
+        await expect(
+          openDiff('old.txt', 'new.txt', editor),
+        ).resolves.toBeUndefined();
+        expect(debugSpy).toHaveBeenCalledWith(`${editor} exited with code 1`);
       });
     }
 
