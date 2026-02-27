@@ -12,23 +12,22 @@ import type {
   RequestContext,
   ExecutionEventBus,
 } from '@a2a-js/sdk/server';
-import type { ToolCallRequestInfo, Config } from '@google/gemini-cli-core';
 import {
   GeminiEventType,
   SimpleExtensionLoader,
+  type ToolCallRequestInfo,
+  type Config,
 } from '@google/gemini-cli-core';
 import { v4 as uuidv4 } from 'uuid';
 
 import { logger } from '../utils/logger.js';
-import type {
-  StateChange,
-  AgentSettings,
-  PersistedStateMetadata,
-} from '../types.js';
 import {
   CoderAgentEvent,
   getPersistedState,
   setPersistedState,
+  type StateChange,
+  type AgentSettings,
+  type PersistedStateMetadata,
   getContextIdFromMetadata,
   getAgentSettingsFromMetadata,
 } from '../types.js';
