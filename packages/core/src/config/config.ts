@@ -325,6 +325,11 @@ export interface ExtensionUIBadge {
    */
   envVar?: string;
   /**
+   * Optional formatting to apply to the result.
+   * 'basename': Returns the last portion of a path.
+   */
+  format?: 'basename';
+  /**
    * Optional icon to display before the text.
    */
   icon?: string;

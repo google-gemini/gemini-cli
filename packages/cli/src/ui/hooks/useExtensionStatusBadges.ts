@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { spawnAsync, type Config } from '@google/gemini-cli-core';
 import { type StatusBadge } from '../contexts/UIStateContext.js';
+import * as path from 'node:path';
 
 export function useExtensionStatusBadges(config: Config): StatusBadge[] {
   const [badges, setBadges] = useState<StatusBadge[]>([]);
@@ -25,26 +26,26 @@ export function useExtensionStatusBadges(config: Config): StatusBadge[] {
       return ext.ui.badges.map(
         async (badgeConfig): Promise<StatusBadge | null> => {
           try {
+            let val: string | undefined;
+
             if (badgeConfig.type === 'env' && badgeConfig.envVar) {
-              const val = process.env[badgeConfig.envVar];
-              if (val) {
-                return {
-                  text: badgeConfig.icon ? `${badgeConfig.icon} ${val}` : val,
-                  color: badgeConfig.color,
-                };
-              }
+              val = process.env[badgeConfig.envVar];
             } else if (badgeConfig.type === 'command' && badgeConfig.command) {
               const { stdout } = await spawnAsync(
                 badgeConfig.command,
                 badgeConfig.args ?? [],
               );
-              const text = stdout.toString().trim();
-              if (text) {
-                return {
-                  text: badgeConfig.icon ? `${badgeConfig.icon} ${text}` : text,
-                  color: badgeConfig.color,
-                };
+              val = stdout.toString().trim();
+            }
+
+            if (val) {
+              if (badgeConfig.format === 'basename') {
+                val = path.basename(val);
               }
+              return {
+                text: badgeConfig.icon ? `${badgeConfig.icon} ${val}` : val,
+                color: badgeConfig.color,
+              };
             }
           } catch (_e) {
             // Ignore failing badge commands silently so they don't break the UI
