@@ -1,174 +1,91 @@
-name: 'Label Workstream Rollup'
+name: "CodeQL Smart Analysis"
 
 on:
-  issues:
-    types: ['opened', 'edited', 'reopened']
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
   schedule:
-    - cron: '0 * * * *'
+    - cron: "0 0 * * 0"  # Weekly Sunday run
   workflow_dispatch:
 
+concurrency:
+  group: codeql-analysis
+  cancel-in-progress: false
+
 jobs:
-  labeler:
-    runs-on: 'ubuntu-latest'
+  analyze:
+    name: Smart CodeQL Analysis
+    runs-on: ubuntu-latest
     permissions:
-      issues: 'write'
+      actions: read
+      contents: read
+      security-events: write
+
     steps:
-      - name: 'Check for Parent Workstream and Apply Label'
-        uses: 'actions/github-script@v7'
+      # ⬇️ Get your repository code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 🧠 Detect repository’s primary languages using GitHub’s Linguist
+      - name: Detect Repository Languages
+        id: detect_lang
+        run: |
+          echo "Detecting repo languages..."
+          curl -s -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/languages" \
+            | jq -r 'keys | map(ascii_downcase) | join(",")' > detected_langs.txt
+
+          detected=$(cat detected_langs.txt)
+          echo "Detected languages: $detected"
+          if [ -z "$detected" ]; then
+            echo "No languages detected — defaulting to javascript."
+            echo "language=javascript" >> $GITHUB_OUTPUT
+          else
+            # Map GitHub language keys to CodeQL-compatible identifiers
+            langs=""
+            for lang in $(echo $detected | tr "," " "); do
+              case "$lang" in
+                javascript|typescript) langs="${langs},javascript" ;;
+                python) langs="${langs},python" ;;
+                java) langs="${langs},java" ;;
+                c|cpp|c++) langs="${langs},cpp" ;;
+                c#|csharp) langs="${langs},csharp" ;;
+                go) langs="${langs},go" ;;
+              esac
+            done
+            langs=$(echo $langs | sed 's/^,//')
+            echo "language=$langs" >> $GITHUB_OUTPUT
+            echo "Languages prepared for CodeQL: $langs"
+          fi
+
+      # 🧩 Initialize CodeQL with detected languages
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
         with:
-          script: |
-            const labelToAdd = 'workstream-rollup';
+          languages: ${{ steps.detect_lang.outputs.language }}
+          queries: +security-and-quality
 
-            // Allow-list of parent issue URLs
-            const allowedParentUrls = [
-              'https://github.com/google-gemini/gemini-cli/issues/15374',
-              'https://github.com/google-gemini/gemini-cli/issues/15456',
-              'https://github.com/google-gemini/gemini-cli/issues/15324',
-              'https://github.com/google-gemini/gemini-cli/issues/17202',
-              'https://github.com/google-gemini/gemini-cli/issues/17203'
-            ];
+      # 🧱 Try to build automatically if needed (Java, C++, C#, etc.)
+      - name: Autobuild Project
+        uses: github/codeql-action/autobuild@v3
 
-            // Single issue processing (for event triggers)
-            async function processSingleIssue(owner, repo, number) {
-              const query = `
-                query($owner:String!, $repo:String!, $number:Int!) {
-                  repository(owner:$owner, name:$repo) {
-                    issue(number:$number) {
-                      number
-                      parent {
-                        url
-                        parent {
-                          url
-                          parent {
-                            url
-                            parent {
-                              url
-                              parent {
-                                url
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              `;
-              try {
-                const result = await github.graphql(query, { owner, repo, number });
+      # 🧠 If autobuild fails, you can manually specify build commands:
+      # - name: Manual Build
+      #   run: |
+      #     npm ci && npm run build
+      #     # or pip install -r requirements.txt
+      #     # or mvn package
 
-                if (!result || !result.repository || !result.repository.issue) {
-                  console.log(`Issue #${number} not found or data missing.`);
-                  return;
-                }
+      # 🔍 Perform static analysis and upload results
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          upload: true
+          category: "/auto:detected"
 
-                const issue = result.repository.issue;
-                await checkAndLabel(issue, owner, repo);
-              } catch (error) {
-                console.error(`Failed to process issue #${number}:`, error);
-                throw error; // Re-throw to be caught by main execution
-              }
-            }
-
-            // Bulk processing (for schedule/dispatch)
-            async function processAllOpenIssues(owner, repo) {
-              const query = `
-                query($owner:String!, $repo:String!, $cursor:String) {
-                  repository(owner:$owner, name:$repo) {
-                    issues(first: 100, states: OPEN, after: $cursor) {
-                      pageInfo {
-                        hasNextPage
-                        endCursor
-                      }
-                      nodes {
-                        number
-                        parent {
-                          url
-                          parent {
-                            url
-                            parent {
-                              url
-                              parent {
-                                url
-                                parent {
-                                  url
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              `;
-
-              let hasNextPage = true;
-              let cursor = null;
-
-              while (hasNextPage) {
-                try {
-                  const result = await github.graphql(query, { owner, repo, cursor });
-
-                  if (!result || !result.repository || !result.repository.issues) {
-                     console.error('Invalid response structure from GitHub API');
-                     break;
-                  }
-
-                  const issues = result.repository.issues.nodes || [];
-
-                  console.log(`Processing batch of ${issues.length} issues...`);
-                  for (const issue of issues) {
-                    await checkAndLabel(issue, owner, repo);
-                  }
-
-                  hasNextPage = result.repository.issues.pageInfo.hasNextPage;
-                  cursor = result.repository.issues.pageInfo.endCursor;
-                } catch (error) {
-                  console.error('Failed to fetch issues batch:', error);
-                  throw error; // Re-throw to be caught by main execution
-                }
-              }
-            }
-
-            async function checkAndLabel(issue, owner, repo) {
-              if (!issue || !issue.parent) return;
-
-              let currentParent = issue.parent;
-              let tracedParents = [];
-              let matched = false;
-
-              while (currentParent) {
-                tracedParents.push(currentParent.url);
-
-                if (allowedParentUrls.includes(currentParent.url)) {
-                  console.log(`SUCCESS: Issue #${issue.number} is a descendant of ${currentParent.url}. Trace: ${tracedParents.join(' -> ')}. Adding label.`);
-                  await github.rest.issues.addLabels({
-                    owner,
-                    repo,
-                    issue_number: issue.number,
-                    labels: [labelToAdd]
-                  });
-                  matched = true;
-                  break;
-                }
-                currentParent = currentParent.parent;
-              }
-
-              if (!matched && context.eventName === 'issues') {
-                 console.log(`Issue #${issue.number} did not match any allowed workstreams. Trace: ${tracedParents.join(' -> ') || 'None'}.`);
-              }
-            }
-
-            // Main execution
-            try {
-              if (context.eventName === 'issues') {
-                console.log(`Processing single issue #${context.payload.issue.number}...`);
-                await processSingleIssue(context.repo.owner, context.repo.repo, context.payload.issue.number);
-              } else {
-                console.log(`Running for event: ${context.eventName}. Processing all open issues...`);
-                await processAllOpenIssues(context.repo.owner, context.repo.repo);
-              }
-            } catch (error) {
-              core.setFailed(`Workflow failed: ${error.message}`);
-            }
+      # ✅ Log results for workflow summary
+      - name: Summary
+        run: |
+          echo "✅ CodeQL smart scan complete."
+          echo "Results available in Security → Code scanning alerts."
