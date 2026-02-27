@@ -18,9 +18,10 @@ import {
   HookSystem,
   PolicyDecision,
   tmpdir,
+  type Config,
+  type Storage,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
-import type { Config, Storage } from '@google/gemini-cli-core';
 import { expect, vi } from 'vitest';
 
 export function createMockConfig(
