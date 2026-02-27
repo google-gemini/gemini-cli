@@ -73,6 +73,7 @@ export interface HttpOptions {
 
 export const CODE_ASSIST_ENDPOINT = 'https://cloudcode-pa.googleapis.com';
 export const CODE_ASSIST_API_VERSION = 'v1internal';
+const GENERATE_CONTENT_RETRY_DELAY_IN_MILLISECONDS = 1000;
 
 export class CodeAssistServer implements ContentGenerator {
   constructor(
@@ -202,6 +203,7 @@ export class CodeAssistServer implements ContentGenerator {
         undefined,
       ),
       req.config?.abortSignal,
+      GENERATE_CONTENT_RETRY_DELAY_IN_MILLISECONDS,
     );
     const duration = formatProtoJsonDuration(Date.now() - start);
     const streamingLatency: StreamingLatency = {
@@ -394,6 +396,7 @@ export class CodeAssistServer implements ContentGenerator {
     method: string,
     req: object,
     signal?: AbortSignal,
+    retryDelay: number = 100,
   ): Promise<T> {
     const res = await this.client.request<T>({
       url: this.getMethodUrl(method),
@@ -406,6 +409,7 @@ export class CodeAssistServer implements ContentGenerator {
       body: JSON.stringify(req),
       signal,
       retryConfig: {
+        retryDelay,
         retry: 3,
         noResponseRetries: 3,
         statusCodesToRetry: [
