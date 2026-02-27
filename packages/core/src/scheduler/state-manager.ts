@@ -188,6 +188,19 @@ export class SchedulerStateManager {
     this.emitUpdate();
   }
 
+  /**
+   * Replaces the currently active call with a new call, placing the new call
+   * at the front of the queue to be processed immediately in the next tick.
+   * Used for Tail Calls to chain execution without finalizing the original call.
+   */
+  replaceActiveCallWithTailCall(callId: string, nextCall: ToolCall): void {
+    if (this.activeCalls.has(callId)) {
+      this.activeCalls.delete(callId);
+      this.queue.unshift(nextCall);
+      this.emitUpdate();
+    }
+  }
+
   cancelAllQueued(reason: string): void {
     if (this.queue.length === 0) {
       return;
@@ -542,6 +555,11 @@ export class SchedulerStateManager {
     const progressPercent =
       execData?.progressPercent ??
       ('progressPercent' in call ? call.progressPercent : undefined);
+    const progress =
+      execData?.progress ?? ('progress' in call ? call.progress : undefined);
+    const progressTotal =
+      execData?.progressTotal ??
+      ('progressTotal' in call ? call.progressTotal : undefined);
 
     return {
       request: call.request,
@@ -554,6 +572,8 @@ export class SchedulerStateManager {
       pid,
       progressMessage,
       progressPercent,
+      progress,
+      progressTotal,
       schedulerId: call.schedulerId,
       approvalMode: call.approvalMode,
     };

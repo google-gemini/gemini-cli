@@ -12,6 +12,11 @@ import {
   DEFAULT_CONTEXT_FILENAME,
 } from '../tools/memoryTool.js';
 import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
+import { ApprovalMode } from '../policy/types.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { MockTool } from '../test-utils/mock-tool.js';
+import type { CallableTool } from '@google/genai';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 vi.mock('../tools/memoryTool.js', async (importOriginal) => {
   const actual = await importOriginal();
@@ -86,5 +91,89 @@ describe('PromptProvider', () => {
     expect(prompt).toContain(
       `# Contextual Instructions (${DEFAULT_CONTEXT_FILENAME}, CUSTOM.md)`,
     );
+  });
+
+  describe('plan mode prompt', () => {
+    const mockMessageBus = {
+      publish: vi.fn(),
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    } as unknown as MessageBus;
+
+    beforeEach(() => {
+      vi.mocked(getAllGeminiMdFilenames).mockReturnValue([
+        DEFAULT_CONTEXT_FILENAME,
+      ]);
+      (mockConfig.getApprovalMode as ReturnType<typeof vi.fn>).mockReturnValue(
+        ApprovalMode.PLAN,
+      );
+    });
+
+    it('should list all active tools from ToolRegistry in plan mode prompt', () => {
+      const mockTools = [
+        new MockTool({ name: 'glob', displayName: 'Glob' }),
+        new MockTool({ name: 'read_file', displayName: 'ReadFile' }),
+        new MockTool({ name: 'write_file', displayName: 'WriteFile' }),
+        new MockTool({ name: 'replace', displayName: 'Replace' }),
+      ];
+      (mockConfig.getToolRegistry as ReturnType<typeof vi.fn>).mockReturnValue({
+        getAllToolNames: vi.fn().mockReturnValue(mockTools.map((t) => t.name)),
+        getAllTools: vi.fn().mockReturnValue(mockTools),
+      });
+
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+      expect(prompt).toContain('`glob`');
+      expect(prompt).toContain('`read_file`');
+      expect(prompt).toContain('`write_file`');
+      expect(prompt).toContain('`replace`');
+    });
+
+    it('should show server name for MCP tools in plan mode prompt', () => {
+      const mcpTool = new DiscoveredMCPTool(
+        {} as CallableTool,
+        'my-mcp-server',
+        'mcp_read',
+        'An MCP read tool',
+        {},
+        mockMessageBus,
+        undefined,
+        true,
+      );
+      const mockTools = [
+        new MockTool({ name: 'glob', displayName: 'Glob' }),
+        mcpTool,
+      ];
+      (mockConfig.getToolRegistry as ReturnType<typeof vi.fn>).mockReturnValue({
+        getAllToolNames: vi.fn().mockReturnValue(mockTools.map((t) => t.name)),
+        getAllTools: vi.fn().mockReturnValue(mockTools),
+      });
+
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+      expect(prompt).toContain('`mcp_read` (my-mcp-server)');
+    });
+
+    it('should include write constraint message in plan mode prompt', () => {
+      const mockTools = [
+        new MockTool({ name: 'glob', displayName: 'Glob' }),
+        new MockTool({ name: 'write_file', displayName: 'WriteFile' }),
+        new MockTool({ name: 'replace', displayName: 'Replace' }),
+      ];
+      (mockConfig.getToolRegistry as ReturnType<typeof vi.fn>).mockReturnValue({
+        getAllToolNames: vi.fn().mockReturnValue(mockTools.map((t) => t.name)),
+        getAllTools: vi.fn().mockReturnValue(mockTools),
+      });
+
+      const provider = new PromptProvider();
+      const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+      expect(prompt).toContain(
+        '`write_file` and `replace` may ONLY be used to write .md plan files',
+      );
+      expect(prompt).toContain('/tmp/project-temp/plans/');
+    });
   });
 });

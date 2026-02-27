@@ -94,6 +94,7 @@ describe('GeminiChat Network Retries', () => {
       getToolRegistry: vi.fn().mockReturnValue({ getTool: vi.fn() }),
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false), // Default false
+      getMaxAttempts: vi.fn().mockReturnValue(10),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => ({
           model: modelConfigKey.model,
