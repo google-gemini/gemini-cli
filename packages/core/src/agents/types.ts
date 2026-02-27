@@ -75,6 +75,8 @@ export interface SubagentActivityItem {
   id: string;
   type: 'thought' | 'tool_call';
   content: string;
+  displayName?: string;
+  description?: string;
   args?: string;
   status: 'running' | 'completed' | 'error' | 'cancelled';
 }

@@ -134,11 +134,19 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           }
           case 'TOOL_CALL_START': {
             const name = String(activity.data['name']);
+            const displayName = activity.data['displayName']
+              ? String(activity.data['displayName'])
+              : undefined;
+            const description = activity.data['description']
+              ? String(activity.data['description'])
+              : undefined;
             const args = JSON.stringify(activity.data['args']);
             recentActivity.push({
               id: randomUUID(),
               type: 'tool_call',
               content: name,
+              displayName,
+              description,
               args,
               status: 'running',
             });

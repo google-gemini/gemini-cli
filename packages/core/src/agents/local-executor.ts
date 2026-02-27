@@ -889,8 +889,24 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const toolName = functionCall.name as string;
 
+      let displayName = toolName;
+      let description: string | undefined = undefined;
+
+      try {
+        const tool = this.toolRegistry.getTool(toolName);
+        if (tool) {
+          displayName = tool.displayName ?? toolName;
+          const invocation = tool.build(args);
+          description = invocation.getDescription();
+        }
+      } catch {
+        // Ignore errors during formatting for activity emission
+      }
+
       this.emitActivity('TOOL_CALL_START', {
         name: toolName,
+        displayName,
+        description,
         args,
       });
 

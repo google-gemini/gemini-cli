@@ -111,7 +111,7 @@ export const SubagentProgressDisplay: React.FC<
                 <Text color={theme.status.error}>{TOOL_STATUS.ERROR}</Text>
               );
 
-            const formattedArgs = formatToolArgs(item.args);
+            const formattedArgs = item.description || formatToolArgs(item.args);
             const displayArgs =
               formattedArgs.length > 60
                 ? formattedArgs.slice(0, 60) + '...'
@@ -126,7 +126,7 @@ export const SubagentProgressDisplay: React.FC<
                     color={theme.text.primary}
                     strikethrough={item.status === 'cancelled'}
                   >
-                    {item.content}
+                    {item.displayName || item.content}
                   </Text>
                   {displayArgs && (
                     <Box marginLeft={1}>

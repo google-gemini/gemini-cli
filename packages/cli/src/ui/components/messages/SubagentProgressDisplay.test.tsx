@@ -42,6 +42,30 @@ describe('<SubagentProgressDisplay />', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
+  it('renders correctly with displayName and description from item', async () => {
+    const progress: SubagentProgress = {
+      isSubagentProgress: true,
+      agentName: 'TestAgent',
+      recentActivity: [
+        {
+          id: '1',
+          type: 'tool_call',
+          content: 'run_shell_command',
+          displayName: 'RunShellCommand',
+          description: 'Executing echo hello',
+          args: '{"command": "echo hello"}',
+          status: 'running',
+        },
+      ],
+    };
+
+    const { lastFrame, waitUntilReady } = render(
+      <SubagentProgressDisplay progress={progress} />,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
   it('renders correctly with command fallback', async () => {
     const progress: SubagentProgress = {
       isSubagentProgress: true,

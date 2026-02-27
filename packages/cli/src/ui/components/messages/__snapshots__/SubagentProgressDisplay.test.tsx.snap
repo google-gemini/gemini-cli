@@ -20,6 +20,11 @@ exports[`<SubagentProgressDisplay /> > renders correctly with description in arg
 "
 `;
 
+exports[`<SubagentProgressDisplay /> > renders correctly with displayName and description from item 1`] = `
+"⠋  RunShellCommand Executing echo hello
+"
+`;
+
 exports[`<SubagentProgressDisplay /> > renders correctly with file_path 1`] = `
 "✓  write_file /tmp/test.txt
 "

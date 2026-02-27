@@ -27,7 +27,8 @@ import {
   type ToolCallConfirmationDetails,
   type Config,
   type UserTierId,
-  type AnsiOutput,
+  type ToolLiveOutput,
+  isSubagentProgress,
   EDIT_TOOL_NAMES,
   processRestorableToolCalls,
 } from '@google/gemini-cli-core';
@@ -333,11 +334,13 @@ export class Task {
 
   private _schedulerOutputUpdate(
     toolCallId: string,
-    outputChunk: string | AnsiOutput,
+    outputChunk: ToolLiveOutput,
   ): void {
     let outputAsText: string;
     if (typeof outputChunk === 'string') {
       outputAsText = outputChunk;
+    } else if (isSubagentProgress(outputChunk)) {
+      outputAsText = JSON.stringify(outputChunk);
     } else {
       outputAsText = outputChunk
         .map((line) => line.map((token) => token.text).join(''))
