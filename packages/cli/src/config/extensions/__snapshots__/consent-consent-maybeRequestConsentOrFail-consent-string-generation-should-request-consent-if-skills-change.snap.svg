@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="920" height="479" viewBox="0 0 920 479">
   <style>
     text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+    a { text-decoration-color: inherit; }
   </style>
   <rect width="920" height="479" fill="#000000" />
   <g transform="translate(10, 10)">
@@ -10,11 +11,15 @@
     <text x="0" y="53" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  * server2 (remote): https://remote.com                                                            </text>
     <text x="0" y="70" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">This extension will append info to your gemini.md context using my-context.md                       </text>
     <text x="0" y="87" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">This extension will exclude the following core tools: tool1,tool2                                   </text>
-    <text x="0" y="121" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Agent Skills:                                                                                       </text>
+    <text x="0" y="121" fill="#ffffff" textLength="117" lengthAdjust="spacingAndGlyphs" font-weight="bold">Agent Skills:</text>
     <text x="0" y="155" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">This extension will install the following agent skills:                                             </text>
-    <text x="0" y="189" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  * skill1: desc1                                                                                   </text>
+    <text x="0" y="189" fill="#ffffff" textLength="36" lengthAdjust="spacingAndGlyphs">  * </text>
+    <text x="36" y="189" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs" font-weight="bold">skill1</text>
+    <text x="90" y="189" fill="#ffffff" textLength="810" lengthAdjust="spacingAndGlyphs">: desc1                                                                                   </text>
     <text x="0" y="206" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">    (Source: /mock/temp/dir/skill1/SKILL.md) (2 items in directory)                                 </text>
-    <text x="0" y="240" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  * skill2: desc2                                                                                   </text>
+    <text x="0" y="240" fill="#ffffff" textLength="36" lengthAdjust="spacingAndGlyphs">  * </text>
+    <text x="36" y="240" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs" font-weight="bold">skill2</text>
+    <text x="90" y="240" fill="#ffffff" textLength="810" lengthAdjust="spacingAndGlyphs">: desc2                                                                                   </text>
     <text x="0" y="257" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">    (Source: /mock/temp/dir/skill2/SKILL.md) (1 items in directory)                                 </text>
     <text x="0" y="308" fill="#cdcd00" textLength="891" lengthAdjust="spacingAndGlyphs">The extension you are about to install may have been created by a third-party developer and sourced</text>
     <text x="0" y="325" fill="#cdcd00" textLength="882" lengthAdjust="spacingAndGlyphs">from a public repository. Google does not vet, endorse, or guarantee the functionality or security</text>

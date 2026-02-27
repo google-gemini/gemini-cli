@@ -89,6 +89,7 @@ export const generateSvgForTerminal = (terminal: Terminal): string => {
       break;
     }
   }
+
   if (contentRows === 0) contentRows = 1; // Minimum 1 row
 
   const width = terminal.cols * charWidth + padding * 2;
@@ -99,6 +100,8 @@ export const generateSvgForTerminal = (terminal: Terminal): string => {
   svg += `  <style>
 `;
   svg += `    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+`;
+  svg += `    a { text-decoration-color: inherit; }
 `;
   svg += `  </style>
 `;
@@ -113,6 +116,10 @@ export const generateSvgForTerminal = (terminal: Terminal): string => {
 
     let currentFgHex: string | null = null;
     let currentBgHex: string | null = null;
+    let currentIsBold = false;
+    let currentIsItalic = false;
+    let currentIsUnderline = false;
+    let currentLinkUri: string | null = null;
     let currentBlockStartCol = -1;
     let currentBlockText = '';
     let currentBlockNumCells = 0;
@@ -128,12 +135,24 @@ export const generateSvgForTerminal = (terminal: Terminal): string => {
             svg += `    <rect x="${xPos}" y="${yPos}" width="${rectWidth}" height="${charHeight}" fill="${currentBgHex}" />
 `;
           }
-          if (currentBlockText.trim().length > 0) {
+          if (currentBlockText.trim().length > 0 || currentIsUnderline) {
             const fill = currentFgHex || '#ffffff'; // Default text color
             const textWidth = currentBlockNumCells * charWidth;
+
+            let extraAttrs = '';
+            if (currentIsBold) extraAttrs += ' font-weight="bold"';
+            if (currentIsItalic) extraAttrs += ' font-style="italic"';
+            if (currentIsUnderline)
+              extraAttrs += ' text-decoration="underline"';
+
             // Use textLength to ensure the block fits exactly into its designated cells
-            svg += `    <text x="${xPos}" y="${yPos + 2}" fill="${fill}" textLength="${textWidth}" lengthAdjust="spacingAndGlyphs">${escapeXml(currentBlockText)}</text>
-`;
+            let textElement = `<text x="${xPos}" y="${yPos + 2}" fill="${fill}" textLength="${textWidth}" lengthAdjust="spacingAndGlyphs"${extraAttrs}>${escapeXml(currentBlockText)}</text>`;
+
+            if (currentLinkUri) {
+              textElement = `<a href="${escapeXml(currentLinkUri)}">${textElement}</a>`;
+            }
+
+            svg += `    ${textElement}\n`;
           }
         }
       }
@@ -164,17 +183,40 @@ export const generateSvgForTerminal = (terminal: Terminal): string => {
         bgHex = tempFgHex || '#ffffff';
       }
 
+      const isBold = !!cell.isBold();
+      const isItalic = !!cell.isItalic();
+      const isUnderline = !!cell.isUnderline();
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+      const urlId = (cell as any).extended?._urlId;
+      let linkUri: string | null = null;
+      if (urlId !== undefined) {
+        /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+        linkUri =
+          (terminal as any)._core?._oscLinkService?.getLinkData(urlId)?.uri ||
+          null;
+        /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+      }
+
       let chars = cell.getChars();
       if (chars === '') chars = ' '.repeat(cellWidth);
 
       if (
         fgHex !== currentFgHex ||
         bgHex !== currentBgHex ||
+        isBold !== currentIsBold ||
+        isItalic !== currentIsItalic ||
+        isUnderline !== currentIsUnderline ||
+        linkUri !== currentLinkUri ||
         currentBlockStartCol === -1
       ) {
         finalizeBlock(x);
         currentFgHex = fgHex;
         currentBgHex = bgHex;
+        currentIsBold = isBold;
+        currentIsItalic = isItalic;
+        currentIsUnderline = isUnderline;
+        currentLinkUri = linkUri;
         currentBlockStartCol = x;
         currentBlockText = chars;
         currentBlockNumCells = cellWidth;
@@ -185,6 +227,7 @@ export const generateSvgForTerminal = (terminal: Terminal): string => {
     }
     finalizeBlock(line.length);
   }
+
   svg += `  </g>\n</svg>`;
   return svg;
 };

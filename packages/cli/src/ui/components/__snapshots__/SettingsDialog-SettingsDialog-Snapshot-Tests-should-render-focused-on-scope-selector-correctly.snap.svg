@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="920" height="751" viewBox="0 0 920 751">
   <style>
     text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+    a { text-decoration-color: inherit; }
   </style>
   <rect width="920" height="751" fill="#000000" />
   <g transform="translate(10, 10)">
@@ -106,7 +107,7 @@
     <text x="0" y="580" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="580" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="597" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="9" y="597" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs">  &gt; Apply To                                                                                      </text>
+    <text x="27" y="597" fill="#ffffff" textLength="90" lengthAdjust="spacingAndGlyphs" font-weight="bold">&gt; Apply To</text>
     <text x="891" y="597" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="614" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="27" y="614" fill="#a6e3a1" textLength="9" lengthAdjust="spacingAndGlyphs">●</text>

@@ -1,16 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="560" height="139" viewBox="0 0 560 139">
   <style>
     text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+    a { text-decoration-color: inherit; }
   </style>
   <rect width="560" height="139" fill="#000000" />
   <g transform="translate(10, 10)">
     <text x="0" y="19" fill="#333333" textLength="405" lengthAdjust="spacingAndGlyphs">┌──────────────┬────────────┬───────────────┐</text>
     <text x="0" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+<<<<<<< HEAD
     <text x="18" y="36" fill="#89b4fa" textLength="63" lengthAdjust="spacingAndGlyphs">Emoji 😃</text>
     <text x="126" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="144" y="36" fill="#89b4fa" textLength="90" lengthAdjust="spacingAndGlyphs">Asian 汉字</text>
     <text x="243" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="261" y="36" fill="#89b4fa" textLength="108" lengthAdjust="spacingAndGlyphs">Mixed 🚀 Text</text>
+=======
+    <text x="18" y="36" fill="#89b4fa" textLength="63" lengthAdjust="spacingAndGlyphs" font-weight="bold">Emoji 😃</text>
+    <text x="117" y="36" fill="#333333" textLength="27" lengthAdjust="spacingAndGlyphs"> │ </text>
+    <text x="144" y="36" fill="#89b4fa" textLength="90" lengthAdjust="spacingAndGlyphs" font-weight="bold">Asian 汉字</text>
+    <text x="234" y="36" fill="#333333" textLength="27" lengthAdjust="spacingAndGlyphs"> │ </text>
+    <text x="261" y="36" fill="#89b4fa" textLength="108" lengthAdjust="spacingAndGlyphs" font-weight="bold">Mixed 🚀 Text</text>
+>>>>>>> fb8a42383 (Include bold in snapshots)
     <text x="378" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="53" fill="#333333" textLength="405" lengthAdjust="spacingAndGlyphs">├──────────────┼────────────┼───────────────┤</text>
     <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
