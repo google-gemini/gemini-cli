@@ -371,6 +371,15 @@ describe('partUtils', () => {
         const result = describeInlineData('audio/mp3', data);
         expect(result).toMatch(/\d+m \d+s/);
       });
+
+      it('should not produce "60s" in duration from rounding edge cases', () => {
+        // 119.9 seconds of mp3: 119.9 * 16000 = 1,918,400 bytes
+        // Without rounding total first, this could produce "1m 60s"
+        const data = makeBase64(1918400);
+        const result = describeInlineData('audio/mp3', data);
+        expect(result).not.toContain('60s');
+        expect(result).toMatch(/\d+m \d+s/);
+      });
     });
 
     describe('video descriptions', () => {
