@@ -301,74 +301,71 @@ describe('applySubstitutions', () => {
 });
 
 describe('isSectionEnabled', () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
     vi.restoreAllMocks();
-    process.env = { ...originalEnv };
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    vi.unstubAllEnvs();
   });
 
   it('should return true when environment variable is not set', () => {
-    delete process.env['GEMINI_PROMPT_TESTSECTION'];
+    vi.stubEnv('GEMINI_PROMPT_TESTSECTION', undefined);
     expect(isSectionEnabled('testSection')).toBe(true);
   });
 
   it('should return true when environment variable is empty', () => {
-    process.env['GEMINI_PROMPT_TESTSECTION'] = '';
+    vi.stubEnv('GEMINI_PROMPT_TESTSECTION', '');
     expect(isSectionEnabled('testSection')).toBe(true);
   });
 
   it('should return false when environment variable is "0"', () => {
-    process.env['GEMINI_PROMPT_TESTSECTION'] = '0';
+    vi.stubEnv('GEMINI_PROMPT_TESTSECTION', '0');
     expect(isSectionEnabled('testSection')).toBe(false);
   });
 
   it('should return false when environment variable is "false"', () => {
-    process.env['GEMINI_PROMPT_TESTSECTION'] = 'false';
+    vi.stubEnv('GEMINI_PROMPT_TESTSECTION', 'false');
     expect(isSectionEnabled('testSection')).toBe(false);
   });
 
   it('should return false when environment variable is "FALSE" (case-insensitive)', () => {
-    process.env['GEMINI_PROMPT_TESTSECTION'] = 'FALSE';
+    vi.stubEnv('GEMINI_PROMPT_TESTSECTION', 'FALSE');
     expect(isSectionEnabled('testSection')).toBe(false);
   });
 
   it('should return false when environment variable is "False" (mixed case)', () => {
-    process.env['GEMINI_PROMPT_TESTSECTION'] = 'False';
+    vi.stubEnv('GEMINI_PROMPT_TESTSECTION', 'False');
     expect(isSectionEnabled('testSection')).toBe(false);
   });
 
   it('should return true when environment variable is "1"', () => {
-    process.env['GEMINI_PROMPT_TESTSECTION'] = '1';
+    vi.stubEnv('GEMINI_PROMPT_TESTSECTION', '1');
     expect(isSectionEnabled('testSection')).toBe(true);
   });
 
   it('should return true when environment variable is "true"', () => {
-    process.env['GEMINI_PROMPT_TESTSECTION'] = 'true';
+    vi.stubEnv('GEMINI_PROMPT_TESTSECTION', 'true');
     expect(isSectionEnabled('testSection')).toBe(true);
   });
 
   it('should return true when environment variable is any other value', () => {
-    process.env['GEMINI_PROMPT_TESTSECTION'] = 'anything';
+    vi.stubEnv('GEMINI_PROMPT_TESTSECTION', 'anything');
     expect(isSectionEnabled('testSection')).toBe(true);
   });
 
   it('should convert key to uppercase for env var lookup', () => {
-    process.env['GEMINI_PROMPT_MYKEY'] = '0';
+    vi.stubEnv('GEMINI_PROMPT_MYKEY', '0');
     expect(isSectionEnabled('myKey')).toBe(false);
   });
 
   it('should handle whitespace in environment variable value', () => {
-    process.env['GEMINI_PROMPT_TESTSECTION'] = '  false  ';
+    vi.stubEnv('GEMINI_PROMPT_TESTSECTION', '  false  ');
     expect(isSectionEnabled('testSection')).toBe(false);
   });
 
   it('should handle whitespace around "0"', () => {
-    process.env['GEMINI_PROMPT_TESTSECTION'] = ' 0 ';
+    vi.stubEnv('GEMINI_PROMPT_TESTSECTION', ' 0 ');
     expect(isSectionEnabled('testSection')).toBe(false);
   });
 });
