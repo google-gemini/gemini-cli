@@ -6,7 +6,18 @@
 
 import { getErrorMessage, isNodeError } from './errors.js';
 import { URL } from 'node:url';
-import { ProxyAgent, setGlobalDispatcher } from 'undici';
+import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
+
+const DEFAULT_HEADERS_TIMEOUT = 60000; // 60 seconds
+const DEFAULT_BODY_TIMEOUT = 300000; // 5 minutes
+
+// Configure default global dispatcher with higher timeouts
+setGlobalDispatcher(
+  new Agent({
+    headersTimeout: DEFAULT_HEADERS_TIMEOUT,
+    bodyTimeout: DEFAULT_BODY_TIMEOUT,
+  }),
+);
 
 const PRIVATE_IP_RANGES = [
   /^10\./,
@@ -41,12 +52,26 @@ export function isPrivateIp(url: string): boolean {
 export async function fetchWithTimeout(
   url: string,
   timeout: number,
+  options?: RequestInit,
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+  if (options?.signal) {
+    if (options.signal.aborted) {
+      controller.abort();
+    } else {
+      options.signal.addEventListener('abort', () => controller.abort(), {
+        once: true,
+      });
+    }
+  }
+
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
     return response;
   } catch (error) {
     if (isNodeError(error) && error.code === 'ABORT_ERR') {
@@ -59,5 +84,11 @@ export async function fetchWithTimeout(
 }
 
 export function setGlobalProxy(proxy: string) {
-  setGlobalDispatcher(new ProxyAgent(proxy));
+  setGlobalDispatcher(
+    new ProxyAgent({
+      uri: proxy,
+      headersTimeout: DEFAULT_HEADERS_TIMEOUT,
+      bodyTimeout: DEFAULT_BODY_TIMEOUT,
+    }),
+  );
 }

@@ -6,8 +6,15 @@
 
 import React from 'react';
 import { Text } from 'ink';
+import chalk from 'chalk';
+import {
+  resolveColor,
+  INK_SUPPORTED_NAMES,
+  INK_NAME_TO_HEX_MAP,
+} from '../themes/color-utils.js';
 import { theme } from '../semantic-colors.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { stripUnsafeCharacters } from './textUtils.js';
 
 // Constants for Markdown parsing
 const BOLD_MARKER_LENGTH = 2; // For "**"
@@ -22,45 +29,108 @@ interface RenderInlineProps {
   defaultColor?: string;
 }
 
-const RenderInlineInternal: React.FC<RenderInlineProps> = ({
-  text,
-  defaultColor,
-}) => {
+/**
+ * Helper to apply color to a string using ANSI escape codes,
+ * consistent with how Ink's colorize works.
+ */
+const ansiColorize = (str: string, color: string | undefined): string => {
+  if (!color) return str;
+  const resolved = resolveColor(color);
+  if (!resolved) return str;
+
+  if (resolved.startsWith('#')) {
+    return chalk.hex(resolved)(str);
+  }
+
+  const mappedHex = INK_NAME_TO_HEX_MAP[resolved];
+  if (mappedHex) {
+    return chalk.hex(mappedHex)(str);
+  }
+
+  if (INK_SUPPORTED_NAMES.has(resolved)) {
+    switch (resolved) {
+      case 'black':
+        return chalk.black(str);
+      case 'red':
+        return chalk.red(str);
+      case 'green':
+        return chalk.green(str);
+      case 'yellow':
+        return chalk.yellow(str);
+      case 'blue':
+        return chalk.blue(str);
+      case 'magenta':
+        return chalk.magenta(str);
+      case 'cyan':
+        return chalk.cyan(str);
+      case 'white':
+        return chalk.white(str);
+      case 'gray':
+      case 'grey':
+        return chalk.gray(str);
+      default:
+        return str;
+    }
+  }
+
+  return str;
+};
+
+/**
+ * Converts markdown text into a string with ANSI escape codes.
+ * This mirrors the parsing logic in InlineMarkdownRenderer.tsx
+ */
+export const parseMarkdownToANSI = (
+  text: string,
+  defaultColor?: string,
+): string => {
   const baseColor = defaultColor ?? theme.text.primary;
   // Early return for plain text without markdown or URLs
   if (!/[*_~`<[https?:]/.test(text)) {
-    return <Text color={baseColor}>{text}</Text>;
+    return ansiColorize(text, baseColor);
   }
 
-  const nodes: React.ReactNode[] = [];
-  let lastIndex = 0;
+  let result = '';
   const inlineRegex =
-    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
+    /(\*\*\*.*?\*\*\*|\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
+  let lastIndex = 0;
   let match;
 
   while ((match = inlineRegex.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      nodes.push(
-        <Text key={`t-${lastIndex}`} color={baseColor}>
-          {text.slice(lastIndex, match.index)}
-        </Text>,
-      );
+      result += ansiColorize(text.slice(lastIndex, match.index), baseColor);
     }
 
     const fullMatch = match[0];
-    let renderedNode: React.ReactNode = null;
-    const key = `m-${match.index}`;
+    let styledPart = '';
 
     try {
       if (
-        fullMatch.startsWith('**') &&
+        fullMatch.endsWith('***') &&
+        fullMatch.startsWith('***') &&
+        fullMatch.length > (BOLD_MARKER_LENGTH + ITALIC_MARKER_LENGTH) * 2
+      ) {
+        styledPart = chalk.bold(
+          chalk.italic(
+            parseMarkdownToANSI(
+              fullMatch.slice(
+                BOLD_MARKER_LENGTH + ITALIC_MARKER_LENGTH,
+                -BOLD_MARKER_LENGTH - ITALIC_MARKER_LENGTH,
+              ),
+              baseColor,
+            ),
+          ),
+        );
+      } else if (
         fullMatch.endsWith('**') &&
+        fullMatch.startsWith('**') &&
         fullMatch.length > BOLD_MARKER_LENGTH * 2
       ) {
-        renderedNode = (
-          <Text key={key} bold color={baseColor}>
-            {fullMatch.slice(BOLD_MARKER_LENGTH, -BOLD_MARKER_LENGTH)}
-          </Text>
+        styledPart = chalk.bold(
+          parseMarkdownToANSI(
+            fullMatch.slice(BOLD_MARKER_LENGTH, -BOLD_MARKER_LENGTH),
+            baseColor,
+          ),
         );
       } else if (
         fullMatch.length > ITALIC_MARKER_LENGTH * 2 &&
@@ -75,23 +145,25 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
           text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 2),
         )
       ) {
-        renderedNode = (
-          <Text key={key} italic color={baseColor}>
-            {fullMatch.slice(ITALIC_MARKER_LENGTH, -ITALIC_MARKER_LENGTH)}
-          </Text>
+        styledPart = chalk.italic(
+          parseMarkdownToANSI(
+            fullMatch.slice(ITALIC_MARKER_LENGTH, -ITALIC_MARKER_LENGTH),
+            baseColor,
+          ),
         );
       } else if (
         fullMatch.startsWith('~~') &&
         fullMatch.endsWith('~~') &&
         fullMatch.length > STRIKETHROUGH_MARKER_LENGTH * 2
       ) {
-        renderedNode = (
-          <Text key={key} strikethrough color={baseColor}>
-            {fullMatch.slice(
+        styledPart = chalk.strikethrough(
+          parseMarkdownToANSI(
+            fullMatch.slice(
               STRIKETHROUGH_MARKER_LENGTH,
               -STRIKETHROUGH_MARKER_LENGTH,
-            )}
-          </Text>
+            ),
+            baseColor,
+          ),
         );
       } else if (
         fullMatch.startsWith('`') &&
@@ -100,11 +172,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
       ) {
         const codeMatch = fullMatch.match(/^(`+)(.+?)\1$/s);
         if (codeMatch && codeMatch[2]) {
-          renderedNode = (
-            <Text key={key} color={theme.text.accent}>
-              {codeMatch[2]}
-            </Text>
-          );
+          styledPart = ansiColorize(codeMatch[2], theme.text.accent);
         }
       } else if (
         fullMatch.startsWith('[') &&
@@ -115,58 +183,54 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
         if (linkMatch) {
           const linkText = linkMatch[1];
           const url = linkMatch[2];
-          renderedNode = (
-            <Text key={key} color={baseColor}>
-              {linkText}
-              <Text color={theme.text.link}> ({url})</Text>
-            </Text>
-          );
+          styledPart =
+            parseMarkdownToANSI(linkText, baseColor) +
+            ansiColorize(' (', baseColor) +
+            ansiColorize(url, theme.text.link) +
+            ansiColorize(')', baseColor);
         }
       } else if (
         fullMatch.startsWith('<u>') &&
         fullMatch.endsWith('</u>') &&
         fullMatch.length >
-          UNDERLINE_TAG_START_LENGTH + UNDERLINE_TAG_END_LENGTH - 1 // -1 because length is compared to combined length of start and end tags
+          UNDERLINE_TAG_START_LENGTH + UNDERLINE_TAG_END_LENGTH - 1
       ) {
-        renderedNode = (
-          <Text key={key} underline color={baseColor}>
-            {fullMatch.slice(
+        styledPart = chalk.underline(
+          parseMarkdownToANSI(
+            fullMatch.slice(
               UNDERLINE_TAG_START_LENGTH,
               -UNDERLINE_TAG_END_LENGTH,
-            )}
-          </Text>
+            ),
+            baseColor,
+          ),
         );
       } else if (fullMatch.match(/^https?:\/\//)) {
-        renderedNode = (
-          <Text key={key} color={theme.text.link}>
-            {fullMatch}
-          </Text>
-        );
+        styledPart = ansiColorize(fullMatch, theme.text.link);
       }
     } catch (e) {
       debugLogger.warn('Error parsing inline markdown part:', fullMatch, e);
-      renderedNode = null;
+      styledPart = '';
     }
 
-    nodes.push(
-      renderedNode ?? (
-        <Text key={key} color={baseColor}>
-          {fullMatch}
-        </Text>
-      ),
-    );
+    result += styledPart || ansiColorize(fullMatch, baseColor);
     lastIndex = inlineRegex.lastIndex;
   }
 
   if (lastIndex < text.length) {
-    nodes.push(
-      <Text key={`t-${lastIndex}`} color={baseColor}>
-        {text.slice(lastIndex)}
-      </Text>,
-    );
+    result += ansiColorize(text.slice(lastIndex), baseColor);
   }
 
-  return <>{nodes.filter((node) => node !== null)}</>;
+  return result;
+};
+
+const RenderInlineInternal: React.FC<RenderInlineProps> = ({
+  text: rawText,
+  defaultColor,
+}) => {
+  const text = stripUnsafeCharacters(rawText);
+  const ansiText = parseMarkdownToANSI(text, defaultColor);
+
+  return <Text>{ansiText}</Text>;
 };
 
 export const RenderInline = React.memo(RenderInlineInternal);

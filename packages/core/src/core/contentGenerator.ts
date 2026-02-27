@@ -77,6 +77,12 @@ export function getAuthTypeFromEnv(): AuthType | undefined {
   if (process.env['GEMINI_API_KEY']) {
     return AuthType.USE_GEMINI;
   }
+  if (
+    process.env['CLOUD_SHELL'] === 'true' ||
+    process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true'
+  ) {
+    return AuthType.COMPUTE_ADC;
+  }
   return undefined;
 }
 
@@ -90,9 +96,13 @@ export type ContentGeneratorConfig = {
 export async function createContentGeneratorConfig(
   config: Config,
   authType: AuthType | undefined,
+  apiKey?: string,
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey =
-    process.env['GEMINI_API_KEY'] || (await loadApiKey()) || undefined;
+    apiKey ||
+    process.env['GEMINI_API_KEY'] ||
+    (await loadApiKey()) ||
+    undefined;
   const googleApiKey = process.env['GOOGLE_API_KEY'] || undefined;
   const googleCloudProject =
     process.env['GOOGLE_CLOUD_PROJECT'] ||
@@ -146,7 +156,12 @@ export async function createContentGenerator(
       return new LoggingContentGenerator(fakeGenerator, gcConfig);
     }
     const version = await getVersion();
-    const model = resolveModel(gcConfig.getModel());
+    const model = resolveModel(
+      gcConfig.getModel(),
+      config.authType === AuthType.USE_GEMINI ||
+        config.authType === AuthType.USE_VERTEX_AI ||
+        ((await gcConfig.getGemini31Launched?.()) ?? false),
+    );
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
     const userAgent = `GeminiCLI/${version}/${model} (${process.platform}; ${process.arch})`;

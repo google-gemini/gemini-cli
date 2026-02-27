@@ -11,6 +11,7 @@ import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
+import { createHash } from 'node:crypto';
 import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
@@ -31,12 +32,16 @@ import {
   registerSyncCleanup,
   runExitCleanup,
   registerTelemetryConfig,
+  setupSignalHandlers,
+  setupTtyCheck,
 } from './utils/cleanup.js';
 import {
   cleanupToolOutputFiles,
   cleanupExpiredSessions,
 } from './utils/sessionCleanup.js';
 import {
+  type StartupWarning,
+  WarningPriority,
   type Config,
   type ResumedSessionData,
   type OutputPayload,
@@ -99,6 +104,7 @@ import { createPolicyUpdater } from './config/policy.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 import { TerminalProvider } from './ui/contexts/TerminalContext.js';
+import { OverflowProvider } from './ui/contexts/OverflowContext.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
@@ -180,7 +186,7 @@ ${reason.stack}`
 export async function startInteractiveUI(
   config: Config,
   settings: LoadedSettings,
-  startupWarnings: string[],
+  startupWarnings: StartupWarning[],
   workspaceRoot: string = process.cwd(),
   resumedSessionData: ResumedSessionData | undefined,
   initializationResult: InitializationResult,
@@ -235,17 +241,19 @@ export async function startInteractiveUI(
           >
             <TerminalProvider>
               <ScrollProvider>
-                <SessionStatsProvider>
-                  <VimModeProvider settings={settings}>
-                    <AppContainer
-                      config={config}
-                      startupWarnings={startupWarnings}
-                      version={version}
-                      resumedSessionData={resumedSessionData}
-                      initializationResult={initializationResult}
-                    />
-                  </VimModeProvider>
-                </SessionStatsProvider>
+                <OverflowProvider>
+                  <SessionStatsProvider>
+                    <VimModeProvider settings={settings}>
+                      <AppContainer
+                        config={config}
+                        startupWarnings={startupWarnings}
+                        version={version}
+                        resumedSessionData={resumedSessionData}
+                        initializationResult={initializationResult}
+                      />
+                    </VimModeProvider>
+                  </SessionStatsProvider>
+                </OverflowProvider>
               </ScrollProvider>
             </TerminalProvider>
           </MouseProvider>
@@ -313,6 +321,8 @@ export async function startInteractiveUI(
     });
 
   registerCleanup(() => instance.unmount());
+
+  registerCleanup(setupTtyCheck());
 }
 
 export async function main() {
@@ -333,6 +343,8 @@ export async function main() {
   });
 
   setupUnhandledRejectionHandler();
+
+  setupSignalHandlers();
 
   const slashCommandConflictHandler = new SlashCommandConflictHandler();
   slashCommandConflictHandler.start();
@@ -580,7 +592,7 @@ export async function main() {
 
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, config.storage);
 
     // Register SessionEnd hook to fire on graceful exit
     // This runs before telemetry shutdown in runExitCleanup()
@@ -640,10 +652,7 @@ export async function main() {
       process.stdin.setRawMode(true);
 
       // This cleanup isn't strictly needed but may help in certain situations.
-      process.on('SIGTERM', () => {
-        process.stdin.setRawMode(wasRaw);
-      });
-      process.on('SIGINT', () => {
+      registerSyncCleanup(() => {
         process.stdin.setRawMode(wasRaw);
       });
     }
@@ -668,9 +677,20 @@ export async function main() {
     }
 
     let input = config.getQuestion();
-    const startupWarnings = [
-      ...(await getStartupWarnings()),
-      ...(await getUserStartupWarnings(settings.merged)),
+    const useAlternateBuffer = shouldEnterAlternateScreen(
+      isAlternateBufferEnabled(settings),
+      config.getScreenReader(),
+    );
+    const rawStartupWarnings = await getStartupWarnings();
+    const startupWarnings: StartupWarning[] = [
+      ...rawStartupWarnings.map((message) => ({
+        id: `startup-${createHash('sha256').update(message).digest('hex').substring(0, 16)}`,
+        message,
+        priority: WarningPriority.High,
+      })),
+      ...(await getUserStartupWarnings(settings.merged, undefined, {
+        isAlternateBuffer: useAlternateBuffer,
+      })),
     ];
 
     // Handle --resume flag

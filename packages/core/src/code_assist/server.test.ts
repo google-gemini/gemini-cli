@@ -73,17 +73,19 @@ describe('CodeAssistServer', () => {
       LlmRole.MAIN,
     );
 
-    expect(mockRequest).toHaveBeenCalledWith({
-      url: expect.stringContaining(':generateContent'),
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-custom-header': 'test-value',
-      },
-      responseType: 'json',
-      body: expect.any(String),
-      signal: undefined,
-    });
+    expect(mockRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: expect.stringContaining(':generateContent'),
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-custom-header': 'test-value',
+        },
+        responseType: 'json',
+        body: expect.any(String),
+        signal: undefined,
+      }),
+    );
 
     const requestBody = JSON.parse(mockRequest.mock.calls[0][0].body);
     expect(requestBody.user_prompt_id).toBe('user-prompt-id');
@@ -391,21 +393,65 @@ describe('CodeAssistServer', () => {
       results.push(res);
     }
 
-    expect(mockRequest).toHaveBeenCalledWith({
-      url: expect.stringContaining(':streamGenerateContent'),
-      method: 'POST',
-      params: { alt: 'sse' },
-      responseType: 'stream',
-      body: expect.any(String),
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      signal: undefined,
-    });
+    expect(mockRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: expect.stringContaining(':streamGenerateContent'),
+        method: 'POST',
+        params: { alt: 'sse' },
+        responseType: 'stream',
+        body: expect.any(String),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: undefined,
+      }),
+    );
 
     expect(results).toHaveLength(2);
     expect(results[0].candidates?.[0].content?.parts?.[0].text).toBe('Hello');
     expect(results[1].candidates?.[0].content?.parts?.[0].text).toBe(' World');
+  });
+
+  it('should handle Web ReadableStream in generateContentStream', async () => {
+    const { server, mockRequest } = createTestServer();
+
+    // Create a mock Web ReadableStream
+    const mockWebStream = new ReadableStream({
+      start(controller) {
+        const mockResponseData = {
+          response: {
+            candidates: [{ content: { parts: [{ text: 'Hello Web' }] } }],
+          },
+        };
+        controller.enqueue(
+          new TextEncoder().encode(
+            'data: ' + JSON.stringify(mockResponseData) + '\n\n',
+          ),
+        );
+        controller.close();
+      },
+    });
+
+    mockRequest.mockResolvedValue({ data: mockWebStream });
+
+    const stream = await server.generateContentStream(
+      {
+        model: 'test-model',
+        contents: [{ role: 'user', parts: [{ text: 'request' }] }],
+      },
+      'user-prompt-id',
+      LlmRole.MAIN,
+    );
+
+    const results = [];
+    for await (const res of stream) {
+      results.push(res);
+    }
+
+    expect(results).toHaveLength(1);
+    expect(results[0].candidates?.[0].content?.parts?.[0].text).toBe(
+      'Hello Web',
+    );
   });
 
   it('should ignore malformed SSE data', async () => {

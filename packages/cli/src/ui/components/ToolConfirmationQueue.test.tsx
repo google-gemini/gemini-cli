@@ -161,7 +161,7 @@ describe('ToolConfirmationQueue', () => {
       </Box>,
       {
         config: mockConfig,
-        useAlternateBuffer: false,
+        useAlternateBuffer: true,
         uiState: {
           terminalWidth: 80,
           terminalHeight: 20,
@@ -173,10 +173,11 @@ describe('ToolConfirmationQueue', () => {
     await waitUntilReady();
 
     await waitFor(() =>
-      expect(lastFrame()).toContain('Press ctrl-o to show more lines'),
+      expect(lastFrame()?.toLowerCase()).toContain(
+        'press ctrl+o to show more lines',
+      ),
     );
     expect(lastFrame()).toMatchSnapshot();
-    expect(lastFrame()).toContain('Press ctrl-o to show more lines');
     unmount();
   });
 
@@ -254,7 +255,11 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const {
+      lastFrame,
+      waitUntilReady,
+      unmount = vi.fn(),
+    } = renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -324,7 +329,7 @@ describe('ToolConfirmationQueue', () => {
     await waitUntilReady();
 
     const output = lastFrame();
-    expect(output).not.toContain('Press ctrl-o to show more lines');
+    expect(output).not.toContain('Press CTRL-O to show more lines');
     expect(output).toMatchSnapshot();
     unmount();
   });
