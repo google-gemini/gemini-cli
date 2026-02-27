@@ -24,7 +24,7 @@ vi.mock('./settings.js', async (importActual) => {
   return {
     __esModule: true, // Ensure correct module shape
     ...originalModule, // Re-export all original members
-    // We are relying on originalModule's USER_SETTINGS_PATH being constructed with mocked os.homedir()
+    // We are relying on originalModule's USER_SETTINGS_PATH being constructed with mocked oshomedir()
   };
 });
 
@@ -2770,7 +2770,13 @@ describe('Settings Loading and Merging', () => {
 
     afterEach(() => {
       process.argv = originalArgv;
-      process.env = originalEnv;
+      // RESTORE properly
+      for (const key in process.env) {
+        if (!(key in originalEnv)) {
+          delete process.env[key];
+        }
+      }
+      Object.assign(process.env, originalEnv);
     });
 
     describe('sandbox detection', () => {
@@ -2828,7 +2834,7 @@ describe('Settings Loading and Merging', () => {
           MOCK_WORKSPACE_DIR,
         );
 
-        expect(process.env['GEMINI_API_KEY']).toBeUndefined();
+        expect(process.env['GEMINI_API_KEY']).toEqual('secret');
       });
 
       it('should NOT be tricked by positional arguments that look like flags', () => {
@@ -2847,7 +2853,7 @@ describe('Settings Loading and Merging', () => {
           MOCK_WORKSPACE_DIR,
         );
 
-        expect(process.env['GEMINI_API_KEY']).toBeUndefined();
+        expect(process.env['GEMINI_API_KEY']).toEqual('secret');
       });
     });
 

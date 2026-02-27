@@ -18,12 +18,12 @@ vi.mock('../utils/terminalSetup.js', () => ({
 }));
 
 describe('<AppHeader />', () => {
-  it('should render the hideBanner with default text', async () => {
+  it('should render the banner with default text', async () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
       bannerData: {
-        defaultText: 'This is the default hideBanner',
+        defaultText: 'This is the default banner',
         warningText: '',
       },
       bannerVisible: true,
@@ -38,17 +38,17 @@ describe('<AppHeader />', () => {
     );
     await waitUntilReady();
 
-    expect(lastFrame()).toContain('This is the default hideBanner');
+    expect(lastFrame()).toContain('This is the default banner');
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('should render the hideBanner with warning text', async () => {
+  it('should render the banner with warning text', async () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
       bannerData: {
-        defaultText: 'This is the default hideBanner',
+        defaultText: 'This is the default banner',
         warningText: 'There are capacity issues',
       },
       bannerVisible: true,
@@ -68,7 +68,7 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should not render the hideBanner when no flags are set', async () => {
+  it('should not render the banner when no flags are set', async () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
@@ -92,12 +92,12 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should not render the default hideBanner if shown count is 5 or more', async () => {
+  it('should not render the default banner if shown count is 5 or more', async () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
       bannerData: {
-        defaultText: 'This is the default hideBanner',
+        defaultText: 'This is the default banner',
         warningText: '',
       },
     };
@@ -120,24 +120,24 @@ describe('<AppHeader />', () => {
     );
     await waitUntilReady();
 
-    expect(lastFrame()).not.toContain('This is the default hideBanner');
+    expect(lastFrame()).not.toContain('This is the default banner');
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 
-  it('should increment the version count when default hideBanner is displayed', async () => {
+  it('should increment the version count when default banner is displayed', async () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
       bannerData: {
-        defaultText: 'This is the default hideBanner',
+        defaultText: 'This is the default banner',
         warningText: '',
       },
     };
 
-    // Set hideTipsShown to 10 or more to prevent Tips from incrementing its count
+    // Set tipsShown to 10 or more to prevent Tips from incrementing its count
     // and interfering with the expected persistentState.set call.
-    persistentStateMock.setData({ hideTipsShown: 10 });
+    persistentStateMock.setData({ tipsShown: 10 });
 
     const { waitUntilReady, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
@@ -160,7 +160,7 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should render hideBanner text with unescaped newlines', async () => {
+  it('should render banner text with unescaped newlines', async () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
@@ -184,7 +184,7 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should render Tips when hideTipsShown is less than 10', async () => {
+  it('should render Tips when tipsShown is less than 10', async () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
       history: [],
@@ -195,7 +195,7 @@ describe('<AppHeader />', () => {
       bannerVisible: true,
     };
 
-    persistentStateMock.setData({ hideTipsShown: 5 });
+    persistentStateMock.setData({ tipsShown: 5 });
 
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
@@ -207,14 +207,14 @@ describe('<AppHeader />', () => {
     await waitUntilReady();
 
     expect(lastFrame()).toContain('Tips');
-    expect(persistentStateMock.set).toHaveBeenCalledWith('hideTipsShown', 6);
+    expect(persistentStateMock.set).toHaveBeenCalledWith('tipsShown', 6);
     unmount();
   });
 
-  it('should NOT render Tips when hideTipsShown is 10 or more', async () => {
+  it('should NOT render Tips when tipsShown is 10 or more', async () => {
     const mockConfig = makeFakeConfig();
 
-    persistentStateMock.setData({ hideTipsShown: 10 });
+    persistentStateMock.setData({ tipsShown: 10 });
 
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <AppHeader version="1.0.0" />,
@@ -228,8 +228,8 @@ describe('<AppHeader />', () => {
     unmount();
   });
 
-  it('should show hideTips until they have been shown 10 times (persistence flow)', async () => {
-    persistentStateMock.setData({ hideTipsShown: 9 });
+  it('should show tips until they have been shown 10 times (persistence flow)', async () => {
+    persistentStateMock.setData({ tipsShown: 9 });
 
     const mockConfig = makeFakeConfig();
     const uiState = {
@@ -249,7 +249,7 @@ describe('<AppHeader />', () => {
     await session1.waitUntilReady();
 
     expect(session1.lastFrame()).toContain('Tips');
-    expect(persistentStateMock.get('hideTipsShown')).toBe(10);
+    expect(persistentStateMock.get('tipsShown')).toBe(10);
     session1.unmount();
 
     // Second session - state is persisted in the fake

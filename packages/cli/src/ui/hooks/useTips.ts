@@ -12,17 +12,15 @@ interface UseTipsResult {
 }
 
 export function useTips(): UseTipsResult {
-  const [hideTipsCount] = useState(
-    () => persistentState.get('hideTipsShown') ?? 0,
-  );
+  const [tipsCount] = useState(() => persistentState.get('tipsShown') ?? 0);
 
-  const showTips = hideTipsCount < 10;
+  const showTips = tipsCount < 10;
 
   useEffect(() => {
     if (showTips) {
-      persistentState.set('hideTipsShown', hideTipsCount + 1);
+      persistentState.set('tipsShown', tipsCount + 1);
     }
-  }, [hideTipsCount, showTips]);
+  }, [tipsCount, showTips]);
 
   return { showTips };
 }

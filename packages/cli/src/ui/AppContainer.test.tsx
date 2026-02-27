@@ -93,7 +93,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 import { mergeSettings, type LoadedSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
-import { StreamingState } from './types.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import {
   UIActionsContext,
@@ -215,7 +214,7 @@ import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useSuspend } from './hooks/useSuspend.js';
-import { ExtensionManager } from '../config/extension-manager.js';
+import type { ExtensionManager } from '../config/extension-manager.js';
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
@@ -1573,7 +1572,9 @@ describe('AppContainer State Management', () => {
         call[0].includes('\x1b]0;'),
       );
 
-      expect(titleWrites.filter(c => c[0].includes('\x1b]0;'))).toHaveLength(0);
+      expect(titleWrites.filter((c) => c[0].includes('\x1b]0;'))).toHaveLength(
+        0,
+      );
       unmount!();
     });
 

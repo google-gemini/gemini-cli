@@ -1956,32 +1956,6 @@ const SETTINGS_SCHEMA = {
     },
   },
 
-  agents: {
-    type: 'object',
-    label: 'Agents',
-    category: 'Advanced',
-    requiresRestart: true,
-    default: {},
-    description: 'Settings for subagents.',
-    showInDialog: false,
-    properties: {
-      overrides: {
-        type: 'object',
-        label: 'Agent Overrides',
-        category: 'Advanced',
-        requiresRestart: true,
-        default: {} as Record<string, AgentOverride>,
-        description:
-          'Override settings for specific agents, e.g. to disable the agent, set a custom model config, or run config.',
-        showInDialog: false,
-        additionalProperties: {
-          type: 'object',
-          ref: 'AgentOverride',
-        },
-      },
-    },
-  },
-
   skills: {
     type: 'object',
     label: 'Skills',
@@ -2344,7 +2318,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
         description: 'Environment variables to set for the server process.',
         additionalProperties: { type: 'string' },
       },
-      hideCWD: {
+      cwd: {
         type: 'string',
         description: 'Working directory for the server process.',
       },

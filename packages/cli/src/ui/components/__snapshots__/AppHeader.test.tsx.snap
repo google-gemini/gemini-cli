@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`<AppHeader /> > should not render the default hideBanner if shown count is 5 or more 1`] = `
+exports[`<AppHeader /> > should not render the banner when no flags are set 1`] = `
 "
  ███         █████████ 
 ░░░███      ███░░░░░███
@@ -19,7 +19,7 @@ Tips for getting started:
 "
 `;
 
-exports[`<AppHeader /> > should not render the hideBanner when no flags are set 1`] = `
+exports[`<AppHeader /> > should not render the default banner if shown count is 5 or more 1`] = `
 "
  ███         █████████ 
 ░░░███      ███░░░░░███
@@ -38,7 +38,7 @@ Tips for getting started:
 "
 `;
 
-exports[`<AppHeader /> > should render the hideBanner with default text 1`] = `
+exports[`<AppHeader /> > should render the banner with default text 1`] = `
 "
  ███         █████████ 
 ░░░███      ███░░░░░███
@@ -50,7 +50,7 @@ exports[`<AppHeader /> > should render the hideBanner with default text 1`] = `
 ░░░         ░░░░░░░░░  
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ This is the default hideBanner                                                                   │
+│ This is the default banner                                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
@@ -60,7 +60,7 @@ Tips for getting started:
 "
 `;
 
-exports[`<AppHeader /> > should render the hideBanner with warning text 1`] = `
+exports[`<AppHeader /> > should render the banner with warning text 1`] = `
 "
  ███         █████████ 
 ░░░███      ███░░░░░███
