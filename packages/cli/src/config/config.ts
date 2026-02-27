@@ -49,6 +49,7 @@ import {
   type MergedSettings,
   saveModelChange,
   loadSettings,
+  mergeSettings,
 } from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -442,7 +443,7 @@ export interface LoadCliConfigOptions {
 }
 
 export async function loadCliConfig(
-  settings: MergedSettings,
+  settingsWithoutExtensions: MergedSettings,
   sessionId: string,
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
@@ -456,18 +457,20 @@ export async function loadCliConfig(
     process.env['GEMINI_SANDBOX'] = 'true';
   }
 
-  const memoryImportFormat = settings.context?.importFormat || 'tree';
-  const includeDirectoryTree = settings.context?.includeDirectoryTree ?? true;
+  const memoryImportFormat =
+    settingsWithoutExtensions.context?.importFormat || 'tree';
+  const includeDirectoryTree =
+    settingsWithoutExtensions.context?.includeDirectoryTree ?? true;
 
-  const ideMode = settings.ide?.enabled ?? false;
+  const ideMode = settingsWithoutExtensions.ide?.enabled ?? false;
 
   const folderTrust =
     process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true' ||
     process.env['VITEST'] === 'true'
       ? false
-      : (settings.security?.folderTrust?.enabled ?? false);
+      : (settingsWithoutExtensions.security?.folderTrust?.enabled ?? false);
   const trustedFolder =
-    isWorkspaceTrusted(settings, cwd, undefined, {
+    isWorkspaceTrusted(settingsWithoutExtensions, cwd, undefined, {
       prompt: argv.prompt,
       query: argv.query,
     })?.isTrusted ?? false;
@@ -476,8 +479,8 @@ export async function loadCliConfig(
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
   // directly to the Config constructor in core, and have core handle setGeminiMdFilename.
   // However, loadHierarchicalGeminiMemory is called *before* createServerConfig.
-  if (settings.context?.fileName) {
-    setServerGeminiMdFilename(settings.context.fileName);
+  if (settingsWithoutExtensions.context?.fileName) {
+    setServerGeminiMdFilename(settingsWithoutExtensions.context.fileName);
   } else {
     // Reset to default if not provided in settings.
     setServerGeminiMdFilename(getCurrentGeminiMdFilename());
@@ -487,20 +490,22 @@ export async function loadCliConfig(
 
   const memoryFileFiltering = {
     ...DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
-    ...settings.context?.fileFiltering,
+    ...settingsWithoutExtensions.context?.fileFiltering,
   };
 
   const fileFiltering = {
     ...DEFAULT_FILE_FILTERING_OPTIONS,
-    ...settings.context?.fileFiltering,
+    ...settingsWithoutExtensions.context?.fileFiltering,
   };
 
-  const includeDirectories = (settings.context?.includeDirectories || [])
+  const includeDirectories = (
+    settingsWithoutExtensions.context?.includeDirectories || []
+  )
     .map(resolvePath)
     .concat((argv.includeDirectories || []).map(resolvePath));
 
   const extensionManager = new ExtensionManager({
-    settings,
+    settings: settingsWithoutExtensions,
     requestConsent: requestConsentNonInteractive,
     requestSetting: promptForSetting,
     workspaceDir: cwd,
@@ -510,6 +515,24 @@ export async function loadCliConfig(
     clientVersion: await getVersion(),
   });
   await extensionManager.loadExtensions();
+
+  // Filter active extensions that define global settings contributions
+  const extensionContributions = extensionManager
+    .getExtensions()
+    .filter((e) => e.isActive && e.contributions)
+    .map((e) => e.contributions!);
+
+  // Re-merge settings with extension contributions included in the precedence chain.
+  // We use the provided 'settingsWithoutExtensions' as the primary layer to ensure
+  // that any overrides (from tests or previous merge passes) are respected.
+  const settings = mergeSettings(
+    {},
+    {},
+    settingsWithoutExtensions,
+    {},
+    true,
+    extensionContributions,
+  );
 
   const experimentalJitContext = settings.experimental?.jitContext ?? false;
 

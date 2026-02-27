@@ -19,6 +19,8 @@ import {
   debugLogger,
   ApprovalMode,
   type MCPServerConfig,
+  Storage,
+  type GeminiCLIExtension,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import {
@@ -3523,5 +3525,77 @@ describe('loadCliConfig mcpEnabled', () => {
     expect(config.getMcpServers()).toEqual({ serverA: { url: 'http://a' } });
     expect(config.getAllowedMcpServers()).toEqual(['serverA']);
     expect(config.getBlockedMcpServers()).toEqual(['serverB']);
+  });
+});
+
+describe('loadCliConfig extension contributions', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    // Mock getProjectIdentifier to avoid "Storage must be initialized before use" error
+    vi.spyOn(
+      Storage.prototype as unknown as { getProjectIdentifier: () => string },
+      'getProjectIdentifier',
+    ).mockReturnValue('test-project');
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should merge generic contributions from active extensions', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      experimental: { plan: true },
+    });
+    const argv = await parseArguments(settings);
+
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
+      {
+        name: 'ext-contribution',
+        isActive: true,
+        contributions: {
+          general: {
+            plan: { directory: 'ext-plans-dir' },
+          },
+          ui: { theme: 'ext-theme' },
+        },
+      } as unknown as GeminiCLIExtension,
+    ]);
+
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    // Check that extension contributions were merged
+    expect(config.storage.getPlansDir()).toContain('ext-plans-dir');
+    // Since we don't have a getter for theme in Config, we can't easily check it here
+    // but the successful load of plan directory confirms the generic merge worked.
+  });
+
+  it('should ignore contributions from inactive extensions', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      experimental: { plan: true },
+    });
+    const argv = await parseArguments(settings);
+
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
+      {
+        name: 'ext-inactive',
+        isActive: false,
+        contributions: {
+          general: {
+            plan: { directory: 'ext-plans-dir' },
+          },
+        },
+      } as unknown as GeminiCLIExtension,
+    ]);
+
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.storage.getPlansDir()).not.toContain('ext-plans-dir');
   });
 });

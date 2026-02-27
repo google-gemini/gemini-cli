@@ -305,6 +305,19 @@ export interface BrowserAgentCustomConfig {
   visualModel?: string;
 }
 
+export interface ExtensionContributions {
+  general?: Record<string, unknown>;
+  ui?: Record<string, unknown>;
+  context?: Record<string, unknown>;
+  tools?: Record<string, unknown>;
+  model?: Record<string, unknown>;
+  modelConfigs?: Record<string, unknown>;
+  agents?: Record<string, unknown>;
+  skills?: Record<string, unknown>;
+  hooks?: Record<string, unknown>;
+  hooksConfig?: Record<string, unknown>;
+}
+
 /**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
@@ -322,6 +335,7 @@ export interface GeminiCLIExtension {
   excludeTools?: string[];
   id: string;
   hooks?: { [K in HookEventName]?: HookDefinition[] };
+  contributions?: ExtensionContributions;
   settings?: ExtensionSetting[];
   resolvedSettings?: ResolvedExtensionSetting[];
   skills?: SkillDefinition[];
