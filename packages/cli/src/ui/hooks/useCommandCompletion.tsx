@@ -22,6 +22,18 @@ import {
 import type { Config } from '@google/gemini-cli-core';
 import { useCompletion } from './useCompletion.js';
 
+function getCommonPrefix(words: string[]): string {
+  if (!words || words.length === 0) return '';
+  let prefix = words[0];
+  for (let i = 1; i < words.length; i++) {
+    while (!words[i].startsWith(prefix)) {
+      prefix = prefix.substring(0, prefix.length - 1);
+      if (!prefix) return '';
+    }
+  }
+  return prefix;
+}
+
 export enum CompletionMode {
   IDLE = 'IDLE',
   AT = 'AT',
@@ -231,9 +243,65 @@ export function useCommandCompletion({
       ? shellCompletionRange.query
       : memoQuery;
 
-  const promptCompletion = usePromptCompletion({
+  const basePromptCompletion = usePromptCompletion({
     buffer,
   });
+
+  const promptCompletion = useMemo(() => {
+    if (
+      completionMode === CompletionMode.SHELL &&
+      suggestions.length > 0 &&
+      query != null
+    ) {
+      const commonPrefix = getCommonPrefix(suggestions.map((s) => s.value));
+      if (commonPrefix && commonPrefix.length > query.length) {
+        const currentLine = buffer.lines[cursorRow] || '';
+        const start = shellCompletionRange.completionStart;
+        const end = shellCompletionRange.completionEnd;
+
+        let textToInsert = commonPrefix;
+        if (suggestions.length === 1) {
+          const charAfterCompletion = currentLine[end];
+          if (
+            charAfterCompletion !== ' ' &&
+            !textToInsert.endsWith('/') &&
+            !textToInsert.endsWith('\\')
+          ) {
+            textToInsert += ' ';
+          }
+        }
+
+        const newText =
+          currentLine.substring(0, start) +
+          textToInsert +
+          currentLine.substring(end);
+
+        return {
+          text: newText,
+          isActive: true,
+          isLoading: false,
+          accept: () => {
+            buffer.replaceRangeByOffset(
+              logicalPosToOffset(buffer.lines, cursorRow, start),
+              logicalPosToOffset(buffer.lines, cursorRow, end),
+              textToInsert,
+            );
+          },
+          clear: () => {},
+          markSelected: () => {},
+        };
+      }
+    }
+    return basePromptCompletion;
+  }, [
+    completionMode,
+    suggestions,
+    query,
+    basePromptCompletion,
+    buffer,
+    cursorRow,
+    shellCompletionRange,
+  ]);
 
   useEffect(() => {
     setActiveSuggestionIndex(suggestions.length > 0 ? 0 : -1);
