@@ -14,6 +14,7 @@ import {
   GOOGLE_ACCOUNTS_FILENAME,
   isSubpath,
   resolveToRealPath,
+  normalizePath,
 } from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
@@ -140,6 +141,17 @@ export class Storage {
 
   getGeminiDir(): string {
     return path.join(this.targetDir, GEMINI_DIR);
+  }
+
+  /**
+   * Checks if the current workspace storage location is the same as the global/user storage location.
+   * This handles symlinks and platform-specific path normalization.
+   */
+  isWorkspaceHomeDir(): boolean {
+    return (
+      normalizePath(resolveToRealPath(this.targetDir)) ===
+      normalizePath(resolveToRealPath(homedir()))
+    );
   }
 
   getAgentsDir(): string {
@@ -275,6 +287,10 @@ export class Storage {
       return path.join(this.getProjectTempDir(), this.sessionId, 'plans');
     }
     return path.join(this.getProjectTempDir(), 'plans');
+  }
+
+  getProjectTempTrackerDir(): string {
+    return path.join(this.getProjectTempDir(), 'tracker');
   }
 
   getPlansDir(): string {

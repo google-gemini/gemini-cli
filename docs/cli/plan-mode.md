@@ -27,6 +27,7 @@ implementation. It allows you to:
     - [Example: Allow git commands in Plan Mode](#example-allow-git-commands-in-plan-mode)
     - [Example: Enable research subagents in Plan Mode](#example-enable-research-subagents-in-plan-mode)
   - [Custom Plan Directory and Policies](#custom-plan-directory-and-policies)
+- [Automatic Model Routing](#automatic-model-routing)
 
 ## Enabling Plan Mode
 
@@ -79,18 +80,37 @@ manually during a session.
 
 ### Planning Workflow
 
+Plan Mode uses an adaptive planning workflow where the research depth, plan
+structure, and consultation level are proportional to the task's complexity:
+
 1.  **Explore & Analyze:** Analyze requirements and use read-only tools to map
-    the codebase and validate assumptions. For complex tasks, identify at least
-    two viable implementation approaches.
-2.  **Consult:** Present a summary of the identified approaches via [`ask_user`]
-    to obtain a selection. For simple or canonical tasks, this step may be
-    skipped.
-3.  **Draft:** Once an approach is selected, write a detailed implementation
-    plan to the plans directory.
+    affected modules and identify dependencies.
+2.  **Consult:** The depth of consultation is proportional to the task's
+    complexity:
+    - **Simple Tasks:** Proceed directly to drafting.
+    - **Standard Tasks:** Present a summary of viable approaches via
+      [`ask_user`] for selection.
+    - **Complex Tasks:** Present detailed trade-offs for at least two viable
+      approaches via [`ask_user`] and obtain approval before drafting.
+3.  **Draft:** Write a detailed implementation plan to the
+    [plans directory](#custom-plan-directory-and-policies). The plan's structure
+    adapts to the task:
+    - **Simple Tasks:** Focused on specific **Changes** and **Verification**
+      steps.
+    - **Standard Tasks:** Includes an **Objective**, **Key Files & Context**,
+      **Implementation Steps**, and **Verification & Testing**.
+    - **Complex Tasks:** Comprehensive plans including **Background &
+      Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives
+      Considered**, a phased **Implementation Plan**, **Verification**, and
+      **Migration & Rollback** strategies.
 4.  **Review & Approval:** Use the [`exit_plan_mode`] tool to present the plan
     and formally request approval.
     - **Approve:** Exit Plan Mode and start implementation.
     - **Iterate:** Provide feedback to refine the plan.
+    - **Refine manually:** Press **Ctrl + X** to open the plan file in your
+      [preferred external editor]. This allows you to manually refine the plan
+      steps before approval. The CLI will automatically refresh and show the
+      updated plan after you save and close the editor.
 
 For more complex or specialized planning tasks, you can
 [customize the planning workflow with skills](#customizing-planning-with-skills).
@@ -118,6 +138,7 @@ These are the only allowed tools:
 - **Planning (Write):** [`write_file`] and [`replace`] only allowed for `.md`
   files in the `~/.gemini/tmp/<project>/<session-id>/plans/` directory or your
   [custom plans directory](#custom-plan-directory-and-policies).
+- **Memory:** [`save_memory`]
 - **Skills:** [`activate_skill`] (allows loading specialized instructions and
   resources in a read-only manner)
 
@@ -143,13 +164,27 @@ based on the task description.
 
 ### Customizing Policies
 
-Plan Mode is designed to be read-only by default to ensure safety during the
-research phase. However, you may occasionally need to allow specific tools to
-assist in your planning.
+Plan Mode's default tool restrictions are managed by the [policy engine] and
+defined in the built-in [`plan.toml`] file. The built-in policy (Tier 1)
+enforces the read-only state, but you can customize these rules by creating your
+own policies in your `~/.gemini/policies/` directory (Tier 2).
 
-Because user policies (Tier 2) have a higher base priority than built-in
-policies (Tier 1), you can override Plan Mode's default restrictions by creating
-a rule in your `~/.gemini/policies/` directory.
+#### Example: Automatically approve read-only MCP tools
+
+By default, read-only MCP tools require user confirmation in Plan Mode. You can
+use `toolAnnotations` and the `mcpName` wildcard to customize this behavior for
+your specific environment.
+
+`~/.gemini/policies/mcp-read-only.toml`
+
+```toml
+[[rule]]
+mcpName = "*"
+toolAnnotations = { readOnlyHint = true }
+decision = "allow"
+priority = 100
+modes = ["plan"]
+```
 
 #### Example: Allow git commands in Plan Mode
 
@@ -225,7 +260,33 @@ priority = 100
 modes = ["plan"]
 # Adjust the pattern to match your custom directory.
 # This example matches any .md file in a .gemini/plans directory within the project.
-argsPattern = "\"file_path\":\"[^\"]*/\\.gemini/plans/[a-zA-Z0-9_-]+\\.md\""
+argsPattern = "\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\""
+```
+
+## Automatic Model Routing
+
+When using an [**auto model**], Gemini CLI automatically optimizes [**model
+routing**] based on the current phase of your task:
+
+1.  **Planning Phase:** While in Plan Mode, the CLI routes requests to a
+    high-reasoning **Pro** model to ensure robust architectural decisions and
+    high-quality plans.
+2.  **Implementation Phase:** Once a plan is approved and you exit Plan Mode,
+    the CLI detects the existence of the approved plan and automatically
+    switches to a high-speed **Flash** model. This provides a faster, more
+    responsive experience during the implementation of the plan.
+
+This behavior is enabled by default to provide the best balance of quality and
+performance. You can disable this automatic switching in your settings:
+
+```json
+{
+  "general": {
+    "plan": {
+      "modelRouting": false
+    }
+  }
+}
 ```
 
 [`list_directory`]: /docs/tools/file-system.md#1-list_directory-readfolder
@@ -236,6 +297,7 @@ argsPattern = "\"file_path\":\"[^\"]*/\\.gemini/plans/[a-zA-Z0-9_-]+\\.md\""
 [`google_web_search`]: /docs/tools/web-search.md
 [`replace`]: /docs/tools/file-system.md#6-replace-edit
 [MCP tools]: /docs/tools/mcp-server.md
+[`save_memory`]: /docs/tools/memory.md
 [`activate_skill`]: /docs/cli/skills.md
 [subagents]: /docs/core/subagents.md
 [policy engine]: /docs/reference/policy-engine.md
@@ -243,3 +305,8 @@ argsPattern = "\"file_path\":\"[^\"]*/\\.gemini/plans/[a-zA-Z0-9_-]+\\.md\""
 [`exit_plan_mode`]: /docs/tools/planning.md#2-exit_plan_mode-exitplanmode
 [`ask_user`]: /docs/tools/ask-user.md
 [YOLO mode]: /docs/reference/configuration.md#command-line-arguments
+[`plan.toml`]:
+  https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/policy/policies/plan.toml
+[auto model]: /docs/reference/configuration.md#model-settings
+[model routing]: /docs/cli/telemetry.md#model-routing
+[preferred external editor]: /docs/reference/configuration.md#general
