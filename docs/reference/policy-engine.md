@@ -70,6 +70,25 @@ The `toolName` in the rule must match the name of the tool being called.
   - `*__toolName`: Matches a specific tool name across **all** MCP servers.
   - `*__*`: Matches **any tool from any MCP server**.
 
+- **Activate Skill** (`activate_skill`)
+- **Ask User** (`ask_user`)
+- **Codebase Investigator Agent** (`codebase_investigator`)
+- **Edit** (`replace`)
+- **Enter Plan Mode** (`enter_plan_mode`)
+- **Exit Plan Mode** (`exit_plan_mode`)
+- **FindFiles** (`glob`)
+- **Get Internal Docs** (`get_internal_docs`)
+- **Google Search** (`google_web_search`)
+- **List Directory** (`list_directory`)
+- **Read Many Files** (`read_many_files`)
+- **ReadFile** (`read_file`)
+- **Run Shell Command** (`run_shell_command`)
+- **Save Memory** (`save_memory`)
+- **Search Text** (`grep_search`)
+- **Web Fetch** (`web_fetch`)
+- **WriteFile** (`write_file`)
+- **Write Todos** (`write_todos`)
+
 #### Arguments pattern
 
 If `argsPattern` is specified, the tool's arguments are converted to a stable
