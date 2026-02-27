@@ -83,7 +83,7 @@ priority = 999
 
     // The actual command result should not appear in the output.
     expect(result).not.toContain('policy-test-passed');
-  }, 30000);
+  }, 15000);
 
   it('should treat global ask_user decisions as DENY in headless mode', async () => {
     // 1. Setup the rig with fake responses
@@ -144,5 +144,5 @@ priority = 999
 
     // The actual command result should not appear in the output.
     expect(result).not.toContain('global-test-passed');
-  }, 30000);
+  }, 15000);
 });
