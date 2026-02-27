@@ -9,8 +9,8 @@ import type { Suggestion } from '../components/SuggestionsDisplay.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { logicalPosToOffset } from '../components/shared/text-buffer.js';
-import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
+import { isSlashCommand } from '../utils/commandUtils.js';
 import { useAtCompletion } from './useAtCompletion.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
 import { useShellCompletion } from './useShellCompletion.js';
@@ -37,7 +37,7 @@ export interface UseCommandCompletionReturn {
   showSuggestions: boolean;
   isLoadingSuggestions: boolean;
   isPerfectMatch: boolean;
-  setActiveSuggestionIndex: React.Dispatch<React.SetStateAction<number>>;
+  setActiveSuggestionIndex: (index: number) => void;
   resetCompletionState: () => void;
   navigateUp: () => void;
   navigateDown: () => void;
