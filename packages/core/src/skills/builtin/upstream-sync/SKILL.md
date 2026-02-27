@@ -9,13 +9,37 @@ You are helping an enterprise team synchronize their Gemini CLI fork with the up
 
 ## Pre-flight Checklist
 
-Before starting, confirm all of the following:
+Run the automated preflight script — it validates all preconditions and exits
+non-zero if anything must be fixed before merging:
 
-- [ ] `upstream` remote is configured: `git remote -v` should show `upstream https://github.com/google-gemini/gemini-cli.git`
-- [ ] Working tree is clean: `git status` shows no uncommitted changes
-- [ ] All existing tests pass on the current fork: `npm run test`
-- [ ] A backup tag or branch exists: `git tag backup/before-upstream-sync-$(date +%Y%m%d)`
-- [ ] The team knows which fork customizations are intentional (run `assess_fork_need.cjs` from the `enterprise-fork-advisor` skill if not done yet)
+```bash
+node preflight_check.cjs
+```
+
+The script checks:
+
+| # | Check | Auto-fix hint |
+|---|-------|---------------|
+| 1 | `upstream` remote exists | `git remote add upstream https://github.com/google-gemini/gemini-cli.git` |
+| 2 | Upstream remote is reachable | Check network / VPN |
+| 3 | Working tree is clean | `git stash` or commit WIP |
+| 4 | No risky untracked files | `git add -N` or `.gitignore` them |
+| 5 | Not on a protected branch (`main`/`master`) | `git checkout -b sync/upstream-YYYYMMDD` |
+| 6 | Backup tag exists | `git tag backup/before-upstream-sync-YYYYMMDD` |
+| 7 | Commits-behind count (warn >20, fail >100) | Cherry-pick critical fixes if too far behind |
+| 8 | No merge/rebase/cherry-pick already in progress | `git merge --abort` / `git rebase --abort` |
+| 9 | `node_modules` present | `npm install` |
+| 10 | Upstream branch exists on remote | `git remote show upstream` |
+
+Exit 0 = all clear. Exit 1 = fix failures before proceeding.
+
+If you prefer a manual checklist instead:
+
+- [ ] `upstream` remote configured (`git remote -v`)
+- [ ] Working tree clean (`git status`)
+- [ ] Backup tag created (`git tag backup/before-upstream-sync-$(date +%Y%m%d)`)
+- [ ] On a sync branch, not `main`
+- [ ] Fork customizations documented (run `assess_fork_need.cjs` if not done)
 
 ## Step 1 — Analyze Upstream Changes
 
