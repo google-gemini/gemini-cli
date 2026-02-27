@@ -114,10 +114,10 @@ import {
   type SafetyCheckerRule,
 } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
-import type {
+import {
   UserTierId,
-  RetrieveUserQuotaResponse,
-  AdminControlsSettings,
+  type RetrieveUserQuotaResponse,
+  type AdminControlsSettings,
 } from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
@@ -2429,6 +2429,12 @@ export class Config {
     ) {
       return true;
     }
+
+    const codeAssistServer = getCodeAssistServer(this);
+    if (codeAssistServer?.userTier === UserTierId.STANDARD) {
+      return true;
+    }
+
     return (
       this.experiments?.flags[ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]
         ?.boolValue ?? false

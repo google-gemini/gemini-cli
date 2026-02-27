@@ -1,3 +1,4 @@
+
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -2676,6 +2677,80 @@ describe('Config Quota & Preview Model Access', () => {
       expect(config.getUserTierName()).toBe(mockTierName);
     });
   });
+
+  describe('getGemini31LaunchedSync', () => {
+  it('should return true if authType is USE_GEMINI', () => {
+    Object.defineProperty(config, 'contentGeneratorConfig', {
+      value: { authType: AuthType.USE_GEMINI },
+      writable: true,
+      configurable: true,
+    });
+
+    expect(config.getGemini31LaunchedSync()).toBe(true);
+    });
+
+   it('should return true if userTier is STANDARD', () => {
+    Object.defineProperty(config, 'contentGeneratorConfig', {
+      value: { authType: AuthType.LOGIN_WITH_GOOGLE },
+      writable: true,
+      configurable: true,
+    });
+
+    vi.mocked(getCodeAssistServer).mockReturnValue({
+      userTier: UserTierId.STANDARD,
+    } as Partial<CodeAssistServer> as CodeAssistServer);
+
+    expect(config.getGemini31LaunchedSync()).toBe(true);
+  });
+
+  it('should return true if experiment flag is true', () => {
+    Object.defineProperty(config, 'contentGeneratorConfig', {
+      value: { authType: AuthType.LOGIN_WITH_GOOGLE },
+      writable: true,
+      configurable: true,
+    });
+
+    vi.mocked(getCodeAssistServer).mockReturnValue({
+      userTier: UserTierId.FREE,
+    } as Partial<CodeAssistServer> as CodeAssistServer);
+
+    Object.defineProperty(config, 'experiments', {
+      value: {
+        flags: {
+          [ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]: { boolValue: true },
+        },
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    expect(config.getGemini31LaunchedSync()).toBe(true);
+  });
+
+  it('should return false if authType is Google, userTier is FREE, and flag is false', () => {
+    Object.defineProperty(config, 'contentGeneratorConfig', {
+      value: { authType: AuthType.LOGIN_WITH_GOOGLE },
+      writable: true,
+      configurable: true,
+    });
+
+    vi.mocked(getCodeAssistServer).mockReturnValue({
+      userTier: UserTierId.FREE,
+    } as Partial<CodeAssistServer> as CodeAssistServer);
+
+    Object.defineProperty(config, 'experiments', {
+      value: {
+        flags: {
+          [ExperimentFlags.GEMINI_3_1_PRO_LAUNCHED]: { boolValue: false },
+        },
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    expect(config.getGemini31LaunchedSync()).toBe(false);
+  });
+});
 
   describe('isPlanEnabled', () => {
     it('should return false by default', () => {
