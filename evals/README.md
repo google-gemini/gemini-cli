@@ -46,17 +46,19 @@ two arguments:
 
 #### Policies
 
-Policies control how strictly a test is validated. Tests should generally use
-the ALWAYS_PASSES policy to offer the strictest guarantees.
-
-USUALLY_PASSES exists to enable assertion of less consistent or aspirational
-behaviors.
+Policies control how strictly a test is validated.
 
 - `ALWAYS_PASSES`: Tests expected to pass 100% of the time. These are typically
-  trivial and test basic functionality. These run in every CI.
+  trivial and test basic functionality. These run in every CI and can block PRs
+  on failure.
 - `USUALLY_PASSES`: Tests expected to pass most of the time but may have some
   flakiness due to non-deterministic behaviors. These are run nightly and used
   to track the health of the product from build to build.
+
+**All new behavioral evaluations must be created with the `USUALLY_PASSES`
+policy.** A subset that prove to be highly stable over time may be promoted to
+`ALWAYS_PASSES`. For more information, see
+[Test promotion process](#test-promotion-process).
 
 #### `EvalCase` Properties
 
@@ -76,7 +78,8 @@ import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 
 describe('my_feature', () => {
-  evalTest('ALWAYS_PASSES', {
+  // New tests MUST start as USUALLY_PASSES and be promoted via /promote-behavioral-eval
+  evalTest('USUALLY_PASSES', {
     name: 'should do something',
     prompt: 'do it',
     assert: async (rig, result) => {
@@ -114,6 +117,39 @@ npm run test:all_evals
 This command sets the `RUN_EVALS` environment variable to `1`, which enables the
 `USUALLY_PASSES` tests.
 
+## Ensuring Eval is Stable Prior to Check-in
+
+The
+[Evals: Nightly](https://github.com/google-gemini/gemini-cli/actions/workflows/evals-nightly.yml)
+run is considered to be the source of truth for the quality of an eval test.
+Each run of it executes a test 3 times in a row, for each supported model. The
+result is then scored 0%, 33%, 66%, or 100% respectively, to indicate how many
+of the individual executions passed.
+
+Googlers can schedule a manual run against their branch by clicking the link
+above.
+
+Tests should score at least 66% with key models including Gemini 3.1 pro, Gemini
+3.0 pro, and Gemini 3 flash prior to check in and they must pass 100% of the
+time before they are promoted.
+
+## Test promotion process
+
+To maintain a stable and reliable CI, all new behavioral evaluations follow a
+mandatory deflaking process.
+
+1. **Incubation**: You must create all new tests with the `USUALLY_PASSES`
+   policy. This lets them be monitored in the nightly runs without blocking PRs.
+2. **Monitoring**: The test must complete at least 10 nightly runs across all
+   supported models.
+3. **Promotion**: Promotion to `ALWAYS_PASSES` happens exclusively through the
+   `/promote-behavioral-eval` slash command. This command verifies the 100%
+   success rate requirement is met across many runs before updating the test
+   policy.
+
+This promotion process is essential for preventing the introduction of flaky
+evaluations into the CI.
+
 ## Reporting
 
 Results for evaluations are available on GitHub Actions:
@@ -135,7 +171,7 @@ aggregated into a **Nightly Summary** attached to the workflow run.
 
 - **Pass Rate (%)**: Each cell represents the percentage of successful runs for
   a specific test in that workflow instance.
-- **History**: The table shows the pass rates for the last 10 nightly runs,
+- **History**: The table shows the pass rates for the last 7 nightly runs,
   allowing you to identify if a model's behavior is trending towards
   instability.
 - **Total Pass Rate**: An aggregate metric of all evaluations run in that batch.
@@ -184,8 +220,35 @@ gemini /fix-behavioral-eval https://github.com/google-gemini/gemini-cli/actions/
 When investigating failures manually, you can also enable verbose agent logs by
 setting the `GEMINI_DEBUG_LOG_FILE` environment variable.
 
+### Best practices
+
 It's highly recommended to manually review and/or ask the agent to iterate on
 any prompt changes, even if they pass all evals. The prompt should prefer
 positive traits ('do X') and resort to negative traits ('do not do X') only when
 unable to accomplish the goal with positive traits. Gemini is quite good at
 instrospecting on its prompt when asked the right questions.
+
+## Promoting evaluations
+
+Evaluations must be promoted from `USUALLY_PASSES` to `ALWAYS_PASSES`
+exclusively using the `/promote-behavioral-eval` slash command. Manual promotion
+is not allowed to ensure that the 100% success rate requirement is empirically
+met.
+
+### `/promote-behavioral-eval`
+
+This command automates the promotion of stable tests by:
+
+1.  **Investigating**: Analyzing the results of the last 7 nightly runs on the
+    `main` branch using the `gh` CLI.
+2.  **Criteria Check**: Identifying tests that have passed 100% of the time for
+    ALL enabled models across the entire 7-run history.
+3.  **Promotion**: Updating the test file's policy from `USUALLY_PASSES` to
+    `ALWAYS_PASSES`.
+4.  **Verification**: Running the promoted test locally to ensure correctness.
+
+To run it:
+
+```bash
+gemini /promote-behavioral-eval
+```
