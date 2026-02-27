@@ -1,0 +1,28 @@
+# Example Policy Rules for Gemini CLI Extension
+#
+# Extensions run in Tier 2 (Extension Tier).
+# Security Note: 'allow' decisions and 'yolo' mode configurations are ignored.
+
+# Rule: Always ask the user before running a specific dangerous shell command.
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "rm -rf"
+decision = "ask_user"
+priority = 100
+
+# Rule: Deny access to sensitive files using the grep tool.
+[[rule]]
+toolName = "grep_search"
+argsPattern = "(\.env|id_rsa|passwd)"
+decision = "deny"
+priority = 200
+deny_message = "Access to sensitive credentials or system files is restricted by the policy-example extension."
+
+# Safety Checker: Apply path validation to all write operations.
+[[safety_checker]]
+toolName = ["write_file", "replace"]
+priority = 300
+[safety_checker.checker]
+type = "in-process"
+name = "allowed-path"
+required_context = ["environment"]
