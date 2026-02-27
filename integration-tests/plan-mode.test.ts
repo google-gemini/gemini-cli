@@ -126,10 +126,7 @@ describe('Plan Mode', () => {
         'I want to perform a complex refactoring. Please enter plan mode so we can design it first.',
     });
 
-    const enterPlanCallFound = await rig.waitForToolCall(
-      'enter_plan_mode',
-      10000,
-    );
+    const enterPlanCallFound = await rig.waitForToolCall('enter_plan_mode');
     expect(enterPlanCallFound, 'Expected enter_plan_mode to be called').toBe(
       true,
     );
