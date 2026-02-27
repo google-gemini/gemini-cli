@@ -17,6 +17,17 @@ import os from 'node:os';
 import { validatePlanPath } from '../utils/planUtils.js';
 import * as loggers from '../telemetry/loggers.js';
 
+let actualFs: typeof import('node:fs');
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    realpathSync: vi.fn(actual.realpathSync),
+    existsSync: vi.fn(actual.existsSync),
+  };
+});
+
 vi.mock('../telemetry/loggers.js', () => ({
   logPlanExecution: vi.fn(),
 }));
@@ -28,7 +39,8 @@ describe('ExitPlanModeTool', () => {
   let tempRootDir: string;
   let mockPlansDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
     vi.useFakeTimers();
     mockMessageBus = createMockMessageBus();
     vi.mocked(mockMessageBus.publish).mockResolvedValue(undefined);
@@ -62,8 +74,8 @@ describe('ExitPlanModeTool', () => {
   });
 
   afterEach(() => {
-    if (fs.existsSync(tempRootDir)) {
-      fs.rmSync(tempRootDir, { recursive: true, force: true });
+    if (actualFs.existsSync(tempRootDir)) {
+      actualFs.rmSync(tempRootDir, { recursive: true, force: true });
     }
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -427,21 +439,28 @@ Ask the user for specific feedback on how to improve the plan.`,
       expect(result).toContain('Plan file does not exist');
     });
 
-    it.runIf(os.platform() !== 'win32')(
-      'should reject symbolic links pointing outside the plans directory',
-      () => {
-        const outsideFile = path.resolve(tempRootDir, 'outside.txt');
-        fs.writeFileSync(outsideFile, 'secret');
-        // The top-level vi.mock handles the malicious path resolution
-        const result = tool.validateToolParams({
-          plan_path: 'plans/malicious.md',
-        });
+    it('should reject symbolic links pointing outside the plans directory', () => {
+      const outsideFile = path.resolve(tempRootDir, 'outside.txt');
+      fs.writeFileSync(outsideFile, 'secret');
+      const maliciousPath = path.join(mockPlansDir, 'malicious.md');
 
-        expect(result).toContain(
-          'Access denied: plan path must be within the designated plans directory',
-        );
-      },
-    );
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        if (p.toString() === maliciousPath) return true;
+        return actualFs.existsSync(p);
+      });
+      vi.mocked(fs.realpathSync).mockImplementation((p) => {
+        if (p.toString() === maliciousPath) return outsideFile;
+        return actualFs.realpathSync(p);
+      });
+
+      const result = tool.validateToolParams({
+        plan_path: 'plans/malicious.md',
+      });
+
+      expect(result).toContain(
+        'Access denied: plan path must be within the designated plans directory',
+      );
+    });
 
     it('should accept valid path within plans directory', () => {
       createPlanFile('valid.md', '# Content');
