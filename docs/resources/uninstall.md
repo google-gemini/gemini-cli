@@ -19,20 +19,11 @@ can find your npm cache path by running `npm config get cache`.
 rm -rf "$(npm config get cache)/_npx"
 ```
 
-**For Windows**
-
-_Command Prompt_
-
-```cmd
-:: The path is typically %LocalAppData%\npm-cache\_npx
-rmdir /s /q "%LocalAppData%\npm-cache\_npx"
-```
-
-_PowerShell_
+**For Windows (PowerShell)**
 
 ```powershell
 # The path is typically $env:LocalAppData\npm-cache\_npx
-Remove-Item -Path (Join-Path $env:LocalAppData "npm-cache\_npx") -Recurse -Force
+rmdir -Recurse -Force "$env:LocalAppData\npm-cache\_npx"
 ```
 
 ## Method 2: Using npm (global install)
