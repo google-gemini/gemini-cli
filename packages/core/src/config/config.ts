@@ -13,6 +13,7 @@ import type {
   ContentGenerator,
   ContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import type { OverageStrategy } from '../billing/billing.js';
 import {
   AuthType,
   createContentGenerator,
@@ -116,6 +117,7 @@ import {
 import { HookSystem } from '../hooks/index.js';
 import type {
   UserTierId,
+  GeminiUserTier,
   RetrieveUserQuotaResponse,
   AdminControlsSettings,
 } from '../code_assist/types.js';
@@ -365,6 +367,7 @@ import {
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
+import { type McpContext } from '../tools/mcp-client.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getErrorMessage } from '../utils/errors.js';
 import {
@@ -573,9 +576,12 @@ export interface ConfigParameters {
     agents?: AgentSettings;
   }>;
   enableConseca?: boolean;
+  billing?: {
+    overageStrategy?: OverageStrategy;
+  };
 }
 
-export class Config {
+export class Config implements McpContext {
   private toolRegistry!: ToolRegistry;
   private mcpClientManager?: McpClientManager;
   private allowedMcpServers: string[];
@@ -753,6 +759,10 @@ export class Config {
         agents?: AgentSettings;
       }>)
     | undefined;
+
+  private readonly billing: {
+    overageStrategy: OverageStrategy;
+  };
 
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
@@ -1000,6 +1010,10 @@ export class Config {
     this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
     this.onReload = params.onReload;
+
+    this.billing = {
+      overageStrategy: params.billing?.overageStrategy ?? 'ask',
+    };
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -1262,6 +1276,10 @@ export class Config {
 
   getUserTierName(): string | undefined {
     return this.contentGenerator?.userTierName;
+  }
+
+  getUserPaidTier(): GeminiUserTier | undefined {
+    return this.contentGenerator?.paidTier;
   }
 
   /**
@@ -1578,6 +1596,19 @@ export class Config {
     this.hasAccessToPreviewModel = hasAccess;
   }
 
+  async refreshAvailableCredits(): Promise<void> {
+    const codeAssistServer = getCodeAssistServer(this);
+    if (!codeAssistServer) {
+      return;
+    }
+    try {
+      await codeAssistServer.refreshAvailableCredits();
+    } catch {
+      // Non-fatal: proceed even if refresh fails.
+      // The actual credit balance will be verified server-side.
+    }
+  }
+
   async refreshUserQuota(): Promise<RetrieveUserQuotaResponse | undefined> {
     const codeAssistServer = getCodeAssistServer(this);
     if (!codeAssistServer || !codeAssistServer.projectId) {
@@ -1737,6 +1768,33 @@ export class Config {
 
   getMcpClientManager(): McpClientManager | undefined {
     return this.mcpClientManager;
+  }
+
+  setUserInteractedWithMcp(): void {
+    this.mcpClientManager?.setUserInteractedWithMcp();
+  }
+
+  /** @deprecated Use getMcpClientManager().getLastError() directly */
+  getLastMcpError(serverName: string): string | undefined {
+    return this.mcpClientManager?.getLastError(serverName);
+  }
+
+  emitMcpDiagnostic(
+    severity: 'info' | 'warning' | 'error',
+    message: string,
+    error?: unknown,
+    serverName?: string,
+  ): void {
+    if (this.mcpClientManager) {
+      this.mcpClientManager.emitDiagnostic(
+        severity,
+        message,
+        error,
+        serverName,
+      );
+    } else {
+      coreEvents.emitFeedback(severity, message, error);
+    }
   }
 
   getAllowedMcpServers(): string[] | undefined {
@@ -2050,6 +2108,19 @@ export class Config {
 
   getTelemetryOutfile(): string | undefined {
     return this.telemetrySettings.outfile;
+  }
+
+  getBillingSettings(): { overageStrategy: OverageStrategy } {
+    return this.billing;
+  }
+
+  /**
+   * Updates the overage strategy at runtime.
+   * Used to switch from 'ask' to 'always' after the user accepts credits
+   * via the overage dialog, so subsequent API calls auto-include credits.
+   */
+  setOverageStrategy(strategy: OverageStrategy): void {
+    this.billing.overageStrategy = strategy;
   }
 
   getTelemetryUseCollector(): boolean {
