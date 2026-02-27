@@ -15,6 +15,7 @@ import { createHash } from 'node:crypto';
 import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
+import { isAndroid } from './utils/platform.js';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
 import {
@@ -273,14 +274,10 @@ export async function startInteractiveUI(
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
+  const app = <AppWrapper key="gemini-root" />;
+
   const instance = render(
-    process.env['DEBUG'] ? (
-      <React.StrictMode>
-        <AppWrapper />
-      </React.StrictMode>
-    ) : (
-      <AppWrapper />
-    ),
+    process.env['DEBUG'] ? <React.StrictMode>{app}</React.StrictMode> : app,
     {
       stdout: inkStdout,
       stderr: inkStderr,
