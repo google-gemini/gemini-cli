@@ -73,19 +73,26 @@ describe('CodeAssistServer', () => {
       LlmRole.MAIN,
     );
 
-    expect(mockRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: expect.stringContaining(':generateContent'),
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-custom-header': 'test-value',
-        },
-        responseType: 'json',
-        body: expect.any(String),
-        signal: undefined,
-      }),
-    );
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: expect.stringContaining(':generateContent'),
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-custom-header': 'test-value',
+      },
+      responseType: 'json',
+      body: expect.any(String),
+      signal: undefined,
+      retryConfig: {
+        retry: 3,
+        noResponseRetries: 3,
+        statusCodesToRetry: [
+          [429, 429],
+          [499, 499],
+          [500, 599],
+        ],
+      },
+    });
 
     const requestBody = JSON.parse(mockRequest.mock.calls[0][0].body);
     expect(requestBody.user_prompt_id).toBe('user-prompt-id');
@@ -393,19 +400,26 @@ describe('CodeAssistServer', () => {
       results.push(res);
     }
 
-    expect(mockRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: expect.stringContaining(':streamGenerateContent'),
-        method: 'POST',
-        params: { alt: 'sse' },
-        responseType: 'stream',
-        body: expect.any(String),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal: undefined,
-      }),
-    );
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: expect.stringContaining(':streamGenerateContent'),
+      method: 'POST',
+      params: { alt: 'sse' },
+      responseType: 'stream',
+      body: expect.any(String),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: undefined,
+      retryConfig: {
+        retry: 3,
+        noResponseRetries: 3,
+        statusCodesToRetry: [
+          [429, 429],
+          [499, 499],
+          [500, 599],
+        ],
+      },
+    });
 
     expect(results).toHaveLength(2);
     expect(results[0].candidates?.[0].content?.parts?.[0].text).toBe('Hello');
