@@ -125,7 +125,7 @@ describe('save_memory', () => {
   });
 
   const rememberingCommandAlias = 'Agent remembers custom command aliases';
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: rememberingCommandAlias,
     params: {
       settings: { tools: { core: ['save_memory'] } },
@@ -178,7 +178,7 @@ describe('save_memory', () => {
 
   const rememberingCodingStyle =
     "Agent remembers user's coding style preference";
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: rememberingCodingStyle,
     params: {
       settings: { tools: { core: ['save_memory'] } },
@@ -260,7 +260,7 @@ describe('save_memory', () => {
   });
 
   const rememberingBirthday = "Agent remembers user's birthday";
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: rememberingBirthday,
     params: {
       settings: { tools: { core: ['save_memory'] } },

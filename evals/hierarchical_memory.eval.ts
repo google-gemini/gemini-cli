@@ -86,7 +86,7 @@ Provide the answer as an XML block like this:
   });
 
   const extensionVsGlobalTest = 'Extension memory wins over Global memory';
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: extensionVsGlobalTest,
     params: {
       settings: {
