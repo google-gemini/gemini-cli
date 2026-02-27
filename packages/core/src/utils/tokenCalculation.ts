@@ -80,7 +80,7 @@ function estimateTextTokens(text: string): number {
  * default estimate.
  */
 function estimateAudioTokens(base64Data: string | undefined): number {
-  if (!base64Data) return DEFAULT_AUDIO_TOKEN_ESTIMATE;
+  if (base64Data === undefined) return DEFAULT_AUDIO_TOKEN_ESTIMATE;
   const rawBytes = base64Data.length * 0.75;
   const estimatedSeconds = rawBytes / COMPRESSED_AUDIO_BYTES_PER_SECOND;
   return Math.ceil(estimatedSeconds * AUDIO_TOKENS_PER_SECOND);
@@ -97,7 +97,7 @@ function estimateAudioTokens(base64Data: string | undefined): number {
  * default estimate.
  */
 function estimateVideoTokens(base64Data: string | undefined): number {
-  if (!base64Data) return DEFAULT_VIDEO_TOKEN_ESTIMATE;
+  if (base64Data === undefined) return DEFAULT_VIDEO_TOKEN_ESTIMATE;
   const rawBytes = base64Data.length * 0.75;
   const estimatedSeconds = rawBytes / COMPRESSED_VIDEO_BYTES_PER_SECOND;
   return Math.ceil(estimatedSeconds * VIDEO_TOKENS_PER_SECOND);

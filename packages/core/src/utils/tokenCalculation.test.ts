@@ -418,6 +418,16 @@ describe('tokenCalculation', () => {
         }
       });
 
+      it('should return 0 tokens for empty base64 data', () => {
+        const parts: Part[] = [
+          { inlineData: { mimeType: 'audio/mpeg', data: '' } },
+        ];
+
+        const tokens = estimateTokenCountSync(parts);
+        // Empty data = 0 bytes = 0 seconds = 0 tokens
+        expect(tokens).toBe(0);
+      });
+
       it('should estimate small audio clips with minimal tokens', () => {
         // ~1 second of audio: 16,000 raw bytes -> base64 ≈ 21,333 chars
         const base64Data = 'B'.repeat(21_333);
@@ -462,6 +472,16 @@ describe('tokenCalculation', () => {
         const tokens = estimateTokenCountSync(parts);
         // Default video estimate: 17,400 tokens (~1 min at 290 tokens/sec)
         expect(tokens).toBe(17400);
+      });
+
+      it('should return 0 tokens for empty base64 video data', () => {
+        const parts: Part[] = [
+          { inlineData: { mimeType: 'video/mp4', data: '' } },
+        ];
+
+        const tokens = estimateTokenCountSync(parts);
+        // Empty data = 0 bytes = 0 seconds = 0 tokens
+        expect(tokens).toBe(0);
       });
 
       it('should handle various video MIME types', () => {
