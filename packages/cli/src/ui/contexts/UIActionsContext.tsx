@@ -18,6 +18,7 @@ import type { AuthState } from '../types.js';
 import { type PermissionsDialogProps } from '../components/PermissionsModifyTrustDialog.js';
 import type { SessionInfo } from '../../utils/sessionUtils.js';
 import { type NewAgentsChoice } from '../components/NewAgentsNotification.js';
+import type { OverageMenuIntent, EmptyWalletIntent } from './UIStateContext.js';
 
 export interface UIActions {
   handleThemeSelect: (
@@ -62,6 +63,8 @@ export interface UIActions {
     choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
   ) => void;
   handleValidationChoice: (choice: 'verify' | 'change_auth' | 'cancel') => void;
+  handleOverageMenuChoice: (choice: OverageMenuIntent) => void;
+  handleEmptyWalletChoice: (choice: EmptyWalletIntent) => void;
   openSessionBrowser: () => void;
   closeSessionBrowser: () => void;
   handleResumeSession: (session: SessionInfo) => Promise<void>;
@@ -87,6 +90,8 @@ export interface UIActions {
   onHintSubmit: (hint: string) => void;
   handleRestart: () => void;
   handleNewAgentsSelect: (choice: NewAgentsChoice) => Promise<void>;
+  getPreferredEditor: () => EditorType | undefined;
+  clearAccountSuspension: () => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

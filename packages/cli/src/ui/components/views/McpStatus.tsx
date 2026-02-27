@@ -25,6 +25,7 @@ interface McpStatusProps {
   serverStatus: (serverName: string) => MCPServerStatus;
   authStatus: HistoryItemMcpStatus['authStatus'];
   enablementState: HistoryItemMcpStatus['enablementState'];
+  errors: Record<string, string>;
   discoveryInProgress: boolean;
   connectingServers: string[];
   showDescriptions: boolean;
@@ -40,6 +41,7 @@ export const McpStatus: React.FC<McpStatusProps> = ({
   serverStatus,
   authStatus,
   enablementState,
+  errors,
   discoveryInProgress,
   connectingServers,
   showDescriptions,
@@ -192,6 +194,14 @@ export const McpStatus: React.FC<McpStatusProps> = ({
             )}
             {status === MCPServerStatus.DISCONNECTED && toolCount > 0 && (
               <Text> ({toolCount} tools cached)</Text>
+            )}
+
+            {errors[serverName] && (
+              <Box marginLeft={2}>
+                <Text color={theme.status.error}>
+                  Error: {errors[serverName]}
+                </Text>
+              </Box>
             )}
 
             {showDescriptions && server?.description && (

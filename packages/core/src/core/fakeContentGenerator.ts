@@ -14,7 +14,7 @@ import {
 } from '@google/genai';
 import { promises } from 'node:fs';
 import type { ContentGenerator } from './contentGenerator.js';
-import type { UserTierId } from '../code_assist/types.js';
+import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { LlmRole } from '../telemetry/types.js';
 
@@ -44,6 +44,7 @@ export class FakeContentGenerator implements ContentGenerator {
   private callCounter = 0;
   userTier?: UserTierId;
   userTierName?: string;
+  paidTier?: GeminiUserTier;
 
   constructor(private readonly responses: FakeResponse[]) {}
 

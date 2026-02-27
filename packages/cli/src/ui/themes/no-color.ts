@@ -23,6 +23,8 @@ const noColorColorsTheme: ColorsTheme = {
   Comment: '',
   Gray: '',
   DarkGray: '',
+  InputBackground: '',
+  MessageBackground: '',
 };
 
 const noColorSemanticColors: SemanticColors = {
@@ -35,6 +37,8 @@ const noColorSemanticColors: SemanticColors = {
   },
   background: {
     primary: '',
+    message: '',
+    input: '',
     diff: {
       added: '',
       removed: '',

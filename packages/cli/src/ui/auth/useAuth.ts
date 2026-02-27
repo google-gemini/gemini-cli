@@ -11,7 +11,7 @@ import {
   type Config,
   loadApiKey,
   debugLogger,
-  getErrorMessage,
+  isAccountSuspendedError,
 } from '@google/gemini-cli-core';
 import { AuthState } from '../types.js';
 import { validateAuthMethod } from '../../config/auth.js';
@@ -34,16 +34,21 @@ export function validateAuthMethodWithSettings(
   return validateAuthMethod(authType);
 }
 
+import type { AccountSuspensionInfo } from '../contexts/UIStateContext.js';
+
 export const useAuthCommand = (
   settings: LoadedSettings,
   config: Config,
   initialAuthError: string | null = null,
+  initialAccountSuspensionInfo: AccountSuspensionInfo | null = null,
 ) => {
   const [authState, setAuthState] = useState<AuthState>(
     initialAuthError ? AuthState.Updating : AuthState.Unauthenticated,
   );
 
   const [authError, setAuthError] = useState<string | null>(initialAuthError);
+  const [accountSuspensionInfo, setAccountSuspensionInfo] =
+    useState<AccountSuspensionInfo | null>(initialAccountSuspensionInfo);
   const [apiKeyDefaultValue, setApiKeyDefaultValue] = useState<
     string | undefined
   >(undefined);
@@ -130,7 +135,16 @@ export const useAuthCommand = (
         setAuthError(null);
         setAuthState(AuthState.Authenticated);
       } catch (e) {
-        onAuthError(`Failed to login. Message: ${getErrorMessage(e)}`);
+        const suspendedError = isAccountSuspendedError(e);
+        if (suspendedError) {
+          setAccountSuspensionInfo({
+            message: suspendedError.message,
+            appealUrl: suspendedError.appealUrl,
+            appealLinkText: suspendedError.appealLinkText,
+          });
+        } else {
+          onAuthError(`Failed to login. Message: ${getErrorMessage(e)}`);
+        }
       }
     })();
   }, [
@@ -150,5 +164,7 @@ export const useAuthCommand = (
     onAuthError,
     apiKeyDefaultValue,
     reloadApiKey,
+    accountSuspensionInfo,
+    setAccountSuspensionInfo,
   };
 };
