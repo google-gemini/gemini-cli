@@ -20,10 +20,18 @@ vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(),
 }));
 
+const runInDevTraceSpan = vi.hoisted(() =>
+  vi.fn(async (opts, fn) => {
+    const metadata = { name: '', attributes: opts.attributes || {} };
+    return fn({
+      metadata,
+      endSpan: vi.fn(),
+    });
+  }),
+);
+
 vi.mock('../telemetry/trace.js', () => ({
-  runInDevTraceSpan: vi.fn(async (_opts, fn) =>
-    fn({ metadata: { input: {}, output: {} } }),
-  ),
+  runInDevTraceSpan,
 }));
 vi.mock('../telemetry/loggers.js', () => ({
   logToolCall: vi.fn(),
@@ -71,6 +79,7 @@ import type {
   ToolCall,
 } from './types.js';
 import { ROOT_SCHEDULER_ID } from './types.js';
+import { GeminiCliOperation } from '../telemetry/constants.js';
 import type { EditorType } from '../utils/editor.js';
 
 describe('Scheduler Parallel Execution', () => {
@@ -306,6 +315,21 @@ describe('Scheduler Parallel Execution', () => {
     );
 
     expect(executionLog).toContain('end-call-3');
+
+    expect(runInDevTraceSpan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: GeminiCliOperation.ScheduleToolCalls,
+      }),
+      expect.any(Function),
+    );
+
+    const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
+    const fn = spanArgs[1];
+    const metadata = { name: '', attributes: {} };
+    await fn({ metadata, endSpan: vi.fn() });
+    expect(metadata).toMatchObject({
+      input: [req1, req2, req3],
+    });
   });
 
   it('should execute non-read-only tools sequentially', async () => {
