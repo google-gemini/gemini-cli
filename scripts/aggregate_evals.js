@@ -12,6 +12,7 @@ import { execSync } from 'node:child_process';
 import os from 'node:os';
 
 const artifactsDir = process.argv[2] || '.';
+const outputFile = process.argv[3];
 const MAX_HISTORY = 10;
 
 // Find all report.json files recursively
@@ -145,10 +146,8 @@ function fetchHistoricalData() {
 }
 
 function generateMarkdown(currentStatsByModel, history) {
-  console.log('### Evals Nightly Summary\n');
-  console.log(
-    'See [evals/README.md](https://github.com/google-gemini/gemini-cli/tree/main/evals) for more details.\n',
-  );
+  let md = '### Evals Nightly Summary\n\n';
+  md += 'See [evals/README.md](https://github.com/google-gemini/gemini-cli/tree/main/evals) for more details.\n\n';
 
   // Reverse history to show oldest first
   const reversedHistory = [...history].reverse();
@@ -171,8 +170,8 @@ function generateMarkdown(currentStatsByModel, history) {
         ? ((totalStats.passed / totalStats.total) * 100).toFixed(1) + '%'
         : 'N/A';
 
-    console.log(`#### Model: ${model}`);
-    console.log(`**Total Pass Rate: ${totalPassRate}**\n`);
+    md += `#### Model: ${model}\n`;
+    md += `**Total Pass Rate: ${totalPassRate}**\n\n`;
 
     // Header
     let header = '| Test Name |';
@@ -187,8 +186,8 @@ function generateMarkdown(currentStatsByModel, history) {
     header += ' Current |';
     separator += ' :---: |';
 
-    console.log(header);
-    console.log(separator);
+    md += header + '\n';
+    md += separator + '\n';
 
     // Collect all test names for this model
     const allTestNames = new Set(Object.keys(currentStats));
@@ -224,23 +223,28 @@ function generateMarkdown(currentStatsByModel, history) {
         row += ' - |';
       }
 
-      console.log(row);
+      md += row + '\n';
     }
-    console.log('\n');
+    md += '\n';
   }
+  return md;
 }
 
 // --- Main ---
 
 const currentReports = findReports(artifactsDir);
 if (currentReports.length === 0) {
-  console.log('No reports found.');
-  // We don't exit here because we might still want to see history if available,
-  // but practically if current has no reports, something is wrong.
-  // Sticking to original behavior roughly, but maybe we can continue.
+  console.error('No reports found.');
   process.exit(0);
 }
 
 const currentStats = getStats(currentReports);
 const history = fetchHistoricalData();
-generateMarkdown(currentStats, history);
+const markdown = generateMarkdown(currentStats, history);
+
+if (outputFile) {
+  fs.writeFileSync(outputFile, markdown);
+  console.log(`Summary written to ${outputFile}`);
+} else {
+  console.log(markdown);
+}
