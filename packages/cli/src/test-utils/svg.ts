@@ -101,8 +101,6 @@ export const generateSvgForTerminal = (terminal: Terminal): string => {
 `;
   svg += `    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
 `;
-  svg += `    a { text-decoration-color: inherit; }
-`;
   svg += `  </style>
 `;
   svg += `  <rect width="${width}" height="${height}" fill="#000000" />
@@ -119,7 +117,6 @@ export const generateSvgForTerminal = (terminal: Terminal): string => {
     let currentIsBold = false;
     let currentIsItalic = false;
     let currentIsUnderline = false;
-    let currentLinkUri: string | null = null;
     let currentBlockStartCol = -1;
     let currentBlockText = '';
     let currentBlockNumCells = 0;
@@ -146,11 +143,7 @@ export const generateSvgForTerminal = (terminal: Terminal): string => {
               extraAttrs += ' text-decoration="underline"';
 
             // Use textLength to ensure the block fits exactly into its designated cells
-            let textElement = `<text x="${xPos}" y="${yPos + 2}" fill="${fill}" textLength="${textWidth}" lengthAdjust="spacingAndGlyphs"${extraAttrs}>${escapeXml(currentBlockText)}</text>`;
-
-            if (currentLinkUri) {
-              textElement = `<a href="${escapeXml(currentLinkUri)}">${textElement}</a>`;
-            }
+            const textElement = `<text x="${xPos}" y="${yPos + 2}" fill="${fill}" textLength="${textWidth}" lengthAdjust="spacingAndGlyphs"${extraAttrs}>${escapeXml(currentBlockText)}</text>`;
 
             svg += `    ${textElement}\n`;
           }
@@ -187,17 +180,6 @@ export const generateSvgForTerminal = (terminal: Terminal): string => {
       const isItalic = !!cell.isItalic();
       const isUnderline = !!cell.isUnderline();
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
-      const urlId = (cell as any).extended?._urlId;
-      let linkUri: string | null = null;
-      if (urlId !== undefined) {
-        /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
-        linkUri =
-          (terminal as any)._core?._oscLinkService?.getLinkData(urlId)?.uri ||
-          null;
-        /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
-      }
-
       let chars = cell.getChars();
       if (chars === '') chars = ' '.repeat(cellWidth);
 
@@ -207,7 +189,6 @@ export const generateSvgForTerminal = (terminal: Terminal): string => {
         isBold !== currentIsBold ||
         isItalic !== currentIsItalic ||
         isUnderline !== currentIsUnderline ||
-        linkUri !== currentLinkUri ||
         currentBlockStartCol === -1
       ) {
         finalizeBlock(x);
@@ -216,7 +197,6 @@ export const generateSvgForTerminal = (terminal: Terminal): string => {
         currentIsBold = isBold;
         currentIsItalic = isItalic;
         currentIsUnderline = isUnderline;
-        currentLinkUri = linkUri;
         currentBlockStartCol = x;
         currentBlockText = chars;
         currentBlockNumCells = cellWidth;

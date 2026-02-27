@@ -89,11 +89,12 @@ const renderStatusDisplay = async (
 };
 
 describe('StatusDisplay', () => {
-  const originalEnv = process.env;
+  beforeEach(() => {
+    vi.stubEnv('GEMINI_SYSTEM_MD', '');
+  });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    delete process.env['GEMINI_SYSTEM_MD'];
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
