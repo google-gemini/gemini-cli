@@ -20,7 +20,7 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-// eslint-disable-next-line import/no-internal-modules
+
 import mime from 'mime/lite';
 
 import {

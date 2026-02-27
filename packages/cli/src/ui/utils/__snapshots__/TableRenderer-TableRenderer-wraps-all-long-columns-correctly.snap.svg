@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="190" viewBox="0 0 920 190">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="190" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="19" fill="#333333" textLength="477" lengthAdjust="spacingAndGlyphs">┌────────────────┬────────────────┬─────────────────┐</text>
+    <text x="0" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="36" fill="#89b4fa" textLength="45" lengthAdjust="spacingAndGlyphs">Col 1</text>
+    <text x="153" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="171" y="36" fill="#89b4fa" textLength="45" lengthAdjust="spacingAndGlyphs">Col 2</text>
+    <text x="306" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="324" y="36" fill="#89b4fa" textLength="45" lengthAdjust="spacingAndGlyphs">Col 3</text>
+    <text x="468" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="53" fill="#333333" textLength="477" lengthAdjust="spacingAndGlyphs">├────────────────┼────────────────┼─────────────────┤</text>
+    <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="70" fill="#ffffff" textLength="144" lengthAdjust="spacingAndGlyphs"> This is a very </text>
+    <text x="153" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="162" y="70" fill="#ffffff" textLength="144" lengthAdjust="spacingAndGlyphs"> This is also a </text>
+    <text x="306" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="315" y="70" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs"> And this is the </text>
+    <text x="468" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="87" fill="#ffffff" textLength="144" lengthAdjust="spacingAndGlyphs"> long text that </text>
+    <text x="153" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="162" y="87" fill="#ffffff" textLength="144" lengthAdjust="spacingAndGlyphs"> very long text </text>
+    <text x="306" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="315" y="87" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs"> third long text </text>
+    <text x="468" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="104" fill="#ffffff" textLength="144" lengthAdjust="spacingAndGlyphs"> needs wrapping </text>
+    <text x="153" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="162" y="104" fill="#ffffff" textLength="144" lengthAdjust="spacingAndGlyphs"> that needs     </text>
+    <text x="306" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="315" y="104" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs"> that needs      </text>
+    <text x="468" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="121" fill="#ffffff" textLength="144" lengthAdjust="spacingAndGlyphs"> in column 1    </text>
+    <text x="153" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="162" y="121" fill="#ffffff" textLength="144" lengthAdjust="spacingAndGlyphs"> wrapping in    </text>
+    <text x="306" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="315" y="121" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs"> wrapping in     </text>
+    <text x="468" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="153" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="162" y="138" fill="#ffffff" textLength="144" lengthAdjust="spacingAndGlyphs"> column 2       </text>
+    <text x="306" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="315" y="138" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs"> column 3        </text>
+    <text x="468" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="155" fill="#333333" textLength="477" lengthAdjust="spacingAndGlyphs">└────────────────┴────────────────┴─────────────────┘</text>
+  </g>
+</svg>

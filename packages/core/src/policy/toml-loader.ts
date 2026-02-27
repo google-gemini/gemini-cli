@@ -46,6 +46,7 @@ const PolicyRuleSchema = z.object({
         'priority must be <= 999 to prevent tier overflow. Priorities >= 1000 would jump to the next tier.',
     }),
   modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
+  toolAnnotations: z.record(z.any()).optional(),
   allow_redirection: z.boolean().optional(),
   deny_message: z.string().optional(),
 });
@@ -61,6 +62,7 @@ const SafetyCheckerRuleSchema = z.object({
   commandRegex: z.string().optional(),
   priority: z.number().int().default(0),
   modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
+  toolAnnotations: z.record(z.any()).optional(),
   checker: z.discriminatedUnion('type', [
     z.object({
       type: z.literal('in-process'),
@@ -106,7 +108,7 @@ export type PolicyFileErrorType =
 export interface PolicyFileError {
   filePath: string;
   fileName: string;
-  tier: 'default' | 'user' | 'workspace' | 'admin';
+  tier: 'default' | 'extension' | 'user' | 'workspace' | 'admin';
   ruleIndex?: number;
   errorType: PolicyFileErrorType;
   message: string;
@@ -171,11 +173,14 @@ export async function readPolicyFiles(
 /**
  * Converts a tier number to a human-readable tier name.
  */
-function getTierName(tier: number): 'default' | 'user' | 'workspace' | 'admin' {
+function getTierName(
+  tier: number,
+): 'default' | 'extension' | 'user' | 'workspace' | 'admin' {
   if (tier === 1) return 'default';
-  if (tier === 2) return 'workspace';
-  if (tier === 3) return 'user';
-  if (tier === 4) return 'admin';
+  if (tier === 2) return 'extension';
+  if (tier === 3) return 'workspace';
+  if (tier === 4) return 'user';
+  if (tier === 5) return 'admin';
   return 'default';
 }
 
@@ -383,6 +388,7 @@ export async function loadPoliciesFromToml(
                   decision: rule.decision,
                   priority: transformPriority(rule.priority, tier),
                   modes: rule.modes,
+                  toolAnnotations: rule.toolAnnotations,
                   allowRedirection: rule.allow_redirection,
                   source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
                   denyMessage: rule.deny_message,
@@ -467,6 +473,7 @@ export async function loadPoliciesFromToml(
                   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                   checker: checker.checker as SafetyCheckerConfig,
                   modes: checker.modes,
+                  toolAnnotations: checker.toolAnnotations,
                   source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
                 };
 
