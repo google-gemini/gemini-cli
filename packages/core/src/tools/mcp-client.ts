@@ -34,11 +34,7 @@ import {
   ProgressNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
-import type {
-  Config,
-  MCPServerConfig,
-  GeminiCLIExtension,
-} from '../config/config.js';
+import type { Config, MCPServerConfig } from '../config/config.js';
 import { AuthProviderType } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
@@ -782,25 +778,15 @@ async function handleAutomaticOAuth(
  *
  * @param mcpServerConfig The MCP server configuration
  * @param headers Additional headers
- * @param sanitizationConfig Configuration for environment sanitization
  */
 function createTransportRequestInit(
   mcpServerConfig: MCPServerConfig,
   headers: Record<string, string>,
-  sanitizationConfig: EnvironmentSanitizationConfig,
 ): RequestInit {
-  const extensionEnv = getExtensionEnvironment(mcpServerConfig.extension);
-  const expansionEnv = { ...process.env, ...extensionEnv };
-
-  const sanitizedEnv = sanitizeEnvironment(expansionEnv, {
-    ...sanitizationConfig,
-    enableEnvironmentVariableRedaction: true,
-  });
-
   const expandedHeaders: Record<string, string> = {};
   if (mcpServerConfig.headers) {
     for (const [key, value] of Object.entries(mcpServerConfig.headers)) {
-      expandedHeaders[key] = expandEnvVars(value, sanitizedEnv);
+      expandedHeaders[key] = expandEnvVars(value, process.env);
     }
   }
 
@@ -840,14 +826,12 @@ function createAuthProvider(
  * @param mcpServerName The name of the MCP server
  * @param mcpServerConfig The MCP server configuration
  * @param accessToken The OAuth access token
- * @param sanitizationConfig Configuration for environment sanitization
  * @returns The transport with OAuth token, or null if creation fails
  */
 async function createTransportWithOAuth(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   accessToken: string,
-  sanitizationConfig: EnvironmentSanitizationConfig,
 ): Promise<StreamableHTTPClientTransport | SSEClientTransport | null> {
   try {
     const headers: Record<string, string> = {
@@ -856,11 +840,7 @@ async function createTransportWithOAuth(
     const transportOptions:
       | StreamableHTTPClientTransportOptions
       | SSEClientTransportOptions = {
-      requestInit: createTransportRequestInit(
-        mcpServerConfig,
-        headers,
-        sanitizationConfig,
-      ),
+      requestInit: createTransportRequestInit(mcpServerConfig, headers),
     };
 
     return createUrlTransport(mcpServerName, mcpServerConfig, transportOptions);
@@ -1455,7 +1435,6 @@ async function showAuthRequiredMessage(serverName: string): Promise<never> {
  * @param config The MCP server configuration
  * @param accessToken The OAuth access token to use
  * @param httpReturned404 Whether the HTTP transport returned 404 (indicating SSE-only server)
- * @param sanitizationConfig Configuration for environment sanitization
  */
 async function retryWithOAuth(
   client: Client,
@@ -1463,7 +1442,6 @@ async function retryWithOAuth(
   config: MCPServerConfig,
   accessToken: string,
   httpReturned404: boolean,
-  sanitizationConfig: EnvironmentSanitizationConfig,
 ): Promise<void> {
   if (httpReturned404) {
     // HTTP returned 404, only try SSE
@@ -1484,7 +1462,6 @@ async function retryWithOAuth(
     serverName,
     config,
     accessToken,
-    sanitizationConfig,
   );
   if (!httpTransport) {
     throw new Error(
@@ -1764,7 +1741,6 @@ export async function connectToMcpServer(
             mcpServerConfig,
             accessToken,
             httpReturned404,
-            sanitizationConfig,
           );
           return mcpClient;
         } else {
@@ -1837,7 +1813,6 @@ export async function connectToMcpServer(
               mcpServerName,
               mcpServerConfig,
               accessToken,
-              sanitizationConfig,
             );
             if (!oauthTransport) {
               throw new Error(
@@ -1985,11 +1960,7 @@ export async function createTransport(
     const transportOptions:
       | StreamableHTTPClientTransportOptions
       | SSEClientTransportOptions = {
-      requestInit: createTransportRequestInit(
-        mcpServerConfig,
-        headers,
-        sanitizationConfig,
-      ),
+      requestInit: createTransportRequestInit(mcpServerConfig, headers),
       authProvider,
     };
 
@@ -1997,11 +1968,8 @@ export async function createTransport(
   }
 
   if (mcpServerConfig.command) {
-    const extensionEnv = getExtensionEnvironment(mcpServerConfig.extension);
-    const expansionEnv = { ...process.env, ...extensionEnv };
-
     // 1. Sanitize the base process environment to prevent unintended leaks of system-wide secrets.
-    const sanitizedEnv = sanitizeEnvironment(expansionEnv, {
+    const sanitizedEnv = sanitizeEnvironment(process.env, {
       ...sanitizationConfig,
       enableEnvironmentVariableRedaction: true,
     });
@@ -2009,7 +1977,6 @@ export async function createTransport(
     const finalEnv: Record<string, string> = {
       [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
         GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
-      ...extensionEnv,
     };
     for (const [key, value] of Object.entries(sanitizedEnv)) {
       if (value !== undefined) {
@@ -2020,7 +1987,7 @@ export async function createTransport(
     // Expand and merge explicit environment variables from the MCP configuration.
     if (mcpServerConfig.env) {
       for (const [key, value] of Object.entries(mcpServerConfig.env)) {
-        finalEnv[key] = expandEnvVars(value, expansionEnv);
+        finalEnv[key] = expandEnvVars(value, process.env);
       }
     }
 
@@ -2076,20 +2043,6 @@ export async function createTransport(
 
 interface NamedTool {
   name?: string;
-}
-
-function getExtensionEnvironment(
-  extension?: GeminiCLIExtension,
-): Record<string, string> {
-  const env: Record<string, string> = {};
-  if (extension?.resolvedSettings) {
-    for (const setting of extension.resolvedSettings) {
-      if (setting.value !== undefined) {
-        env[setting.envVar] = setting.value;
-      }
-    }
-  }
-  return env;
 }
 
 /** Visible for testing */

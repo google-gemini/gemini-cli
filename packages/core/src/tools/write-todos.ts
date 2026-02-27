@@ -34,8 +34,17 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    isSensitive?: boolean,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+      undefined,
+      undefined,
+      isSensitive,
+    );
   }
 
   getDescription(): string {
@@ -85,6 +94,9 @@ export class WriteTodosTool extends BaseDeclarativeTool<
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
+      undefined,
+      undefined,
+      true,
     );
   }
 
@@ -128,12 +140,14 @@ export class WriteTodosTool extends BaseDeclarativeTool<
     messageBus: MessageBus,
     _toolName?: string,
     _displayName?: string,
+    isSensitive?: boolean,
   ): ToolInvocation<WriteTodosToolParams, ToolResult> {
     return new WriteTodosToolInvocation(
       params,
       messageBus,
       _toolName,
       _displayName,
+      isSensitive,
     );
   }
 }

@@ -78,8 +78,17 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    isSensitive?: boolean,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+      undefined,
+      undefined,
+      isSensitive,
+    );
   }
 
   /**
@@ -293,6 +302,9 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
       messageBus,
       true,
       false,
+      undefined,
+      undefined,
+      true,
     );
   }
 
@@ -316,13 +328,15 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    isSensitive?: boolean,
   ): ToolInvocation<LSToolParams, ToolResult> {
     return new LSToolInvocation(
       this.config,
       params,
-      messageBus ?? this.messageBus,
+      messageBus,
       _toolName,
       _toolDisplayName,
+      isSensitive,
     );
   }
 

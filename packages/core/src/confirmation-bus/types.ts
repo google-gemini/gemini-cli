@@ -121,6 +121,7 @@ export interface UpdatePolicy {
   argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;
+  isSensitive?: boolean;
 }
 
 export interface ToolPolicyRejection {
