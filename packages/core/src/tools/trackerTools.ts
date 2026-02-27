@@ -29,28 +29,6 @@ import { ToolErrorType } from './tool-error.js';
 import type { TrackerTask, TaskType } from '../services/trackerTypes.js';
 import { TaskStatus } from '../services/trackerTypes.js';
 
-// --- Shared Base ---
-
-abstract class BaseTrackerInvocation<
-  P extends object,
-  R extends ToolResult,
-> extends BaseToolInvocation<P, R> {
-  constructor(
-    protected readonly config: Config,
-    params: P,
-    messageBus: MessageBus,
-    toolName: string,
-  ) {
-    super(params, messageBus, toolName);
-  }
-
-  protected get service() {
-    return this.config.getTrackerService();
-  }
-
-  abstract override getDescription(): string;
-}
-
 // --- tracker_create_task ---
 
 interface CreateTaskParams {
@@ -61,10 +39,22 @@ interface CreateTaskParams {
   dependencies?: string[];
 }
 
-class TrackerCreateTaskInvocation extends BaseTrackerInvocation<
+class TrackerCreateTaskInvocation extends BaseToolInvocation<
   CreateTaskParams,
   ToolResult
 > {
+  constructor(
+    private readonly config: Config,
+    params: CreateTaskParams,
+    messageBus: MessageBus,
+    toolName: string,
+  ) {
+    super(params, messageBus, toolName);
+  }
+
+  private get service() {
+    return this.config.getTrackerService();
+  }
   getDescription(): string {
     return `Creating task: ${this.params.title}`;
   }
@@ -139,10 +129,22 @@ interface UpdateTaskParams {
   dependencies?: string[];
 }
 
-class TrackerUpdateTaskInvocation extends BaseTrackerInvocation<
+class TrackerUpdateTaskInvocation extends BaseToolInvocation<
   UpdateTaskParams,
   ToolResult
 > {
+  constructor(
+    private readonly config: Config,
+    params: UpdateTaskParams,
+    messageBus: MessageBus,
+    toolName: string,
+  ) {
+    super(params, messageBus, toolName);
+  }
+
+  private get service() {
+    return this.config.getTrackerService();
+  }
   getDescription(): string {
     return `Updating task ${this.params.id}`;
   }
@@ -207,10 +209,22 @@ interface GetTaskParams {
   id: string;
 }
 
-class TrackerGetTaskInvocation extends BaseTrackerInvocation<
+class TrackerGetTaskInvocation extends BaseToolInvocation<
   GetTaskParams,
   ToolResult
 > {
+  constructor(
+    private readonly config: Config,
+    params: GetTaskParams,
+    messageBus: MessageBus,
+    toolName: string,
+  ) {
+    super(params, messageBus, toolName);
+  }
+
+  private get service() {
+    return this.config.getTrackerService();
+  }
   getDescription(): string {
     return `Retrieving task ${this.params.id}`;
   }
@@ -269,10 +283,22 @@ interface ListTasksParams {
   parentId?: string;
 }
 
-class TrackerListTasksInvocation extends BaseTrackerInvocation<
+class TrackerListTasksInvocation extends BaseToolInvocation<
   ListTasksParams,
   ToolResult
 > {
+  constructor(
+    private readonly config: Config,
+    params: ListTasksParams,
+    messageBus: MessageBus,
+    toolName: string,
+  ) {
+    super(params, messageBus, toolName);
+  }
+
+  private get service() {
+    return this.config.getTrackerService();
+  }
   getDescription(): string {
     return 'Listing tasks.';
   }
@@ -344,10 +370,22 @@ interface AddDependencyParams {
   dependencyId: string;
 }
 
-class TrackerAddDependencyInvocation extends BaseTrackerInvocation<
+class TrackerAddDependencyInvocation extends BaseToolInvocation<
   AddDependencyParams,
   ToolResult
 > {
+  constructor(
+    private readonly config: Config,
+    params: AddDependencyParams,
+    messageBus: MessageBus,
+    toolName: string,
+  ) {
+    super(params, messageBus, toolName);
+  }
+
+  private get service() {
+    return this.config.getTrackerService();
+  }
   getDescription(): string {
     return `Adding dependency: ${this.params.taskId} depends on ${this.params.dependencyId}`;
   }
@@ -431,10 +469,22 @@ export class TrackerAddDependencyTool extends BaseDeclarativeTool<
 
 // --- tracker_visualize ---
 
-class TrackerVisualizeInvocation extends BaseTrackerInvocation<
+class TrackerVisualizeInvocation extends BaseToolInvocation<
   Record<string, never>,
   ToolResult
 > {
+  constructor(
+    private readonly config: Config,
+    params: Record<string, never>,
+    messageBus: MessageBus,
+    toolName: string,
+  ) {
+    super(params, messageBus, toolName);
+  }
+
+  private get service() {
+    return this.config.getTrackerService();
+  }
   getDescription(): string {
     return 'Visualizing the task graph.';
   }
