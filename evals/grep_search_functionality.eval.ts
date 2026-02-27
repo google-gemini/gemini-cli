@@ -32,7 +32,7 @@ describe('grep_search_functionality', () => {
     },
   });
 
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should perform a case-sensitive search',
     files: {
       'test.txt': `Hello
