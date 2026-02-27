@@ -232,10 +232,9 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           updateOutput(progress);
         }
 
-        return {
-          llmContent: `Subagent '${this.definition.name}' was cancelled by the user.`,
-          returnDisplay: progress,
-        };
+        const cancelError = new Error('Operation cancelled by user');
+        cancelError.name = 'AbortError';
+        throw cancelError;
       }
 
       const resultContent = `Subagent '${this.definition.name}' finished.
@@ -298,6 +297,10 @@ ${output.result}
 
       if (updateOutput) {
         updateOutput(progress);
+      }
+
+      if (isAbort) {
+        throw error;
       }
 
       return {

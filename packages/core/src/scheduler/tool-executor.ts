@@ -142,7 +142,12 @@ export class ToolExecutor {
           }
         } catch (executionError: unknown) {
           spanMetadata.error = executionError;
-          if (signal.aborted) {
+          const isAbortError =
+            executionError instanceof Error &&
+            (executionError.name === 'AbortError' ||
+              executionError.message.includes('Operation cancelled by user'));
+
+          if (signal.aborted || isAbortError) {
             return this.createCancelledResult(
               call,
               'User cancelled tool execution.',

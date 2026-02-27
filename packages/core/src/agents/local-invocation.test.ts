@@ -336,6 +336,7 @@ describe('LocalSubagentInvocation', () => {
 
     it('should handle abortion signal during execution', async () => {
       const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
       mockExecutorInstance.run.mockRejectedValue(abortError);
 
       const controller = new AbortController();
@@ -344,34 +345,24 @@ describe('LocalSubagentInvocation', () => {
         updateOutput,
       );
       controller.abort();
-      const result = await executePromise;
+      await expect(executePromise).rejects.toThrow('Aborted');
 
       expect(mockExecutorInstance.run).toHaveBeenCalledWith(
         params,
         controller.signal,
       );
-      expect(result.error).toBeUndefined();
-      expect(result.llmContent).toContain('Aborted');
     });
 
-    it('should return cancelled state when execution returns ABORTED', async () => {
+    it('should throw an error and bubble cancellation when execution returns ABORTED', async () => {
       const mockOutput = {
         result: 'Cancelled by user',
         terminate_reason: AgentTerminateMode.ABORTED,
       };
       mockExecutorInstance.run.mockResolvedValue(mockOutput);
 
-      const result = await invocation.execute(signal, updateOutput);
-
-      expect(result.llmContent).toEqual(
-        expect.stringContaining(
-          "Subagent 'MockAgent' was cancelled by the user.",
-        ),
+      await expect(invocation.execute(signal, updateOutput)).rejects.toThrow(
+        'Operation cancelled by user',
       );
-
-      const display = result.returnDisplay as SubagentProgress;
-      expect(display.isSubagentProgress).toBe(true);
-      expect(display.state).toBe('cancelled');
     });
   });
 });
