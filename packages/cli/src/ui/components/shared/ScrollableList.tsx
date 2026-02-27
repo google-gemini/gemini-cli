@@ -10,7 +10,7 @@ import {
   useImperativeHandle,
   useCallback,
   useMemo,
-  useEffect,
+  useLayoutEffect,
 } from 'react';
 import type React from 'react';
 import {
@@ -105,7 +105,7 @@ function ScrollableList<T>(
     smoothScrollState.current.active = false;
   }, []);
 
-  useEffect(() => stopSmoothScroll, [stopSmoothScroll]);
+  useLayoutEffect(() => stopSmoothScroll, [stopSmoothScroll]);
 
   const smoothScrollTo = useCallback(
     (

@@ -10,7 +10,6 @@ import {
   useLayoutEffect,
   forwardRef,
   useImperativeHandle,
-  useEffect,
   useMemo,
   useCallback,
 } from 'react';
@@ -81,7 +80,7 @@ function VirtualizedList<T>(
   } = props;
   const { copyModeEnabled } = useUIState();
   const dataRef = useRef(data);
-  useEffect(() => {
+  useLayoutEffect(() => {
     dataRef.current = data;
   }, [data]);
 
@@ -165,7 +164,7 @@ function VirtualizedList<T>(
     [],
   );
 
-  useEffect(
+  useLayoutEffect(
     () => () => {
       containerObserverRef.current?.disconnect();
       itemsObserver.disconnect();

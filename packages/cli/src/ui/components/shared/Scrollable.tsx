@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import { Box, ResizeObserver, type DOMElement } from 'ink';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { useScrollable } from '../../contexts/ScrollProvider.js';
@@ -44,11 +44,11 @@ export const Scrollable: React.FC<ScrollableProps> = ({
   const sizeRef = useRef(size);
   const scrollTopRef = useRef(scrollTop);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     sizeRef.current = size;
   }, [size]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     scrollTopRef.current = scrollTop;
   }, [scrollTop]);
 
