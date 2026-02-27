@@ -784,15 +784,18 @@ function createTransportRequestInit(
   headers: Record<string, string>,
 ): RequestInit {
   // Merge configured headers and runtime headers (e.g. Authorization)
-  const mergedHeaders: Record<string, string> = {
+  const mergedHeaders: Record<string, string> = {};
+
+  // Lowercase all keys to avoid duplicates when merging with SDK headers
+  for (const [key, value] of Object.entries({
     ...(mcpServerConfig.headers ?? {}),
     ...headers,
-  };
+  })) {
+    mergedHeaders[key.toLowerCase()] = value;
+  }
 
   // If user already provided an Accept header (any casing), respect it.
-  const hasAccept = Object.keys(mergedHeaders).some(
-    (k) => k.toLowerCase() === 'accept',
-  );
+  const hasAccept = Object.keys(mergedHeaders).some((k) => k === 'accept');
 
   if (!hasAccept) {
     // Determine appropriate Accept header based on configured transport.
@@ -804,7 +807,7 @@ function createTransportRequestInit(
       acceptValue = 'text/event-stream';
     }
 
-    mergedHeaders['Accept'] = acceptValue;
+    mergedHeaders['accept'] = acceptValue;
   }
 
   return {
@@ -1716,7 +1719,7 @@ export async function connectToMcpServer(
           const response = await fetch(urlToFetch, {
             method: 'HEAD',
             headers: {
-              Accept: acceptHeader,
+              accept: acceptHeader,
             },
             signal: AbortSignal.timeout(5000),
           });

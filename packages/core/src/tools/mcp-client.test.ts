@@ -1445,7 +1445,7 @@ describe('mcp-client', () => {
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
-            headers: { Accept: 'application/json, text/event-stream' },
+            headers: { accept: 'application/json, text/event-stream' },
           },
         });
       });
@@ -1466,8 +1466,8 @@ describe('mcp-client', () => {
           _url: new URL('http://test-server'),
           _requestInit: {
             headers: {
-              Authorization: 'derp',
-              Accept: 'application/json, text/event-stream',
+              authorization: 'derp',
+              accept: 'application/json, text/event-stream',
             },
           },
         });
@@ -1488,7 +1488,7 @@ describe('mcp-client', () => {
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
-            headers: { Accept: 'application/json, text/event-stream' },
+            headers: { accept: 'application/json, text/event-stream' },
           },
         });
       });
@@ -1509,8 +1509,8 @@ describe('mcp-client', () => {
           _url: new URL('http://test-server'),
           _requestInit: {
             headers: {
-              Authorization: 'derp',
-              Accept: 'application/json, text/event-stream',
+              authorization: 'derp',
+              accept: 'application/json, text/event-stream',
             },
           },
         });
@@ -1531,7 +1531,7 @@ describe('mcp-client', () => {
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
-            headers: { Accept: 'application/json, text/event-stream' },
+            headers: { accept: 'application/json, text/event-stream' },
           },
         });
       });
@@ -1551,7 +1551,7 @@ describe('mcp-client', () => {
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
-            headers: { Accept: 'text/event-stream' },
+            headers: { accept: 'text/event-stream' },
           },
         });
       });
@@ -1570,7 +1570,7 @@ describe('mcp-client', () => {
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
-            headers: { Accept: 'application/json, text/event-stream' },
+            headers: { accept: 'application/json, text/event-stream' },
           },
         });
       });
@@ -1592,8 +1592,8 @@ describe('mcp-client', () => {
           _url: new URL('http://test-server'),
           _requestInit: {
             headers: {
-              Authorization: 'Bearer token',
-              Accept: 'application/json, text/event-stream',
+              authorization: 'Bearer token',
+              accept: 'application/json, text/event-stream',
             },
           },
         });
@@ -1615,7 +1615,7 @@ describe('mcp-client', () => {
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
-            headers: { 'X-API-Key': 'key123', Accept: 'text/event-stream' },
+            headers: { 'x-api-key': 'key123', accept: 'text/event-stream' },
           },
         });
       });
@@ -1636,17 +1636,17 @@ describe('mcp-client', () => {
         expect(transport).toMatchObject({
           _url: new URL('http://test-server-http'),
           _requestInit: {
-            headers: { Accept: 'application/json, text/event-stream' },
+            headers: { accept: 'application/json, text/event-stream' },
           },
         });
       });
 
-      it('user-provided Accept header is preserved', async () => {
+      it('user-provided accept header is preserved', async () => {
         const transport = await createTransport(
           'test-server',
           {
             httpUrl: 'http://test-server',
-            headers: { Accept: 'custom/accept-type' },
+            headers: { accept: 'custom/accept-type' },
           },
           false,
           EMPTY_CONFIG,
@@ -1656,12 +1656,12 @@ describe('mcp-client', () => {
         expect(transport).toMatchObject({
           _url: new URL('http://test-server'),
           _requestInit: {
-            headers: { Accept: 'custom/accept-type' },
+            headers: { accept: 'custom/accept-type' },
           },
         });
       });
 
-      it('user-provided Accept header (lowercase) is preserved', async () => {
+      it('user-provided accept header (lowercase) is preserved', async () => {
         const transport = await createTransport(
           'test-server',
           {
@@ -1799,7 +1799,7 @@ describe('mcp-client', () => {
         expect(authProvider).toBeInstanceOf(GoogleCredentialProvider);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const googUserProject = (transport as any)._requestInit?.headers?.[
-          'X-Goog-User-Project'
+          'x-goog-user-project'
         ];
         expect(googUserProject).toBe('myproject');
       });
@@ -1830,7 +1830,7 @@ describe('mcp-client', () => {
         expect(mockGetRequestHeaders).toHaveBeenCalled();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const headers = (transport as any)._requestInit?.headers;
-        expect(headers['X-Goog-User-Project']).toBe('provider-project');
+        expect(headers['x-goog-user-project']).toBe('provider-project');
       });
 
       it('should prioritize provider headers over config headers', async () => {
@@ -1861,7 +1861,7 @@ describe('mcp-client', () => {
         expect(transport).toBeInstanceOf(StreamableHTTPClientTransport);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const headers = (transport as any)._requestInit?.headers;
-        expect(headers['X-Goog-User-Project']).toBe('provider-project');
+        expect(headers['x-goog-user-project']).toBe('provider-project');
       });
 
       it('should use GoogleCredentialProvider with SSE transport', async () => {
@@ -2067,7 +2067,7 @@ describe('connectToMcpServer with OAuth', () => {
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
 
     const authHeader =
-      capturedTransport._requestInit?.headers?.['Authorization'];
+      capturedTransport._requestInit?.headers?.['authorization'];
     expect(authHeader).toBe('Bearer test-access-token');
   });
 
@@ -2114,7 +2114,7 @@ describe('connectToMcpServer with OAuth', () => {
     expect(OAuthUtils.discoverOAuthConfig).toHaveBeenCalledWith(serverUrl);
 
     const authHeader =
-      capturedTransport._requestInit?.headers?.['Authorization'];
+      capturedTransport._requestInit?.headers?.['authorization'];
     expect(authHeader).toBe('Bearer test-access-token-from-discovery');
   });
 
