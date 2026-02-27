@@ -204,12 +204,9 @@ Place at `/etc/gemini-cli/policies/security.toml` (Linux/macOS) or
 `C:\ProgramData\gemini-cli\policies\security.toml` (Windows).
 
 ```toml
-# Enforce minimum approval mode across all users
+# Enforce minimum approval mode and disable telemetry org-wide
 [general]
 defaultApprovalMode = "default"
-
-# Disable telemetry org-wide
-[general]
 telemetry = false
 
 # Block shell tool entirely at system level

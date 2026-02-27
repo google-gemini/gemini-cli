@@ -132,8 +132,13 @@ function extractChangedFiles(diffText) {
   const files = new Set();
   for (const line of diffText.split('\n')) {
     // "diff --git a/path/to/file b/path/to/file"
-    const m = line.match(/^diff --git a\/(.+?) b\/.+$/);
-    if (m) files.add(m[1]);
+    // git quotes paths containing spaces as "a/path with spaces/file"
+    const m = line.match(/^diff --git a\/((?:"[^"]*"|[^ ]+)) b\//);
+    if (m) {
+      // Strip surrounding quotes if present (git adds them for paths with spaces)
+      const raw = m[1];
+      files.add(raw.startsWith('"') ? raw.slice(1, -1) : raw);
+    }
   }
   return [...files];
 }
