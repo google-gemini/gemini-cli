@@ -31,7 +31,6 @@ interface BackgroundColorRow {
 type ColorRow = StandardColorRow | GradientColorRow | BackgroundColorRow;
 
 const VALUE_COLUMN_WIDTH = 10;
-const NAME_COLUMN_WIDTH = '30%';
 
 interface ColorsDisplayProps {
   activeTheme: Theme;
@@ -155,7 +154,7 @@ export const ColorsDisplay: React.FC<ColorsDisplayProps> = ({
             Value
           </Text>
         </Box>
-        <Box width={NAME_COLUMN_WIDTH}>
+        <Box flexGrow={1}>
           <Text bold color={theme.text.link} dimColor>
             Name
           </Text>
@@ -184,7 +183,7 @@ function renderStandardRow({ name, value }: StandardColorRow) {
       <Box width={VALUE_COLUMN_WIDTH}>
         <Text color={displayColor}>{value || '(blank)'}</Text>
       </Box>
-      <Box width={NAME_COLUMN_WIDTH}>
+      <Box flexGrow={1}>
         <Text color={displayColor}>{name}</Text>
       </Box>
     </Box>
@@ -201,7 +200,7 @@ function renderGradientRow({ name, value }: GradientColorRow) {
           </Text>
         ))}
       </Box>
-      <Box width={NAME_COLUMN_WIDTH}>
+      <Box flexGrow={1}>
         <Gradient colors={value}>
           <Text>{name}</Text>
         </Gradient>
@@ -223,7 +222,7 @@ function renderBackgroundRow({ name, value }: BackgroundColorRow) {
           {value || 'default'}
         </Text>
       </Box>
-      <Box width={NAME_COLUMN_WIDTH} paddingLeft={1}>
+      <Box flexGrow={1} paddingLeft={1}>
         <Text color={theme.text.primary}>{name}</Text>
       </Box>
     </Box>
