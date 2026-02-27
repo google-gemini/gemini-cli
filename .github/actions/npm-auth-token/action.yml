@@ -30,16 +30,22 @@ runs:
       id: 'npm_auth_token'
       shell: 'bash'
       run: |
-        AUTH_TOKEN="${{ inputs.github-token }}"
-        PACKAGE_NAME="${{ inputs.package-name }}"
+        AUTH_TOKEN="${INPUTS_GITHUB_TOKEN}"
+        PACKAGE_NAME="${INPUTS_PACKAGE_NAME}"
         PRIVATE_REPO="@google-gemini/"
         if [[ "$PACKAGE_NAME" == "$PRIVATE_REPO"* ]]; then
-          AUTH_TOKEN="${{ inputs.github-token }}"
+          AUTH_TOKEN="${INPUTS_GITHUB_TOKEN}"
         elif [[ "$PACKAGE_NAME" == "@google/gemini-cli" ]]; then
-          AUTH_TOKEN="${{ inputs.wombat-token-cli }}"
+          AUTH_TOKEN="${INPUTS_WOMBAT_TOKEN_CLI}"
         elif [[ "$PACKAGE_NAME" == "@google/gemini-cli-core" ]]; then
-          AUTH_TOKEN="${{ inputs.wombat-token-core }}"
+          AUTH_TOKEN="${INPUTS_WOMBAT_TOKEN_CORE}"
         elif [[ "$PACKAGE_NAME" == "@google/gemini-cli-a2a-server" ]]; then
-          AUTH_TOKEN="${{ inputs.wombat-token-a2a-server }}"
+          AUTH_TOKEN="${INPUTS_WOMBAT_TOKEN_A2A_SERVER}"
         fi
         echo "auth-token=$AUTH_TOKEN" >> $GITHUB_OUTPUT
+      env:
+        INPUTS_GITHUB_TOKEN: '${{ inputs.github-token }}'
+        INPUTS_PACKAGE_NAME: '${{ inputs.package-name }}'
+        INPUTS_WOMBAT_TOKEN_CLI: '${{ inputs.wombat-token-cli }}'
+        INPUTS_WOMBAT_TOKEN_CORE: '${{ inputs.wombat-token-core }}'
+        INPUTS_WOMBAT_TOKEN_A2A_SERVER: '${{ inputs.wombat-token-a2a-server }}'
