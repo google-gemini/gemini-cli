@@ -162,11 +162,12 @@ describe('useEditorSettings', () => {
   it('should handle different editor types', () => {
     render(<TestComponent />);
 
-    const editorTypes: EditorType[] = ['cursor', 'windsurf', 'vim'];
+    const editorTypes: EditorType[] = ['cursor', 'windsurf', 'vim', 'kak'];
     const displayNames: Record<string, string> = {
       cursor: 'Cursor',
       windsurf: 'Windsurf',
       vim: 'Vim',
+      kak: 'Kakoune',
     };
     const scope = SettingScope.User;
 
