@@ -203,7 +203,7 @@ jobs:
         run: |
           ROLLBACK_COMMIT=$(git rev-parse -q --verify "$TARGET_TAG")
           if [ "$ROLLBACK_COMMIT" != "$TARGET_HASH" ]; then
-            echo '❌ Failed to add tag $TARGET_TAG to commit $TARGET_HASH'
+            echo "❌ Failed to add tag ${TARGET_TAG} to commit ${TARGET_HASH}"
             echo '❌ This means the tag was not added, and the workflow should fail.'
             exit 1
           fi

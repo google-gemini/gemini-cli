@@ -5,10 +5,8 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Mock, Mocked } from 'vitest';
+import type { Mocked } from 'vitest';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import * as fs from 'node:fs';
-import { EDIT_TOOL_NAME } from '../tools/tool-names.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 
 // MOCKS
@@ -16,75 +14,16 @@ let callCount = 0;
 const mockResponses: any[] = [];
 
 let mockGenerateJson: any;
-let mockStartChat: any;
-let mockSendMessageStream: any;
 
-vi.mock('fs', () => ({
-  statSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  createWriteStream: vi.fn(() => ({
-    write: vi.fn(),
-    on: vi.fn(),
-  })),
-}));
-
-vi.mock('../core/client.js', () => ({
-  GeminiClient: vi.fn().mockImplementation(function (
-    this: any,
-    _config: Config,
-  ) {
-    this.startChat = (...params: any[]) => mockStartChat(...params);
-    this.sendMessageStream = (...params: any[]) =>
-      mockSendMessageStream(...params);
-    return this;
-  }),
-}));
 // END MOCKS
 
 import {
-  countOccurrences,
-  ensureCorrectEdit,
   ensureCorrectFileContent,
   unescapeStringForGeminiBug,
   resetEditCorrectorCaches_TEST_ONLY,
 } from './editCorrector.js';
-import { GeminiClient } from '../core/client.js';
-import type { Config } from '../config/config.js';
-import { ToolRegistry } from '../tools/tool-registry.js';
-
-vi.mock('../tools/tool-registry.js');
 
 describe('editCorrector', () => {
-  describe('countOccurrences', () => {
-    it('should return 0 for empty string', () => {
-      expect(countOccurrences('', 'a')).toBe(0);
-    });
-    it('should return 0 for empty substring', () => {
-      expect(countOccurrences('abc', '')).toBe(0);
-    });
-    it('should return 0 if substring is not found', () => {
-      expect(countOccurrences('abc', 'd')).toBe(0);
-    });
-    it('should return 1 if substring is found once', () => {
-      expect(countOccurrences('abc', 'b')).toBe(1);
-    });
-    it('should return correct count for multiple occurrences', () => {
-      expect(countOccurrences('ababa', 'a')).toBe(3);
-      expect(countOccurrences('ababab', 'ab')).toBe(3);
-    });
-    it('should count non-overlapping occurrences', () => {
-      expect(countOccurrences('aaaaa', 'aa')).toBe(2);
-      expect(countOccurrences('ababab', 'aba')).toBe(1);
-    });
-    it('should correctly count occurrences when substring is longer', () => {
-      expect(countOccurrences('abc', 'abcdef')).toBe(0);
-    });
-    it('should be case-sensitive', () => {
-      expect(countOccurrences('abcABC', 'a')).toBe(1);
-      expect(countOccurrences('abcABC', 'A')).toBe(1);
-    });
-  });
-
   describe('unescapeStringForGeminiBug', () => {
     it('should unescape common sequences', () => {
       expect(unescapeStringForGeminiBug('\\n')).toBe('\n');
@@ -153,542 +92,6 @@ describe('editCorrector', () => {
       expect(unescapeStringForGeminiBug('quote\\\\"text\\\\nline')).toBe(
         'quote"text\nline',
       );
-    });
-  });
-
-  describe('ensureCorrectEdit', () => {
-    let mockGeminiClientInstance: Mocked<GeminiClient>;
-    let mockBaseLlmClientInstance: Mocked<BaseLlmClient>;
-    let mockToolRegistry: Mocked<ToolRegistry>;
-    let mockConfigInstance: Config;
-    const abortSignal = new AbortController().signal;
-
-    beforeEach(() => {
-      mockToolRegistry = new ToolRegistry(
-        {} as Config,
-        {} as any,
-      ) as Mocked<ToolRegistry>;
-      const configParams = {
-        apiKey: 'test-api-key',
-        model: 'test-model',
-        sandbox: false as boolean | string,
-        targetDir: '/test',
-        debugMode: false,
-        question: undefined as string | undefined,
-
-        coreTools: undefined as string[] | undefined,
-        toolDiscoveryCommand: undefined as string | undefined,
-        toolCallCommand: undefined as string | undefined,
-        mcpServerCommand: undefined as string | undefined,
-        mcpServers: undefined as Record<string, any> | undefined,
-        userAgent: 'test-agent',
-        userMemory: '',
-        geminiMdFileCount: 0,
-        alwaysSkipModificationConfirmation: false,
-      };
-      mockConfigInstance = {
-        ...configParams,
-        getApiKey: vi.fn(() => configParams.apiKey),
-        getModel: vi.fn(() => configParams.model),
-        getSandbox: vi.fn(() => configParams.sandbox),
-        getTargetDir: vi.fn(() => configParams.targetDir),
-        getToolRegistry: vi.fn(() => mockToolRegistry),
-        getDebugMode: vi.fn(() => configParams.debugMode),
-        getQuestion: vi.fn(() => configParams.question),
-
-        getCoreTools: vi.fn(() => configParams.coreTools),
-        getToolDiscoveryCommand: vi.fn(() => configParams.toolDiscoveryCommand),
-        getToolCallCommand: vi.fn(() => configParams.toolCallCommand),
-        getMcpServerCommand: vi.fn(() => configParams.mcpServerCommand),
-        getMcpServers: vi.fn(() => configParams.mcpServers),
-        getUserAgent: vi.fn(() => configParams.userAgent),
-        getUserMemory: vi.fn(() => configParams.userMemory),
-        setUserMemory: vi.fn((mem: string) => {
-          configParams.userMemory = mem;
-        }),
-        getGeminiMdFileCount: vi.fn(() => configParams.geminiMdFileCount),
-        setGeminiMdFileCount: vi.fn((count: number) => {
-          configParams.geminiMdFileCount = count;
-        }),
-        getAlwaysSkipModificationConfirmation: vi.fn(
-          () => configParams.alwaysSkipModificationConfirmation,
-        ),
-        setAlwaysSkipModificationConfirmation: vi.fn((skip: boolean) => {
-          configParams.alwaysSkipModificationConfirmation = skip;
-        }),
-        getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
-        setQuotaErrorOccurred: vi.fn(),
-      } as unknown as Config;
-
-      callCount = 0;
-      mockResponses.length = 0;
-      mockGenerateJson = vi
-        .fn()
-        .mockImplementation((_contents, _schema, signal) => {
-          // Check if the signal is aborted. If so, throw an error or return a specific response.
-          if (signal && signal.aborted) {
-            return Promise.reject(new Error('Aborted')); // Or some other specific error/response
-          }
-          const response = mockResponses[callCount];
-          callCount++;
-          if (response === undefined) return Promise.resolve({});
-          return Promise.resolve(response);
-        });
-      mockStartChat = vi.fn();
-      mockSendMessageStream = vi.fn();
-
-      mockGeminiClientInstance = new GeminiClient(
-        mockConfigInstance,
-      ) as Mocked<GeminiClient>;
-      mockGeminiClientInstance.getHistory = vi.fn().mockReturnValue([]);
-      mockBaseLlmClientInstance = {
-        generateJson: mockGenerateJson,
-        config: {
-          generationConfigService: {
-            getResolvedConfig: vi.fn().mockReturnValue({
-              model: 'edit-corrector',
-              generateContentConfig: {},
-            }),
-          },
-        },
-      } as unknown as Mocked<BaseLlmClient>;
-      resetEditCorrectorCaches_TEST_ONLY();
-    });
-
-    describe('Scenario Group 1: originalParams.old_string matches currentContent directly', () => {
-      it('Test 1.1: old_string (no literal \\), new_string (escaped by Gemini) -> new_string unescaped', async () => {
-        const currentContent = 'This is a test string to find me.';
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: 'find me',
-          new_string: 'replace with \\"this\\"',
-        };
-        mockResponses.push({
-          corrected_new_string_escaping: 'replace with "this"',
-        });
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
-        expect(result.params.new_string).toBe('replace with "this"');
-        expect(result.params.old_string).toBe('find me');
-        expect(result.occurrences).toBe(1);
-      });
-      it('Test 1.2: old_string (no literal \\), new_string (correctly formatted) -> new_string unchanged', async () => {
-        const currentContent = 'This is a test string to find me.';
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: 'find me',
-          new_string: 'replace with this',
-        };
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(0);
-        expect(result.params.new_string).toBe('replace with this');
-        expect(result.params.old_string).toBe('find me');
-        expect(result.occurrences).toBe(1);
-      });
-      it('Test 1.3: old_string (with literal \\), new_string (escaped by Gemini) -> new_string unchanged (still escaped)', async () => {
-        const currentContent = 'This is a test string to find\\me.';
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: 'find\\me',
-          new_string: 'replace with \\"this\\"',
-        };
-        mockResponses.push({
-          corrected_new_string_escaping: 'replace with "this"',
-        });
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
-        expect(result.params.new_string).toBe('replace with "this"');
-        expect(result.params.old_string).toBe('find\\me');
-        expect(result.occurrences).toBe(1);
-      });
-      it('Test 1.4: old_string (with literal \\), new_string (correctly formatted) -> new_string unchanged', async () => {
-        const currentContent = 'This is a test string to find\\me.';
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: 'find\\me',
-          new_string: 'replace with this',
-        };
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(0);
-        expect(result.params.new_string).toBe('replace with this');
-        expect(result.params.old_string).toBe('find\\me');
-        expect(result.occurrences).toBe(1);
-      });
-    });
-
-    describe('Scenario Group 2: originalParams.old_string does NOT match, but unescapeStringForGeminiBug(originalParams.old_string) DOES match', () => {
-      it('Test 2.1: old_string (over-escaped, no intended literal \\), new_string (escaped by Gemini) -> new_string unescaped', async () => {
-        const currentContent = 'This is a test string to find "me".';
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: 'find \\"me\\"',
-          new_string: 'replace with \\"this\\"',
-        };
-        mockResponses.push({ corrected_new_string: 'replace with "this"' });
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
-        expect(result.params.new_string).toBe('replace with "this"');
-        expect(result.params.old_string).toBe('find "me"');
-        expect(result.occurrences).toBe(1);
-      });
-      it('Test 2.2: old_string (over-escaped, no intended literal \\), new_string (correctly formatted) -> new_string unescaped (harmlessly)', async () => {
-        const currentContent = 'This is a test string to find "me".';
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: 'find \\"me\\"',
-          new_string: 'replace with this',
-        };
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(0);
-        expect(result.params.new_string).toBe('replace with this');
-        expect(result.params.old_string).toBe('find "me"');
-        expect(result.occurrences).toBe(1);
-      });
-      it('Test 2.3: old_string (over-escaped, with intended literal \\), new_string (simple) -> new_string corrected', async () => {
-        const currentContent = 'This is a test string to find \\me.';
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: 'find \\\\me',
-          new_string: 'replace with foobar',
-        };
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(0);
-        expect(result.params.new_string).toBe('replace with foobar');
-        expect(result.params.old_string).toBe('find \\me');
-        expect(result.occurrences).toBe(1);
-      });
-    });
-
-    describe('Scenario Group 3: LLM Correction Path', () => {
-      it('Test 3.1: old_string (no literal \\), new_string (escaped by Gemini), LLM re-escapes new_string -> final new_string is double unescaped', async () => {
-        const currentContent = 'This is a test string to corrected find me.';
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: 'find me',
-          new_string: 'replace with \\\\"this\\\\"',
-        };
-        const llmNewString = 'LLM says replace with "that"';
-        mockResponses.push({ corrected_new_string_escaping: llmNewString });
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
-        expect(result.params.new_string).toBe(llmNewString);
-        expect(result.params.old_string).toBe('find me');
-        expect(result.occurrences).toBe(1);
-      });
-      it('Test 3.2: old_string (with literal \\), new_string (escaped by Gemini), LLM re-escapes new_string -> final new_string is unescaped once', async () => {
-        const currentContent = 'This is a test string to corrected find me.';
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: 'find\\me',
-          new_string: 'replace with \\\\"this\\\\"',
-        };
-        const llmCorrectedOldString = 'corrected find me';
-        const llmNewString = 'LLM says replace with "that"';
-        mockResponses.push({ corrected_target_snippet: llmCorrectedOldString });
-        mockResponses.push({ corrected_new_string: llmNewString });
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(2);
-        expect(result.params.new_string).toBe(llmNewString);
-        expect(result.params.old_string).toBe(llmCorrectedOldString);
-        expect(result.occurrences).toBe(1);
-      });
-      it('Test 3.3: old_string needs LLM, new_string is fine -> old_string corrected, new_string original', async () => {
-        const currentContent = 'This is a test string to be corrected.';
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: 'fiiind me',
-          new_string: 'replace with "this"',
-        };
-        const llmCorrectedOldString = 'to be corrected';
-        mockResponses.push({ corrected_target_snippet: llmCorrectedOldString });
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
-        expect(result.params.new_string).toBe('replace with "this"');
-        expect(result.params.old_string).toBe(llmCorrectedOldString);
-        expect(result.occurrences).toBe(1);
-      });
-      it('Test 3.4: LLM correction path, correctNewString returns the originalNewString it was passed (which was unescaped) -> final new_string is unescaped', async () => {
-        const currentContent = 'This is a test string to corrected find me.';
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: 'find me',
-          new_string: 'replace with \\\\"this\\\\"',
-        };
-        const newStringForLLMAndReturnedByLLM = 'replace with "this"';
-        mockResponses.push({
-          corrected_new_string_escaping: newStringForLLMAndReturnedByLLM,
-        });
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
-        expect(result.params.new_string).toBe(newStringForLLMAndReturnedByLLM);
-        expect(result.occurrences).toBe(1);
-      });
-    });
-
-    describe('Scenario Group 4: No Match Found / Multiple Matches', () => {
-      it('Test 4.1: No version of old_string (original, unescaped, LLM-corrected) matches -> returns original params, 0 occurrences', async () => {
-        const currentContent = 'This content has nothing to find.';
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: 'nonexistent string',
-          new_string: 'some new string',
-        };
-        mockResponses.push({ corrected_target_snippet: 'still nonexistent' });
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
-        expect(result.params).toEqual(originalParams);
-        expect(result.occurrences).toBe(0);
-      });
-      it('Test 4.2: unescapedOldStringAttempt results in >1 occurrences -> returns original params, count occurrences', async () => {
-        const currentContent =
-          'This content has find "me" and also find "me" again.';
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: 'find "me"',
-          new_string: 'some new string',
-        };
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(0);
-        expect(result.params).toEqual(originalParams);
-        expect(result.occurrences).toBe(2);
-      });
-    });
-
-    describe('Scenario Group 5: Specific unescapeStringForGeminiBug checks (integrated into ensureCorrectEdit)', () => {
-      it('Test 5.1: old_string needs LLM to become currentContent, new_string also needs correction', async () => {
-        const currentContent = 'const x = "a\nbc\\"def\\"';
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: 'const x = \\"a\\nbc\\\\"def\\\\"',
-          new_string: 'const y = \\"new\\nval\\\\"content\\\\"',
-        };
-        const expectedFinalNewString = 'const y = "new\nval\\"content\\"';
-        mockResponses.push({ corrected_target_snippet: currentContent });
-        mockResponses.push({ corrected_new_string: expectedFinalNewString });
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-        expect(mockGenerateJson).toHaveBeenCalledTimes(2);
-        expect(result.params.old_string).toBe(currentContent);
-        expect(result.params.new_string).toBe(expectedFinalNewString);
-        expect(result.occurrences).toBe(1);
-      });
-    });
-
-    describe('Scenario Group 6: Concurrent Edits', () => {
-      it('Test 6.1: should return early if file was modified by another process', async () => {
-        const filePath = '/test/file.txt';
-        const currentContent =
-          'This content has been modified by someone else.';
-        const originalParams = {
-          file_path: filePath,
-          old_string: 'nonexistent string',
-          new_string: 'some new string',
-        };
-
-        const now = Date.now();
-        const lastEditTime = now - 5000; // 5 seconds ago
-
-        // Mock the file's modification time to be recent
-        vi.spyOn(fs, 'statSync').mockReturnValue({
-          mtimeMs: now,
-        } as fs.Stats);
-
-        // Mock the last edit timestamp from our history to be in the past
-        const history = [
-          {
-            role: 'model',
-            parts: [
-              {
-                functionResponse: {
-                  name: EDIT_TOOL_NAME,
-                  id: `${EDIT_TOOL_NAME}-${lastEditTime}-123`,
-                  response: {
-                    output: {
-                      llmContent: `Successfully modified file: ${filePath}`,
-                    },
-                  },
-                },
-              },
-            ],
-          },
-        ];
-        (mockGeminiClientInstance.getHistory as Mock).mockReturnValue(history);
-
-        const result = await ensureCorrectEdit(
-          filePath,
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-
-        expect(result.occurrences).toBe(0);
-        expect(result.params).toEqual(originalParams);
-      });
-    });
-
-    describe('Scenario Group 7: Trimming with Newline Preservation', () => {
-      it('Test 7.1: should preserve trailing newlines in new_string when trimming is applied', async () => {
-        const currentContent = '  find me'; // Matches old_string initially
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: '  find me', // Matches, but has whitespace to trim
-          new_string: '  replaced\n\n', // Needs trimming but preserve newlines
-        };
-
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-
-        // old_string should be trimmed to 'find me' because 'find me' also exists uniquely in '  find me'
-        expect(result.params.old_string).toBe('find me');
-        // new_string should be trimmed of spaces but keep ALL newlines
-        expect(result.params.new_string).toBe('replaced\n\n');
-        expect(result.occurrences).toBe(1);
-      });
-
-      it('Test 7.2: should handle trailing newlines separated by spaces (regression fix)', async () => {
-        const currentContent = 'find me '; // Matches old_string initially
-        const originalParams = {
-          file_path: '/test/file.txt',
-          old_string: 'find me ', // Trailing space
-          new_string: 'replaced \n \n', // Trailing newlines with spaces
-        };
-
-        const result = await ensureCorrectEdit(
-          '/test/file.txt',
-          currentContent,
-          originalParams,
-          mockGeminiClientInstance,
-          mockBaseLlmClientInstance,
-          abortSignal,
-          false,
-        );
-
-        expect(result.params.old_string).toBe('find me');
-        // Should capture both newlines and join them, stripping the space between
-        expect(result.params.new_string).toBe('replaced\n\n');
-        expect(result.occurrences).toBe(1);
-      });
     });
   });
 
@@ -810,6 +213,38 @@ describe('editCorrector', () => {
       );
 
       expect(result).toBe(correctedContent);
+    });
+
+    it('should return unescaped content when LLM is disabled and aggressiveUnescape is true', async () => {
+      const content = 'LaTeX command \\\\title{Example}';
+      // unescapeStringForGeminiBug would change \\\\title to \title (literal tab and "itle")
+      const expected = 'LaTeX command \title{Example}';
+
+      const result = await ensureCorrectFileContent(
+        content,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        true, // disableLLMCorrection
+        true, // aggressiveUnescape
+      );
+
+      expect(result).toBe(expected);
+      expect(mockGenerateJson).not.toHaveBeenCalled();
+    });
+
+    it('should return original content when LLM is disabled and aggressiveUnescape is false', async () => {
+      const content = 'LaTeX command \\\\title{Example}';
+
+      const result = await ensureCorrectFileContent(
+        content,
+        mockBaseLlmClientInstance,
+        abortSignal,
+        true, // disableLLMCorrection
+        false, // aggressiveUnescape
+      );
+
+      expect(result).toBe(content);
+      expect(mockGenerateJson).not.toHaveBeenCalled();
     });
   });
 });
