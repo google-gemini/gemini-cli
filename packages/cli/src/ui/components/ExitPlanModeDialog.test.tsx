@@ -167,6 +167,7 @@ Implement a comprehensive authentication system with multiple providers.
             readTextFile: vi.fn(),
             writeTextFile: vi.fn(),
           }),
+          getUseAlternateBuffer: () => options?.useAlternateBuffer ?? true,
         } as unknown as import('@google/gemini-cli-core').Config,
       },
     );
@@ -443,6 +444,7 @@ Implement a comprehensive authentication system with multiple providers.
                 readTextFile: vi.fn(),
                 writeTextFile: vi.fn(),
               }),
+              getUseAlternateBuffer: () => useAlternateBuffer ?? true,
             } as unknown as import('@google/gemini-cli-core').Config,
           },
         );
