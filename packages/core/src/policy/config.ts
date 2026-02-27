@@ -14,7 +14,6 @@ import {
   type PolicyEngineConfig,
   PolicyDecision,
   type PolicyRule,
-  ApprovalMode,
   type PolicySettings,
   type SafetyCheckerRule,
 } from './types.js';

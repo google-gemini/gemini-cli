@@ -70,7 +70,7 @@ describe('Plan Mode', () => {
           experimental: { plan: true },
           tools: {
             core: ['write_file', 'read_file', 'list_directory'],
-            allowed: ['write_file']
+            allowed: ['write_file'],
           },
           general: {
             defaultApprovalMode: 'plan',
@@ -84,7 +84,7 @@ describe('Plan Mode', () => {
 
     // We ask the agent to create a plan for a feature, which should trigger a write_file in the plans directory.
     // Verify that write_file outside of plan directory fails
-    const output = await rig.run({
+    await rig.run({
       approvalMode: 'plan',
       stdin:
         'Create a file called plan.md in the plans directory. Then create a file called hello.txt in the current directory',
