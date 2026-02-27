@@ -436,6 +436,7 @@ export function isDebugMode(argv: CliArgs): boolean {
 
 export interface LoadCliConfigOptions {
   cwd?: string;
+  skipMemoryLoad?: boolean;
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
     disabled?: string[];
   };
@@ -517,7 +518,7 @@ export async function loadCliConfig(
   let fileCount = 0;
   let filePaths: string[] = [];
 
-  if (!experimentalJitContext) {
+  if (!experimentalJitContext && !options.skipMemoryLoad) {
     // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
     const result = await loadServerHierarchicalMemory(
       cwd,
