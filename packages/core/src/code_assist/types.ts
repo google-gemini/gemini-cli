@@ -60,7 +60,7 @@ export interface LoadCodeAssistResponse {
  * GeminiUserTier reflects the structure received from the CodeAssist when calling LoadCodeAssist.
  */
 export interface GeminiUserTier {
-  id: UserTierId;
+  id?: UserTierId;
   name?: string;
   description?: string;
   // This value is used to declare whether a given tier requires the user to configure the project setting on the IDE settings or not.
@@ -79,10 +79,10 @@ export interface GeminiUserTier {
  * @param tierName name of the tier.
  */
 export interface IneligibleTier {
-  reasonCode: IneligibleTierReasonCode;
-  reasonMessage: string;
-  tierId: UserTierId;
-  tierName: string;
+  reasonCode?: IneligibleTierReasonCode;
+  reasonMessage?: string;
+  tierId?: UserTierId;
+  tierName?: string;
   validationErrorMessage?: string;
   validationUrl?: string;
   validationUrlLinkText?: string;
@@ -127,7 +127,7 @@ export type UserTierId = (typeof UserTierId)[keyof typeof UserTierId] | string;
  * privacy notice.
  */
 export interface PrivacyNotice {
-  showNotice: boolean;
+  showNotice?: boolean;
   noticeText?: string;
 }
 
@@ -145,7 +145,7 @@ export interface OnboardUserRequest {
  * http://google3/google/longrunning/operations.proto;rcl=698857719;l=107
  */
 export interface LongRunningOperationResponse {
-  name: string;
+  name?: string;
   done?: boolean;
   response?: OnboardUserResponse;
 }
@@ -157,8 +157,8 @@ export interface LongRunningOperationResponse {
 export interface OnboardUserResponse {
   // tslint:disable-next-line:enforce-name-casing This is the name of the field in the proto.
   cloudaicompanionProject?: {
-    id: string;
-    name: string;
+    id?: string;
+    name?: string;
   };
 }
 
@@ -195,7 +195,7 @@ export interface SetCodeAssistGlobalUserSettingRequest {
 
 export interface CodeAssistGlobalUserSettingResponse {
   cloudaicompanionProject?: string;
-  freeTierDataCollectionOptin: boolean;
+  freeTierDataCollectionOptin?: boolean;
 }
 
 /**
