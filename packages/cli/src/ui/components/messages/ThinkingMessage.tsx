@@ -19,7 +19,7 @@ interface ThinkingMessageProps {
 }
 
 const THINKING_LEFT_PADDING = 1;
-const VERTICAL_LINE_WIDTH = 2;
+const VERTICAL_LINE_WIDTH = 1;
 
 function splitGraphemes(value: string): string[] {
   if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
@@ -148,7 +148,7 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
 
   const verticalLine = (
     <Box width={VERTICAL_LINE_WIDTH}>
-      <Text color={theme.text.secondary}>│ </Text>
+      <Text color={theme.text.secondary}>│</Text>
     </Box>
   );
 
