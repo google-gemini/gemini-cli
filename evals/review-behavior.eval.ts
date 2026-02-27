@@ -8,32 +8,40 @@ import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 
 const FILES = {
-  'package.json': JSON.stringify({
-    name: 'review-project',
-    version: '1.0.0',
-    scripts: {
-      test: 'echo "All tests passed!"',
-      build: 'tsc'
+  'package.json': JSON.stringify(
+    {
+      name: 'review-project',
+      version: '1.0.0',
+      scripts: {
+        test: 'echo "All tests passed!"',
+        build: 'tsc',
+      },
+      dependencies: {
+        express: '^4.18.2',
+      },
+      devDependencies: {
+        typescript: '^5.0.0',
+        '@types/express': '^4.17.17',
+      },
     },
-    dependencies: {
-      express: '^4.18.2'
+    null,
+    2,
+  ),
+  'tsconfig.json': JSON.stringify(
+    {
+      compilerOptions: {
+        target: 'es2022',
+        module: 'commonjs',
+        strict: true,
+        esModuleInterop: true,
+        skipLibCheck: true,
+        forceConsistentCasingInFileNames: true,
+      },
+      include: ['src/**/*'],
     },
-    devDependencies: {
-      typescript: '^5.0.0',
-      '@types/express': '^4.17.17'
-    }
-  }, null, 2),
-  'tsconfig.json': JSON.stringify({
-    compilerOptions: {
-      target: 'es2022',
-      module: 'commonjs',
-      strict: true,
-      esModuleInterop: true,
-      skipLibCheck: true,
-      forceConsistentCasingInFileNames: true
-    },
-    include: ['src/**/*']
-  }, null, 2),
+    null,
+    2,
+  ),
   'src/index.ts': `
 import express from 'express';
 const app = express();
@@ -47,14 +55,14 @@ app.listen(port, () => {
   console.log(\`Server listening on port \${port}\`);
 });
 `.trim(),
-  '.gitignore': 'node_modules\\n'
+  '.gitignore': 'node_modules\\n',
 } as const;
 
 describe('review behavior eval', () => {
   evalTest('USUALLY_PASSES', {
     name: 'should not run git status for a trivial code change',
     prompt:
-      'Change the response of the "/" route in src/index.ts to say "Hello Universe!" instead of "Hello World!". Make the change and do nothing else.',
+      'Change the response of the "/" route in src/index.ts to say "Hello Universe!" instead of "Hello World!".',
     files: FILES,
     assert: async (rig, _result) => {
       const toolLogs = rig.readToolLogs();
@@ -75,7 +83,7 @@ describe('review behavior eval', () => {
   evalTest('USUALLY_PASSES', {
     name: 'should run git status for a non-trivial code change',
     prompt:
-      'Refactor the codebase by extracting the express route in src/index.ts into a new module called src/routes.ts. Ensure the application still works. After you finish the code changes, prepare a commit.',
+      'Refactor the codebase by extracting the express route in src/index.ts into a new module called src/routes.ts.',
     files: FILES,
     assert: async (rig, _result) => {
       const toolLogs = rig.readToolLogs();
