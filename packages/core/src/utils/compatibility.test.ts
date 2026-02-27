@@ -32,6 +32,7 @@ describe('compatibility', () => {
       isVSCode: false,
       isITerm2: false,
       isGhostty: false,
+      isAppleTerminal: false,
       isWindows10: false,
       supports256Colors: true,
       supportsTrueColor: true,
@@ -146,6 +147,7 @@ describe('compatibility', () => {
       vi.stubEnv('TERM_PROGRAM', 'Apple_Terminal');
       const termEnv = {
         ...defaultEnv,
+        isAppleTerminal: true,
         supports256Colors: true,
         supportsTrueColor: false,
       };

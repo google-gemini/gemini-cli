@@ -13,7 +13,11 @@ import {
   getTerminalCapabilities,
   type TerminalEnvironment,
 } from '@google/gemini-cli-core';
-import type { LoadedSettings } from '../../config/settings.js';
+import type {
+  LoadedSettings} from '../../config/settings.js';
+import {
+  createTestMergedSettings,
+} from '../../config/settings.js';
 
 vi.mock('../contexts/SettingsContext.js', () => ({
   useSettings: vi.fn(),
@@ -39,15 +43,16 @@ describe('useTerminalCapabilities', () => {
   });
 
   it('should return terminal capabilities based on detection and settings', () => {
-    const mockSettings = {
-      merged: {
-        ui: {
-          compatibility: {
-            forceAltBuffer: true,
-          },
+    const merged = createTestMergedSettings({
+      ui: {
+        compatibility: {
+          forceAltBuffer: true,
         },
       },
-    } as unknown as LoadedSettings;
+    });
+    const mockSettings = {
+      merged,
+    } as LoadedSettings;
     vi.mocked(useSettings).mockReturnValue(mockSettings);
 
     const mockEnv = { isJetBrains: true } as TerminalEnvironment;
@@ -76,15 +81,16 @@ describe('useTerminalCapabilities', () => {
   });
 
   it('should update when settings change', () => {
-    const mockSettings1 = {
-      merged: {
-        ui: {
-          compatibility: {
-            forceAltBuffer: false,
-          },
+    const merged1 = createTestMergedSettings({
+      ui: {
+        compatibility: {
+          forceAltBuffer: false,
         },
       },
-    } as unknown as LoadedSettings;
+    });
+    const mockSettings1 = {
+      merged: merged1,
+    } as LoadedSettings;
     vi.mocked(useSettings).mockReturnValue(mockSettings1);
 
     const mockEnv = { isJetBrains: false } as TerminalEnvironment;
@@ -105,15 +111,16 @@ describe('useTerminalCapabilities', () => {
 
     expect(result.current).toEqual(mockCaps1.capabilities);
 
-    const mockSettings2 = {
-      merged: {
-        ui: {
-          compatibility: {
-            forceAltBuffer: true,
-          },
+    const merged2 = createTestMergedSettings({
+      ui: {
+        compatibility: {
+          forceAltBuffer: true,
         },
       },
-    } as unknown as LoadedSettings;
+    });
+    const mockSettings2 = {
+      merged: merged2,
+    } as LoadedSettings;
     vi.mocked(useSettings).mockReturnValue(mockSettings2);
 
     const mockCaps2: ReturnType<typeof getTerminalCapabilities> = {

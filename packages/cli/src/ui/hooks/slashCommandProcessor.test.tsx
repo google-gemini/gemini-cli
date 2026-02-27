@@ -248,7 +248,11 @@ describe('useSlashCommandProcessor', () => {
           true, // isConfigInitialized
           vi.fn(), // setBannerVisible
           vi.fn(), // setCustomDialog
-          { supportsReliableBackbufferClear: true } as TerminalCapabilities,
+          {
+            supportsAltBuffer: true,
+            supportsMouse: true,
+            supportsReliableBackbufferClear: true,
+          } satisfies TerminalCapabilities,
         ),
       );
       result = hook.result;

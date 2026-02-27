@@ -74,6 +74,8 @@ import {
   getVersion,
   ValidationCancelledError,
   ValidationRequiredError,
+  type TerminalEnvironment,
+  type TerminalCapabilities,
   type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 import {
@@ -192,25 +194,31 @@ export async function startInteractiveUI(
   workspaceRoot: string = process.cwd(),
   resumedSessionData: ResumedSessionData | undefined,
   initializationResult: InitializationResult,
+  termEnv?: TerminalEnvironment,
+  capabilities?: TerminalCapabilities,
 ) {
   // Never enter Ink alternate buffer mode when screen reader mode is enabled
   // as there is no benefit of alternate buffer mode when using a screen reader
   // and the Ink alternate buffer mode requires line wrapping harmful to
   // screen readers.
-  const termEnv = detectTerminalEnvironment();
-  const { capabilities } = getTerminalCapabilities(termEnv, process.env, {
-    forceAltBuffer: settings.merged.ui.compatibility?.forceAltBuffer,
-    disableAltBuffer: settings.merged.ui.compatibility?.disableAltBuffer,
-    disableMouse: settings.merged.ui.compatibility?.disableMouse,
-    assumeTrustedTerminal:
-      settings.merged.ui.compatibility?.assumeTrustedTerminal,
-  });
+  const resolvedTermEnv: TerminalEnvironment =
+    termEnv ?? detectTerminalEnvironment();
+  const resolvedCapabilities: TerminalCapabilities =
+    capabilities ??
+    getTerminalCapabilities(resolvedTermEnv, process.env, {
+      forceAltBuffer: settings.merged.ui.compatibility?.forceAltBuffer,
+      disableAltBuffer: settings.merged.ui.compatibility?.disableAltBuffer,
+      disableMouse: settings.merged.ui.compatibility?.disableMouse,
+      assumeTrustedTerminal:
+        settings.merged.ui.compatibility?.assumeTrustedTerminal,
+    }).capabilities;
 
   const useAlternateBuffer = shouldEnterAlternateScreen(
-    isAlternateBufferEnabled(config, capabilities),
+    isAlternateBufferEnabled(config, resolvedCapabilities),
     config.getScreenReader(),
   );
-  const mouseEventsEnabled = useAlternateBuffer && capabilities.supportsMouse;
+  const mouseEventsEnabled =
+    useAlternateBuffer && resolvedCapabilities.supportsMouse;
   if (mouseEventsEnabled) {
     enableMouseEvents();
     registerCleanup(() => {
@@ -688,7 +696,7 @@ export async function main() {
     }
 
     let input = config.getQuestion();
-    const termEnv = detectTerminalEnvironment();
+    const termEnv: TerminalEnvironment = detectTerminalEnvironment();
     const { capabilities, warnings, reasons } = getTerminalCapabilities(
       termEnv,
       process.env,
@@ -761,6 +769,8 @@ export async function main() {
         process.cwd(),
         resumedSessionData,
         initializationResult,
+        termEnv,
+        capabilities,
       );
       return;
     }

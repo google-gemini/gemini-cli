@@ -69,21 +69,15 @@ export function getCompatibilityWarnings(options?: {
     !env.supportsTrueColor &&
     !env.isITerm2 &&
     !env.isVSCode &&
-    !env.isGhostty
+    !env.isGhostty &&
+    !env.isAppleTerminal
   ) {
-    // Only warn about true color if it's not a known-good terminal that might just be missing the env var
-    // Apple Terminal doesn't support true color, but we don't want to be too noisy if it's just a common limitation.
-    // The previous code had a check for !isAppleTerminal().
-    // Apple Terminal.app is detected as TERM_PROGRAM=Apple_Terminal.
-    const isAppleTerminal = process.env['TERM_PROGRAM'] === 'Apple_Terminal';
-    if (!isAppleTerminal) {
-      warnings.push({
-        id: 'true-color',
-        message:
-          'Warning: True color (24-bit) support not detected. Using a terminal with true color enabled will result in a better visual experience.',
-        priority: WarningPriority.Low,
-      });
-    }
+    warnings.push({
+      id: 'true-color',
+      message:
+        'Warning: True color (24-bit) support not detected. Using a terminal with true color enabled will result in a better visual experience.',
+      priority: WarningPriority.Low,
+    });
   }
 
   return warnings;

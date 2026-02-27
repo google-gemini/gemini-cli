@@ -25,6 +25,7 @@ export interface TerminalEnvironment {
   isVSCode: boolean;
   isITerm2: boolean;
   isGhostty: boolean;
+  isAppleTerminal: boolean;
   isWindows10: boolean;
   supports256Colors: boolean;
   supportsTrueColor: boolean;
@@ -60,6 +61,8 @@ export function detectTerminalEnvironment(
   const isITerm2 = termProgram === 'iTerm.app';
   // Ghostty sets TERM_PROGRAM=ghostty or GHOSTTY_BIN_DIR.
   const isGhostty = termProgram === 'ghostty' || !!env['GHOSTTY_BIN_DIR'];
+  // Apple Terminal.app is detected as TERM_PROGRAM=Apple_Terminal.
+  const isAppleTerminal = termProgram === 'Apple_Terminal';
 
   // Windows 10 detection: release version 10.0.x where x < 22000 (Win11 is >= 22000).
   let isWindows10 = false;
@@ -109,6 +112,7 @@ export function detectTerminalEnvironment(
     isVSCode,
     isITerm2,
     isGhostty,
+    isAppleTerminal,
     isWindows10,
     supports256Colors,
     supportsTrueColor,
