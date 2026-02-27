@@ -3,6 +3,8 @@
 exports[`ShellTool > getDescription > should return the non-windows description when not on windows 1`] = `
 "This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
 
+      The CLI will automatically prompt the user for confirmation before executing any command provided by this tool, so you MUST NOT ask for permission or confirmation separately (e.g., using ask_user).
+
       Efficiency Guidelines:
       - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
       - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
@@ -19,6 +21,8 @@ exports[`ShellTool > getDescription > should return the non-windows description 
 
 exports[`ShellTool > getDescription > should return the windows description when on windows 1`] = `
 "This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.
+
+      The CLI will automatically prompt the user for confirmation before executing any command provided by this tool, so you MUST NOT ask for permission or confirmation separately (e.g., using ask_user).
 
       Efficiency Guidelines:
       - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
@@ -37,6 +41,8 @@ exports[`ShellTool > getDescription > should return the windows description when
 exports[`ShellTool > getSchema > should return the base schema when no modelId is provided 1`] = `
 "This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
 
+      The CLI will automatically prompt the user for confirmation before executing any command provided by this tool, so you MUST NOT ask for permission or confirmation separately (e.g., using ask_user).
+
       Efficiency Guidelines:
       - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
       - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
@@ -53,6 +59,8 @@ exports[`ShellTool > getSchema > should return the base schema when no modelId i
 
 exports[`ShellTool > getSchema > should return the schema from the resolver when modelId is provided 1`] = `
 "This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
+
+      The CLI will automatically prompt the user for confirmation before executing any command provided by this tool, so you MUST NOT ask for permission or confirmation separately (e.g., using ask_user).
 
       Efficiency Guidelines:
       - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
