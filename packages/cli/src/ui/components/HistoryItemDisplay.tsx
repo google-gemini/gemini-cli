@@ -36,10 +36,7 @@ import { HooksList } from './views/HooksList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
 import { ThinkingMessage } from './messages/ThinkingMessage.js';
 import { HintMessage } from './messages/HintMessage.js';
-import {
-  getInlineThinkingMode,
-  type InlineThinkingMode,
-} from '../utils/inlineThinkingMode.js';
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 
 interface HistoryItemDisplayProps {
