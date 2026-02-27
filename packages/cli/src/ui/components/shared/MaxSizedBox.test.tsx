@@ -42,7 +42,7 @@ describe('<MaxSizedBox />', () => {
     );
     await waitUntilReady();
     expect(lastFrame()).toContain(
-      '... first 2 lines hidden (ctrl+o to show) ...',
+      '... first 2 lines hidden (Ctrl+O to show) ...',
     );
     expect(lastFrame()).toMatchSnapshot();
     unmount();
@@ -62,7 +62,7 @@ describe('<MaxSizedBox />', () => {
     );
     await waitUntilReady();
     expect(lastFrame()).toContain(
-      '... last 2 lines hidden (ctrl+o to show) ...',
+      '... last 2 lines hidden (Ctrl+O to show) ...',
     );
     expect(lastFrame()).toMatchSnapshot();
     unmount();
@@ -82,7 +82,7 @@ describe('<MaxSizedBox />', () => {
     );
     await waitUntilReady();
     expect(lastFrame()).toContain(
-      '... first 2 lines hidden (ctrl+o to show) ...',
+      '... first 2 lines hidden (Ctrl+O to show) ...',
     );
     expect(lastFrame()).toMatchSnapshot();
     unmount();
@@ -100,7 +100,7 @@ describe('<MaxSizedBox />', () => {
     );
     await waitUntilReady();
     expect(lastFrame()).toContain(
-      '... first 1 line hidden (ctrl+o to show) ...',
+      '... first 1 line hidden (Ctrl+O to show) ...',
     );
     expect(lastFrame()).toMatchSnapshot();
     unmount();
@@ -120,7 +120,7 @@ describe('<MaxSizedBox />', () => {
     );
     await waitUntilReady();
     expect(lastFrame()).toContain(
-      '... first 7 lines hidden (ctrl+o to show) ...',
+      '... first 7 lines hidden (Ctrl+O to show) ...',
     );
     expect(lastFrame()).toMatchSnapshot();
     unmount();
@@ -208,7 +208,7 @@ describe('<MaxSizedBox />', () => {
 
     await waitUntilReady();
     expect(lastFrame()).toContain(
-      '... first 21 lines hidden (ctrl+o to show) ...',
+      '... first 21 lines hidden (Ctrl+O to show) ...',
     );
     expect(lastFrame()).toMatchSnapshot();
     unmount();
@@ -231,7 +231,7 @@ describe('<MaxSizedBox />', () => {
 
     await waitUntilReady();
     expect(lastFrame()).toContain(
-      '... last 21 lines hidden (ctrl+o to show) ...',
+      '... last 21 lines hidden (Ctrl+O to show) ...',
     );
     expect(lastFrame()).toMatchSnapshot();
     unmount();
@@ -262,7 +262,7 @@ describe('<MaxSizedBox />', () => {
 
     // The last line should only contain the hidden indicator, no leaked content
     expect(lastLine).toMatch(
-      /^\.\.\. last \d+ lines? hidden \(ctrl\+o to show\) \.\.\.$/,
+      /^\.\.\. last \d+ lines? hidden \(Ctrl\+O to show\) \.\.\.$/,
     );
     expect(lastFrame()).toMatchSnapshot();
     unmount();
