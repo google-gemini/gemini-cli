@@ -322,27 +322,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
-exports[`SettingsDialog > Snapshot Tests > should render 'search mode with cursor' correctly 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│                                                                                                  │
-│  > Settings                                                                                      │
-│                                                                                                  │
-│ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
-│ │ /                                                                                            │ │
-│ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
-│                                                                                                  │
-│  No matches found.                                                                               │
-│                                                                                                  │
-│    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
-│    Workspace Settings                                                                            │
-│    System Settings                                                                               │
-│                                                                                                  │
-│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
-│                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
 exports[`SettingsDialog > Snapshot Tests > should render 'tools and security settings' correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │

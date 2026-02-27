@@ -1,20 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="920" height="156" viewBox="0 0 920 156">
   <style>
     text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+    a { text-decoration-color: inherit; }
   </style>
   <rect width="920" height="156" fill="#000000" />
   <g transform="translate(10, 10)">
     <text x="0" y="19" fill="#333333" textLength="819" lengthAdjust="spacingAndGlyphs">┌─────────────────────────────┬─────────────────────────────┬─────────────────────────────┐</text>
     <text x="0" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="18" y="36" fill="#89b4fa" textLength="72" lengthAdjust="spacingAndGlyphs">Header 1</text>
+    <text x="18" y="36" fill="#89b4fa" textLength="72" lengthAdjust="spacingAndGlyphs" font-weight="bold">Header 1</text>
     <text x="270" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="288" y="36" fill="#89b4fa" textLength="72" lengthAdjust="spacingAndGlyphs">Header 2</text>
+    <text x="288" y="36" fill="#89b4fa" textLength="72" lengthAdjust="spacingAndGlyphs" font-weight="bold">Header 2</text>
     <text x="540" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="558" y="36" fill="#89b4fa" textLength="72" lengthAdjust="spacingAndGlyphs">Header 3</text>
+    <text x="558" y="36" fill="#89b4fa" textLength="72" lengthAdjust="spacingAndGlyphs" font-weight="bold">Header 3</text>
     <text x="810" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="53" fill="#333333" textLength="819" lengthAdjust="spacingAndGlyphs">├─────────────────────────────┼─────────────────────────────┼─────────────────────────────┤</text>
     <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="9" y="70" fill="#ffffff" textLength="261" lengthAdjust="spacingAndGlyphs"> Bold with Italic and Strike </text>
+    <text x="18" y="70" fill="#ffffff" textLength="90" lengthAdjust="spacingAndGlyphs" font-weight="bold">Bold with </text>
+    <text x="108" y="70" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs" font-weight="bold" font-style="italic">Italic</text>
+    <text x="162" y="70" fill="#ffffff" textLength="99" lengthAdjust="spacingAndGlyphs" font-weight="bold"> and Strike</text>
     <text x="270" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="279" y="70" fill="#ffffff" textLength="261" lengthAdjust="spacingAndGlyphs"> Normal                      </text>
     <text x="540" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
@@ -23,7 +26,9 @@
     <text x="0" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="9" y="87" fill="#ffffff" textLength="261" lengthAdjust="spacingAndGlyphs"> Short                       </text>
     <text x="270" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="279" y="87" fill="#ffffff" textLength="261" lengthAdjust="spacingAndGlyphs"> Bold with Italic and Strike </text>
+    <text x="288" y="87" fill="#ffffff" textLength="90" lengthAdjust="spacingAndGlyphs" font-weight="bold">Bold with </text>
+    <text x="378" y="87" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs" font-weight="bold" font-style="italic">Italic</text>
+    <text x="432" y="87" fill="#ffffff" textLength="99" lengthAdjust="spacingAndGlyphs" font-weight="bold"> and Strike</text>
     <text x="540" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="549" y="87" fill="#ffffff" textLength="261" lengthAdjust="spacingAndGlyphs"> Normal                      </text>
     <text x="810" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
@@ -32,7 +37,9 @@
     <text x="270" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="279" y="104" fill="#ffffff" textLength="261" lengthAdjust="spacingAndGlyphs"> Short                       </text>
     <text x="540" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="549" y="104" fill="#ffffff" textLength="261" lengthAdjust="spacingAndGlyphs"> Bold with Italic and Strike </text>
+    <text x="558" y="104" fill="#ffffff" textLength="90" lengthAdjust="spacingAndGlyphs" font-weight="bold">Bold with </text>
+    <text x="648" y="104" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs" font-weight="bold" font-style="italic">Italic</text>
+    <text x="702" y="104" fill="#ffffff" textLength="99" lengthAdjust="spacingAndGlyphs" font-weight="bold"> and Strike</text>
     <text x="810" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="121" fill="#333333" textLength="819" lengthAdjust="spacingAndGlyphs">└─────────────────────────────┴─────────────────────────────┴─────────────────────────────┘</text>
   </g>

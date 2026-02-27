@@ -1,61 +1,62 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1460" height="615" viewBox="0 0 1460 615">
   <style>
     text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+    a { text-decoration-color: inherit; }
   </style>
   <rect width="1460" height="615" fill="#000000" />
   <g transform="translate(10, 10)">
     <text x="0" y="19" fill="#333333" textLength="1404" lengthAdjust="spacingAndGlyphs">┌─────────────────────────────┬──────────────────────────────┬─────────────────────────────┬──────────────────────────────┬─────┬────────┬─────────┬───────┐</text>
     <text x="0" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="18" y="36" fill="#89b4fa" textLength="243" lengthAdjust="spacingAndGlyphs">Comprehensive Architectural</text>
+    <text x="18" y="36" fill="#89b4fa" textLength="243" lengthAdjust="spacingAndGlyphs" font-weight="bold">Comprehensive Architectural</text>
     <text x="270" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="288" y="36" fill="#89b4fa" textLength="234" lengthAdjust="spacingAndGlyphs">Implementation Details for</text>
+    <text x="288" y="36" fill="#89b4fa" textLength="234" lengthAdjust="spacingAndGlyphs" font-weight="bold">Implementation Details for</text>
     <text x="549" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="567" y="36" fill="#89b4fa" textLength="216" lengthAdjust="spacingAndGlyphs">Longitudinal Performance</text>
+    <text x="567" y="36" fill="#89b4fa" textLength="216" lengthAdjust="spacingAndGlyphs" font-weight="bold">Longitudinal Performance</text>
     <text x="819" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="837" y="36" fill="#89b4fa" textLength="252" lengthAdjust="spacingAndGlyphs">Strategic Security Framework</text>
+    <text x="837" y="36" fill="#89b4fa" textLength="252" lengthAdjust="spacingAndGlyphs" font-weight="bold">Strategic Security Framework</text>
     <text x="1098" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="1116" y="36" fill="#89b4fa" textLength="27" lengthAdjust="spacingAndGlyphs">Key</text>
+    <text x="1116" y="36" fill="#89b4fa" textLength="27" lengthAdjust="spacingAndGlyphs" font-weight="bold">Key</text>
     <text x="1152" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="1170" y="36" fill="#89b4fa" textLength="54" lengthAdjust="spacingAndGlyphs">Status</text>
+    <text x="1170" y="36" fill="#89b4fa" textLength="54" lengthAdjust="spacingAndGlyphs" font-weight="bold">Status</text>
     <text x="1233" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="1251" y="36" fill="#89b4fa" textLength="63" lengthAdjust="spacingAndGlyphs">Version</text>
+    <text x="1251" y="36" fill="#89b4fa" textLength="63" lengthAdjust="spacingAndGlyphs" font-weight="bold">Version</text>
     <text x="1323" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="1341" y="36" fill="#89b4fa" textLength="45" lengthAdjust="spacingAndGlyphs">Owner</text>
+    <text x="1341" y="36" fill="#89b4fa" textLength="45" lengthAdjust="spacingAndGlyphs" font-weight="bold">Owner</text>
     <text x="1395" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="18" y="53" fill="#89b4fa" textLength="189" lengthAdjust="spacingAndGlyphs">Specification for the</text>
+    <text x="18" y="53" fill="#89b4fa" textLength="189" lengthAdjust="spacingAndGlyphs" font-weight="bold">Specification for the</text>
     <text x="270" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="288" y="53" fill="#89b4fa" textLength="171" lengthAdjust="spacingAndGlyphs">the High-Throughput</text>
+    <text x="288" y="53" fill="#89b4fa" textLength="171" lengthAdjust="spacingAndGlyphs" font-weight="bold">the High-Throughput</text>
     <text x="549" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="567" y="53" fill="#89b4fa" textLength="135" lengthAdjust="spacingAndGlyphs">Analysis Across</text>
+    <text x="567" y="53" fill="#89b4fa" textLength="135" lengthAdjust="spacingAndGlyphs" font-weight="bold">Analysis Across</text>
     <text x="819" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="837" y="53" fill="#89b4fa" textLength="252" lengthAdjust="spacingAndGlyphs">for Mitigating Sophisticated</text>
+    <text x="837" y="53" fill="#89b4fa" textLength="252" lengthAdjust="spacingAndGlyphs" font-weight="bold">for Mitigating Sophisticated</text>
     <text x="1098" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="1152" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="1233" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="1323" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="1395" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="18" y="70" fill="#89b4fa" textLength="234" lengthAdjust="spacingAndGlyphs">Distributed Infrastructure</text>
+    <text x="18" y="70" fill="#89b4fa" textLength="234" lengthAdjust="spacingAndGlyphs" font-weight="bold">Distributed Infrastructure</text>
     <text x="270" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="288" y="70" fill="#89b4fa" textLength="180" lengthAdjust="spacingAndGlyphs">Asynchronous Message</text>
+    <text x="288" y="70" fill="#89b4fa" textLength="180" lengthAdjust="spacingAndGlyphs" font-weight="bold">Asynchronous Message</text>
     <text x="549" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="567" y="70" fill="#89b4fa" textLength="180" lengthAdjust="spacingAndGlyphs">Multi-Regional Cloud</text>
+    <text x="567" y="70" fill="#89b4fa" textLength="180" lengthAdjust="spacingAndGlyphs" font-weight="bold">Multi-Regional Cloud</text>
     <text x="819" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="837" y="70" fill="#89b4fa" textLength="180" lengthAdjust="spacingAndGlyphs">Cross-Site Scripting</text>
+    <text x="837" y="70" fill="#89b4fa" textLength="180" lengthAdjust="spacingAndGlyphs" font-weight="bold">Cross-Site Scripting</text>
     <text x="1098" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="1152" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="1233" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="1323" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="1395" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="18" y="87" fill="#89b4fa" textLength="45" lengthAdjust="spacingAndGlyphs">Layer</text>
+    <text x="18" y="87" fill="#89b4fa" textLength="45" lengthAdjust="spacingAndGlyphs" font-weight="bold">Layer</text>
     <text x="270" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="288" y="87" fill="#89b4fa" textLength="216" lengthAdjust="spacingAndGlyphs">Processing Pipeline with</text>
+    <text x="288" y="87" fill="#89b4fa" textLength="216" lengthAdjust="spacingAndGlyphs" font-weight="bold">Processing Pipeline with</text>
     <text x="549" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="567" y="87" fill="#89b4fa" textLength="171" lengthAdjust="spacingAndGlyphs">Deployment Clusters</text>
+    <text x="567" y="87" fill="#89b4fa" textLength="171" lengthAdjust="spacingAndGlyphs" font-weight="bold">Deployment Clusters</text>
     <text x="819" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="837" y="87" fill="#89b4fa" textLength="135" lengthAdjust="spacingAndGlyphs">Vulnerabilities</text>
+    <text x="837" y="87" fill="#89b4fa" textLength="135" lengthAdjust="spacingAndGlyphs" font-weight="bold">Vulnerabilities</text>
     <text x="1098" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="1152" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="1233" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
@@ -63,7 +64,7 @@
     <text x="1395" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="270" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="288" y="104" fill="#89b4fa" textLength="180" lengthAdjust="spacingAndGlyphs">Extended Scalability</text>
+    <text x="288" y="104" fill="#89b4fa" textLength="180" lengthAdjust="spacingAndGlyphs" font-weight="bold">Extended Scalability</text>
     <text x="549" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="819" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="1098" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
@@ -73,7 +74,7 @@
     <text x="1395" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="270" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="288" y="121" fill="#89b4fa" textLength="207" lengthAdjust="spacingAndGlyphs">Features and Redundancy</text>
+    <text x="288" y="121" fill="#89b4fa" textLength="207" lengthAdjust="spacingAndGlyphs" font-weight="bold">Features and Redundancy</text>
     <text x="549" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="819" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="1098" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
@@ -83,7 +84,7 @@
     <text x="1395" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="270" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="288" y="138" fill="#89b4fa" textLength="81" lengthAdjust="spacingAndGlyphs">Protocols</text>
+    <text x="288" y="138" fill="#89b4fa" textLength="81" lengthAdjust="spacingAndGlyphs" font-weight="bold">Protocols</text>
     <text x="549" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="819" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="1098" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>

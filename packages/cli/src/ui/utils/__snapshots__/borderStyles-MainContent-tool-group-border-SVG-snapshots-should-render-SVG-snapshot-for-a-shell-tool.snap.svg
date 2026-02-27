@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="920" height="275" viewBox="0 0 920 275">
   <style>
     text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+    a { text-decoration-color: inherit; }
   </style>
   <rect width="920" height="275" fill="#000000" />
   <g transform="translate(10, 10)">
@@ -111,7 +112,8 @@
     <text x="180" y="138" fill="#b86a8d" textLength="9" lengthAdjust="spacingAndGlyphs">░</text>
     <text x="0" y="172" fill="#6c7086" textLength="864" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────╮</text>
     <text x="0" y="189" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="9" y="189" fill="#ffffff" textLength="846" lengthAdjust="spacingAndGlyphs"> ⊷  run_shell_command                                                                         </text>
+    <text x="9" y="189" fill="#ffffff" textLength="36" lengthAdjust="spacingAndGlyphs"> ⊷  </text>
+    <text x="45" y="189" fill="#ffffff" textLength="153" lengthAdjust="spacingAndGlyphs" font-weight="bold">run_shell_command</text>
     <text x="855" y="189" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="206" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="855" y="206" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
