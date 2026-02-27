@@ -359,14 +359,10 @@ describe('useToolScheduler', () => {
       } as ToolCallsUpdateMessage);
     });
 
-    let [toolCalls] = result.current;
-    expect(toolCalls).toHaveLength(2);
-    expect(
-      toolCalls.find((t) => t.request.callId === 'call-root')?.schedulerId,
-    ).toBe(ROOT_SCHEDULER_ID);
-    expect(
-      toolCalls.find((t) => t.request.callId === 'call-sub')?.schedulerId,
-    ).toBe('subagent-1');
+    const [toolCalls] = result.current;
+    expect(toolCalls).toHaveLength(1);
+    expect(toolCalls[0].request.callId).toBe('call-root');
+    expect(toolCalls[0].schedulerId).toBe(ROOT_SCHEDULER_ID);
 
     // 2. Call setToolCallsForDisplay (e.g., simulate a manual update or clear)
     act(() => {
@@ -377,34 +373,45 @@ describe('useToolScheduler', () => {
     });
 
     // 3. Verify that tools are still present and maintain their scheduler IDs
-    // The internal map should have been re-grouped.
-    [toolCalls] = result.current;
-    expect(toolCalls).toHaveLength(2);
-    expect(toolCalls.every((t) => t.responseSubmittedToGemini)).toBe(true);
+    const [toolCalls2] = result.current;
+    expect(toolCalls2).toHaveLength(1);
+    expect(toolCalls2[0].responseSubmittedToGemini).toBe(true);
+    expect(toolCalls2[0].schedulerId).toBe(ROOT_SCHEDULER_ID);
+  });
 
-    const updatedRoot = toolCalls.find((t) => t.request.callId === 'call-root');
-    const updatedSub = toolCalls.find((t) => t.request.callId === 'call-sub');
+  it('ignores TOOL_CALLS_UPDATE from non-root schedulers', () => {
+    const { result } = renderHook(() =>
+      useToolScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
 
-    expect(updatedRoot?.schedulerId).toBe(ROOT_SCHEDULER_ID);
-    expect(updatedSub?.schedulerId).toBe('subagent-1');
+    const subagentCall = {
+      status: CoreToolCallStatus.Executing as const,
+      request: {
+        callId: 'call-sub',
+        name: 'test',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: createMockTool(),
+      invocation: createMockInvocation(),
+      schedulerId: 'subagent-1',
+    };
 
-    // 4. Verify that a subsequent update to ONE scheduler doesn't wipe the other
     act(() => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
-        toolCalls: [{ ...callRoot, status: CoreToolCallStatus.Executing }],
-        schedulerId: ROOT_SCHEDULER_ID,
+        toolCalls: [subagentCall],
+        schedulerId: 'subagent-1',
       } as ToolCallsUpdateMessage);
     });
 
-    [toolCalls] = result.current;
-    expect(toolCalls).toHaveLength(2);
-    expect(
-      toolCalls.find((t) => t.request.callId === 'call-root')?.status,
-    ).toBe(CoreToolCallStatus.Executing);
-    expect(
-      toolCalls.find((t) => t.request.callId === 'call-sub')?.schedulerId,
-    ).toBe('subagent-1');
+    const [toolCalls] = result.current;
+    expect(toolCalls).toHaveLength(0);
   });
 
   it('adapts success/error status to executing when a tail call is present', () => {
