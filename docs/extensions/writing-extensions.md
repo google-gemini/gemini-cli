@@ -295,6 +295,7 @@ surface environmental context.
       "ui": {
         "badges": [
           {
+            "type": "command",
             "command": "sh",
             "args": ["${extensionPath}/status.sh"],
             "color": "accent",
