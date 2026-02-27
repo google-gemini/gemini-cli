@@ -122,6 +122,9 @@ describe('sandbox', () => {
   });
 
   afterEach(() => {
+    // Note: We intentionally avoid vi.restoreAllMocks() here because it clears the top-level
+    // vi.mock('@google/gemini-cli-core') entirely, making its un-exported constants (like GEMINI_DIR)
+    // undefined in subsequent tests. Call counts are still reset by clearAllMocks() in beforeEach.
     process.env = originalEnv;
     process.argv = originalArgv;
   });
