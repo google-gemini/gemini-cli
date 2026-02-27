@@ -10,10 +10,10 @@ import * as crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
 import {
+  ApprovalMode,
   type PolicyEngineConfig,
   PolicyDecision,
   type PolicyRule,
-  type ApprovalMode,
   type PolicySettings,
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
@@ -245,7 +245,7 @@ export async function createPolicyEngineConfig(
     ) {
       return {
         ...rule,
-        priority: rule.priority + 10,
+        priority: (rule.priority ?? 0) + 10,
       };
     }
     return rule;
