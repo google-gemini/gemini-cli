@@ -498,6 +498,8 @@ describe('gemini.tsx main function kitty protocol', () => {
       rawOutput: undefined,
       acceptRawOutputRisk: undefined,
       isCommand: undefined,
+      themeMode: undefined,
+      theme: undefined,
     });
 
     await act(async () => {
@@ -657,7 +659,10 @@ describe('gemini.tsx main function kitty protocol', () => {
         merged: {
           advanced: {},
           security: { auth: {} },
-          ui: { theme: 'non-existent-theme' },
+          ui: {
+            themeLight: 'non-existent-theme',
+            themeDark: 'non-existent-theme',
+          },
         },
         workspace: { settings: {} },
         setValue: vi.fn(),

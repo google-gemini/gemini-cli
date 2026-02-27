@@ -14,8 +14,8 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
    'test';
 21 + const anotherNew =
    'test';
-22  console.log('end of second
-    hunk');
+22   console.log('end of
+   second hunk');
 "
 `;
 
@@ -107,8 +107,8 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
    'test';
 21 + const anotherNew =
    'test';
-22  console.log('end of second
-    hunk');
+22   console.log('end of
+   second hunk');
 "
 `;
 

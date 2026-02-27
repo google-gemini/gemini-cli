@@ -572,6 +572,8 @@ export interface ConfigParameters {
     agents?: AgentSettings;
   }>;
   enableConseca?: boolean;
+  cliTheme?: string;
+  cliThemeMode?: 'light' | 'dark';
 }
 
 export class Config {
@@ -600,6 +602,8 @@ export class Config {
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
   readonly enableConseca: boolean;
+  private readonly cliTheme?: string;
+  private readonly cliThemeMode?: 'light' | 'dark';
 
   private readonly coreTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
@@ -786,6 +790,9 @@ export class Config {
     this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
     this.question = params.question;
+    this.enableConseca = params.enableConseca ?? false;
+    this.cliTheme = params.cliTheme;
+    this.cliThemeMode = params.cliThemeMode;
 
     this.coreTools = params.coreTools;
     this.allowedTools = params.allowedTools;
@@ -1510,6 +1517,14 @@ export class Config {
 
   getSandbox(): SandboxConfig | undefined {
     return this.sandbox;
+  }
+
+  getCliTheme(): string | undefined {
+    return this.cliTheme;
+  }
+
+  getCliThemeMode(): 'light' | 'dark' | undefined {
+    return this.cliThemeMode;
   }
 
   isRestrictiveSandbox(): boolean {

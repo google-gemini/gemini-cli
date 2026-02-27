@@ -13,9 +13,13 @@ import { type LoadedSettings } from '../config/settings.js';
  * @returns An error message if the theme is not found, otherwise null.
  */
 export function validateTheme(settings: LoadedSettings): string | null {
-  const effectiveTheme = settings.merged.ui.theme;
-  if (effectiveTheme && !themeManager.findThemeByName(effectiveTheme)) {
-    return `Theme "${effectiveTheme}" not found.`;
+  const themeLight = settings.merged.ui.themeLight;
+  if (themeLight && !themeManager.findThemeByName(themeLight)) {
+    return `Theme "${themeLight}" not found.`;
+  }
+  const themeDark = settings.merged.ui.themeDark;
+  if (themeDark && !themeManager.findThemeByName(themeDark)) {
+    return `Theme "${themeDark}" not found.`;
   }
   return null;
 }

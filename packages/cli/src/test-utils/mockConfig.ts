@@ -26,6 +26,8 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     },
     getDebugMode: vi.fn(() => false),
     getProjectRoot: vi.fn(() => '/'),
+    getCliTheme: vi.fn(() => undefined),
+    getCliThemeMode: vi.fn(() => undefined),
     refreshAuth: vi.fn().mockResolvedValue(undefined),
     getRemoteAdminSettings: vi.fn(() => undefined),
     initialize: vi.fn().mockResolvedValue(undefined),

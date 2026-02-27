@@ -660,6 +660,7 @@ export const AppContainer = (props: AppContainerProps) => {
     historyManager.addItem,
     initializationResult.themeError,
     refreshStatic,
+    config,
   );
   // Poll for terminal background color changes to auto-switch theme
   useTerminalTheme(handleThemeSelect, config, refreshStatic);
