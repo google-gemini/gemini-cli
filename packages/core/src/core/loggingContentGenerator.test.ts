@@ -243,6 +243,75 @@ describe('LoggingContentGenerator', () => {
         expect(errorEvent.error_type).toBe('FatalAuthenticationError');
       });
     });
+
+    describe('Gaxios error parsing', () => {
+      it('should parse raw ASCII buffer strings in Gaxios errors', async () => {
+        const req = { contents: [], model: 'gemini-pro' };
+
+        // Simulate a Gaxios error with comma-separated ASCII codes
+        const asciiData = '72,101,108,108,111'; // "Hello"
+        const gaxiosError = Object.assign(new Error('Gaxios Error'), {
+          response: { data: asciiData },
+        });
+
+        vi.mocked(wrapped.generateContent).mockRejectedValue(gaxiosError);
+
+        try {
+          await loggingContentGenerator.generateContent(
+            req,
+            'prompt-123',
+            LlmRole.MAIN,
+          );
+        } catch (error: unknown) {
+          const gError = error as { response: { data: unknown } };
+          expect(gError.response.data).toBe('Hello');
+        }
+      });
+
+      it('should leave data alone if it is not a comma-separated string', async () => {
+        const req = { contents: [], model: 'gemini-pro' };
+
+        const normalData = 'Normal error message';
+        const gaxiosError = Object.assign(new Error('Gaxios Error'), {
+          response: { data: normalData },
+        });
+
+        vi.mocked(wrapped.generateContent).mockRejectedValue(gaxiosError);
+
+        try {
+          await loggingContentGenerator.generateContent(
+            req,
+            'prompt-123',
+            LlmRole.MAIN,
+          );
+        } catch (error: unknown) {
+          const gError = error as { response: { data: unknown } };
+          expect(gError.response.data).toBe(normalData);
+        }
+      });
+
+      it('should leave data alone if parsing fails', async () => {
+        const req = { contents: [], model: 'gemini-pro' };
+
+        const invalidAscii = '72,invalid,101';
+        const gaxiosError = Object.assign(new Error('Gaxios Error'), {
+          response: { data: invalidAscii },
+        });
+
+        vi.mocked(wrapped.generateContent).mockRejectedValue(gaxiosError);
+
+        try {
+          await loggingContentGenerator.generateContent(
+            req,
+            'prompt-123',
+            LlmRole.MAIN,
+          );
+        } catch (error: unknown) {
+          const gError = error as { response: { data: unknown } };
+          expect(gError.response.data).toBe(invalidAscii);
+        }
+      });
+    });
   });
 
   describe('generateContentStream', () => {
