@@ -327,9 +327,7 @@ export function formatValidationError(
   }
 
   lines.push('Please fix the configuration.');
-  lines.push(
-    'See: https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/configuration.md',
-  );
+  lines.push('See: https://geminicli.com/docs/reference/configuration/');
 
   return lines.join('\n');
 }

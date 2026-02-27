@@ -25,6 +25,7 @@ import {
 } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import type { AnyDeclarativeTool } from '../tools/tools.js';
 import type { CallableTool } from '@google/genai';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
@@ -422,10 +423,51 @@ describe('Core System Prompt (prompts.ts)', () => {
   );
 
   describe('ApprovalMode in System Prompt', () => {
-    it('should include PLAN mode instructions', () => {
+    // Shared plan mode test fixtures
+    const readOnlyMcpTool = new DiscoveredMCPTool(
+      {} as CallableTool,
+      'readonly-server',
+      'read_data',
+      'A read-only MCP tool',
+      {},
+      {} as MessageBus,
+      false,
+      true, // isReadOnly
+    );
+
+    // Represents the full set of tools allowed by plan.toml policy
+    // (including a read-only MCP tool that passes annotation matching).
+    // Non-read-only MCP tools are excluded by the policy engine and
+    // never appear in getAllTools().
+    const planModeTools = [
+      { name: 'glob' },
+      { name: 'grep_search' },
+      { name: 'read_file' },
+      { name: 'ask_user' },
+      { name: 'exit_plan_mode' },
+      { name: 'write_file' },
+      { name: 'replace' },
+      readOnlyMcpTool,
+    ] as unknown as AnyDeclarativeTool[];
+
+    const setupPlanMode = () => {
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        PREVIEW_GEMINI_MODEL,
+      );
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+      vi.mocked(mockConfig.getToolRegistry().getAllTools).mockReturnValue(
+        planModeTools,
+      );
+    };
+
+    it('should include PLAN mode instructions', () => {
+      setupPlanMode();
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain('# Active Approval Mode: Plan');
+      // Read-only MCP tool should appear with server name
+      expect(prompt).toContain('`read_data` (readonly-server)');
+      // Non-read-only MCP tool should not appear (excluded by policy)
+      expect(prompt).not.toContain('`write_data` (nonreadonly-server)');
       expect(prompt).toMatchSnapshot();
     });
 
@@ -438,56 +480,30 @@ describe('Core System Prompt (prompts.ts)', () => {
       expect(prompt).toMatchSnapshot();
     });
 
-    it('should include read-only MCP tools in PLAN mode', () => {
-      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
-
-      const readOnlyMcpTool = new DiscoveredMCPTool(
-        {} as CallableTool,
-        'readonly-server',
-        'read_static_value',
-        'A read-only tool',
-        {},
-        {} as MessageBus,
-        false,
-        true, // isReadOnly
-      );
-
-      const nonReadOnlyMcpTool = new DiscoveredMCPTool(
-        {} as CallableTool,
-        'nonreadonly-server',
-        'non_read_static_value',
-        'A non-read-only tool',
-        {},
-        {} as MessageBus,
-        false,
-        false,
-      );
-
-      vi.mocked(mockConfig.getToolRegistry().getAllTools).mockReturnValue([
-        readOnlyMcpTool,
-        nonReadOnlyMcpTool,
-      ]);
-      vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
-        readOnlyMcpTool.name,
-        nonReadOnlyMcpTool.name,
-      ]);
+    it('should include read-only MCP tools but not non-read-only MCP tools in PLAN mode', () => {
+      setupPlanMode();
 
       const prompt = getCoreSystemPrompt(mockConfig);
 
-      expect(prompt).toContain('`read_static_value` (readonly-server)');
-      expect(prompt).not.toContain(
-        '`non_read_static_value` (nonreadonly-server)',
-      );
+      expect(prompt).toContain('`read_data` (readonly-server)');
+      expect(prompt).not.toContain('`write_data` (nonreadonly-server)');
     });
 
     it('should only list available tools in PLAN mode', () => {
+      // Use a smaller subset than the full planModeTools to verify
+      // that only tools returned by getAllTools() appear in the prompt.
+      const subsetTools = [
+        { name: 'glob' },
+        { name: 'read_file' },
+        { name: 'ask_user' },
+      ] as unknown as AnyDeclarativeTool[];
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        PREVIEW_GEMINI_MODEL,
+      );
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
-      // Only enable a subset of tools, including ask_user
-      vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
-        'glob',
-        'read_file',
-        'ask_user',
-      ]);
+      vi.mocked(mockConfig.getToolRegistry().getAllTools).mockReturnValue(
+        subsetTools,
+      );
 
       const prompt = getCoreSystemPrompt(mockConfig);
 
@@ -496,7 +512,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       expect(prompt).toContain('`read_file`');
       expect(prompt).toContain('`ask_user`');
 
-      // Should NOT include disabled tools
+      // Should NOT include tools not in getAllTools()
       expect(prompt).not.toContain('`google_web_search`');
       expect(prompt).not.toContain('`list_directory`');
       expect(prompt).not.toContain('`grep_search`');
@@ -504,9 +520,7 @@ describe('Core System Prompt (prompts.ts)', () => {
 
     describe('Approved Plan in Plan Mode', () => {
       beforeEach(() => {
-        vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
-          ApprovalMode.PLAN,
-        );
+        setupPlanMode();
         vi.mocked(mockConfig.storage.getPlansDir).mockReturnValue('/tmp/plans');
       });
 
@@ -614,6 +628,22 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot();
   });
 
+  it('should include modern approved plan instructions with completion in DEFAULT mode when approvedPlanPath is set', () => {
+    const planPath = '/tmp/plans/feature-x.md';
+    vi.mocked(mockConfig.getApprovedPlanPath).mockReturnValue(planPath);
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.DEFAULT);
+
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toContain(
+      '2. **Strategy:** An approved plan is available for this task',
+    );
+    expect(prompt).toContain(
+      'provide a **final summary** of the work completed against the plan',
+    );
+    expect(prompt).toMatchSnapshot();
+  });
+
   it('should include planning phase suggestion when enter_plan_mode tool is enabled', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
     vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
@@ -622,7 +652,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     const prompt = getCoreSystemPrompt(mockConfig);
 
     expect(prompt).toContain(
-      'If the request is ambiguous, broad in scope, or involves creating a new feature/application, you MUST use the `enter_plan_mode` tool to design your approach before making changes. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.',
+      'If the request is ambiguous, broad in scope, or involves architectural decisions or cross-cutting changes, use the `enter_plan_mode` tool to safely research and design your strategy. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.',
     );
     expect(prompt).toMatchSnapshot();
   });

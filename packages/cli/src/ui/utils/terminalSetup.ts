@@ -32,6 +32,13 @@ import { promisify } from 'node:util';
 import { terminalCapabilityManager } from './terminalCapabilityManager.js';
 
 import { debugLogger, homedir } from '@google/gemini-cli-core';
+import { useEffect } from 'react';
+import { persistentState } from '../../utils/persistentState.js';
+import { requestConsentInteractive } from '../../config/extensions/consent.js';
+import type { ConfirmationRequest } from '../types.js';
+import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+
+type AddItemFn = UseHistoryManagerReturn['addItem'];
 
 export const VSCODE_SHIFT_ENTER_SEQUENCE = '\\\r\n';
 
@@ -53,6 +60,56 @@ export interface TerminalSetupResult {
 }
 
 type SupportedTerminal = 'vscode' | 'cursor' | 'windsurf' | 'antigravity';
+
+/**
+ * Terminal metadata used for configuration.
+ */
+interface TerminalData {
+  terminalName: string;
+  appName: string;
+}
+const TERMINAL_DATA: Record<SupportedTerminal, TerminalData> = {
+  vscode: { terminalName: 'VS Code', appName: 'Code' },
+  cursor: { terminalName: 'Cursor', appName: 'Cursor' },
+  windsurf: { terminalName: 'Windsurf', appName: 'Windsurf' },
+  antigravity: { terminalName: 'Antigravity', appName: 'Antigravity' },
+};
+
+/**
+ * Maps a supported terminal ID to its display name and config folder name.
+ */
+function getSupportedTerminalData(
+  terminal: SupportedTerminal,
+): TerminalData | null {
+  return TERMINAL_DATA[terminal] || null;
+}
+
+type Keybinding = {
+  key?: string;
+  command?: string;
+  args?: { text?: string };
+};
+
+function isKeybinding(kb: unknown): kb is Keybinding {
+  return typeof kb === 'object' && kb !== null;
+}
+
+/**
+ * Checks if a keybindings array contains our specific binding for a given key.
+ */
+function hasOurBinding(
+  keybindings: unknown[],
+  key: 'shift+enter' | 'ctrl+enter',
+): boolean {
+  return keybindings.some((kb) => {
+    if (!isKeybinding(kb)) return false;
+    return (
+      kb.key === key &&
+      kb.command === 'workbench.action.terminal.sendSequence' &&
+      kb.args?.text === VSCODE_SHIFT_ENTER_SEQUENCE
+    );
+  });
+}
 
 export function getTerminalProgram(): SupportedTerminal | null {
   const termProgram = process.env['TERM_PROGRAM'];
@@ -246,23 +303,17 @@ async function configureVSCodeStyle(
 
     const results = targetBindings.map((target) => {
       const hasOurBinding = keybindings.some((kb) => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const binding = kb as {
-          command?: string;
-          args?: { text?: string };
-          key?: string;
-        };
+        if (!isKeybinding(kb)) return false;
         return (
-          binding.key === target.key &&
-          binding.command === target.command &&
-          binding.args?.text === target.args.text
+          kb.key === target.key &&
+          kb.command === target.command &&
+          kb.args?.text === target.args.text
         );
       });
 
       const existingBinding = keybindings.find((kb) => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const binding = kb as { key?: string };
-        return binding.key === target.key;
+        if (!isKeybinding(kb)) return false;
+        return kb.key === target.key;
       });
 
       return {
@@ -316,22 +367,57 @@ async function configureVSCodeStyle(
   }
 }
 
-// Terminal-specific configuration functions
+/**
+ * Determines whether it is useful to prompt the user to run /terminal-setup
+ * in the current environment.
+ *
+ * Returns true when:
+ * - Kitty/modifyOtherKeys keyboard protocol is not already enabled, and
+ * - We're running inside a supported terminal (VS Code, Cursor, Windsurf, Antigravity), and
+ * - The keybindings file either does not exist or does not already contain both
+ *   of our Shift+Enter and Ctrl+Enter bindings.
+ */
+export async function shouldPromptForTerminalSetup(): Promise<boolean> {
+  if (terminalCapabilityManager.isKittyProtocolEnabled()) {
+    return false;
+  }
 
-async function configureVSCode(): Promise<TerminalSetupResult> {
-  return configureVSCodeStyle('VS Code', 'Code');
-}
+  const terminal = await detectTerminal();
+  if (!terminal) {
+    return false;
+  }
 
-async function configureCursor(): Promise<TerminalSetupResult> {
-  return configureVSCodeStyle('Cursor', 'Cursor');
-}
+  const terminalData = getSupportedTerminalData(terminal);
+  if (!terminalData) {
+    return false;
+  }
 
-async function configureWindsurf(): Promise<TerminalSetupResult> {
-  return configureVSCodeStyle('Windsurf', 'Windsurf');
-}
+  const configDir = getVSCodeStyleConfigDir(terminalData.appName);
+  if (!configDir) {
+    return false;
+  }
 
-async function configureAntigravity(): Promise<TerminalSetupResult> {
-  return configureVSCodeStyle('Antigravity', 'Antigravity');
+  const keybindingsFile = path.join(configDir, 'keybindings.json');
+
+  try {
+    const content = await fs.readFile(keybindingsFile, 'utf8');
+    const cleanContent = stripJsonComments(content);
+    const parsedContent: unknown = JSON.parse(cleanContent) as unknown;
+
+    if (!Array.isArray(parsedContent)) {
+      return true;
+    }
+
+    const hasOurShiftEnter = hasOurBinding(parsedContent, 'shift+enter');
+    const hasOurCtrlEnter = hasOurBinding(parsedContent, 'ctrl+enter');
+
+    return !(hasOurShiftEnter && hasOurCtrlEnter);
+  } catch (error) {
+    debugLogger.debug(
+      `Failed to read or parse keybindings, assuming prompt is needed: ${error}`,
+    );
+    return true;
+  }
 }
 
 /**
@@ -373,19 +459,79 @@ export async function terminalSetup(): Promise<TerminalSetupResult> {
     };
   }
 
-  switch (terminal) {
-    case 'vscode':
-      return configureVSCode();
-    case 'cursor':
-      return configureCursor();
-    case 'windsurf':
-      return configureWindsurf();
-    case 'antigravity':
-      return configureAntigravity();
-    default:
-      return {
-        success: false,
-        message: `Terminal "${terminal}" is not supported yet.`,
-      };
+  const terminalData = getSupportedTerminalData(terminal);
+  if (!terminalData) {
+    return {
+      success: false,
+      message: `Terminal "${terminal}" is not supported yet.`,
+    };
   }
+
+  return configureVSCodeStyle(terminalData.terminalName, terminalData.appName);
+}
+
+export const TERMINAL_SETUP_CONSENT_MESSAGE =
+  'Gemini CLI works best with Shift+Enter/Ctrl+Enter for multiline input. ' +
+  'Would you like to automatically configure your terminal keybindings?';
+
+export function formatTerminalSetupResultMessage(
+  result: TerminalSetupResult,
+): string {
+  let content = result.message;
+  if (result.requiresRestart) {
+    content +=
+      '\n\nPlease restart your terminal for the changes to take effect.';
+  }
+  return content;
+}
+
+interface UseTerminalSetupPromptParams {
+  addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
+  addItem: AddItemFn;
+}
+
+/**
+ * Hook that shows a one-time prompt to run /terminal-setup when it would help.
+ */
+export function useTerminalSetupPrompt({
+  addConfirmUpdateExtensionRequest,
+  addItem,
+}: UseTerminalSetupPromptParams): void {
+  useEffect(() => {
+    const hasBeenPrompted = persistentState.get('terminalSetupPromptShown');
+    if (hasBeenPrompted) {
+      return;
+    }
+
+    let cancelled = false;
+
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    (async () => {
+      const shouldPrompt = await shouldPromptForTerminalSetup();
+      if (!shouldPrompt || cancelled) return;
+
+      persistentState.set('terminalSetupPromptShown', true);
+
+      const confirmed = await requestConsentInteractive(
+        TERMINAL_SETUP_CONSENT_MESSAGE,
+        addConfirmUpdateExtensionRequest,
+      );
+
+      if (!confirmed || cancelled) return;
+
+      const result = await terminalSetup();
+      if (cancelled) return;
+      addItem(
+        {
+          type: result.success ? 'info' : 'error',
+          text: formatTerminalSetupResultMessage(result),
+        },
+        Date.now(),
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [addConfirmUpdateExtensionRequest, addItem]);
 }
