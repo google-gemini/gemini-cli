@@ -59,7 +59,7 @@ describe('SessionStatsContext', () => {
     > = { current: undefined };
 
     const { unmount } = render(
-      <SessionStatsProvider>
+      <SessionStatsProvider initialSessionId="test-session-id">
         <TestHarness contextRef={contextRef} />
       </SessionStatsProvider>,
     );
@@ -78,7 +78,7 @@ describe('SessionStatsContext', () => {
     > = { current: undefined };
 
     const { unmount } = render(
-      <SessionStatsProvider>
+      <SessionStatsProvider initialSessionId="test-session-id">
         <TestHarness contextRef={contextRef} />
       </SessionStatsProvider>,
     );
@@ -161,7 +161,7 @@ describe('SessionStatsContext', () => {
     };
 
     const { unmount } = render(
-      <SessionStatsProvider>
+      <SessionStatsProvider initialSessionId="test-session-id">
         <CountingTestHarness />
       </SessionStatsProvider>,
     );

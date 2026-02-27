@@ -126,7 +126,7 @@ describe('<HistoryItemDisplay />', () => {
       duration: '1s',
     };
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <SessionStatsProvider>
+      <SessionStatsProvider initialSessionId="test-session-id">
         <HistoryItemDisplay {...baseItem} item={item} />
       </SessionStatsProvider>,
     );
@@ -161,7 +161,7 @@ describe('<HistoryItemDisplay />', () => {
       type: 'model_stats',
     };
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <SessionStatsProvider>
+      <SessionStatsProvider initialSessionId="test-session-id">
         <HistoryItemDisplay {...baseItem} item={item} />
       </SessionStatsProvider>,
     );
@@ -178,7 +178,7 @@ describe('<HistoryItemDisplay />', () => {
       type: 'tool_stats',
     };
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <SessionStatsProvider>
+      <SessionStatsProvider initialSessionId="test-session-id">
         <HistoryItemDisplay {...baseItem} item={item} />
       </SessionStatsProvider>,
     );
@@ -196,7 +196,7 @@ describe('<HistoryItemDisplay />', () => {
       duration: '1s',
     };
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <SessionStatsProvider>
+      <SessionStatsProvider initialSessionId="test-session-id">
         <HistoryItemDisplay {...baseItem} item={item} />
       </SessionStatsProvider>,
     );

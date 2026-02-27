@@ -19,7 +19,7 @@ import type {
   ModelMetrics,
   ToolCallStats,
 } from '@google/gemini-cli-core';
-import { uiTelemetryService, sessionId } from '@google/gemini-cli-core';
+import { uiTelemetryService } from '@google/gemini-cli-core';
 
 export enum ToolCallDecision {
   ACCEPT = 'accept',
@@ -182,16 +182,26 @@ const SessionStatsContext = createContext<SessionStatsContextValue | undefined>(
 
 // --- Provider Component ---
 
-export const SessionStatsProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const SessionStatsProvider: React.FC<{
+  children: React.ReactNode;
+  initialSessionId: string;
+}> = ({ children, initialSessionId }) => {
   const [stats, setStats] = useState<SessionStatsState>({
-    sessionId,
+    sessionId: initialSessionId,
     sessionStartTime: new Date(),
     metrics: uiTelemetryService.getMetrics(),
     lastPromptTokenCount: 0,
     promptCount: 0,
   });
+
+  // Keep sessionId in sync if the prop changes at runtime (e.g., session
+  // browser switch) without a full remount.
+  useEffect(() => {
+    setStats((prev) => {
+      if (prev.sessionId === initialSessionId) return prev;
+      return { ...prev, sessionId: initialSessionId };
+    });
+  }, [initialSessionId]);
 
   useEffect(() => {
     const handleUpdate = ({
