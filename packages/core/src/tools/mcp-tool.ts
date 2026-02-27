@@ -75,6 +75,36 @@ type McpContentBlock =
   | McpResourceBlock
   | McpResourceLinkBlock;
 
+/**
+ * Runtime type guard that validates whether an unknown value has the basic
+ * shape of an MCP content block (an object with a string `type` field).
+ * Full structural validation is deferred to each consumer's switch statement
+ * so that unrecognised block types can still be surfaced in display output.
+ */
+function isMcpContentBlock(value: unknown): value is McpContentBlock {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'type' in value &&
+    typeof (value as Record<string, unknown>)['type'] === 'string'
+  );
+}
+
+/**
+ * Safely extracts and validates the MCP content blocks from a raw SDK
+ * response without using unsafe type assertions. Returns `null` when the
+ * response does not contain a parseable content array.
+ */
+function parseMcpContent(rawResponse: Part[]): McpContentBlock[] | null {
+  const content: unknown =
+    rawResponse?.[0]?.functionResponse?.response?.['content'];
+  if (!Array.isArray(content)) {
+    return null;
+  }
+  // Validate every element has the basic block shape; drop malformed entries.
+  return content.filter(isMcpContentBlock);
+}
+
 export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   ToolParams,
   ToolResult
@@ -409,11 +439,10 @@ function transformResourceLinkBlock(block: McpResourceLinkBlock): Part {
  */
 function transformMcpContentToParts(sdkResponse: Part[]): Part[] {
   const funcResponse = sdkResponse?.[0]?.functionResponse;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const mcpContent = funcResponse?.response?.['content'] as McpContentBlock[];
+  const mcpContent = parseMcpContent(sdkResponse);
   const toolName = funcResponse?.name || 'unknown tool';
 
-  if (!Array.isArray(mcpContent)) {
+  if (!mcpContent) {
     return [{ text: '[Error: Could not parse tool response]' }];
   }
 
@@ -447,12 +476,9 @@ function transformMcpContentToParts(sdkResponse: Part[]): Part[] {
  * @returns A formatted string representing the tool's output.
  */
 function getStringifiedResultForDisplay(rawResponse: Part[]): string {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const mcpContent = rawResponse?.[0]?.functionResponse?.response?.[
-    'content'
-  ] as McpContentBlock[];
+  const mcpContent = parseMcpContent(rawResponse);
 
-  if (!Array.isArray(mcpContent)) {
+  if (!mcpContent) {
     return '```json\n' + JSON.stringify(rawResponse, null, 2) + '\n```';
   }
 
