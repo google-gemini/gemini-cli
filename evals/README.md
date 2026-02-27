@@ -46,17 +46,18 @@ two arguments:
 
 #### Policies
 
-Policies control how strictly a test is validated. Tests should generally use
-the ALWAYS_PASSES policy to offer the strictest guarantees.
-
-USUALLY_PASSES exists to enable assertion of less consistent or aspirational
-behaviors.
+Policies control how strictly a test is validated.
 
 - `ALWAYS_PASSES`: Tests expected to pass 100% of the time. These are typically
   trivial and test basic functionality. These run in every CI.
 - `USUALLY_PASSES`: Tests expected to pass most of the time but may have some
   flakiness due to non-deterministic behaviors. These are run nightly and used
   to track the health of the product from build to build.
+
+**All new behavioral evaluations must be created with the `USUALLY_PASSES`
+policy.** They must only be promoted to `ALWAYS_PASSES` once they demonstrate
+100% stability over time. For more information, see
+[Test promotion process](#deflaking-process).
 
 #### `EvalCase` Properties
 
@@ -69,6 +70,19 @@ behaviors.
 - `log`: An optional boolean that, if set to `true`, will log the tool calls to
   a file in the `evals/logs` directory.
 
+### Test promotion process
+
+To maintain a stable and reliable CI, all new behavioral evaluations follow a
+mandatory deflaking process.
+
+1. **Incubation**: You must create all new tests with the `USUALLY_PASSES`
+   policy. This lets them be monitored in the nightly runs without blocking PRs.
+2. **Monitoring**: The test must complete at least 10 nightly runs across all
+   supported models.
+3. **Promotion**: Promotion to `ALWAYS_PASSES` happens exclusively through the
+   `/promote-behavioral-eval` slash command. This command verifies the 100%
+   success rate requirement is met before updating the test policy.
+
 ### Example
 
 ```typescript
@@ -76,7 +90,8 @@ import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 
 describe('my_feature', () => {
-  evalTest('ALWAYS_PASSES', {
+  // New tests MUST start as USUALLY_PASSES and be promoted via /promote-behavioral-eval
+  evalTest('USUALLY_PASSES', {
     name: 'should do something',
     prompt: 'do it',
     assert: async (rig, result) => {
@@ -183,6 +198,31 @@ gemini /fix-behavioral-eval https://github.com/google-gemini/gemini-cli/actions/
 
 When investigating failures manually, you can also enable verbose agent logs by
 setting the `GEMINI_DEBUG_LOG_FILE` environment variable.
+
+## Promoting evaluations
+
+Evaluations must be promoted from `USUALLY_PASSES` to `ALWAYS_PASSES`
+exclusively using the `/promote-behavioral-eval` slash command. Manual promotion
+is not allowed to ensure that the 100% success rate requirement is empirically
+met.
+
+### `/promote-behavioral-eval`
+
+This command automates the promotion of stable tests by:
+
+1.  **Investigating**: Analyzing the results of the last 10 nightly runs on the
+    `main` branch using the `gh` CLI.
+2.  **Criteria Check**: Identifying tests that have passed 100% of the time for
+    ALL enabled models across the entire 10-run history.
+3.  **Promotion**: Updating the test file's policy from `USUALLY_PASSES` to
+    `ALWAYS_PASSES`.
+4.  **Verification**: Running the promoted test locally to ensure correctness.
+
+To run it:
+
+```bash
+gemini /promote-behavioral-eval
+```
 
 It's highly recommended to manually review and/or ask the agent to iterate on
 any prompt changes, even if they pass all evals. The prompt should prefer
