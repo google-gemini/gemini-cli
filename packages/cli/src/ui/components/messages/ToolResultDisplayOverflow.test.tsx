@@ -8,7 +8,6 @@ import { describe, it, expect } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { StreamingState, type IndividualToolCallDisplay } from '../../types.js';
-import { OverflowProvider } from '../../contexts/OverflowContext.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { CoreToolCallStatus } from '@google/gemini-cli-core';
 
@@ -32,16 +31,14 @@ describe('ToolResultDisplay Overflow', () => {
       },
     ];
 
-    const { lastFrame } = renderWithProviders(
-      <OverflowProvider>
-        <ToolGroupMessage
-          item={{ id: 1, type: 'tool_group', tools: toolCalls }}
-          toolCalls={toolCalls}
-          availableTerminalHeight={15} // Small height to force overflow
-          terminalWidth={80}
-          isExpandable={true}
-        />
-      </OverflowProvider>,
+    const { lastFrame, waitUntilReady } = renderWithProviders(
+      <ToolGroupMessage
+        item={{ id: 1, type: 'tool_group', tools: toolCalls }}
+        toolCalls={toolCalls}
+        availableTerminalHeight={15} // Small height to force overflow
+        terminalWidth={80}
+        isExpandable={true}
+      />,
       {
         uiState: {
           streamingState: StreamingState.Idle,
@@ -51,12 +48,13 @@ describe('ToolResultDisplay Overflow', () => {
       },
     );
 
-    // ResizeObserver might take a tick
-    await waitFor(() =>
-      expect(lastFrame()?.toLowerCase()).toContain(
-        'press ctrl+o to show more lines',
-      ),
-    );
+    await waitUntilReady();
+
+    // ResizeObserver might take a tick, though ToolGroupMessage calculates overflow synchronously
+    await waitFor(() => {
+      const frame = lastFrame();
+      expect(frame.toLowerCase()).toContain('press ctrl+o to show more lines');
+    });
 
     const frame = lastFrame();
     expect(frame).toBeDefined();

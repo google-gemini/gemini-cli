@@ -80,6 +80,12 @@ they appear in the UI.
 | -------- | ------------- | ---------------------------- | ------- |
 | IDE Mode | `ide.enabled` | Enable IDE integration mode. | `false` |
 
+### Billing
+
+| UI Label         | Setting                   | Description                                                                                                                                                | Default |
+| ---------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Overage Strategy | `billing.overageStrategy` | How to handle quota exhaustion when AI credits are available. 'ask' prompts each time, 'always' automatically uses credits, 'never' disables credit usage. | `"ask"` |
+
 ### Model
 
 | UI Label                | Setting                      | Description                                                                            | Default     |
@@ -140,6 +146,7 @@ they appear in the UI.
 | Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                                                                                           | `false` |
 | Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
 | Direct Web Fetch           | `experimental.directWebFetch`            | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
+| Enable Gemma Model Router  | `experimental.gemmaModelRouter.enabled`  | Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.                                           | `false` |
 
 ### Skills
 
