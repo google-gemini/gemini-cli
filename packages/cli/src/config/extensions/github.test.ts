@@ -75,6 +75,7 @@ describe('github.ts', () => {
       checkout: ReturnType<typeof vi.fn>;
       listRemote: ReturnType<typeof vi.fn>;
       revparse: ReturnType<typeof vi.fn>;
+      submoduleUpdate: ReturnType<typeof vi.fn>;
     };
 
     beforeEach(() => {
@@ -85,6 +86,7 @@ describe('github.ts', () => {
         checkout: vi.fn(),
         listRemote: vi.fn(),
         revparse: vi.fn(),
+        submoduleUpdate: vi.fn(),
       };
       vi.mocked(simpleGit).mockReturnValue(mockGit as unknown as SimpleGit);
     });
@@ -108,6 +110,10 @@ describe('github.ts', () => {
       );
       expect(mockGit.fetch).toHaveBeenCalledWith('origin', 'v1.0.0');
       expect(mockGit.checkout).toHaveBeenCalledWith('FETCH_HEAD');
+      expect(mockGit.submoduleUpdate).toHaveBeenCalledWith([
+        '--init',
+        '--recursive',
+      ]);
     });
 
     it('should throw if no remotes found', async () => {
