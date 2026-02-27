@@ -582,6 +582,33 @@ describe('useCommandCompletion', () => {
 
       expect(result.current.textBuffer.text).toBe('@src\\components\\');
     });
+
+    it('should ADD a space for AT completion even if name matches a command with an action', async () => {
+      // Setup a mock where getCommandFromSuggestion WOULD return a command with an action
+      // if it were in SLASH mode.
+      setupMocks({
+        atSuggestions: [{ label: 'memory', value: 'memory' }],
+        slashCompletionRange: {
+          completionStart: 0,
+          completionEnd: 0,
+          getCommandFromSuggestion: () =>
+            ({ action: vi.fn() }) as unknown as SlashCommand,
+        },
+      });
+
+      const { result } = renderCommandCompletionHook('@mem');
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      // Should have a space because it's AT mode, not SLASH mode
+      expect(result.current.textBuffer.text).toBe('@memory ');
+    });
   });
 
   describe('prompt completion filtering', () => {

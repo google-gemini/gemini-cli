@@ -362,12 +362,16 @@ export function useCommandCompletion({
       const lineCodePoints = toCodePoints(buffer.lines[cursorRow] || '');
       const charAfterCompletion = lineCodePoints[end];
 
-      const command = slashCompletionRange.getCommandFromSuggestion(suggestion);
-      // Don't add a space if the command has an action (can be executed)
-      // and doesn't have a completion function (doesn't REQUIRE more arguments)
-      const isExecutableCommand = !!(command && command.action);
-      const requiresArguments = !!(command && command.completion);
-      const shouldAddSpace = !isExecutableCommand || requiresArguments;
+      let shouldAddSpace = true;
+      if (completionMode === CompletionMode.SLASH) {
+        const command =
+          slashCompletionRange.getCommandFromSuggestion(suggestion);
+        // Don't add a space if the command has an action (can be executed)
+        // and doesn't have a completion function (doesn't REQUIRE more arguments)
+        const isExecutableCommand = !!(command && command.action);
+        const requiresArguments = !!(command && command.completion);
+        shouldAddSpace = !isExecutableCommand || requiresArguments;
+      }
 
       if (
         charAfterCompletion !== ' ' &&
