@@ -78,7 +78,7 @@ export const ToastDisplay: React.FC = () => {
     const action = uiState.constrainHeight ? 'show more' : 'collapse';
     return (
       <Text color={theme.text.accent}>
-        Press Ctrl+O to {action} lines for the most recent response
+        Ctrl+O to {action} lines of the last response
       </Text>
     );
   }
