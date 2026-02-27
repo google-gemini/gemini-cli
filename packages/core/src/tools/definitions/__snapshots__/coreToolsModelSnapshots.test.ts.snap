@@ -1197,7 +1197,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: read_file 1`] = `
 {
-  "description": "Reads and returns the content of a specified file. For text files, it reads up to 2000 lines at a time (use 'start_line' and 'end_line' to navigate) and truncates lines longer than 2000 characters. The tool's response will clearly indicate if truncation has occurred. Supports files up to 20MB. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.",
+  "description": "Reads and returns the content of a specified file. Prioritize using 'start_line' and 'end_line' for targeted reads to maintain context efficiency. Tool includes safety truncation limits (2000 lines, 2000 characters in a line and 20MB file size), but relying on this automatic feedback is less efficient than requesting specific line ranges. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.",
   "name": "read_file",
   "parametersJsonSchema": {
     "properties": {
