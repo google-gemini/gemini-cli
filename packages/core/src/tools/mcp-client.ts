@@ -738,8 +738,6 @@ function createTransportRequestInit(
   headers: Record<string, string>,
   sanitizationConfig: EnvironmentSanitizationConfig,
 ): RequestInit {
-<<<<<<< HEAD
-=======
   const extensionEnv = getExtensionEnvironment(mcpServerConfig.extension);
   const expansionEnv = { ...process.env, ...extensionEnv };
 
@@ -755,7 +753,6 @@ function createTransportRequestInit(
     }
   }
 
->>>>>>> 58df1c623 (Fix extension MCP server env var loading (#20374))
   return {
     headers: {
       ...mcpServerConfig.headers,
@@ -1937,8 +1934,6 @@ export async function createTransport(
   }
 
   if (mcpServerConfig.command) {
-<<<<<<< HEAD
-=======
     const extensionEnv = getExtensionEnvironment(mcpServerConfig.extension);
     const expansionEnv = { ...process.env, ...extensionEnv };
 
@@ -1966,7 +1961,6 @@ export async function createTransport(
       }
     }
 
->>>>>>> 58df1c623 (Fix extension MCP server env var loading (#20374))
     let transport: Transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],

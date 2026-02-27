@@ -1696,8 +1696,6 @@ describe('mcp-client', () => {
       expect(callArgs.env!['GEMINI_CLI_EXT_VAR']).toBeUndefined();
     });
 
-<<<<<<< HEAD
-=======
     it('should include extension settings with defined values in environment', async () => {
       const mockedTransport = vi
         .spyOn(SdkClientStdioLib, 'StdioClientTransport')
@@ -1806,7 +1804,6 @@ describe('mcp-client', () => {
       }
     });
 
->>>>>>> 58df1c623 (Fix extension MCP server env var loading (#20374))
     describe('useGoogleCredentialProvider', () => {
       beforeEach(() => {
         // Mock GoogleAuth client
