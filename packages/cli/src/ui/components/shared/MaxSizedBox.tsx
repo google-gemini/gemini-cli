@@ -9,6 +9,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Box, Text, ResizeObserver, type DOMElement } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
+import { isNarrowWidth } from '../../utils/isNarrowWidth.js';
 
 /**
  * Minimum height for the MaxSizedBox component.
@@ -84,6 +85,8 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
 
   const totalHiddenLines = hiddenLinesCount + additionalHiddenLinesCount;
 
+  const isNarrow = maxWidth !== undefined && isNarrowWidth(maxWidth);
+
   useEffect(() => {
     if (totalHiddenLines > 0) {
       addOverflowingId?.(id);
@@ -116,8 +119,9 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
     >
       {totalHiddenLines > 0 && overflowDirection === 'top' && (
         <Text color={theme.text.secondary} wrap="truncate">
-          ... first {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
-          hidden (ctrl+o to show) ...
+          {isNarrow
+            ? `... ${totalHiddenLines} hidden (ctrl+o) ...`
+            : `... first ${totalHiddenLines} line${totalHiddenLines === 1 ? '' : 's'} hidden (ctrl+o to show) ...`}
         </Text>
       )}
       <Box
@@ -137,8 +141,9 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
       </Box>
       {totalHiddenLines > 0 && overflowDirection === 'bottom' && (
         <Text color={theme.text.secondary} wrap="truncate">
-          ... last {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
-          hidden (ctrl+o to show) ...
+          {isNarrow
+            ? `... ${totalHiddenLines} hidden (ctrl+o) ...`
+            : `... last ${totalHiddenLines} line${totalHiddenLines === 1 ? '' : 's'} hidden (ctrl+o to show) ...`}
         </Text>
       )}
     </Box>
