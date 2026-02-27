@@ -46,6 +46,7 @@ import {
   CoreEvent,
   type McpProgressPayload,
 } from '../utils/events.js';
+import { GeminiCliOperation } from '../telemetry/constants.js';
 
 interface SchedulerQueueItem {
   requests: ToolCallRequestInfo[];
@@ -191,16 +192,22 @@ export class Scheduler {
     signal: AbortSignal,
   ): Promise<CompletedToolCall[]> {
     return runInDevTraceSpan(
-      { name: 'schedule' },
+      { operation: GeminiCliOperation.ScheduleToolCalls },
       async ({ metadata: spanMetadata }) => {
         const requests = Array.isArray(request) ? request : [request];
+
         spanMetadata.input = requests;
 
+        let toolCallResponse: CompletedToolCall[] = [];
+
         if (this.isProcessing || this.state.isActive) {
-          return this._enqueueRequest(requests, signal);
+          toolCallResponse = await this._enqueueRequest(requests, signal);
+        } else {
+          toolCallResponse = await this._startBatch(requests, signal);
         }
 
-        return this._startBatch(requests, signal);
+        spanMetadata.output = toolCallResponse;
+        return toolCallResponse;
       },
     );
   }
