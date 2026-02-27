@@ -30,6 +30,7 @@ import type { ToolRegistry } from '../tools/tool-registry.js';
 import { ThinkingLevel } from '@google/genai';
 import type { AcknowledgedAgentsService } from './acknowledgedAgents.js';
 import { PolicyDecision } from '../policy/types.js';
+import { DEFAULT_POLICY_TIER } from '../policy/config.js';
 
 vi.mock('./agentLoader.js', () => ({
   loadAgentsFromDirectory: vi
@@ -678,7 +679,7 @@ describe('AgentRegistry', () => {
         expect.objectContaining({
           toolName: 'PolicyTestAgent',
           decision: PolicyDecision.ALLOW,
-          priority: 1.05,
+          priority: DEFAULT_POLICY_TIER + 0.05,
         }),
       );
     });
@@ -705,7 +706,7 @@ describe('AgentRegistry', () => {
         expect.objectContaining({
           toolName: 'RemotePolicyAgent',
           decision: PolicyDecision.ASK_USER,
-          priority: 1.05,
+          priority: DEFAULT_POLICY_TIER + 0.05,
         }),
       );
     });

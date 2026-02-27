@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import nodePath from 'node:path';
 import { ApprovalMode } from './types.js';
+import { USER_POLICY_TIER } from './config.js';
 import { isDirectorySecure } from '../utils/security.js';
 
 // Mock dependencies
@@ -145,7 +146,7 @@ priority = 10
     // Check for all 4 rules
     const defaultRule = rules?.find((r) => r.priority === 1.01);
     const workspaceRule = rules?.find((r) => r.priority === 2.01);
-    const userRule = rules?.find((r) => r.priority === 3.01);
+    const userRule = rules?.find((r) => r.priority === USER_POLICY_TIER + 0.01);
     const adminRule = rules?.find((r) => r.priority === 4.01);
 
     expect(defaultRule).toBeDefined();

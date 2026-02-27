@@ -6,9 +6,14 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import {
+  ALLOWED_MCP_SERVER_PRIORITY,
+  ALLOWED_TOOLS_FLAG_PRIORITY,
   ApprovalMode,
+  EXCLUDE_TOOLS_FLAG_PRIORITY,
+  MCP_EXCLUDED_PRIORITY,
   PolicyDecision,
   PolicyEngine,
+  TRUSTED_MCP_SERVER_PRIORITY,
 } from '@google/gemini-cli-core';
 import { createPolicyEngineConfig } from './policy.js';
 import type { Settings } from './settings.js';
@@ -177,13 +182,10 @@ describe('Policy Engine Integration Tests', () => {
       );
       const engine = new PolicyEngine(config);
 
-      // MCP server allowed (priority 3.1) provides general allow for server
-      // MCP server allowed (priority 3.1) provides general allow for server
       expect(
         (await engine.check({ name: 'my-server__safe-tool' }, undefined))
           .decision,
       ).toBe(PolicyDecision.ALLOW);
-      // But specific tool exclude (priority 3.4) wins over server allow
       expect(
         (await engine.check({ name: 'my-server__dangerous-tool' }, undefined))
           .decision,
@@ -476,25 +478,25 @@ describe('Policy Engine Integration Tests', () => {
 
       // Find rules and verify their priorities
       const blockedToolRule = rules.find((r) => r.toolName === 'blocked-tool');
-      expect(blockedToolRule?.priority).toBe(3.4); // Command line exclude
+      expect(blockedToolRule?.priority).toBe(EXCLUDE_TOOLS_FLAG_PRIORITY);
 
       const blockedServerRule = rules.find(
         (r) => r.toolName === 'blocked-server__*',
       );
-      expect(blockedServerRule?.priority).toBe(3.9); // MCP server exclude
+      expect(blockedServerRule?.priority).toBe(MCP_EXCLUDED_PRIORITY);
 
       const specificToolRule = rules.find(
         (r) => r.toolName === 'specific-tool',
       );
-      expect(specificToolRule?.priority).toBe(3.3); // Command line allow
+      expect(specificToolRule?.priority).toBe(ALLOWED_TOOLS_FLAG_PRIORITY);
 
       const trustedServerRule = rules.find(
         (r) => r.toolName === 'trusted-server__*',
       );
-      expect(trustedServerRule?.priority).toBe(3.2); // MCP trusted server
+      expect(trustedServerRule?.priority).toBe(TRUSTED_MCP_SERVER_PRIORITY);
 
       const mcpServerRule = rules.find((r) => r.toolName === 'mcp-server__*');
-      expect(mcpServerRule?.priority).toBe(3.1); // MCP allowed server
+      expect(mcpServerRule?.priority).toBe(ALLOWED_MCP_SERVER_PRIORITY);
 
       const readOnlyToolRule = rules.find((r) => r.toolName === 'glob');
       // Priority 70 in default tier → 1.07 (Overriding Plan Mode Deny)
@@ -641,16 +643,16 @@ describe('Policy Engine Integration Tests', () => {
 
       // Verify each rule has the expected priority
       const tool3Rule = rules.find((r) => r.toolName === 'tool3');
-      expect(tool3Rule?.priority).toBe(3.4); // Excluded tools (user tier)
+      expect(tool3Rule?.priority).toBe(EXCLUDE_TOOLS_FLAG_PRIORITY);
 
       const server2Rule = rules.find((r) => r.toolName === 'server2__*');
-      expect(server2Rule?.priority).toBe(3.9); // Excluded servers (user tier)
+      expect(server2Rule?.priority).toBe(MCP_EXCLUDED_PRIORITY);
 
       const tool1Rule = rules.find((r) => r.toolName === 'tool1');
-      expect(tool1Rule?.priority).toBe(3.3); // Allowed tools (user tier)
+      expect(tool1Rule?.priority).toBe(ALLOWED_TOOLS_FLAG_PRIORITY);
 
       const server1Rule = rules.find((r) => r.toolName === 'server1__*');
-      expect(server1Rule?.priority).toBe(3.1); // Allowed servers (user tier)
+      expect(server1Rule?.priority).toBe(ALLOWED_MCP_SERVER_PRIORITY);
 
       const globRule = rules.find((r) => r.toolName === 'glob');
       // Priority 70 in default tier → 1.07
