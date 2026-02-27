@@ -550,8 +550,11 @@ describe('ToolRegistry', () => {
       expect(result.error?.type).toBe(
         ToolErrorType.DISCOVERED_TOOL_EXECUTION_ERROR,
       );
-      expect(result.llmContent).toContain('Stderr: Something went wrong');
-      expect(result.llmContent).toContain('Exit Code: 1');
+      expect(result.llmContent).toContain('<stdout>(empty)</stdout>');
+      expect(result.llmContent).toContain(
+        '<stderr>Something went wrong</stderr>',
+      );
+      expect(result.llmContent).toContain('<exit_code>1</exit_code>');
     });
 
     it('should pass MessageBus to DiscoveredTool and its invocations', async () => {

@@ -19,6 +19,7 @@ import { DiscoveredMCPTool } from './mcp-tool.js';
 import { parse } from 'shell-quote';
 import { ToolErrorType } from './tool-error.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { escapeXml } from '../utils/xml.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
@@ -106,13 +107,21 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
 
     // if there is any error, non-zero exit code, signal, or stderr, return error details instead of stdout
     if (error || code !== 0 || signal || stderr) {
-      const llmContent = [
-        `Stdout: ${stdout || '(empty)'}`,
-        `Stderr: ${stderr || '(empty)'}`,
-        `Error: ${error ?? '(none)'}`,
-        `Exit Code: ${code ?? '(none)'}`,
-        `Signal: ${signal ?? '(none)'}`,
-      ].join('\n');
+      const parts: string[] = [];
+      if (code !== null && code !== 0) {
+        parts.push(`<exit_code>${code}</exit_code>`);
+      }
+      parts.push(
+        `<output>\n    <stdout>${escapeXml(stdout.trim() || '(empty)')}</stdout>\n    <stderr>${escapeXml(stderr.trim() || '(empty)')}</stderr>\n  </output>`,
+      );
+      if (error) {
+        parts.push(`<error>${escapeXml(String(error))}</error>`);
+      }
+
+      if (signal) {
+        parts.push(`<signal>${signal}</signal>`);
+      }
+      const llmContent = `<subprocess_result>\n${parts.map((p) => `  ${p}`).join('\n')}\n</subprocess_result>`;
       return {
         llmContent,
         returnDisplay: llmContent,
@@ -156,13 +165,6 @@ Tool discovery and call commands can be configured in project or user settings.
 
 When called, the tool call command is executed as a subprocess.
 On success, tool output is returned as a json string.
-Otherwise, the following information is returned:
-
-Stdout: Output on stdout stream. Can be \`(empty)\` or partial.
-Stderr: Output on stderr stream. Can be \`(empty)\` or partial.
-Error: Error or \`(none)\` if no error was reported for the subprocess.
-Exit Code: Exit code or \`(none)\` if terminated by signal.
-Signal: Signal number or \`(none)\` if no signal was received.
 `;
     super(
       prefixedName,
