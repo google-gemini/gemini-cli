@@ -150,13 +150,17 @@ describe('policy.ts', () => {
   describe('updatePolicy', () => {
     it('should set AUTO_EDIT mode for auto-edit transition tools', async () => {
       const mockConfig = {
+        getAutoAddPolicy: vi.fn().mockReturnValue(false),
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
 
-      const tool = { name: 'replace' } as AnyDeclarativeTool; // 'replace' is in EDIT_TOOL_NAMES
+      const tool = {
+        name: 'replace',
+        isSensitive: false,
+      } as AnyDeclarativeTool; // 'replace' is in EDIT_TOOL_NAMES
 
       await updatePolicy(
         tool,
@@ -168,17 +172,27 @@ describe('policy.ts', () => {
       expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
         ApprovalMode.AUTO_EDIT,
       );
-      expect(mockMessageBus.publish).not.toHaveBeenCalled();
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.UPDATE_POLICY,
+          toolName: 'replace',
+          persist: false,
+        }),
+      );
     });
 
     it('should handle standard policy updates (persist=false)', async () => {
       const mockConfig = {
+        getAutoAddPolicy: vi.fn().mockReturnValue(false),
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
-      const tool = { name: 'test-tool' } as AnyDeclarativeTool;
+      const tool = {
+        name: 'test-tool',
+        isSensitive: false,
+      } as AnyDeclarativeTool;
 
       await updatePolicy(
         tool,
@@ -198,12 +212,16 @@ describe('policy.ts', () => {
 
     it('should handle standard policy updates with persistence', async () => {
       const mockConfig = {
+        getAutoAddPolicy: vi.fn().mockReturnValue(false),
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
-      const tool = { name: 'test-tool' } as AnyDeclarativeTool;
+      const tool = {
+        name: 'test-tool',
+        isSensitive: false,
+      } as AnyDeclarativeTool;
 
       await updatePolicy(
         tool,
@@ -223,12 +241,16 @@ describe('policy.ts', () => {
 
     it('should handle shell command prefixes', async () => {
       const mockConfig = {
+        getAutoAddPolicy: vi.fn().mockReturnValue(false),
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
-      const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
+      const tool = {
+        name: 'run_shell_command',
+        isSensitive: true,
+      } as AnyDeclarativeTool;
       const details: ToolExecuteConfirmationDetails = {
         type: 'exec',
         command: 'ls -la',
@@ -254,12 +276,16 @@ describe('policy.ts', () => {
 
     it('should handle MCP policy updates (server scope)', async () => {
       const mockConfig = {
+        getAutoAddPolicy: vi.fn().mockReturnValue(false),
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
-      const tool = { name: 'mcp-tool' } as AnyDeclarativeTool;
+      const tool = {
+        name: 'mcp-tool',
+        isSensitive: false,
+      } as AnyDeclarativeTool;
       const details: ToolMcpConfirmationDetails = {
         type: 'mcp',
         serverName: 'my-server',
@@ -288,12 +314,16 @@ describe('policy.ts', () => {
 
     it('should NOT publish update for ProceedOnce', async () => {
       const mockConfig = {
+        getAutoAddPolicy: vi.fn().mockReturnValue(false),
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
-      const tool = { name: 'test-tool' } as AnyDeclarativeTool;
+      const tool = {
+        name: 'test-tool',
+        isSensitive: false,
+      } as AnyDeclarativeTool;
 
       await updatePolicy(tool, ToolConfirmationOutcome.ProceedOnce, undefined, {
         config: mockConfig,
@@ -306,12 +336,16 @@ describe('policy.ts', () => {
 
     it('should NOT publish update for Cancel', async () => {
       const mockConfig = {
+        getAutoAddPolicy: vi.fn().mockReturnValue(false),
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
-      const tool = { name: 'test-tool' } as AnyDeclarativeTool;
+      const tool = {
+        name: 'test-tool',
+        isSensitive: false,
+      } as AnyDeclarativeTool;
 
       await updatePolicy(tool, ToolConfirmationOutcome.Cancel, undefined, {
         config: mockConfig,
@@ -323,12 +357,16 @@ describe('policy.ts', () => {
 
     it('should NOT publish update for ModifyWithEditor', async () => {
       const mockConfig = {
+        getAutoAddPolicy: vi.fn().mockReturnValue(false),
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
-      const tool = { name: 'test-tool' } as AnyDeclarativeTool;
+      const tool = {
+        name: 'test-tool',
+        isSensitive: false,
+      } as AnyDeclarativeTool;
 
       await updatePolicy(
         tool,
@@ -342,12 +380,16 @@ describe('policy.ts', () => {
 
     it('should handle MCP ProceedAlwaysTool (specific tool name)', async () => {
       const mockConfig = {
+        getAutoAddPolicy: vi.fn().mockReturnValue(false),
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
-      const tool = { name: 'mcp-tool' } as AnyDeclarativeTool;
+      const tool = {
+        name: 'mcp-tool',
+        isSensitive: false,
+      } as AnyDeclarativeTool;
       const details: ToolMcpConfirmationDetails = {
         type: 'mcp',
         serverName: 'my-server',
@@ -376,12 +418,16 @@ describe('policy.ts', () => {
 
     it('should handle MCP ProceedAlways (persist: false)', async () => {
       const mockConfig = {
+        getAutoAddPolicy: vi.fn().mockReturnValue(false),
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
-      const tool = { name: 'mcp-tool' } as AnyDeclarativeTool;
+      const tool = {
+        name: 'mcp-tool',
+        isSensitive: false,
+      } as AnyDeclarativeTool;
       const details: ToolMcpConfirmationDetails = {
         type: 'mcp',
         serverName: 'my-server',
@@ -408,12 +454,16 @@ describe('policy.ts', () => {
 
     it('should handle MCP ProceedAlwaysAndSave (persist: true)', async () => {
       const mockConfig = {
+        getAutoAddPolicy: vi.fn().mockReturnValue(false),
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
-      const tool = { name: 'mcp-tool' } as AnyDeclarativeTool;
+      const tool = {
+        name: 'mcp-tool',
+        isSensitive: false,
+      } as AnyDeclarativeTool;
       const details: ToolMcpConfirmationDetails = {
         type: 'mcp',
         serverName: 'my-server',
@@ -436,6 +486,80 @@ describe('policy.ts', () => {
           toolName: 'mcp-tool',
           mcpName: 'my-server',
           persist: true,
+          argsPattern: '\\{.*\\}', // Fix verified: specific pattern provided for auto-add
+        }),
+      );
+    });
+
+    it('should NOT provide argsPattern for server-wide MCP approvals', async () => {
+      const mockConfig = {
+        getAutoAddPolicy: vi.fn().mockReturnValue(true),
+        setApprovalMode: vi.fn(),
+      } as unknown as Mocked<Config>;
+      const mockMessageBus = {
+        publish: vi.fn(),
+      } as unknown as Mocked<MessageBus>;
+      const tool = {
+        name: 'mcp-tool',
+        isSensitive: false,
+      } as AnyDeclarativeTool;
+      const details: ToolMcpConfirmationDetails = {
+        type: 'mcp',
+        serverName: 'my-server',
+        toolName: 'mcp-tool',
+        toolDisplayName: 'My Tool',
+        title: 'MCP',
+        onConfirm: vi.fn(),
+      };
+
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlwaysServer,
+        details,
+        { config: mockConfig, messageBus: mockMessageBus },
+      );
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.UPDATE_POLICY,
+          toolName: 'my-server__*',
+          mcpName: 'my-server',
+          persist: false, // Server-wide approvals currently do not auto-persist for safety
+          argsPattern: undefined, // Server-wide approvals are intentionally not specific
+        }),
+      );
+    });
+
+    it('should handle specificity for read_many_files', async () => {
+      const mockConfig = {
+        getAutoAddPolicy: vi.fn().mockReturnValue(true),
+        setApprovalMode: vi.fn(),
+      } as unknown as Mocked<Config>;
+      const mockMessageBus = {
+        publish: vi.fn(),
+      } as unknown as Mocked<MessageBus>;
+      const tool = {
+        name: 'read_many_files',
+        isSensitive: true,
+        params: { include: ['file1.ts', 'file2.ts'] },
+      } as unknown as AnyDeclarativeTool;
+
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlways,
+        undefined,
+        {
+          config: mockConfig,
+          messageBus: mockMessageBus,
+        },
+      );
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.UPDATE_POLICY,
+          toolName: 'read_many_files',
+          persist: true,
+          argsPattern: expect.stringContaining('file1\\.ts'),
         }),
       );
     });
