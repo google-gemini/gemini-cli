@@ -38,6 +38,7 @@ import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
+import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
@@ -106,7 +107,12 @@ import { FileExclusions } from '../utils/ignorePatterns.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
-import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
+import {
+  ApprovalMode,
+  type PolicyEngineConfig,
+  type PolicyRule,
+  type SafetyCheckerRule,
+} from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type {
   UserTierId,
@@ -176,6 +182,14 @@ export interface ToolOutputMaskingConfig {
   toolProtectionThreshold: number;
   minPrunableTokensThreshold: number;
   protectLatestTurn: boolean;
+}
+
+export interface GemmaModelRouterSettings {
+  enabled?: boolean;
+  classifier?: {
+    host?: string;
+    model?: string;
+  };
 }
 
 export interface ExtensionSetting {
@@ -315,6 +329,14 @@ export interface GeminiCLIExtension {
    * These themes will be registered when the extension is activated.
    */
   themes?: CustomTheme[];
+  /**
+   * Policy rules contributed by this extension.
+   */
+  rules?: PolicyRule[];
+  /**
+   * Safety checkers contributed by this extension.
+   */
+  checkers?: SafetyCheckerRule[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -509,6 +531,7 @@ export interface ConfigParameters {
   directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
+  gemmaModelRouter?: GemmaModelRouterSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
@@ -599,6 +622,7 @@ export class Config {
   private readonly usageStatisticsEnabled: boolean;
   private geminiClient!: GeminiClient;
   private baseLlmClient!: BaseLlmClient;
+  private localLiteRtLmClient?: LocalLiteRtLmClient;
   private modelRouterService: ModelRouterService;
   private readonly modelAvailabilityService: ModelAvailabilityService;
   private readonly fileFiltering: {
@@ -694,6 +718,9 @@ export class Config {
     | PolicyUpdateConfirmationRequest
     | undefined;
   private readonly outputSettings: OutputSettings;
+
+  private readonly gemmaModelRouter: GemmaModelRouterSettings;
+
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly maxAttempts: number;
@@ -942,6 +969,15 @@ export class Config {
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
+    this.gemmaModelRouter = {
+      enabled: params.gemmaModelRouter?.enabled ?? false,
+      classifier: {
+        host:
+          params.gemmaModelRouter?.classifier?.host ?? 'http://localhost:9379',
+        model:
+          params.gemmaModelRouter?.classifier?.model ?? 'gemma3-1b-gpu-custom',
+      },
+    };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.maxAttempts = Math.min(
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
@@ -1126,7 +1162,7 @@ export class Config {
     return this.contentGenerator;
   }
 
-  async refreshAuth(authMethod: AuthType) {
+  async refreshAuth(authMethod: AuthType, apiKey?: string) {
     // Reset availability service when switching auth
     this.modelAvailabilityService.reset();
 
@@ -1152,6 +1188,7 @@ export class Config {
     const newContentGeneratorConfig = await createContentGeneratorConfig(
       this,
       authMethod,
+      apiKey,
     );
     this.contentGenerator = await createContentGenerator(
       newContentGeneratorConfig,
@@ -1242,6 +1279,13 @@ export class Config {
       }
     }
     return this.baseLlmClient;
+  }
+
+  getLocalLiteRtLmClient(): LocalLiteRtLmClient {
+    if (!this.localLiteRtLmClient) {
+      this.localLiteRtLmClient = new LocalLiteRtLmClient(this);
+    }
+    return this.localLiteRtLmClient;
   }
 
   getSessionId(): string {
@@ -2575,6 +2619,14 @@ export class Config {
 
   getEnableHooksUI(): boolean {
     return this.enableHooksUI;
+  }
+
+  getGemmaModelRouterEnabled(): boolean {
+    return this.gemmaModelRouter.enabled ?? false;
+  }
+
+  getGemmaModelRouterSettings(): GemmaModelRouterSettings {
+    return this.gemmaModelRouter;
   }
 
   /**
