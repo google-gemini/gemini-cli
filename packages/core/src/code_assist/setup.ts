@@ -18,6 +18,7 @@ import type { AuthClient } from 'google-auth-library';
 import type { ValidationHandler } from '../fallback/types.js';
 import { ChangeAuthRequestedError } from '../utils/errors.js';
 import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export class ProjectIdRequiredError extends Error {
   constructor() {
@@ -51,6 +52,7 @@ export interface UserData {
   projectId: string;
   userTier: UserTierId;
   userTierName?: string;
+  paidTier?: GeminiUserTier;
 }
 
 /**
@@ -130,12 +132,22 @@ export async function setupUser(
   }
 
   if (loadRes.currentTier) {
+    if (!loadRes.paidTier?.id && !loadRes.currentTier.id) {
+      debugLogger.warn(
+        'Warning: Code Assist API did not return a user tier ID. Defaulting to STANDARD tier.',
+      );
+    }
+
     if (!loadRes.cloudaicompanionProject) {
       if (projectId) {
         return {
           projectId,
-          userTier: loadRes.paidTier?.id ?? loadRes.currentTier.id,
+          userTier:
+            loadRes.paidTier?.id ??
+            loadRes.currentTier.id ??
+            UserTierId.STANDARD,
           userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
+          paidTier: loadRes.paidTier ?? undefined,
         };
       }
 
@@ -144,12 +156,20 @@ export async function setupUser(
     }
     return {
       projectId: loadRes.cloudaicompanionProject,
-      userTier: loadRes.paidTier?.id ?? loadRes.currentTier.id,
+      userTier:
+        loadRes.paidTier?.id ?? loadRes.currentTier.id ?? UserTierId.STANDARD,
       userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
+      paidTier: loadRes.paidTier ?? undefined,
     };
   }
 
   const tier = getOnboardTier(loadRes);
+
+  if (!tier.id) {
+    debugLogger.warn(
+      'Warning: Code Assist API did not return an onboarding tier ID. Defaulting to STANDARD tier.',
+    );
+  }
 
   let onboardReq: OnboardUserRequest;
   if (tier.id === UserTierId.FREE) {
@@ -183,7 +203,7 @@ export async function setupUser(
     if (projectId) {
       return {
         projectId,
-        userTier: tier.id,
+        userTier: tier.id ?? UserTierId.STANDARD,
         userTierName: tier.name,
       };
     }
@@ -193,7 +213,7 @@ export async function setupUser(
 
   return {
     projectId: lroRes.response.cloudaicompanionProject.id,
-    userTier: tier.id,
+    userTier: tier.id ?? UserTierId.STANDARD,
     userTierName: tier.name,
   };
 }
