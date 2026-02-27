@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AcknowledgedAgentsService } from './acknowledgedAgents.js';
 import { Storage } from '../config/storage.js';
 import * as fs from 'node:fs/promises';
