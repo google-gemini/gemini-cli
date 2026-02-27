@@ -44,6 +44,7 @@ import { oncallCommand } from '../ui/commands/oncallCommand.js';
 import { permissionsCommand } from '../ui/commands/permissionsCommand.js';
 import { planCommand } from '../ui/commands/planCommand.js';
 import { policiesCommand } from '../ui/commands/policiesCommand.js';
+import { approvedCommand } from '../ui/commands/approvedCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { profileCommand } from '../ui/commands/profileCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
@@ -149,6 +150,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       ...(this.config?.getFolderTrust() ? [permissionsCommand] : []),
       ...(this.config?.isPlanEnabled() ? [planCommand] : []),
       policiesCommand,
+      approvedCommand,
       privacyCommand,
       ...(isDevelopment ? [profileCommand] : []),
       quitCommand,

@@ -25,6 +25,7 @@ import {
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
 import type { ValidatingToolCall } from './types.js';
+import { coreEvents } from '../utils/events.js';
 
 /**
  * Helper to format the policy denial error.
@@ -99,6 +100,10 @@ export async function updatePolicy(
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
     deps.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+    coreEvents.emitFeedback(
+      'info',
+      `Session switched to auto-edit mode: future file edits will not require confirmation. Shell commands still require approval unless individually approved.`,
+    );
     return;
   }
 
