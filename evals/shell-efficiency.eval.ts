@@ -72,7 +72,7 @@ describe('Shell Efficiency', () => {
     },
   });
 
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: 'should NOT use efficiency flags when enableShellOutputEfficiency is disabled',
     params: {
       settings: {
