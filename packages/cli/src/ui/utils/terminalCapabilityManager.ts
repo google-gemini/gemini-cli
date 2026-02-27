@@ -76,7 +76,6 @@ export class TerminalCapabilityManager {
 
   private detectionComplete = false;
   private terminalBackgroundColor: TerminalBackgroundColor;
-  private kittySupported = false;
   private kittyEnabled = false;
   private modifyOtherKeysSupported = false;
   private terminalName: string | undefined;
@@ -172,7 +171,6 @@ export class TerminalCapabilityManager {
           TerminalCapabilityManager.KITTY_REGEX.test(buffer)
         ) {
           kittyKeyboardReceived = true;
-          this.kittySupported = true;
         }
 
         // check for modifyOtherKeys support
@@ -245,12 +243,8 @@ export class TerminalCapabilityManager {
 
   enableSupportedModes() {
     try {
-      if (this.kittySupported) {
-        enableKittyKeyboardProtocol();
-        this.kittyEnabled = true;
-      } else if (this.modifyOtherKeysSupported) {
-        enableModifyOtherKeys();
-      }
+      enableModifyOtherKeys();
+      enableKittyKeyboardProtocol();
       // Always enable bracketed paste since it'll be ignored if unsupported.
       enableBracketedPasteMode();
     } catch (e) {
