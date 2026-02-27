@@ -17,7 +17,7 @@ import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import type { Config } from '../config/config.js';
 import { loadApiKey } from './apiKeyCredentialStorage.js';
 
-import type { UserTierId } from '../code_assist/types.js';
+import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { InstallationManager } from '../utils/installationManager.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
@@ -49,6 +49,8 @@ export interface ContentGenerator {
   userTier?: UserTierId;
 
   userTierName?: string;
+
+  paidTier?: GeminiUserTier;
 }
 
 export enum AuthType {

@@ -322,6 +322,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"tips"`
   - **Values:** `"tips"`, `"witty"`, `"all"`, `"off"`
 
+- **`ui.errorVerbosity`** (enum):
+  - **Description:** Controls whether recoverable errors are hidden (low) or
+    fully shown (full).
+  - **Default:** `"low"`
+  - **Values:** `"low"`, `"full"`
+
 - **`ui.customWittyPhrases`** (array):
   - **Description:** Custom witty phrases to display during loading. When
     provided, the CLI cycles through these instead of the defaults.
@@ -356,6 +362,15 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable collection of usage statistics
   - **Default:** `true`
   - **Requires restart:** Yes
+
+#### `billing`
+
+- **`billing.overageStrategy`** (enum):
+  - **Description:** How to handle quota exhaustion when AI credits are
+    available. 'ask' prompts each time, 'always' automatically uses credits,
+    'never' disables credit usage.
+  - **Default:** `"ask"`
+  - **Values:** `"ask"`, `"always"`, `"never"`
 
 #### `model`
 
@@ -1012,6 +1027,23 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.directWebFetch`** (boolean):
   - **Description:** Enable web fetch behavior that bypasses LLM summarization.
   - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.enabled`** (boolean):
+  - **Description:** Enable the Gemma Model Router. Requires a local endpoint
+    serving Gemma via the Gemini API using LiteRT-LM shim.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.classifier.host`** (string):
+  - **Description:** The host of the classifier.
+  - **Default:** `"http://localhost:9379"`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.classifier.model`** (string):
+  - **Description:** The model to use for the classifier. Only tested on
+    `gemma3-1b-gpu-custom`.
+  - **Default:** `"gemma3-1b-gpu-custom"`
   - **Requires restart:** Yes
 
 #### `skills`
