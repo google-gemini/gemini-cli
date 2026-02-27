@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type React from 'react';
 import { useCallback, useMemo, useEffect } from 'react';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
@@ -37,7 +38,7 @@ export interface UseCommandCompletionReturn {
   showSuggestions: boolean;
   isLoadingSuggestions: boolean;
   isPerfectMatch: boolean;
-  setActiveSuggestionIndex: (index: number) => void;
+  setActiveSuggestionIndex: React.Dispatch<React.SetStateAction<number>>;
   resetCompletionState: () => void;
   navigateUp: () => void;
   navigateDown: () => void;
