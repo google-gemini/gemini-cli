@@ -1,0 +1,121 @@
+body {
+    font-family: 'Arial', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #121212; /* Dark background - common in Binance theme */
+    color: #EAECEF; /* Light text color */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    overflow: hidden; /* To prevent scrollbars during transitions */
+}
+
+#presentation-container {
+    width: 90%;
+    max-width: 1000px;
+    height: 0; /* Set to 0, padding-bottom will control height */
+    padding-bottom: 60%; /* 600 / 1000 = 0.6 or 60% to maintain 5:3 aspect ratio */
+    position: relative;
+    /* border: 1px solid #333; */ /* Replaced by box-shadow */
+    overflow: hidden; /* Crucial for slide transitions */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); /* Subtle shadow for depth */
+    border-radius: 8px; /* Apply border-radius here if container has shadow */
+}
+
+.slide {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    padding: 4%; /* Use percentage for padding to scale with container */
+    box-sizing: border-box;
+    opacity: 0;
+    visibility: hidden;
+    /* Content fade-in/out faster to let SVG morph be the primary visual transition */
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+    background-color: #1E1E1E; /* Slightly lighter than body for slide background */
+    /* border-radius: 8px; */ /* Moved to container if it has shadow, or keep if slides need it individually */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.slide.active {
+    opacity: 1;
+    visibility: visible;
+    z-index: 1;
+}
+
+.slide h1 {
+    font-size: 2.5em;
+    margin-bottom: 10px;
+    color: #F0B90B; /* Binance Gold */
+}
+
+.slide h2 {
+    font-size: 1.8em;
+    margin-bottom: 20px;
+    color: #F0B90B; /* Binance Gold */
+}
+
+.slide p, .slide ul {
+    font-size: 1.1em;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+.slide ul {
+    list-style-position: outside;
+    padding-left: 20px;
+}
+
+.slide ul li {
+    margin-bottom: 10px;
+}
+
+#navigation-controls {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+}
+
+#navigation-controls button {
+    padding: 10px 20px;
+    font-size: 1em;
+    background-color: #F0B90B; /* Binance Gold */
+    color: #121212; /* Dark text on gold button */
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#navigation-controls button:hover {
+    background-color: #f3c73a; /* Lighter gold on hover */
+}
+
+#navigation-controls button:disabled {
+    background-color: #555;
+    color: #888;
+    cursor: not-allowed;
+}
+
+/* Placeholder for SVG morphing elements */
+#morphing-svg-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0; /* Behind content but visible */
+    pointer-events: none; /* Allow clicks to pass through */
+}
+
+/* Initial styles for any SVG path that will be morphed */
+#morph-path {
+    fill: rgba(240, 185, 11, 0.2); /* Semi-transparent Binance Gold */
+    /* Other properties like stroke, stroke-width can be added */
+}
