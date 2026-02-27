@@ -736,6 +736,10 @@ export class GeminiClient {
           );
           return turn;
         }
+        // Check if abort was triggered before continuing
+        if (signal?.aborted) {
+          return turn;
+        }
         const nextRequest = [{ text: 'System: Please continue.' }];
         // Recursive call - update turn with result
         turn = yield* this.sendMessageStream(
@@ -769,6 +773,10 @@ export class GeminiClient {
             nextSpeakerCheck?.next_speaker || '',
           ),
         );
+        // Re-check abort signal after async checkNextSpeaker call
+        if (signal?.aborted) {
+          return turn;
+        }
         if (nextSpeakerCheck?.next_speaker === 'model') {
           const nextRequest = [{ text: 'Please continue.' }];
           turn = yield* this.sendMessageStream(
