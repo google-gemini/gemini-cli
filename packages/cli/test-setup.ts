@@ -35,6 +35,8 @@ let actWarnings: Array<{ message: string; stack: string }> = [];
 beforeEach(() => {
   // Reset themeManager state to ensure test isolation
   themeManager.loadCustomThemes({});
+  themeManager.clearExtensionThemes();
+  themeManager.clearFileThemes();
   themeManager.setActiveTheme(DEFAULT_THEME.name);
   themeManager.setTerminalBackground(undefined);
 

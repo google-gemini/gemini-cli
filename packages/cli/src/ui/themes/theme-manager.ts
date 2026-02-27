@@ -242,6 +242,14 @@ class ThemeManager {
   }
 
   /**
+   * Clears all themes loaded from files.
+   * This is primarily for testing purposes to reset state between tests.
+   */
+  clearFileThemes(): void {
+    this.fileThemes.clear();
+  }
+
+  /**
    * Sets the active theme.
    * @param themeName The name of the theme to set as active.
    * @returns True if the theme was successfully set, false otherwise.
