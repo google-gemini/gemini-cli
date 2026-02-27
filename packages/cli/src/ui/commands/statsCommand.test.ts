@@ -11,6 +11,7 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
 import type { Config } from '@google/gemini-cli-core';
+import { loadAuthState } from '../../config/authState.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -23,6 +24,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
+vi.mock('../../config/authState.js', () => ({
+  loadAuthState: vi.fn(() => ({})),
+}));
+
 describe('statsCommand', () => {
   let mockContext: CommandContext;
   const startTime = new Date('2025-07-14T10:00:00.000Z');
@@ -31,6 +36,7 @@ describe('statsCommand', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(endTime);
+    vi.mocked(loadAuthState).mockReturnValue({});
 
     // 1. Create the mock context with all default values
     mockContext = createMockCommandContext();

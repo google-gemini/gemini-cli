@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { authCommand } from './authCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { SettingScope } from '../../config/settings.js';
+import { saveAuthState } from '../../config/authState.js';
 
 vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual('@google/gemini-cli-core');
@@ -17,6 +17,10 @@ vi.mock('@google/gemini-cli-core', async () => {
     clearCachedCredentialFile: vi.fn().mockResolvedValue(undefined),
   };
 });
+
+vi.mock('../../config/authState.js', () => ({
+  saveAuthState: vi.fn(),
+}));
 
 describe('authCommand', () => {
   let mockContext: CommandContext;
@@ -29,8 +33,6 @@ describe('authCommand', () => {
         },
       },
     });
-    // Add setValue mock to settings
-    mockContext.services.settings.setValue = vi.fn();
     vi.clearAllMocks();
   });
 
@@ -82,16 +84,12 @@ describe('authCommand', () => {
       expect(clearCachedCredentialFile).toHaveBeenCalledOnce();
     });
 
-    it('should clear selectedAuthType setting', async () => {
+    it('should clear selectedAuthType from auth-state', async () => {
       const logoutCommand = authCommand.subCommands?.[1];
 
       await logoutCommand!.action!(mockContext, '');
 
-      expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
-        SettingScope.User,
-        'security.auth.selectedType',
-        undefined,
-      );
+      expect(saveAuthState).toHaveBeenCalledWith(undefined);
     });
 
     it('should strip thoughts from history', async () => {

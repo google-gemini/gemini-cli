@@ -26,7 +26,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
 import { DescriptiveRadioButtonSelect } from './shared/DescriptiveRadioButtonSelect.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
-import { useSettings } from '../contexts/SettingsContext.js';
+import { loadAuthState } from '../../config/authState.js';
 
 interface ModelDialogProps {
   onClose: () => void;
@@ -34,7 +34,6 @@ interface ModelDialogProps {
 
 export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
-  const settings = useSettings();
   const [view, setView] = useState<'main' | 'manual'>('main');
   const [persistMode, setPersistMode] = useState(false);
 
@@ -43,7 +42,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
   const shouldShowPreviewModels = config?.getHasAccessToPreviewModel();
   const useGemini31 = config?.getGemini31LaunchedSync?.() ?? false;
-  const selectedAuthType = settings.merged.security.auth.selectedType;
+  const selectedAuthType = loadAuthState().selectedType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
 

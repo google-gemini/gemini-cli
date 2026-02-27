@@ -22,6 +22,7 @@ import {
   AuthType,
 } from '@google/gemini-cli-core';
 import type { Config, ModelSlashCommandEvent } from '@google/gemini-cli-core';
+import { loadAuthState } from '../../config/authState.js';
 
 // Mock dependencies
 const mockGetDisplayString = vi.fn();
@@ -42,6 +43,10 @@ vi.mock('@google/gemini-cli-core', async () => {
     },
   };
 });
+
+vi.mock('../../config/authState.js', () => ({
+  loadAuthState: vi.fn(() => ({ selectedType: AuthType.LOGIN_WITH_GOOGLE })),
+}));
 
 describe('<ModelDialog />', () => {
   const mockSetModel = vi.fn();
@@ -71,6 +76,9 @@ describe('<ModelDialog />', () => {
     mockGetModel.mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
     mockGetHasAccessToPreviewModel.mockReturnValue(false);
     mockGetGemini31LaunchedSync.mockReturnValue(false);
+    vi.mocked(loadAuthState).mockReturnValue({
+      selectedType: AuthType.LOGIN_WITH_GOOGLE,
+    });
 
     // Default implementation for getDisplayString
     mockGetDisplayString.mockImplementation((val: string) => {
@@ -84,6 +92,7 @@ describe('<ModelDialog />', () => {
     configValue = mockConfig as Config,
     authType = AuthType.LOGIN_WITH_GOOGLE,
   ) => {
+    vi.mocked(loadAuthState).mockReturnValue({ selectedType: authType });
     const settings = createMockSettings({
       security: {
         auth: {
