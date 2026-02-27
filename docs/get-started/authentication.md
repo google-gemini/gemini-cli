@@ -82,6 +82,15 @@ To authenticate and use Gemini CLI with a Gemini API key:
    # Replace YOUR_GEMINI_API_KEY with the key from AI Studio
    export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
    ```
+   ```powershell
+  # Windows PowerShell
+  $env:GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
+  ```
+
+  ```cmd
+  # Windows Command Prompt
+  setx GEMINI_API_KEY "YOUR_GEMINI_API_KEY"
+  ```
 
    To make this setting persistent, see
    [Persisting Environment Variables](#persisting-vars).
@@ -119,6 +128,17 @@ For example:
 export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
 export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
 ```
+```powershell
+# Windows PowerShell
+$env:GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+$env:GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
+```
+
+```cmd
+# Windows Command Prompt
+setx GOOGLE_CLOUD_PROJECT "YOUR_PROJECT_ID"
+setx GOOGLE_CLOUD_LOCATION "YOUR_PROJECT_LOCATION"
+```
 
 To make any Vertex AI environment variable settings persistent, see
 [Persisting Environment Variables](#persisting-vars).
@@ -132,6 +152,11 @@ Consider this authentication method if you have Google Cloud CLI installed.
 >
 > ```bash
 > unset GOOGLE_API_KEY GEMINI_API_KEY
+> ```
+> ```powershell
+> # Windows PowerShell
+> Remove-Item Env:GOOGLE_API_KEY
+> Remove-Item Env:GEMINI_API_KEY
 > ```
 
 1. Verify you have a Google Cloud project and Vertex AI API is enabled.
@@ -163,6 +188,11 @@ pipelines, or if your organization restricts user-based ADC or API key creation.
 > ```bash
 > unset GOOGLE_API_KEY GEMINI_API_KEY
 > ```
+> ```powershell
+> # Windows PowerShell
+> Remove-Item Env:GOOGLE_API_KEY
+> Remove-Item Env:GEMINI_API_KEY
+> ```
 
 1.  [Create a service account and key](https://cloud.google.com/iam/docs/keys-create-delete)
     and download the provided JSON file. Assign the "Vertex AI User" role to the
@@ -174,6 +204,15 @@ pipelines, or if your organization restricts user-based ADC or API key creation.
     ```bash
     # Replace /path/to/your/keyfile.json with the actual path
     export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/keyfile.json"
+    ```
+    ```powershell
+    # Windows PowerShell
+    $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\your\keyfile.json"
+    ```
+
+    ```cmd
+    # Windows Command Prompt
+    setx GOOGLE_APPLICATION_CREDENTIALS "C:\path\to\your\keyfile.json"
     ```
 
 3.  [Configure your Google Cloud Project](#set-gcp).
@@ -198,6 +237,15 @@ pipelines, or if your organization restricts user-based ADC or API key creation.
     ```bash
     # Replace YOUR_GOOGLE_API_KEY with your Vertex AI API key
     export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
+    ```
+    ```powershell
+    # Windows PowerShell
+    $env:GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
+    ```
+
+    ```cmd
+    # Windows Command Prompt
+    setx GOOGLE_API_KEY "YOUR_GOOGLE_API_KEY"
     ```
 
     > **Note:** If you see errors like
@@ -246,6 +294,15 @@ To configure Gemini CLI to use a Google Cloud project, do the following:
     ```bash
     # Replace YOUR_PROJECT_ID with your actual Google Cloud project ID
     export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+    ```
+    ```powershell
+    # Windows PowerShell
+    $env:GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+    ```
+
+    ```cmd
+    # Windows Command Prompt
+    setx GOOGLE_CLOUD_PROJECT "YOUR_PROJECT_ID"
     ```
 
     To make this setting persistent, see
