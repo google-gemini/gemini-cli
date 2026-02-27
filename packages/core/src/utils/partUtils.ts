@@ -167,21 +167,17 @@ export function partToString(
     return value.map((part) => partToString(part, options)).join('');
   }
 
-  // Cast to Part, assuming it might contain project-specific fields
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const part = value as Part & {
-    videoMetadata?: unknown;
-    thought?: string;
-    codeExecutionResult?: unknown;
-    executableCode?: unknown;
-  };
+  // After ruling out string and array, value is narrowed to Part.
+  // All checked fields (videoMetadata, thought, codeExecutionResult,
+  // executableCode) are declared on the Part interface from @google/genai.
+  const part: Part = value;
 
   if (options?.verbose) {
     if (part.videoMetadata !== undefined) {
       return `[Video Metadata]`;
     }
     if (part.thought !== undefined) {
-      return `[Thought: ${part.thought}]`;
+      return `[Thought: ${part.text ?? ''}]`;
     }
     if (part.codeExecutionResult !== undefined) {
       return `[Code Execution Result]`;

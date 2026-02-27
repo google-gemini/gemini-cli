@@ -88,7 +88,7 @@ describe('partUtils', () => {
     });
 
     it('should return descriptive string for thought part', () => {
-      const part = { thought: 'thinking' } as unknown as Part;
+      const part: Part = { thought: true, text: 'thinking' };
       expect(partToString(part, verboseOptions)).toBe('[Thought: thinking]');
     });
 
