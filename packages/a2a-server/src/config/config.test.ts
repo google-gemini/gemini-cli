@@ -69,15 +69,13 @@ describe('loadConfig', () => {
   const mockSettings = {} as Settings;
   const mockExtensionLoader = {} as ExtensionLoader;
   const taskId = 'test-task-id';
-
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env['GEMINI_API_KEY'] = 'test-key';
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
   });
 
   afterEach(() => {
-    delete process.env['CUSTOM_IGNORE_FILE_PATHS'];
-    delete process.env['GEMINI_API_KEY'];
+    vi.unstubAllEnvs();
   });
 
   describe('admin settings overrides', () => {
@@ -197,7 +195,7 @@ describe('loadConfig', () => {
 
   it('should set customIgnoreFilePaths when CUSTOM_IGNORE_FILE_PATHS env var is present', async () => {
     const testPath = '/tmp/ignore';
-    process.env['CUSTOM_IGNORE_FILE_PATHS'] = testPath;
+    vi.stubEnv('CUSTOM_IGNORE_FILE_PATHS', testPath);
     const config = await loadConfig(mockSettings, mockExtensionLoader, taskId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([
@@ -222,7 +220,7 @@ describe('loadConfig', () => {
   it('should merge customIgnoreFilePaths from settings and env var', async () => {
     const envPath = '/env/ignore';
     const settingsPath = '/settings/ignore';
-    process.env['CUSTOM_IGNORE_FILE_PATHS'] = envPath;
+    vi.stubEnv('CUSTOM_IGNORE_FILE_PATHS', envPath);
     const settings: Settings = {
       fileFiltering: {
         customIgnoreFilePaths: [settingsPath],
@@ -238,7 +236,7 @@ describe('loadConfig', () => {
 
   it('should split CUSTOM_IGNORE_FILE_PATHS using system delimiter', async () => {
     const paths = ['/path/one', '/path/two'];
-    process.env['CUSTOM_IGNORE_FILE_PATHS'] = paths.join(path.delimiter);
+    vi.stubEnv('CUSTOM_IGNORE_FILE_PATHS', paths.join(path.delimiter));
     const config = await loadConfig(mockSettings, mockExtensionLoader, taskId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual(paths);
@@ -252,7 +250,7 @@ describe('loadConfig', () => {
 
   it('should initialize FileDiscoveryService with correct options', async () => {
     const testPath = '/tmp/ignore';
-    process.env['CUSTOM_IGNORE_FILE_PATHS'] = testPath;
+    vi.stubEnv('CUSTOM_IGNORE_FILE_PATHS', testPath);
     const settings: Settings = {
       fileFiltering: {
         respectGitIgnore: false,
