@@ -34,6 +34,11 @@ export interface ToolInvocation<
   params: TParams;
 
   /**
+   * Whether the tool is sensitive and requires specific policy approvals.
+   */
+  isSensitive: boolean;
+
+  /**
    * Gets a pre-execution description of the tool operation.
    *
    * @returns A markdown string describing what the tool will do.

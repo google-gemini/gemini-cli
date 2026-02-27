@@ -16,6 +16,7 @@ class TestToolInvocation implements ToolInvocation<object, ToolResult> {
   constructor(
     readonly params: object,
     private readonly executeFn: () => Promise<ToolResult>,
+    readonly isSensitive: boolean = false,
   ) {}
 
   getDescription(): string {
