@@ -25,14 +25,14 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -43,8 +43,7 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings enabled' correctly 1`] = `
@@ -72,14 +71,14 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -90,8 +89,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings disabled' correctly 1`] = `
@@ -119,14 +117,14 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                               false*  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -137,8 +135,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'default state' correctly 1`] = `
@@ -166,14 +163,14 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -184,8 +181,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'file filtering settings configured' correctly 1`] = `
@@ -213,14 +209,14 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -231,8 +227,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selector' correctly 1`] = `
@@ -260,14 +255,14 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -278,8 +273,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and number settings' correctly 1`] = `
@@ -307,14 +301,14 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -325,8 +319,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'tools and security settings' correctly 1`] = `
@@ -354,14 +347,14 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -372,8 +365,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settings enabled' correctly 1`] = `
@@ -401,14 +393,14 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                true*  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -419,6 +411,5 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;

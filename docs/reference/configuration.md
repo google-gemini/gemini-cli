@@ -137,6 +137,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`general.plan.modelRouting`** (boolean):
+  - **Description:** Automatically switch between Pro and Flash models based on
+    Plan Mode status. Uses Pro for the planning phase and Flash for the
+    implementation phase.
+  - **Default:** `true`
+
 - **`general.retryFetchErrors`** (boolean):
   - **Description:** Retry on "exception TypeError: fetch failed sending
     request" errors.
@@ -1006,6 +1012,23 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.directWebFetch`** (boolean):
   - **Description:** Enable web fetch behavior that bypasses LLM summarization.
   - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.enabled`** (boolean):
+  - **Description:** Enable the Gemma Model Router. Requires a local endpoint
+    serving Gemma via the Gemini API using LiteRT-LM shim.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.classifier.host`** (string):
+  - **Description:** The host of the classifier.
+  - **Default:** `"http://localhost:9379"`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.classifier.model`** (string):
+  - **Description:** The model to use for the classifier. Only tested on
+    `gemma3-1b-gpu-custom`.
+  - **Default:** `"gemma3-1b-gpu-custom"`
   - **Requires restart:** Yes
 
 #### `skills`

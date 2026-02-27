@@ -628,6 +628,22 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot();
   });
 
+  it('should include modern approved plan instructions with completion in DEFAULT mode when approvedPlanPath is set', () => {
+    const planPath = '/tmp/plans/feature-x.md';
+    vi.mocked(mockConfig.getApprovedPlanPath).mockReturnValue(planPath);
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.DEFAULT);
+
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toContain(
+      '2. **Strategy:** An approved plan is available for this task',
+    );
+    expect(prompt).toContain(
+      'provide a **final summary** of the work completed against the plan',
+    );
+    expect(prompt).toMatchSnapshot();
+  });
+
   it('should include planning phase suggestion when enter_plan_mode tool is enabled', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
     vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
@@ -636,7 +652,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     const prompt = getCoreSystemPrompt(mockConfig);
 
     expect(prompt).toContain(
-      'If the request is ambiguous, broad in scope, or involves creating a new feature/application, you MUST use the `enter_plan_mode` tool to design your approach before making changes. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.',
+      'If the request is ambiguous, broad in scope, or involves architectural decisions or cross-cutting changes, use the `enter_plan_mode` tool to safely research and design your strategy. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.',
     );
     expect(prompt).toMatchSnapshot();
   });

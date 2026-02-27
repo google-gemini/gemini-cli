@@ -29,6 +29,7 @@ they appear in the UI.
 | Enable Auto Update      | `general.enableAutoUpdate`         | Enable automatic updates.                                                                                                                                                      | `true`      |
 | Enable Notifications    | `general.enableNotifications`      | Enable run-event notifications for action-required prompts and session completion. Currently macOS only.                                                                       | `false`     |
 | Plan Directory          | `general.plan.directory`           | The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.                                                               | `undefined` |
+| Plan Model Routing      | `general.plan.modelRouting`        | Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.                           | `true`      |
 | Max Chat Model Attempts | `general.maxAttempts`              | Maximum number of attempts for requests to the main chat model. Cannot exceed 10.                                                                                              | `10`        |
 | Debug Keystroke Logging | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.                                                                                                                             | `false`     |
 | Enable Session Cleanup  | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                               | `false`     |
@@ -81,12 +82,13 @@ they appear in the UI.
 
 ### Model
 
-| UI Label                | Setting                      | Description                                                                            | Default |
-| ----------------------- | ---------------------------- | -------------------------------------------------------------------------------------- | ------- |
-| Max Session Turns       | `model.maxSessionTurns`      | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.      | `-1`    |
-| Compression Threshold   | `model.compressionThreshold` | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3). | `0.5`   |
-| Disable Loop Detection  | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false` |
-| Skip Next Speaker Check | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`  |
+| UI Label                | Setting                      | Description                                                                            | Default     |
+| ----------------------- | ---------------------------- | -------------------------------------------------------------------------------------- | ----------- |
+| Model                   | `model.name`                 | The Gemini model to use for conversations.                                             | `undefined` |
+| Max Session Turns       | `model.maxSessionTurns`      | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.      | `-1`        |
+| Compression Threshold   | `model.compressionThreshold` | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3). | `0.5`       |
+| Disable Loop Detection  | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false`     |
+| Skip Next Speaker Check | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`      |
 
 ### Context
 
@@ -138,6 +140,7 @@ they appear in the UI.
 | Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                                                                                           | `false` |
 | Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
 | Direct Web Fetch           | `experimental.directWebFetch`            | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
+| Enable Gemma Model Router  | `experimental.gemmaModelRouter.enabled`  | Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.                                           | `false` |
 
 ### Skills
 
