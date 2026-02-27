@@ -182,17 +182,31 @@ export async function createContentGenerator(
       config.authType === AuthType.COMPUTE_ADC
     ) {
       const httpOptions = { headers: baseHeaders };
-      return new LoggingContentGenerator(
-        await createCodeAssistContentGenerator(
-          httpOptions,
-          config.authType,
-          gcConfig,
-          sessionId,
-        ),
-        gcConfig,
-      );
-    }
 
+      try {
+        return new LoggingContentGenerator(
+          await createCodeAssistContentGenerator(
+            httpOptions,
+            config.authType,
+            gcConfig,
+            sessionId,
+          ),
+          gcConfig,
+        );
+      } catch (unknownError) {
+        if (unknownError instanceof Error) {
+          if (
+            unknownError.name === 'IneligibleTierError' ||
+            unknownError.message.includes('IneligibleTierError')
+          ) {
+            throw new Error(
+              'Authentication Fallback: Your personal Google account does not have a Code Assist license. Please switch to an API key from Google AI Studio for Gemini 3 developer access.',
+            );
+          }
+        }
+        throw unknownError;
+      }
+    }
     if (
       config.authType === AuthType.USE_GEMINI ||
       config.authType === AuthType.USE_VERTEX_AI
