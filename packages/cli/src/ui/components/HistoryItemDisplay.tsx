@@ -38,6 +38,7 @@ import { ThinkingMessage } from './messages/ThinkingMessage.js';
 import { HintMessage } from './messages/HintMessage.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useSettings } from '../contexts/SettingsContext.js';
+import { InsightsReport } from './InsightsReport.js';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
@@ -218,6 +219,20 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'hooks_list' && (
         <HooksList hooks={itemForDisplay.hooks} />
+      )}
+      {itemForDisplay.type === 'insights' && (
+        <InsightsReport
+          sessionsAnalyzed={itemForDisplay.sessionsAnalyzed}
+          totalMessages={itemForDisplay.totalMessages}
+          userMessages={itemForDisplay.userMessages}
+          assistantMessages={itemForDisplay.assistantMessages}
+          totalToolCalls={itemForDisplay.totalToolCalls}
+          successfulToolCalls={itemForDisplay.successfulToolCalls}
+          failedToolCalls={itemForDisplay.failedToolCalls}
+          toolUsage={itemForDisplay.toolUsage}
+          llmAnalysis={itemForDisplay.llmAnalysis}
+          terminalWidth={terminalWidth}
+        />
       )}
     </Box>
   );
