@@ -791,15 +791,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return true;
         }
 
-        if (shellModeActive) {
-          setShellModeActive(false);
+        if (completion.showSuggestions) {
+          completion.resetCompletionState();
+          setExpandedSuggestionIndex(-1);
           resetEscapeState();
           return true;
         }
 
-        if (completion.showSuggestions) {
-          completion.resetCompletionState();
-          setExpandedSuggestionIndex(-1);
+        if (shellModeActive) {
+          setShellModeActive(false);
           resetEscapeState();
           return true;
         }
