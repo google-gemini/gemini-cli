@@ -1883,7 +1883,6 @@ export class Config {
         this,
         new ApprovalModeSwitchEvent(currentMode, mode),
       );
-      this.lastModeSwitchTime = Date.now();
     }
 
     this.policyEngine.setApprovalMode(mode);
