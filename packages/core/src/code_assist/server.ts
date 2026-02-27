@@ -310,6 +310,13 @@ export class CodeAssistServer implements ContentGenerator {
       signal,
       retryConfig: {
         retryDelay,
+        retry: 3,
+        noResponseRetries: 3,
+        statusCodesToRetry: [
+          [429, 429],
+          [499, 499],
+          [500, 599],
+        ],
       },
     });
     return res.data;
