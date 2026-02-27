@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync, spawn, type ChildProcess } from 'node:child_process';
+import {
+  execSync,
+  spawn,
+  spawnSync,
+  type ChildProcess,
+} from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -688,11 +693,11 @@ export async function start_sandbox(
       // install handlers to stop proxy on exit/signal
       const stopProxy = () => {
         debugLogger.log('stopping proxy container ...');
-        return spawnAsync(config.command, [
-          'rm',
-          '-f',
-          SANDBOX_PROXY_NAME,
-        ])?.catch(() => {});
+        try {
+          spawnSync(config.command, ['rm', '-f', SANDBOX_PROXY_NAME]);
+        } catch {
+          // ignore
+        }
       };
 
       process.off('exit', stopProxy);

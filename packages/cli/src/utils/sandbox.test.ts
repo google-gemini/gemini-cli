@@ -70,6 +70,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     },
     spawnAsync: mockSpawnAsync,
     LOCAL_DEV_SANDBOX_IMAGE_NAME: 'gemini-cli-sandbox',
+    SANDBOX_NETWORK_NAME: 'gemini-cli-sandbox',
+    SANDBOX_PROXY_NAME: 'gemini-cli-sandbox-proxy',
     homedir: mockedHomedir,
   };
 });
