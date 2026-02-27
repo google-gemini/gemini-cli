@@ -29,6 +29,7 @@ export const DEFAULT_GEMINI_MODEL_AUTO = 'auto-gemini-2.5';
 // Model aliases for user convenience.
 export const GEMINI_MODEL_ALIAS_AUTO = 'auto';
 export const GEMINI_MODEL_ALIAS_PRO = 'pro';
+export const GEMINI_MODEL_ALIAS_PRO_LATEST = 'gemini-pro-latest';
 export const GEMINI_MODEL_ALIAS_FLASH = 'flash';
 export const GEMINI_MODEL_ALIAS_FLASH_LITE = 'flash-lite';
 
@@ -54,7 +55,8 @@ export function resolveModel(
     case PREVIEW_GEMINI_MODEL:
     case PREVIEW_GEMINI_MODEL_AUTO:
     case GEMINI_MODEL_ALIAS_AUTO:
-    case GEMINI_MODEL_ALIAS_PRO: {
+    case GEMINI_MODEL_ALIAS_PRO:
+    case GEMINI_MODEL_ALIAS_PRO_LATEST: {
       if (useGemini3_1) {
         return useCustomToolModel
           ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
