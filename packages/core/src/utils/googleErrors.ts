@@ -16,8 +16,8 @@
 export interface ErrorInfo {
   '@type': 'type.googleapis.com/google.rpc.ErrorInfo';
   reason: string;
-  domain: string;
-  metadata: { [key: string]: string };
+  domain?: string;
+  metadata?: { [key: string]: string };
 }
 
 export interface RetryInfo {

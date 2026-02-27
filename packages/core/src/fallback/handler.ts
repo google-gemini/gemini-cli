@@ -140,6 +140,9 @@ async function processIntent(
       // based on the availability service state (which is updated before this).
       return true;
 
+    case 'retry_with_credits':
+      return true;
+
     case 'stop':
       // Do not switch model on stop. User wants to stay on current model (and stop).
       return false;

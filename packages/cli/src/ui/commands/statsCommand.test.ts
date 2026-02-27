@@ -39,11 +39,18 @@ describe('statsCommand', () => {
     mockContext.session.stats.sessionStartTime = startTime;
   });
 
-  it('should display general session stats when run with no subcommand', () => {
+  it('should display general session stats when run with no subcommand', async () => {
     if (!statsCommand.action) throw new Error('Command has no action');
 
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    statsCommand.action(mockContext, '');
+    mockContext.services.config = {
+      refreshUserQuota: vi.fn(),
+      refreshAvailableCredits: vi.fn(),
+      getUserTierName: vi.fn(),
+      getUserPaidTier: vi.fn(),
+      getModel: vi.fn(),
+    } as unknown as Config;
+
+    await statsCommand.action(mockContext, '');
 
     const expectedDuration = formatDuration(
       endTime.getTime() - startTime.getTime(),
@@ -55,6 +62,7 @@ describe('statsCommand', () => {
       tier: undefined,
       userEmail: 'mock@example.com',
       currentModel: undefined,
+      creditBalance: undefined,
     });
   });
 
@@ -78,6 +86,8 @@ describe('statsCommand', () => {
       getQuotaRemaining: mockGetQuotaRemaining,
       getQuotaLimit: mockGetQuotaLimit,
       getQuotaResetTime: mockGetQuotaResetTime,
+      getUserPaidTier: vi.fn(),
+      refreshAvailableCredits: vi.fn(),
     } as unknown as Config;
 
     await statsCommand.action(mockContext, '');

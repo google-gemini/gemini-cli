@@ -77,6 +77,7 @@ describe('Telemetry SDK', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
   });
 
