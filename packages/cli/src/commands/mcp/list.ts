@@ -20,11 +20,7 @@ import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
-
-const COLOR_GREEN = '\u001b[32m';
-const COLOR_YELLOW = '\u001b[33m';
-const COLOR_RED = '\u001b[31m';
-const RESET_COLOR = '\u001b[0m';
+import chalk from 'chalk';
 
 export async function getMcpServersFromConfig(
   settings?: MergedSettings,
@@ -66,27 +62,56 @@ async function testMCPConnection(
   serverName: string,
   config: MCPServerConfig,
 ): Promise<MCPServerStatus> {
+  const settings = loadSettings();
+
+  // SECURITY: Only test connection if workspace is trusted or if it's a remote server.
+  // stdio servers execute local commands and must never run in untrusted workspaces.
+  const isStdio = !!config.command;
+  if (isStdio && !settings.isTrusted) {
+    return MCPServerStatus.DISCONNECTED;
+  }
+
   const client = new Client({
     name: 'mcp-test-client',
     version: '0.0.1',
   });
 
-  const settings = loadSettings();
-  const sanitizationConfig = {
-    enableEnvironmentVariableRedaction: true,
-    allowedEnvironmentVariables: [],
-    blockedEnvironmentVariables: settings.merged.advanced.excludedEnvVars,
+  const mcpContext = {
+    sanitizationConfig: {
+      enableEnvironmentVariableRedaction: true,
+      allowedEnvironmentVariables: [],
+      blockedEnvironmentVariables: settings.merged.advanced.excludedEnvVars,
+    },
+    emitMcpDiagnostic: (
+      severity: 'info' | 'warning' | 'error',
+      message: string,
+      error?: unknown,
+      serverName?: string,
+    ) => {
+      // In non-interactive list, we log everything through debugLogger for consistency
+      if (severity === 'error') {
+        debugLogger.error(
+          chalk.red(`Error${serverName ? ` (${serverName})` : ''}: ${message}`),
+          error,
+        );
+      } else if (severity === 'warning') {
+        debugLogger.warn(
+          chalk.yellow(
+            `Warning${serverName ? ` (${serverName})` : ''}: ${message}`,
+          ),
+          error,
+        );
+      } else {
+        debugLogger.log(message, error);
+      }
+    },
+    isTrustedFolder: () => settings.isTrusted,
   };
 
   let transport;
   try {
     // Use the same transport creation logic as core
-    transport = await createTransport(
-      serverName,
-      config,
-      false,
-      sanitizationConfig,
-    );
+    transport = await createTransport(serverName, config, false, mcpContext);
   } catch (_error) {
     await client.close();
     return MCPServerStatus.DISCONNECTED;
@@ -125,7 +150,7 @@ export async function listMcpServers(settings?: MergedSettings): Promise<void> {
       blockedServerNames,
       undefined,
     );
-    debugLogger.log(COLOR_YELLOW + message + RESET_COLOR + '\n');
+    debugLogger.log(chalk.yellow(message + '\n'));
   }
 
   if (serverNames.length === 0) {
@@ -146,16 +171,16 @@ export async function listMcpServers(settings?: MergedSettings): Promise<void> {
     let statusText = '';
     switch (status) {
       case MCPServerStatus.CONNECTED:
-        statusIndicator = COLOR_GREEN + '✓' + RESET_COLOR;
+        statusIndicator = chalk.green('✓');
         statusText = 'Connected';
         break;
       case MCPServerStatus.CONNECTING:
-        statusIndicator = COLOR_YELLOW + '…' + RESET_COLOR;
+        statusIndicator = chalk.yellow('…');
         statusText = 'Connecting';
         break;
       case MCPServerStatus.DISCONNECTED:
       default:
-        statusIndicator = COLOR_RED + '✗' + RESET_COLOR;
+        statusIndicator = chalk.red('✗');
         statusText = 'Disconnected';
         break;
     }

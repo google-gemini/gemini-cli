@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mcpCommand } from './mcpCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import {
@@ -77,6 +77,8 @@ describe('mcpCommand', () => {
     getGeminiClient: ReturnType<typeof vi.fn>;
     getMcpClientManager: ReturnType<typeof vi.fn>;
     getResourceRegistry: ReturnType<typeof vi.fn>;
+    setUserInteractedWithMcp: ReturnType<typeof vi.fn>;
+    getLastMcpError: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -104,12 +106,15 @@ describe('mcpCommand', () => {
       }),
       getGeminiClient: vi.fn(),
       getMcpClientManager: vi.fn().mockImplementation(() => ({
-        getBlockedMcpServers: vi.fn(),
-        getMcpServers: vi.fn(),
+        getBlockedMcpServers: vi.fn().mockReturnValue([]),
+        getMcpServers: vi.fn().mockReturnValue({}),
+        getLastError: vi.fn().mockReturnValue(undefined),
       })),
       getResourceRegistry: vi.fn().mockReturnValue({
         getAllResources: vi.fn().mockReturnValue([]),
       }),
+      setUserInteractedWithMcp: vi.fn(),
+      getLastMcpError: vi.fn().mockReturnValue(undefined),
     };
 
     mockContext = createMockCommandContext({
@@ -117,6 +122,10 @@ describe('mcpCommand', () => {
         config: mockConfig,
       },
     });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('basic functionality', () => {
@@ -161,6 +170,7 @@ describe('mcpCommand', () => {
       mockConfig.getMcpClientManager = vi.fn().mockReturnValue({
         getMcpServers: vi.fn().mockReturnValue(mockMcpServers),
         getBlockedMcpServers: vi.fn().mockReturnValue([]),
+        getLastError: vi.fn().mockReturnValue(undefined),
       });
     });
 
