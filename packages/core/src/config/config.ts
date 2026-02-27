@@ -308,20 +308,28 @@ export interface BrowserAgentCustomConfig {
  */
 export interface ExtensionUIBadge {
   /**
-   * The command to execute to get the badge text.
-   * Should return a plain string to stdout.
+   * The type of badge to render.
+   * 'command' executes a shell command. 'env' reads an environment variable.
    */
-  command: string;
+  type: 'command' | 'env';
+  /**
+   * The command to execute (Required if type === 'command').
+   */
+  command?: string;
   /**
    * Optional arguments for the command.
    */
   args?: string[];
   /**
+   * The environment variable to read (Required if type === 'env').
+   */
+  envVar?: string;
+  /**
    * Optional icon to display before the text.
    */
   icon?: string;
   /**
-   * Optional polling interval in milliseconds. Defaults to 30000.
+   * Optional polling interval in milliseconds for commands. Defaults to 30000.
    */
   intervalMs?: number;
   /**

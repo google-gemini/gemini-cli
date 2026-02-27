@@ -25,16 +25,26 @@ export function useExtensionStatusBadges(config: Config): StatusBadge[] {
       return ext.ui.badges.map(
         async (badgeConfig): Promise<StatusBadge | null> => {
           try {
-            const { stdout } = await spawnAsync(
-              badgeConfig.command,
-              badgeConfig.args ?? [],
-            );
-            const text = stdout.toString().trim();
-            if (text) {
-              return {
-                text: badgeConfig.icon ? `${badgeConfig.icon} ${text}` : text,
-                color: badgeConfig.color,
-              };
+            if (badgeConfig.type === 'env' && badgeConfig.envVar) {
+              const val = process.env[badgeConfig.envVar];
+              if (val) {
+                return {
+                  text: badgeConfig.icon ? `${badgeConfig.icon} ${val}` : val,
+                  color: badgeConfig.color,
+                };
+              }
+            } else if (badgeConfig.type === 'command' && badgeConfig.command) {
+              const { stdout } = await spawnAsync(
+                badgeConfig.command,
+                badgeConfig.args ?? [],
+              );
+              const text = stdout.toString().trim();
+              if (text) {
+                return {
+                  text: badgeConfig.icon ? `${badgeConfig.icon} ${text}` : text,
+                  color: badgeConfig.color,
+                };
+              }
             }
           } catch (_e) {
             // Ignore failing badge commands silently so they don't break the UI

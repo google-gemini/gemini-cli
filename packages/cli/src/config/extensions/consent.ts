@@ -179,7 +179,10 @@ async function extensionConsentString(
       '⚠️  This extension contains Hooks which can automatically execute commands.',
     );
   }
-  if (sanitizedConfig.ui?.badges && sanitizedConfig.ui.badges.length > 0) {
+  const hasCommandBadges = sanitizedConfig.ui?.badges?.some(
+    (b) => b.type === 'command' || b.command,
+  );
+  if (hasCommandBadges) {
     output.push(
       '⚠️  This extension contributes UI Badges which will automatically execute commands in the background to update their status.',
     );
