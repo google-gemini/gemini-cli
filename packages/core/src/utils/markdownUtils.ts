@@ -98,11 +98,15 @@ export function jsonToMarkdown(data: unknown, indent = 0): string {
  */
 export function safeJsonToMarkdown(text: string): string {
   try {
-    const parsed = JSON.parse(text) as unknown;
+    const parsed: unknown = JSON.parse(text);
     return jsonToMarkdown(parsed);
   } catch {
     return text;
   }
+}
+
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isArrayOfSimilarObjects(
@@ -111,30 +115,9 @@ function isArrayOfSimilarObjects(
   if (data.length === 0) {
     return false;
   }
-  if (
-    !data.every(
-      (item) =>
-        typeof item === 'object' &&
-        item !== null &&
-        !Array.isArray(item) &&
-        Object.keys(item).length > 0,
-    )
-  ) {
-    return false;
-  }
-
-  // These casts are not unsafe, due to the `typeof` check above.
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const firstKeys = Object.keys(data[0] as object)
-    .sort()
-    .join(',');
-  return data.every(
-    (item) =>
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      Object.keys(item as object)
-        .sort()
-        .join(',') === firstKeys,
-  );
+  if (!data.every(isRecord)) return false;
+  const firstKeys = Object.keys(data[0]).sort().join(',');
+  return data.every((item) => Object.keys(item).sort().join(',') === firstKeys);
 }
 
 function renderTable(data: Array<Record<string, unknown>>, indent = 0): string {

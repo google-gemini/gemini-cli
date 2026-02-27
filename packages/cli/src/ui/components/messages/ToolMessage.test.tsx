@@ -441,7 +441,7 @@ describe('<ToolMessage />', () => {
   });
 
   describe('Truncation', () => {
-    it('applies truncation for Kind.Agent', async () => {
+    it('applies truncation for Kind.Agent when availableTerminalHeight is provided', async () => {
       const multilineString = Array.from(
         { length: 30 },
         (_, i) => `Line ${i + 1}`,
@@ -453,6 +453,43 @@ describe('<ToolMessage />', () => {
           kind={Kind.Agent}
           resultDisplay={multilineString}
           renderOutputAsMarkdown={false}
+          availableTerminalHeight={40}
+        />,
+        {
+          uiActions,
+          uiState: {
+            streamingState: StreamingState.Idle,
+            constrainHeight: true,
+          },
+          width: 80,
+          useAlternateBuffer: false,
+        },
+      );
+      await waitUntilReady();
+      const output = lastFrame();
+
+      // Since kind=Kind.Agent and availableTerminalHeight is provided, it should truncate to SUBAGENT_MAX_LINES (15)
+      // and show the FIRST lines (overflowDirection='bottom')
+      expect(output).toContain('Line 1');
+      expect(output).toContain('Line 14');
+      expect(output).not.toContain('Line 16');
+      expect(output).not.toContain('Line 30');
+      unmount();
+    });
+
+    it('does NOT apply truncation for Kind.Agent when availableTerminalHeight is undefined', async () => {
+      const multilineString = Array.from(
+        { length: 30 },
+        (_, i) => `Line ${i + 1}`,
+      ).join('\n');
+
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ToolMessage
+          {...baseProps}
+          kind={Kind.Agent}
+          resultDisplay={multilineString}
+          renderOutputAsMarkdown={false}
+          availableTerminalHeight={undefined}
         />,
         {
           uiActions,
@@ -464,12 +501,8 @@ describe('<ToolMessage />', () => {
       await waitUntilReady();
       const output = lastFrame();
 
-      // Since kind=Kind.Agent, it should truncate to SUBAGENT_MAX_LINES (15)
-      // and show the FIRST lines (overflowDirection='bottom')
       expect(output).toContain('Line 1');
-      expect(output).toContain('Line 14');
-      expect(output).not.toContain('Line 16');
-      expect(output).not.toContain('Line 30');
+      expect(output).toContain('Line 30');
       unmount();
     });
 
