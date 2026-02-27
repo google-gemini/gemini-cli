@@ -144,6 +144,12 @@ describe('getDisplayString', () => {
     expect(getDisplayString(GEMINI_MODEL_ALIAS_PRO)).toBe(PREVIEW_GEMINI_MODEL);
   });
 
+  it('should return concrete model name for gemini-pro-latest alias', () => {
+    expect(getDisplayString(GEMINI_MODEL_ALIAS_PRO_LATEST)).toBe(
+      PREVIEW_GEMINI_MODEL,
+    );
+  });
+
   it('should return concrete model name for flash alias', () => {
     expect(getDisplayString(GEMINI_MODEL_ALIAS_FLASH)).toBe(
       PREVIEW_GEMINI_FLASH_MODEL,

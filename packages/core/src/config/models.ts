@@ -116,6 +116,7 @@ export function getDisplayString(model: string) {
     case DEFAULT_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 2.5)';
     case GEMINI_MODEL_ALIAS_PRO:
+    case GEMINI_MODEL_ALIAS_PRO_LATEST:
       return PREVIEW_GEMINI_MODEL;
     case GEMINI_MODEL_ALIAS_FLASH:
       return PREVIEW_GEMINI_FLASH_MODEL;
