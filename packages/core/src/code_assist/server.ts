@@ -305,6 +305,7 @@ export class CodeAssistServer implements ContentGenerator {
       responseType: 'json',
       body: JSON.stringify(req),
       signal,
+      retry: false,
     });
     return res.data;
   }
