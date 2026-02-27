@@ -25,6 +25,7 @@ import {
   GLOB_DISPLAY_NAME,
 } from '@google/gemini-cli-core';
 import os from 'node:os';
+import { createMockSettings } from '../../../test-utils/settings.js';
 
 describe('<ToolGroupMessage />', () => {
   afterEach(() => {
@@ -64,6 +65,11 @@ describe('<ToolGroupMessage />', () => {
     ideMode: false,
     enableInteractiveShell: true,
   });
+  const fullVerbositySettings = createMockSettings({
+    merged: {
+      ui: { errorVerbosity: 'full' },
+    },
+  });
 
   describe('Golden Snapshots', () => {
     it('renders single successful tool call', async () => {
@@ -73,6 +79,7 @@ describe('<ToolGroupMessage />', () => {
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
             pendingHistoryItems: [
               {
@@ -104,7 +111,7 @@ describe('<ToolGroupMessage />', () => {
 
       const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
-        { config: baseMockConfig },
+        { config: baseMockConfig, settings: fullVerbositySettings },
       );
 
       // Should render nothing because all tools in the group are confirming
@@ -140,6 +147,7 @@ describe('<ToolGroupMessage />', () => {
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
             pendingHistoryItems: [
               {
@@ -157,6 +165,76 @@ describe('<ToolGroupMessage />', () => {
       expect(output).not.toContain('pending-tool');
       expect(output).toContain('error-tool');
       expect(output).toMatchSnapshot();
+      unmount();
+    });
+
+    it('hides errored tool calls in low error verbosity mode', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'tool-1',
+          name: 'successful-tool',
+          status: CoreToolCallStatus.Success,
+        }),
+        createToolCall({
+          callId: 'tool-2',
+          name: 'error-tool',
+          status: CoreToolCallStatus.Error,
+          resultDisplay: 'Tool failed',
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          uiState: {
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
+          },
+        },
+      );
+      await waitUntilReady();
+      const output = lastFrame();
+      expect(output).toContain('successful-tool');
+      expect(output).not.toContain('error-tool');
+      unmount();
+    });
+
+    it('keeps client-initiated errored tool calls visible in low error verbosity mode', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'tool-1',
+          name: 'client-error-tool',
+          status: CoreToolCallStatus.Error,
+          isClientInitiated: true,
+          resultDisplay: 'Client tool failed',
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          uiState: {
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
+          },
+        },
+      );
+
+      await waitUntilReady();
+      const output = lastFrame();
+      expect(output).toContain('client-error-tool');
       unmount();
     });
 
@@ -187,6 +265,7 @@ describe('<ToolGroupMessage />', () => {
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
             pendingHistoryItems: [
               {
@@ -233,6 +312,7 @@ describe('<ToolGroupMessage />', () => {
         />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
             pendingHistoryItems: [
               {
@@ -266,6 +346,7 @@ describe('<ToolGroupMessage />', () => {
         />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
             pendingHistoryItems: [
               {
@@ -288,6 +369,7 @@ describe('<ToolGroupMessage />', () => {
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
             pendingHistoryItems: [
               {
@@ -326,6 +408,7 @@ describe('<ToolGroupMessage />', () => {
         </Scrollable>,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
             pendingHistoryItems: [
               {
@@ -356,6 +439,7 @@ describe('<ToolGroupMessage />', () => {
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
             pendingHistoryItems: [
               {
@@ -406,6 +490,7 @@ describe('<ToolGroupMessage />', () => {
         </Scrollable>,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
             pendingHistoryItems: [
               {
@@ -439,6 +524,7 @@ describe('<ToolGroupMessage />', () => {
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
             pendingHistoryItems: [
               {
@@ -468,6 +554,7 @@ describe('<ToolGroupMessage />', () => {
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
             pendingHistoryItems: [
               {
@@ -510,6 +597,7 @@ describe('<ToolGroupMessage />', () => {
         />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
             pendingHistoryItems: [
               {
@@ -569,7 +657,7 @@ describe('<ToolGroupMessage />', () => {
 
         const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
           <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
-          { config: baseMockConfig },
+          { config: baseMockConfig, settings: fullVerbositySettings },
         );
         await waitUntilReady();
 
@@ -599,7 +687,7 @@ describe('<ToolGroupMessage />', () => {
 
       const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
-        { config: baseMockConfig },
+        { config: baseMockConfig, settings: fullVerbositySettings },
       );
 
       await waitUntilReady();
@@ -627,7 +715,7 @@ describe('<ToolGroupMessage />', () => {
           toolCalls={toolCalls}
           borderBottom={false}
         />,
-        { config: baseMockConfig },
+        { config: baseMockConfig, settings: fullVerbositySettings },
       );
       // AskUser tools in progress are rendered by AskUserDialog, so we expect nothing.
       await waitUntilReady();
@@ -665,7 +753,7 @@ describe('<ToolGroupMessage />', () => {
 
         const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
           <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
-          { config: baseMockConfig },
+          { config: baseMockConfig, settings: fullVerbositySettings },
         );
 
         await waitUntilReady();
@@ -697,6 +785,7 @@ describe('<ToolGroupMessage />', () => {
         />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           useAlternateBuffer: true,
           uiState: {
             constrainHeight: true,
@@ -728,6 +817,7 @@ describe('<ToolGroupMessage />', () => {
         />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           useAlternateBuffer: true,
           uiState: {
             constrainHeight: true,
@@ -760,6 +850,7 @@ describe('<ToolGroupMessage />', () => {
         />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           useAlternateBuffer: true,
           uiState: {
             constrainHeight: true,
@@ -791,6 +882,7 @@ describe('<ToolGroupMessage />', () => {
         />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           useAlternateBuffer: true,
           uiState: {
             constrainHeight: true,
@@ -818,6 +910,7 @@ describe('<ToolGroupMessage />', () => {
         />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           useAlternateBuffer: true,
           uiState: {
             constrainHeight: false,
@@ -850,6 +943,7 @@ describe('<ToolGroupMessage />', () => {
           />,
           {
             config: baseMockConfig,
+            settings: fullVerbositySettings,
             useAlternateBuffer: true,
             uiState: {
               constrainHeight: true,

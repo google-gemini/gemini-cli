@@ -581,6 +581,7 @@ export const useSlashCommandProcessor = (
                       name: 'Expansion',
                       description: 'Command expansion needs shell access',
                       status: CoreToolCallStatus.AwaitingApproval,
+                      isClientInitiated: true,
                       resultDisplay: undefined,
                       confirmationDetails,
                     };

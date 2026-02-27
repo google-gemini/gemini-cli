@@ -161,6 +161,67 @@ describe('useQuotaAndFallback', () => {
       );
     });
 
+    it('should auto-retry transient capacity failures in low verbosity mode', async () => {
+      const { result } = renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.FREE,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
+          errorVerbosity: 'low',
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+      const intent = await handler(
+        'gemini-pro',
+        'gemini-flash',
+        new RetryableQuotaError('retryable quota', mockGoogleApiError, 5),
+      );
+
+      expect(intent).toBe('retry_once');
+      expect(result.current.proQuotaRequest).toBeNull();
+      expect(mockSetModelSwitchedFromQuotaError).not.toHaveBeenCalledWith(true);
+      expect(mockConfig.setQuotaErrorOccurred).not.toHaveBeenCalledWith(true);
+    });
+
+    it('should still prompt for terminal quota in low verbosity mode', async () => {
+      const { result } = renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.FREE,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
+          errorVerbosity: 'low',
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+      let promise: Promise<FallbackIntent | null>;
+      act(() => {
+        promise = handler(
+          'gemini-pro',
+          'gemini-flash',
+          new TerminalQuotaError('pro quota', mockGoogleApiError),
+        );
+      });
+
+      expect(result.current.proQuotaRequest).not.toBeNull();
+
+      act(() => {
+        result.current.handleProQuotaChoice('retry_later');
+      });
+      await promise!;
+    });
+
     describe('Interactive Fallback', () => {
       it('should set an interactive request for a terminal quota error', async () => {
         const { result } = renderHook(() =>
