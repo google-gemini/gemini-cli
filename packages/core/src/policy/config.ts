@@ -532,7 +532,7 @@ export function createPolicyUpdater(
               // Fall back to copy + unlink which works across filesystems.
               if (isNodeError(renameError) && renameError.code === 'EXDEV') {
                 await fs.copyFile(tmpFile, policyFile);
-                await fs.unlink(tmpFile);
+                await fs.unlink(tmpFile).catch(() => {});
               } else {
                 throw renameError;
               }
