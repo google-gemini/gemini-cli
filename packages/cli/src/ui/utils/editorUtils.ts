@@ -92,7 +92,6 @@ export async function openFileInEditor(
         env: {
           ...process.env,
           TERM: process.env['TERM'] || 'xterm-256color',
-          COLORTERM: process.env['COLORTERM'] || 'truecolor',
         },
       });
       if (result.error) {
@@ -122,7 +121,6 @@ export async function openFileInEditor(
           env: {
             ...process.env,
             TERM: process.env['TERM'] || 'xterm-256color',
-            COLORTERM: process.env['COLORTERM'] || 'truecolor',
           },
         });
 
