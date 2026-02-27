@@ -16,6 +16,10 @@ import {
 import type { Settings, SessionRetentionSettings } from '../config/settings.js';
 import { getAllSessionFiles, type SessionFileEntry } from './sessionUtils.js';
 
+// Constants for deleted corrupted sessions tracking
+const DELETED_CORRUPTED_FILE = 'deleted-corrupted.json';
+const MAX_DELETED_TRACKING = 100;
+
 // Constants
 export const DEFAULT_MIN_RETENTION = '1d' as string;
 const MIN_MAX_COUNT = 1;
@@ -86,10 +90,33 @@ export async function cleanupExpiredSessions(
       retentionConfig,
     );
 
+    // Track corrupted sessions being deleted
+    const corruptedSessionIds: string[] = [];
+
     // Delete all sessions that need to be deleted
     for (const sessionToDelete of sessionsToDelete) {
       try {
         const sessionPath = path.join(chatsDir, sessionToDelete.fileName);
+
+        // Track corrupted session deletion BEFORE deleting the file
+        if (sessionToDelete.sessionInfo === null) {
+          try {
+            const content = await fs.readFile(sessionPath, 'utf-8');
+            const idMatch = content.match(/"sessionId"\s*:\s*"([^"]+)"/);
+            if (idMatch && idMatch[1]) {
+              corruptedSessionIds.push(idMatch[1]);
+            }
+          } catch {
+            // If we can't read the file, try to extract short ID from filename
+            const match = sessionToDelete.fileName.match(
+              /-([a-f0-9]{8,})\.json$/i,
+            );
+            if (match) {
+              corruptedSessionIds.push(match[1]);
+            }
+          }
+        }
+
         await fs.unlink(sessionPath);
 
         // ALSO cleanup Activity logs in the project logs directory
@@ -154,6 +181,22 @@ export async function cleanupExpiredSessions(
     }
 
     result.skipped = result.scanned - result.deleted - result.failed;
+
+    // Record deleted corrupted sessions
+    if (corruptedSessionIds.length > 0) {
+      try {
+        await recordDeletedCorruptedSessions(
+          config.storage.getProjectTempDir(),
+          corruptedSessionIds,
+        );
+      } catch (error) {
+        if (config.getDebugMode()) {
+          debugLogger.debug(
+            `Failed to record deleted corrupted sessions: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
+        }
+      }
+    }
 
     if (config.getDebugMode() && result.deleted > 0) {
       debugLogger.debug(
@@ -519,4 +562,61 @@ export async function cleanupToolOutputFiles(
   }
 
   return result;
+}
+
+/**
+ * Records deleted corrupted session IDs to a tracking file.
+ * Keeps only the most recent MAX_DELETED_TRACKING entries.
+ */
+async function recordDeletedCorruptedSessions(
+  projectTempDir: string,
+  newSessionIds: string[],
+): Promise<void> {
+  const trackingPath = path.join(projectTempDir, DELETED_CORRUPTED_FILE);
+
+  let existingIds: string[] = [];
+  try {
+    const content = await fs.readFile(trackingPath, 'utf8');
+    const data = JSON.parse(content);
+    if (Array.isArray(data)) {
+      existingIds = data;
+    }
+  } catch {
+    // Ignore if file doesn't exist or is invalid
+  }
+
+  const combined = [...newSessionIds, ...existingIds];
+
+  const unique = Array.from(new Set(combined));
+
+  const trimmed = unique.slice(0, MAX_DELETED_TRACKING);
+
+  await fs.writeFile(trackingPath, JSON.stringify(trimmed, null, 2), 'utf8');
+}
+
+/**
+ * Checks if a session ID was deleted as corrupted.
+ */
+export async function wasSessionDeletedAsCorrupted(
+  projectTempDir: string,
+  sessionId: string,
+): Promise<boolean> {
+  const trackingPath = path.join(projectTempDir, DELETED_CORRUPTED_FILE);
+
+  try {
+    const content = await fs.readFile(trackingPath, 'utf8');
+    const data = JSON.parse(content);
+    if (Array.isArray(data)) {
+      return data.some(
+        (id) =>
+          id === sessionId ||
+          (sessionId.length >= 8 && id.startsWith(sessionId)) ||
+          (id.length >= 8 && sessionId.startsWith(id)),
+      );
+    }
+  } catch {
+    // Ignore if file doesn't exist or is invalid
+  }
+
+  return false;
 }

@@ -341,6 +341,56 @@ describe('SessionSelector', () => {
     );
   });
 
+  it('should show specific error for sessions deleted as corrupted', async () => {
+    const sessionId1 = randomUUID();
+    const deletedSessionId = randomUUID();
+
+    // Create test session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const session1 = {
+      sessionId: sessionId1,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Test message 1',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId1.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session1, null, 2),
+    );
+
+    // Create a deleted-corrupted.json file with the deleted session ID
+    await fs.writeFile(
+      path.join(tmpDir, 'deleted-corrupted.json'),
+      JSON.stringify([deletedSessionId]),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+
+    // Try to resolve the deleted session - should get specific error
+    await expect(
+      sessionSelector.resolveSession(deletedSessionId),
+    ).rejects.toThrow('was previously deleted because it was corrupted');
+
+    // Try to resolve a session that never existed - should get generic error
+    await expect(
+      sessionSelector.resolveSession('never-existed-uuid'),
+    ).rejects.toThrow('Invalid session identifier');
+  });
+
   it('should not list sessions with only system messages', async () => {
     const sessionIdWithUser = randomUUID();
     const sessionIdSystemOnly = randomUUID();

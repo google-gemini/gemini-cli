@@ -1669,5 +1669,61 @@ describe('Session Cleanup', () => {
       expect(result.disabled).toBe(false);
       expect(result.failed).toBe(1);
     });
+
+    it('should track corrupted sessions in deleted-corrupted.json', async () => {
+      const config = createMockConfig();
+      const settings: Settings = {
+        general: {
+          sessionRetention: {
+            enabled: true,
+            maxAge: '30d',
+          },
+        },
+      };
+
+      const corruptedSessionId1 = 'corrupt1-1234-5678-90ab-cdef12345678';
+      const corruptedSessionId2 = 'corrupt2-abcd-efgh-ijkl-mnop12345678';
+
+      // Mock the corrupted session file content with sessionIds
+      mockFs.readFile.mockImplementation(async (filePath) => {
+        const filePathStr = filePath.toString();
+        if (filePathStr.includes('corrupt1')) {
+          return `{"sessionId":"${corruptedSessionId1}","messages":[{"role":"user"`;
+        }
+        if (filePathStr.includes('corrupt2')) {
+          return `{"sessionId":"${corruptedSessionId2}","messages":[{"role":"user"`;
+        }
+        return '[]';
+      });
+
+      // Mock getAllSessionFiles to return corrupted files
+      mockGetAllSessionFiles.mockResolvedValue([
+        {
+          fileName: `${SESSION_FILE_PREFIX}2025-01-02T10-00-00-corrupt1.json`,
+          sessionInfo: null,
+        },
+        {
+          fileName: `${SESSION_FILE_PREFIX}2025-01-03T10-00-00-corrupt2.json`,
+          sessionInfo: null,
+        },
+      ]);
+
+      mockFs.unlink.mockResolvedValue(undefined);
+      mockFs.writeFile.mockResolvedValue(undefined);
+
+      const result = await cleanupExpiredSessions(config, settings);
+
+      expect(result.deleted).toBe(2);
+
+      // Verify that tracking file was written with the corrupted sessionIds
+      const writeFileCalls = mockFs.writeFile.mock.calls;
+      const trackingFileCall = writeFileCalls.find((call) =>
+        call[0].toString().includes('deleted-corrupted.json'),
+      );
+
+      expect(trackingFileCall).toBeDefined();
+      expect(trackingFileCall![1]).toContain(corruptedSessionId1);
+      expect(trackingFileCall![1]).toContain(corruptedSessionId2);
+    });
   });
 });
