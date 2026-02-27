@@ -187,7 +187,9 @@ describe('ToastDisplay', () => {
       constrainHeight: true,
     });
     await waitUntilReady();
-    expect(lastFrame()).toContain('Press Ctrl+O to show more lines');
+    expect(lastFrame()).toContain(
+      'Ctrl+O to show more lines of the last response',
+    );
   });
 
   it('renders collapse hint when showIsExpandableHint is true and constrainHeight is false', async () => {
@@ -196,6 +198,8 @@ describe('ToastDisplay', () => {
       constrainHeight: false,
     });
     await waitUntilReady();
-    expect(lastFrame()).toContain('Press Ctrl+O to collapse lines');
+    expect(lastFrame()).toContain(
+      'Ctrl+O to collapse lines of the last response',
+    );
   });
 });
