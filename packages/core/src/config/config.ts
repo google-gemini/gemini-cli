@@ -38,6 +38,7 @@ import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
+import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
@@ -176,6 +177,14 @@ export interface ToolOutputMaskingConfig {
   toolProtectionThreshold: number;
   minPrunableTokensThreshold: number;
   protectLatestTurn: boolean;
+}
+
+export interface GemmaModelRouterSettings {
+  enabled?: boolean;
+  classifier?: {
+    host?: string;
+    model?: string;
+  };
 }
 
 export interface ExtensionSetting {
@@ -509,6 +518,7 @@ export interface ConfigParameters {
   directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
+  gemmaModelRouter?: GemmaModelRouterSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
@@ -599,6 +609,7 @@ export class Config {
   private readonly usageStatisticsEnabled: boolean;
   private geminiClient!: GeminiClient;
   private baseLlmClient!: BaseLlmClient;
+  private localLiteRtLmClient?: LocalLiteRtLmClient;
   private modelRouterService: ModelRouterService;
   private readonly modelAvailabilityService: ModelAvailabilityService;
   private readonly fileFiltering: {
@@ -694,6 +705,9 @@ export class Config {
     | PolicyUpdateConfirmationRequest
     | undefined;
   private readonly outputSettings: OutputSettings;
+
+  private readonly gemmaModelRouter: GemmaModelRouterSettings;
+
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly maxAttempts: number;
@@ -941,6 +955,15 @@ export class Config {
     this.skillManager = new SkillManager();
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
+    };
+    this.gemmaModelRouter = {
+      enabled: params.gemmaModelRouter?.enabled ?? false,
+      classifier: {
+        host:
+          params.gemmaModelRouter?.classifier?.host ?? 'http://localhost:9379',
+        model:
+          params.gemmaModelRouter?.classifier?.model ?? 'gemma3-1b-gpu-custom',
+      },
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.maxAttempts = Math.min(
@@ -1243,6 +1266,13 @@ export class Config {
       }
     }
     return this.baseLlmClient;
+  }
+
+  getLocalLiteRtLmClient(): LocalLiteRtLmClient {
+    if (!this.localLiteRtLmClient) {
+      this.localLiteRtLmClient = new LocalLiteRtLmClient(this);
+    }
+    return this.localLiteRtLmClient;
   }
 
   getSessionId(): string {
@@ -2576,6 +2606,14 @@ export class Config {
 
   getEnableHooksUI(): boolean {
     return this.enableHooksUI;
+  }
+
+  getGemmaModelRouterEnabled(): boolean {
+    return this.gemmaModelRouter.enabled ?? false;
+  }
+
+  getGemmaModelRouterSettings(): GemmaModelRouterSettings {
+    return this.gemmaModelRouter;
   }
 
   /**
