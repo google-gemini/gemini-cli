@@ -103,7 +103,7 @@ describe('useQuotaAndFallback', () => {
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('should register a fallback handler on initialization', () => {
