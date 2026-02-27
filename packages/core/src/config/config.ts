@@ -38,6 +38,7 @@ import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
+import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
@@ -107,7 +108,12 @@ import { FileExclusions } from '../utils/ignorePatterns.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
-import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
+import {
+  ApprovalMode,
+  type PolicyEngineConfig,
+  type PolicyRule,
+  type SafetyCheckerRule,
+} from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type {
   UserTierId,
@@ -133,6 +139,11 @@ import { UserHintService } from './userHintService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
 
+import { CheckerRunner } from '../safety/checker-runner.js';
+import { ContextBuilder } from '../safety/context-builder.js';
+import { CheckerRegistry } from '../safety/registry.js';
+import { ConsecaSafetyChecker } from '../safety/conseca/conseca.js';
+
 export interface AccessibilitySettings {
   /** @deprecated Use ui.loadingPhrases instead. */
   enableLoadingPhrases?: boolean;
@@ -149,6 +160,7 @@ export interface SummarizeToolOutputSettings {
 
 export interface PlanSettings {
   directory?: string;
+  modelRouting?: boolean;
 }
 
 export interface TelemetrySettings {
@@ -173,6 +185,14 @@ export interface ToolOutputMaskingConfig {
   protectLatestTurn: boolean;
 }
 
+export interface GemmaModelRouterSettings {
+  enabled?: boolean;
+  classifier?: {
+    host?: string;
+    model?: string;
+  };
+}
+
 export interface ExtensionSetting {
   name: string;
   description: string;
@@ -194,6 +214,10 @@ export interface AgentRunConfig {
   maxTurns?: number;
 }
 
+/**
+ * Override configuration for a specific agent.
+ * Generic fields (modelConfig, runConfig, enabled) are standard across all agents.
+ */
 export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
@@ -202,6 +226,7 @@ export interface AgentOverride {
 
 export interface AgentSettings {
   overrides?: Record<string, AgentOverride>;
+  browser?: BrowserAgentCustomConfig;
 }
 
 export interface CustomTheme {
@@ -256,6 +281,30 @@ export interface CustomTheme {
 }
 
 /**
+ * Browser agent custom configuration.
+ * Used in agents.browser
+ *
+ * IMPORTANT: Keep in sync with the browser settings schema in
+ * packages/cli/src/config/settingsSchema.ts (agents.browser.properties).
+ */
+export interface BrowserAgentCustomConfig {
+  /**
+   * Session mode:
+   * - 'persistent': Launch Chrome with a persistent profile at ~/.cache/chrome-devtools-mcp/ (default)
+   * - 'isolated': Launch Chrome with a temporary profile, cleaned up after session
+   * - 'existing': Attach to an already-running Chrome instance (requires remote debugging
+   *   enabled at chrome://inspect/#remote-debugging)
+   */
+  sessionMode?: 'isolated' | 'persistent' | 'existing';
+  /** Run browser in headless mode. Default: false */
+  headless?: boolean;
+  /** Path to Chrome profile directory for session persistence. */
+  profilePath?: string;
+  /** Model override for the visual agent. */
+  visualModel?: string;
+}
+
+/**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
  * around on the config object though Core does not use this information
@@ -281,6 +330,14 @@ export interface GeminiCLIExtension {
    * These themes will be registered when the extension is activated.
    */
   themes?: CustomTheme[];
+  /**
+   * Policy rules contributed by this extension.
+   */
+  rules?: PolicyRule[];
+  /**
+   * Safety checkers contributed by this extension.
+   */
+  checkers?: SafetyCheckerRule[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -292,6 +349,7 @@ export interface ExtensionInstallMetadata {
   allowPreRelease?: boolean;
 }
 
+import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import type { FileFilteringOptions } from './constants.js';
 import {
   DEFAULT_FILE_FILTERING_OPTIONS,
@@ -462,6 +520,7 @@ export interface ConfigParameters {
   interactive?: boolean;
   trustedFolder?: boolean;
   useBackgroundColor?: boolean;
+  useAlternateBuffer?: boolean;
   useRipgrep?: boolean;
   enableInteractiveShell?: boolean;
   skipNextSpeakerCheck?: boolean;
@@ -471,11 +530,14 @@ export interface ConfigParameters {
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
+  directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
+  gemmaModelRouter?: GemmaModelRouterSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
+  maxAttempts?: number;
   enableShellOutputEfficiency?: boolean;
   shellToolInactivityTimeout?: number;
   fakeResponses?: string;
@@ -511,6 +573,7 @@ export interface ConfigParameters {
     adminSkillsEnabled?: boolean;
     agents?: AgentSettings;
   }>;
+  enableConseca?: boolean;
 }
 
 export class Config {
@@ -538,6 +601,7 @@ export class Config {
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
+  readonly enableConseca: boolean;
 
   private readonly coreTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
@@ -560,6 +624,7 @@ export class Config {
   private readonly usageStatisticsEnabled: boolean;
   private geminiClient!: GeminiClient;
   private baseLlmClient!: BaseLlmClient;
+  private localLiteRtLmClient?: LocalLiteRtLmClient;
   private modelRouterService: ModelRouterService;
   private readonly modelAvailabilityService: ModelAvailabilityService;
   private readonly fileFiltering: {
@@ -634,10 +699,12 @@ export class Config {
   readonly interactive: boolean;
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
+  private readonly directWebFetch: boolean;
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private readonly useBackgroundColor: boolean;
+  private readonly useAlternateBuffer: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly truncateToolOutputThreshold: number;
@@ -654,8 +721,12 @@ export class Config {
     | PolicyUpdateConfirmationRequest
     | undefined;
   private readonly outputSettings: OutputSettings;
+
+  private readonly gemmaModelRouter: GemmaModelRouterSettings;
+
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
+  private readonly maxAttempts: number;
   private readonly enableShellOutputEfficiency: boolean;
   private readonly shellToolInactivityTimeout: number;
   readonly fakeResponses?: string;
@@ -694,6 +765,7 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
@@ -783,6 +855,7 @@ export class Config {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
+    this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
@@ -827,8 +900,10 @@ export class Config {
     this.interactive = params.interactive ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
+    this.directWebFetch = params.directWebFetch ?? false;
     this.useRipgrep = params.useRipgrep ?? true;
     this.useBackgroundColor = params.useBackgroundColor ?? true;
+    this.useAlternateBuffer = params.useAlternateBuffer ?? false;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
@@ -863,20 +938,55 @@ export class Config {
     this.recordResponses = params.recordResponses;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
-    this.policyEngine = new PolicyEngine({
-      ...params.policyEngineConfig,
-      approvalMode:
-        params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+    this.enableConseca = params.enableConseca ?? false;
+
+    // Initialize Safety Infrastructure
+    const contextBuilder = new ContextBuilder(this);
+    const checkersPath = this.targetDir;
+    // The checkersPath  is used to resolve external checkers. Since we do not have any external checkers currently, it is set to the targetDir.
+    const checkerRegistry = new CheckerRegistry(checkersPath);
+    const checkerRunner = new CheckerRunner(contextBuilder, checkerRegistry, {
+      checkersPath,
+      timeout: 30000, // 30 seconds to allow for LLM-based checkers
     });
     this.policyUpdateConfirmationRequest =
       params.policyUpdateConfirmationRequest;
+
+    this.policyEngine = new PolicyEngine(
+      {
+        ...params.policyEngineConfig,
+        approvalMode:
+          params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+      },
+      checkerRunner,
+    );
+
+    // Register Conseca if enabled
+    if (this.enableConseca) {
+      debugLogger.log('[SAFETY] Registering Conseca Safety Checker');
+      ConsecaSafetyChecker.getInstance().setConfig(this);
+    }
+
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
+    this.gemmaModelRouter = {
+      enabled: params.gemmaModelRouter?.enabled ?? false,
+      classifier: {
+        host:
+          params.gemmaModelRouter?.classifier?.host ?? 'http://localhost:9379',
+        model:
+          params.gemmaModelRouter?.classifier?.model ?? 'gemma3-1b-gpu-custom',
+      },
+    };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
+    this.maxAttempts = Math.min(
+      params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+      DEFAULT_MAX_ATTEMPTS,
+    );
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
@@ -1056,7 +1166,7 @@ export class Config {
     return this.contentGenerator;
   }
 
-  async refreshAuth(authMethod: AuthType) {
+  async refreshAuth(authMethod: AuthType, apiKey?: string) {
     // Reset availability service when switching auth
     this.modelAvailabilityService.reset();
 
@@ -1082,6 +1192,7 @@ export class Config {
     const newContentGeneratorConfig = await createContentGeneratorConfig(
       this,
       authMethod,
+      apiKey,
     );
     this.contentGenerator = await createContentGenerator(
       newContentGeneratorConfig,
@@ -1172,6 +1283,13 @@ export class Config {
       }
     }
     return this.baseLlmClient;
+  }
+
+  getLocalLiteRtLmClient(): LocalLiteRtLmClient {
+    if (!this.localLiteRtLmClient) {
+      this.localLiteRtLmClient = new LocalLiteRtLmClient(this);
+    }
+    return this.localLiteRtLmClient;
   }
 
   getSessionId(): string {
@@ -1562,7 +1680,10 @@ export class Config {
    *
    * May change over time.
    */
-  getExcludeTools(): Set<string> | undefined {
+  getExcludeTools(
+    toolMetadata?: Map<string, Record<string, unknown>>,
+    allToolNames?: Set<string>,
+  ): Set<string> | undefined {
     // Right now this is present for backward compatibility with settings.json exclude
     const excludeToolsSet = new Set([...(this.excludeTools ?? [])]);
     for (const extension of this.getExtensionLoader().getExtensions()) {
@@ -1574,7 +1695,10 @@ export class Config {
       }
     }
 
-    const policyExclusions = this.policyEngine.getExcludedTools();
+    const policyExclusions = this.policyEngine.getExcludedTools(
+      toolMetadata,
+      allToolNames,
+    );
     for (const tool of policyExclusions) {
       excludeToolsSet.add(tool);
     }
@@ -2089,6 +2213,10 @@ export class Config {
     return this.approvedPlanPath;
   }
 
+  getDirectWebFetch(): boolean {
+    return this.directWebFetch;
+  }
+
   setApprovedPlanPath(path: string | undefined): void {
     this.approvedPlanPath = path;
   }
@@ -2244,6 +2372,10 @@ export class Config {
     return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
   }
 
+  async getPlanModeRoutingEnabled(): Promise<boolean> {
+    return this.planModeRoutingEnabled;
+  }
+
   async getNumericalRoutingEnabled(): Promise<boolean> {
     await this.ensureExperimentsLoaded();
 
@@ -2396,6 +2528,10 @@ export class Config {
     return this.useBackgroundColor;
   }
 
+  getUseAlternateBuffer(): boolean {
+    return this.useAlternateBuffer;
+  }
+
   getEnableInteractiveShell(): boolean {
     return this.enableInteractiveShell;
   }
@@ -2410,6 +2546,10 @@ export class Config {
 
   getRetryFetchErrors(): boolean {
     return this.retryFetchErrors;
+  }
+
+  getMaxAttempts(): number {
+    return this.maxAttempts;
   }
 
   getEnableShellOutputEfficiency(): boolean {
@@ -2490,6 +2630,46 @@ export class Config {
 
   getEnableHooksUI(): boolean {
     return this.enableHooksUI;
+  }
+
+  getGemmaModelRouterEnabled(): boolean {
+    return this.gemmaModelRouter.enabled ?? false;
+  }
+
+  getGemmaModelRouterSettings(): GemmaModelRouterSettings {
+    return this.gemmaModelRouter;
+  }
+
+  /**
+   * Get override settings for a specific agent.
+   * Reads from agents.overrides.<agentName>.
+   */
+  getAgentOverride(agentName: string): AgentOverride | undefined {
+    return this.getAgentsSettings()?.overrides?.[agentName];
+  }
+
+  /**
+   * Get browser agent configuration.
+   * Combines generic AgentOverride fields with browser-specific customConfig.
+   * This is the canonical way to access browser agent settings.
+   */
+  getBrowserAgentConfig(): {
+    enabled: boolean;
+    model?: string;
+    customConfig: BrowserAgentCustomConfig;
+  } {
+    const override = this.getAgentOverride('browser_agent');
+    const customConfig = this.getAgentsSettings()?.browser ?? {};
+    return {
+      enabled: override?.enabled ?? false,
+      model: override?.modelConfig?.model,
+      customConfig: {
+        sessionMode: customConfig.sessionMode ?? 'persistent',
+        headless: customConfig.headless ?? false,
+        profilePath: customConfig.profilePath,
+        visualModel: customConfig.visualModel,
+      },
+    };
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
