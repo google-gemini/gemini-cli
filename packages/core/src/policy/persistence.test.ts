@@ -48,14 +48,8 @@ describe('createPolicyUpdater', () => {
   it('should persist policy when persist flag is true', async () => {
     createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
-    const workspacePoliciesDir = '/mock/project/.gemini/policies';
-    const policyFile = path.join(
-      workspacePoliciesDir,
-      AUTO_SAVED_POLICY_FILENAME,
-    );
-    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
-      workspacePoliciesDir,
-    );
+    const userPoliciesDir = '/mock/user/.gemini/policies';
+    const policyFile = path.join(userPoliciesDir, AUTO_SAVED_POLICY_FILENAME);
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
@@ -79,8 +73,7 @@ describe('createPolicyUpdater', () => {
     // Wait for async operations (microtasks)
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(mockStorage.getWorkspacePoliciesDir).toHaveBeenCalled();
-    expect(fs.mkdir).toHaveBeenCalledWith(workspacePoliciesDir, {
+    expect(fs.mkdir).toHaveBeenCalledWith(userPoliciesDir, {
       recursive: true,
     });
 
@@ -115,14 +108,8 @@ describe('createPolicyUpdater', () => {
   it('should persist policy with commandPrefix when provided', async () => {
     createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
-    const workspacePoliciesDir = '/mock/project/.gemini/policies';
-    const policyFile = path.join(
-      workspacePoliciesDir,
-      AUTO_SAVED_POLICY_FILENAME,
-    );
-    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
-      workspacePoliciesDir,
-    );
+    const userPoliciesDir = '/mock/user/.gemini/policies';
+    const policyFile = path.join(userPoliciesDir, AUTO_SAVED_POLICY_FILENAME);
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
@@ -168,14 +155,8 @@ describe('createPolicyUpdater', () => {
   it('should persist policy with mcpName and toolName when provided', async () => {
     createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
-    const workspacePoliciesDir = '/mock/project/.gemini/policies';
-    const policyFile = path.join(
-      workspacePoliciesDir,
-      AUTO_SAVED_POLICY_FILENAME,
-    );
-    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
-      workspacePoliciesDir,
-    );
+    const userPoliciesDir = '/mock/user/.gemini/policies';
+    const policyFile = path.join(userPoliciesDir, AUTO_SAVED_POLICY_FILENAME);
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
@@ -214,14 +195,8 @@ describe('createPolicyUpdater', () => {
   it('should escape special characters in toolName and mcpName', async () => {
     createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
-    const workspacePoliciesDir = '/mock/project/.gemini/policies';
-    const policyFile = path.join(
-      workspacePoliciesDir,
-      AUTO_SAVED_POLICY_FILENAME,
-    );
-    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
-      workspacePoliciesDir,
-    );
+    const userPoliciesDir = '/mock/user/.gemini/policies';
+    const policyFile = path.join(userPoliciesDir, AUTO_SAVED_POLICY_FILENAME);
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
     (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
     (fs.readFile as unknown as Mock).mockRejectedValue(
