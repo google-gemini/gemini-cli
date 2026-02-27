@@ -354,6 +354,66 @@ Hidden`,
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should load agents from symbolic links to .md files', async () => {
+      await writeAgentMarkdown(
+        `---
+name: original-agent
+description: Original agent
+---
+Original prompt`,
+        'original.md',
+      );
+
+      await fs.symlink(
+        path.join(tempDir, 'original.md'),
+        path.join(tempDir, 'symlinked.md'),
+      );
+
+      const result = await loadAgentsFromDirectory(tempDir);
+      expect(result.errors).toHaveLength(0);
+      expect(result.agents).toHaveLength(2);
+      const names = result.agents.map((a) => a.name);
+      expect(names).toContain('original-agent');
+    });
+
+    it('should reject symbolic links pointing outside the agents directory', async () => {
+      const outsideDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'agent-outside-'),
+      );
+      try {
+        const outsideFile = path.join(outsideDir, 'evil.md');
+        await fs.writeFile(
+          outsideFile,
+          `---
+name: evil-agent
+description: Evil agent
+---
+Evil prompt`,
+        );
+
+        await fs.symlink(outsideFile, path.join(tempDir, 'evil-link.md'));
+
+        const result = await loadAgentsFromDirectory(tempDir);
+        expect(result.errors).toHaveLength(1);
+        expect(result.errors[0].message).toContain(
+          'Symbolic link points outside the agents directory',
+        );
+      } finally {
+        await fs.rm(outsideDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should report error for dangling symbolic links', async () => {
+      await fs.symlink(
+        path.join(tempDir, 'nonexistent.md'),
+        path.join(tempDir, 'dangling.md'),
+      );
+
+      const result = await loadAgentsFromDirectory(tempDir);
+      expect(result.errors).toHaveLength(1);
+      expect(result.agents).toHaveLength(0);
+    });
+
     it('should capture errors for malformed individual files', async () => {
       // Create a malformed Markdown file
       await writeAgentMarkdown('invalid markdown', 'malformed.md');
