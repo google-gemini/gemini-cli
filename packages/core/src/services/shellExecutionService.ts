@@ -32,6 +32,18 @@ const { Terminal } = pkg;
 
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
+/**
+ * An environment variable that is set for shell executions. This can be used
+ * by downstream executables and scripts to identify that they were executed
+ * from within Gemini CLI.
+ */
+export const GEMINI_CLI_IDENTIFICATION_ENV_VAR = 'GEMINI_CLI';
+
+/**
+ * The value of {@link GEMINI_CLI_IDENTIFICATION_ENV_VAR}
+ */
+export const GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE = '1';
+
 // We want to allow shell outputs that are close to the context window in size.
 // 300,000 lines is roughly equivalent to a large context window, ensuring
 // we capture significant output from long-running commands.
@@ -302,7 +314,8 @@ export class ShellExecutionService {
         detached: !isWindows,
         env: {
           ...sanitizeEnvironment(process.env, sanitizationConfig),
-          GEMINI_CLI: '1',
+          [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
+            GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
           TERM: 'xterm-256color',
           PAGER: 'cat',
           GIT_PAGER: 'cat',
@@ -555,6 +568,7 @@ export class ShellExecutionService {
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const args = [...argsPrefix, guardedCommand];
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(executable, args, {
         cwd,
         name: 'xterm-256color',
@@ -585,6 +599,7 @@ export class ShellExecutionService {
         headlessTerminal.scrollToTop();
 
         this.activePtys.set(ptyProcess.pid, {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           ptyProcess,
           headlessTerminal,
           maxSerializedLines: shellExecutionConfig.maxSerializedLines,
@@ -818,6 +833,7 @@ export class ShellExecutionService {
                 signal: signal ?? null,
                 error,
                 aborted: abortSignal.aborted,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 pid: ptyProcess.pid,
                 executionMethod: ptyInfo?.name ?? 'node-pty',
               });
@@ -849,9 +865,11 @@ export class ShellExecutionService {
         const abortHandler = async () => {
           if (ptyProcess.pid && !exited) {
             await killProcessGroup({
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               pid: ptyProcess.pid,
               escalate: true,
               isExited: () => exited,
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               pty: ptyProcess,
             });
           }
@@ -860,6 +878,7 @@ export class ShellExecutionService {
         abortSignal.addEventListener('abort', abortHandler, { once: true });
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       return { pid: ptyProcess.pid, result };
     } catch (e) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

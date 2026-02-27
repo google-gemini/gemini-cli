@@ -8,21 +8,20 @@ import { describe, it, expect, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import type { CallableTool } from '@google/genai';
 import { CoreToolScheduler } from './coreToolScheduler.js';
-import type {
-  ToolCall,
-  WaitingToolCall,
-  ErroredToolCall,
-} from '../scheduler/types.js';
-import type {
-  ToolCallConfirmationDetails,
-  ToolConfirmationPayload,
-  ToolInvocation,
-  ToolResult,
-  Config,
-  ToolRegistry,
-  MessageBus,
-} from '../index.js';
 import {
+  type ToolCall,
+  type WaitingToolCall,
+  type ErroredToolCall,
+  CoreToolCallStatus,
+} from '../scheduler/types.js';
+import {
+  type ToolCallConfirmationDetails,
+  type ToolConfirmationPayload,
+  type ToolInvocation,
+  type ToolResult,
+  type Config,
+  type ToolRegistry,
+  type MessageBus,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -32,6 +31,8 @@ import {
   HookSystem,
   PolicyDecision,
   ToolErrorType,
+  DiscoveredMCPTool,
+  GeminiCliOperation,
 } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import {
@@ -42,10 +43,20 @@ import {
 import * as modifiableToolModule from '../tools/modifiable-tool.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
-import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
 
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
+}));
+
+vi.mock('../telemetry/trace.js', () => ({
+  runInDevTraceSpan: vi.fn(async (opts, fn) => {
+    const metadata = { attributes: opts.attributes || {} };
+    return fn({
+      metadata,
+      endSpan: vi.fn(),
+    });
+  }),
 }));
 
 class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
@@ -195,7 +206,7 @@ class AbortDuringConfirmationTool extends BaseDeclarativeTool<
 
 async function waitForStatus(
   onToolCallsUpdate: Mock,
-  status: 'awaiting_approval' | 'executing' | 'success' | 'error' | 'cancelled',
+  status: CoreToolCallStatus,
   timeout = 5000,
 ): Promise<ToolCall> {
   return new Promise((resolve, reject) => {
@@ -360,7 +371,22 @@ describe('CoreToolScheduler', () => {
     expect(onAllToolCallsComplete).toHaveBeenCalled();
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
-    expect(completedCalls[0].status).toBe('cancelled');
+    expect(completedCalls[0].status).toBe(CoreToolCallStatus.Cancelled);
+
+    expect(runInDevTraceSpan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: GeminiCliOperation.ScheduleToolCalls,
+      }),
+      expect.any(Function),
+    );
+
+    const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
+    const fn = spanArgs[1];
+    const metadata: SpanMetadata = { name: '', attributes: {} };
+    await fn({ metadata, endSpan: vi.fn() });
+    expect(metadata).toMatchObject({
+      input: [request],
+    });
   });
 
   it('should cancel all tools when cancelAll is called', async () => {
@@ -439,7 +465,7 @@ describe('CoreToolScheduler', () => {
     void scheduler.schedule(requests, abortController.signal);
 
     // Wait for the first tool to be awaiting approval
-    await waitForStatus(onToolCallsUpdate, 'awaiting_approval');
+    await waitForStatus(onToolCallsUpdate, CoreToolCallStatus.AwaitingApproval);
 
     // Cancel all operations
     scheduler.cancelAll(abortController.signal);
@@ -454,13 +480,13 @@ describe('CoreToolScheduler', () => {
 
     expect(completedCalls).toHaveLength(3);
     expect(completedCalls.find((c) => c.request.callId === '1')?.status).toBe(
-      'cancelled',
+      CoreToolCallStatus.Cancelled,
     );
     expect(completedCalls.find((c) => c.request.callId === '2')?.status).toBe(
-      'cancelled',
+      CoreToolCallStatus.Cancelled,
     );
     expect(completedCalls.find((c) => c.request.callId === '3')?.status).toBe(
-      'cancelled',
+      CoreToolCallStatus.Cancelled,
     );
   });
 
@@ -542,7 +568,7 @@ describe('CoreToolScheduler', () => {
     // Wait for the first tool to be awaiting approval
     const awaitingCall = (await waitForStatus(
       onToolCallsUpdate,
-      'awaiting_approval',
+      CoreToolCallStatus.AwaitingApproval,
     )) as WaitingToolCall;
 
     // Cancel the first tool via its confirmation handler
@@ -560,13 +586,13 @@ describe('CoreToolScheduler', () => {
 
     expect(completedCalls).toHaveLength(3);
     expect(completedCalls.find((c) => c.request.callId === '1')?.status).toBe(
-      'cancelled',
+      CoreToolCallStatus.Cancelled,
     );
     expect(completedCalls.find((c) => c.request.callId === '2')?.status).toBe(
-      'cancelled',
+      CoreToolCallStatus.Cancelled,
     );
     expect(completedCalls.find((c) => c.request.callId === '3')?.status).toBe(
-      'cancelled',
+      CoreToolCallStatus.Cancelled,
     );
   });
 
@@ -621,11 +647,11 @@ describe('CoreToolScheduler', () => {
     expect(onAllToolCallsComplete).toHaveBeenCalled();
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
-    expect(completedCalls[0].status).toBe('cancelled');
+    expect(completedCalls[0].status).toBe(CoreToolCallStatus.Cancelled);
     const statuses = onToolCallsUpdate.mock.calls.flatMap((call) =>
       (call[0] as ToolCall[]).map((toolCall) => toolCall.status),
     );
-    expect(statuses).not.toContain('error');
+    expect(statuses).not.toContain(CoreToolCallStatus.Error);
   });
 
   it('should error when tool requires confirmation in non-interactive mode', async () => {
@@ -677,7 +703,7 @@ describe('CoreToolScheduler', () => {
     expect(onAllToolCallsComplete).toHaveBeenCalled();
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
-    expect(completedCalls[0].status).toBe('error');
+    expect(completedCalls[0].status).toBe(CoreToolCallStatus.Error);
 
     const erroredCall = completedCalls[0] as ErroredToolCall;
     const errorResponse = erroredCall.response;
@@ -742,7 +768,7 @@ describe('CoreToolScheduler with payload', () => {
 
     const awaitingCall = (await waitForStatus(
       onToolCallsUpdate,
-      'awaiting_approval',
+      CoreToolCallStatus.AwaitingApproval,
     )) as WaitingToolCall;
     const confirmationDetails = awaitingCall.confirmationDetails;
 
@@ -757,7 +783,7 @@ describe('CoreToolScheduler with payload', () => {
     // After internal update, the tool should be awaiting approval again with the NEW content.
     const updatedAwaitingCall = (await waitForStatus(
       onToolCallsUpdate,
-      'awaiting_approval',
+      CoreToolCallStatus.AwaitingApproval,
     )) as WaitingToolCall;
 
     // Now confirm for real to execute.
@@ -772,7 +798,7 @@ describe('CoreToolScheduler with payload', () => {
 
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
-    expect(completedCalls[0].status).toBe('success');
+    expect(completedCalls[0].status).toBe(CoreToolCallStatus.Success);
     expect(mockTool.executeFn).toHaveBeenCalledWith({
       newContent: 'final version',
     });
@@ -890,7 +916,7 @@ describe('CoreToolScheduler edit cancellation', () => {
 
     const awaitingCall = (await waitForStatus(
       onToolCallsUpdate,
-      'awaiting_approval',
+      CoreToolCallStatus.AwaitingApproval,
     )) as WaitingToolCall;
 
     // Cancel the edit
@@ -905,7 +931,7 @@ describe('CoreToolScheduler edit cancellation', () => {
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
 
-    expect(completedCalls[0].status).toBe('cancelled');
+    expect(completedCalls[0].status).toBe(CoreToolCallStatus.Cancelled);
 
     // Check that the diff is preserved
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -991,16 +1017,16 @@ describe('CoreToolScheduler YOLO mode', () => {
     // 1. The tool's execute method was called directly.
     expect(executeFn).toHaveBeenCalledWith({ param: 'value' });
 
-    // 2. The tool call status never entered 'awaiting_approval'.
+    // 2. The tool call status never entered CoreToolCallStatus.AwaitingApproval.
     const statusUpdates = onToolCallsUpdate.mock.calls
       .map((call) => (call[0][0] as ToolCall)?.status)
       .filter(Boolean);
-    expect(statusUpdates).not.toContain('awaiting_approval');
+    expect(statusUpdates).not.toContain(CoreToolCallStatus.AwaitingApproval);
     expect(statusUpdates).toEqual([
-      'validating',
-      'scheduled',
-      'executing',
-      'success',
+      CoreToolCallStatus.Validating,
+      CoreToolCallStatus.Scheduled,
+      CoreToolCallStatus.Executing,
+      CoreToolCallStatus.Success,
     ]);
 
     // 3. The final callback indicates the tool call was successful.
@@ -1008,8 +1034,8 @@ describe('CoreToolScheduler YOLO mode', () => {
       .calls[0][0] as ToolCall[];
     expect(completedCalls).toHaveLength(1);
     const completedCall = completedCalls[0];
-    expect(completedCall.status).toBe('success');
-    if (completedCall.status === 'success') {
+    expect(completedCall.status).toBe(CoreToolCallStatus.Success);
+    if (completedCall.status === CoreToolCallStatus.Success) {
       expect(completedCall.response.resultDisplay).toBe('Tool executed');
     }
   });
@@ -1082,8 +1108,8 @@ describe('CoreToolScheduler request queueing', () => {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     scheduler.schedule([request1], abortController.signal);
 
-    // Wait for the first call to be in the 'executing' state.
-    await waitForStatus(onToolCallsUpdate, 'executing');
+    // Wait for the first call to be in the CoreToolCallStatus.Executing state.
+    await waitForStatus(onToolCallsUpdate, CoreToolCallStatus.Executing);
 
     // Schedule the second call while the first is "running".
     const schedulePromise2 = scheduler.schedule(
@@ -1124,8 +1150,12 @@ describe('CoreToolScheduler request queueing', () => {
     });
 
     // Verify the completion callbacks were called correctly.
-    expect(onAllToolCallsComplete.mock.calls[0][0][0].status).toBe('success');
-    expect(onAllToolCallsComplete.mock.calls[1][0][0].status).toBe('success');
+    expect(onAllToolCallsComplete.mock.calls[0][0][0].status).toBe(
+      CoreToolCallStatus.Success,
+    );
+    expect(onAllToolCallsComplete.mock.calls[1][0][0].status).toBe(
+      CoreToolCallStatus.Success,
+    );
   });
 
   it('should auto-approve a tool call if it is on the allowedTools list', async () => {
@@ -1208,16 +1238,16 @@ describe('CoreToolScheduler request queueing', () => {
     // 1. The tool's execute method was called directly.
     expect(executeFn).toHaveBeenCalledWith({ param: 'value' });
 
-    // 2. The tool call status never entered 'awaiting_approval'.
+    // 2. The tool call status never entered CoreToolCallStatus.AwaitingApproval.
     const statusUpdates = onToolCallsUpdate.mock.calls
       .map((call) => (call[0][0] as ToolCall)?.status)
       .filter(Boolean);
-    expect(statusUpdates).not.toContain('awaiting_approval');
+    expect(statusUpdates).not.toContain(CoreToolCallStatus.AwaitingApproval);
     expect(statusUpdates).toEqual([
-      'validating',
-      'scheduled',
-      'executing',
-      'success',
+      CoreToolCallStatus.Validating,
+      CoreToolCallStatus.Scheduled,
+      CoreToolCallStatus.Executing,
+      CoreToolCallStatus.Success,
     ]);
 
     // 3. The final callback indicates the tool call was successful.
@@ -1226,8 +1256,8 @@ describe('CoreToolScheduler request queueing', () => {
       .calls[0][0] as ToolCall[];
     expect(completedCalls).toHaveLength(1);
     const completedCall = completedCalls[0];
-    expect(completedCall.status).toBe('success');
-    if (completedCall.status === 'success') {
+    expect(completedCall.status).toBe(CoreToolCallStatus.Success);
+    if (completedCall.status === CoreToolCallStatus.Success) {
       expect(completedCall.response.resultDisplay).toBe('Tool executed');
     }
   });
@@ -1310,7 +1340,7 @@ describe('CoreToolScheduler request queueing', () => {
       .map((call) => (call[0][0] as ToolCall)?.status)
       .filter(Boolean);
 
-    expect(statusUpdates).toContain('awaiting_approval');
+    expect(statusUpdates).toContain(CoreToolCallStatus.AwaitingApproval);
     expect(executeFn).not.toHaveBeenCalled();
     expect(onAllToolCallsComplete).not.toHaveBeenCalled();
   }, 20000);
@@ -1446,7 +1476,7 @@ describe('CoreToolScheduler request queueing', () => {
         onToolCallsUpdate(toolCalls);
         // Capture confirmation handlers for awaiting_approval tools
         toolCalls.forEach((call) => {
-          if (call.status === 'awaiting_approval') {
+          if (call.status === CoreToolCallStatus.AwaitingApproval) {
             const waitingCall = call;
             const details =
               waitingCall.confirmationDetails as ToolCallConfirmationDetails;
@@ -1498,11 +1528,11 @@ describe('CoreToolScheduler request queueing', () => {
       const calls = onToolCallsUpdate.mock.calls.at(-1)?.[0] as ToolCall[];
       // With the sequential scheduler, the update includes the active call and the queue.
       expect(calls?.length).toBe(3);
-      expect(calls?.[0].status).toBe('awaiting_approval');
+      expect(calls?.[0].status).toBe(CoreToolCallStatus.AwaitingApproval);
       expect(calls?.[0].request.callId).toBe('1');
-      // Check that the other two are in the queue (still in 'validating' state)
-      expect(calls?.[1].status).toBe('validating');
-      expect(calls?.[2].status).toBe('validating');
+      // Check that the other two are in the queue (still in CoreToolCallStatus.Validating state)
+      expect(calls?.[1].status).toBe(CoreToolCallStatus.Validating);
+      expect(calls?.[2].status).toBe(CoreToolCallStatus.Validating);
     });
 
     expect(pendingConfirmations.length).toBe(1);
@@ -1520,9 +1550,11 @@ describe('CoreToolScheduler request queueing', () => {
       -1,
     )?.[0] as ToolCall[];
     expect(completedCalls?.length).toBe(3);
-    expect(completedCalls?.every((call) => call.status === 'success')).toBe(
-      true,
-    );
+    expect(
+      completedCalls?.every(
+        (call) => call.status === CoreToolCallStatus.Success,
+      ),
+    ).toBe(true);
 
     // Verify approval mode was changed
     expect(approvalMode).toBe(ApprovalMode.AUTO_EDIT);
@@ -1631,8 +1663,8 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
     expect(completedCalls).toHaveLength(2);
-    expect(completedCalls[0].status).toBe('success');
-    expect(completedCalls[1].status).toBe('success');
+    expect(completedCalls[0].status).toBe(CoreToolCallStatus.Success);
+    expect(completedCalls[1].status).toBe(CoreToolCallStatus.Success);
   });
 
   it('should cancel subsequent tools when the signal is aborted.', async () => {
@@ -1754,9 +1786,9 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const call2 = completedCalls.find((c) => c.request.callId === '2');
     const call3 = completedCalls.find((c) => c.request.callId === '3');
 
-    expect(call1?.status).toBe('success');
-    expect(call2?.status).toBe('cancelled');
-    expect(call3?.status).toBe('cancelled');
+    expect(call1?.status).toBe(CoreToolCallStatus.Success);
+    expect(call2?.status).toBe(CoreToolCallStatus.Cancelled);
+    expect(call3?.status).toBe(CoreToolCallStatus.Cancelled);
   });
 
   it('should pass confirmation diff data into modifyWithEditor overrides', async () => {
@@ -1819,7 +1851,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
 
     const toolCall = (scheduler as unknown as { toolCalls: ToolCall[] })
       .toolCalls[0] as WaitingToolCall;
-    expect(toolCall.status).toBe('awaiting_approval');
+    expect(toolCall.status).toBe(CoreToolCallStatus.AwaitingApproval);
 
     const confirmationSignal = new AbortController().signal;
     await scheduler.handleConfirmationResponse(
@@ -1868,7 +1900,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     // Manually inject a waiting tool call
     const callId = 'call-1';
     const toolCall: WaitingToolCall = {
-      status: 'awaiting_approval',
+      status: CoreToolCallStatus.AwaitingApproval,
       request: {
         callId,
         name: 'mockModifiableTool',
@@ -1919,13 +1951,14 @@ describe('CoreToolScheduler Sequential Execution', () => {
     isModifiableSpy.mockRestore();
   });
 
-  it('should pass serverName to policy engine for DiscoveredMCPTool', async () => {
+  it('should pass serverName and toolAnnotations to policy engine for DiscoveredMCPTool', async () => {
     const mockMcpTool = {
       tool: async () => ({ functionDeclarations: [] }),
       callTool: async () => [],
     };
     const serverName = 'test-server';
     const toolName = 'test-tool';
+    const annotations = { readOnlyHint: true };
     const mcpTool = new DiscoveredMCPTool(
       mockMcpTool as unknown as CallableTool,
       serverName,
@@ -1933,6 +1966,13 @@ describe('CoreToolScheduler Sequential Execution', () => {
       'description',
       { type: 'object', properties: {} },
       createMockMessageBus() as unknown as MessageBus,
+      undefined, // trust
+      true, // isReadOnly
+      undefined, // nameOverride
+      undefined, // cliConfig
+      undefined, // extensionName
+      undefined, // extensionId
+      annotations, // toolAnnotations
     );
 
     const mockToolRegistry = {
@@ -1982,12 +2022,15 @@ describe('CoreToolScheduler Sequential Execution', () => {
     expect(mockPolicyEngineCheck).toHaveBeenCalledWith(
       expect.objectContaining({ name: toolName }),
       serverName,
+      annotations,
     );
   });
 
   it('should not double-report completed tools when concurrent completions occur', async () => {
     // Arrange
-    const executeFn = vi.fn().mockResolvedValue({ llmContent: 'success' });
+    const executeFn = vi
+      .fn()
+      .mockResolvedValue({ llmContent: CoreToolCallStatus.Success });
     const mockTool = new MockTool({ name: 'mockTool', execute: executeFn });
     const declarativeTool = mockTool;
 
@@ -2152,7 +2195,10 @@ describe('CoreToolScheduler Sequential Execution', () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       call[0].map((t: any) => t.status),
     );
-    expect(allStatuses).toEqual(['success', 'success']);
+    expect(allStatuses).toEqual([
+      CoreToolCallStatus.Success,
+      CoreToolCallStatus.Success,
+    ]);
 
     expect(onAllToolCallsComplete).toHaveBeenCalledTimes(1);
   });
@@ -2201,7 +2247,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
       const reportedTools = onAllToolCallsComplete.mock.calls[0][0];
       const result = reportedTools[0];
 
-      expect(result.status).toBe('error');
+      expect(result.status).toBe(CoreToolCallStatus.Error);
       expect(result.response.errorType).toBe(ToolErrorType.POLICY_VIOLATION);
       expect(result.response.error.message).toBe(
         'Tool execution denied by policy.',
@@ -2255,11 +2301,94 @@ describe('CoreToolScheduler Sequential Execution', () => {
       const reportedTools = onAllToolCallsComplete.mock.calls[0][0];
       const result = reportedTools[0];
 
-      expect(result.status).toBe('error');
+      expect(result.status).toBe(CoreToolCallStatus.Error);
       expect(result.response.errorType).toBe(ToolErrorType.POLICY_VIOLATION);
       expect(result.response.error.message).toBe(
         `Tool execution denied by policy. ${customDenyMessage}`,
       );
+    });
+  });
+
+  describe('ApprovalMode Preservation', () => {
+    it('should preserve approvalMode throughout tool lifecycle', async () => {
+      // Arrange
+      const executeFn = vi.fn().mockResolvedValue({
+        llmContent: 'Tool executed',
+        returnDisplay: 'Tool executed',
+      });
+      const mockTool = new MockTool({
+        name: 'mockTool',
+        execute: executeFn,
+        shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+      });
+
+      const mockToolRegistry = {
+        getTool: () => mockTool,
+        getAllToolNames: () => ['mockTool'],
+      } as unknown as ToolRegistry;
+
+      const onAllToolCallsComplete = vi.fn();
+      const onToolCallsUpdate = vi.fn();
+
+      // Set approval mode to PLAN
+      const mockConfig = createMockConfig({
+        getToolRegistry: () => mockToolRegistry,
+        getApprovalMode: () => ApprovalMode.PLAN,
+        // Ensure policy engine returns ASK_USER to trigger AwaitingApproval state
+        getPolicyEngine: () =>
+          ({
+            check: async () => ({ decision: PolicyDecision.ASK_USER }),
+          }) as unknown as PolicyEngine,
+      });
+      mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
+
+      const scheduler = new CoreToolScheduler({
+        config: mockConfig,
+        onAllToolCallsComplete,
+        onToolCallsUpdate,
+        getPreferredEditor: () => 'vscode',
+      });
+
+      const abortController = new AbortController();
+      const request = {
+        callId: '1',
+        name: 'mockTool',
+        args: { param: 'value' },
+        isClientInitiated: false,
+        prompt_id: 'test-prompt',
+      };
+
+      // Act - Schedule
+      const schedulePromise = scheduler.schedule(
+        request,
+        abortController.signal,
+      );
+
+      // Assert - Check AwaitingApproval state
+      const awaitingCall = (await waitForStatus(
+        onToolCallsUpdate,
+        CoreToolCallStatus.AwaitingApproval,
+      )) as WaitingToolCall;
+
+      expect(awaitingCall).toBeDefined();
+      expect(awaitingCall.approvalMode).toBe(ApprovalMode.PLAN);
+
+      // Act - Confirm
+
+      await (
+        awaitingCall.confirmationDetails as ToolCallConfirmationDetails
+      ).onConfirm(ToolConfirmationOutcome.ProceedOnce);
+
+      // Wait for completion
+      await schedulePromise;
+
+      // Assert - Check Success state
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+      const completedCalls = onAllToolCallsComplete.mock
+        .calls[0][0] as ToolCall[];
+      expect(completedCalls).toHaveLength(1);
+      expect(completedCalls[0].status).toBe(CoreToolCallStatus.Success);
+      expect(completedCalls[0].approvalMode).toBe(ApprovalMode.PLAN);
     });
   });
 });

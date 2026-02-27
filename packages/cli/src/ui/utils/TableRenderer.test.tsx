@@ -8,7 +8,7 @@ import { TableRenderer } from './TableRenderer.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 
 describe('TableRenderer', () => {
-  it('renders a 3x3 table correctly', () => {
+  it('renders a 3x3 table correctly', async () => {
     const headers = ['Header 1', 'Header 2', 'Header 3'];
     const rows = [
       ['Row 1, Col 1', 'Row 1, Col 2', 'Row 1, Col 3'],
@@ -17,22 +17,25 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 80;
 
-    const { lastFrame } = renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Header 1');
     expect(output).toContain('Row 1, Col 1');
     expect(output).toContain('Row 3, Col 3');
-    expect(output).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
   });
 
-  it('renders a table with long headers and 4 columns correctly', () => {
+  it('renders a table with long headers and 4 columns correctly', async () => {
     const headers = [
       'Very Long Column Header One',
       'Very Long Column Header Two',
@@ -46,23 +49,26 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 80;
 
-    const { lastFrame } = renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
 
     const output = lastFrame();
     // Since terminalWidth is 80 and headers are long, they might be truncated.
     // We just check for some of the content.
     expect(output).toContain('Data 1.1');
     expect(output).toContain('Data 3.4');
-    expect(output).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
   });
 
-  it('wraps long cell content correctly', () => {
+  it('wraps long cell content correctly', async () => {
     const headers = ['Col 1', 'Col 2', 'Col 3'];
     const rows = [
       [
@@ -73,21 +79,24 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 50;
 
-    const { lastFrame } = renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('This is a very');
     expect(output).toContain('long cell');
-    expect(output).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
   });
 
-  it('wraps all long columns correctly', () => {
+  it('wraps all long columns correctly', async () => {
     const headers = ['Col 1', 'Col 2', 'Col 3'];
     const rows = [
       [
@@ -98,20 +107,23 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 60;
 
-    const { lastFrame } = renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('wrapping in');
-    expect(output).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
   });
 
-  it('wraps mixed long and short columns correctly', () => {
+  it('wraps mixed long and short columns correctly', async () => {
     const headers = ['Short', 'Long', 'Medium'];
     const rows = [
       [
@@ -122,22 +134,25 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 50;
 
-    const { lastFrame } = renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Tiny');
     expect(output).toContain('definitely needs');
-    expect(output).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
   });
 
   // The snapshot looks weird but checked on VS Code terminal and it looks fine
-  it('wraps columns with punctuation correctly', () => {
+  it('wraps columns with punctuation correctly', async () => {
     const headers = ['Punctuation 1', 'Punctuation 2', 'Punctuation 3'];
     const rows = [
       [
@@ -148,40 +163,46 @@ describe('TableRenderer', () => {
     ];
     const terminalWidth = 60;
 
-    const { lastFrame } = renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
 
     const output = lastFrame();
     expect(output).toContain('Start. Stop.');
-    expect(output).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
   });
 
-  it('strips bold markers from headers and renders them correctly', () => {
+  it('strips bold markers from headers and renders them correctly', async () => {
     const headers = ['**Bold Header**', 'Normal Header', '**Another Bold**'];
     const rows = [['Data 1', 'Data 2', 'Data 3']];
     const terminalWidth = 50;
 
-    const { lastFrame } = renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
 
     const output = lastFrame();
     // The output should NOT contain the literal '**'
     expect(output).not.toContain('**Bold Header**');
     expect(output).toContain('Bold Header');
-    expect(output).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
   });
 
-  it('handles wrapped bold headers without showing markers', () => {
+  it('handles wrapped bold headers without showing markers', async () => {
     const headers = [
       '**Very Long Bold Header That Will Wrap**',
       'Short',
@@ -190,22 +211,25 @@ describe('TableRenderer', () => {
     const rows = [['Data 1', 'Data 2', 'Data 3']];
     const terminalWidth = 40;
 
-    const { lastFrame } = renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
 
     const output = lastFrame();
     // Markers should be gone
     expect(output).not.toContain('**');
     expect(output).toContain('Very Long');
-    expect(output).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
   });
 
-  it('renders a complex table with mixed content lengths correctly', () => {
+  it('renders a complex table with mixed content lengths correctly', async () => {
     const headers = [
       'Comprehensive Architectural Specification for the Distributed Infrastructure Layer',
       'Implementation Details for the High-Throughput Asynchronous Message Processing Pipeline with Extended Scalability Features and Redundancy Protocols',
@@ -231,7 +255,7 @@ describe('TableRenderer', () => {
 
     const terminalWidth = 160;
 
-    const { lastFrame } = renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -239,9 +263,10 @@ describe('TableRenderer', () => {
       />,
       { width: terminalWidth },
     );
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
 
     const output = lastFrame();
-
     expect(output).toContain('Comprehensive Architectural');
     expect(output).toContain('protocol buffers');
     expect(output).toContain('exponential backoff');
@@ -254,7 +279,8 @@ describe('TableRenderer', () => {
     expect(output).toContain('J.');
     expect(output).toContain('Doe');
 
-    expect(output).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
   });
 
   it.each([
@@ -298,8 +324,8 @@ describe('TableRenderer', () => {
       terminalWidth: 80,
       expected: ['Mixed 😃 中文', '你好 😃', 'こんにちは 🚀'],
     },
-  ])('$name', ({ headers, rows, terminalWidth, expected }) => {
-    const { lastFrame } = renderWithProviders(
+  ])('$name', async ({ headers, rows, terminalWidth, expected }) => {
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
@@ -307,12 +333,15 @@ describe('TableRenderer', () => {
       />,
       { width: terminalWidth },
     );
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
 
     const output = lastFrame();
     expected.forEach((text) => {
       expect(output).toContain(text);
     });
-    expect(output).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
   });
 
   it.each([
@@ -328,21 +357,154 @@ describe('TableRenderer', () => {
       rows: [['Data 1', 'Data 2']],
       expected: ['Header 1', 'Header 2', 'Header 3', 'Data 1', 'Data 2'],
     },
-  ])('$name', ({ headers, rows, expected }) => {
+  ])('$name', async ({ headers, rows, expected }) => {
     const terminalWidth = 50;
 
-    const { lastFrame } = renderWithProviders(
+    const renderResult = renderWithProviders(
       <TableRenderer
         headers={headers}
         rows={rows}
         terminalWidth={terminalWidth}
       />,
     );
+    const { lastFrame, waitUntilReady, unmount } = renderResult;
+    await waitUntilReady();
 
     const output = lastFrame();
     expected.forEach((text) => {
       expect(output).toContain(text);
     });
-    expect(output).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
+    unmount();
   });
+
+  it.each([
+    {
+      name: 'renders complex markdown in rows and calculates widths correctly',
+      headers: ['Feature', 'Markdown'],
+      rows: [
+        ['Bold', '**Bold Text**'],
+        ['Italic', '_Italic Text_'],
+        ['Combined', '***Bold and Italic***'],
+        ['Link', '[Google](https://google.com)'],
+        ['Code', '`const x = 1`'],
+        ['Strikethrough', '~~Strike~~'],
+        ['Underline', '<u>Underline</u>'],
+      ],
+      terminalWidth: 80,
+      waitForText: 'Bold Text',
+      assertions: (output: string) => {
+        expect(output).not.toContain('**Bold Text**');
+        expect(output).toContain('Bold Text');
+        expect(output).not.toContain('_Italic Text_');
+        expect(output).toContain('Italic Text');
+        expect(output).toContain('Bold and Italic');
+        expect(output).toContain('Google');
+        expect(output).toContain('https://google.com');
+        expect(output).toContain('(https://google.com)');
+        expect(output).toContain('const x = 1');
+        expect(output).not.toContain('`const x = 1`');
+        expect(output).toContain('Strike');
+        expect(output).toContain('Underline');
+      },
+    },
+    {
+      name: 'calculates column widths based on rendered text, not raw markdown',
+      headers: ['Col 1', 'Col 2', 'Col 3'],
+      rows: [
+        ['**123456**', 'Normal', 'Short'],
+        ['Short', '**123456**', 'Normal'],
+        ['Normal', 'Short', '**123456**'],
+      ],
+      terminalWidth: 40,
+      waitForText: '123456',
+      assertions: (output: string) => {
+        expect(output).toContain('123456');
+        const dataLines = output.split('\n').filter((l) => /123456/.test(l));
+        expect(dataLines.length).toBe(3);
+      },
+    },
+    {
+      name: 'handles nested markdown styles recursively',
+      headers: ['Header 1', 'Header 2', 'Header 3'],
+      rows: [
+        ['**Bold with _Italic_ and ~~Strike~~**', 'Normal', 'Short'],
+        ['Short', '**Bold with _Italic_ and ~~Strike~~**', 'Normal'],
+        ['Normal', 'Short', '**Bold with _Italic_ and ~~Strike~~**'],
+      ],
+      terminalWidth: 100,
+      waitForText: 'Bold with Italic and Strike',
+      assertions: (output: string) => {
+        expect(output).not.toContain('**');
+        expect(output).not.toContain('_');
+        expect(output).not.toContain('~~');
+        expect(output).toContain('Bold with Italic and Strike');
+      },
+    },
+    {
+      name: 'calculates width correctly for content with URLs and styles',
+      headers: ['Col 1', 'Col 2', 'Col 3'],
+      rows: [
+        ['Visit [Google](https://google.com)', 'Plain Text', 'More Info'],
+        ['Info Here', 'Visit [Bing](https://bing.com)', 'Links'],
+        ['Check This', 'Search', 'Visit [Yahoo](https://yahoo.com)'],
+      ],
+      terminalWidth: 120,
+      waitForText: 'Visit Google',
+      assertions: (output: string) => {
+        expect(output).toContain('Visit Google');
+        expect(output).toContain('Visit Bing');
+        expect(output).toContain('Visit Yahoo');
+        expect(output).toContain('https://google.com');
+        expect(output).toContain('https://bing.com');
+        expect(output).toContain('https://yahoo.com');
+        expect(output).toContain('(https://google.com)');
+        const dataLine = output
+          .split('\n')
+          .find((l) => l.includes('Visit Google'));
+        expect(dataLine).toContain('Visit Google');
+      },
+    },
+    {
+      name: 'does not parse markdown inside code snippets',
+      headers: ['Col 1', 'Col 2', 'Col 3'],
+      rows: [
+        ['`**not bold**`', '`_not italic_`', '`~~not strike~~`'],
+        ['`[not link](url)`', '`<u>not underline</u>`', '`https://not.link`'],
+        ['Normal Text', 'More Code: `*test*`', '`***nested***`'],
+      ],
+      terminalWidth: 100,
+      waitForText: '**not bold**',
+      assertions: (output: string) => {
+        expect(output).toContain('**not bold**');
+        expect(output).toContain('_not italic_');
+        expect(output).toContain('~~not strike~~');
+        expect(output).toContain('[not link](url)');
+        expect(output).toContain('<u>not underline</u>');
+        expect(output).toContain('https://not.link');
+        expect(output).toContain('***nested***');
+      },
+    },
+  ])(
+    '$name',
+    async ({ headers, rows, terminalWidth, waitForText, assertions }) => {
+      const renderResult = renderWithProviders(
+        <TableRenderer
+          headers={headers}
+          rows={rows}
+          terminalWidth={terminalWidth}
+        />,
+        { width: terminalWidth },
+      );
+      const { lastFrame, waitUntilReady, unmount } = renderResult;
+      await waitUntilReady();
+
+      const output = lastFrame();
+      expect(output).toBeDefined();
+      expect(output).toContain(waitForText);
+      assertions(output);
+      await expect(renderResult).toMatchSvgSnapshot();
+      unmount();
+    },
+  );
 });

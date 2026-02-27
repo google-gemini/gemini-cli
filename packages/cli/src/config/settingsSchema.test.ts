@@ -83,6 +83,19 @@ describe('SettingsSchema', () => {
       ).toBe('boolean');
     });
 
+    it('should have loadingPhrases enum property', () => {
+      const definition = getSettingsSchema().ui?.properties?.loadingPhrases;
+      expect(definition).toBeDefined();
+      expect(definition?.type).toBe('enum');
+      expect(definition?.default).toBe('tips');
+      expect(definition?.options?.map((o) => o.value)).toEqual([
+        'tips',
+        'witty',
+        'all',
+        'off',
+      ]);
+    });
+
     it('should have checkpointing nested properties', () => {
       expect(
         getSettingsSchema().general?.properties?.checkpointing.properties
@@ -92,6 +105,16 @@ describe('SettingsSchema', () => {
         getSettingsSchema().general?.properties?.checkpointing.properties
           ?.enabled.type,
       ).toBe('boolean');
+    });
+
+    it('should have plan nested properties', () => {
+      expect(
+        getSettingsSchema().general?.properties?.plan?.properties?.directory,
+      ).toBeDefined();
+      expect(
+        getSettingsSchema().general?.properties?.plan?.properties?.directory
+          .type,
+      ).toBe('string');
     });
 
     it('should have fileFiltering nested properties', () => {
@@ -353,6 +376,17 @@ describe('SettingsSchema', () => {
       ).toBe('Show the "? for shortcuts" hint above the input.');
     });
 
+    it('should have enableNotifications setting in schema', () => {
+      const setting =
+        getSettingsSchema().general.properties.enableNotifications;
+      expect(setting).toBeDefined();
+      expect(setting.type).toBe('boolean');
+      expect(setting.category).toBe('General');
+      expect(setting.default).toBe(false);
+      expect(setting.requiresRestart).toBe(false);
+      expect(setting.showInDialog).toBe(true);
+    });
+
     it('should have enableAgents setting in schema', () => {
       const setting = getSettingsSchema().experimental.properties.enableAgents;
       expect(setting).toBeDefined();
@@ -409,6 +443,60 @@ describe('SettingsSchema', () => {
       expect(hookItemProperties.name.type).toBe('string');
       expect(hookItemProperties.description).toBeDefined();
       expect(hookItemProperties.description.type).toBe('string');
+    });
+
+    it('should have gemmaModelRouter setting in schema', () => {
+      const gemmaModelRouter =
+        getSettingsSchema().experimental.properties.gemmaModelRouter;
+      expect(gemmaModelRouter).toBeDefined();
+      expect(gemmaModelRouter.type).toBe('object');
+      expect(gemmaModelRouter.category).toBe('Experimental');
+      expect(gemmaModelRouter.default).toEqual({});
+      expect(gemmaModelRouter.requiresRestart).toBe(true);
+      expect(gemmaModelRouter.showInDialog).toBe(true);
+      expect(gemmaModelRouter.description).toBe(
+        'Enable Gemma model router (experimental).',
+      );
+
+      const enabled = gemmaModelRouter.properties.enabled;
+      expect(enabled).toBeDefined();
+      expect(enabled.type).toBe('boolean');
+      expect(enabled.category).toBe('Experimental');
+      expect(enabled.default).toBe(false);
+      expect(enabled.requiresRestart).toBe(true);
+      expect(enabled.showInDialog).toBe(true);
+      expect(enabled.description).toBe(
+        'Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+      );
+
+      const classifier = gemmaModelRouter.properties.classifier;
+      expect(classifier).toBeDefined();
+      expect(classifier.type).toBe('object');
+      expect(classifier.category).toBe('Experimental');
+      expect(classifier.default).toEqual({});
+      expect(classifier.requiresRestart).toBe(true);
+      expect(classifier.showInDialog).toBe(false);
+      expect(classifier.description).toBe('Classifier configuration.');
+
+      const host = classifier.properties.host;
+      expect(host).toBeDefined();
+      expect(host.type).toBe('string');
+      expect(host.category).toBe('Experimental');
+      expect(host.default).toBe('http://localhost:9379');
+      expect(host.requiresRestart).toBe(true);
+      expect(host.showInDialog).toBe(false);
+      expect(host.description).toBe('The host of the classifier.');
+
+      const model = classifier.properties.model;
+      expect(model).toBeDefined();
+      expect(model.type).toBe('string');
+      expect(model.category).toBe('Experimental');
+      expect(model.default).toBe('gemma3-1b-gpu-custom');
+      expect(model.requiresRestart).toBe(true);
+      expect(model.showInDialog).toBe(false);
+      expect(model.description).toBe(
+        'The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.',
+      );
     });
   });
 

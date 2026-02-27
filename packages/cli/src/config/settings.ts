@@ -10,6 +10,7 @@ import { platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
 import {
+  CoreEvent,
   FatalConfigError,
   GEMINI_DIR,
   getErrorMessage,
@@ -164,7 +165,10 @@ export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
 }
 
+export type LoadingPhrasesMode = 'tips' | 'witty' | 'all' | 'off';
+
 export interface AccessibilitySettings {
+  /** @deprecated Use ui.loadingPhrases instead. */
   enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }
@@ -181,6 +185,9 @@ export interface SessionRetentionSettings {
 
   /** Minimum retention period (safety limit, defaults to "1d") */
   minRetention?: string;
+
+  /** INTERNAL: Whether the user has acknowledged the session retention warning */
+  warningAcknowledged?: boolean;
 }
 
 export interface SettingsError {
@@ -284,6 +291,20 @@ export function createTestMergedSettings(
   ) as MergedSettings;
 }
 
+/**
+ * An immutable snapshot of settings state.
+ * Used with useSyncExternalStore for reactive updates.
+ */
+export interface LoadedSettingsSnapshot {
+  system: SettingsFile;
+  systemDefaults: SettingsFile;
+  user: SettingsFile;
+  workspace: SettingsFile;
+  isTrusted: boolean;
+  errors: SettingsError[];
+  merged: MergedSettings;
+}
+
 export class LoadedSettings {
   constructor(
     system: SettingsFile,
@@ -303,6 +324,7 @@ export class LoadedSettings {
       : this.createEmptyWorkspace(workspace);
     this.errors = errors;
     this._merged = this.computeMergedSettings();
+    this._snapshot = this.computeSnapshot();
   }
 
   readonly system: SettingsFile;
@@ -314,6 +336,7 @@ export class LoadedSettings {
 
   private _workspaceFile: SettingsFile;
   private _merged: MergedSettings;
+  private _snapshot: LoadedSettingsSnapshot;
   private _remoteAdminSettings: Partial<Settings> | undefined;
 
   get merged(): MergedSettings {
@@ -368,6 +391,36 @@ export class LoadedSettings {
     return merged;
   }
 
+  private computeSnapshot(): LoadedSettingsSnapshot {
+    const cloneSettingsFile = (file: SettingsFile): SettingsFile => ({
+      path: file.path,
+      rawJson: file.rawJson,
+      settings: structuredClone(file.settings),
+      originalSettings: structuredClone(file.originalSettings),
+    });
+    return {
+      system: cloneSettingsFile(this.system),
+      systemDefaults: cloneSettingsFile(this.systemDefaults),
+      user: cloneSettingsFile(this.user),
+      workspace: cloneSettingsFile(this.workspace),
+      isTrusted: this.isTrusted,
+      errors: [...this.errors],
+      merged: structuredClone(this._merged),
+    };
+  }
+
+  // Passing this along with getSnapshot to useSyncExternalStore allows for idiomatic reactivity on settings changes
+  // React will pass a listener fn into this subscribe fn
+  // that listener fn will perform an object identity check on the snapshot and trigger a React re render if the snapshot has changed
+  subscribe(listener: () => void): () => void {
+    coreEvents.on(CoreEvent.SettingsChanged, listener);
+    return () => coreEvents.off(CoreEvent.SettingsChanged, listener);
+  }
+
+  getSnapshot(): LoadedSettingsSnapshot {
+    return this._snapshot;
+  }
+
   forScope(scope: LoadableSettingScope): SettingsFile {
     switch (scope) {
       case SettingScope.User:
@@ -409,6 +462,7 @@ export class LoadedSettings {
     }
 
     this._merged = this.computeMergedSettings();
+    this._snapshot = this.computeSnapshot();
     coreEvents.emitSettingsChanged();
   }
 
@@ -519,10 +573,6 @@ export function loadEnvironment(
     relevantArgs.includes('-s') ||
     relevantArgs.includes('--sandbox');
 
-  if (trustResult.isTrusted !== true && !isSandboxed) {
-    return;
-  }
-
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
     setUpCloudShellEnvironment(envFilePath, isTrusted, isSandboxed);
@@ -583,24 +633,8 @@ export function loadSettings(
   const systemSettingsPath = getSystemSettingsPath();
   const systemDefaultsPath = getSystemDefaultsPath();
 
-  // Resolve paths to their canonical representation to handle symlinks
-  const resolvedWorkspaceDir = path.resolve(workspaceDir);
-  const resolvedHomeDir = path.resolve(homedir());
-
-  let realWorkspaceDir = resolvedWorkspaceDir;
-  try {
-    // fs.realpathSync gets the "true" path, resolving any symlinks
-    realWorkspaceDir = fs.realpathSync(resolvedWorkspaceDir);
-  } catch (_e) {
-    // This is okay. The path might not exist yet, and that's a valid state.
-  }
-
-  // We expect homedir to always exist and be resolvable.
-  const realHomeDir = fs.realpathSync(resolvedHomeDir);
-
-  const workspaceSettingsPath = new Storage(
-    workspaceDir,
-  ).getWorkspaceSettingsPath();
+  const storage = new Storage(workspaceDir);
+  const workspaceSettingsPath = storage.getWorkspaceSettingsPath();
 
   const load = (filePath: string): { settings: Settings; rawJson?: string } => {
     try {
@@ -658,7 +692,7 @@ export function loadSettings(
     settings: {} as Settings,
     rawJson: undefined,
   };
-  if (realWorkspaceDir !== realHomeDir) {
+  if (!storage.isWorkspaceHomeDir()) {
     workspaceResult = load(workspaceSettingsPath);
   }
 
@@ -746,11 +780,11 @@ export function loadSettings(
       readOnly: false,
     },
     {
-      path: workspaceSettingsPath,
+      path: storage.isWorkspaceHomeDir() ? '' : workspaceSettingsPath,
       settings: workspaceSettings,
       originalSettings: workspaceOriginalSettings,
       rawJson: workspaceResult.rawJson,
-      readOnly: false,
+      readOnly: storage.isWorkspaceHomeDir(),
     },
     isTrusted,
     settingsErrors,
@@ -876,6 +910,22 @@ export function migrateDeprecatedSettings(
           if (!settingsFile.readOnly) {
             anyModified = true;
           }
+        }
+
+        // Migrate enableLoadingPhrases: false → loadingPhrases: 'off'
+        const enableLP = newAccessibility['enableLoadingPhrases'];
+        if (
+          typeof enableLP === 'boolean' &&
+          newUi['loadingPhrases'] === undefined
+        ) {
+          if (!enableLP) {
+            newUi['loadingPhrases'] = 'off';
+            loadedSettings.setValue(scope, 'ui', newUi);
+            if (!settingsFile.readOnly) {
+              anyModified = true;
+            }
+          }
+          foundDeprecated.push('ui.accessibility.enableLoadingPhrases');
         }
       }
     }

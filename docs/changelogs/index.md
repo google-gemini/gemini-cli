@@ -18,6 +18,67 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.30.0 - 2026-02-25
+
+- **SDK & Custom Skills:** Introduced the initial SDK package, enabling dynamic
+  system instructions, `SessionContext` for SDK tool calls, and support for
+  custom skills
+  ([#18861](https://github.com/google-gemini/gemini-cli/pull/18861) by
+  @mbleigh).
+- **Policy Engine Enhancements:** Added a new `--policy` flag for user-defined
+  policies, introduced strict seatbelt profiles, and deprecated
+  `--allowed-tools` in favor of the policy engine
+  ([#18500](https://github.com/google-gemini/gemini-cli/pull/18500) by
+  @allenhutchison).
+- **UI & Themes:** Added a generic searchable list for settings and extensions,
+  new Solarized themes, text wrapping for markdown tables, and a clean UI toggle
+  prototype ([#19064](https://github.com/google-gemini/gemini-cli/pull/19064) by
+  @rmedranollamas).
+- **Vim & Terminal Interaction:** Improved Vim support to feel more complete and
+  added support for Ctrl-Z terminal suspension
+  ([#18755](https://github.com/google-gemini/gemini-cli/pull/18755) by
+  @ppgranger, [#18931](https://github.com/google-gemini/gemini-cli/pull/18931)
+  by @scidomino).
+
+## Announcements: v0.29.0 - 2026-02-17
+
+- **Plan Mode:** A new comprehensive planning capability with `/plan`,
+  `enter_plan_mode` tool, and dedicated documentation
+  ([#17698](https://github.com/google-gemini/gemini-cli/pull/17698) by @Adib234,
+  [#18324](https://github.com/google-gemini/gemini-cli/pull/18324) by @jerop).
+- **Gemini 3 Default:** We've removed the preview flag and enabled Gemini 3 by
+  default for all users
+  ([#18414](https://github.com/google-gemini/gemini-cli/pull/18414) by
+  @sehoon38).
+- **Extension Exploration:** New UI and settings to explore and manage
+  extensions more easily
+  ([#18686](https://github.com/google-gemini/gemini-cli/pull/18686) by
+  @sripasg).
+- **Admin Control:** Administrators can now allowlist specific MCP server
+  configurations
+  ([#18311](https://github.com/google-gemini/gemini-cli/pull/18311) by
+  @skeshive).
+
+## Announcements: v0.28.0 - 2026-02-10
+
+- **Slash Command:** We've added a new `/prompt-suggest` slash command to help
+  you generate prompt suggestions
+  ([#17264](https://github.com/google-gemini/gemini-cli/pull/17264) by
+  @NTaylorMullen).
+- **IDE Support:** Gemini CLI now supports the Positron IDE
+  ([#15047](https://github.com/google-gemini/gemini-cli/pull/15047) by
+  @kapsner).
+- **Customization:** You can now use custom themes in extensions, and we've
+  implemented automatic theme switching based on your terminal's background
+  ([#17327](https://github.com/google-gemini/gemini-cli/pull/17327) by
+  @spencer426, [#17976](https://github.com/google-gemini/gemini-cli/pull/17976)
+  by @Abhijit-2592).
+- **Authentication:** We've added interactive and non-interactive consent for
+  OAuth, and you can now include your auth method in bug reports
+  ([#17699](https://github.com/google-gemini/gemini-cli/pull/17699) by
+  @ehedlund, [#17569](https://github.com/google-gemini/gemini-cli/pull/17569) by
+  @erikus).
+
 ## Announcements: v0.27.0 - 2026-02-03
 
 - **Event-Driven Architecture:** The CLI now uses a new event-driven scheduler
@@ -256,7 +317,8 @@ on GitHub.
 - **Experimental permission improvements:** We are now experimenting with a new
   policy engine in Gemini CLI. This allows users and administrators to create
   fine-grained policy for tool calls. Currently behind a flag. See
-  [policy engine documentation](../core/policy-engine.md) for more information.
+  [policy engine documentation](../reference/policy-engine.md) for more
+  information.
   - Blog:
     [https://allen.hutchison.org/2025/11/26/the-guardrails-of-autonomy/](https://allen.hutchison.org/2025/11/26/the-guardrails-of-autonomy/)
 - **Gemini 3 support for paid:** Gemini 3 support has been rolled out to all API

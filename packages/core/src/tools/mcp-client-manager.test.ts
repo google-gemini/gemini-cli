@@ -103,6 +103,43 @@ describe('McpClientManager', () => {
     expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.COMPLETED);
   });
 
+  it('should mark discovery completed when all configured servers are user-disabled', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      'test-server': {},
+    });
+    mockConfig.getMcpEnablementCallbacks.mockReturnValue({
+      isSessionDisabled: vi.fn().mockReturnValue(false),
+      isFileEnabled: vi.fn().mockResolvedValue(false),
+    });
+
+    const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+    const promise = manager.startConfiguredMcpServers();
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.IN_PROGRESS);
+    await promise;
+
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.COMPLETED);
+    expect(manager.getMcpServerCount()).toBe(0);
+    expect(mockedMcpClient.connect).not.toHaveBeenCalled();
+    expect(mockedMcpClient.discover).not.toHaveBeenCalled();
+  });
+
+  it('should mark discovery completed when all configured servers are blocked', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      'test-server': {},
+    });
+    mockConfig.getBlockedMcpServers.mockReturnValue(['test-server']);
+
+    const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+    const promise = manager.startConfiguredMcpServers();
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.IN_PROGRESS);
+    await promise;
+
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.COMPLETED);
+    expect(manager.getMcpServerCount()).toBe(0);
+    expect(mockedMcpClient.connect).not.toHaveBeenCalled();
+    expect(mockedMcpClient.discover).not.toHaveBeenCalled();
+  });
+
   it('should not discover tools if folder is not trusted', async () => {
     mockConfig.getMcpServers.mockReturnValue({
       'test-server': {},
@@ -227,6 +264,40 @@ describe('McpClientManager', () => {
         'No MCP server registered with the name "non-existent"',
       );
     });
+
+    it('should create a new McpClient with updated config on restart', async () => {
+      const originalConfig = { command: 'node', args: ['--port', '8000'] };
+      const updatedConfig = { command: 'node', args: ['--port', '9000'] };
+
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': originalConfig,
+      });
+
+      // Track McpClient constructor calls
+      const constructorCalls: unknown[][] = [];
+      vi.mocked(McpClient).mockImplementation((...args: unknown[]) => {
+        constructorCalls.push(args);
+        return mockedMcpClient;
+      });
+      mockedMcpClient.getServerConfig.mockReturnValue(originalConfig);
+
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      await manager.startConfiguredMcpServers();
+
+      // First call should use the original config
+      expect(constructorCalls).toHaveLength(1);
+      expect(constructorCalls[0][1]).toBe(originalConfig);
+
+      // Simulate config file change and hot-reload
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': updatedConfig,
+      });
+      await manager.startConfiguredMcpServers();
+
+      // A NEW McpClient should have been constructed with the updated config
+      expect(constructorCalls).toHaveLength(2);
+      expect(constructorCalls[1][1]).toBe(updatedConfig);
+    });
   });
 
   describe('getMcpInstructions', () => {
@@ -342,6 +413,36 @@ describe('McpClientManager', () => {
 
       await manager.stopExtension(extension);
       expect(manager.getMcpServers()).not.toHaveProperty('test-server');
+    });
+
+    it('should ignore an extension attempting to register a server with an existing name', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      const userConfig = { command: 'node', args: ['user-server.js'] };
+
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': userConfig,
+      });
+      mockedMcpClient.getServerConfig.mockReturnValue(userConfig);
+
+      await manager.startConfiguredMcpServers();
+      expect(mockedMcpClient.connect).toHaveBeenCalledTimes(1);
+
+      const extension: GeminiCLIExtension = {
+        name: 'test-extension',
+        mcpServers: {
+          'test-server': { command: 'node', args: ['ext-server.js'] },
+        },
+        isActive: true,
+        version: '1.0.0',
+        path: '/some-path',
+        contextFiles: [],
+        id: '123',
+      };
+
+      await manager.startExtension(extension);
+
+      expect(mockedMcpClient.disconnect).not.toHaveBeenCalled();
+      expect(mockedMcpClient.connect).toHaveBeenCalledTimes(1);
     });
 
     it('should remove servers from blockedMcpServers when stopExtension is called', async () => {

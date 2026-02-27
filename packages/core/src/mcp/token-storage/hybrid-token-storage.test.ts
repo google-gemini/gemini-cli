@@ -22,6 +22,20 @@ vi.mock('./keychain-token-storage.js', () => ({
   })),
 }));
 
+vi.mock('../../code_assist/oauth-credential-storage.js', () => ({
+  OAuthCredentialStorage: {
+    saveCredentials: vi.fn(),
+    loadCredentials: vi.fn(),
+    clearCredentials: vi.fn(),
+  },
+}));
+
+vi.mock('../../core/apiKeyCredentialStorage.js', () => ({
+  loadApiKey: vi.fn(),
+  saveApiKey: vi.fn(),
+  clearApiKey: vi.fn(),
+}));
+
 vi.mock('./file-token-storage.js', () => ({
   FileTokenStorage: vi.fn().mockImplementation(() => ({
     getCredentials: vi.fn(),

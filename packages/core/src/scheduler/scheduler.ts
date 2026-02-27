@@ -19,8 +19,12 @@ import {
   type ExecutingToolCall,
   type ValidatingToolCall,
   type ErroredToolCall,
+  type SuccessfulToolCall,
+  CoreToolCallStatus,
+  type ScheduledToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
+import type { ApprovalMode } from '../policy/types.js';
 import { PolicyDecision } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
@@ -37,6 +41,12 @@ import {
   type ToolConfirmationRequest,
 } from '../confirmation-bus/types.js';
 import { runWithToolCallContext } from '../utils/toolCallContext.js';
+import {
+  coreEvents,
+  CoreEvent,
+  type McpProgressPayload,
+} from '../utils/events.js';
+import { GeminiCliOperation } from '../telemetry/constants.js';
 
 interface SchedulerQueueItem {
   requests: ToolCallRequestInfo[];
@@ -113,7 +123,38 @@ export class Scheduler {
     this.modifier = new ToolModificationHandler();
 
     this.setupMessageBusListener(this.messageBus);
+
+    coreEvents.on(CoreEvent.McpProgress, this.handleMcpProgress);
   }
+
+  dispose(): void {
+    coreEvents.off(CoreEvent.McpProgress, this.handleMcpProgress);
+  }
+
+  private readonly handleMcpProgress = (payload: McpProgressPayload) => {
+    const { callId } = payload;
+
+    const call = this.state.getToolCall(callId);
+    if (!call || call.status !== CoreToolCallStatus.Executing) {
+      return;
+    }
+
+    const validTotal =
+      payload.total !== undefined &&
+      Number.isFinite(payload.total) &&
+      payload.total > 0
+        ? payload.total
+        : undefined;
+
+    this.state.updateStatus(callId, CoreToolCallStatus.Executing, {
+      progressMessage: payload.message,
+      progressPercent: validTotal
+        ? Math.min(100, (payload.progress / validTotal) * 100)
+        : undefined,
+      progress: payload.progress,
+      progressTotal: validTotal,
+    });
+  };
 
   private setupMessageBusListener(messageBus: MessageBus): void {
     if (Scheduler.subscribedMessageBuses.has(messageBus)) {
@@ -146,16 +187,22 @@ export class Scheduler {
     signal: AbortSignal,
   ): Promise<CompletedToolCall[]> {
     return runInDevTraceSpan(
-      { name: 'schedule' },
+      { operation: GeminiCliOperation.ScheduleToolCalls },
       async ({ metadata: spanMetadata }) => {
         const requests = Array.isArray(request) ? request : [request];
+
         spanMetadata.input = requests;
 
+        let toolCallResponse: CompletedToolCall[] = [];
+
         if (this.isProcessing || this.state.isActive) {
-          return this._enqueueRequest(requests, signal);
+          toolCallResponse = await this._enqueueRequest(requests, signal);
+        } else {
+          toolCallResponse = await this._startBatch(requests, signal);
         }
 
-        return this._startBatch(requests, signal);
+        spanMetadata.output = toolCallResponse;
+        return toolCallResponse;
       },
     );
   }
@@ -207,14 +254,16 @@ export class Scheduler {
       next?.reject(new Error('Operation cancelled by user'));
     }
 
-    // Cancel active call
-    const activeCall = this.state.firstActiveCall;
-    if (activeCall && !this.isTerminal(activeCall.status)) {
-      this.state.updateStatus(
-        activeCall.request.callId,
-        'cancelled',
-        'Operation cancelled by user',
-      );
+    // Cancel active calls
+    const activeCalls = this.state.allActiveCalls;
+    for (const activeCall of activeCalls) {
+      if (!this.isTerminal(activeCall.status)) {
+        this.state.updateStatus(
+          activeCall.request.callId,
+          CoreToolCallStatus.Cancelled,
+          'Operation cancelled by user',
+        );
+      }
     }
 
     // Clear queue
@@ -226,7 +275,11 @@ export class Scheduler {
   }
 
   private isTerminal(status: string) {
-    return status === 'success' || status === 'error' || status === 'cancelled';
+    return (
+      status === CoreToolCallStatus.Success ||
+      status === CoreToolCallStatus.Error ||
+      status === CoreToolCallStatus.Cancelled
+    );
   }
 
   // --- Phase 1: Ingestion & Resolution ---
@@ -238,6 +291,7 @@ export class Scheduler {
     this.isProcessing = true;
     this.isCancelling = false;
     this.state.clearBatch();
+    const currentApprovalMode = this.config.getApprovalMode();
 
     try {
       const toolRegistry = this.config.getToolRegistry();
@@ -250,13 +304,20 @@ export class Scheduler {
         const tool = toolRegistry.getTool(request.name);
 
         if (!tool) {
-          return this._createToolNotFoundErroredToolCall(
-            enrichedRequest,
-            toolRegistry.getAllToolNames(),
-          );
+          return {
+            ...this._createToolNotFoundErroredToolCall(
+              enrichedRequest,
+              toolRegistry.getAllToolNames(),
+            ),
+            approvalMode: currentApprovalMode,
+          };
         }
 
-        return this._validateAndCreateToolCall(enrichedRequest, tool);
+        return this._validateAndCreateToolCall(
+          enrichedRequest,
+          tool,
+          currentApprovalMode,
+        );
       });
 
       this.state.enqueue(newCalls);
@@ -275,7 +336,7 @@ export class Scheduler {
   ): ErroredToolCall {
     const suggestion = getToolSuggestion(request.name, toolNames);
     return {
-      status: 'error',
+      status: CoreToolCallStatus.Error,
       request,
       response: createErrorResponse(
         request,
@@ -290,6 +351,7 @@ export class Scheduler {
   private _validateAndCreateToolCall(
     request: ToolCallRequestInfo,
     tool: AnyDeclarativeTool,
+    approvalMode: ApprovalMode,
   ): ValidatingToolCall | ErroredToolCall {
     return runWithToolCallContext(
       {
@@ -301,16 +363,17 @@ export class Scheduler {
         try {
           const invocation = tool.build(request.args);
           return {
-            status: 'validating',
+            status: CoreToolCallStatus.Validating,
             request,
             tool,
             invocation,
             startTime: Date.now(),
             schedulerId: this.schedulerId,
+            approvalMode,
           };
         } catch (e) {
           return {
-            status: 'error',
+            status: CoreToolCallStatus.Error,
             request,
             tool,
             response: createErrorResponse(
@@ -320,6 +383,7 @@ export class Scheduler {
             ),
             durationMs: 0,
             schedulerId: this.schedulerId,
+            approvalMode,
           };
         }
       },
@@ -345,25 +409,111 @@ export class Scheduler {
       return false;
     }
 
+    const initialStatuses = new Map(
+      this.state.allActiveCalls.map((c) => [c.request.callId, c.status]),
+    );
+
     if (!this.state.isActive) {
       const next = this.state.dequeue();
       if (!next) return false;
 
-      if (next.status === 'error') {
-        this.state.updateStatus(next.request.callId, 'error', next.response);
+      if (next.status === CoreToolCallStatus.Error) {
+        this.state.updateStatus(
+          next.request.callId,
+          CoreToolCallStatus.Error,
+          next.response,
+        );
         this.state.finalizeCall(next.request.callId);
         return true;
       }
+
+      // If the first tool is read-only, batch all contiguous read-only tools.
+      if (next.tool?.isReadOnly) {
+        while (this.state.queueLength > 0) {
+          const peeked = this.state.peekQueue();
+          if (peeked && peeked.tool?.isReadOnly) {
+            this.state.dequeue();
+          } else {
+            break;
+          }
+        }
+      }
     }
 
-    const active = this.state.firstActiveCall;
-    if (!active) return false;
+    // Now we have one or more active calls. Move them through the lifecycle
+    // as much as possible in this iteration.
 
-    if (active.status === 'validating') {
-      await this._processValidatingCall(active, signal);
+    // 1. Process all 'validating' calls (Policy & Confirmation)
+    let activeCalls = this.state.allActiveCalls;
+    const validatingCalls = activeCalls.filter(
+      (c): c is ValidatingToolCall =>
+        c.status === CoreToolCallStatus.Validating,
+    );
+    if (validatingCalls.length > 0) {
+      await Promise.all(
+        validatingCalls.map((c) => this._processValidatingCall(c, signal)),
+      );
     }
 
-    return true;
+    // 2. Execute scheduled calls
+    // Refresh activeCalls as status might have changed to 'scheduled'
+    activeCalls = this.state.allActiveCalls;
+    const scheduledCalls = activeCalls.filter(
+      (c): c is ScheduledToolCall => c.status === CoreToolCallStatus.Scheduled,
+    );
+
+    // We only execute if ALL active calls are in a ready state (scheduled or terminal)
+    const allReady = activeCalls.every(
+      (c) =>
+        c.status === CoreToolCallStatus.Scheduled || this.isTerminal(c.status),
+    );
+
+    let madeProgress = false;
+    if (allReady && scheduledCalls.length > 0) {
+      const execResults = await Promise.all(
+        scheduledCalls.map((c) => this._execute(c, signal)),
+      );
+      madeProgress = execResults.some((res) => res);
+    }
+
+    // 3. Finalize terminal calls
+    activeCalls = this.state.allActiveCalls;
+    for (const call of activeCalls) {
+      if (this.isTerminal(call.status)) {
+        this.state.finalizeCall(call.request.callId);
+        madeProgress = true;
+      }
+    }
+
+    // Check if any calls changed status during this iteration (excluding terminal finalization)
+    const currentStatuses = new Map(
+      activeCalls.map((c) => [c.request.callId, c.status]),
+    );
+    const anyStatusChanged = Array.from(initialStatuses.entries()).some(
+      ([id, status]) => currentStatuses.get(id) !== status,
+    );
+
+    if (madeProgress || anyStatusChanged) {
+      return true;
+    }
+
+    // If we have active calls but NONE of them progressed, check if we are waiting for external events.
+    // States that are 'waiting' from the loop's perspective: awaiting_approval, executing.
+    const isWaitingForExternal = activeCalls.some(
+      (c) =>
+        c.status === CoreToolCallStatus.AwaitingApproval ||
+        c.status === CoreToolCallStatus.Executing,
+    );
+
+    if (isWaitingForExternal && this.state.isActive) {
+      // Yield to the event loop to allow external events (tool completion, user input) to progress.
+      await new Promise((resolve) => queueMicrotask(() => resolve(true)));
+      return true;
+    }
+
+    // If we are here, we have active calls (likely Validating or Scheduled) but none progressed.
+    // This is a stuck state.
+    return false;
   }
 
   private async _processValidatingCall(
@@ -379,13 +529,13 @@ export class Scheduler {
       if (signal.aborted || err.name === 'AbortError') {
         this.state.updateStatus(
           active.request.callId,
-          'cancelled',
+          CoreToolCallStatus.Cancelled,
           'Operation cancelled',
         );
       } else {
         this.state.updateStatus(
           active.request.callId,
-          'error',
+          CoreToolCallStatus.Error,
           createErrorResponse(
             active.request,
             err,
@@ -394,8 +544,6 @@ export class Scheduler {
         );
       }
     }
-
-    this.state.finalizeCall(active.request.callId);
   }
 
   // --- Phase 3: Single Call Orchestration ---
@@ -417,14 +565,13 @@ export class Scheduler {
 
       this.state.updateStatus(
         callId,
-        'error',
+        CoreToolCallStatus.Error,
         createErrorResponse(
           toolCall.request,
           new Error(errorMessage),
           errorType,
         ),
       );
-      this.state.finalizeCall(callId);
       return;
     }
 
@@ -444,40 +591,54 @@ export class Scheduler {
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;
-    } else {
-      this.state.setOutcome(callId, ToolConfirmationOutcome.ProceedOnce);
     }
 
+    this.state.setOutcome(callId, outcome);
+
     // Handle Policy Updates
-    await updatePolicy(toolCall.tool, outcome, lastDetails, {
-      config: this.config,
-      messageBus: this.messageBus,
-    });
+    if (decision === PolicyDecision.ASK_USER && outcome) {
+      await updatePolicy(toolCall.tool, outcome, lastDetails, {
+        config: this.config,
+        messageBus: this.messageBus,
+      });
+    }
 
     // Handle cancellation (cascades to entire batch)
     if (outcome === ToolConfirmationOutcome.Cancel) {
-      this.state.updateStatus(callId, 'cancelled', 'User denied execution.');
-      this.state.finalizeCall(callId);
+      this.state.updateStatus(
+        callId,
+        CoreToolCallStatus.Cancelled,
+        'User denied execution.',
+      );
       this.state.cancelAllQueued('User cancelled operation');
       return; // Skip execution
     }
 
-    // Execution
-    await this._execute(callId, signal);
+    this.state.updateStatus(callId, CoreToolCallStatus.Scheduled);
   }
 
   // --- Sub-phase Handlers ---
 
   /**
-   * Executes the tool and records the result.
+   * Executes the tool and records the result. Returns true if a new tool call was added.
    */
-  private async _execute(callId: string, signal: AbortSignal): Promise<void> {
-    this.state.updateStatus(callId, 'scheduled');
-    if (signal.aborted) throw new Error('Operation cancelled');
-    this.state.updateStatus(callId, 'executing');
+  private async _execute(
+    toolCall: ScheduledToolCall,
+    signal: AbortSignal,
+  ): Promise<boolean> {
+    const callId = toolCall.request.callId;
+    if (signal.aborted) {
+      this.state.updateStatus(
+        callId,
+        CoreToolCallStatus.Cancelled,
+        'Operation cancelled',
+      );
+      return false;
+    }
+    this.state.updateStatus(callId, CoreToolCallStatus.Executing);
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const activeCall = this.state.firstActiveCall as ExecutingToolCall;
+    const activeCall = this.state.getToolCall(callId) as ExecutingToolCall;
 
     const result = await runWithToolCallContext(
       {
@@ -490,10 +651,15 @@ export class Scheduler {
           call: activeCall,
           signal,
           outputUpdateHandler: (id, out) =>
-            this.state.updateStatus(id, 'executing', { liveOutput: out }),
+            this.state.updateStatus(id, CoreToolCallStatus.Executing, {
+              liveOutput: out,
+            }),
           onUpdateToolCall: (updated) => {
-            if (updated.status === 'executing' && updated.pid) {
-              this.state.updateStatus(callId, 'executing', {
+            if (
+              updated.status === CoreToolCallStatus.Executing &&
+              updated.pid
+            ) {
+              this.state.updateStatus(callId, CoreToolCallStatus.Executing, {
                 pid: updated.pid,
               });
             }
@@ -501,13 +667,84 @@ export class Scheduler {
         }),
     );
 
-    if (result.status === 'success') {
-      this.state.updateStatus(callId, 'success', result.response);
-    } else if (result.status === 'cancelled') {
-      this.state.updateStatus(callId, 'cancelled', 'Operation cancelled');
-    } else {
-      this.state.updateStatus(callId, 'error', result.response);
+    if (
+      (result.status === CoreToolCallStatus.Success ||
+        result.status === CoreToolCallStatus.Error) &&
+      result.tailToolCallRequest
+    ) {
+      // Log the intermediate tool call before it gets replaced.
+      const intermediateCall: SuccessfulToolCall | ErroredToolCall = {
+        request: activeCall.request,
+        tool: activeCall.tool,
+        invocation: activeCall.invocation,
+        status: result.status,
+        response: result.response,
+        durationMs: activeCall.startTime
+          ? Date.now() - activeCall.startTime
+          : undefined,
+        outcome: activeCall.outcome,
+        schedulerId: this.schedulerId,
+      };
+      logToolCall(this.config, new ToolCallEvent(intermediateCall));
+
+      const tailRequest = result.tailToolCallRequest;
+      const originalCallId = result.request.callId;
+      const originalRequestName =
+        result.request.originalRequestName || result.request.name;
+
+      const newTool = this.config.getToolRegistry().getTool(tailRequest.name);
+
+      const newRequest: ToolCallRequestInfo = {
+        callId: originalCallId,
+        name: tailRequest.name,
+        args: tailRequest.args,
+        originalRequestName,
+        isClientInitiated: result.request.isClientInitiated,
+        prompt_id: result.request.prompt_id,
+        schedulerId: this.schedulerId,
+      };
+
+      if (!newTool) {
+        // Enqueue an errored tool call
+        const errorCall = this._createToolNotFoundErroredToolCall(
+          newRequest,
+          this.config.getToolRegistry().getAllToolNames(),
+        );
+        this.state.replaceActiveCallWithTailCall(callId, errorCall);
+      } else {
+        // Enqueue a validating tool call for the new tail tool
+        const validatingCall = this._validateAndCreateToolCall(
+          newRequest,
+          newTool,
+          activeCall.approvalMode ?? this.config.getApprovalMode(),
+        );
+        this.state.replaceActiveCallWithTailCall(callId, validatingCall);
+      }
+
+      // Loop continues, picking up the new tail call at the front of the queue.
+      return true;
     }
+
+    if (result.status === CoreToolCallStatus.Success) {
+      this.state.updateStatus(
+        callId,
+        CoreToolCallStatus.Success,
+        result.response,
+      );
+    } else if (result.status === CoreToolCallStatus.Cancelled) {
+      this.state.updateStatus(
+        callId,
+        CoreToolCallStatus.Cancelled,
+        'Operation cancelled',
+      );
+    } else {
+      this.state.updateStatus(
+        callId,
+        CoreToolCallStatus.Error,
+        result.response,
+      );
+    }
+    return false;
   }
 
   private _processNextInRequestQueue() {

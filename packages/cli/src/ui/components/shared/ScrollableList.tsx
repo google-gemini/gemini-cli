@@ -108,7 +108,10 @@ function ScrollableList<T>(
   useEffect(() => stopSmoothScroll, [stopSmoothScroll]);
 
   const smoothScrollTo = useCallback(
-    (targetScrollTop: number, duration: number = 200) => {
+    (
+      targetScrollTop: number,
+      duration: number = process.env['NODE_ENV'] === 'test' ? 0 : 200,
+    ) => {
       stopSmoothScroll();
 
       const scrollState = virtualizedListRef.current?.getScrollState() ?? {

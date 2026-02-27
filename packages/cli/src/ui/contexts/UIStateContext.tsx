@@ -24,9 +24,12 @@ import type {
   ApprovalMode,
   UserTierId,
   IdeInfo,
+  AuthType,
   FallbackIntent,
   ValidationIntent,
   AgentDefinition,
+  FolderDiscoveryResults,
+  PolicyUpdateConfirmationRequest,
 } from '@google/gemini-cli-core';
 import { type TransientMessageType } from '../../utils/events.js';
 import type { DOMElement } from 'ink';
@@ -40,6 +43,7 @@ export interface ProQuotaDialogRequest {
   message: string;
   isTerminalQuotaError: boolean;
   isModelNotFoundError?: boolean;
+  authType?: AuthType;
   resolve: (intent: FallbackIntent) => void;
 }
 
@@ -66,6 +70,8 @@ export interface UIState {
   history: HistoryItem[];
   historyManager: UseHistoryManagerReturn;
   isThemeDialogOpen: boolean;
+  shouldShowRetentionWarning: boolean;
+  sessionsToDeleteCount: number;
   themeError: string | null;
   isAuthenticating: boolean;
   isConfigInitialized: boolean;
@@ -110,6 +116,9 @@ export interface UIState {
   isResuming: boolean;
   shouldShowIdePrompt: boolean;
   isFolderTrustDialogOpen: boolean;
+  folderDiscoveryResults: FolderDiscoveryResults | null;
+  isPolicyUpdateDialogOpen: boolean;
+  policyUpdateConfirmationRequest: PolicyUpdateConfirmationRequest | undefined;
   isTrustedFolder: boolean | undefined;
   constrainHeight: boolean;
   showErrorDetails: boolean;
@@ -120,6 +129,7 @@ export interface UIState {
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;
   shortcutsHelpVisible: boolean;
+  cleanUiDetailsVisible: boolean;
   elapsedTime: number;
   currentLoadingPhrase: string | undefined;
   historyRemountKey: number;
@@ -127,6 +137,7 @@ export interface UIState {
   messageQueue: string[];
   queueErrorMessage: string | null;
   showApprovalModeIndicator: ApprovalMode;
+  allowPlanMode: boolean;
   // Quota-related state
   quota: QuotaState;
   currentModel: string;
@@ -173,6 +184,9 @@ export interface UIState {
   isBackgroundShellListOpen: boolean;
   adminSettingsChanged: boolean;
   newAgents: AgentDefinition[] | null;
+  showIsExpandableHint: boolean;
+  hintMode: boolean;
+  hintBuffer: string;
   transientMessage: {
     text: string;
     type: TransientMessageType;

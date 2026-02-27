@@ -12,7 +12,7 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import { getCompressionPrompt } from '../core/prompts.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { logChatCompression } from '../telemetry/loggers.js';
-import { makeChatCompressionEvent } from '../telemetry/types.js';
+import { makeChatCompressionEvent, LlmRole } from '../telemetry/types.js';
 import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
@@ -29,6 +29,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
 } from '../config/models.js';
 import { PreCompressTrigger } from '../hooks/types.js';
 
@@ -36,18 +37,18 @@ import { PreCompressTrigger } from '../hooks/types.js';
  * Default threshold for compression token count as a fraction of the model's
  * token limit. If the chat history exceeds this threshold, it will be compressed.
  */
-export const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.5;
+const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.5;
 
 /**
  * The fraction of the latest chat history to keep. A value of 0.3
  * means that only the last 30% of the chat history will be kept after compression.
  */
-export const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
+const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
 /**
  * The budget for function response tokens in the preserved history.
  */
-export const COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET = 50_000;
+const COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET = 50_000;
 
 /**
  * Returns the index of the oldest item to keep when compressing. May return
@@ -100,6 +101,7 @@ export function findCompressSplitPoint(
 export function modelStringToModelConfigAlias(model: string): string {
   switch (model) {
     case PREVIEW_GEMINI_MODEL:
+    case PREVIEW_GEMINI_3_1_MODEL:
       return 'chat-compression-3-pro';
     case PREVIEW_GEMINI_FLASH_MODEL:
       return 'chat-compression-3-flash';
@@ -239,10 +241,7 @@ export class ChatCompressionService {
     const curatedHistory = chat.getHistory(true);
 
     // Regardless of `force`, don't do anything if the history is empty.
-    if (
-      curatedHistory.length === 0 ||
-      (hasFailedCompressionAttempt && !force)
-    ) {
+    if (curatedHistory.length === 0) {
       return {
         newHistory: null,
         info: {
@@ -283,6 +282,35 @@ export class ChatCompressionService {
       curatedHistory,
       config,
     );
+
+    // If summarization previously failed (and not forced), we only rely on truncation.
+    // We do NOT attempt to invoke the LLM for summarization again to avoid repeated failures/costs.
+    if (hasFailedCompressionAttempt && !force) {
+      const truncatedTokenCount = estimateTokenCountSync(
+        truncatedHistory.flatMap((c) => c.parts || []),
+      );
+
+      // If truncation reduced the size, we consider it a successful "compression" (truncation only).
+      if (truncatedTokenCount < originalTokenCount) {
+        return {
+          newHistory: truncatedHistory,
+          info: {
+            originalTokenCount,
+            newTokenCount: truncatedTokenCount,
+            compressionStatus: CompressionStatus.CONTENT_TRUNCATED,
+          },
+        };
+      }
+
+      return {
+        newHistory: null,
+        info: {
+          originalTokenCount,
+          newTokenCount: originalTokenCount,
+          compressionStatus: CompressionStatus.NOOP,
+        },
+      };
+    }
 
     const splitPoint = findCompressSplitPoint(
       truncatedHistory,
@@ -339,6 +367,7 @@ export class ChatCompressionService {
       promptId,
       // TODO(joshualitt): wire up a sensible abort signal,
       abortSignal: abortSignal ?? new AbortController().signal,
+      role: LlmRole.UTILITY_COMPRESSOR,
     });
     const summary = getResponseText(summaryResponse) ?? '';
 
@@ -365,6 +394,7 @@ export class ChatCompressionService {
         ],
         systemInstruction: { text: getCompressionPrompt(config) },
         promptId: `${promptId}-verify`,
+        role: LlmRole.UTILITY_COMPRESSOR,
         abortSignal: abortSignal ?? new AbortController().signal,
       });
 

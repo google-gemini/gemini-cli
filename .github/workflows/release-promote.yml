@@ -239,6 +239,7 @@ jobs:
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
           wombat-token-a2a-server: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
+          github-release-token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}'
           working-directory: './release'
@@ -305,6 +306,7 @@ jobs:
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
           wombat-token-a2a-server: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
+          github-release-token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_STABLE_TAG }}'
           working-directory: './release'
@@ -360,23 +362,28 @@ jobs:
       - name: 'Create and switch to a new branch'
         id: 'release_branch'
         run: |
-          BRANCH_NAME="chore/nightly-version-bump-${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          BRANCH_NAME="chore/nightly-version-bump-${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"
           git switch -c "${BRANCH_NAME}"
           echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
+        env:
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: '${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}'
 
       - name: 'Update package versions'
-        run: 'npm run release:version "${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"'
+        run: 'npm run release:version "${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"'
+        env:
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: '${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}'
 
       - name: 'Commit and Push package versions'
         env:
           BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           DRY_RUN: '${{ github.event.inputs.dry_run }}'
+          NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION: '${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}'
         run: |-
           git add package.json packages/*/package.json
           if [ -f package-lock.json ]; then
             git add package-lock.json
           fi
-          git commit -m "chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          git commit -m "chore(release): bump version to ${NEEDS_CALCULATE_VERSIONS_OUTPUTS_NEXT_NIGHTLY_VERSION}"
           if [[ "${DRY_RUN}" == "false" ]]; then
             echo "Pushing release branch to remote..."
             git push --set-upstream origin "${BRANCH_NAME}"
@@ -390,7 +397,7 @@ jobs:
           branch-name: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           pr-title: 'chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}'
           pr-body: 'Automated version bump to prepare for the next nightly release.'
-          github-token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
 
       - name: 'Create Issue on Failure'

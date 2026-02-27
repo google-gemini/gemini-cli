@@ -93,7 +93,7 @@ Environment variables can be used to override the settings in the file.
 `true` or `1` will enable the feature. Any other value will disable it.
 
 For detailed information about all configuration options, see the
-[Configuration guide](../get-started/configuration.md).
+[Configuration guide](../reference/configuration.md).
 
 ## Google Cloud telemetry
 
@@ -176,11 +176,12 @@ Sends telemetry directly to Google Cloud services. No collector needed.
    }
    ```
 2. Run Gemini CLI and send prompts.
-3. View logs and metrics:
+3. View logs, metrics, and traces:
    - Open the Google Cloud Console in your browser after sending prompts:
-     - Logs: https://console.cloud.google.com/logs/
-     - Metrics: https://console.cloud.google.com/monitoring/metrics-explorer
-     - Traces: https://console.cloud.google.com/traces/list
+     - Logs (Logs Explorer): https://console.cloud.google.com/logs/
+     - Metrics (Metrics Explorer):
+       https://console.cloud.google.com/monitoring/metrics-explorer
+     - Traces (Trace Explorer): https://console.cloud.google.com/traces/list
 
 ### Collector-based export (advanced)
 
@@ -208,11 +209,12 @@ forward data to Google Cloud.
    - Save collector logs to `~/.gemini/tmp/<projectHash>/otel/collector-gcp.log`
    - Stop collector on exit (e.g. `Ctrl+C`)
 3. Run Gemini CLI and send prompts.
-4. View logs and metrics:
+4. View logs, metrics, and traces:
    - Open the Google Cloud Console in your browser after sending prompts:
-     - Logs: https://console.cloud.google.com/logs/
-     - Metrics: https://console.cloud.google.com/monitoring/metrics-explorer
-     - Traces: https://console.cloud.google.com/traces/list
+     - Logs (Logs Explorer): https://console.cloud.google.com/logs/
+     - Metrics (Metrics Explorer):
+       https://console.cloud.google.com/monitoring/metrics-explorer
+     - Traces (Trace Explorer): https://console.cloud.google.com/traces/list
    - Open `~/.gemini/tmp/<projectHash>/otel/collector-gcp.log` to view local
      collector logs.
 
@@ -270,14 +272,14 @@ For local development and debugging, you can capture telemetry data locally:
 3. View traces at http://localhost:16686 and logs/metrics in the collector log
    file.
 
-## Logs and metrics
+## Logs, metrics, and traces
 
-The following section describes the structure of logs and metrics generated for
-Gemini CLI.
+The following section describes the structure of logs, metrics, and traces
+generated for Gemini CLI.
 
-The `session.id`, `installation.id`, and `user.email` (available only when
-authenticated with a Google account) are included as common attributes on all
-logs and metrics.
+The `session.id`, `installation.id`, `active_approval_mode`, and `user.email`
+(available only when authenticated with a Google account) are included as common
+attributes on all logs and metrics.
 
 ### Logs
 
@@ -360,7 +362,21 @@ Captures tool executions, output truncation, and Edit behavior.
     - `extension_name` (string, if applicable)
     - `extension_id` (string, if applicable)
     - `content_length` (int, if applicable)
-    - `metadata` (if applicable)
+    - `metadata` (if applicable), which includes for the `AskUser` tool:
+      - `ask_user` (object):
+        - `question_types` (array of strings)
+        - `ask_user_dismissed` (boolean)
+        - `ask_user_empty_submission` (boolean)
+        - `ask_user_answer_count` (number)
+      - `diffStat` (if applicable), which includes:
+        - `model_added_lines` (number)
+        - `model_removed_lines` (number)
+        - `model_added_chars` (number)
+        - `model_removed_chars` (number)
+        - `user_added_lines` (number)
+        - `user_removed_lines` (number)
+        - `user_added_chars` (number)
+        - `user_removed_chars` (number)
 
 - `gemini_cli.tool_output_truncated`: Output of a tool call was truncated.
   - **Attributes**:
@@ -473,6 +489,7 @@ Captures Gemini API requests, responses, and errors.
     - `reasoning` (string, optional)
     - `failed` (boolean)
     - `error_message` (string, optional)
+    - `approval_mode` (string)
 
 #### Chat and streaming
 
@@ -697,12 +714,14 @@ Routing latency/failures and slash-command selections.
   - **Attributes**:
     - `routing.decision_model` (string)
     - `routing.decision_source` (string)
+    - `routing.approval_mode` (string)
 
 - `gemini_cli.model_routing.failure.count` (Counter, Int): Counts model routing
   failures.
   - **Attributes**:
     - `routing.decision_source` (string)
     - `routing.error_message` (string)
+    - `routing.approval_mode` (string)
 
 ##### Agent runs
 
@@ -806,6 +825,32 @@ Optional performance monitoring for startup, CPU/memory, and phase timing.
     - `category` (string)
     - `current_value` (number)
     - `baseline_value` (number)
+
+### Traces
+
+Traces offer a granular, "under-the-hood" view of every agent and backend
+operation. By providing a high-fidelity execution map, they enable precise
+debugging of complex tool interactions and deep performance optimization. Each
+trace captures rich, consistent metadata via custom span attributes:
+
+- `gen_ai.operation.name` (string): The high-level operation kind (e.g.
+  "tool_call", "llm_call").
+- `gen_ai.agent.name` (string): The service agent identifier ("gemini-cli").
+- `gen_ai.agent.description` (string): The service agent description.
+- `gen_ai.input.messages` (string): Input messages or metadata specific to the
+  operation.
+- `gen_ai.output.messages` (string): Output messages or metadata generated from
+  the operation.
+- `gen_ai.request.model` (string): The request model name.
+- `gen_ai.response.model` (string): The response model name.
+- `gen_ai.system_instructions` (json string): The system instructions.
+- `gen_ai.prompt.name` (string): The prompt name.
+- `gen_ai.tool.name` (string): The executed tool's name.
+- `gen_ai.tool.call_id` (string): The generated specific ID of the tool call.
+- `gen_ai.tool.description` (string): The executed tool's description.
+- `gen_ai.tool.definitions` (json string): The executed tool's description.
+- `gen_ai.conversation.id` (string): The current CLI session ID.
+- Additional user-defined Custom Attributes passed via the span's configuration.
 
 #### GenAI semantic convention
 
