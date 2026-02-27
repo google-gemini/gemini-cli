@@ -5,6 +5,9 @@ problems encountered while using Gemini CLI.
 
 ## General issues
 
+This section addresses common questions about Gemini CLI usage, security, and
+troubleshooting general errors.
+
 ### Why can't I use third-party software (e.g. Claude Code, OpenClaw, OpenCode) with Gemini CLI?
 
 Using third-party software, tools, or services to harvest or piggyback on Gemini
