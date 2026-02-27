@@ -391,6 +391,17 @@ class TrackerAddDependencyInvocation extends BaseToolInvocation<
   }
 
   override async execute(_signal: AbortSignal): Promise<ToolResult> {
+    if (this.params.taskId === this.params.dependencyId) {
+      return {
+        llmContent: `Error: Task ${this.params.taskId} cannot depend on itself.`,
+        returnDisplay: 'Self-referential dependency rejected.',
+        error: {
+          message: 'Task cannot depend on itself',
+          type: ToolErrorType.EXECUTION_FAILED,
+        }
+      };
+    }
+
     const [task, dep] = await Promise.all([
       this.service.getTask(this.params.taskId),
       this.service.getTask(this.params.dependencyId),
@@ -527,7 +538,13 @@ class TrackerVisualizeInvocation extends BaseToolInvocation<
 
     let output = 'Task Tracker Graph:\n';
 
-    const renderTask = (task: TrackerTask, depth: number) => {
+    const renderTask = (task: TrackerTask, depth: number, visited: Set<string>) => {
+      if (visited.has(task.id)) {
+        output += `${'  '.repeat(depth)}[CYCLE DETECTED: ${task.id}]\n`;
+        return;
+      }
+      visited.add(task.id);
+
       const indent = '  '.repeat(depth);
       output += `${indent}${statusEmojis[task.status]} ${task.id} ${typeLabels[task.type]} ${task.title}\n`;
       if (task.dependencies.length > 0) {
@@ -535,12 +552,12 @@ class TrackerVisualizeInvocation extends BaseToolInvocation<
       }
       const children = childrenMap.get(task.id) ?? [];
       for (const child of children) {
-        renderTask(child, depth + 1);
+        renderTask(child, depth + 1, new Set(visited));
       }
     };
 
     for (const root of roots) {
-      renderTask(root, 0);
+      renderTask(root, 0, new Set());
     }
 
     return {

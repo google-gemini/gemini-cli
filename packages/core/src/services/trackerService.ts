@@ -19,17 +19,17 @@ import { type z } from 'zod';
 export class TrackerService {
   private readonly tasksDir: string;
 
-  private initialized = false;
+  private initPromise: Promise<void> | null = null;
 
   constructor(readonly trackerDir: string) {
     this.tasksDir = trackerDir;
   }
 
-  private async ensureInitialized(): Promise<void> {
-    if (!this.initialized) {
-      await fs.mkdir(this.tasksDir, { recursive: true });
-      this.initialized = true;
+  private ensureInitialized(): Promise<void> {
+    if (!this.initPromise) {
+      this.initPromise = fs.mkdir(this.tasksDir, { recursive: true });
     }
+    return this.initPromise;
   }
 
   /**
@@ -133,30 +133,39 @@ export class TrackerService {
     id: string,
     updates: Partial<TrackerTask>,
   ): Promise<TrackerTask> {
-    const allTasks = await this.listTasks();
-    const taskMap = new Map<string, TrackerTask>(
-      allTasks.map((t) => [t.id, t]),
-    );
-    const task = taskMap.get(id);
+    const isClosing = updates.status === TaskStatus.CLOSED;
+    const changingDependencies = updates.dependencies !== undefined;
 
-    if (!task) {
-      throw new Error(`Task with ID ${id} not found.`);
-    }
+    let task: TrackerTask | null | undefined;
+    let updatedTask: TrackerTask;
 
-    const updatedTask = { ...task, ...updates };
+    if (isClosing || changingDependencies) {
+      const allTasks = await this.listTasks();
+      const taskMap = new Map<string, TrackerTask>(
+        allTasks.map((t) => [t.id, t]),
+      );
+      task = taskMap.get(id);
 
-    // Validate status transition if closing
-    if (
-      updatedTask.status === TaskStatus.CLOSED &&
-      task.status !== TaskStatus.CLOSED
-    ) {
-      this.validateCanClose(updatedTask, taskMap);
-    }
+      if (!task) {
+        throw new Error(`Task with ID ${id} not found.`);
+      }
 
-    // Validate circular dependencies if dependencies changed
-    if (updates.dependencies) {
-      taskMap.set(updatedTask.id, updatedTask);
-      this.validateNoCircularDependencies(updatedTask, taskMap);
+      updatedTask = { ...task, ...updates };
+
+      if (isClosing && task.status !== TaskStatus.CLOSED) {
+        this.validateCanClose(updatedTask, taskMap);
+      }
+
+      if (changingDependencies) {
+        taskMap.set(updatedTask.id, updatedTask);
+        this.validateNoCircularDependencies(updatedTask, taskMap);
+      }
+    } else {
+      task = await this.getTask(id);
+      if (!task) {
+        throw new Error(`Task with ID ${id} not found.`);
+      }
+      updatedTask = { ...task, ...updates };
     }
 
     TrackerTaskSchema.parse(updatedTask);
