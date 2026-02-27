@@ -87,11 +87,8 @@ export interface UIActions {
   onHintSubmit: (hint: string) => void;
   handleRestart: () => void;
   handleNewAgentsSelect: (choice: NewAgentsChoice) => Promise<void>;
-<<<<<<< HEAD
-=======
   getPreferredEditor: () => EditorType | undefined;
   clearAccountSuspension: () => void;
->>>>>>> ea48bd941 (feat: better error messages (#20577))
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

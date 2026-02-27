@@ -2563,14 +2563,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
         setNewAgents(null);
       },
-<<<<<<< HEAD
-=======
       getPreferredEditor,
       clearAccountSuspension: () => {
         setAccountSuspensionInfo(null);
         setAuthState(AuthState.Updating);
       },
->>>>>>> ea48bd941 (feat: better error messages (#20577))
     }),
     [
       handleThemeSelect,
@@ -2623,6 +2620,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       newAgents,
       config,
       historyManager,
+      getPreferredEditor,
     ],
   );
 

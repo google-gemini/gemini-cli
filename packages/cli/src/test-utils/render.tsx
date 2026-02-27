@@ -574,11 +574,8 @@ const mockUIActions: UIActions = {
   onHintSubmit: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
-<<<<<<< HEAD
-=======
   getPreferredEditor: vi.fn(),
   clearAccountSuspension: vi.fn(),
->>>>>>> ea48bd941 (feat: better error messages (#20577))
 };
 
 let capturedOverflowState: OverflowState | undefined;
