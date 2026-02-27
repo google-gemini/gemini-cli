@@ -843,6 +843,7 @@ export async function loadCliConfig(
     interactive,
     trustedFolder,
     useBackgroundColor: settings.ui?.useBackgroundColor,
+    useAlternateBuffer: settings.ui?.useAlternateBuffer,
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
