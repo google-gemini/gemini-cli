@@ -23,6 +23,7 @@ import {
   initializeShellParsers,
   splitCommands,
   hasRedirection,
+  stripEnvPrefix,
 } from '../utils/shell-utils.js';
 import { getToolAliases } from '../tools/tool-names.js';
 
@@ -296,13 +297,35 @@ export class PolicyEngine {
               responsibleRule = undefined; // Inherent policy
             }
           } else {
-            // Atomic command matching the rule.
-            if (
-              ruleDecision === PolicyDecision.ASK_USER &&
-              aggregateDecision === PolicyDecision.ALLOW
-            ) {
-              aggregateDecision = PolicyDecision.ASK_USER;
-              responsibleRule = rule;
+            // Try to extract the command portion without env var assignments.
+            // For "CI=true npm test", tree-sitter parses the command name as "npm",
+            // so we can strip the env prefix and re-check "npm test".
+            const envStripped = stripEnvPrefix(command);
+            if (envStripped && envStripped !== command) {
+              const subResult = await this.check(
+                { name: toolName, args: { command: envStripped, dir_path } },
+                serverName,
+                toolAnnotations,
+              );
+              const subDecision = subResult.decision;
+              if (subDecision === PolicyDecision.DENY) {
+                return { decision: PolicyDecision.DENY, rule: subResult.rule };
+              }
+              if (subDecision === PolicyDecision.ASK_USER) {
+                aggregateDecision = PolicyDecision.ASK_USER;
+                if (!responsibleRule) {
+                  responsibleRule = subResult.rule;
+                }
+              }
+            } else {
+              // No env prefix found -- original behavior
+              if (
+                ruleDecision === PolicyDecision.ASK_USER &&
+                aggregateDecision === PolicyDecision.ALLOW
+              ) {
+                aggregateDecision = PolicyDecision.ASK_USER;
+                responsibleRule = rule;
+              }
             }
           }
           continue;
