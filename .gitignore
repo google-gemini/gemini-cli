@@ -42,6 +42,7 @@ bundle
 # Test report files
 junit.xml
 packages/*/coverage/
+gemini-cli-test-workspace*
 
 # Generated files
 packages/cli/src/generated/
