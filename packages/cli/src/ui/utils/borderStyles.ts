@@ -47,7 +47,10 @@ export function getToolGroupBorderAppearance(
       : allPendingItems
           .filter(
             (i): i is HistoryItemToolGroup =>
-              i !== null && i !== undefined && i.type === 'tool_group',
+              i !== null &&
+              i !== undefined &&
+              i.type === 'tool_group' &&
+              i.tools.length > 0,
           )
           .slice(-1)
           .flatMap((i) => i.tools);
