@@ -29,6 +29,7 @@ vi.mock('../telemetry/loggers.js', () => ({
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
 const CONTENT_CHUNK_SIZE = 50;
+const CYCLE_REPEAT_THRESHOLD = 3;
 
 describe('LoopDetectionService', () => {
   let service: LoopDetectionService;
@@ -102,21 +103,28 @@ describe('LoopDetectionService', () => {
       expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
     });
 
-    it('should not detect a loop for different tool calls', () => {
-      const event1 = createToolCallRequestEvent('testTool', {
-        param: 'value1',
-      });
-      const event2 = createToolCallRequestEvent('testTool', {
-        param: 'value2',
-      });
-      const event3 = createToolCallRequestEvent('anotherTool', {
-        param: 'value1',
-      });
-
+    it('should not detect a loop for tool calls with distinct args (genuine sequential work)', () => {
+      // Each iteration uses unique args — simulating real work on different
+      // inputs (e.g., different files).  Even though the tool names repeat,
+      // the hashes differ so no cyclic pattern is formed.
       for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD - 2; i++) {
-        expect(service.addAndCheck(event1)).toBe(false);
-        expect(service.addAndCheck(event2)).toBe(false);
-        expect(service.addAndCheck(event3)).toBe(false);
+        expect(
+          service.addAndCheck(
+            createToolCallRequestEvent('testTool', { param: `value1-${i}` }),
+          ),
+        ).toBe(false);
+        expect(
+          service.addAndCheck(
+            createToolCallRequestEvent('testTool', { param: `value2-${i}` }),
+          ),
+        ).toBe(false);
+        expect(
+          service.addAndCheck(
+            createToolCallRequestEvent('anotherTool', {
+              param: `value1-${i}`,
+            }),
+          ),
+        ).toBe(false);
       }
     });
 
@@ -169,6 +177,92 @@ describe('LoopDetectionService', () => {
       const event = createToolCallRequestEvent('testTool', { param: 'value' });
       for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD + 2; i++) {
         expect(service.addAndCheck(event)).toBe(false);
+      }
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Cyclic Tool Call Loop Detection', () => {
+    it('should detect an alternating A→B pattern after enough repetitions', () => {
+      const eventA = createToolCallRequestEvent('toolA', { x: 1 });
+      const eventB = createToolCallRequestEvent('toolB', { x: 1 });
+
+      // Emit CYCLE_REPEAT_THRESHOLD - 1 full cycles → should NOT trigger yet
+      for (let i = 0; i < CYCLE_REPEAT_THRESHOLD - 1; i++) {
+        expect(service.addAndCheck(eventA)).toBe(false);
+        expect(service.addAndCheck(eventB)).toBe(false);
+      }
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+
+      // The next A starts the CYCLE_REPEAT_THRESHOLD-th repetition
+      expect(service.addAndCheck(eventA)).toBe(false);
+      // B completes CYCLE_REPEAT_THRESHOLD full cycles → loop detected
+      expect(service.addAndCheck(eventB)).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should detect a 3-way cycling pattern A→B→C after enough repetitions', () => {
+      const eventA = createToolCallRequestEvent('toolA', { x: 1 });
+      const eventB = createToolCallRequestEvent('toolB', { x: 1 });
+      const eventC = createToolCallRequestEvent('toolC', { x: 1 });
+
+      for (let i = 0; i < CYCLE_REPEAT_THRESHOLD - 1; i++) {
+        expect(service.addAndCheck(eventA)).toBe(false);
+        expect(service.addAndCheck(eventB)).toBe(false);
+        expect(service.addAndCheck(eventC)).toBe(false);
+      }
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+
+      expect(service.addAndCheck(eventA)).toBe(false);
+      expect(service.addAndCheck(eventB)).toBe(false);
+      expect(service.addAndCheck(eventC)).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not detect a cyclic loop when the pattern is broken by a new call', () => {
+      const eventA = createToolCallRequestEvent('toolA', { x: 1 });
+      const eventB = createToolCallRequestEvent('toolB', { x: 1 });
+      const eventC = createToolCallRequestEvent('toolC', { x: 99 }); // different args
+
+      // Two full A→B cycles
+      for (let i = 0; i < CYCLE_REPEAT_THRESHOLD - 1; i++) {
+        service.addAndCheck(eventA);
+        service.addAndCheck(eventB);
+      }
+      // Break the cycle with a genuinely different call
+      expect(service.addAndCheck(eventC)).toBe(false);
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should not detect a cyclic loop when disabled for session', () => {
+      service.disableForSession();
+      const eventA = createToolCallRequestEvent('toolA', { x: 1 });
+      const eventB = createToolCallRequestEvent('toolB', { x: 1 });
+
+      for (let i = 0; i < CYCLE_REPEAT_THRESHOLD; i++) {
+        expect(service.addAndCheck(eventA)).toBe(false);
+        expect(service.addAndCheck(eventB)).toBe(false);
+      }
+      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+
+    it('should reset cyclic history on service reset', () => {
+      const eventA = createToolCallRequestEvent('toolA', { x: 1 });
+      const eventB = createToolCallRequestEvent('toolB', { x: 1 });
+
+      // Build up two full A→B cycles
+      for (let i = 0; i < CYCLE_REPEAT_THRESHOLD - 1; i++) {
+        service.addAndCheck(eventA);
+        service.addAndCheck(eventB);
+      }
+
+      // Reset clears the cyclic history
+      service.reset('new-prompt-id');
+
+      // Should now need another CYCLE_REPEAT_THRESHOLD cycles to trigger
+      for (let i = 0; i < CYCLE_REPEAT_THRESHOLD - 1; i++) {
+        expect(service.addAndCheck(eventA)).toBe(false);
+        expect(service.addAndCheck(eventB)).toBe(false);
       }
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
@@ -806,15 +900,15 @@ describe('LoopDetectionService LLM Checks', () => {
   };
 
   it('should not trigger LLM check before LLM_CHECK_AFTER_TURNS', async () => {
-    await advanceTurns(29);
+    await advanceTurns(9);
     expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
   });
 
-  it('should trigger LLM check on the 30th turn', async () => {
+  it('should trigger LLM check on the 10th turn', async () => {
     mockBaseLlmClient.generateJson = vi
       .fn()
       .mockResolvedValue({ unproductive_state_confidence: 0.1 });
-    await advanceTurns(30);
+    await advanceTurns(10);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -828,12 +922,12 @@ describe('LoopDetectionService LLM Checks', () => {
   });
 
   it('should detect a cognitive loop when confidence is high', async () => {
-    // First check at turn 30
+    // First check at turn 10
     mockBaseLlmClient.generateJson = vi.fn().mockResolvedValue({
       unproductive_state_confidence: 0.85,
       unproductive_state_analysis: 'Repetitive actions',
     });
-    await advanceTurns(30);
+    await advanceTurns(10);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -843,13 +937,13 @@ describe('LoopDetectionService LLM Checks', () => {
 
     // The confidence of 0.85 will result in a low interval.
     // The interval will be: 5 + (15 - 5) * (1 - 0.85) = 5 + 10 * 0.15 = 6.5 -> rounded to 7
-    await advanceTurns(6); // advance to turn 36
+    await advanceTurns(6); // advance to turn 16
 
     mockBaseLlmClient.generateJson = vi.fn().mockResolvedValue({
       unproductive_state_confidence: 0.95,
       unproductive_state_analysis: 'Repetitive actions',
     });
-    const finalResult = await service.turnStarted(abortController.signal); // This is turn 37
+    const finalResult = await service.turnStarted(abortController.signal); // This is turn 17
 
     expect(finalResult).toBe(true);
     expect(loggers.logLoopDetected).toHaveBeenCalledWith(
@@ -867,7 +961,7 @@ describe('LoopDetectionService LLM Checks', () => {
       unproductive_state_confidence: 0.5,
       unproductive_state_analysis: 'Looks okay',
     });
-    await advanceTurns(30);
+    await advanceTurns(10);
     const result = await service.turnStarted(abortController.signal);
     expect(result).toBe(false);
     expect(loggers.logLoopDetected).not.toHaveBeenCalled();
@@ -878,13 +972,13 @@ describe('LoopDetectionService LLM Checks', () => {
     mockBaseLlmClient.generateJson = vi
       .fn()
       .mockResolvedValue({ unproductive_state_confidence: 0.0 });
-    await advanceTurns(30); // First check at turn 30
+    await advanceTurns(10); // First check at turn 10
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
 
-    await advanceTurns(14); // Advance to turn 44
+    await advanceTurns(14); // Advance to turn 24
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
 
-    await service.turnStarted(abortController.signal); // Turn 45
+    await service.turnStarted(abortController.signal); // Turn 25
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
   });
 
@@ -892,7 +986,7 @@ describe('LoopDetectionService LLM Checks', () => {
     mockBaseLlmClient.generateJson = vi
       .fn()
       .mockRejectedValue(new Error('API error'));
-    await advanceTurns(30);
+    await advanceTurns(10);
     const result = await service.turnStarted(abortController.signal);
     expect(result).toBe(false);
     expect(loggers.logLoopDetected).not.toHaveBeenCalled();
@@ -901,7 +995,7 @@ describe('LoopDetectionService LLM Checks', () => {
   it('should not trigger LLM check when disabled for session', async () => {
     service.disableForSession();
     expect(loggers.logLoopDetectionDisabled).toHaveBeenCalledTimes(1);
-    await advanceTurns(30);
+    await advanceTurns(10);
     const result = await service.turnStarted(abortController.signal);
     expect(result).toBe(false);
     expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
@@ -924,7 +1018,7 @@ describe('LoopDetectionService LLM Checks', () => {
       .fn()
       .mockResolvedValue({ unproductive_state_confidence: 0.1 });
 
-    await advanceTurns(30);
+    await advanceTurns(10);
 
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
     const calledArg = vi.mocked(mockBaseLlmClient.generateJson).mock
@@ -949,7 +1043,7 @@ describe('LoopDetectionService LLM Checks', () => {
         unproductive_state_analysis: 'Main says loop',
       });
 
-    await advanceTurns(30);
+    await advanceTurns(10);
 
     // It should have called generateJson twice
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
@@ -989,7 +1083,7 @@ describe('LoopDetectionService LLM Checks', () => {
         unproductive_state_analysis: 'Main says no loop',
       });
 
-    await advanceTurns(30);
+    await advanceTurns(10);
 
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
     expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
@@ -1014,7 +1108,7 @@ describe('LoopDetectionService LLM Checks', () => {
     // Advance by 6 turns
     await advanceTurns(6);
 
-    // Next turn (37) should trigger another check
+    // Next turn (17) should trigger another check
     await service.turnStarted(abortController.signal);
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(3);
   });
@@ -1032,7 +1126,7 @@ describe('LoopDetectionService LLM Checks', () => {
       unproductive_state_analysis: 'Flash says loop',
     });
 
-    await advanceTurns(30);
+    await advanceTurns(10);
 
     // It should have called generateJson only once
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);

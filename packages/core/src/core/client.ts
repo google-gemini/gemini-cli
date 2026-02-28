@@ -67,6 +67,13 @@ import type { LlmRole } from '../telemetry/types.js';
 
 const MAX_TURNS = 100;
 
+/**
+ * Maximum number of consecutive "Please continue." turns that the next-speaker
+ * checker is allowed to trigger within a single user prompt before the loop is
+ * forcibly broken.  A new tool call or a fresh user prompt resets the counter.
+ */
+const MAX_CONSECUTIVE_CONTINUATIONS = 10;
+
 type BeforeAgentHookReturn =
   | {
       type: GeminiEventType.AgentExecutionStopped;
@@ -90,6 +97,13 @@ export class GeminiClient {
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
   private forceFullIdeContext = true;
+
+  /**
+   * Tracks how many consecutive "Please continue." turns the next-speaker
+   * checker has triggered for the current user prompt.  Reset on every new
+   * prompt_id and whenever the model makes a real tool call.
+   */
+  private consecutiveContinuations = 0;
 
   /**
    * At any point in this conversation, was compression triggered without
@@ -750,6 +764,12 @@ export class GeminiClient {
       }
     }
 
+    if (turn.pendingToolCalls.length) {
+      // A real tool call happened; the model is making progress, so reset the
+      // consecutive-continuation counter.
+      this.consecutiveContinuations = 0;
+    }
+
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
       if (
         !this.config.getQuotaErrorOccurred() &&
@@ -770,6 +790,14 @@ export class GeminiClient {
           ),
         );
         if (nextSpeakerCheck?.next_speaker === 'model') {
+          this.consecutiveContinuations++;
+          if (this.consecutiveContinuations > MAX_CONSECUTIVE_CONTINUATIONS) {
+            // The next-speaker checker has told the model to continue too many
+            // times in a row without a real tool call or a new user message.
+            // Treat this as a loop and let the loop-detection UI take over.
+            yield { type: GeminiEventType.LoopDetected };
+            return turn;
+          }
           const nextRequest = [{ text: 'Please continue.' }];
           turn = yield* this.sendMessageStream(
             nextRequest,
@@ -781,6 +809,9 @@ export class GeminiClient {
           );
           return turn;
         }
+        // Model is done talking; reset the continuation counter so a future
+        // tool-call round does not inherit stale counts.
+        this.consecutiveContinuations = 0;
       }
     }
     return turn;
@@ -806,6 +837,7 @@ export class GeminiClient {
       this.hookStateMap.delete(this.lastPromptId);
       this.lastPromptId = prompt_id;
       this.currentSequenceModel = null;
+      this.consecutiveContinuations = 0;
     }
 
     if (hooksEnabled && messageBus) {

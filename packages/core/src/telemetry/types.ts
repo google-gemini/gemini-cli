@@ -788,6 +788,7 @@ export class RipgrepFallbackEvent implements BaseTelemetryEvent {
 
 export enum LoopType {
   CONSECUTIVE_IDENTICAL_TOOL_CALLS = 'consecutive_identical_tool_calls',
+  CYCLIC_TOOL_CALLS = 'cyclic_tool_calls',
   CHANTING_IDENTICAL_SENTENCES = 'chanting_identical_sentences',
   LLM_DETECTED_LOOP = 'llm_detected_loop',
 }
