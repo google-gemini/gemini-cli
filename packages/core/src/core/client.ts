@@ -11,6 +11,8 @@ import type {
   Tool,
   GenerateContentResponse,
 } from '@google/genai';
+import os from 'node:os';
+import path from 'node:path';
 import { createUserContent } from '@google/genai';
 import {
   getDirectoryContextString,
@@ -90,6 +92,13 @@ export class GeminiClient {
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
   private forceFullIdeContext = true;
+
+  private getErrorReportDir(): string {
+    return path.join(
+      this.config.storage?.getProjectTempDir() ?? os.tmpdir(),
+      'error-reports',
+    );
+  }
 
   /**
    * At any point in this conversation, was compression triggered without
@@ -356,11 +365,13 @@ export class GeminiClient {
         },
       );
     } catch (error) {
+      const errorReportDir = this.getErrorReportDir();
       await reportError(
         error,
         'Error initializing Gemini chat session.',
         history,
         'startChat',
+        errorReportDir,
       );
       throw new Error(`Failed to initialize chat: ${getErrorMessage(error)}`);
     }
@@ -555,8 +566,9 @@ export class GeminiClient {
     isInvalidStreamRetry: boolean,
     displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    const errorReportDir = this.getErrorReportDir();
     // Re-initialize turn (it was empty before if in loop, or new instance)
-    let turn = new Turn(this.getChat(), prompt_id);
+    let turn = new Turn(this.getChat(), prompt_id, errorReportDir);
 
     this.sessionTurnCount++;
     if (
@@ -629,7 +641,7 @@ export class GeminiClient {
     }
 
     // Re-initialize turn with fresh history
-    turn = new Turn(this.getChat(), prompt_id);
+    turn = new Turn(this.getChat(), prompt_id, errorReportDir);
 
     const controller = new AbortController();
     const linkedSignal = AbortSignal.any([signal, controller.signal]);
@@ -794,6 +806,8 @@ export class GeminiClient {
     isInvalidStreamRetry: boolean = false,
     displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    const sharedErrorReportDir = this.getErrorReportDir();
+
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
     }
@@ -818,13 +832,13 @@ export class GeminiClient {
           // Add user message to history before returning so it's kept in the transcript
           this.getChat().addHistory(createUserContent(request));
           yield hookResult;
-          return new Turn(this.getChat(), prompt_id);
+          return new Turn(this.getChat(), prompt_id, sharedErrorReportDir);
         } else if (
           'type' in hookResult &&
           hookResult.type === GeminiEventType.AgentExecutionBlocked
         ) {
           yield hookResult;
-          return new Turn(this.getChat(), prompt_id);
+          return new Turn(this.getChat(), prompt_id, sharedErrorReportDir);
         } else if ('additionalContext' in hookResult) {
           const additionalContext = hookResult.additionalContext;
           if (additionalContext) {
@@ -839,7 +853,7 @@ export class GeminiClient {
     }
 
     const boundedTurns = Math.min(turns, MAX_TURNS);
-    let turn = new Turn(this.getChat(), prompt_id);
+    let turn = new Turn(this.getChat(), prompt_id, sharedErrorReportDir);
 
     try {
       turn = yield* this.processTurn(
@@ -1031,6 +1045,7 @@ export class GeminiClient {
         throw error;
       }
 
+      const errorReportDir = this.getErrorReportDir();
       await reportError(
         error,
         `Error generating content via API with model ${currentAttemptModel}.`,
@@ -1039,6 +1054,7 @@ export class GeminiClient {
           requestConfig: currentAttemptGenerateContentConfig,
         },
         'generateContent-api',
+        errorReportDir,
       );
       throw new Error(
         `Failed to generate content with model ${currentAttemptModel}: ${getErrorMessage(error)}`,

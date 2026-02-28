@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import os from 'node:os';
+import path from 'node:path';
 import type { Config } from '../config/config.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
@@ -832,11 +834,16 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         'subagent',
       );
     } catch (e: unknown) {
+      const errorReportDir = path.join(
+        this.runtimeContext.storage?.getProjectTempDir() ?? os.tmpdir(),
+        'error-reports',
+      );
       await reportError(
         e,
         `Error initializing Gemini chat for agent ${this.definition.name}.`,
         startHistory,
         'startChat',
+        errorReportDir,
       );
       // Re-throw as a more specific error after reporting.
       throw new Error(`Failed to create chat object: ${getErrorMessage(e)}`);
