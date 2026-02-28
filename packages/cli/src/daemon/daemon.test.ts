@@ -33,9 +33,9 @@ describe('Daemon Mode', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as unknown as (
-      code?: number,
-    ) => never);
+    vi.spyOn(process, 'exit').mockImplementation(
+      (() => {}) as unknown as typeof process.exit,
+    );
 
     // Mock os.homedir to avoid polluting real user dirs
     vi.spyOn(os, 'homedir').mockReturnValue(testHome);

@@ -6,6 +6,8 @@
 
 import net from 'node:net';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { getDaemonSocketPath, checkDaemonStatus } from './daemonClient.js';
 import {
   type Config,
@@ -78,7 +80,11 @@ export async function startDaemon(
       for (const line of parts) {
         if (!line.trim()) continue;
         try {
-          const payload = JSON.parse(line);
+          const raw: unknown = JSON.parse(line);
+          const payload: DaemonPayload =
+            raw !== null && typeof raw === 'object'
+              ? (raw as DaemonPayload)
+              : {};
           await handleClientRequest(payload, socket, settings, baseArgv);
         } catch (e) {
           debugLogger.error('Failed to parse IPC message from client', e);
@@ -96,6 +102,7 @@ export async function startDaemon(
   });
 
   server.listen(socketPath, () => {
+    fs.chmodSync(socketPath, 0o600);
     writeToStdout(`Daemon started, listening on ${socketPath}\n`);
   });
 
@@ -110,7 +117,11 @@ export async function startDaemon(
 
 async function shutdownDaemon(server: net.Server, socketPath: string) {
   writeToStdout('\nShutting down daemon...\n');
-  server.close();
+  await new Promise<void>((resolve) => {
+    server.close(() => {
+      resolve();
+    });
+  });
   if (fs.existsSync(socketPath)) {
     fs.unlinkSync(socketPath);
   }
@@ -134,14 +145,8 @@ async function handleClientRequest(
 ): Promise<void> {
   if (payload.action === 'stop') {
     socket.end();
-    const socketPath = getDaemonSocketPath();
-    // Use a slight delay to allow the socket to send the response before closing
-    setTimeout(() => {
-      if (fs.existsSync(socketPath)) {
-        fs.unlinkSync(socketPath);
-      }
-      process.exit(ExitCodes.SUCCESS);
-    }, 100);
+    // Trigger graceful shutdown to run all cleanup handlers
+    process.kill(process.pid, 'SIGTERM');
     return;
   }
 
@@ -186,6 +191,20 @@ async function handleClientRequest(
         JSON.stringify({
           type: 'error',
           content: 'Missing required prompt parameters',
+        }) + '\n',
+      );
+      socket.write(JSON.stringify({ type: 'end' }) + '\n');
+      return;
+    }
+
+    const resolvedCwd = path.resolve(cwd);
+    const homeDir = os.homedir();
+    if (!resolvedCwd.startsWith(homeDir)) {
+      socket.write(
+        JSON.stringify({
+          type: 'error',
+          content:
+            'Error: Security restriction - session cwd must be within the user home directory.',
         }) + '\n',
       );
       socket.write(JSON.stringify({ type: 'end' }) + '\n');
