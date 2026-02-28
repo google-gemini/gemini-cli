@@ -9,15 +9,20 @@ import { renderWithProviders } from '../../../test-utils/render.js';
 import { ThinkingMessage } from './ThinkingMessage.js';
 
 describe('ThinkingMessage', () => {
-  it('renders subject line', async () => {
+  it('renders subject line with vertical rule and "Thinking..." header', async () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ThinkingMessage
         thought={{ subject: 'Planning', description: 'test' }}
+        terminalWidth={80}
+        isFirstThinking={true}
       />,
     );
     await waitUntilReady();
 
-    expect(lastFrame()).toMatchSnapshot();
+    const output = lastFrame();
+    expect(output).toContain(' Thinking...');
+    expect(output).toContain('│');
+    expect(output).toContain('Planning');
     unmount();
   });
 
@@ -25,11 +30,14 @@ describe('ThinkingMessage', () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ThinkingMessage
         thought={{ subject: '', description: 'Processing details' }}
+        terminalWidth={80}
       />,
     );
     await waitUntilReady();
 
-    expect(lastFrame()).toMatchSnapshot();
+    const output = lastFrame();
+    expect(output).toContain('Processing details');
+    expect(output).toContain('│');
     unmount();
   });
 
@@ -40,26 +48,35 @@ describe('ThinkingMessage', () => {
           subject: 'Planning',
           description: 'I am planning the solution.',
         }}
+        terminalWidth={80}
       />,
     );
     await waitUntilReady();
 
-    expect(lastFrame()).toMatchSnapshot();
+    const output = lastFrame();
+    expect(output).toContain('│');
+    expect(output).toContain('Planning');
+    expect(output).toContain('I am planning the solution.');
     unmount();
   });
 
-  it('indents summary line correctly', async () => {
+  it('renders "Thinking..." header when isFirstThinking is true', async () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ThinkingMessage
         thought={{
           subject: 'Summary line',
           description: 'First body line',
         }}
+        terminalWidth={80}
+        isFirstThinking={true}
       />,
     );
     await waitUntilReady();
 
-    expect(lastFrame()).toMatchSnapshot();
+    const output = lastFrame();
+    expect(output).toContain(' Thinking...');
+    expect(output).toContain('Summary line');
+    expect(output).toContain('│');
     unmount();
   });
 
@@ -70,6 +87,7 @@ describe('ThinkingMessage', () => {
           subject: 'Matching the Blocks',
           description: '\\n\\nSome more text',
         }}
+        terminalWidth={80}
       />,
     );
     await waitUntilReady();
@@ -80,7 +98,10 @@ describe('ThinkingMessage', () => {
 
   it('renders empty state gracefully', async () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <ThinkingMessage thought={{ subject: '', description: '' }} />,
+      <ThinkingMessage
+        thought={{ subject: '', description: '' }}
+        terminalWidth={80}
+      />,
     );
     await waitUntilReady();
 

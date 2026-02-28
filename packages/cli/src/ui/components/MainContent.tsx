@@ -65,6 +65,14 @@ export const MainContent = () => {
     () =>
       uiState.history.map((h, index) => {
         const isExpandable = index > lastUserPromptIndex;
+        const isFirstThinking =
+          h.type === 'thinking' &&
+          (index === 0 || uiState.history[index - 1]?.type !== 'thinking');
+        const isLastThinking =
+          h.type === 'thinking' &&
+          (index === uiState.history.length - 1 ||
+            uiState.history[index + 1]?.type !== 'thinking');
+
         return (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
@@ -79,6 +87,8 @@ export const MainContent = () => {
             isPending={false}
             commands={uiState.slashCommands}
             isExpandable={isExpandable}
+            isFirstThinking={isFirstThinking}
+            isLastThinking={isLastThinking}
           />
         );
       }),
@@ -105,18 +115,32 @@ export const MainContent = () => {
   const pendingItems = useMemo(
     () => (
       <Box flexDirection="column">
-        {pendingHistoryItems.map((item, i) => (
-          <HistoryItemDisplay
-            key={i}
-            availableTerminalHeight={
-              uiState.constrainHeight ? staticAreaMaxItemHeight : undefined
-            }
-            terminalWidth={mainAreaWidth}
-            item={{ ...item, id: 0 }}
-            isPending={true}
-            isExpandable={true}
-          />
-        ))}
+        {pendingHistoryItems.map((item, i) => {
+          const isFirstThinking =
+            item.type === 'thinking' &&
+            (i === 0 || pendingHistoryItems[i - 1]?.type !== 'thinking') &&
+            (uiState.history.length === 0 ||
+              uiState.history.at(-1)?.type !== 'thinking');
+          const isLastThinking =
+            item.type === 'thinking' &&
+            (i === pendingHistoryItems.length - 1 ||
+              pendingHistoryItems[i + 1]?.type !== 'thinking');
+
+          return (
+            <HistoryItemDisplay
+              key={i}
+              availableTerminalHeight={
+                uiState.constrainHeight ? staticAreaMaxItemHeight : undefined
+              }
+              terminalWidth={mainAreaWidth}
+              item={{ ...item, id: 0 }}
+              isPending={true}
+              isExpandable={true}
+              isFirstThinking={isFirstThinking}
+              isLastThinking={isLastThinking}
+            />
+          );
+        })}
         {showConfirmationQueue && confirmingTool && (
           <ToolConfirmationQueue confirmingTool={confirmingTool} />
         )}
@@ -129,17 +153,29 @@ export const MainContent = () => {
       mainAreaWidth,
       showConfirmationQueue,
       confirmingTool,
+      uiState.history,
     ],
   );
 
   const virtualizedData = useMemo(
     () => [
       { type: 'header' as const },
-      ...uiState.history.map((item, index) => ({
-        type: 'history' as const,
-        item,
-        isExpandable: index > lastUserPromptIndex,
-      })),
+      ...uiState.history.map((item, index) => {
+        const isFirstThinking =
+          item.type === 'thinking' &&
+          (index === 0 || uiState.history[index - 1]?.type !== 'thinking');
+        const isLastThinking =
+          item.type === 'thinking' &&
+          (index === uiState.history.length - 1 ||
+            uiState.history[index + 1]?.type !== 'thinking');
+        return {
+          type: 'history' as const,
+          item,
+          isExpandable: index > lastUserPromptIndex,
+          isFirstThinking,
+          isLastThinking,
+        };
+      }),
       { type: 'pending' as const },
     ],
     [uiState.history, lastUserPromptIndex],
@@ -170,6 +206,8 @@ export const MainContent = () => {
             isPending={false}
             commands={uiState.slashCommands}
             isExpandable={item.isExpandable}
+            isFirstThinking={item.isFirstThinking}
+            isLastThinking={item.isLastThinking}
           />
         );
       } else {

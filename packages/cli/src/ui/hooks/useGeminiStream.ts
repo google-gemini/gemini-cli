@@ -903,17 +903,14 @@ export const useGeminiStream = (
   );
 
   const handleThoughtEvent = useCallback(
-    (eventValue: ThoughtSummary, userMessageTimestamp: number) => {
+    (eventValue: ThoughtSummary, _userMessageTimestamp: number) => {
       setThought(eventValue);
 
       if (getInlineThinkingMode(settings) === 'full') {
-        addItem(
-          {
-            type: 'thinking',
-            thought: eventValue,
-          } as HistoryItemThinking,
-          userMessageTimestamp,
-        );
+        addItem({
+          type: 'thinking',
+          thought: eventValue,
+        } as HistoryItemThinking);
       }
     },
     [addItem, settings, setThought],
