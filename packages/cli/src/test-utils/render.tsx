@@ -49,7 +49,7 @@ import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
 import { createMockSettings } from './settings.js';
 import { SessionStatsProvider } from '../ui/contexts/SessionContext.js';
 import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
-import { DefaultLight } from '../ui/themes/default-light.js';
+import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
 import { pickDefaultThemeName } from '../ui/themes/theme.js';
 import { generateSvgForTerminal } from './svg.js';
 
