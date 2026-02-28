@@ -24,7 +24,7 @@ exports[`<SessionSummaryDisplay /> > renders the summary display with a title 1`
 │                                                                                                  │
 │  Savings Highlight: 500 (50.0%) of input tokens were served from the cache, reducing costs.      │
 │                                                                                                  │
-│  Tip: Resume a previous session using gemini --resume or /resume                                 │
+│  Tip: Resume this session from any folder with: gemini --resume test-session                     │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
 `;

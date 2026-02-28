@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   SessionSelector,
   extractFirstUserMessage,
@@ -13,7 +13,7 @@ import {
   SessionError,
 } from './sessionUtils.js';
 import type { Config, MessageRecord } from '@google/gemini-cli-core';
-import { SESSION_FILE_PREFIX } from '@google/gemini-cli-core';
+import { SESSION_FILE_PREFIX, Storage } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -514,6 +514,318 @@ describe('SessionSelector', () => {
     // Should only list the main session
     expect(sessions.length).toBe(1);
     expect(sessions[0].id).toBe(mainSessionId);
+  });
+
+  describe('findSessionGlobal', () => {
+    let globalTmpDir: string;
+
+    beforeEach(() => {
+      // Point Storage.getGlobalTempDir to our test temp dir
+      globalTmpDir = path.join(tmpDir, 'global-tmp');
+      vi.spyOn(Storage, 'getGlobalTempDir').mockReturnValue(globalTmpDir);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should find a session across different project directories by UUID', async () => {
+      const sessionId = randomUUID();
+
+      // Create a "different project" directory with a session
+      const otherProjectChatsDir = path.join(
+        globalTmpDir,
+        'other-project',
+        'chats',
+      );
+      await fs.mkdir(otherProjectChatsDir, { recursive: true });
+
+      const session = {
+        sessionId,
+        projectHash: 'other-project-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:30:00.000Z',
+        messages: [
+          {
+            type: 'user',
+            content: 'Hello from another project',
+            id: 'msg1',
+            timestamp: '2024-01-01T10:00:00.000Z',
+          },
+        ],
+      };
+
+      await fs.writeFile(
+        path.join(
+          otherProjectChatsDir,
+          `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+        ),
+        JSON.stringify(session, null, 2),
+      );
+
+      const sessionSelector = new SessionSelector(config);
+      const result = await sessionSelector.findSessionGlobal(sessionId);
+
+      expect(result).not.toBeNull();
+      expect(result!.sessionData.sessionId).toBe(sessionId);
+      expect(result!.sessionData.messages[0].content).toBe(
+        'Hello from another project',
+      );
+      expect(result!.isCrossProject).toBe(true);
+    });
+
+    it('should return null when no matching session is found globally', async () => {
+      // Create a project directory with an unrelated session
+      const otherProjectChatsDir = path.join(
+        globalTmpDir,
+        'other-project',
+        'chats',
+      );
+      await fs.mkdir(otherProjectChatsDir, { recursive: true });
+
+      const otherSessionId = randomUUID();
+      const session = {
+        sessionId: otherSessionId,
+        projectHash: 'other-project-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:30:00.000Z',
+        messages: [
+          {
+            type: 'user',
+            content: 'Unrelated session',
+            id: 'msg1',
+            timestamp: '2024-01-01T10:00:00.000Z',
+          },
+        ],
+      };
+
+      await fs.writeFile(
+        path.join(
+          otherProjectChatsDir,
+          `${SESSION_FILE_PREFIX}2024-01-01T10-00-${otherSessionId.slice(0, 8)}.json`,
+        ),
+        JSON.stringify(session, null, 2),
+      );
+
+      const sessionSelector = new SessionSelector(config);
+      const result = await sessionSelector.findSessionGlobal(randomUUID());
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when global temp dir does not exist', async () => {
+      vi.spyOn(Storage, 'getGlobalTempDir').mockReturnValue(
+        path.join(tmpDir, 'nonexistent-dir'),
+      );
+
+      const sessionSelector = new SessionSelector(config);
+      const result = await sessionSelector.findSessionGlobal(randomUUID());
+
+      expect(result).toBeNull();
+    });
+
+    it('should skip projects without chats directories', async () => {
+      const sessionId = randomUUID();
+
+      // Create a project dir without chats subdirectory
+      const emptyProjectDir = path.join(globalTmpDir, 'empty-project');
+      await fs.mkdir(emptyProjectDir, { recursive: true });
+
+      // Create another project with the session
+      const otherProjectChatsDir = path.join(
+        globalTmpDir,
+        'valid-project',
+        'chats',
+      );
+      await fs.mkdir(otherProjectChatsDir, { recursive: true });
+
+      const session = {
+        sessionId,
+        projectHash: 'valid-project-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:30:00.000Z',
+        messages: [
+          {
+            type: 'user',
+            content: 'Found in valid project',
+            id: 'msg1',
+            timestamp: '2024-01-01T10:00:00.000Z',
+          },
+        ],
+      };
+
+      await fs.writeFile(
+        path.join(
+          otherProjectChatsDir,
+          `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+        ),
+        JSON.stringify(session, null, 2),
+      );
+
+      const sessionSelector = new SessionSelector(config);
+      const result = await sessionSelector.findSessionGlobal(sessionId);
+
+      expect(result).not.toBeNull();
+      expect(result!.sessionData.sessionId).toBe(sessionId);
+    });
+
+    it('should skip corrupted session files', async () => {
+      const sessionId = randomUUID();
+
+      const projectChatsDir = path.join(
+        globalTmpDir,
+        'project-with-corrupted',
+        'chats',
+      );
+      await fs.mkdir(projectChatsDir, { recursive: true });
+
+      // Write a corrupted file
+      await fs.writeFile(
+        path.join(
+          projectChatsDir,
+          `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+        ),
+        'not valid json {{{',
+      );
+
+      const sessionSelector = new SessionSelector(config);
+      const result = await sessionSelector.findSessionGlobal(sessionId);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('resolveSession with cross-project fallback', () => {
+    let globalTmpDir: string;
+
+    beforeEach(() => {
+      globalTmpDir = path.join(tmpDir, 'global-tmp');
+      vi.spyOn(Storage, 'getGlobalTempDir').mockReturnValue(globalTmpDir);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should fall back to global search when UUID not found locally', async () => {
+      const sessionId = randomUUID();
+
+      // Create the local chats dir (empty)
+      const localChatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(localChatsDir, { recursive: true });
+
+      // Create a different project with the target session
+      const otherProjectChatsDir = path.join(
+        globalTmpDir,
+        'other-project',
+        'chats',
+      );
+      await fs.mkdir(otherProjectChatsDir, { recursive: true });
+
+      const session = {
+        sessionId,
+        projectHash: 'other-project-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:30:00.000Z',
+        messages: [
+          {
+            type: 'user',
+            content: 'Cross-project session',
+            id: 'msg1',
+            timestamp: '2024-01-01T10:00:00.000Z',
+          },
+        ],
+      };
+
+      await fs.writeFile(
+        path.join(
+          otherProjectChatsDir,
+          `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+        ),
+        JSON.stringify(session, null, 2),
+      );
+
+      const sessionSelector = new SessionSelector(config);
+      const result = await sessionSelector.resolveSession(sessionId);
+
+      expect(result.sessionData.sessionId).toBe(sessionId);
+      expect(result.isCrossProject).toBe(true);
+    });
+
+    it('should prefer local session over global when UUID exists locally', async () => {
+      const sessionId = randomUUID();
+
+      // Create local chats dir with the session
+      const localChatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(localChatsDir, { recursive: true });
+
+      const localSession = {
+        sessionId,
+        projectHash: 'local-project-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:30:00.000Z',
+        messages: [
+          {
+            type: 'user',
+            content: 'Local session',
+            id: 'msg1',
+            timestamp: '2024-01-01T10:00:00.000Z',
+          },
+        ],
+      };
+
+      await fs.writeFile(
+        path.join(
+          localChatsDir,
+          `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+        ),
+        JSON.stringify(localSession, null, 2),
+      );
+
+      const sessionSelector = new SessionSelector(config);
+      const result = await sessionSelector.resolveSession(sessionId);
+
+      expect(result.sessionData.sessionId).toBe(sessionId);
+      // Should NOT be cross-project since it was found locally
+      expect(result.isCrossProject).toBeUndefined();
+    });
+
+    it('should not fall back to global search for numeric index identifiers', async () => {
+      // Create local chats dir with one session
+      const localChatsDir = path.join(tmpDir, 'chats');
+      await fs.mkdir(localChatsDir, { recursive: true });
+
+      const sessionId = randomUUID();
+      const session = {
+        sessionId,
+        projectHash: 'local-project-hash',
+        startTime: '2024-01-01T10:00:00.000Z',
+        lastUpdated: '2024-01-01T10:30:00.000Z',
+        messages: [
+          {
+            type: 'user',
+            content: 'Only session',
+            id: 'msg1',
+            timestamp: '2024-01-01T10:00:00.000Z',
+          },
+        ],
+      };
+
+      await fs.writeFile(
+        path.join(
+          localChatsDir,
+          `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+        ),
+        JSON.stringify(session, null, 2),
+      );
+
+      const sessionSelector = new SessionSelector(config);
+
+      // Index 999 doesn't exist, should throw without trying global search
+      await expect(sessionSelector.resolveSession('999')).rejects.toThrow(
+        SessionError,
+      );
+    });
   });
 });
 
