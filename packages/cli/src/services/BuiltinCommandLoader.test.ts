@@ -73,7 +73,17 @@ vi.mock('../ui/commands/agentsCommand.js', () => ({
 }));
 vi.mock('../ui/commands/bugCommand.js', () => ({ bugCommand: {} }));
 vi.mock('../ui/commands/chatCommand.js', () => ({
-  chatCommand: { name: 'chat', subCommands: [] },
+  chatCommand: {
+    name: 'chat',
+    subCommands: [
+      { name: 'list' },
+      { name: 'save' },
+      { name: 'resume' },
+      { name: 'delete' },
+      { name: 'share' },
+      { name: 'checkpoints', hidden: true, subCommands: [{ name: 'list' }] },
+    ],
+  },
   debugCommand: { name: 'debug' },
 }));
 vi.mock('../ui/commands/clearCommand.js', () => ({ clearCommand: {} }));
@@ -94,7 +104,19 @@ vi.mock('../ui/commands/modelCommand.js', () => ({
 }));
 vi.mock('../ui/commands/privacyCommand.js', () => ({ privacyCommand: {} }));
 vi.mock('../ui/commands/quitCommand.js', () => ({ quitCommand: {} }));
-vi.mock('../ui/commands/resumeCommand.js', () => ({ resumeCommand: {} }));
+vi.mock('../ui/commands/resumeCommand.js', () => ({
+  resumeCommand: {
+    name: 'resume',
+    subCommands: [
+      { name: 'list' },
+      { name: 'save' },
+      { name: 'resume' },
+      { name: 'delete' },
+      { name: 'share' },
+      { name: 'checkpoints', hidden: true, subCommands: [{ name: 'list' }] },
+    ],
+  },
+}));
 vi.mock('../ui/commands/statsCommand.js', () => ({ statsCommand: {} }));
 vi.mock('../ui/commands/themeCommand.js', () => ({ themeCommand: {} }));
 vi.mock('../ui/commands/toolsCommand.js', () => ({ toolsCommand: {} }));
@@ -256,7 +278,7 @@ describe('BuiltinCommandLoader', () => {
   });
 
   describe('chat debug command', () => {
-    it('should NOT add debug subcommand to chatCommand if not a nightly build', async () => {
+    it('should NOT add debug subcommand to chat/resume commands if not a nightly build', async () => {
       vi.mocked(isNightly).mockResolvedValue(false);
       const loader = new BuiltinCommandLoader(mockConfig);
       const commands = await loader.loadCommands(new AbortController().signal);
@@ -265,9 +287,30 @@ describe('BuiltinCommandLoader', () => {
       expect(chatCmd?.subCommands).toBeDefined();
       const hasDebug = chatCmd!.subCommands!.some((c) => c.name === 'debug');
       expect(hasDebug).toBe(false);
+
+      const resumeCmd = commands.find((c) => c.name === 'resume');
+      const resumeHasDebug =
+        resumeCmd?.subCommands?.some((c) => c.name === 'debug') ?? false;
+      expect(resumeHasDebug).toBe(false);
+
+      const chatCheckpointsCmd = chatCmd?.subCommands?.find(
+        (c) => c.name === 'checkpoints',
+      );
+      const chatCheckpointHasDebug =
+        chatCheckpointsCmd?.subCommands?.some((c) => c.name === 'debug') ??
+        false;
+      expect(chatCheckpointHasDebug).toBe(false);
+
+      const resumeCheckpointsCmd = resumeCmd?.subCommands?.find(
+        (c) => c.name === 'checkpoints',
+      );
+      const resumeCheckpointHasDebug =
+        resumeCheckpointsCmd?.subCommands?.some((c) => c.name === 'debug') ??
+        false;
+      expect(resumeCheckpointHasDebug).toBe(false);
     });
 
-    it('should add debug subcommand to chatCommand if it is a nightly build', async () => {
+    it('should add debug subcommand to chat/resume commands if it is a nightly build', async () => {
       vi.mocked(isNightly).mockResolvedValue(true);
       const loader = new BuiltinCommandLoader(mockConfig);
       const commands = await loader.loadCommands(new AbortController().signal);
@@ -276,6 +319,27 @@ describe('BuiltinCommandLoader', () => {
       expect(chatCmd?.subCommands).toBeDefined();
       const hasDebug = chatCmd!.subCommands!.some((c) => c.name === 'debug');
       expect(hasDebug).toBe(true);
+
+      const resumeCmd = commands.find((c) => c.name === 'resume');
+      const resumeHasDebug =
+        resumeCmd?.subCommands?.some((c) => c.name === 'debug') ?? false;
+      expect(resumeHasDebug).toBe(true);
+
+      const chatCheckpointsCmd = chatCmd?.subCommands?.find(
+        (c) => c.name === 'checkpoints',
+      );
+      const chatCheckpointHasDebug =
+        chatCheckpointsCmd?.subCommands?.some((c) => c.name === 'debug') ??
+        false;
+      expect(chatCheckpointHasDebug).toBe(true);
+
+      const resumeCheckpointsCmd = resumeCmd?.subCommands?.find(
+        (c) => c.name === 'checkpoints',
+      );
+      const resumeCheckpointHasDebug =
+        resumeCheckpointsCmd?.subCommands?.some((c) => c.name === 'debug') ??
+        false;
+      expect(resumeCheckpointHasDebug).toBe(true);
     });
   });
 });

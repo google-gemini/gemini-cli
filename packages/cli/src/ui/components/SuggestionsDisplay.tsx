@@ -14,9 +14,12 @@ import { sanitizeForDisplay } from '../utils/textUtils.js';
 export interface Suggestion {
   label: string;
   value: string;
+  insertValue?: string;
   description?: string;
   matchedIndex?: number;
   commandKind?: CommandKind;
+  sectionTitle?: string;
+  submitValue?: string;
 }
 interface SuggestionsDisplayProps {
   suggestions: Suggestion[];
@@ -86,6 +89,12 @@ export function SuggestionsDisplay({
         const isExpanded = originalIndex === expandedIndex;
         const textColor = isActive ? theme.text.accent : theme.text.secondary;
         const isLong = suggestion.value.length >= MAX_WIDTH;
+        const previousSectionTitle =
+          suggestions[originalIndex - 1]?.sectionTitle;
+        const shouldRenderSectionHeader =
+          mode === 'slash' &&
+          !!suggestion.sectionTitle &&
+          suggestion.sectionTitle !== previousSectionTitle;
         const labelElement = (
           <ExpandableText
             label={suggestion.value}
@@ -97,35 +106,45 @@ export function SuggestionsDisplay({
         );
 
         return (
-          <Box key={`${suggestion.value}-${originalIndex}`} flexDirection="row">
-            <Box
-              {...(mode === 'slash'
-                ? { width: commandColumnWidth, flexShrink: 0 as const }
-                : { flexShrink: 1 as const })}
-            >
-              <Box>
-                {labelElement}
-                {suggestion.commandKind &&
-                  COMMAND_KIND_SUFFIX[suggestion.commandKind] && (
-                    <Text color={textColor}>
-                      {COMMAND_KIND_SUFFIX[suggestion.commandKind]}
-                    </Text>
-                  )}
+          <Box
+            key={`${suggestion.value}-${originalIndex}`}
+            flexDirection="column"
+          >
+            {shouldRenderSectionHeader && (
+              <Text color={theme.text.secondary}>
+                -- {suggestion.sectionTitle} --
+              </Text>
+            )}
+            <Box flexDirection="row">
+              <Box
+                {...(mode === 'slash'
+                  ? { width: commandColumnWidth, flexShrink: 0 as const }
+                  : { flexShrink: 1 as const })}
+              >
+                <Box>
+                  {labelElement}
+                  {suggestion.commandKind &&
+                    COMMAND_KIND_SUFFIX[suggestion.commandKind] && (
+                      <Text color={textColor}>
+                        {COMMAND_KIND_SUFFIX[suggestion.commandKind]}
+                      </Text>
+                    )}
+                </Box>
               </Box>
-            </Box>
 
-            {suggestion.description && (
-              <Box flexGrow={1} paddingLeft={3}>
-                <Text color={textColor} wrap="truncate">
-                  {sanitizeForDisplay(suggestion.description, 100)}
-                </Text>
-              </Box>
-            )}
-            {isActive && isLong && (
-              <Box width={3} flexShrink={0}>
-                <Text color={Colors.Gray}>{isExpanded ? ' ← ' : ' → '}</Text>
-              </Box>
-            )}
+              {suggestion.description && (
+                <Box flexGrow={1} paddingLeft={3}>
+                  <Text color={textColor} wrap="truncate">
+                    {sanitizeForDisplay(suggestion.description, 100)}
+                  </Text>
+                </Box>
+              )}
+              {isActive && isLong && (
+                <Box width={3} flexShrink={0}>
+                  <Text color={Colors.Gray}>{isExpanded ? ' ← ' : ' → '}</Text>
+                </Box>
+              )}
+            </Box>
           </Box>
         );
       })}

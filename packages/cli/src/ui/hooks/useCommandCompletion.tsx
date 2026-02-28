@@ -299,7 +299,7 @@ export function useCommandCompletion({
       }
 
       // Apply space padding for slash commands (needed for subcommands like "/chat list")
-      let suggestionText = suggestion.value;
+      let suggestionText = suggestion.insertValue ?? suggestion.value;
       if (completionMode === CompletionMode.SLASH) {
         // Add leading space if completing a subcommand (cursor is after parent command with no space)
         if (start === end && start > 1 && currentLine[start - 1] !== ' ') {
@@ -348,7 +348,7 @@ export function useCommandCompletion({
       }
 
       // Add space padding for Tab completion (auto-execute gets padding from getCompletedText)
-      let suggestionText = suggestion.value;
+      let suggestionText = suggestion.insertValue ?? suggestion.value;
       if (completionMode === CompletionMode.SLASH) {
         if (
           start === end &&
