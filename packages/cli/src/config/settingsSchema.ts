@@ -694,6 +694,57 @@ const SETTINGS_SCHEMA = {
           'Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.',
         showInDialog: true,
       },
+      compatibility: {
+        type: 'object',
+        label: 'Compatibility',
+        category: 'UI',
+        requiresRestart: true,
+        default: {},
+        description: 'Terminal compatibility overrides.',
+        showInDialog: false,
+        properties: {
+          forceAltBuffer: {
+            type: 'boolean',
+            label: 'Force Alternate Buffer',
+            category: 'UI',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Force enable the alternate screen buffer even in potentially buggy terminals. Can also be controlled via the `GEMINI_CLI_FORCE_ALT_BUFFER=1` environment variable.',
+            showInDialog: true,
+          },
+          disableAltBuffer: {
+            type: 'boolean',
+            label: 'Disable Alternate Buffer',
+            category: 'UI',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Disable the alternate screen buffer globally. Can also be controlled via the `GEMINI_CLI_DISABLE_ALT_BUFFER=1` environment variable.',
+            showInDialog: true,
+          },
+          disableMouse: {
+            type: 'boolean',
+            label: 'Disable Mouse Support',
+            category: 'UI',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Disable mouse event tracking. Can also be controlled via the `GEMINI_CLI_DISABLE_MOUSE=1` environment variable.',
+            showInDialog: true,
+          },
+          assumeTrustedTerminal: {
+            type: 'boolean',
+            label: 'Assume Trusted Terminal',
+            category: 'UI',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Assume the terminal is fully capable and skip capability fallbacks. Can also be controlled via the `GEMINI_CLI_ASSUME_TRUSTED_TERMINAL=1` environment variable.',
+            showInDialog: true,
+          },
+        },
+      },
       showSpinner: {
         type: 'boolean',
         label: 'Show Spinner',

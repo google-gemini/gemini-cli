@@ -421,6 +421,44 @@
           "default": true,
           "type": "boolean"
         },
+        "compatibility": {
+          "title": "Compatibility",
+          "description": "Terminal compatibility overrides.",
+          "markdownDescription": "Terminal compatibility overrides.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "forceAltBuffer": {
+              "title": "Force Alternate Buffer",
+              "description": "Force enable the alternate screen buffer even in potentially buggy terminals. Can also be controlled via the `GEMINI_CLI_FORCE_ALT_BUFFER=1` environment variable.",
+              "markdownDescription": "Force enable the alternate screen buffer even in potentially buggy terminals. Can also be controlled via the `GEMINI_CLI_FORCE_ALT_BUFFER=1` environment variable.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "disableAltBuffer": {
+              "title": "Disable Alternate Buffer",
+              "description": "Disable the alternate screen buffer globally. Can also be controlled via the `GEMINI_CLI_DISABLE_ALT_BUFFER=1` environment variable.",
+              "markdownDescription": "Disable the alternate screen buffer globally. Can also be controlled via the `GEMINI_CLI_DISABLE_ALT_BUFFER=1` environment variable.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "disableMouse": {
+              "title": "Disable Mouse Support",
+              "description": "Disable mouse event tracking. Can also be controlled via the `GEMINI_CLI_DISABLE_MOUSE=1` environment variable.",
+              "markdownDescription": "Disable mouse event tracking. Can also be controlled via the `GEMINI_CLI_DISABLE_MOUSE=1` environment variable.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "assumeTrustedTerminal": {
+              "title": "Assume Trusted Terminal",
+              "description": "Assume the terminal is fully capable and skip capability fallbacks. Can also be controlled via the `GEMINI_CLI_ASSUME_TRUSTED_TERMINAL=1` environment variable.",
+              "markdownDescription": "Assume the terminal is fully capable and skip capability fallbacks. Can also be controlled via the `GEMINI_CLI_ASSUME_TRUSTED_TERMINAL=1` environment variable.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "showSpinner": {
           "title": "Show Spinner",
           "description": "Show the spinner during operations.",

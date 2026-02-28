@@ -12,6 +12,7 @@ import {
   getCompatibilityWarnings,
   WarningPriority,
   type StartupWarning,
+  type TerminalEnvironment,
 } from '@google/gemini-cli-core';
 import type { Settings } from '../config/settingsSchema.js';
 import {
@@ -88,7 +89,7 @@ const WARNING_CHECKS: readonly WarningCheck[] = [
 export async function getUserStartupWarnings(
   settings: Settings,
   workspaceRoot: string = process.cwd(),
-  options?: { isAlternateBuffer?: boolean },
+  options?: { isAlternateBuffer?: boolean; termEnv?: TerminalEnvironment },
 ): Promise<StartupWarning[]> {
   const results = await Promise.all(
     WARNING_CHECKS.map(async (check) => {
@@ -109,6 +110,7 @@ export async function getUserStartupWarnings(
     warnings.push(
       ...getCompatibilityWarnings({
         isAlternateBuffer: options?.isAlternateBuffer,
+        termEnv: options?.termEnv,
       }),
     );
   }

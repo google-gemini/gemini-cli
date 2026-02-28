@@ -312,6 +312,32 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`ui.compatibility.forceAltBuffer`** (boolean):
+  - **Description:** Force enable the alternate screen buffer even in
+    potentially buggy terminals. Can also be controlled via the
+    `GEMINI_CLI_FORCE_ALT_BUFFER=1` environment variable.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`ui.compatibility.disableAltBuffer`** (boolean):
+  - **Description:** Disable the alternate screen buffer globally. Can also be
+    controlled via the `GEMINI_CLI_DISABLE_ALT_BUFFER=1` environment variable.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`ui.compatibility.disableMouse`** (boolean):
+  - **Description:** Disable mouse event tracking. Can also be controlled via
+    the `GEMINI_CLI_DISABLE_MOUSE=1` environment variable.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`ui.compatibility.assumeTrustedTerminal`** (boolean):
+  - **Description:** Assume the terminal is fully capable and skip capability
+    fallbacks. Can also be controlled via the
+    `GEMINI_CLI_ASSUME_TRUSTED_TERMINAL=1` environment variable.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`ui.showSpinner`** (boolean):
   - **Description:** Show the spinner during operations.
   - **Default:** `true`
@@ -1451,6 +1477,22 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`CODE_ASSIST_ENDPOINT`**:
   - Specifies the endpoint for the code assist server.
   - This is useful for development and testing.
+
+- **`GEMINI_CLI_FORCE_ALT_BUFFER`**:
+  - Force enable the alternate screen buffer, even in potentially buggy
+    environments (like JetBrains/IntelliJ terminals).
+  - Example: `export GEMINI_CLI_FORCE_ALT_BUFFER=1`
+- **`GEMINI_CLI_DISABLE_ALT_BUFFER`**:
+  - Disable the alternate screen buffer globally.
+  - Example: `export GEMINI_CLI_DISABLE_ALT_BUFFER=1`
+- **`GEMINI_CLI_DISABLE_MOUSE`**:
+  - Disable mouse event tracking. Useful for terminals with unreliable mouse
+    support (like Windows Terminal on Windows 10).
+  - Example: `export GEMINI_CLI_DISABLE_MOUSE=1`
+- **`GEMINI_CLI_ASSUME_TRUSTED_TERMINAL`**:
+  - Assume the terminal is fully capable and skip all automatic capability
+    fallbacks.
+  - Example: `export GEMINI_CLI_ASSUME_TRUSTED_TERMINAL=1`
 
 ### Environment variable redaction
 

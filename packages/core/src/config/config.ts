@@ -579,6 +579,12 @@ export interface ConfigParameters {
   billing?: {
     overageStrategy?: OverageStrategy;
   };
+  uiCompatibility?: {
+    forceAltBuffer?: boolean;
+    disableAltBuffer?: boolean;
+    disableMouse?: boolean;
+    assumeTrustedTerminal?: boolean;
+  };
 }
 
 export class Config implements McpContext {
@@ -607,6 +613,12 @@ export class Config implements McpContext {
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
   readonly enableConseca: boolean;
+  private readonly uiCompatibility: {
+    forceAltBuffer?: boolean;
+    disableAltBuffer?: boolean;
+    disableMouse?: boolean;
+    assumeTrustedTerminal?: boolean;
+  };
 
   private readonly coreTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
@@ -799,6 +811,7 @@ export class Config implements McpContext {
     this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
     this.question = params.question;
+    this.uiCompatibility = params.uiCompatibility ?? {};
 
     this.coreTools = params.coreTools;
     this.allowedTools = params.allowedTools;
@@ -1328,6 +1341,10 @@ export class Config implements McpContext {
 
   getLatestApiRequest(): GenerateContentParameters | undefined {
     return this.latestApiRequest;
+  }
+
+  getUiCompatibility() {
+    return this.uiCompatibility;
   }
 
   setLatestApiRequest(req: GenerateContentParameters): void {

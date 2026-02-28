@@ -14,14 +14,12 @@ import {
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import type {
-  Config,
-  ExtensionsStartingEvent,
-  ExtensionsStoppingEvent,
-  ToolCallConfirmationDetails,
-  AgentDefinition,
-} from '@google/gemini-cli-core';
 import {
+  type Config,
+  type ExtensionsStartingEvent,
+  type ExtensionsStoppingEvent,
+  type ToolCallConfirmationDetails,
+  type AgentDefinition,
   GitService,
   Logger,
   logSlashCommand,
@@ -35,6 +33,9 @@ import {
   removeMCPStatusChangeListener,
   MCPDiscoveryState,
   CoreToolCallStatus,
+  clearScreen,
+  clearScrollback,
+  type TerminalCapabilities,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
@@ -105,6 +106,7 @@ export const useSlashCommandProcessor = (
   isConfigInitialized: boolean,
   setBannerVisible: (visible: boolean) => void,
   setCustomDialog: (dialog: React.ReactNode | null) => void,
+  terminalCapabilities: TerminalCapabilities,
 ) => {
   const session = useSessionStats();
   const [commands, setCommands] = useState<readonly SlashCommand[] | undefined>(
@@ -219,6 +221,10 @@ export const useSlashCommandProcessor = (
           clearItems();
           refreshStatic();
           setBannerVisible(false);
+          clearScreen();
+          if (terminalCapabilities.supportsReliableBackbufferClear) {
+            clearScrollback();
+          }
         },
         loadHistory: (history, postLoadInput) => {
           loadHistory(history);
@@ -269,6 +275,7 @@ export const useSlashCommandProcessor = (
       extensionsUpdateState,
       setBannerVisible,
       setCustomDialog,
+      terminalCapabilities.supportsReliableBackbufferClear,
     ],
   );
 

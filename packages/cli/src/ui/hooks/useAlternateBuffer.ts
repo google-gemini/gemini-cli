@@ -1,17 +1,43 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import { useConfig } from '../contexts/ConfigContext.js';
-import type { Config } from '@google/gemini-cli-core';
+import type { Config, TerminalCapabilities } from '@google/gemini-cli-core';
+import {
+  detectTerminalEnvironment,
+  getTerminalCapabilities,
+} from '@google/gemini-cli-core';
+import { useTerminalCapabilities } from './useTerminalCapabilities.js';
 
-export const isAlternateBufferEnabled = (config: Config): boolean =>
-  config.getUseAlternateBuffer();
+/**
+ * Returns true if the alternate buffer should be used according to config
+ * and terminal capabilities.
+ */
+export const isAlternateBufferEnabled = (
+  config: Config,
+  capabilities?: TerminalCapabilities,
+): boolean => {
+  const compatibility = config.getUiCompatibility();
+  const caps =
+    capabilities ??
+    getTerminalCapabilities(detectTerminalEnvironment(), process.env, {
+      forceAltBuffer: compatibility?.forceAltBuffer,
+      disableAltBuffer: compatibility?.disableAltBuffer,
+      disableMouse: compatibility?.disableMouse,
+      assumeTrustedTerminal: compatibility?.assumeTrustedTerminal,
+    }).capabilities;
 
-// This is read from Config so that the UI reads the same value per application session
+  return config.getUseAlternateBuffer() && caps.supportsAltBuffer;
+};
+
+/**
+ * Hook to determine if the alternate buffer is enabled.
+ */
 export const useAlternateBuffer = (): boolean => {
   const config = useConfig();
-  return isAlternateBufferEnabled(config);
+  const capabilities = useTerminalCapabilities();
+  return isAlternateBufferEnabled(config, capabilities);
 };

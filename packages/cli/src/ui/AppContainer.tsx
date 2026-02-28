@@ -96,12 +96,14 @@ import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { useModelCommand } from './hooks/useModelCommand.js';
+import { useTerminalCapabilities } from './hooks/useTerminalCapabilities.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import {
   useOverflowActions,
   useOverflowState,
 } from './contexts/OverflowContext.js';
+import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
@@ -230,7 +232,7 @@ export const AppContainer = (props: AppContainerProps) => {
   });
 
   useMemoryMonitor(historyManager);
-  const isAlternateBuffer = config.getUseAlternateBuffer();
+  const isAlternateBuffer = useAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
   const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
@@ -550,7 +552,10 @@ export const AppContainer = (props: AppContainerProps) => {
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();
 
-  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, config);
+  const mainAreaWidth = calculateMainAreaWidth(
+    terminalWidth,
+    isAlternateBuffer,
+  );
   // Derive widths for InputPrompt using shared helper
   const { inputWidth, suggestionsWidth } = useMemo(() => {
     const { inputWidth, suggestionsWidth } =
@@ -945,6 +950,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
+  const terminalCapabilities = useTerminalCapabilities();
+
   const {
     handleSlashCommand,
     slashCommands,
@@ -965,6 +972,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isConfigInitialized,
     setBannerVisible,
     setCustomDialog,
+    terminalCapabilities,
   );
 
   const [authConsentRequest, setAuthConsentRequest] =
@@ -1623,6 +1631,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     refreshStatic,
     setForceRerenderKey,
     shouldUseAlternateScreen,
+    terminalCapabilities,
   });
 
   useEffect(() => {

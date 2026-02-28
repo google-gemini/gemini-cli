@@ -24,6 +24,7 @@ import {
   makeFakeConfig,
   coreEvents,
   CoreEvent,
+  type TerminalCapabilities,
 } from '@google/gemini-cli-core';
 import { SlashCommandConflictHandler } from '../../services/SlashCommandConflictHandler.js';
 
@@ -57,6 +58,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...original,
     logSlashCommand,
+    clearScreen: vi.fn(),
+    clearScrollback: vi.fn(),
     getIdeInstaller: vi.fn().mockReturnValue(null),
     IdeClient: {
       getInstance: mockIdeClientGetInstance,
@@ -245,6 +248,11 @@ describe('useSlashCommandProcessor', () => {
           true, // isConfigInitialized
           vi.fn(), // setBannerVisible
           vi.fn(), // setCustomDialog
+          {
+            supportsAltBuffer: true,
+            supportsMouse: true,
+            supportsReliableBackbufferClear: true,
+          } satisfies TerminalCapabilities,
         ),
       );
       result = hook.result;

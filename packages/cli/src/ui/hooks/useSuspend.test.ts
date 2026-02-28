@@ -17,11 +17,12 @@ import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useSuspend } from './useSuspend.js';
 import {
-  writeToStdout,
   disableMouseEvents,
   enableMouseEvents,
   enterAlternateScreen,
   exitAlternateScreen,
+  clearScreen,
+  clearScrollback,
   enableLineWrapping,
   disableLineWrapping,
 } from '@google/gemini-cli-core';
@@ -39,6 +40,8 @@ vi.mock('@google/gemini-cli-core', async () => {
     enableMouseEvents: vi.fn(),
     enterAlternateScreen: vi.fn(),
     exitAlternateScreen: vi.fn(),
+    clearScreen: vi.fn(),
+    clearScrollback: vi.fn(),
     enableLineWrapping: vi.fn(),
     disableLineWrapping: vi.fn(),
   };
@@ -76,6 +79,7 @@ describe('useSuspend', () => {
     vi.useRealTimers();
     killSpy.mockRestore();
     setPlatform(originalPlatform);
+    vi.restoreAllMocks();
   });
 
   it('cleans terminal state on suspend and restores/repaints on resume in alternate screen mode', () => {
@@ -93,6 +97,7 @@ describe('useSuspend', () => {
         refreshStatic,
         setForceRerenderKey,
         shouldUseAlternateScreen: true,
+        terminalCapabilities: { supportsReliableBackbufferClear: true },
       }),
     );
 
@@ -109,7 +114,8 @@ describe('useSuspend', () => {
 
     expect(exitAlternateScreen).toHaveBeenCalledTimes(1);
     expect(enableLineWrapping).toHaveBeenCalledTimes(1);
-    expect(writeToStdout).toHaveBeenCalledWith('\x1b[2J\x1b[H');
+    expect(clearScreen).toHaveBeenCalledTimes(1);
+    expect(clearScrollback).toHaveBeenCalledTimes(1);
     expect(disableMouseEvents).toHaveBeenCalledTimes(1);
     expect(cleanupTerminalOnExit).toHaveBeenCalledTimes(1);
     expect(setRawMode).toHaveBeenCalledWith(false);
@@ -122,6 +128,8 @@ describe('useSuspend', () => {
 
     expect(enterAlternateScreen).toHaveBeenCalledTimes(1);
     expect(disableLineWrapping).toHaveBeenCalledTimes(1);
+    expect(clearScreen).toHaveBeenCalledTimes(2); // One on suspend, one on resume
+    expect(clearScrollback).toHaveBeenCalledTimes(2);
     expect(enableSupportedModes).toHaveBeenCalledTimes(1);
     expect(enableMouseEvents).toHaveBeenCalledTimes(1);
     expect(setRawMode).toHaveBeenCalledWith(true);
@@ -144,6 +152,7 @@ describe('useSuspend', () => {
         refreshStatic,
         setForceRerenderKey,
         shouldUseAlternateScreen: false,
+        terminalCapabilities: { supportsReliableBackbufferClear: true },
       }),
     );
 
@@ -178,6 +187,7 @@ describe('useSuspend', () => {
         refreshStatic,
         setForceRerenderKey,
         shouldUseAlternateScreen: true,
+        terminalCapabilities: { supportsReliableBackbufferClear: true },
       }),
     );
 

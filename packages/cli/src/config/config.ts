@@ -882,6 +882,7 @@ export async function loadCliConfig(
       };
     },
     enableConseca: settings.security?.enableConseca,
+    uiCompatibility: settings.ui?.compatibility,
   });
 }
 
