@@ -9,7 +9,7 @@ import { aboutCommand } from './aboutCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
-import { IdeClient, getVersion } from '@google/gemini-cli-core';
+import { AuthType, IdeClient, getVersion } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -24,6 +24,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     UserAccountManager: vi.fn().mockImplementation(() => ({
       getCachedGoogleAccount: vi.fn().mockReturnValue('test-email@example.com'),
     })),
+    getCodeAssistServer: vi.fn().mockReturnValue({
+      projectId: 'server-gcp-project',
+    }),
     getVersion: vi.fn(),
   };
 });
@@ -45,7 +48,7 @@ describe('aboutCommand', () => {
           merged: {
             security: {
               auth: {
-                selectedType: 'test-auth',
+                selectedType: AuthType.USE_VERTEX_AI,
               },
             },
           },
@@ -94,7 +97,7 @@ describe('aboutCommand', () => {
       osVersion: 'test-os',
       sandboxEnv: 'no sandbox',
       modelVersion: 'test-model',
-      selectedAuthType: 'test-auth',
+      selectedAuthType: AuthType.USE_VERTEX_AI,
       gcpProject: 'test-gcp-project',
       ideClient: 'test-ide',
       userEmail: 'test-email@example.com',
@@ -152,7 +155,7 @@ describe('aboutCommand', () => {
         osVersion: 'test-os',
         sandboxEnv: 'no sandbox',
         modelVersion: 'test-model',
-        selectedAuthType: 'test-auth',
+        selectedAuthType: AuthType.USE_VERTEX_AI,
         gcpProject: 'test-gcp-project',
         ideClient: '',
       }),
@@ -172,6 +175,23 @@ describe('aboutCommand', () => {
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
         tier: 'Enterprise Tier',
+      }),
+    );
+  });
+
+  it('should show the active Code Assist project for OAuth auth types', async () => {
+    mockContext.services.settings.merged.security.auth.selectedType =
+      AuthType.LOGIN_WITH_GOOGLE;
+    if (!aboutCommand.action) {
+      throw new Error('The about command must have an action.');
+    }
+
+    await aboutCommand.action(mockContext, '');
+
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedAuthType: AuthType.LOGIN_WITH_GOOGLE,
+        gcpProject: 'server-gcp-project',
       }),
     );
   });
