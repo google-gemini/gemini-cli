@@ -28,6 +28,7 @@ export interface ExtensionConfig {
   contextFileName?: string | string[];
   excludeTools?: string[];
   settings?: ExtensionSetting[];
+  contributions?: Record<string, unknown>;
   /**
    * Custom themes contributed by this extension.
    * These themes will be registered when the extension is activated.

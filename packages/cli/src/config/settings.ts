@@ -251,21 +251,38 @@ export function mergeSettings(
   user: Settings,
   workspace: Settings,
   isTrusted: boolean,
+  extensionSettings: Settings[] = [],
 ): MergedSettings {
   const safeWorkspace = isTrusted ? workspace : ({} as Settings);
   const schemaDefaults = getDefaultsFromSchema();
 
+  // Filter extension settings to only allow safe keys
+  const safeExtensionSettings = extensionSettings.map((s) => ({
+    general: s.general,
+    ui: s.ui,
+    context: s.context,
+    tools: s.tools,
+    model: s.model,
+    modelConfigs: s.modelConfigs,
+    agents: s.agents,
+    skills: s.skills,
+    hooks: s.hooks,
+    hooksConfig: s.hooksConfig,
+  }));
+
   // Settings are merged with the following precedence (last one wins for
   // single values):
   // 1. Schema Defaults (Built-in)
-  // 2. System Defaults
-  // 3. User Settings
-  // 4. Workspace Settings
-  // 5. System Settings (as overrides)
+  // 2. Extension Contributions
+  // 3. System Defaults
+  // 4. User Settings
+  // 5. Workspace Settings
+  // 6. System Settings (as overrides)
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return customDeepMerge(
     getMergeStrategyForPath,
     schemaDefaults,
+    ...safeExtensionSettings,
     systemDefaults,
     user,
     safeWorkspace,
