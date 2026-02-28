@@ -619,6 +619,20 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the footer from the UI',
         showInDialog: true,
       },
+      newFooterLayout: {
+        type: 'enum',
+        label: 'New Footer Layout',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'legacy',
+        description: 'Use the new 2-row layout with inline tips.',
+        showInDialog: true,
+        options: [
+          { value: 'legacy', label: 'Legacy' },
+          { value: 'new', label: 'New Layout' },
+          { value: 'new_divider_down', label: 'New Layout (Divider Down)' },
+        ],
+      },
       showMemoryUsage: {
         type: 'boolean',
         label: 'Show Memory Usage',
@@ -708,7 +722,7 @@ const SETTINGS_SCHEMA = {
         label: 'Loading Phrases',
         category: 'UI',
         requiresRestart: false,
-        default: 'tips',
+        default: 'all',
         description:
           'What to show while the model is working: tips, witty comments, both, or nothing.',
         showInDialog: true,

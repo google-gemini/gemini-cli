@@ -1365,7 +1365,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !isResuming &&
     !!slashCommands &&
     (streamingState === StreamingState.Idle ||
-      streamingState === StreamingState.Responding) &&
+      streamingState === StreamingState.Responding ||
+      streamingState === StreamingState.WaitingForConfirmation) &&
     !proQuotaRequest;
 
   const [controlsHeight, setControlsHeight] = useState(0);
