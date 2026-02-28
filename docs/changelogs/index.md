@@ -18,6 +18,51 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.32.0-preview.0 - 2026-02-27
+
+- **Plan Mode Enhancements:** Added support for modifying plans in external
+  editors and adaptive workflows that adjust based on task complexity
+  ([#20348](https://github.com/google-gemini/gemini-cli/pull/20348) by @jerop,
+  [#20465](https://github.com/google-gemini/gemini-cli/pull/20465) by @Adib234).
+- **Agent and Core Engine:** Enabled the generalist agent for broader task
+  handling and introduced `Kind.Agent` for sub-agent classification
+  ([#19665](https://github.com/google-gemini/gemini-cli/pull/19665) by
+  @gsquared94, [#20369](https://github.com/google-gemini/gemini-cli/pull/20369)
+  by @jerop).
+- **CLI & User Experience:** Introduced interactive shell autocompletion,
+  parallel loading of extensions, and new low/full error verbosity modes for
+  cleaner UI reporting
+  ([#20082](https://github.com/google-gemini/gemini-cli/pull/20082) by
+  @scidomino, [#20229](https://github.com/google-gemini/gemini-cli/pull/20229)
+  by @galz10).
+- **Stability and Bug Fixes:** Resolved an issue where orphaned processes could
+  consume 100% CPU and improved retry logic for Code Assist API calls
+  ([#16965](https://github.com/google-gemini/gemini-cli/pull/16965) by @braddux,
+  [#19949](https://github.com/google-gemini/gemini-cli/pull/19949) by
+  @sehoon38).
+
+## Announcements: v0.31.0 - 2026-02-27
+
+- **Models & Agents:** Support for Gemini 3.1 Pro Preview and the introduction
+  of an experimental browser agent for web-based tasks
+  ([#19676](https://github.com/google-gemini/gemini-cli/pull/19676) by
+  @sehoon38, [#19284](https://github.com/google-gemini/gemini-cli/pull/19284) by
+  @gsquared94).
+- **Policy Engine Updates:** Project-level policy support, MCP server wildcard
+  support, and tool annotation matching in the policy engine
+  ([#18682](https://github.com/google-gemini/gemini-cli/pull/18682) by
+  @Abhijit-2592,
+  [#20024](https://github.com/google-gemini/gemini-cli/pull/20024) by @jerop).
+- **Web Capabilities:** Implemented a new direct web fetch tool with built-in
+  rate limiting to mitigate DDoS risks via prompt injection
+  ([#19557](https://github.com/google-gemini/gemini-cli/pull/19557) by @mbleigh,
+  [#19567](https://github.com/google-gemini/gemini-cli/pull/19567) by
+  @mattKorwel).
+- **Plan Mode Enhancements:** Added support for automatic model switching,
+  configuring custom plan storage, and post-execution work summaries
+  ([#20240](https://github.com/google-gemini/gemini-cli/pull/20240) by @jerop,
+  [#19577](https://github.com/google-gemini/gemini-cli/pull/19577) by @jerop).
+
 ## Announcements: v0.30.0 - 2026-02-25
 
 - **SDK & Custom Skills:** Introduced the initial SDK package, enabling dynamic
