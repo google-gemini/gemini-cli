@@ -727,10 +727,37 @@ better discoverability of features:
   wit). This provides a more even distribution of content while Gemini is
   processing.
 
-### 3. Concise System Copy
+---
 
-- **Pause State:** Now displays as `⏸ Awaiting user approval...` (using the
-  unicode symbol) rather than `[Paused]`.
-- **Shell Focus Hint:** The long interactive shell toast has been shortened to
-  `! Shell awaiting input (Tab to focus)` for better readability and less row
-  collision.
+## 12. Testing Summary & Final Feedback
+
+The implementation has been verified through targeted unit tests and manual code
+review against the updated specification.
+
+### Final Layout Behavior
+
+- **Setting:** Toggle via `/settings` -> `UI` -> `New Footer Layout`.
+- **Divider Options:**
+  - `New Layout`: Divider above everything.
+  - `New Layout (Divider Down)`: Divider between status and indicators.
+- **Input State:** Drafted text remains visible during tool approval; the input
+  box is greyed out and focus is removed.
+- **Toasts:** Claims 100% width, left-aligned, prominent warning color.
+  Overrides ambient tips.
+- **Hooks:** Uses `↪` (Before) / `↩` (After) icons. Text is white and italic.
+- **Responsive:**
+  - Tips/Wit disappear on narrow windows or if they collide with long statuses.
+  - Status text wraps onto multiple lines only when the window is narrow.
+- **Cleaning:** No more `💬` or `⏸️` emojis. No more empty line at the bottom of
+  the footer.
+
+### Identified Gaps / Future Triage
+
+- [ ] **Shortcut Hint Discoverability:** On very narrow windows, the
+      `? for shortcuts` hint is completely hidden. Users might forget the hotkey
+      if they rely on the visual hint.
+- [ ] **Ambient Truncation:** Ambient tips are currently all-or-nothing (either
+      shown or hidden). Partial truncation might allow them to persist longer on
+      medium-width windows.
+- [x] **Empty Footer Line:** Verified removed via `paddingBottom={0}` in both
+      `Footer.tsx` and `DefaultAppLayout.tsx`.
