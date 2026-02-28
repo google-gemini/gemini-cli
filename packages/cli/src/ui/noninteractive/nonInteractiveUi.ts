@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { CommandContext } from '../commands/types.js';
+import type { CommandContext, LastOutput } from '../commands/types.js';
 import type { ExtensionUpdateAction } from '../state/extensions.js';
 
 /**
@@ -43,5 +43,7 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     removeComponent: () => {},
     toggleBackgroundShell: () => {},
     toggleShortcutsHelp: () => {},
+    getLastOutput: () => undefined,
+    setLastOutput: (_output: LastOutput | undefined) => {},
   };
 }

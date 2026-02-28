@@ -8,6 +8,7 @@ import {
   useCallback,
   useMemo,
   useEffect,
+  useRef,
   useState,
   createElement,
 } from 'react';
@@ -47,7 +48,11 @@ import type {
 } from '../types.js';
 import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
-import { type CommandContext, type SlashCommand } from '../commands/types.js';
+import {
+  type CommandContext,
+  type SlashCommand,
+  type LastOutput,
+} from '../commands/types.js';
 import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
@@ -143,6 +148,10 @@ export const useSlashCommandProcessor = (
   const [pendingItem, setPendingItem] = useState<HistoryItemWithoutId | null>(
     null,
   );
+
+  // Tracks the most recent visible output (either from a slash command or an AI
+  // response) so that /copy can accurately capture the latest information.
+  const lastOutputRef = useRef<LastOutput | undefined>(undefined);
 
   const pendingHistoryItems = useMemo(() => {
     const items: HistoryItemWithoutId[] = [];
@@ -243,6 +252,19 @@ export const useSlashCommandProcessor = (
         removeComponent: () => setCustomDialog(null),
         toggleBackgroundShell: actions.toggleBackgroundShell,
         toggleShortcutsHelp: actions.toggleShortcutsHelp,
+        getLastOutput: () => lastOutputRef.current,
+        setLastOutput: (output: LastOutput | undefined) => {
+          if (!output) {
+            lastOutputRef.current = undefined;
+            return;
+          }
+          const trimmed = output.content.trim();
+          if (trimmed) {
+            lastOutputRef.current = { content: trimmed };
+          } else {
+            lastOutputRef.current = undefined;
+          }
+        },
       },
       session: {
         stats: session.stats,
@@ -447,6 +469,10 @@ export const useSlashCommandProcessor = (
                     toolArgs: result.toolArgs,
                   };
                 case 'message':
+                  // Store the output text so /copy can retrieve it later.
+                  commandContext.ui.setLastOutput({
+                    content: result.content,
+                  });
                   addItem(
                     {
                       type:

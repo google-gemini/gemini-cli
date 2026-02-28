@@ -6,7 +6,12 @@
 
 import { debugLogger } from '@google/gemini-cli-core';
 import { copyToClipboard } from '../utils/commandUtils.js';
-import type { SlashCommand, SlashCommandActionReturn } from './types.js';
+import type {
+  SlashCommand,
+  SlashCommandActionReturn,
+  CommandContext,
+  LastOutput,
+} from './types.js';
 import { CommandKind } from './types.js';
 
 export const copyCommand: SlashCommand = {
@@ -14,53 +19,38 @@ export const copyCommand: SlashCommand = {
   description: 'Copy the last result or code snippet to clipboard',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: async (context, _args): Promise<SlashCommandActionReturn | void> => {
-    const chat = context.services.config?.getGeminiClient()?.getChat();
-    const history = chat?.getHistory();
+  action: async (
+    context: CommandContext,
+    _args: string,
+  ): Promise<SlashCommandActionReturn | void> => {
+    const lastOutput: LastOutput | undefined = context.ui.getLastOutput();
+    const textToCopy = lastOutput?.content;
 
-    // Get the last message from the AI (model role)
-    const lastAiMessage = history
-      ? history.filter((item) => item.role === 'model').pop()
-      : undefined;
-
-    if (!lastAiMessage) {
+    if (!textToCopy) {
       return {
         type: 'message',
         messageType: 'info',
         content: 'No output in history',
       };
     }
-    // Extract text from the parts
-    const lastAiOutput = lastAiMessage.parts
-      ?.filter((part) => part.text)
-      .map((part) => part.text)
-      .join('');
 
-    if (lastAiOutput) {
-      try {
-        const settings = context.services.settings.merged;
-        await copyToClipboard(lastAiOutput, settings);
+    try {
+      const settings = context.services.settings.merged;
+      await copyToClipboard(textToCopy, settings);
 
-        return {
-          type: 'message',
-          messageType: 'info',
-          content: 'Last output copied to the clipboard',
-        };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        debugLogger.debug(message);
-
-        return {
-          type: 'message',
-          messageType: 'error',
-          content: `Failed to copy to the clipboard. ${message}`,
-        };
-      }
-    } else {
       return {
         type: 'message',
         messageType: 'info',
-        content: 'Last AI output contains no text to copy.',
+        content: 'Last output copied to the clipboard',
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      debugLogger.debug(message);
+
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Failed to copy to the clipboard. ${message}`,
       };
     }
   },
