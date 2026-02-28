@@ -112,7 +112,7 @@ describe('agentsCommand', () => {
     });
 
     const refreshCommand = agentsCommand.subCommands?.find(
-      (cmd) => cmd.name === 'refresh',
+      (cmd) => cmd.name === 'reload',
     );
     expect(refreshCommand).toBeDefined();
 
@@ -130,7 +130,7 @@ describe('agentsCommand', () => {
     mockConfig.getAgentRegistry = vi.fn().mockReturnValue(undefined);
 
     const refreshCommand = agentsCommand.subCommands?.find(
-      (cmd) => cmd.name === 'refresh',
+      (cmd) => cmd.name === 'reload',
     );
     const result = await refreshCommand!.action!(mockContext, '');
 

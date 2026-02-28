@@ -323,8 +323,8 @@ const configCommand: SlashCommand = {
 };
 
 const agentsRefreshCommand: SlashCommand = {
-  name: 'refresh',
-  altNames: ['reload'],
+  name: 'reload',
+  altNames: ['refresh'],
   description: 'Reload the agent registry',
   kind: CommandKind.BUILT_IN,
   action: async (context: CommandContext) => {
