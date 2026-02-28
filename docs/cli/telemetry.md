@@ -103,12 +103,31 @@ Before using either method below, complete these steps:
 
 1. Set your Google Cloud project ID:
    - For telemetry in a separate project from inference:
+
+     **macOS/Linux**
+
      ```bash
      export OTLP_GOOGLE_CLOUD_PROJECT="your-telemetry-project-id"
      ```
+
+     **Windows (PowerShell)**
+
+     ```powershell
+     $env:OTLP_GOOGLE_CLOUD_PROJECT="your-telemetry-project-id"
+     ```
+
    - For telemetry in the same project as inference:
+
+     **macOS/Linux**
+
      ```bash
      export GOOGLE_CLOUD_PROJECT="your-project-id"
+     ```
+
+     **Windows (PowerShell)**
+
+     ```powershell
+     $env:GOOGLE_CLOUD_PROJECT="your-project-id"
      ```
 
 2. Authenticate with Google Cloud:
@@ -117,9 +136,19 @@ Before using either method below, complete these steps:
      gcloud auth application-default login
      ```
    - If using a service account:
+
+     **macOS/Linux**
+
      ```bash
      export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/service-account.json"
      ```
+
+     **Windows (PowerShell)**
+
+     ```powershell
+     $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\your\service-account.json"
+     ```
+
 3. Make sure your account or service account has these IAM roles:
    - Cloud Trace Agent
    - Monitoring Metric Writer

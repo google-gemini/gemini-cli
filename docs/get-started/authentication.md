@@ -78,9 +78,18 @@ To authenticate and use Gemini CLI with a Gemini API key:
 
 2. Set the `GEMINI_API_KEY` environment variable to your key. For example:
 
+   **macOS/Linux**
+
    ```bash
    # Replace YOUR_GEMINI_API_KEY with the key from AI Studio
    export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
+   ```
+
+   **Windows (PowerShell)**
+
+   ```powershell
+   # Replace YOUR_GEMINI_API_KEY with the key from AI Studio
+   $env:GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
    ```
 
    To make this setting persistent, see
@@ -114,10 +123,20 @@ or the location where you want to run your jobs.
 
 For example:
 
+**macOS/Linux**
+
 ```bash
 # Replace with your project ID and desired location (e.g., us-central1)
 export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
 export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
+```
+
+**Windows (PowerShell)**
+
+```powershell
+# Replace with your project ID and desired location (e.g., us-central1)
+$env:GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+$env:GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
 ```
 
 To make any Vertex AI environment variable settings persistent, see
@@ -130,8 +149,16 @@ Consider this authentication method if you have Google Cloud CLI installed.
 > **Note:** If you have previously set `GOOGLE_API_KEY` or `GEMINI_API_KEY`, you
 > must unset them to use ADC:
 >
+> **macOS/Linux**
+>
 > ```bash
 > unset GOOGLE_API_KEY GEMINI_API_KEY
+> ```
+>
+> **Windows (PowerShell)**
+>
+> ```powershell
+> Remove-Item Env:\GOOGLE_API_KEY, Env:\GEMINI_API_KEY -ErrorAction Ignore
 > ```
 
 1. Verify you have a Google Cloud project and Vertex AI API is enabled.
@@ -160,8 +187,16 @@ pipelines, or if your organization restricts user-based ADC or API key creation.
 > **Note:** If you have previously set `GOOGLE_API_KEY` or `GEMINI_API_KEY`, you
 > must unset them:
 >
+> **macOS/Linux**
+>
 > ```bash
 > unset GOOGLE_API_KEY GEMINI_API_KEY
+> ```
+>
+> **Windows (PowerShell)**
+>
+> ```powershell
+> Remove-Item Env:\GOOGLE_API_KEY, Env:\GEMINI_API_KEY -ErrorAction Ignore
 > ```
 
 1.  [Create a service account and key](https://cloud.google.com/iam/docs/keys-create-delete)
@@ -171,9 +206,18 @@ pipelines, or if your organization restricts user-based ADC or API key creation.
 2.  Set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to the JSON
     file's absolute path. For example:
 
+    **macOS/Linux**
+
     ```bash
     # Replace /path/to/your/keyfile.json with the actual path
     export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/keyfile.json"
+    ```
+
+    **Windows (PowerShell)**
+
+    ```powershell
+    # Replace C:\path\to\your\keyfile.json with the actual path
+    $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\your\keyfile.json"
     ```
 
 3.  [Configure your Google Cloud Project](#set-gcp).
@@ -195,9 +239,18 @@ pipelines, or if your organization restricts user-based ADC or API key creation.
 
 2.  Set the `GOOGLE_API_KEY` environment variable:
 
+    **macOS/Linux**
+
     ```bash
     # Replace YOUR_GOOGLE_API_KEY with your Vertex AI API key
     export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
+    ```
+
+    **Windows (PowerShell)**
+
+    ```powershell
+    # Replace YOUR_GOOGLE_API_KEY with your Vertex AI API key
+    $env:GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
     ```
 
     > **Note:** If you see errors like
@@ -243,9 +296,18 @@ To configure Gemini CLI to use a Google Cloud project, do the following:
 
     For example, to set the `GOOGLE_CLOUD_PROJECT_ID` variable:
 
+    **macOS/Linux**
+
     ```bash
     # Replace YOUR_PROJECT_ID with your actual Google Cloud project ID
     export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+    ```
+
+    **Windows (PowerShell)**
+
+    ```powershell
+    # Replace YOUR_PROJECT_ID with your actual Google Cloud project ID
+    $env:GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
     ```
 
     To make this setting persistent, see
@@ -257,14 +319,20 @@ To avoid setting environment variables for every terminal session, you can
 persist them with the following methods:
 
 1.  **Add your environment variables to your shell configuration file:** Append
-    the `export ...` commands to your shell's startup file (e.g., `~/.bashrc`,
-    `~/.zshrc`, or `~/.profile`) and reload your shell (e.g.,
-    `source ~/.bashrc`).
+    the environment variable commands to your shell's startup file.
+
+    **macOS/Linux** (e.g., `~/.bashrc`, `~/.zshrc`, or `~/.profile`):
 
     ```bash
-    # Example for .bashrc
     echo 'export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"' >> ~/.bashrc
     source ~/.bashrc
+    ```
+
+    **Windows (PowerShell)** (e.g., `$PROFILE`):
+
+    ```powershell
+    Add-Content -Path $PROFILE -Value '$env:GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"'
+    . $PROFILE
     ```
 
     > **Warning:** Be aware that when you export API keys or service account
@@ -274,9 +342,12 @@ persist them with the following methods:
 2.  **Use a `.env` file:** Create a `.gemini/.env` file in your project
     directory or home directory. Gemini CLI automatically loads variables from
     the first `.env` file it finds, searching up from the current directory,
-    then in `~/.gemini/.env` or `~/.env`. `.gemini/.env` is recommended.
+    then in your home directory's `.gemini/.env` (e.g., `~/.gemini/.env` or
+    `%USERPROFILE%\.gemini\.env`).
 
     Example for user-wide settings:
+
+    **macOS/Linux**
 
     ```bash
     mkdir -p ~/.gemini
@@ -284,6 +355,16 @@ persist them with the following methods:
     GOOGLE_CLOUD_PROJECT="your-project-id"
     # Add other variables like GEMINI_API_KEY as needed
     EOF
+    ```
+
+    **Windows (PowerShell)**
+
+    ```powershell
+    New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini"
+    @"
+    GOOGLE_CLOUD_PROJECT="your-project-id"
+    # Add other variables like GEMINI_API_KEY as needed
+    "@ | Out-File -FilePath "$env:USERPROFILE\.gemini\.env" -Encoding utf8 -Append
     ```
 
 Variables are loaded from the first file found, not merged.
