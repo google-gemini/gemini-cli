@@ -120,7 +120,20 @@ export class AgentRegistry {
       coreEvents.emitFeedback('error', `Agent loading error: ${error.message}`);
     }
     await Promise.allSettled(
-      userAgents.agents.map((agent) => this.registerAgent(agent)),
+      userAgents.agents.map(async (agent) => {
+        try {
+          await this.registerAgent(agent);
+        } catch (e) {
+          debugLogger.warn(
+            `[AgentRegistry] Error registering user agent "${agent.name}":`,
+            e,
+          );
+          coreEvents.emitFeedback(
+            'error',
+            `Error registering user agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
+      }),
     );
 
     // Load project-level agents: .gemini/agents/ (relative to Project Root)
@@ -175,7 +188,20 @@ export class AgentRegistry {
       }
 
       await Promise.allSettled(
-        agentsToRegister.map((agent) => this.registerAgent(agent)),
+        agentsToRegister.map(async (agent) => {
+          try {
+            await this.registerAgent(agent);
+          } catch (e) {
+            debugLogger.warn(
+              `[AgentRegistry] Error registering project agent "${agent.name}":`,
+              e,
+            );
+            coreEvents.emitFeedback(
+              'error',
+              `Error registering project agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`,
+            );
+          }
+        }),
       );
     } else {
       coreEvents.emitFeedback(
@@ -188,7 +214,20 @@ export class AgentRegistry {
     for (const extension of this.config.getExtensions()) {
       if (extension.isActive && extension.agents) {
         await Promise.allSettled(
-          extension.agents.map((agent) => this.registerAgent(agent)),
+          extension.agents.map(async (agent) => {
+            try {
+              await this.registerAgent(agent);
+            } catch (e) {
+              debugLogger.warn(
+                `[AgentRegistry] Error registering extension agent "${agent.name}":`,
+                e,
+              );
+              coreEvents.emitFeedback(
+                'error',
+                `Error registering extension agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`,
+              );
+            }
+          }),
         );
       }
     }
@@ -399,10 +438,9 @@ export class AgentRegistry {
       this.agents.set(definition.name, definition);
       this.addAgentPolicy(definition);
     } catch (e) {
-      debugLogger.warn(
-        `[AgentRegistry] Error loading A2A agent "${definition.name}":`,
-        e,
-      );
+      const errorMessage = `Error loading A2A agent "${definition.name}": ${e instanceof Error ? e.message : String(e)}`;
+      debugLogger.warn(`[AgentRegistry] ${errorMessage}`, e);
+      coreEvents.emitFeedback('error', errorMessage);
     }
   }
 

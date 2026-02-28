@@ -628,6 +628,30 @@ describe('AgentRegistry', () => {
       );
     });
 
+    it('should surface an error if remote agent registration fails', async () => {
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'FailingRemoteAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      const error = new Error('401 Unauthorized');
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockRejectedValue(error),
+      } as unknown as A2AClientManager);
+
+      const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'error',
+        `Error loading A2A agent "FailingRemoteAgent": 401 Unauthorized`,
+      );
+    });
+
     it('should handle special characters in agent names', async () => {
       const specialAgent = {
         ...MOCK_AGENT_V1,
