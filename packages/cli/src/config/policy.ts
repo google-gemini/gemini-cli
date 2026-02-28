@@ -17,8 +17,37 @@ import {
   Storage,
   type PolicyUpdateConfirmationRequest,
   writeToStderr,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import { type Settings } from './settings.js';
+
+/**
+ * Temporary flag to automatically accept workspace policies to reduce friction.
+ * Exported as 'let' to allow monkey patching in tests via the setter.
+ */
+export let autoAcceptWorkspacePolicies = true;
+
+/**
+ * Sets the autoAcceptWorkspacePolicies flag.
+ * Used primarily for testing purposes.
+ */
+export function setAutoAcceptWorkspacePolicies(value: boolean) {
+  autoAcceptWorkspacePolicies = value;
+}
+
+/**
+ * Temporary flag to disable workspace level policies altogether.
+ * Exported as 'let' to allow monkey patching in tests via the setter.
+ */
+export let disableWorkspacePolicies = true;
+
+/**
+ * Sets the disableWorkspacePolicies flag.
+ * Used primarily for testing purposes.
+ */
+export function setDisableWorkspacePolicies(value: boolean) {
+  disableWorkspacePolicies = value;
+}
 
 export async function createPolicyEngineConfig(
   settings: Settings,
@@ -66,10 +95,16 @@ export async function resolveWorkspacePolicyState(options: {
     | PolicyUpdateConfirmationRequest
     | undefined;
 
-  if (trustedFolder) {
-    const potentialWorkspacePoliciesDir = new Storage(
-      cwd,
-    ).getWorkspacePoliciesDir();
+  if (trustedFolder && !disableWorkspacePolicies) {
+    const storage = new Storage(cwd);
+
+    // If we are in the home directory (or rather, our target Gemini dir is the global one),
+    // don't treat it as a workspace to avoid loading global policies twice.
+    if (storage.isWorkspaceHomeDir()) {
+      return { workspacePoliciesDir: undefined };
+    }
+
+    const potentialWorkspacePoliciesDir = storage.getWorkspacePoliciesDir();
     const integrityManager = new PolicyIntegrityManager();
     const integrityResult = await integrityManager.checkIntegrity(
       'workspace',
@@ -85,8 +120,8 @@ export async function resolveWorkspacePolicyState(options: {
     ) {
       // No workspace policies found
       workspacePoliciesDir = undefined;
-    } else if (interactive) {
-      // Policies changed or are new, and we are in interactive mode
+    } else if (interactive && !autoAcceptWorkspacePolicies) {
+      // Policies changed or are new, and we are in interactive mode and auto-accept is disabled
       policyUpdateConfirmationRequest = {
         scope: 'workspace',
         identifier: cwd,
@@ -94,17 +129,23 @@ export async function resolveWorkspacePolicyState(options: {
         newHash: integrityResult.hash,
       };
     } else {
-      // Non-interactive mode: warn and automatically accept/load
+      // Non-interactive mode or auto-accept is enabled: automatically accept/load
       await integrityManager.acceptIntegrity(
         'workspace',
         cwd,
         integrityResult.hash,
       );
       workspacePoliciesDir = potentialWorkspacePoliciesDir;
-      // debugLogger.warn here doesn't show up in the terminal. It is showing up only in debug mode on the debug console
-      writeToStderr(
-        'WARNING: Workspace policies changed or are new. Automatically accepting and loading them in non-interactive mode.\n',
-      );
+
+      if (!interactive) {
+        writeToStderr(
+          'WARNING: Workspace policies changed or are new. Automatically accepting and loading them.\n',
+        );
+      } else {
+        debugLogger.warn(
+          'Workspace policies changed or are new. Automatically accepting and loading them.',
+        );
+      }
     }
   }
 

@@ -11,6 +11,7 @@ import { waitFor } from '../../test-utils/async.js';
 import { ExitPlanModeDialog } from './ExitPlanModeDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
+import { openFileInEditor } from '../utils/editorUtils.js';
 import {
   ApprovalMode,
   validatePlanContent,
@@ -18,6 +19,10 @@ import {
   type FileSystemService,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
+
+vi.mock('../utils/editorUtils.js', () => ({
+  openFileInEditor: vi.fn(),
+}));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -144,6 +149,7 @@ Implement a comprehensive authentication system with multiple providers.
         onApprove={onApprove}
         onFeedback={onFeedback}
         onCancel={onCancel}
+        getPreferredEditor={vi.fn()}
         width={80}
         availableHeight={24}
       />,
@@ -153,6 +159,7 @@ Implement a comprehensive authentication system with multiple providers.
           getTargetDir: () => mockTargetDir,
           getIdeMode: () => false,
           isTrustedFolder: () => true,
+          getPreferredEditor: () => undefined,
           storage: {
             getPlansDir: () => mockPlansDir,
           },
@@ -160,6 +167,7 @@ Implement a comprehensive authentication system with multiple providers.
             readTextFile: vi.fn(),
             writeTextFile: vi.fn(),
           }),
+          getUseAlternateBuffer: () => options?.useAlternateBuffer ?? true,
         } as unknown as import('@google/gemini-cli-core').Config,
       },
     );
@@ -418,6 +426,7 @@ Implement a comprehensive authentication system with multiple providers.
               onApprove={onApprove}
               onFeedback={onFeedback}
               onCancel={onCancel}
+              getPreferredEditor={vi.fn()}
               width={80}
               availableHeight={24}
             />
@@ -435,6 +444,7 @@ Implement a comprehensive authentication system with multiple providers.
                 readTextFile: vi.fn(),
                 writeTextFile: vi.fn(),
               }),
+              getUseAlternateBuffer: () => useAlternateBuffer ?? true,
             } as unknown as import('@google/gemini-cli-core').Config,
           },
         );
@@ -534,6 +544,40 @@ Implement a comprehensive authentication system with multiple providers.
           expect(onApprove).toHaveBeenCalledWith(ApprovalMode.DEFAULT);
         });
         expect(onFeedback).not.toHaveBeenCalled();
+      });
+
+      it('opens plan in external editor when Ctrl+X is pressed', async () => {
+        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
+        await waitFor(() => {
+          expect(lastFrame()).toContain('Add user authentication');
+        });
+
+        // Reset the mock to track the second call during refresh
+        vi.mocked(processSingleFileContent).mockClear();
+
+        // Press Ctrl+X
+        await act(async () => {
+          writeKey(stdin, '\x18'); // Ctrl+X
+        });
+
+        await waitFor(() => {
+          expect(openFileInEditor).toHaveBeenCalledWith(
+            mockPlanFullPath,
+            expect.anything(),
+            expect.anything(),
+            undefined,
+          );
+        });
+
+        // Verify that content is refreshed (processSingleFileContent called again)
+        await waitFor(() => {
+          expect(processSingleFileContent).toHaveBeenCalled();
+        });
       });
     },
   );
