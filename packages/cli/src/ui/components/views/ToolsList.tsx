@@ -47,5 +47,13 @@ export const ToolsList: React.FC<ToolsListProps> = ({
     ) : (
       <Text color={theme.text.primary}> No tools available</Text>
     )}
+    <Box marginTop={1}>
+      <Text color={theme.text.secondary}>
+        For more insights into the Tools API, visit:{' '}
+        <Text color={theme.text.link}>
+          https://geminicli.com/docs/reference/tools-api/
+        </Text>
+      </Text>
+    </Box>
   </Box>
 );

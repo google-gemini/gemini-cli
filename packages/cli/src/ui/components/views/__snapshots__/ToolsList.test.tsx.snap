@@ -12,6 +12,8 @@ exports[`<ToolsList /> > renders correctly with descriptions 1`] = `
        3. important this tool is awesome.
   - Test Tool Three (test-tool-three)
     This is the third test tool.
+
+For more insights into the Tools API, visit: https://geminicli.com/docs/reference/tools-api/
 "
 `;
 
@@ -19,6 +21,8 @@ exports[`<ToolsList /> > renders correctly with no tools 1`] = `
 "Available Gemini CLI tools:
 
  No tools available
+
+For more insights into the Tools API, visit: https://geminicli.com/docs/reference/tools-api/
 "
 `;
 
@@ -28,5 +32,7 @@ exports[`<ToolsList /> > renders correctly without descriptions 1`] = `
   - Test Tool One (test-tool-one)
   - Test Tool Two (test-tool-two)
   - Test Tool Three (test-tool-three)
+
+For more insights into the Tools API, visit: https://geminicli.com/docs/reference/tools-api/
 "
 `;
