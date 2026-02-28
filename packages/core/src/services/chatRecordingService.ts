@@ -431,8 +431,13 @@ export class ChatRecordingService {
   private readConversation(): ConversationRecord {
     try {
       this.cachedLastConvData = fs.readFileSync(this.conversationFile!, 'utf8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return JSON.parse(this.cachedLastConvData);
+      const parsed: unknown = JSON.parse(this.cachedLastConvData);
+      const isConversationRecord = (val: unknown): val is ConversationRecord =>
+        typeof val === 'object' && val !== null;
+      if (isConversationRecord(parsed)) {
+        return parsed;
+      }
+      throw new Error('Invalid conversation record format');
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {

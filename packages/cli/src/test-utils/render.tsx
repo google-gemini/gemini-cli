@@ -715,8 +715,7 @@ export const renderWithProviders = (
         if (prop === 'getUseAlternateBuffer') {
           return () => useAlternateBuffer;
         }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        return Reflect.get(target, prop, receiver);
+        return Reflect.get(target, prop, receiver) as unknown;
       },
     });
   }

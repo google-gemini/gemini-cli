@@ -121,6 +121,11 @@ export const createMockCommandContext = (
     return output;
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-  return merge(defaultMocks, overrides);
+  const merged: unknown = merge(defaultMocks, overrides);
+  const isCommandContext = (val: unknown): val is CommandContext =>
+    typeof val === 'object' && val !== null;
+  if (isCommandContext(merged)) {
+    return merged;
+  }
+  throw new Error('Unreachable');
 };

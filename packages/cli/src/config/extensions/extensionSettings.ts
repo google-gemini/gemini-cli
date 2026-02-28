@@ -165,8 +165,7 @@ export async function promptForSetting(
     name: 'value',
     message: `${setting.name}\n${setting.description}`,
   });
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-  return response.value;
+  return typeof response.value === 'string' ? response.value : '';
 }
 
 export async function getScopedEnvContents(

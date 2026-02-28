@@ -347,9 +347,11 @@ export class IdeClient {
         try {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const parsedJson = JSON.parse(textPart.text);
-          if (parsedJson && typeof parsedJson.content === 'string') {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-            return parsedJson.content;
+          if (parsedJson) {
+            const content: unknown = parsedJson.content;
+            if (typeof content === 'string') {
+              return content;
+            }
           }
           if (parsedJson && parsedJson.content === null) {
             return undefined;
