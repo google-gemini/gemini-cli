@@ -31,6 +31,11 @@ import {
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
 } from '../dynamic-declaration-helpers.js';
+import {
+  DEFAULT_MAX_LINES_TEXT_FILE,
+  MAX_LINE_LENGTH_TEXT_FILE,
+  MAX_FILE_SIZE_MB,
+} from '../../../utils/constants.js';
 
 /**
  * Gemini 3 tool set. Initially a copy of the default legacy set.
@@ -38,7 +43,7 @@ import {
 export const GEMINI_3_SET: CoreToolSet = {
   read_file: {
     name: READ_FILE_TOOL_NAME,
-    description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+    description: `Reads and returns the content of a specified file. Prioritize using 'start_line' and 'end_line' for targeted reads to maintain context efficiency. Tool includes safety truncation limits (${DEFAULT_MAX_LINES_TEXT_FILE} lines, ${MAX_LINE_LENGTH_TEXT_FILE} characters in a line and ${MAX_FILE_SIZE_MB}MB file size), but relying on this automatic feedback is less efficient than requesting specific line ranges. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
