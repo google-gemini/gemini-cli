@@ -10,6 +10,8 @@ import {
   getResponseText,
   flatMapTextParts,
   appendToLastTextPart,
+  base64ByteSize,
+  describeInlineData,
 } from './partUtils.js';
 import type { GenerateContentResponse, Part, PartUnion } from '@google/genai';
 
@@ -86,7 +88,7 @@ describe('partUtils', () => {
     });
 
     it('should return descriptive string for thought part', () => {
-      const part = { thought: 'thinking' } as unknown as Part;
+      const part: Part = { thought: true, text: 'thinking' };
       expect(partToString(part, verboseOptions)).toBe('[Thought: thinking]');
     });
 
@@ -123,7 +125,7 @@ describe('partUtils', () => {
 
     it('should return descriptive string for inlineData part', () => {
       const part = { inlineData: { mimeType: 'image/png', data: '' } } as Part;
-      expect(partToString(part, verboseOptions)).toBe('<image/png>');
+      expect(partToString(part, verboseOptions)).toBe('[Image: image/png]');
     });
 
     it('should return an empty string for an unknown part type', () => {
@@ -142,7 +144,7 @@ describe('partUtils', () => {
         ],
       ];
       expect(partToString(parts as Part, verboseOptions)).toBe(
-        'start middle[Function Call: func1] end<audio/mp3>',
+        'start middle[Function Call: func1] end[Audio: audio/mp3]',
       );
     });
   });
@@ -257,6 +259,241 @@ describe('partUtils', () => {
       ];
       const result = await flatMapTextParts(parts, removeTransform);
       expect(result).toEqual([{ functionCall: { name: 'keep' } }]);
+    });
+  });
+
+  describe('base64ByteSize', () => {
+    it('should compute byte size for unpadded base64', () => {
+      // 4 base64 chars = 3 bytes (no padding)
+      expect(base64ByteSize('AAAA')).toBe(3);
+    });
+
+    it('should account for single padding character', () => {
+      // 4 base64 chars with "=" padding = 2 bytes
+      expect(base64ByteSize('AAA=')).toBe(2);
+    });
+
+    it('should account for double padding characters', () => {
+      // 4 base64 chars with "==" padding = 1 byte
+      expect(base64ByteSize('AA==')).toBe(1);
+    });
+
+    it('should handle empty string', () => {
+      expect(base64ByteSize('')).toBe(0);
+    });
+
+    it('should compute correct size for larger data', () => {
+      // 8 base64 chars = 6 bytes
+      expect(base64ByteSize('AAAAAAAA')).toBe(6);
+      // 12 base64 chars with '==' padding = floor(12*3/4) - 2 = 7 bytes
+      expect(base64ByteSize('AAAAAAAAAA==')).toBe(7);
+    });
+  });
+
+  describe('describeInlineData', () => {
+    // Helper: create a base64 string of approximately N raw bytes.
+    // base64 encodes 3 bytes per 4 chars, so we need ceil(N/3)*4 chars.
+    function makeBase64(rawBytes: number): string {
+      const chars = Math.ceil(rawBytes / 3) * 4;
+      return 'A'.repeat(chars);
+    }
+
+    describe('audio descriptions', () => {
+      it('should describe audio with MIME type only when data is empty', () => {
+        expect(describeInlineData('audio/mp3', '')).toBe('[Audio: audio/mp3]');
+      });
+
+      it('should describe audio with MIME type only when data is undefined', () => {
+        expect(describeInlineData('audio/mp3', undefined)).toBe(
+          '[Audio: audio/mp3]',
+        );
+      });
+
+      it('should include size and duration for mp3 audio', () => {
+        // 16000 bytes at 16000 bytes/sec (128 kbps) = ~1.0s
+        const data = makeBase64(16000);
+        const result = describeInlineData('audio/mp3', data);
+        expect(result).toMatch(/^\[Audio: audio\/mp3, [\d.]+ KB, ~[\d.]+s\]$/);
+      });
+
+      it('should include size and duration for wav audio', () => {
+        const data = makeBase64(176400);
+        const result = describeInlineData('audio/wav', data);
+        expect(result).toMatch(/^\[Audio: audio\/wav, [\d.]+ KB, ~[\d.]+s\]$/);
+      });
+
+      it('should include size and duration for ogg audio', () => {
+        const data = makeBase64(32000);
+        const result = describeInlineData('audio/ogg', data);
+        expect(result).toMatch(/^\[Audio: audio\/ogg, [\d.]+ KB, ~[\d.]+s\]$/);
+      });
+
+      it('should include size and duration for opus audio', () => {
+        const data = makeBase64(8000);
+        const result = describeInlineData('audio/opus', data);
+        expect(result).toMatch(/^\[Audio: audio\/opus, [\d.]+ KB, ~[\d.]+s\]$/);
+      });
+
+      it('should include size and duration for webm audio', () => {
+        const data = makeBase64(16000);
+        const result = describeInlineData('audio/webm', data);
+        expect(result).toMatch(/^\[Audio: audio\/webm, [\d.]+ KB, ~[\d.]+s\]$/);
+      });
+
+      it('should include size and duration for aac audio', () => {
+        const data = makeBase64(16000);
+        const result = describeInlineData('audio/aac', data);
+        expect(result).toMatch(/^\[Audio: audio\/aac, [\d.]+ KB, ~[\d.]+s\]$/);
+      });
+
+      it('should include size and duration for flac audio', () => {
+        const data = makeBase64(88200);
+        const result = describeInlineData('audio/flac', data);
+        expect(result).toMatch(/^\[Audio: audio\/flac, [\d.]+ KB, ~[\d.]+s\]$/);
+      });
+
+      it('should include size and duration for mpeg audio', () => {
+        const data = makeBase64(16000);
+        const result = describeInlineData('audio/mpeg', data);
+        expect(result).toMatch(/^\[Audio: audio\/mpeg, [\d.]+ KB, ~[\d.]+s\]$/);
+      });
+
+      it('should show size but no duration for unknown audio codec', () => {
+        const data = makeBase64(10000);
+        const result = describeInlineData('audio/x-custom', data);
+        expect(result).toMatch(/^\[Audio: audio\/x-custom, [\d.]+ KB\]$/);
+        expect(result).not.toContain('~');
+      });
+
+      it('should format duration as minutes and seconds for long audio', () => {
+        // 120 seconds of mp3: 120 * 16000 = 1,920,000 bytes
+        const data = makeBase64(1920000);
+        const result = describeInlineData('audio/mp3', data);
+        expect(result).toMatch(/\d+m \d+s/);
+      });
+
+      it('should not produce "60s" in duration from rounding edge cases', () => {
+        // 119.9 seconds of mp3: 119.9 * 16000 = 1,918,400 bytes
+        // Without rounding total first, this could produce "1m 60s"
+        const data = makeBase64(1918400);
+        const result = describeInlineData('audio/mp3', data);
+        expect(result).not.toContain('60s');
+        expect(result).toMatch(/\d+m \d+s/);
+      });
+    });
+
+    describe('video descriptions', () => {
+      it('should describe video with MIME type only when data is empty', () => {
+        expect(describeInlineData('video/mp4', '')).toBe('[Video: video/mp4]');
+      });
+
+      it('should include size and duration for mp4 video', () => {
+        const data = makeBase64(375000);
+        const result = describeInlineData('video/mp4', data);
+        expect(result).toMatch(/^\[Video: video\/mp4, [\d.]+ KB, ~[\d.]+s\]$/);
+      });
+
+      it('should include size and duration for webm video', () => {
+        const data = makeBase64(312500);
+        const result = describeInlineData('video/webm', data);
+        expect(result).toMatch(/^\[Video: video\/webm, [\d.]+ KB, ~[\d.]+s\]$/);
+      });
+
+      it('should include size and duration for quicktime video', () => {
+        const data = makeBase64(375000);
+        const result = describeInlineData('video/quicktime', data);
+        expect(result).toMatch(
+          /^\[Video: video\/quicktime, [\d.]+ KB, ~[\d.]+s\]$/,
+        );
+      });
+
+      it('should show size but no duration for unknown video codec', () => {
+        const data = makeBase64(50000);
+        const result = describeInlineData('video/x-matroska', data);
+        expect(result).toMatch(/^\[Video: video\/x-matroska, [\d.]+ KB\]$/);
+        expect(result).not.toContain('~');
+      });
+
+      it('should format large video size in MB', () => {
+        // 5 MB video
+        const data = makeBase64(5 * 1024 * 1024);
+        const result = describeInlineData('video/mp4', data);
+        expect(result).toContain('MB');
+      });
+    });
+
+    describe('image descriptions', () => {
+      it('should describe image with MIME type only when data is empty', () => {
+        expect(describeInlineData('image/png', '')).toBe('[Image: image/png]');
+      });
+
+      it('should include size for image with data', () => {
+        const data = makeBase64(50000);
+        const result = describeInlineData('image/png', data);
+        expect(result).toMatch(/^\[Image: image\/png, [\d.]+ KB\]$/);
+      });
+
+      it('should not include duration estimate for images', () => {
+        const data = makeBase64(50000);
+        const result = describeInlineData('image/jpeg', data);
+        expect(result).not.toContain('~');
+      });
+    });
+
+    describe('PDF descriptions', () => {
+      it('should describe PDF without MIME type label', () => {
+        expect(describeInlineData('application/pdf', '')).toBe('[PDF]');
+      });
+
+      it('should include size for PDF with data', () => {
+        const data = makeBase64(100000);
+        const result = describeInlineData('application/pdf', data);
+        expect(result).toMatch(/^\[PDF, [\d.]+ KB\]$/);
+      });
+    });
+
+    describe('other/unknown types', () => {
+      it('should describe unknown MIME type with Data label', () => {
+        expect(describeInlineData('application/octet-stream', '')).toBe(
+          '[Data: application/octet-stream]',
+        );
+      });
+
+      it('should handle undefined MIME type', () => {
+        expect(describeInlineData(undefined, '')).toBe('[Data: unknown]');
+      });
+
+      it('should handle both undefined MIME type and data', () => {
+        expect(describeInlineData(undefined, undefined)).toBe(
+          '[Data: unknown]',
+        );
+      });
+
+      it('should include size for unknown type with data', () => {
+        const data = makeBase64(512);
+        const result = describeInlineData('application/octet-stream', data);
+        expect(result).toMatch(/^\[Data: application\/octet-stream, \d+ B\]$/);
+      });
+    });
+
+    describe('size formatting', () => {
+      it('should format small sizes in bytes', () => {
+        const data = makeBase64(500);
+        const result = describeInlineData('application/octet-stream', data);
+        expect(result).toMatch(/\d+ B/);
+      });
+
+      it('should format medium sizes in KB', () => {
+        const data = makeBase64(50000);
+        const result = describeInlineData('application/octet-stream', data);
+        expect(result).toMatch(/[\d.]+ KB/);
+      });
+
+      it('should format large sizes in MB', () => {
+        const data = makeBase64(2 * 1024 * 1024);
+        const result = describeInlineData('application/octet-stream', data);
+        expect(result).toMatch(/[\d.]+ MB/);
+      });
     });
   });
 
