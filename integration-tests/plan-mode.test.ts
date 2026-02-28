@@ -62,7 +62,7 @@ describe('Plan Mode', () => {
     });
   });
 
-  it.skip('should allow write_file only in the plans directory in plan mode', async () => {
+  it('should allow write_file only in the plans directory in plan mode', async () => {
     await rig.setup(
       'should allow write_file only in the plans directory in plan mode',
       {
@@ -72,7 +72,12 @@ describe('Plan Mode', () => {
             core: ['write_file', 'read_file', 'list_directory'],
             allowed: ['write_file'],
           },
-          general: { defaultApprovalMode: 'plan' },
+          general: {
+            defaultApprovalMode: 'plan',
+            plan: {
+              directory: '.gemini/tmp/v1/session/plans',
+            },
+          },
         },
       },
     );

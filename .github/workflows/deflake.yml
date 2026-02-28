@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       branch_ref:
-        description: 'Branch to run on'
-        required: true
-        default: 'main'
-        type: 'string'
-      test_name_pattern:
-        description: 'The test name pattern to use'
+        description: 'Branch to run on (defaults to selected branch)'
         required: false
+        type: 'string'
+      test_filter:
+        description: 'Test name pattern to run (passed to vitest -t)'
+        required: false
+        default: 'should allow write_file only in the plans directory in plan mode'
         type: 'string'
       runs:
         description: 'The number of runs'
@@ -41,7 +41,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ github.event.pull_request.head.sha }}'
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
           repository: '${{ github.repository }}'
 
       - name: 'Set up Node.js ${{ matrix.node-version }}'
@@ -62,18 +62,28 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          DEBUG_SCHEDULER: 'true'
           IS_DOCKER: "${{ matrix.sandbox == 'sandbox:docker' }}"
           KEEP_OUTPUT: 'true'
           RUNS: '${{ github.event.inputs.runs }}'
-          TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
+          TEST_FILTER: '${{ github.event.inputs.test_filter }}'
           VERBOSE: 'true'
         shell: 'bash'
         run: |
+          # Construct the inner command
           if [[ "${IS_DOCKER}" == "true" ]]; then
-            npm run deflake:test:integration:sandbox:docker -- --runs="${RUNS}" -- --testNamePattern "'${TEST_NAME_PATTERN}'"
+            INNER_CMD="npm run test:integration:sandbox:docker -- --retry=0"
           else
-            npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}" -- --testNamePattern "'${TEST_NAME_PATTERN}'"
+            INNER_CMD="npm run test:integration:sandbox:none -- --retry=0"
           fi
+
+          # Append test filter if provided
+          if [[ -n "${TEST_FILTER}" ]]; then
+            INNER_CMD="${INNER_CMD} -t \"${TEST_FILTER}\""
+          fi
+
+          # Run deflake script directly
+          node scripts/deflake.js --command="${INNER_CMD}" --runs="${RUNS}"
 
   deflake_e2e_mac:
     name: 'E2E Test (macOS)'
@@ -83,7 +93,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ github.event.pull_request.head.sha }}'
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
           repository: '${{ github.repository }}'
 
       - name: 'Set up Node.js 20.x'
@@ -105,13 +115,18 @@ jobs:
         if: "runner.os != 'Windows'"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          DEBUG_SCHEDULER: 'true'
           KEEP_OUTPUT: 'true'
           RUNS: '${{ github.event.inputs.runs }}'
           SANDBOX: 'sandbox:none'
-          TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
+          TEST_FILTER: '${{ github.event.inputs.test_filter }}'
           VERBOSE: 'true'
         run: |
-          npm run deflake:test:integration:sandbox:none -- --runs="${RUNS}" -- --testNamePattern "'${TEST_NAME_PATTERN}'"
+          INNER_CMD="npm run test:integration:sandbox:none -- --retry=0"
+          if [[ -n "${TEST_FILTER}" ]]; then
+            INNER_CMD="${INNER_CMD} -t \"${TEST_FILTER}\""
+          fi
+          node scripts/deflake.js --command="${INNER_CMD}" --runs="${RUNS}"
 
   deflake_e2e_windows:
     name: 'Slow E2E - Win'
@@ -122,7 +137,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ github.event.pull_request.head.sha }}'
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
           repository: '${{ github.repository }}'
 
       - name: 'Set up Node.js 20.x'
@@ -160,6 +175,7 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          DEBUG_SCHEDULER: 'true'
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
@@ -167,7 +183,11 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
           RUNS: '${{ github.event.inputs.runs }}'
-          TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
+          TEST_FILTER: '${{ github.event.inputs.test_filter }}'
         shell: 'pwsh'
         run: |
-          npm run deflake:test:integration:sandbox:none -- --runs="$env:RUNS" -- --testNamePattern "'$env:TEST_NAME_PATTERN'"
+          $InnerCmd = "npm run test:integration:sandbox:none -- --retry=0"
+          if ($env:TEST_FILTER) {
+            $InnerCmd = "$InnerCmd -t `"$env:TEST_FILTER`""
+          }
+          node scripts/deflake.js --command "$InnerCmd" --runs $env:RUNS

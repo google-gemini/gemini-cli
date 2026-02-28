@@ -10,10 +10,10 @@ import * as crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
 import {
+  ApprovalMode,
   type PolicyEngineConfig,
   PolicyDecision,
   type PolicyRule,
-  ApprovalMode,
   type PolicySettings,
   type SafetyCheckerRule,
 } from './types.js';
@@ -297,7 +297,26 @@ export async function createPolicyEngineConfig(
     }
   }
 
-  const rules: PolicyRule[] = [...tomlRules];
+  const rules: PolicyRule[] = tomlRules.map((rule) => {
+    // Mode-specific rules (Plan, YOLO, Auto-Edit) are intended to be authoritative
+    // overrides of the default policy for that mode. We add a large offset (+10)
+    // to their priority so they take precedence over mode-agnostic user settings
+    // and workspace policies (which sit in the 1.x - 4.x range).
+    // By adding a flat 10, we preserve the original tier hierarchy
+    // (User 13.x > Workspace 12.x > Default 11.x) ensuring that safety boundaries
+    // remain effective while still allowing users to customize them via TOML.
+    if (
+      rule.modes?.includes(ApprovalMode.PLAN) ||
+      rule.modes?.includes(ApprovalMode.YOLO) ||
+      rule.modes?.includes(ApprovalMode.AUTO_EDIT)
+    ) {
+      return {
+        ...rule,
+        priority: (rule.priority ?? 0) + 10,
+      };
+    }
+    return rule;
+  });
   const checkers = [...tomlCheckers];
 
   // Priority system for policy rules:
