@@ -75,7 +75,7 @@ Markdown file.
 Users can manage subagents using the following commands within the Gemini CLI:
 
 - `/agents list`: Displays all available local and remote subagents.
-- `/agents refresh`: Reloads the agent registry. Use this after adding or
+- `/agents reload`: Reloads the agent registry. Use this after adding or
   modifying agent definition files.
 - `/agents enable <agent_name>`: Enables a specific subagent.
 - `/agents disable <agent_name>`: Disables a specific subagent.
