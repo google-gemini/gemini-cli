@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { lock } from 'proper-lockfile';
 import { debugLogger } from '../utils/debugLogger.js';
+import { z } from 'zod';
 
 export interface RegistryData {
   projects: Record<string, string>;
@@ -59,8 +60,11 @@ export class ProjectRegistry {
 
     try {
       const content = await fs.promises.readFile(this.registryPath, 'utf8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return JSON.parse(content);
+      const parsed: unknown = JSON.parse(content);
+      const schema = z.object({
+        projects: z.record(z.string(), z.string()),
+      });
+      return schema.parse(parsed);
     } catch (e) {
       debugLogger.debug('Failed to load registry: ', e);
       // If the registry is corrupted, we'll start fresh to avoid blocking the CLI

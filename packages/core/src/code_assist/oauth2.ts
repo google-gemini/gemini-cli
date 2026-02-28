@@ -639,8 +639,13 @@ async function fetchCachedCredentials(): Promise<
   for (const keyFile of pathsToTry) {
     try {
       const keyFileString = await fs.readFile(keyFile, 'utf-8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return JSON.parse(keyFileString);
+      const parsed: unknown = JSON.parse(keyFileString);
+      const isOAuthCreds = (val: unknown): val is Credentials | JWTInput =>
+        typeof val === 'object' && val !== null;
+      if (isOAuthCreds(parsed)) {
+        return parsed;
+      }
+      throw new Error('Invalid credentials format');
     } catch (error) {
       // Log specific error for debugging, but continue trying other paths
       debugLogger.debug(
