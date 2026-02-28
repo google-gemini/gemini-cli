@@ -5,14 +5,18 @@ problems encountered while using Gemini CLI.
 
 ## General issues
 
+This section addresses common questions about Gemini CLI usage, security, and
+troubleshooting general errors.
+
 ### Why can't I use third-party software (e.g. Claude Code, OpenClaw, OpenCode) with Gemini CLI?
 
-Using third-party software, tools, or services to access Gemini CLI is a
-violation of our [applicable terms and policies](tos-privacy.md), and severely
-degrades the experience for legitimate product users. Such actions may be
-grounds for suspension or termination of your account. If you would like to use
-a third-party coding agent with Gemini, we recommend using a Vertex or AI Studio
-API key.
+Using third-party software, tools, or services to harvest or piggyback on Gemini
+CLI's OAuth authentication to access our backend services is a direct violation
+of our [applicable terms and policies](tos-privacy.md). Doing so bypasses our
+intended authentication and security structures, and such actions may be grounds
+for immediate suspension or termination of your account. If you would like to
+use a third-party coding agent with Gemini, the supported and secure method is
+to use a Vertex AI or Google AI Studio API key.
 
 ### Why am I getting an `API error: 429 - Resource exhausted`?
 
@@ -84,8 +88,16 @@ You can configure your Google Cloud Project ID using an environment variable.
 
 Set the `GOOGLE_CLOUD_PROJECT` environment variable in your shell:
 
+**macOS/Linux**
+
 ```bash
 export GOOGLE_CLOUD_PROJECT="your-project-id"
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:GOOGLE_CLOUD_PROJECT="your-project-id"
 ```
 
 To make this setting permanent, add this line to your shell's startup file
