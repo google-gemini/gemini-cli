@@ -538,7 +538,7 @@ const createMcpServer = (
           content: [
             {
               type: 'text',
-              text: message,
+              text: 'Failed to resolve external URI.',
             },
           ],
         };
