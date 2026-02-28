@@ -791,14 +791,12 @@ describe('gemini.tsx main function kitty protocol', () => {
       }),
     );
 
-    process.env['GEMINI_API_KEY'] = 'test-key';
+    vi.stubEnv('GEMINI_API_KEY', 'test-key');
     vi.stubEnv('SANDBOX', 'true');
     try {
       await main();
     } catch (e) {
       if (!(e instanceof MockProcessExitError)) throw e;
-    } finally {
-      delete process.env['GEMINI_API_KEY'];
     }
 
     expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
