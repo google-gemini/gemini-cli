@@ -8,7 +8,7 @@ import { render } from '../../test-utils/render.js';
 import { GeminiRespondingSpinner } from './GeminiRespondingSpinner.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
-import { useIsScreenReaderEnabled } from 'ink';
+import { Text, useIsScreenReaderEnabled } from 'ink';
 import { StreamingState } from '../types.js';
 import {
   SCREEN_READER_LOADING,
@@ -24,8 +24,10 @@ vi.mock('ink', async (importOriginal) => {
   };
 });
 
-vi.mock('./CliSpinner.js', () => ({
-  CliSpinner: () => 'Spinner',
+vi.mock('./GeminiSpinner.js', () => ({
+  GeminiSpinner: ({ altText }: { altText?: string }) => (
+    <Text>GeminiSpinner {altText}</Text>
+  ),
 }));
 
 describe('GeminiRespondingSpinner', () => {
@@ -33,13 +35,8 @@ describe('GeminiRespondingSpinner', () => {
   const mockUseIsScreenReaderEnabled = vi.mocked(useIsScreenReaderEnabled);
 
   beforeEach(() => {
-    vi.useFakeTimers();
     vi.clearAllMocks();
     mockUseIsScreenReaderEnabled.mockReturnValue(false);
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   it('renders spinner when responding', async () => {
@@ -48,8 +45,7 @@ describe('GeminiRespondingSpinner', () => {
       <GeminiRespondingSpinner />,
     );
     await waitUntilReady();
-    // Spinner output varies, but it shouldn't be empty
-    expect(lastFrame()).not.toBe('');
+    expect(lastFrame()).toContain('GeminiSpinner');
     unmount();
   });
 

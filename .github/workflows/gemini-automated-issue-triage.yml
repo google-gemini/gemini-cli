@@ -158,7 +158,7 @@ jobs:
               },
               "coreTools": [
                 "run_shell_command(echo)"
-              ],
+              ]
             }
           prompt: |-
             ## Role
