@@ -68,6 +68,8 @@ export const ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES: ReadonlySet<string> =
     'HOME',
     'LANG',
     'SHELL',
+    'PAGER',
+    'GIT_PAGER',
     'TERM',
     'COLORTERM',
     'TMPDIR',
