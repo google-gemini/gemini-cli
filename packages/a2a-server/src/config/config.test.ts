@@ -28,6 +28,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       const mockConfig = {
         ...params,
         initialize: vi.fn(),
+        waitForMcpInit: vi.fn(),
         refreshAuth: vi.fn(),
         getExperiments: vi.fn().mockReturnValue({
           flags: {
@@ -94,6 +95,7 @@ describe('loadConfig', () => {
           const mockConfig = {
             ...(params as object),
             initialize: vi.fn(),
+            waitForMcpInit: vi.fn(),
             refreshAuth: vi.fn(),
             getExperiments: vi.fn().mockReturnValue({
               flags: {
