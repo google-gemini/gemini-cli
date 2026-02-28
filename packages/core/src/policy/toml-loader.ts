@@ -18,6 +18,7 @@ import path from 'node:path';
 import toml from '@iarna/toml';
 import { z, type ZodError } from 'zod';
 import { isNodeError } from '../utils/errors.js';
+import { isWithinRoot } from '../utils/fileUtils.js';
 
 /**
  * Schema for a single policy rule in the TOML file (before transformation).
@@ -138,7 +139,8 @@ export interface PolicyFile {
  */
 export async function readPolicyFiles(
   policyPath: string,
-): Promise<PolicyFile[]> {
+  tierName: 'default' | 'user' | 'workspace' | 'admin',
+): Promise<{ files: PolicyFile[]; errors: PolicyFileError[] }> {
   let filesToLoad: string[] = [];
   let baseDir = '';
 
@@ -148,7 +150,11 @@ export async function readPolicyFiles(
       baseDir = policyPath;
       const dirEntries = await fs.readdir(policyPath, { withFileTypes: true });
       filesToLoad = dirEntries
-        .filter((entry) => entry.isFile() && entry.name.endsWith('.toml'))
+        .filter(
+          (entry) =>
+            (entry.isFile() || entry.isSymbolicLink()) &&
+            entry.name.endsWith('.toml'),
+        )
         .map((entry) => entry.name);
     } else if (stats.isFile() && policyPath.endsWith('.toml')) {
       baseDir = path.dirname(policyPath);
@@ -156,18 +162,53 @@ export async function readPolicyFiles(
     }
   } catch (e) {
     if (isNodeError(e) && e.code === 'ENOENT') {
-      return [];
+      return { files: [], errors: [] };
     }
     throw e;
   }
 
   const results: PolicyFile[] = [];
+  const errors: PolicyFileError[] = [];
   for (const file of filesToLoad) {
     const filePath = path.join(baseDir, file);
-    const content = await fs.readFile(filePath, 'utf-8');
-    results.push({ path: filePath, content });
+    try {
+      const realFilePath = await fs.realpath(filePath);
+
+      // For workspace policies, ensure the symlink doesn't "escape" the policy directory
+      if (tierName === 'workspace') {
+        const realBaseDir = await fs.realpath(baseDir);
+        if (!isWithinRoot(realFilePath, realBaseDir)) {
+          errors.push({
+            filePath,
+            fileName: file,
+            tier: tierName,
+            errorType: 'file_read',
+            message:
+              'Security violation: Symbolic link points outside of the workspace policy directory.',
+            details: `Symlink ${file} resolves to a path outside of the policy folder. Workspace policies are restricted for security.`,
+            suggestion:
+              'To use global policies, place them in your user directory (~/.gemini/policies/) instead.',
+          });
+          continue;
+        }
+      }
+
+      const content = await fs.readFile(realFilePath, 'utf-8');
+      results.push({ path: filePath, content });
+    } catch (e) {
+      errors.push({
+        filePath,
+        fileName: file,
+        tier: tierName,
+        errorType: 'file_read',
+        message: 'Failed to read policy file',
+        details: isNodeError(e) ? e.message : String(e),
+        suggestion:
+          'Check if the file is a broken symbolic link or an unreadable directory.',
+      });
+    }
   }
-  return results;
+  return { files: results, errors };
 }
 
 /**
@@ -281,7 +322,9 @@ export async function loadPoliciesFromToml(
     let policyFiles: PolicyFile[] = [];
 
     try {
-      policyFiles = await readPolicyFiles(p);
+      const readResult = await readPolicyFiles(p, tierName);
+      policyFiles = readResult.files;
+      errors.push(...readResult.errors);
     } catch (e) {
       errors.push({
         filePath: p,
