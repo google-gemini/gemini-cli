@@ -10,6 +10,7 @@ import {
   createContentGenerator,
   AuthType,
   createContentGeneratorConfig,
+  resolveCustomBaseUrl,
 } from './contentGenerator.js';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';
@@ -19,6 +20,7 @@ import { loadApiKey } from './apiKeyCredentialStorage.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { resetVersionCache } from '../utils/version.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('@google/genai');
@@ -558,5 +560,168 @@ describe('createContentGeneratorConfig', () => {
     );
     expect(config.apiKey).toBeUndefined();
     expect(config.vertexai).toBeUndefined();
+  });
+});
+
+describe('resolveCustomBaseUrl', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('returns undefined when no env vars are set', () => {
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', '');
+    vi.stubEnv('GEMINI_API_BASE_URL', '');
+
+    const result = resolveCustomBaseUrl();
+    expect(result).toBeUndefined();
+  });
+
+  it('returns GOOGLE_GEMINI_BASE_URL when set to a valid URL', () => {
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'http://localhost:4000');
+
+    const result = resolveCustomBaseUrl();
+    expect(result).toBe('http://localhost:4000');
+  });
+
+  it('returns GEMINI_API_BASE_URL when GOOGLE_GEMINI_BASE_URL is not set', () => {
+    vi.stubEnv('GEMINI_API_BASE_URL', 'http://localhost:8080');
+
+    const result = resolveCustomBaseUrl();
+    expect(result).toBe('http://localhost:8080');
+  });
+
+  it('GOOGLE_GEMINI_BASE_URL takes precedence over GEMINI_API_BASE_URL', () => {
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'http://localhost:4000');
+    vi.stubEnv('GEMINI_API_BASE_URL', 'http://localhost:8080');
+
+    const result = resolveCustomBaseUrl();
+    expect(result).toBe('http://localhost:4000');
+  });
+
+  it('returns undefined and logs a warning when URL is malformed', () => {
+    const warnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'not-a-valid-url');
+
+    const result = resolveCustomBaseUrl();
+
+    expect(result).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('not-a-valid-url'),
+    );
+
+    warnSpy.mockRestore();
+  });
+
+  it('accepts https URLs', () => {
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'https://my-proxy.example.com');
+
+    const result = resolveCustomBaseUrl();
+    expect(result).toBe('https://my-proxy.example.com');
+  });
+
+  it('accepts URLs with port numbers', () => {
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'http://localhost:11434'); // Ollama default
+
+    const result = resolveCustomBaseUrl();
+    expect(result).toBe('http://localhost:11434');
+  });
+
+  it('accepts URLs with path components', () => {
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'http://localhost:4000/v1');
+
+    const result = resolveCustomBaseUrl();
+    expect(result).toBe('http://localhost:4000/v1');
+  });
+
+  it('returns undefined when env var is empty string', () => {
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', '');
+
+    const result = resolveCustomBaseUrl();
+    expect(result).toBeUndefined();
+  });
+});
+
+describe('createContentGenerator with custom base URL', () => {
+  beforeEach(() => {
+    resetVersionCache();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('passes baseUrl to GoogleGenAI httpOptions when GOOGLE_GEMINI_BASE_URL is set', async () => {
+    const mockCfg = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
+
+    const mockGenerator = { models: {} } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'http://localhost:4000');
+
+    await createContentGenerator(
+      { apiKey: 'test-key', authType: AuthType.USE_GEMINI },
+      mockCfg,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          baseUrl: 'http://localhost:4000',
+        }),
+      }),
+    );
+  });
+
+  it('passes baseUrl to GoogleGenAI httpOptions when GEMINI_API_BASE_URL is set', async () => {
+    const mockCfg = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
+
+    const mockGenerator = { models: {} } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv('GEMINI_API_BASE_URL', 'http://localhost:8080');
+
+    await createContentGenerator(
+      { apiKey: 'test-key', authType: AuthType.USE_GEMINI },
+      mockCfg,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          baseUrl: 'http://localhost:8080',
+        }),
+      }),
+    );
+  });
+
+  it('does not include baseUrl in httpOptions when no custom URL env var is set', async () => {
+    const mockCfg = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
+
+    const mockGenerator = { models: {} } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+
+    await createContentGenerator(
+      { apiKey: 'test-key', authType: AuthType.USE_GEMINI },
+      mockCfg,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        httpOptions: expect.objectContaining({
+          baseUrl: expect.any(String),
+        }),
+      }),
+    );
   });
 });

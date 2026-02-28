@@ -1376,6 +1376,22 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - When set, overrides the default API version used by the SDK.
   - Example: `export GOOGLE_GENAI_API_VERSION="v1"` (Windows PowerShell:
     `$env:GOOGLE_GENAI_API_VERSION="v1"`)
+- **`GOOGLE_GEMINI_BASE_URL`**:
+  - Overrides the default Gemini API endpoint
+    (`generativelanguage.googleapis.com`).
+  - Use this to point the CLI at a local LLM proxy (such as
+    [Ollama](https://ollama.com) or [LiteLLM](https://litellm.ai)), a mock
+    server for testing, or any custom API-compatible endpoint.
+  - `GOOGLE_GEMINI_BASE_URL` takes priority over `GEMINI_API_BASE_URL` (see
+    below).
+  - If the value is not a valid URL, the CLI logs a warning and falls back to
+    the default endpoint.
+  - Example (Ollama): `export GOOGLE_GEMINI_BASE_URL="http://localhost:11434"`
+  - Example (LiteLLM): `export GOOGLE_GEMINI_BASE_URL="http://localhost:4000"`
+- **`GEMINI_API_BASE_URL`**:
+  - Alias for `GOOGLE_GEMINI_BASE_URL`. Supported for compatibility. When both
+    are set, `GOOGLE_GEMINI_BASE_URL` takes precedence.
+  - Example: `export GEMINI_API_BASE_URL="http://localhost:4000"`
 - **`OTLP_GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID for Telemetry in Google Cloud
   - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"` (Windows
