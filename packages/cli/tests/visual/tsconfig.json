@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@google/gemini-cli-core": ["../../core/src/index.ts"],
+      "@google/gemini-cli-core/*": ["../../core/src/*"]
+    }
+  }
+}

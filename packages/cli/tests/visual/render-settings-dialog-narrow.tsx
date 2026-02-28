@@ -5,9 +5,10 @@ import { VimModeProvider } from '../../src/ui/contexts/VimModeContext';
 import { KeypressProvider } from '../../src/ui/contexts/KeypressContext';
 import { UIStateContext } from '../../src/ui/contexts/UIStateContext';
 
+// Slightly different data for the narrow view to ensure it's a unique snapshot
 const mockData = {
-  general: { vimMode: true, disableAutoUpdate: false },
-  ui: { showMemoryUsage: true, theme: 'system' }
+  general: { vimMode: false, disableAutoUpdate: true },
+  ui: { showMemoryUsage: false, theme: 'dark' }
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -24,9 +25,9 @@ const robustMockSettings = {
 } as any;
 
 const mockUIState = {
-  searchBuffer: '',
+  searchBuffer: 'narrow-test',
   setSearchBuffer: () => {},
-  isSearching: false,
+  isSearching: true,
   setIsSearching: () => {},
   activeTab: 'general',
   setActiveTab: () => {},

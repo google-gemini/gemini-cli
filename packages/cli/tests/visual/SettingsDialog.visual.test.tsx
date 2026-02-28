@@ -34,4 +34,19 @@ describe('SettingsDialog Visual Regression', () => {
       timeout: 30000,
     });
   }, 40000);
+
+  it('renders narrow layout (60x20)', async () => {
+    await createSnapshotFromPty({
+      command: 'npx',
+      args: ['tsx', path.resolve(__dirname, 'render-settings-dialog-narrow.tsx')],
+      outputPath: 'tests/__baselines__/render-settings-dialog-narrow.png',
+      ...getCIOptimizedConfig({
+        baseFont: 'bundled',
+        emojiFontKey: 'system'
+      }),
+      cols: 60,
+      rows: 20,
+      timeout: 30000,
+    });
+  }, 40000);
 });
