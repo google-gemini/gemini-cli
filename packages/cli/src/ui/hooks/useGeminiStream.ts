@@ -1536,13 +1536,10 @@ export const useGeminiStream = (
       startNewPrompt,
       getPromptCount,
       setThought,
- Fix/copy-to-Capture-Slash-Command-Output
       setLastOutput,
       fullAiResponseBufferRef,
-
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,
- main
     ],
   );
 
