@@ -67,15 +67,15 @@ runs:
         echo "Determined image tag: $FINAL_TAG"
         echo "FINAL_TAG=$FINAL_TAG" >> $GITHUB_OUTPUT
       env:
-        INPUTS_GITHUB_REF_NAME: ${{ inputs.github-ref-name }}
-        INPUTS_GITHUB_SHA: ${{ inputs.github-sha }}
+        INPUTS_GITHUB_REF_NAME: '${{ inputs.github-ref-name }}'
+        INPUTS_GITHUB_SHA: '${{ inputs.github-sha }}'
     - name: 'build'
       id: 'docker_build'
       shell: 'bash'
       env:
         GEMINI_SANDBOX_IMAGE_TAG: '${{ steps.image_tag.outputs.FINAL_TAG }}'
         GEMINI_SANDBOX: 'docker'
-        STEPS_IMAGE_TAG_OUTPUTS_FINAL_TAG: ${{ steps.image_tag.outputs.FINAL_TAG }}
+        STEPS_IMAGE_TAG_OUTPUTS_FINAL_TAG: '${{ steps.image_tag.outputs.FINAL_TAG }}'
       run: |-
         npm run build:sandbox -- \
           --image google/gemini-cli-sandbox:${STEPS_IMAGE_TAG_OUTPUTS_FINAL_TAG} \
@@ -95,7 +95,7 @@ runs:
       run: |-
         docker push "${STEPS_DOCKER_BUILD_OUTPUTS_URI}"
       env:
-        STEPS_DOCKER_BUILD_OUTPUTS_URI: ${{ steps.docker_build.outputs.uri }}
+        STEPS_DOCKER_BUILD_OUTPUTS_URI: '${{ steps.docker_build.outputs.uri }}'
     - name: 'Create issue on failure'
       if: |-
         ${{ failure() }}

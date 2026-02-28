@@ -384,6 +384,10 @@ describe('useShellCompletion utilities', () => {
       // Very basic sanity check: common commands should be found
       if (process.platform !== 'win32') {
         expect(results).toContain('ls');
+      } else {
+        expect(results).toContain('dir');
+        expect(results).toContain('cls');
+        expect(results).toContain('copy');
       }
     });
 
@@ -398,7 +402,12 @@ describe('useShellCompletion utilities', () => {
     it('should handle empty PATH', async () => {
       vi.stubEnv('PATH', '');
       const results = await scanPathExecutables();
-      expect(results).toEqual([]);
+      if (process.platform === 'win32') {
+        expect(results.length).toBeGreaterThan(0);
+        expect(results).toContain('dir');
+      } else {
+        expect(results).toEqual([]);
+      }
       vi.unstubAllEnvs();
     });
   });
