@@ -23,6 +23,9 @@ if (process.env.NO_COLOR !== undefined) {
   delete process.env.NO_COLOR;
 }
 
+// Force true color output for ink so that snapshots always include color information.
+process.env.FORCE_COLOR = '3';
+
 import './src/test-utils/customMatchers.js';
 
 let consoleErrorSpy: vi.SpyInstance;
