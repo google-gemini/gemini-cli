@@ -282,14 +282,14 @@ gemini
   quickly.
 - [**Authentication Setup**](./docs/get-started/authentication.md) - Detailed
   auth configuration.
-- [**Configuration Guide**](./docs/get-started/configuration.md) - Settings and
+- [**Configuration Guide**](./docs/reference/configuration.md) - Settings and
   customization.
-- [**Keyboard Shortcuts**](./docs/cli/keyboard-shortcuts.md) - Productivity
-  tips.
+- [**Keyboard Shortcuts**](./docs/reference/keyboard-shortcuts.md) -
+  Productivity tips.
 
 ### Core Features
 
-- [**Commands Reference**](./docs/cli/commands.md) - All slash commands
+- [**Commands Reference**](./docs/reference/commands.md) - All slash commands
   (`/help`, `/chat`, etc).
 - [**Custom Commands**](./docs/cli/custom-commands.md) - Create your own
   reusable commands.
