@@ -1066,12 +1066,12 @@ describe('LoopDetectionService LLM Checks', () => {
     expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
     const calledArg = vi.mocked(mockBaseLlmClient.generateJson).mock
       .calls[0][0];
-    // First content should be the user prompt context
+    // First content should be the user prompt context wrapped in XML
     expect(calledArg.contents[0]).toEqual({
       role: 'user',
       parts: [
         {
-          text: 'Original user request for this task:\nAdd license headers to all files',
+          text: '<original_user_request>\nAdd license headers to all files\n</original_user_request>',
         },
       ],
     });

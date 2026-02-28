@@ -484,7 +484,7 @@ export class LoopDetectionService {
               role: 'user' as const,
               parts: [
                 {
-                  text: `Original user request for this task:\n${this.userPrompt}`,
+                  text: `<original_user_request>\n${this.userPrompt}\n</original_user_request>`,
                 },
               ],
             },
