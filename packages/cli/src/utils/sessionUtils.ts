@@ -9,6 +9,7 @@ import {
   partListUnionToString,
   SESSION_FILE_PREFIX,
   CoreToolCallStatus,
+  Storage,
   type Config,
   type ConversationRecord,
   type MessageRecord,
@@ -132,6 +133,8 @@ export interface SessionSelectionResult {
   sessionPath: string;
   sessionData: ConversationRecord;
   displayInfo: string;
+  /** True if the session was found in a different project than the current one. */
+  isCrossProject?: boolean;
 }
 
 /**
@@ -451,13 +454,99 @@ export class SessionSelector {
   }
 
   /**
+   * Searches for a session by UUID across all project directories.
+   * This enables resuming sessions from any folder, not just the original project folder.
+   *
+   * @param sessionId - The full UUID of the session to find
+   * @returns Promise resolving to the session selection result, or null if not found
+   */
+  async findSessionGlobal(
+    sessionId: string,
+  ): Promise<SessionSelectionResult | null> {
+    const globalTmpDir = Storage.getGlobalTempDir();
+
+    let projectDirs: string[];
+    try {
+      const entries = await fs.readdir(globalTmpDir, { withFileTypes: true });
+      projectDirs = entries
+        .filter((entry) => entry.isDirectory() && entry.name !== 'bin')
+        .map((entry) => path.join(globalTmpDir, entry.name));
+    } catch {
+      // If the global temp dir doesn't exist, there are no sessions at all
+      return null;
+    }
+
+    const truncatedId = sessionId.slice(0, 8);
+
+    for (const projectDir of projectDirs) {
+      const chatsDir = path.join(projectDir, 'chats');
+
+      let files: string[];
+      try {
+        files = await fs.readdir(chatsDir);
+      } catch {
+        // Skip projects with no chats directory
+        continue;
+      }
+
+      // Optimization: only check files whose name contains the truncated session ID
+      const candidates = files.filter(
+        (f) =>
+          f.startsWith(SESSION_FILE_PREFIX) &&
+          f.endsWith('.json') &&
+          f.includes(truncatedId),
+      );
+
+      // If no filename matches, also fall back to checking all session files
+      // (handles older naming conventions)
+      const filesToCheck =
+        candidates.length > 0
+          ? candidates
+          : files.filter(
+              (f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'),
+            );
+
+      for (const file of filesToCheck) {
+        const filePath = path.join(chatsDir, file);
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          const data: ConversationRecord = JSON.parse(
+            await fs.readFile(filePath, 'utf8'),
+          );
+
+          if (data.sessionId === sessionId) {
+            const firstUserMessage = extractFirstUserMessage(data.messages);
+            const displayInfo = `Session: ${firstUserMessage} (${data.messages.length} messages, ${formatRelativeTime(data.lastUpdated)})`;
+
+            return {
+              sessionPath: filePath,
+              sessionData: data,
+              displayInfo,
+              isCrossProject: true,
+            };
+          }
+        } catch {
+          // Skip corrupted files
+          continue;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Resolves a resume argument to a specific session.
+   *
+   * When a session UUID is provided and not found in the current project,
+   * this method falls back to searching across all projects, enabling
+   * session resumption from any folder.
    *
    * @param resumeArg - Can be "latest", a full UUID, or an index number (1-based)
    * @returns Promise resolving to session selection result
    */
   async resolveSession(resumeArg: string): Promise<SessionSelectionResult> {
-    let selectedSession: SessionInfo;
+    let selectedSession: SessionInfo | undefined;
 
     if (resumeArg === RESUME_LATEST) {
       const sessions = await this.listSessions();
@@ -477,6 +566,20 @@ export class SessionSelector {
       try {
         selectedSession = await this.findSession(resumeArg);
       } catch (error) {
+        // If the identifier looks like a UUID and wasn't found locally,
+        // try searching across all projects before giving up
+        const isUuid =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            resumeArg,
+          );
+
+        if (isUuid) {
+          const globalResult = await this.findSessionGlobal(resumeArg);
+          if (globalResult) {
+            return globalResult;
+          }
+        }
+
         // SessionError already has detailed messages - just rethrow
         if (error instanceof SessionError) {
           throw error;
