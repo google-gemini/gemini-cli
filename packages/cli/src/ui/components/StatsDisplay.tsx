@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useStdout } from 'ink';
 import { ThemedGradient } from './ThemedGradient.js';
 import { theme } from '../semantic-colors.js';
 import { formatDuration, formatResetTime } from '../utils/formatters.js';
@@ -158,6 +158,7 @@ const ModelUsageTable: React.FC<{
   useGemini3_1,
   useCustomToolModel,
 }) => {
+  const { stdout } = useStdout();
   const rows = buildModelRows(models, quotas, useGemini3_1, useCustomToolModel);
 
   if (rows.length === 0) {
@@ -166,19 +167,25 @@ const ModelUsageTable: React.FC<{
 
   const showQuotaColumn = !!quotas && rows.some((row) => !!row.bucket);
 
+  const terminalWidth = stdout?.columns ?? 100;
+
   const nameWidth = 25;
   const requestsWidth = 7;
   const uncachedWidth = 15;
   const cachedWidth = 14;
   const outputTokensWidth = 15;
-  const usageLimitWidth = showQuotaColumn ? 85 : 0;
+
+  const isNarrow = terminalWidth < 100;
+  const usageLimitWidth = showQuotaColumn
+    ? Math.max(30, terminalWidth - nameWidth - requestsWidth - 10)
+    : 0;
 
   const renderProgressBar = (usedFraction: number, color: string) => {
-    const totalSteps = 20;
+    const totalSteps = isNarrow ? 10 : 20;
     let filledSteps = Math.round(usedFraction * totalSteps);
 
     // If something is used (fraction > 0) but rounds to 0, show 1 tick.
-    // If < 100% (fraction < 1) but rounds to 20, show 19 ticks.
+    // If < 100% (fraction < 1) but rounds to totalSteps, show totalSteps - 1 ticks.
     if (usedFraction > 0 && usedFraction < 1) {
       filledSteps = Math.min(Math.max(filledSteps, 1), totalSteps - 1);
     }
@@ -186,8 +193,8 @@ const ModelUsageTable: React.FC<{
     const emptySteps = totalSteps - filledSteps;
     return (
       <Box flexDirection="row">
-        <Text color={color}>{'▬'.repeat(filledSteps)}</Text>
-        <Text color={theme.border.default}>{'▬'.repeat(emptySteps)}</Text>
+        <Text color={color}>{'▇'.repeat(filledSteps)}</Text>
+        <Text color={theme.ui.comment}>{'▇'.repeat(emptySteps)}</Text>
       </Box>
     );
   };
@@ -423,8 +430,8 @@ const ModelUsageTable: React.FC<{
                               <Text color={statusColor}>{percentageText}</Text>
                               <Text color={theme.text.secondary}>
                                 {row.bucket.resetTime &&
-                                formatResetTime(row.bucket.resetTime)
-                                  ? ` (Limit resets in ${formatResetTime(row.bucket.resetTime)})`
+                                formatResetTime(row.bucket.resetTime, true)
+                                  ? ` (resets in ${formatResetTime(row.bucket.resetTime, true)})`
                                   : ''}
                               </Text>
                             </>

@@ -21,6 +21,6 @@ exports[`QuotaDisplay > should render warning when used >= 80% 1`] = `
 `;
 
 exports[`QuotaDisplay > should render with reset time when provided 1`] = `
-"85% used (Limit resets in 1 hour at 11:00 AM UTC)
+"85% used (resets in 1hr)
 "
 `;
