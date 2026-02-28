@@ -75,6 +75,7 @@ export interface ToolInvocation<
 export interface PolicyUpdateOptions {
   commandPrefix?: string | string[];
   mcpName?: string;
+  skillName?: string;
 }
 
 /**

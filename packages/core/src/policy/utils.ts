@@ -51,12 +51,14 @@ export function isSafeRegExp(pattern: string): boolean {
  * @param argsPattern An optional raw regex string for arguments.
  * @param commandPrefix An optional command prefix (or list of prefixes) to allow.
  * @param commandRegex An optional command regex string to allow.
+ * @param skillName An optional skill name to allow specifically for activate_skill.
  * @returns An array of string patterns (or undefined) for the PolicyEngine.
  */
 export function buildArgsPatterns(
   argsPattern?: string,
   commandPrefix?: string | string[],
   commandRegex?: string,
+  skillName?: string,
 ): Array<string | undefined> {
   if (commandPrefix) {
     const prefixes = Array.isArray(commandPrefix)
@@ -78,6 +80,11 @@ export function buildArgsPatterns(
 
   if (commandRegex) {
     return [`"command":"${commandRegex}`];
+  }
+
+  if (skillName) {
+    const jsonSkillName = JSON.stringify(skillName).slice(1, -1);
+    return [`"name":"${escapeRegex(jsonSkillName)}"`];
   }
 
   return [argsPattern];

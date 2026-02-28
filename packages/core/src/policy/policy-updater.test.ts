@@ -143,6 +143,29 @@ describe('createPolicyUpdater', () => {
     expect(parsed.rule![0].commandPrefix).toEqual(['echo', 'ls']);
   });
 
+  it('should add a narrow rule for skill activation', async () => {
+    createPolicyUpdater(policyEngine, messageBus);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'activate_skill',
+      skillName: 'test-skill',
+      persist: false,
+    });
+
+    expect(policyEngine.addRule).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: 'activate_skill',
+        argsPattern: expect.any(RegExp),
+      }),
+    );
+    const addedRule = policyEngine
+      .getRules()
+      .find((rule) => rule.toolName === 'activate_skill');
+    expect(addedRule?.argsPattern).toBeDefined();
+    expect(addedRule!.argsPattern!.test('{"name":"test-skill"}')).toBe(true);
+  });
+
   it('should reject unsafe regex patterns', async () => {
     createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
