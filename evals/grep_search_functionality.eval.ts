@@ -25,10 +25,13 @@ describe('grep_search_functionality', () => {
     assert: async (rig: TestRig, result: string) => {
       await rig.waitForToolCall('grep_search');
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/L2: world/, /L3: hello world/],
-        testName: `${TEST_PREFIX}simple search`,
-      });
+      expect(
+        checkModelOutputContent(result, {
+          expectedContent: [/L2: world/, /L3: hello world/],
+          testName: `${TEST_PREFIX}simple search`,
+        }),
+        'Model output content check failed for simple search',
+      ).toBe(true);
     },
   });
 
@@ -54,11 +57,14 @@ describe('grep_search_functionality', () => {
       ).toBe(true);
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/L1: Hello/],
-        forbiddenContent: [/L2: hello/],
-        testName: `${TEST_PREFIX}case-sensitive search`,
-      });
+      expect(
+        checkModelOutputContent(result, {
+          expectedContent: [/L1: Hello/],
+          forbiddenContent: [/L2: hello/],
+          testName: `${TEST_PREFIX}case-sensitive search`,
+        }),
+        'Model output content check failed for case-sensitive search',
+      ).toBe(true);
     },
   });
 
@@ -84,11 +90,14 @@ describe('grep_search_functionality', () => {
       ).toBe(true);
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/file1.txt/, /file2.txt/],
-        forbiddenContent: [/L1:/],
-        testName: `${TEST_PREFIX}names_only search`,
-      });
+      expect(
+        checkModelOutputContent(result, {
+          expectedContent: [/file1.txt/, /file2.txt/],
+          forbiddenContent: [/L1:/],
+          testName: `${TEST_PREFIX}names_only search`,
+        }),
+        'Model output content check failed for names_only search',
+      ).toBe(true);
     },
   });
 
@@ -114,11 +123,14 @@ describe('grep_search_functionality', () => {
       ).toBe(true);
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/file.js/],
-        forbiddenContent: [/file.ts/],
-        testName: `${TEST_PREFIX}include_pattern glob search`,
-      });
+      expect(
+        checkModelOutputContent(result, {
+          expectedContent: [/file.js/],
+          forbiddenContent: [/file.ts/],
+          testName: `${TEST_PREFIX}include_pattern glob search`,
+        }),
+        'Model output content check failed for include_pattern glob search',
+      ).toBe(true);
     },
   });
 
@@ -144,11 +156,14 @@ describe('grep_search_functionality', () => {
       ).toBe(true);
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/unique_string_1/],
-        forbiddenContent: [/unique_string_2/],
-        testName: `${TEST_PREFIX}subdirectory search`,
-      });
+      expect(
+        checkModelOutputContent(result, {
+          expectedContent: [/unique_string_1/],
+          forbiddenContent: [/unique_string_2/],
+          testName: `${TEST_PREFIX}subdirectory search`,
+        }),
+        'Model output content check failed for subdirectory search',
+      ).toBe(true);
     },
   });
 
@@ -161,10 +176,13 @@ describe('grep_search_functionality', () => {
     assert: async (rig: TestRig, result: string) => {
       await rig.waitForToolCall('grep_search');
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/No matches found/],
-        testName: `${TEST_PREFIX}no matches`,
-      });
+      expect(
+        checkModelOutputContent(result, {
+          expectedContent: [/No matches found/],
+          testName: `${TEST_PREFIX}no matches`,
+        }),
+        'Model output content check failed for no matches',
+      ).toBe(true);
     },
   });
 });
