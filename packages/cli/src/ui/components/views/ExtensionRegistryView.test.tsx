@@ -132,6 +132,9 @@ describe('ExtensionRegistryView', () => {
 
     vi.mocked(useConfig).mockReturnValue({
       getEnableExtensionReloading: vi.fn().mockReturnValue(false),
+      getExtensionRegistryURI: vi
+        .fn()
+        .mockReturnValue('https://geminicli.com/extensions.json'),
     } as unknown as ReturnType<typeof useConfig>);
   });
 

@@ -1672,6 +1672,13 @@
           "default": false,
           "type": "boolean"
         },
+        "extensionRegistryURI": {
+          "title": "Extension Registry URI",
+          "description": "The URI (web URL or local file path) of the extension registry.",
+          "markdownDescription": "The URI (web URL or local file path) of the extension registry.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `https://geminicli.com/extensions.json`",
+          "default": "https://geminicli.com/extensions.json",
+          "type": "string"
+        },
         "extensionReloading": {
           "title": "Extension Reloading",
           "description": "Enables extension loading/unloading within the CLI session.",

@@ -528,6 +528,7 @@ export interface ConfigParameters {
   skipNextSpeakerCheck?: boolean;
   shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
+  extensionRegistryURI?: string;
   truncateToolOutputThreshold?: number;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
@@ -712,6 +713,7 @@ export class Config implements McpContext {
   private readonly useAlternateBuffer: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
+  private readonly extensionRegistryURI: string | undefined;
   private readonly truncateToolOutputThreshold: number;
   private compressionTruncationCounter = 0;
   private initialized = false;
@@ -939,6 +941,7 @@ export class Config implements McpContext {
     this.shellToolInactivityTimeout =
       (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
     this.extensionManagement = params.extensionManagement ?? true;
+    this.extensionRegistryURI = params.extensionRegistryURI;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir, this.sessionId);
     this.storage.setCustomPlansDir(params.planSettings?.directory);
@@ -1764,6 +1767,10 @@ export class Config implements McpContext {
 
   getExtensionsEnabled(): boolean {
     return this.extensionsEnabled;
+  }
+
+  getExtensionRegistryURI(): string | undefined {
+    return this.extensionRegistryURI;
   }
 
   getMcpClientManager(): McpClientManager | undefined {

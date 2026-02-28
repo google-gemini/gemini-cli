@@ -992,6 +992,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.extensionRegistryURI`** (string):
+  - **Description:** The URI (web URL or local file path) of the extension
+    registry.
+  - **Default:** `"https://geminicli.com/extensions.json"`
+  - **Requires restart:** Yes
+
 - **`experimental.extensionReloading`** (boolean):
   - **Description:** Enables extension loading/unloading within the CLI session.
   - **Default:** `false`
