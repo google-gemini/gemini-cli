@@ -184,8 +184,12 @@ export class FileDiscoveryService {
       this.defaultFilterFileOptions.respectGitIgnore
     ) {
       const gitIgnorePath = path.join(this.projectRoot, '.gitignore');
-      if (fs.existsSync(gitIgnorePath)) {
-        paths.push(gitIgnorePath);
+      try {
+        if (fs.statSync(gitIgnorePath).isFile()) {
+          paths.push(gitIgnorePath);
+        }
+      } catch {
+        // File does not exist or cannot be accessed, ignore.
       }
     }
     return paths.concat(this.getIgnoreFilePaths());
