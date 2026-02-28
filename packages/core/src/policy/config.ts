@@ -13,8 +13,9 @@ import {
   type PolicyEngineConfig,
   PolicyDecision,
   type PolicyRule,
-  type ApprovalMode,
+  ApprovalMode,
   type PolicySettings,
+  type SafetyCheckerRule,
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
 import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
@@ -39,14 +40,15 @@ export const DEFAULT_CORE_POLICIES_DIR = path.join(__dirname, 'policies');
 
 // Policy tier constants for priority calculation
 export const DEFAULT_POLICY_TIER = 1;
-export const WORKSPACE_POLICY_TIER = 2;
-export const USER_POLICY_TIER = 3;
-export const ADMIN_POLICY_TIER = 4;
+export const EXTENSION_POLICY_TIER = 2;
+export const WORKSPACE_POLICY_TIER = 3;
+export const USER_POLICY_TIER = 4;
+export const ADMIN_POLICY_TIER = 5;
 
 // Specific priority offsets and derived priorities for dynamic/settings rules.
 // These are added to the tier base (e.g., USER_POLICY_TIER).
 
-// Workspace tier (2) + high priority (950/1000) = ALWAYS_ALLOW_PRIORITY
+// Workspace tier (3) + high priority (950/1000) = ALWAYS_ALLOW_PRIORITY
 // This ensures user "always allow" selections are high priority
 // within the workspace tier but still lose to user/admin policies.
 export const ALWAYS_ALLOW_PRIORITY = WORKSPACE_POLICY_TIER + 0.95;
@@ -59,7 +61,9 @@ export const ALLOWED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.1;
 
 /**
  * Gets the list of directories to search for policy files, in order of increasing priority
- * (Default -> User -> Project -> Admin).
+ * (Default -> Extension -> Workspace -> User -> Admin).
+ *
+ * Note: Extension policies are loaded separately by the extension manager.
  *
  * @param defaultPoliciesDir Optional path to a directory containing default policies.
  * @param policyPaths Optional user-provided policy paths (from --policy flag).
@@ -95,7 +99,7 @@ export function getPolicyDirectories(
 }
 
 /**
- * Determines the policy tier (1=default, 2=user, 3=workspace, 4=admin) for a given directory.
+ * Determines the policy tier (1=default, 2=extension, 3=workspace, 4=user, 5=admin) for a given directory.
  * This is used by the TOML loader to assign priority bands.
  */
 export function getPolicyTier(
@@ -178,6 +182,69 @@ async function filterSecurePolicyDirectories(
   return results.filter((dir): dir is string => dir !== null);
 }
 
+/**
+ * Loads and sanitizes policies from an extension's policies directory.
+ * Security: Filters out 'ALLOW' rules and YOLO mode configurations.
+ */
+export async function loadExtensionPolicies(
+  extensionName: string,
+  policyDir: string,
+): Promise<{
+  rules: PolicyRule[];
+  checkers: SafetyCheckerRule[];
+  errors: PolicyFileError[];
+}> {
+  const result = await loadPoliciesFromToml(
+    [policyDir],
+    () => EXTENSION_POLICY_TIER,
+  );
+
+  const rules = result.rules.filter((rule) => {
+    // Security: Extensions are not allowed to automatically approve tool calls.
+    if (rule.decision === PolicyDecision.ALLOW) {
+      debugLogger.warn(
+        `[PolicyConfig] Extension "${extensionName}" attempted to contribute an ALLOW rule for tool "${rule.toolName}". Ignoring this rule for security.`,
+      );
+      return false;
+    }
+
+    // Security: Extensions are not allowed to contribute YOLO mode rules.
+    if (rule.modes?.includes(ApprovalMode.YOLO)) {
+      debugLogger.warn(
+        `[PolicyConfig] Extension "${extensionName}" attempted to contribute a rule for YOLO mode. Ignoring this rule for security.`,
+      );
+      return false;
+    }
+
+    // Prefix source with extension name to avoid collisions and double prefixing.
+    // toml-loader.ts adds "Extension: file.toml", we transform it to "Extension (name): file.toml".
+    rule.source = rule.source?.replace(
+      /^Extension: /,
+      `Extension (${extensionName}): `,
+    );
+    return true;
+  });
+
+  const checkers = result.checkers.filter((checker) => {
+    // Security: Extensions are not allowed to contribute YOLO mode checkers.
+    if (checker.modes?.includes(ApprovalMode.YOLO)) {
+      debugLogger.warn(
+        `[PolicyConfig] Extension "${extensionName}" attempted to contribute a safety checker for YOLO mode. Ignoring this checker for security.`,
+      );
+      return false;
+    }
+
+    // Prefix source with extension name.
+    checker.source = checker.source?.replace(
+      /^Extension: /,
+      `Extension (${extensionName}): `,
+    );
+    return true;
+  });
+
+  return { rules, checkers, errors: result.errors };
+}
+
 export async function createPolicyEngineConfig(
   settings: PolicySettings,
   approvalMode: ApprovalMode,
@@ -234,17 +301,19 @@ export async function createPolicyEngineConfig(
   const checkers = [...tomlCheckers];
 
   // Priority system for policy rules:
+
   // - Higher priority numbers win over lower priority numbers
   // - When multiple rules match, the highest priority rule is applied
   // - Rules are evaluated in order of priority (highest first)
   //
   // Priority bands (tiers):
   // - Default policies (TOML): 1 + priority/1000 (e.g., priority 100 → 1.100)
-  // - Workspace policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
-  // - User policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
-  // - Admin policies (TOML): 4 + priority/1000 (e.g., priority 100 → 4.100)
+  // - Extension policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
+  // - Workspace policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
+  // - User policies (TOML): 4 + priority/1000 (e.g., priority 100 → 4.100)
+  // - Admin policies (TOML): 5 + priority/1000 (e.g., priority 100 → 5.100)
   //
-  // This ensures Admin > User > Workspace > Default hierarchy is always preserved,
+  // This ensures Admin > User > Workspace > Extension > Default hierarchy is always preserved,
   // while allowing user-specified priorities to work within each tier.
   //
   // Settings-based and dynamic rules (mixed tiers):
@@ -254,7 +323,7 @@ export async function createPolicyEngineConfig(
   //   TRUSTED_MCP_SERVER_PRIORITY:  MCP servers with trust=true (persistent trusted servers)
   //   ALLOWED_MCP_SERVER_PRIORITY:  MCP servers allowed list (persistent general server allows)
   //   ALWAYS_ALLOW_PRIORITY:        Tools that the user has selected as "Always Allow" in the interactive UI
-  //                                 (Workspace tier 2.x - scoped to the project)
+  //                                 (Workspace tier 3.x - scoped to the project)
   //
   // TOML policy priorities (before transformation):
   //   10: Write tools default to ASK_USER (becomes 1.010 in default tier)
@@ -447,9 +516,8 @@ export function createPolicyUpdater(
       if (message.persist) {
         persistenceQueue = persistenceQueue.then(async () => {
           try {
-            const workspacePoliciesDir = storage.getWorkspacePoliciesDir();
-            await fs.mkdir(workspacePoliciesDir, { recursive: true });
             const policyFile = storage.getAutoSavedPolicyPath();
+            await fs.mkdir(path.dirname(policyFile), { recursive: true });
 
             // Read existing file
             let existingData: { rule?: TomlRule[] } = {};
