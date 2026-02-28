@@ -13,6 +13,74 @@ import {
 import { theme } from '../semantic-colors.js';
 import { debugLogger } from '@google/gemini-cli-core';
 
+// Characters that should be stripped from the end of bare URLs.
+// Includes common punctuation and CJK fullwidth equivalents.
+const TRAILING_PUNCT = new Set([
+  '.',
+  ',',
+  ';',
+  ':',
+  '!',
+  '?',
+  "'",
+  '"',
+  ')',
+  ']',
+  '>',
+  '}',
+  // CJK fullwidth equivalents
+  '\u3002', // Ideographic full stop
+  '\uFF0C', // Fullwidth comma
+  '\uFF1B', // Fullwidth semicolon
+  '\uFF1A', // Fullwidth colon
+  '\uFF01', // Fullwidth exclamation
+  '\uFF1F', // Fullwidth question mark
+  '\u300D', // Right corner bracket
+  '\u300F', // Right white corner bracket
+  '\uFF09', // Fullwidth right parenthesis
+  '\u3011', // Right black lenticular bracket
+  '\uFF3D', // Fullwidth right square bracket
+  '\uFF1E', // Fullwidth greater-than
+  '\uFF5D', // Fullwidth right curly bracket
+]);
+
+/**
+ * Strips trailing punctuation from a URL while preserving balanced parentheses.
+ * This handles Wikipedia-style URLs like https://en.wikipedia.org/wiki/Foo_(bar)
+ * where the closing paren is part of the URL, not trailing punctuation.
+ *
+ * Returns the cleaned URL and any stripped trailing characters.
+ */
+export const stripTrailingPunctuation = (
+  url: string,
+): { cleanUrl: string; trailing: string } => {
+  let end = url.length;
+
+  while (end > 0 && TRAILING_PUNCT.has(url[end - 1])) {
+    const ch = url[end - 1];
+
+    // Preserve balanced parentheses (for Wikipedia URLs etc.)
+    if (ch === ')' || ch === '\uFF09') {
+      const open = ch === ')' ? '(' : '\uFF08';
+      const urlPortion = url.slice(0, end);
+      let depth = 0;
+      for (const c of urlPortion) {
+        if (c === open) depth++;
+        else if (c === ch) depth--;
+      }
+      // depth < 0 means more closing than opening, so this one is trailing
+      if (depth >= 0) break;
+    }
+
+    end--;
+  }
+
+  return {
+    cleanUrl: url.slice(0, end),
+    trailing: url.slice(end),
+  };
+};
+
 // Constants for Markdown parsing
 const BOLD_MARKER_LENGTH = 2; // For "**"
 const ITALIC_MARKER_LENGTH = 1; // For "*" or "_"
@@ -197,7 +265,11 @@ export const parseMarkdownToANSI = (
           ),
         );
       } else if (fullMatch.match(/^https?:\/\//)) {
-        styledPart = ansiColorize(fullMatch, theme.text.link);
+        const { cleanUrl, trailing } = stripTrailingPunctuation(fullMatch);
+        styledPart = ansiColorize(cleanUrl, theme.text.link);
+        if (trailing) {
+          styledPart += ansiColorize(trailing, baseColor);
+        }
       }
     } catch (e) {
       debugLogger.warn('Error parsing inline markdown part:', fullMatch, e);
