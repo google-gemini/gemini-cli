@@ -166,7 +166,11 @@ const createDiscoveryProcess = (toolDeclarations: FunctionDeclaration[]) => {
 };
 
 // Helper to create a mock spawn process for tool execution
-const createExecutionProcess = (exitCode: number, stderrMessage?: string) => {
+const createExecutionProcess = (
+  exitCode: number,
+  stderrMessage?: string,
+  stdoutMessage?: string,
+) => {
   const mockProcess = {
     stdout: { on: vi.fn(), removeListener: vi.fn() },
     stderr: { on: vi.fn(), removeListener: vi.fn() },
@@ -181,6 +185,14 @@ const createExecutionProcess = (exitCode: number, stderrMessage?: string) => {
     mockProcess.stderr.on.mockImplementation((event, callback) => {
       if (event === 'data') {
         callback(Buffer.from(stderrMessage));
+      }
+    });
+  }
+
+  if (stdoutMessage) {
+    mockProcess.stdout.on.mockImplementation((event, callback) => {
+      if (event === 'data') {
+        callback(Buffer.from(stdoutMessage));
       }
     });
   }
@@ -541,7 +553,7 @@ describe('ToolRegistry', () => {
       expect(discoveredTool).toBeDefined();
 
       mockSpawn.mockReturnValueOnce(
-        createExecutionProcess(1, 'Something went wrong') as any,
+        createExecutionProcess(2, 'Something went wrong') as any,
       );
 
       const invocation = (discoveredTool as DiscoveredTool).build({});
@@ -551,7 +563,7 @@ describe('ToolRegistry', () => {
         ToolErrorType.DISCOVERED_TOOL_EXECUTION_ERROR,
       );
       expect(result.llmContent).toContain('Stderr: Something went wrong');
-      expect(result.llmContent).toContain('Exit Code: 1');
+      expect(result.llmContent).toContain('Exit Code: 2');
     });
 
     it('should pass MessageBus to DiscoveredTool and its invocations', async () => {
@@ -578,6 +590,30 @@ describe('ToolRegistry', () => {
 
       const invocation = tool!.build({});
       expect((invocation as any).messageBus).toBe(mockMessageBus);
+    });
+
+    it('should support canUpdateOutput from discovery', async () => {
+      const discoveryCommand = 'my-discovery-command';
+      mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
+
+      const toolDeclaration = {
+        name: 'streaming-tool',
+        description: 'A tool that streams',
+        parametersJsonSchema: { type: 'object', properties: {} },
+        canUpdateOutput: true,
+      };
+
+      const mockSpawn = vi.mocked(spawn);
+      mockSpawn.mockReturnValueOnce(
+        createDiscoveryProcess([toolDeclaration]) as any,
+      );
+
+      await toolRegistry.discoverAllTools();
+      const tool = toolRegistry.getTool(
+        DISCOVERED_TOOL_PREFIX + 'streaming-tool',
+      );
+      expect(tool).toBeDefined();
+      expect(tool?.canUpdateOutput).toBe(true);
     });
   });
 
@@ -730,6 +766,58 @@ describe('ToolRegistry', () => {
   });
 
   describe('DiscoveredToolInvocation', () => {
+    it('should call updateOutput during execution when provided', async () => {
+      vi.spyOn(config, 'getToolCallCommand').mockReturnValue('my-call-command');
+
+      const tool = new DiscoveredTool(
+        config,
+        'streaming-tool',
+        DISCOVERED_TOOL_PREFIX + 'streaming-tool',
+        'A tool that streams',
+        {},
+        mockMessageBus,
+        true, // canUpdateOutput
+      );
+
+      const mockSpawn = vi.mocked(spawn);
+      const stdoutMessage = 'Live update';
+      mockSpawn.mockReturnValueOnce(
+        createExecutionProcess(0, undefined, stdoutMessage) as any,
+      );
+
+      const updateOutput = vi.fn();
+      const invocation = tool.build({});
+      await invocation.execute(new AbortController().signal, updateOutput);
+
+      expect(updateOutput).toHaveBeenCalledWith(stdoutMessage);
+    });
+
+    it('should call updateOutput for stderr during execution when provided', async () => {
+      vi.spyOn(config, 'getToolCallCommand').mockReturnValue('my-call-command');
+
+      const tool = new DiscoveredTool(
+        config,
+        'streaming-tool',
+        DISCOVERED_TOOL_PREFIX + 'streaming-tool',
+        'A tool that streams',
+        {},
+        mockMessageBus,
+        true, // canUpdateOutput
+      );
+
+      const mockSpawn = vi.mocked(spawn);
+      const stderrMessage = 'Progress update';
+      mockSpawn.mockReturnValueOnce(
+        createExecutionProcess(0, stderrMessage) as any,
+      );
+
+      const updateOutput = vi.fn();
+      const invocation = tool.build({});
+      await invocation.execute(new AbortController().signal, updateOutput);
+
+      expect(updateOutput).toHaveBeenCalledWith(stderrMessage);
+    });
+
     it('should return the stringified params from getDescription', () => {
       const tool = new DiscoveredTool(
         config,
