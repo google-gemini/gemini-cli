@@ -42,11 +42,33 @@ export function useInputHistory({
     Record<number, { text: string; offset: number }>
   >({});
 
+  // Stores user-edited drafts of historical prompts across navigation sessions.
+  // Keyed by the stable originalIndex (position in userMessages) rather than
+  // message content, so duplicate messages are handled independently.
+  // Uses a null-prototype object to avoid Object Property Injection risks.
+  const persistentDraftsRef = useRef<Record<number, string>>(
+    Object.create(null),
+  );
+
   const resetHistoryNav = useCallback(() => {
+    // Before clearing the session cache, persist any history entries the user
+    // edited but did not submit. Keyed by originalIndex which is stable since
+    // userMessages is append-only — existing entries never shift position.
+    Object.entries(historyCacheRef.current).forEach(([idx, cached]) => {
+      const index = Number(idx);
+      if (index >= 0) {
+        const originalIndex = userMessages.length - 1 - index;
+        const original = userMessages[originalIndex];
+        if (original !== undefined && cached.text !== original) {
+          persistentDraftsRef.current[originalIndex] = cached.text;
+        }
+      }
+    });
+
     setHistoryIndex(-1);
     previousHistoryIndexRef.current = undefined;
     historyCacheRef.current = {};
-  }, []);
+  }, [userMessages]);
 
   const handleSubmit = useCallback(
     (value: string) => {
@@ -96,7 +118,12 @@ export function useInputHistory({
         if (saved) {
           onChange(saved.text, defaultCursor);
         } else {
-          const newValue = userMessages[userMessages.length - 1 - nextIndex];
+          // Check for a draft persisted from a previous navigation session
+          // before falling back to the original message.
+          const originalIndex = userMessages.length - 1 - nextIndex;
+          const original = userMessages[originalIndex];
+          const persistedDraft = persistentDraftsRef.current[originalIndex];
+          const newValue = persistedDraft ?? original;
           onChange(newValue, defaultCursor);
         }
       }
