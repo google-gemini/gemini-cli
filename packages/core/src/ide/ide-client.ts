@@ -301,6 +301,57 @@ export class IdeClient {
     return oldMutex.then(() => release);
   }
 
+  /**
+   * Resolves an external URI for a local URI using the IDE's built-in capability.
+   * This is particularly useful for Remote Tunnels or other environments where
+   * localhost is not directly accessible from the browser.
+   *
+   * @param uri The local URI to be resolved.
+   * @returns A promise that resolves to the external URI.
+   */
+  async asExternalUri(uri: string): Promise<string> {
+    if (!this.client || !this.availableTools.includes('asExternalUri')) {
+      logger.debug(
+        'asExternalUri is not available through the IDE client. Falling back to original URI.',
+      );
+      return uri;
+    }
+
+    try {
+      const resultData = await this.client.request(
+        {
+          method: 'tools/call',
+          params: {
+            name: 'asExternalUri',
+            arguments: { uri },
+          },
+        },
+        CallToolResultSchema,
+        { timeout: IDE_REQUEST_TIMEOUT_MS },
+      );
+
+      if (resultData.isError) {
+        const textPart = resultData.content.find(
+          (part) => part.type === 'text',
+        );
+        logger.debug(
+          `asExternalUri request failed for ${uri}:`,
+          textPart?.text ?? 'Unknown error',
+        );
+        return uri;
+      }
+
+      const textPart = resultData.content.find((part) => part.type === 'text');
+      if (textPart?.text) {
+        return textPart.text;
+      }
+    } catch (err) {
+      logger.debug(`asExternalUri request failed for ${uri}:`, err);
+    }
+
+    return uri;
+  }
+
   async closeDiff(
     filePath: string,
     options?: { suppressNotification?: boolean },

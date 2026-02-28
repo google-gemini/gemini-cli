@@ -146,3 +146,13 @@ export const CloseDiffRequestSchema = z.object({
    */
   suppressNotification: z.boolean().optional(),
 });
+
+/**
+ * The request to resolve an external URI for a local URI.
+ */
+export const AsExternalUriRequestSchema = z.object({
+  /**
+   * The local URI to be resolved.
+   */
+  uri: z.string(),
+});

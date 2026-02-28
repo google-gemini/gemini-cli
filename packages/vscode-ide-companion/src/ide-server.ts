@@ -9,7 +9,9 @@ import {
   CloseDiffRequestSchema,
   IdeContextNotificationSchema,
   OpenDiffRequestSchema,
-} from '@google/gemini-cli-core/src/ide/types.js';
+  AsExternalUriRequestSchema,
+  tmpdir,
+} from '@google/gemini-cli-core';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -23,7 +25,7 @@ import { randomUUID } from 'node:crypto';
 import { type Server as HTTPServer } from 'node:http';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import { tmpdir } from '@google/gemini-cli-core';
+import * as net from 'node:net';
 import type { z } from 'zod';
 import type { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
@@ -473,6 +475,74 @@ const createMcpServer = (
           },
         ],
       };
+    },
+  );
+  server.registerTool(
+    'asExternalUri',
+    {
+      description:
+        '(IDE Tool) Resolve an external URI for a local URI. Hardened to allow only OAuth callback redirects on loopback.',
+      inputSchema: AsExternalUriRequestSchema.shape,
+    },
+    async ({ uri }: z.infer<typeof AsExternalUriRequestSchema>) => {
+      log(`Received asExternalUri request for uri: ${uri}`);
+      try {
+        // 1. Validate using WHATWG URL constructor for reliable host/port/path parsing
+        const parsedUrl = new URL(uri);
+
+        // Required for security: Only allow absolute URIs with http scheme
+        if (parsedUrl.protocol !== 'http:') {
+          throw new Error(
+            `Invalid scheme: ${parsedUrl.protocol.slice(0, -1)}. Only 'http' is allowed for security reasons.`,
+          );
+        }
+
+        // Required for security: Only allow loopback hosts
+        const hostname = parsedUrl.hostname;
+        // @ts-expect-error: isLoopback might be missing in @types/node@20
+        if (!net.isLoopback(hostname)) {
+          throw new Error(
+            `Invalid host: ${hostname}. Only loopback hosts are allowed.`,
+          );
+        }
+
+        // Required for security: Require an explicit port
+        if (!parsedUrl.port) {
+          throw new Error('A port must be specified in the URI.');
+        }
+
+        // Required for security: Restrict path strictly to OAuth callback
+        if (parsedUrl.pathname !== '/oauth2redirect') {
+          throw new Error(
+            `Unauthorized path: ${parsedUrl.pathname}. Only '/oauth2redirect' is allowed for security reasons.`,
+          );
+        }
+
+        // 2. Use vscode.Uri for the actual resolution
+        const parsedUri = vscode.Uri.parse(uri);
+        const externalUri = await vscode.env.asExternalUri(parsedUri);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: externalUri.toString(),
+            },
+          ],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log(`asExternalUri validation failed: ${message}`);
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Failed to resolve external URI.',
+            },
+          ],
+        };
+      }
     },
   );
   return server;
