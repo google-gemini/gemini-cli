@@ -107,7 +107,7 @@ vi.mock('../ui/auth/useAuth.js', () => ({
     accountSuspensionInfo: null,
     setAccountSuspensionInfo: vi.fn(),
   }),
-  validateAuthMethodWithSettings: () => null,
+  validateAuthMethodWithSettings: async () => null,
 }));
 
 // A minimal mock ExtensionManager to satisfy AppContainer's forceful cast
