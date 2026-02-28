@@ -67,11 +67,11 @@ export async function runZedIntegration(
   argv: CliArgs,
 ) {
   const { stdout: workingStdout } = createWorkingStdio();
-  const stdout = Writable.toWeb(workingStdout) as WritableStream;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
-
-  const stream = acp.ndJsonStream(stdout, stdin);
+  const stream = acp.ndJsonStream(
+    Writable.toWeb(workingStdout),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>,
+  );
   const connection = new acp.AgentSideConnection(
     (connection) => new GeminiAgent(config, settings, argv, connection),
     stream,
@@ -441,8 +441,11 @@ export class Session {
     if (!mode) {
       throw new Error(`Invalid or unavailable mode: ${modeId}`);
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    this.config.setApprovalMode(mode.id as ApprovalMode);
+    const parseResult = z.nativeEnum(ApprovalMode).safeParse(mode.id);
+    if (!parseResult.success) {
+      throw new Error(`Invalid approval mode ID: ${mode.id}`);
+    }
+    this.config.setApprovalMode(parseResult.data);
     return {};
   }
 

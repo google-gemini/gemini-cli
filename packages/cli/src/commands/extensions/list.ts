@@ -62,8 +62,10 @@ export const listCommand: CommandModule = {
     }),
   handler: async (argv) => {
     await handleList({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      outputFormat: argv['output-format'] as 'text' | 'json',
+      outputFormat:
+        argv['output-format'] === 'text' || argv['output-format'] === 'json'
+          ? argv['output-format']
+          : 'text',
     });
     await exitCli();
   },

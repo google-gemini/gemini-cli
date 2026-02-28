@@ -73,8 +73,10 @@ export const listCommand: CommandModule = {
       default: false,
     }),
   handler: async (argv) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    await handleList({ all: argv['all'] as boolean });
+    await handleList({
+      all:
+        typeof argv['all'] === 'boolean' ? argv['all'] : Boolean(argv['all']),
+    });
     await exitCli();
   },
 };
