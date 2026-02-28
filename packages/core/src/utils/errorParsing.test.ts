@@ -114,4 +114,29 @@ describe('parseAndFormatApiError', () => {
     const expected = '[API Error: An unknown error occurred.]';
     expect(parseAndFormatApiError(error)).toBe(expected);
   });
+
+  it('should append a DNS hint for ENOTFOUND errors', () => {
+    const errorMessage =
+      'request to https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent failed, reason: getaddrinfo ENOTFOUND cloudcode-pa.googleapis.com';
+    const result = parseAndFormatApiError(errorMessage);
+    expect(result).toContain(`[API Error: ${errorMessage}]`);
+    expect(result).toContain(
+      'Network error: DNS resolution failed for cloudcode-pa.googleapis.com.',
+    );
+  });
+
+  it('should append a DNS hint for EAI_AGAIN errors in structured errors', () => {
+    const error: StructuredError = {
+      message:
+        'request failed, reason: getaddrinfo EAI_AGAIN cloudcode-pa.googleapis.com',
+      status: 503,
+    };
+    const result = parseAndFormatApiError(error);
+    expect(result).toContain(
+      '[API Error: request failed, reason: getaddrinfo EAI_AGAIN cloudcode-pa.googleapis.com]',
+    );
+    expect(result).toContain(
+      'Network error: DNS resolution failed for cloudcode-pa.googleapis.com.',
+    );
+  });
 });
