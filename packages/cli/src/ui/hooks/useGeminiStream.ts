@@ -88,8 +88,9 @@ import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
-import { useKeypress } from './useKeypress.js';
+import { useKeypress, type Key } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import { useVimMode } from '../contexts/VimModeContext.js';
 
 type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;
@@ -203,6 +204,7 @@ export const useGeminiStream = (
   isShellFocused?: boolean,
   consumeUserHint?: () => string | null,
 ) => {
+  const { vimEnabled, vimMode } = useVimMode();
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
     null,
@@ -700,18 +702,26 @@ export const useGeminiStream = (
     activeShellPtyId,
   ]);
 
-  useKeypress(
-    (key) => {
+  const handleEscapeKeypress = useCallback(
+    (key: Key) => {
       if (key.name === 'escape' && !isShellFocused) {
+        // If Vim mode is enabled and we are in INSERT mode, escape should just
+        // switch back to NORMAL mode (handled by the editor) and NOT cancel
+        // the request.
+        if (vimEnabled && vimMode === 'INSERT') {
+          return;
+        }
         cancelOngoingRequest();
       }
     },
-    {
-      isActive:
-        streamingState === StreamingState.Responding ||
-        streamingState === StreamingState.WaitingForConfirmation,
-    },
+    [vimEnabled, vimMode, isShellFocused, cancelOngoingRequest],
   );
+
+  useKeypress(handleEscapeKeypress, {
+    isActive:
+      streamingState === StreamingState.Responding ||
+      streamingState === StreamingState.WaitingForConfirmation,
+  });
 
   const prepareQueryForGemini = useCallback(
     async (
