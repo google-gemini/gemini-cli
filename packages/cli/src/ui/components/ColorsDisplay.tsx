@@ -36,6 +36,22 @@ interface ColorsDisplayProps {
   activeTheme: Theme;
 }
 
+/**
+ * Determines a contrasting text color (black or white) based on the background color's luminance.
+ */
+function getContrastingTextColor(hex: string): string {
+  if (!hex || !hex.startsWith('#') || hex.length < 7) {
+    // Fallback for invalid hex codes or named colors
+    return theme.text.primary;
+  }
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  // Using YIQ formula to determine luminance
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 128 ? '#000000' : '#FFFFFF';
+}
+
 export const ColorsDisplay: React.FC<ColorsDisplayProps> = ({
   activeTheme,
 }) => {
@@ -53,54 +69,40 @@ export const ColorsDisplay: React.FC<ColorsDisplayProps> = ({
     };
   }
 
-  // Flatten and categorize the SemanticColors object
-  for (const [category, subColors] of Object.entries(semanticColors)) {
-    if (category === 'ui' && 'gradient' in subColors) {
-      continue;
-    }
+  /**
+   * Recursively flattens the semanticColors object.
+   */
+  const flattenColors = (obj: object, path: string = '') => {
+    for (const [key, value] of Object.entries(obj)) {
+      if (value === undefined || value === null) continue;
+      const newPath = path ? `${path}.${key}` : key;
 
-    for (const [name, value] of Object.entries(subColors)) {
-      const fullName = `${category}.${name}`;
-
-      if (value === undefined || value === null) {
+      if (key === 'gradient' && Array.isArray(value)) {
+        // Gradient handled separately
         continue;
       }
 
       if (typeof value === 'object' && !Array.isArray(value)) {
-        for (const [diffName, diffValue] of Object.entries(value)) {
-          if (typeof diffValue === 'string') {
-            if (category === 'background') {
-              backgroundRows.push({
-                type: 'background',
-                name: `${fullName}.${diffName}`,
-                value: diffValue,
-              });
-            } else {
-              standardRows.push({
-                type: 'standard',
-                name: `${fullName}.${diffName}`,
-                value: diffValue,
-              });
-            }
-          }
-        }
+        flattenColors(value, newPath);
       } else if (typeof value === 'string') {
-        if (category === 'background') {
+        if (newPath.startsWith('background.')) {
           backgroundRows.push({
             type: 'background',
-            name: fullName,
+            name: newPath,
             value,
           });
         } else {
           standardRows.push({
             type: 'standard',
-            name: fullName,
+            name: newPath,
             value,
           });
         }
       }
     }
-  }
+  };
+
+  flattenColors(semanticColors);
 
   // Final order: Backgrounds first, then Standards, then Gradient
   const allRows: ColorRow[] = [
@@ -218,7 +220,7 @@ function renderBackgroundRow({ name, value }: BackgroundColorRow) {
         justifyContent="center"
         paddingX={1}
       >
-        <Text color={theme.text.primary} bold wrap="truncate">
+        <Text color={getContrastingTextColor(value)} bold wrap="truncate">
           {value || 'default'}
         </Text>
       </Box>

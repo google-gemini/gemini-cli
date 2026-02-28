@@ -44,6 +44,9 @@ exports[`Initial Theme Selection > should default to a dark theme when terminal 
 │                                              │  (blank)   text.response                       │  │
 │                                              │  #3d3f51   border.default                      │  │
 │                                              │  #89B4FA   border.focused                      │  │
+│                                              │  #6C7086   ui.comment                          │  │
+│                                              │  #89DCEB   ui.symbol                           │  │
+│                                              │  #3d3f51   ui.dark                             │  │
 │                                              │  #F38BA8   status.error                        │  │
 │                                              │  #A6E3A1   status.success                      │  │
 │                                              │  #F9E2AF   status.warning                      │  │
@@ -102,6 +105,9 @@ exports[`Initial Theme Selection > should default to a light theme when terminal
 │                                              │  (blank)   text.response                       │  │
 │                                              │  #d2d6dc   border.default                      │  │
 │                                              │  #3B82F6   border.focused                      │  │
+│                                              │  #97a0b0   ui.comment                          │  │
+│                                              │  #06B6D4   ui.symbol                           │  │
+│                                              │  #d2d6dc   ui.dark                             │  │
 │                                              │  #DD4C4C   status.error                        │  │
 │                                              │  #3CA84B   status.success                      │  │
 │                                              │  #D5A40A   status.warning                      │  │
@@ -160,6 +166,9 @@ exports[`Initial Theme Selection > should use the theme from settings even if te
 │                                              │  (blank)   text.response                       │  │
 │                                              │  #3d3f51   border.default                      │  │
 │                                              │  #89B4FA   border.focused                      │  │
+│                                              │  #6C7086   ui.comment                          │  │
+│                                              │  #89DCEB   ui.symbol                           │  │
+│                                              │  #3d3f51   ui.dark                             │  │
 │                                              │  #F38BA8   status.error                        │  │
 │                                              │  #A6E3A1   status.success                      │  │
 │                                              │  #F9E2AF   status.warning                      │  │
@@ -232,6 +241,9 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │                                              │  (blank)   text.response                       │  │
 │                                              │  #3d3f51   border.default                      │  │
 │                                              │  #89B4FA   border.focused                      │  │
+│                                              │  #6C7086   ui.comment                          │  │
+│                                              │  #6C7086   ui.symbol                           │  │
+│                                              │  #3d3f51   ui.dark                             │  │
 │                                              │  #F38BA8   status.error                        │  │
 │                                              │  #A6E3A1   status.success                      │  │
 │                                              │  #F9E2AF   status.warning                      │  │
