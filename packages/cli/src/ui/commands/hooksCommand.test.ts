@@ -141,7 +141,7 @@ describe('hooksCommand', () => {
     it('should return error when config is not loaded', async () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
-          config: null,
+          config: {} as unknown as Config,
         },
       });
 
@@ -237,7 +237,7 @@ describe('hooksCommand', () => {
     it('should return error when config is not loaded', async () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
-          config: null,
+          config: {} as unknown as Config,
         },
       });
 
@@ -350,7 +350,7 @@ describe('hooksCommand', () => {
     it('should return error when config is not loaded', async () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
-          config: null,
+          config: {} as unknown as Config,
         },
       });
 
@@ -482,7 +482,7 @@ describe('hooksCommand', () => {
     it('should return empty array when config is not available', () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
-          config: null,
+          config: {} as unknown as Config,
         },
       });
 
@@ -579,7 +579,7 @@ describe('hooksCommand', () => {
     it('should return error when config is not loaded', async () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
-          config: null,
+          config: {} as unknown as Config,
         },
       });
 
@@ -703,7 +703,7 @@ describe('hooksCommand', () => {
     it('should return error when config is not loaded', async () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
-          config: null,
+          config: {} as unknown as Config,
         },
       });
 

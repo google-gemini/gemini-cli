@@ -100,7 +100,7 @@ describe('clearCommand', () => {
 
     const nullConfigContext = createMockCommandContext({
       services: {
-        config: null,
+        config: {} as unknown as Config,
       },
     });
 

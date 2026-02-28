@@ -92,7 +92,7 @@ interface SlashCommandProcessorActions {
  * Hook to define and process slash commands (e.g., /help, /clear).
  */
 export const useSlashCommandProcessor = (
-  config: Config | null,
+  config: Config,
   settings: LoadedSettings,
   addItem: UseHistoryManagerReturn['addItem'],
   clearItems: UseHistoryManagerReturn['clearItems'],

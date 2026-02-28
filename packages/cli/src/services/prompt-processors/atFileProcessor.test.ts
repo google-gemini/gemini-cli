@@ -60,7 +60,7 @@ describe('AtFileProcessor', () => {
     const prompt: PartUnion[] = [{ text: 'Analyze @{file.txt}' }];
     const contextWithoutConfig = createMockCommandContext({
       services: {
-        config: null,
+        config: {} as unknown as Config,
       },
     });
     const result = await processor.process(prompt, contextWithoutConfig);

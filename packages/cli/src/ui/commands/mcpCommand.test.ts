@@ -132,7 +132,7 @@ describe('mcpCommand', () => {
     it('should show an error if config is not available', async () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
-          config: null,
+          config: {} as unknown as Config,
         },
       });
 

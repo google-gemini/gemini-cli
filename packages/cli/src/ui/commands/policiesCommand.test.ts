@@ -32,7 +32,7 @@ describe('policiesCommand', () => {
 
   describe('list subcommand', () => {
     it('should show error if config is missing', async () => {
-      mockContext.services.config = null;
+      mockContext.services.config = {} as unknown as Config;
       const listCommand = policiesCommand.subCommands![0];
 
       await listCommand.action!(mockContext, '');

@@ -53,7 +53,7 @@ describe('agentsCommand', () => {
   it('should show an error if config is not available', async () => {
     const contextWithoutConfig = createMockCommandContext({
       services: {
-        config: null,
+        config: {} as unknown as Config,
       },
     });
 
@@ -220,7 +220,7 @@ describe('agentsCommand', () => {
 
   it('should show an error if config is not available for enable', async () => {
     const contextWithoutConfig = createMockCommandContext({
-      services: { config: null },
+      services: { config: {} as unknown as Config },
     });
     const enableCommand = agentsCommand.subCommands?.find(
       (cmd) => cmd.name === 'enable',
@@ -326,7 +326,7 @@ describe('agentsCommand', () => {
 
   it('should show an error if config is not available for disable', async () => {
     const contextWithoutConfig = createMockCommandContext({
-      services: { config: null },
+      services: { config: {} as unknown as Config },
     });
     const disableCommand = agentsCommand.subCommands?.find(
       (cmd) => cmd.name === 'disable',
@@ -427,7 +427,7 @@ describe('agentsCommand', () => {
 
     it('should show an error if config is not available', async () => {
       const contextWithoutConfig = createMockCommandContext({
-        services: { config: null },
+        services: { config: {} as unknown as Config },
       });
       const configCommand = agentsCommand.subCommands?.find(
         (cmd) => cmd.name === 'config',

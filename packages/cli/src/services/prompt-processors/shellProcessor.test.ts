@@ -112,7 +112,7 @@ describe('ShellProcessor', () => {
     const prompt: PromptPipelineContent = createPromptPipelineContent('!{ls}');
     const contextWithoutConfig = createMockCommandContext({
       services: {
-        config: null,
+        config: {} as unknown as Config,
       },
     });
 

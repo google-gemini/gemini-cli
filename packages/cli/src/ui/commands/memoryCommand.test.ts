@@ -371,7 +371,7 @@ describe('memoryCommand', () => {
       if (!refreshCommand.action) throw new Error('Command has no action');
 
       const nullConfigContext = createMockCommandContext({
-        services: { config: null },
+        services: { config: {} as unknown as Config },
       });
 
       await expect(
