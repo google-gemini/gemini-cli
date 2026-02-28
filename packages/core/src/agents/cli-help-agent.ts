@@ -49,7 +49,7 @@ export const CliHelpAgent = (
     schema: CliHelpReportSchema,
   },
 
-  processOutput: (output) => JSON.stringify(output, null, 2),
+  processOutput: (output) => output.answer,
 
   modelConfig: {
     model: GEMINI_MODEL_ALIAS_FLASH,
