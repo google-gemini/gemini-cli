@@ -101,33 +101,33 @@ describe('retryWithBackoff', () => {
     expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
-  it('should default to 3 maxAttempts if no options are provided', async () => {
-    // This function will fail more than 3 times to ensure all retries are used.
-    const mockFn = createFailingFunction(5);
+  it('should default to 10 maxAttempts if no options are provided', async () => {
+    // This function will fail more than 10 times to ensure all retries are used.
+    const mockFn = createFailingFunction(15);
 
     const promise = retryWithBackoff(mockFn);
 
     await Promise.all([
-      expect(promise).rejects.toThrow('Simulated error attempt 3'),
+      expect(promise).rejects.toThrow('Simulated error attempt 10'),
       vi.runAllTimersAsync(),
     ]);
 
-    expect(mockFn).toHaveBeenCalledTimes(3);
+    expect(mockFn).toHaveBeenCalledTimes(10);
   });
 
-  it('should default to 3 maxAttempts if options.maxAttempts is undefined', async () => {
-    // This function will fail more than 3 times to ensure all retries are used.
-    const mockFn = createFailingFunction(5);
+  it('should default to 10 maxAttempts if options.maxAttempts is undefined', async () => {
+    // This function will fail more than 10 times to ensure all retries are used.
+    const mockFn = createFailingFunction(15);
 
     const promise = retryWithBackoff(mockFn, { maxAttempts: undefined });
 
-    // Expect it to fail with the error from the 3rd attempt.
+    // Expect it to fail with the error from the 10th attempt.
     await Promise.all([
-      expect(promise).rejects.toThrow('Simulated error attempt 3'),
+      expect(promise).rejects.toThrow('Simulated error attempt 10'),
       vi.runAllTimersAsync(),
     ]);
 
-    expect(mockFn).toHaveBeenCalledTimes(3);
+    expect(mockFn).toHaveBeenCalledTimes(10);
   });
 
   it('should not retry if shouldRetry returns false', async () => {
@@ -156,6 +156,30 @@ describe('retryWithBackoff', () => {
 
     // The function should not be called at all if validation fails
     expect(mockFn).not.toHaveBeenCalled();
+  });
+
+  it('should retry on HTTP 499 (Client Closed Request) error', async () => {
+    let attempts = 0;
+    const mockFn = vi.fn(async () => {
+      attempts++;
+      if (attempts === 1) {
+        const error: HttpError = new Error('Simulated 499 error');
+        error.status = 499;
+        throw error;
+      }
+      return 'success';
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 2,
+      initialDelayMs: 10,
+    });
+
+    await vi.runAllTimersAsync();
+
+    const result = await promise;
+    expect(result).toBe('success');
+    expect(mockFn).toHaveBeenCalledTimes(2);
   });
 
   it('should use default shouldRetry if not provided, retrying on ApiError 429', async () => {
@@ -541,7 +565,13 @@ describe('retryWithBackoff', () => {
       await vi.runAllTimersAsync();
       await assertionPromise;
 
-      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 12345);
+      expect(setTimeoutSpy).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.any(Number),
+      );
+      const calledDelayMs = setTimeoutSpy.mock.calls[0][1];
+      expect(calledDelayMs).toBeGreaterThanOrEqual(12345);
+      expect(calledDelayMs).toBeLessThanOrEqual(12345 * 1.2);
     });
 
     it.each([[AuthType.USE_GEMINI], [AuthType.USE_VERTEX_AI], [undefined]])(

@@ -21,6 +21,7 @@ import { defaultHookTranslator } from './hookTranslator.js';
  * Configuration source levels in precedence order (highest to lowest)
  */
 export enum ConfigSource {
+  Runtime = 'runtime',
   Project = 'project',
   User = 'user',
   System = 'system',
@@ -50,11 +51,43 @@ export enum HookEventName {
 export const HOOKS_CONFIG_FIELDS = ['enabled', 'disabled', 'notifications'];
 
 /**
- * Hook configuration entry
+ * Hook implementation types
+ */
+export enum HookType {
+  Command = 'command',
+  Runtime = 'runtime',
+}
+
+/**
+ * Hook action function
+ */
+export type HookAction = (
+  input: HookInput,
+  options?: { signal: AbortSignal },
+) => Promise<HookOutput | void | null>;
+
+/**
+ * Runtime hook configuration
+ */
+export interface RuntimeHookConfig {
+  type: HookType.Runtime;
+  /** Unique name for the runtime hook */
+  name: string;
+  /** Function to execute when the hook is triggered */
+  action: HookAction;
+  command?: never;
+  source?: ConfigSource;
+  /** Maximum time allowed for hook execution in milliseconds */
+  timeout?: number;
+}
+
+/**
+ * Command hook configuration entry
  */
 export interface CommandHookConfig {
   type: HookType.Command;
   command: string;
+  action?: never;
   name?: string;
   description?: string;
   timeout?: number;
@@ -62,7 +95,7 @@ export interface CommandHookConfig {
   env?: Record<string, string>;
 }
 
-export type HookConfig = CommandHookConfig;
+export type HookConfig = CommandHookConfig | RuntimeHookConfig;
 
 /**
  * Hook definition with matcher
@@ -74,18 +107,11 @@ export interface HookDefinition {
 }
 
 /**
- * Hook implementation types
- */
-export enum HookType {
-  Command = 'command',
-}
-
-/**
  * Generate a unique key for a hook configuration
  */
 export function getHookKey(hook: HookConfig): string {
   const name = hook.name || '';
-  const command = hook.command || '';
+  const command = hook.type === HookType.Command ? hook.command : '';
   return `${name}:${command}`;
 }
 
@@ -252,6 +278,33 @@ export class DefaultHookOutput implements HookOutput {
    */
   shouldClearContext(): boolean {
     return false;
+  }
+
+  /**
+   * Optional request to execute another tool immediately after this one.
+   * The result of this tail call will replace the original tool's response.
+   */
+  getTailToolCallRequest():
+    | {
+        name: string;
+        args: Record<string, unknown>;
+      }
+    | undefined {
+    if (
+      this.hookSpecificOutput &&
+      'tailToolCallRequest' in this.hookSpecificOutput
+    ) {
+      const request = this.hookSpecificOutput['tailToolCallRequest'];
+      if (
+        typeof request === 'object' &&
+        request !== null &&
+        !Array.isArray(request)
+      ) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        return request as { name: string; args: Record<string, unknown> };
+      }
+    }
+    return undefined;
   }
 }
 
@@ -430,6 +483,7 @@ export interface BeforeToolInput extends HookInput {
   tool_name: string;
   tool_input: Record<string, unknown>;
   mcp_context?: McpToolContext; // Only present for MCP tools
+  original_request_name?: string;
 }
 
 /**
@@ -450,6 +504,7 @@ export interface AfterToolInput extends HookInput {
   tool_input: Record<string, unknown>;
   tool_response: Record<string, unknown>;
   mcp_context?: McpToolContext; // Only present for MCP tools
+  original_request_name?: string;
 }
 
 /**
@@ -459,6 +514,14 @@ export interface AfterToolOutput extends HookOutput {
   hookSpecificOutput?: {
     hookEventName: 'AfterTool';
     additionalContext?: string;
+    /**
+     * Optional request to execute another tool immediately after this one.
+     * The result of this tail call will replace the original tool's response.
+     */
+    tailToolCallRequest?: {
+      name: string;
+      args: Record<string, unknown>;
+    };
   };
 }
 
