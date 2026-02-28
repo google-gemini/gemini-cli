@@ -33,8 +33,15 @@ async function handleEnable(args: Args): Promise<void> {
   const settings = loadSettings();
 
   // Get all servers including extensions
-  const servers = await getMcpServersFromConfig();
-  const normalizedServerNames = Object.keys(servers).map(normalizeServerId);
+  const { mcpServers, blockedServerNames } = await getMcpServersFromConfig();
+  if (blockedServerNames.map(normalizeServerId).includes(name)) {
+    debugLogger.log(
+      `${RED}Error:${RESET} MCP server '${args.name}' is blocked by administrator.`,
+    );
+    return;
+  }
+  const allKnownServers = [...Object.keys(mcpServers), ...blockedServerNames];
+  const normalizedServerNames = allKnownServers.map(normalizeServerId);
   if (!normalizedServerNames.includes(name)) {
     debugLogger.log(
       `${RED}Error:${RESET} Server '${args.name}' not found. Use 'gemini mcp' to see available servers.`,
@@ -76,8 +83,9 @@ async function handleDisable(args: Args): Promise<void> {
   const name = normalizeServerId(args.name);
 
   // Get all servers including extensions
-  const servers = await getMcpServersFromConfig();
-  const normalizedServerNames = Object.keys(servers).map(normalizeServerId);
+  const { mcpServers, blockedServerNames } = await getMcpServersFromConfig();
+  const allKnownServers = [...Object.keys(mcpServers), ...blockedServerNames];
+  const normalizedServerNames = allKnownServers.map(normalizeServerId);
   if (!normalizedServerNames.includes(name)) {
     debugLogger.log(
       `${RED}Error:${RESET} Server '${args.name}' not found. Use 'gemini mcp' to see available servers.`,
