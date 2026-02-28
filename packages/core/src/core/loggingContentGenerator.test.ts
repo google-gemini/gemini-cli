@@ -860,3 +860,125 @@ describe('estimateContextBreakdown', () => {
     expect(result.tool_calls['unknown']).toBeGreaterThan(0);
   });
 });
+
+describe('LoggingContentGenerator._getEndpointUrl with custom base URL', () => {
+  let wrapped: ContentGenerator;
+  let config: Config;
+
+  beforeEach(() => {
+    wrapped = {
+      generateContent: vi.fn().mockResolvedValue({
+        candidates: [],
+        usageMetadata: {},
+        text: undefined,
+        functionCalls: undefined,
+        executableCode: undefined,
+        codeExecutionResult: undefined,
+        data: undefined,
+      }),
+      generateContentStream: vi.fn(),
+      countTokens: vi.fn(),
+      embedContent: vi.fn(),
+    };
+    config = {
+      getGoogleAIConfig: vi.fn(),
+      getVertexAIConfig: vi.fn(),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({
+        authType: 'API_KEY',
+        vertexai: false,
+      }),
+      refreshUserQuotaIfStale: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Config;
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  it('uses default endpoint when no custom URL is set', async () => {
+    const generator = new LoggingContentGenerator(wrapped, config);
+    const req = {
+      contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+      model: 'gemini-pro',
+    };
+
+    await generator.generateContent(req, 'prompt-1', LlmRole.MAIN);
+
+    const event = vi.mocked(logApiRequest).mock.calls[0][1] as ApiRequestEvent;
+    expect(event.prompt.server).toEqual({
+      address: 'generativelanguage.googleapis.com',
+      port: 443,
+    });
+  });
+
+  it('uses custom hostname and port when GOOGLE_GEMINI_BASE_URL is set with port', async () => {
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'http://localhost:4000');
+    const generator = new LoggingContentGenerator(wrapped, config);
+    const req = {
+      contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+      model: 'gemini-pro',
+    };
+
+    await generator.generateContent(req, 'prompt-1', LlmRole.MAIN);
+
+    const event = vi.mocked(logApiRequest).mock.calls[0][1] as ApiRequestEvent;
+    expect(event.prompt.server).toEqual({
+      address: 'localhost',
+      port: 4000,
+    });
+  });
+
+  it('uses custom hostname with default https port when GOOGLE_GEMINI_BASE_URL uses https without port', async () => {
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'https://my-proxy.example.com');
+    const generator = new LoggingContentGenerator(wrapped, config);
+    const req = {
+      contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+      model: 'gemini-pro',
+    };
+
+    await generator.generateContent(req, 'prompt-1', LlmRole.MAIN);
+
+    const event = vi.mocked(logApiRequest).mock.calls[0][1] as ApiRequestEvent;
+    expect(event.prompt.server).toEqual({
+      address: 'my-proxy.example.com',
+      port: 443,
+    });
+  });
+
+  it('uses custom hostname with default http port when GOOGLE_GEMINI_BASE_URL uses http without port', async () => {
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'http://localhost');
+    const generator = new LoggingContentGenerator(wrapped, config);
+    const req = {
+      contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+      model: 'gemini-pro',
+    };
+
+    await generator.generateContent(req, 'prompt-1', LlmRole.MAIN);
+
+    const event = vi.mocked(logApiRequest).mock.calls[0][1] as ApiRequestEvent;
+    expect(event.prompt.server).toEqual({
+      address: 'localhost',
+      port: 80,
+    });
+  });
+
+  it('uses GEMINI_API_BASE_URL alias when GOOGLE_GEMINI_BASE_URL is not set', async () => {
+    vi.stubEnv('GEMINI_API_BASE_URL', 'http://localhost:8080');
+    const generator = new LoggingContentGenerator(wrapped, config);
+    const req = {
+      contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+      model: 'gemini-pro',
+    };
+
+    await generator.generateContent(req, 'prompt-1', LlmRole.MAIN);
+
+    const event = vi.mocked(logApiRequest).mock.calls[0][1] as ApiRequestEvent;
+    expect(event.prompt.server).toEqual({
+      address: 'localhost',
+      port: 8080,
+    });
+  });
+});
