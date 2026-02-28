@@ -21,17 +21,11 @@ import {
   type TrackedWaitingToolCall,
   useToolScheduler,
 } from './useToolScheduler.js';
-import { useToolScheduler } from './useToolScheduler.js';
-import type {
-  Config,
-  EditorType,
-  AnyToolInvocation,
-  SpanMetadata,
-} from '@google/gemini-cli-core';
 import {
   type Config,
   type EditorType,
   type AnyToolInvocation,
+  type SpanMetadata,
   CoreToolCallStatus,
   ApprovalMode,
   AuthType,

@@ -11,6 +11,7 @@ import {
   shutdownTelemetry,
   isTelemetrySdkInitialized,
   ExitCodes,
+  type Config,
 } from '@google/gemini-cli-core';
 
 const cleanupFunctions: Array<(() => void) | (() => Promise<void>)> = [];
@@ -52,7 +53,7 @@ export function runSyncCleanup() {
  * Register the config instance for telemetry shutdown.
  * This must be called early in the application lifecycle.
  */
-export function registerTelemetryConfig(config: Config) {
+export function registerTelemetryConfig(config: Config): void {
   configForTelemetry = config;
 }
 

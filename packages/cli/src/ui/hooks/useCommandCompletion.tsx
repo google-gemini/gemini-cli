@@ -16,14 +16,13 @@ import { toCodePoints } from '../utils/textUtils.js';
 import { useAtCompletion } from './useAtCompletion.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
 import { useShellCompletion } from './useShellCompletion.js';
-import type { PromptCompletion } from './usePromptCompletion.js';
 import {
   type PromptCompletion,
   usePromptCompletion,
   PROMPT_COMPLETION_MIN_LENGTH,
 } from './usePromptCompletion.js';
-import type { Config } from '@google/gemini-cli-core';
 import { useCompletion } from './useCompletion.js';
+import type { Config } from '@google/gemini-cli-core';
 
 export enum CompletionMode {
   IDLE = 'IDLE',

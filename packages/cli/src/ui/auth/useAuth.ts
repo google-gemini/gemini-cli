@@ -12,6 +12,7 @@ import {
   loadApiKey,
   debugLogger,
   isAccountSuspendedError,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
 import { AuthState } from '../types.js';
 import { validateAuthMethod } from '../../config/auth.js';
