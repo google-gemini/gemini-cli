@@ -110,6 +110,51 @@ exports[`RewindViewer > Navigation > handles 'down' navigation > after-down 1`] 
 "
 `;
 
+exports[`RewindViewer > Navigation > handles 'down' navigation > after-down 2`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
 exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
@@ -131,6 +176,1851 @@ exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 1`] = `
 │ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                     │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 2`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 3`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 4`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 5`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 6`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 7`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 8`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 9`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 10`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 11`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 12`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 13`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 14`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 15`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 16`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 17`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 18`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 19`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 20`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 21`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 22`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 23`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 24`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 25`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 26`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 27`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 28`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 29`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 30`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 31`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 32`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 33`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 34`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 35`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 36`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 37`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 38`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 39`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 40`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 41`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 42`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
 "
 `;
 
@@ -158,6 +2048,51 @@ exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-down 1`]
 "
 `;
 
+exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-down 2`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
+"
+`;
+
 exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-up 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
@@ -179,6 +2114,51 @@ exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-up 1`] =
 │ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                     │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-up 2`] = `
+"
+  ERROR  Cannot read properties of undefined (reading 'isKittyProtocolEnabled')
+
+ src/ui/contexts/KeypressContext.tsx:797:36
+
+ 794:     process.stdin.setEncoding('utf8'); // Make data events emit strings
+ 795:
+ 796:     let processor = nonKeyboardEventFilter(broadcast);
+ 797:     if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
+ 798:       processor = bufferFastReturn(processor);
+ 799:     }
+ 800:     processor = bufferBackslashEnter(processor);
+
+ -  (src/ui/contexts/KeypressContext.tsx:797:36)
+ -Object.react-stack-bott 
+  m-frame                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs
+                         /react-reconciler.development.js:15945:20)
+ -runWithFiberIn 
+  EV            (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/react-re
+                conciler.development.js:1738:13)
+ -commitHookEffectList 
+  ount                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:9516:29)
+ -commitHookPassiveMount 
+  ffects                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/
+                        react-reconciler.development.js:9639:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11364:13)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11479:11)
+ -recursivelyTraversePassiveM 
+  untEffects                 (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler
+                             /cjs/react-reconciler.development.js:11338:11)
+ -commitPassiveMountOn 
+  iber                (/Users/spencertang/Workspace/gemini-cli/node_modules/react-reconciler/cjs/re
+                      act-reconciler.development.js:11357:11)
 "
 `;
 

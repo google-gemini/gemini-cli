@@ -34,6 +34,11 @@ export interface ToolInvocation<
   params: TParams;
 
   /**
+   * Whether the tool is sensitive and requires specific policy approvals.
+   */
+  isSensitive: boolean;
+
+  /**
    * Gets a pre-execution description of the tool operation.
    *
    * @returns A markdown string describing what the tool will do.
@@ -75,6 +80,7 @@ export interface ToolInvocation<
 export interface PolicyUpdateOptions {
   commandPrefix?: string | string[];
   mcpName?: string;
+  argsPattern?: string;
 }
 
 /**
@@ -92,6 +98,7 @@ export abstract class BaseToolInvocation<
     readonly _toolDisplayName?: string,
     readonly _serverName?: string,
     readonly _toolAnnotations?: Record<string, unknown>,
+    readonly isSensitive: boolean = false,
   ) {}
 
   abstract getDescription(): string;
@@ -152,6 +159,7 @@ export abstract class BaseToolInvocation<
           type: MessageBusType.UPDATE_POLICY,
           toolName: this._toolName,
           persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
+          isSensitive: this.isSensitive,
           ...options,
         });
       }
@@ -341,6 +349,11 @@ export interface ToolBuilder<
   isReadOnly: boolean;
 
   /**
+   * Whether the tool is sensitive and requires specific policy approvals.
+   */
+  isSensitive: boolean;
+
+  /**
    * Validates raw parameters and builds a ready-to-execute invocation.
    * @param params The raw, untrusted parameters from the model.
    * @returns A valid `ToolInvocation` if successful. Throws an error if validation fails.
@@ -368,6 +381,7 @@ export abstract class DeclarativeTool<
     readonly canUpdateOutput: boolean = false,
     readonly extensionName?: string,
     readonly extensionId?: string,
+    readonly isSensitive: boolean = false,
   ) {}
 
   get isReadOnly(): boolean {
@@ -498,6 +512,34 @@ export abstract class BaseDeclarativeTool<
   TParams extends object,
   TResult extends ToolResult,
 > extends DeclarativeTool<TParams, TResult> {
+  constructor(
+    name: string,
+    displayName: string,
+    description: string,
+    kind: Kind,
+    parameterSchema: unknown,
+    messageBus: MessageBus,
+    isOutputMarkdown: boolean = true,
+    canUpdateOutput: boolean = false,
+    extensionName?: string,
+    extensionId?: string,
+    isSensitive: boolean = false,
+  ) {
+    super(
+      name,
+      displayName,
+      description,
+      kind,
+      parameterSchema,
+      messageBus,
+      isOutputMarkdown,
+      canUpdateOutput,
+      extensionName,
+      extensionId,
+      isSensitive,
+    );
+  }
+
   build(params: TParams): ToolInvocation<TParams, TResult> {
     const validationError = this.validateToolParams(params);
     if (validationError) {
@@ -508,6 +550,7 @@ export abstract class BaseDeclarativeTool<
       this.messageBus,
       this.name,
       this.displayName,
+      this.isSensitive,
     );
   }
 
@@ -533,6 +576,7 @@ export abstract class BaseDeclarativeTool<
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    isSensitive?: boolean,
   ): ToolInvocation<TParams, TResult>;
 }
 
@@ -826,6 +870,7 @@ export enum ToolConfirmationOutcome {
 
 export enum Kind {
   Read = 'read',
+  Write = 'write',
   Edit = 'edit',
   Delete = 'delete',
   Move = 'move',
@@ -842,6 +887,7 @@ export enum Kind {
 
 // Function kinds that have side effects
 export const MUTATOR_KINDS: Kind[] = [
+  Kind.Write,
   Kind.Edit,
   Kind.Delete,
   Kind.Move,

@@ -136,8 +136,17 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     messageBus: MessageBus,
     toolName?: string,
     displayName?: string,
+    isSensitive?: boolean,
   ) {
-    super(params, messageBus, toolName, displayName);
+    super(
+      params,
+      messageBus,
+      toolName,
+      displayName,
+      undefined,
+      undefined,
+      isSensitive,
+    );
     this.resolvedPath = path.resolve(
       this.config.getTargetDir(),
       this.params.file_path,
@@ -429,11 +438,14 @@ export class WriteFileTool
       WriteFileTool.Name,
       WRITE_FILE_DISPLAY_NAME,
       WRITE_FILE_DEFINITION.base.description!,
-      Kind.Edit,
+      Kind.Write,
       WRITE_FILE_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true,
       false,
+      undefined,
+      undefined,
+      true,
     );
   }
 
@@ -477,6 +489,9 @@ export class WriteFileTool
   protected createInvocation(
     params: WriteFileToolParams,
     messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+    isSensitive?: boolean,
   ): ToolInvocation<WriteFileToolParams, ToolResult> {
     return new WriteFileToolInvocation(
       this.config,
@@ -484,6 +499,7 @@ export class WriteFileTool
       messageBus ?? this.messageBus,
       this.name,
       this.displayName,
+      isSensitive,
     );
   }
 

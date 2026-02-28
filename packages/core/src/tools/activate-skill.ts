@@ -43,7 +43,15 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+      undefined,
+      undefined,
+      true, // ActivateSkill is always sensitive
+    );
   }
 
   getDescription(): string {
@@ -185,13 +193,14 @@ export class ActivateSkillTool extends BaseDeclarativeTool<
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    _isSensitive?: boolean,
   ): ToolInvocation<ActivateSkillToolParams, ToolResult> {
     return new ActivateSkillToolInvocation(
       this.config,
       params,
       messageBus,
       _toolName,
-      _toolDisplayName ?? 'Activate Skill',
+      _toolDisplayName,
     );
   }
 

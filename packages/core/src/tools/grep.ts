@@ -83,8 +83,17 @@ class GrepToolInvocation extends BaseToolInvocation<
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    isSensitive?: boolean,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+      undefined,
+      undefined,
+      isSensitive,
+    );
     this.fileExclusions = config.getFileExclusions();
   }
 
@@ -601,6 +610,9 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
       messageBus,
       true,
       false,
+      undefined,
+      undefined,
+      true,
     );
   }
 
@@ -676,6 +688,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    isSensitive?: boolean,
   ): ToolInvocation<GrepToolParams, ToolResult> {
     return new GrepToolInvocation(
       this.config,
@@ -683,6 +696,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
       messageBus,
       _toolName,
       _toolDisplayName,
+      isSensitive,
     );
   }
 

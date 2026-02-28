@@ -84,6 +84,7 @@ describe('SubAgentInvocation', () => {
       params: {},
       getDescription: vi.fn(),
       toolLocations: vi.fn(),
+      isSensitive: false,
     };
 
     MockSubagentToolWrapper.prototype.build = vi

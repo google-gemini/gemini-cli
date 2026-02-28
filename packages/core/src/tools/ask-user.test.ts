@@ -293,6 +293,7 @@ describe('AskUserTool', () => {
         getDescription: vi.fn().mockReturnValue(''),
         toolLocations: vi.fn().mockReturnValue([]),
         shouldConfirmExecute: vi.fn().mockResolvedValue(false),
+        isSensitive: false,
       };
 
       const buildSpy = vi.spyOn(tool, 'build').mockReturnValue(mockInvocation);

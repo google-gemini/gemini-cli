@@ -202,6 +202,21 @@ describe('EditTool', () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
+  it('should be marked as sensitive and pass the flag to its invocations', () => {
+    // Check the tool definition itself
+    expect(tool.isSensitive).toBe(true);
+
+    // Build an invocation and check the instance
+    const params: EditToolParams = {
+      file_path: path.join(rootDir, 'test.txt'),
+      instruction: 'An instruction',
+      old_string: 'old',
+      new_string: 'new',
+    };
+    const invocation = tool.build(params);
+    expect(invocation.isSensitive).toBe(true);
+  });
+
   describe('applyReplacement', () => {
     it('should return newString if isNewFile is true', () => {
       expect(applyReplacement(null, 'old', 'new', true)).toBe('new');
