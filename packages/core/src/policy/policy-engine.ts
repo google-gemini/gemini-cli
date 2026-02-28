@@ -325,7 +325,10 @@ export class PolicyEngine {
                     rule: subResult.rule,
                   };
                 }
-                if (subDecision === PolicyDecision.ASK_USER) {
+                if (
+                  subDecision === PolicyDecision.ASK_USER &&
+                  ruleDecision !== PolicyDecision.ALLOW
+                ) {
                   aggregateDecision = PolicyDecision.ASK_USER;
                   if (!responsibleRule) {
                     responsibleRule = subResult.rule;
