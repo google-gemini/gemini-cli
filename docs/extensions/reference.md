@@ -122,7 +122,17 @@ The manifest file defines the extension's behavior and configuration.
     }
   },
   "contextFileName": "GEMINI.md",
-  "excludeTools": ["run_shell_command"]
+  "excludeTools": ["run_shell_command"],
+  "ui": {
+    "badges": [
+      {
+        "command": "sh",
+        "args": ["${extensionPath}/status.sh"],
+        "color": "accent",
+        "intervalMs": 30000
+      }
+    ]
+  }
 }
 ```
 
@@ -157,6 +167,23 @@ The manifest file defines the extension's behavior and configuration.
   `"excludeTools": ["run_shell_command(rm -rf)"]` will block the `rm -rf`
   command. Note that this differs from the MCP server `excludeTools`
   functionality, which can be listed in the MCP server config.
+- `ui`: Configuration for UI contributions.
+  - `badges`: An array of status badge definitions to display in the CLI footer.
+    - `type`: The type of badge. Use `"command"` to execute a shell command, or
+      `"env"` to read an environment variable.
+    - `command`: The executable command to run to get the badge text (Required
+      if `type` is `"command"`).
+    - `args`: An array of arguments to pass to the command.
+    - `envVar`: The name of the environment variable to read (Required if `type`
+      is `"env"`).
+    - `format`: Optional formatting to apply to the result. Currently supports
+      `"basename"` (extracts the last segment of a path, useful for
+      `VIRTUAL_ENV`).
+    - `icon`: An optional icon to display before the badge text.
+    - `intervalMs`: The interval (in milliseconds) at which to poll the command
+      for updates. Defaults to `30000`.
+    - `color`: The semantic color for the badge text (e.g., `primary`, `accent`,
+      `warning`, `error`).
 
 When Gemini CLI starts, it loads all the extensions and merges their
 configurations. If there are any conflicts, the workspace configuration takes
