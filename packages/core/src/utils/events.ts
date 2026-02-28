@@ -182,21 +182,21 @@ export enum CoreEvent {
   ConsentRequest = 'consent-request',
   McpProgress = 'mcp-progress',
   AgentsDiscovered = 'agents-discovered',
-  RequestEditorSelection = 'request-editor-selection',
-  EditorSelected = 'editor-selected',
-  SlashCommandConflicts = 'slash-command-conflicts',
-  QuotaChanged = 'quota-changed',
-  TelemetryKeychainAvailability = 'telemetry-keychain-availability',
-  TelemetryTokenStorageType = 'telemetry-token-storage-type',
+RequestEditorSelection = 'request-editor-selection',
+EditorSelected = 'editor-selected',
+SlashCommandConflicts = 'slash-command-conflicts',
+QuotaChanged = 'quota-changed',
+TelemetryKeychainAvailability = 'telemetry-keychain-availability',
+TelemetryTokenStorageType = 'telemetry-token-storage-type',
+VoiceTranscript = 'voice-transcript',
 }
 
 /**
- * Payload for the 'editor-selected' event.
- */
+* Payload for the 'editor-selected' event.
+*/
 export interface EditorSelectedPayload {
-  editor?: EditorType;
+editor?: EditorType;
 }
-
 export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
@@ -221,6 +221,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
   [CoreEvent.TelemetryKeychainAvailability]: [KeychainAvailabilityEvent];
   [CoreEvent.TelemetryTokenStorageType]: [TokenStorageInitializationEvent];
+  [CoreEvent.VoiceTranscript]: [string];
 }
 
 type EventBacklogItem = {
@@ -408,6 +409,10 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
 
   emitTelemetryTokenStorageType(event: TokenStorageInitializationEvent): void {
     this._emitOrQueue(CoreEvent.TelemetryTokenStorageType, event);
+  }
+
+  emitVoiceTranscript(transcript: string): void {
+    this.emit(CoreEvent.VoiceTranscript, transcript);
   }
 }
 

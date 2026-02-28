@@ -481,6 +481,42 @@
       },
       "additionalProperties": false
     },
+    "voice": {
+      "title": "Voice Input",
+      "description": "Settings for voice input.",
+      "markdownDescription": "Settings for voice input.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "title": "Enable Voice Input",
+          "description": "Enable voice input support.",
+          "markdownDescription": "Enable voice input support.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "provider": {
+          "title": "Transcription Backend",
+          "description": "Transcription backend: \"gemini\" (default, zero-install) or \"whisper\" (local).",
+          "markdownDescription": "Transcription backend: \"gemini\" (default, zero-install) or \"whisper\" (local).\n\n- Category: `General`\n- Requires restart: `no`",
+          "type": "string"
+        },
+        "whisperPath": {
+          "title": "Whisper Binary Path",
+          "description": "Path to the whisper executable. Only used when provider is \"whisper\".",
+          "markdownDescription": "Path to the whisper executable. Only used when provider is \"whisper\".\n\n- Category: `General`\n- Requires restart: `no`",
+          "type": "string"
+        },
+        "silenceThreshold": {
+          "title": "Silence Detection Threshold",
+          "description": "RMS energy threshold (0–1000) below which audio is discarded as silence. Lower values allow quieter speech such as whispering. 0 disables silence detection.",
+          "markdownDescription": "RMS energy threshold (0–1000) below which audio is discarded as silence. Lower values allow quieter speech such as whispering. 0 disables silence detection.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `80`",
+          "default": 80,
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
     "ide": {
       "title": "IDE",
       "description": "IDE integration settings.",
