@@ -254,6 +254,13 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot();
   });
 
+  it('should include truthfulness guardrails in the system prompt', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toContain('# Truthfulness & Verification Integrity');
+    expect(prompt).toContain('MUST NOT claim to have reviewed');
+  });
+
   it.each([
     ['empty string', ''],
     ['whitespace only', '   \n  \t '],
