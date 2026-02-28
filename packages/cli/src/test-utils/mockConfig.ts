@@ -141,7 +141,10 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getMcpClientManager: vi.fn().mockReturnValue({
       getMcpInstructions: vi.fn().mockReturnValue(''),
       getMcpServers: vi.fn().mockReturnValue({}),
+      getLastError: vi.fn().mockReturnValue(undefined),
     }),
+    setUserInteractedWithMcp: vi.fn(),
+    emitMcpDiagnostic: vi.fn(),
     getEnableEventDrivenScheduler: vi.fn().mockReturnValue(false),
     getAdminSkillsEnabled: vi.fn().mockReturnValue(false),
     getDisabledSkills: vi.fn().mockReturnValue([]),
