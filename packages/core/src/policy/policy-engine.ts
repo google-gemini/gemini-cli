@@ -563,11 +563,27 @@ export class PolicyEngine {
   }
 
   /**
+   * Remove rules matching a specific source.
+   */
+  removeRulesBySource(source: string): void {
+    this.rules = this.rules.filter((rule) => rule.source !== source);
+  }
+
+  /**
    * Remove checkers matching a specific tier (priority band).
    */
   removeCheckersByTier(tier: number): void {
     this.checkers = this.checkers.filter(
       (checker) => Math.floor(checker.priority ?? 0) !== tier,
+    );
+  }
+
+  /**
+   * Remove checkers matching a specific source.
+   */
+  removeCheckersBySource(source: string): void {
+    this.checkers = this.checkers.filter(
+      (checker) => checker.source !== source,
     );
   }
 
@@ -635,6 +651,7 @@ export class PolicyEngine {
    */
   getExcludedTools(
     toolMetadata?: Map<string, Record<string, unknown>>,
+    allToolNames?: Set<string>,
   ): Set<string> {
     const excludedTools = new Set<string>();
     const processedTools = new Set<string>();
@@ -680,7 +697,16 @@ export class PolicyEngine {
           // Check if the tool name matches the rule's toolName pattern (if any)
           if (rule.toolName) {
             if (isWildcardPattern(rule.toolName)) {
-              if (!matchesWildcard(rule.toolName, toolName, undefined)) {
+              // For composite patterns (e.g. "*__*"), construct a qualified
+              // name from metadata so matchesWildcard can resolve it.
+              const rawServerName = annotations['_serverName'];
+              const serverName =
+                typeof rawServerName === 'string' ? rawServerName : undefined;
+              const qualifiedName =
+                serverName && !toolName.includes('__')
+                  ? `${serverName}__${toolName}`
+                  : toolName;
+              if (!matchesWildcard(rule.toolName, qualifiedName, undefined)) {
                 continue;
               }
             } else if (toolName !== rule.toolName) {
@@ -758,6 +784,17 @@ export class PolicyEngine {
         excludedTools.add(toolName);
       }
     }
+
+    // If there's a global DENY and we know all tool names, exclude any tool
+    // that wasn't explicitly allowed by a higher-priority rule.
+    if (globalVerdict === PolicyDecision.DENY && allToolNames) {
+      for (const name of allToolNames) {
+        if (!processedTools.has(name)) {
+          excludedTools.add(name);
+        }
+      }
+    }
+
     return excludedTools;
   }
 

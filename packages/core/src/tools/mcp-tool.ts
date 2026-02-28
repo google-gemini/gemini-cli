@@ -20,14 +20,24 @@ import {
 } from './tools.js';
 import type { CallableTool, FunctionCall, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
-import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { McpContext } from './mcp-client.js';
 
 /**
  * The separator used to qualify MCP tool names with their server prefix.
  * e.g. "server_name__tool_name"
  */
 export const MCP_QUALIFIED_NAME_SEPARATOR = '__';
+
+/**
+ * Returns true if `name` matches the MCP qualified name format: "server__tool",
+ * i.e. exactly two non-empty parts separated by the MCP_QUALIFIED_NAME_SEPARATOR.
+ */
+export function isMcpToolName(name: string): boolean {
+  if (!name.includes(MCP_QUALIFIED_NAME_SEPARATOR)) return false;
+  const parts = name.split(MCP_QUALIFIED_NAME_SEPARATOR);
+  return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
+}
 
 type ToolParams = Record<string, unknown>;
 
@@ -79,7 +89,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     messageBus: MessageBus,
     readonly trust?: boolean,
     params: ToolParams = {},
-    private readonly cliConfig?: Config,
+    private readonly cliConfig?: McpContext,
     private readonly toolDescription?: string,
     private readonly toolParameterSchema?: unknown,
     toolAnnotationsData?: Record<string, unknown>,
@@ -174,6 +184,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   }
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
+    this.cliConfig?.setUserInteractedWithMcp?.();
     const functionCalls: FunctionCall[] = [
       {
         name: this.serverToolName,
@@ -256,7 +267,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     readonly trust?: boolean,
     isReadOnly?: boolean,
     nameOverride?: string,
-    private readonly cliConfig?: Config,
+    private readonly cliConfig?: McpContext,
     override readonly extensionName?: string,
     override readonly extensionId?: string,
     private readonly _toolAnnotations?: Record<string, unknown>,

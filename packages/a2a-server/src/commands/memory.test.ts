@@ -9,6 +9,9 @@ import {
   listMemoryFiles,
   refreshMemory,
   showMemory,
+  type AnyDeclarativeTool,
+  type Config,
+  type ToolRegistry,
 } from '@google/gemini-cli-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -19,11 +22,6 @@ import {
   ShowMemoryCommand,
 } from './memory.js';
 import type { CommandContext } from './types.js';
-import type {
-  AnyDeclarativeTool,
-  Config,
-  ToolRegistry,
-} from '@google/gemini-cli-core';
 
 // Mock the core functions
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
