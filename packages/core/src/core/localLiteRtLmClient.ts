@@ -83,8 +83,13 @@ export class LocalLiteRtLmClient {
         );
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return JSON.parse(result.text);
+      const parsed: unknown = JSON.parse(result.text);
+      const isRecord = (val: unknown): val is Record<string, unknown> =>
+        typeof val === 'object' && val !== null && !Array.isArray(val);
+      if (isRecord(parsed)) {
+        return parsed;
+      }
+      throw new Error('Invalid JSON response format from Local LLM');
     } catch (error) {
       debugLogger.error(
         `[LocalLiteRtLmClient] Failed to generate content:`,

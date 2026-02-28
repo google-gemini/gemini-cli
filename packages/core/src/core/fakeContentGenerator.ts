@@ -84,11 +84,12 @@ export class FakeContentGenerator implements ContentGenerator {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     role: LlmRole,
   ): Promise<GenerateContentResponse> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return Object.setPrototypeOf(
-      this.getNextResponse('generateContent', request),
-      GenerateContentResponse.prototype,
-    );
+    const response: unknown = this.getNextResponse('generateContent', request);
+    Object.setPrototypeOf(response, GenerateContentResponse.prototype);
+    if (response instanceof GenerateContentResponse) {
+      return response;
+    }
+    throw new Error('Failed to create GenerateContentResponse');
   }
 
   async generateContentStream(
@@ -118,10 +119,11 @@ export class FakeContentGenerator implements ContentGenerator {
   async embedContent(
     request: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return Object.setPrototypeOf(
-      this.getNextResponse('embedContent', request),
-      EmbedContentResponse.prototype,
-    );
+    const response: unknown = this.getNextResponse('embedContent', request);
+    Object.setPrototypeOf(response, EmbedContentResponse.prototype);
+    if (response instanceof EmbedContentResponse) {
+      return response;
+    }
+    throw new Error('Failed to create EmbedContentResponse');
   }
 }

@@ -162,10 +162,15 @@ export class BaseLlmClient {
     );
 
     // If we are here, the content is valid (not empty and parsable).
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return JSON.parse(
+    const parsed: unknown = JSON.parse(
       this.cleanJsonResponse(getResponseText(result)!.trim(), model),
     );
+    const isRecord = (val: unknown): val is Record<string, unknown> =>
+      typeof val === 'object' && val !== null && !Array.isArray(val);
+    if (isRecord(parsed)) {
+      return parsed;
+    }
+    throw new Error('Invalid JSON response format from LLM');
   }
 
   async generateEmbedding(texts: string[]): Promise<number[][]> {
