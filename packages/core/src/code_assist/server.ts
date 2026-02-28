@@ -517,7 +517,15 @@ interface VpcScErrorResponse {
   };
 }
 
-function isVpcScErrorResponse(error: unknown): error is VpcScErrorResponse {
+function isVpcScErrorResponse(error: unknown): error is VpcScErrorResponse & {
+  response: {
+    data: {
+      error: {
+        details: unknown[];
+      };
+    };
+  };
+} {
   return (
     !!error &&
     typeof error === 'object' &&
@@ -537,14 +545,12 @@ function isVpcScErrorResponse(error: unknown): error is VpcScErrorResponse {
 
 function isVpcScAffectedUser(error: unknown): boolean {
   if (isVpcScErrorResponse(error)) {
-    return (
-      error.response?.data?.error?.details?.some(
-        (detail: unknown) =>
-          detail &&
-          typeof detail === 'object' &&
-          'reason' in detail &&
-          detail.reason === 'SECURITY_POLICY_VIOLATED',
-      ) ?? false
+    return error.response.data.error.details.some(
+      (detail: unknown) =>
+        detail &&
+        typeof detail === 'object' &&
+        'reason' in detail &&
+        detail.reason === 'SECURITY_POLICY_VIOLATED',
     );
   }
   return false;

@@ -25,6 +25,18 @@ const __dirname = path.dirname(__filename);
 const projectRoot = __dirname;
 const currentYear = new Date().getFullYear();
 
+const commonRestrictedSyntaxRules = [
+  {
+    selector: 'CallExpression[callee.name="require"]',
+    message: 'Avoid using require(). Use ES6 imports instead.',
+  },
+  {
+    selector: 'ThrowStatement > Literal:not([value=/^\\w+Error:/])',
+    message:
+      'Do not throw string literals or non-Error objects. Throw new Error("...") instead.',
+  },
+];
+
 export default tseslint.config(
   {
     // Global ignores
@@ -120,18 +132,7 @@ export default tseslint.config(
       'no-cond-assign': 'error',
       'no-debugger': 'error',
       'no-duplicate-case': 'error',
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: 'CallExpression[callee.name="require"]',
-          message: 'Avoid using require(). Use ES6 imports instead.',
-        },
-        {
-          selector: 'ThrowStatement > Literal:not([value=/^\\w+Error:/])',
-          message:
-            'Do not throw string literals or non-Error objects. Throw new Error("...") instead.',
-        },
-      ],
+      'no-restricted-syntax': ['error', ...commonRestrictedSyntaxRules],
       'no-unsafe-finally': 'error',
       'no-unused-expressions': 'off', // Disable base rule
       '@typescript-eslint/no-unused-expressions': [
@@ -177,15 +178,7 @@ export default tseslint.config(
     rules: {
       'no-restricted-syntax': [
         'error',
-        {
-          selector: 'CallExpression[callee.name="require"]',
-          message: 'Avoid using require(). Use ES6 imports instead.',
-        },
-        {
-          selector: 'ThrowStatement > Literal:not([value=/^\\w+Error:/])',
-          message:
-            'Do not throw string literals or non-Error objects. Throw new Error("...") instead.',
-        },
+        ...commonRestrictedSyntaxRules,
         {
           selector:
             'TSInterfaceDeclaration[id.name=/.+Response$/] TSPropertySignature:not([optional=true])',
