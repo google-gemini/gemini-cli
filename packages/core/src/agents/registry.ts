@@ -23,6 +23,8 @@ import {
   ModelConfigService,
 } from '../services/modelConfigService.js';
 import { PolicyDecision, PRIORITY_SUBAGENT_TOOL } from '../policy/types.js';
+import { A2AAgentError, AgentAuthConfigMissingError } from './a2a-errors.js';
+import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -326,6 +328,9 @@ export class AgentRegistry {
 
   /**
    * Registers a remote agent definition asynchronously.
+   * Provides robust error handling with user-friendly messages for:
+   * - Agent card fetch failures (404, 401/403, network errors)
+   * - Missing authentication configuration
    */
   protected async registerRemoteAgent<TOutput extends z.ZodTypeAny>(
     definition: AgentDefinition<TOutput>,
@@ -360,7 +365,7 @@ export class AgentRegistry {
       debugLogger.log(`[AgentRegistry] Overriding agent '${definition.name}'`);
     }
 
-    // Log remote A2A agent registration for visibility.
+    // Load the remote A2A agent card and register.
     try {
       const clientManager = A2AClientManager.getInstance();
       // Use ADCHandler to ensure we can load agents hosted on secure platforms (e.g. Vertex AI)
@@ -370,6 +375,28 @@ export class AgentRegistry {
         definition.agentCardUrl,
         authHandler,
       );
+
+      // Validate auth configuration against the agent card's security schemes.
+      if (agentCard.securitySchemes) {
+        const validation = A2AAuthProviderFactory.validateAuthConfig(
+          definition.auth,
+          agentCard.securitySchemes,
+        );
+        if (!validation.valid && validation.diff) {
+          const requiredAuth = A2AAuthProviderFactory.describeRequiredAuth(
+            agentCard.securitySchemes,
+          );
+          const authError = new AgentAuthConfigMissingError(
+            definition.name,
+            requiredAuth,
+            validation.diff.missingConfig,
+          );
+          coreEvents.emitFeedback('warning', authError.userMessage);
+          debugLogger.warn(`[AgentRegistry] ${authError.message}`);
+          // Still register the agent — it may work with ADC fallback or user can fix config.
+        }
+      }
+
       if (agentCard.skills && agentCard.skills.length > 0) {
         definition.description = agentCard.skills
           .map(
@@ -386,6 +413,15 @@ export class AgentRegistry {
       this.agents.set(definition.name, definition);
       this.addAgentPolicy(definition);
     } catch (e) {
+      // Surface structured, user-friendly error messages for known failure modes.
+      if (e instanceof A2AAgentError) {
+        coreEvents.emitFeedback('error', e.userMessage);
+      } else {
+        coreEvents.emitFeedback(
+          'error',
+          `Failed to load remote agent "${definition.name}": ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
       debugLogger.warn(
         `[AgentRegistry] Error loading A2A agent "${definition.name}":`,
         e,
