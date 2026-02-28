@@ -60,6 +60,12 @@ export type HttpAuthConfig = BaseAuthConfig & {
         /** For Basic. Supports $ENV_VAR, !command, or literal. */
         password: string;
       }
+    | {
+        /** Any IANA-registered scheme (e.g., "Digest", "HOBA", "Custom"). */
+        scheme: string;
+        /** Raw value to be sent as "Authorization: <scheme> <value>". Supports $ENV_VAR, !command, or literal. */
+        value: string;
+      }
   );
 
 /** Client config corresponding to OAuth2SecurityScheme. */

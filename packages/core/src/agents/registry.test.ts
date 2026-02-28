@@ -30,6 +30,8 @@ import type { ToolRegistry } from '../tools/tool-registry.js';
 import { ThinkingLevel } from '@google/genai';
 import type { AcknowledgedAgentsService } from './acknowledgedAgents.js';
 import { PolicyDecision } from '../policy/types.js';
+import { A2AAuthProviderFactory } from './auth-provider/factory.js';
+import type { A2AAuthProvider } from './auth-provider/types.js';
 
 vi.mock('./agentLoader.js', () => ({
   loadAgentsFromDirectory: vi
@@ -40,6 +42,12 @@ vi.mock('./agentLoader.js', () => ({
 vi.mock('./a2a-client-manager.js', () => ({
   A2AClientManager: {
     getInstance: vi.fn(),
+  },
+}));
+
+vi.mock('./auth-provider/factory.js', () => ({
+  A2AAuthProviderFactory: {
+    create: vi.fn(),
   },
 }));
 
@@ -544,6 +552,54 @@ describe('AgentRegistry', () => {
 
       await registry.testRegisterAgent(remoteAgent);
       expect(registry.getDefinition('RemoteAgent')).toEqual(remoteAgent);
+    });
+
+    it('should register a remote agent with authentication configuration', async () => {
+      const mockAuth = {
+        type: 'http' as const,
+        scheme: 'Bearer' as const,
+        token: 'secret-token',
+      };
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgentWithAuth',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+        auth: mockAuth,
+      };
+
+      const mockHandler = {
+        type: 'http' as const,
+        headers: vi
+          .fn()
+          .mockResolvedValue({ Authorization: 'Bearer secret-token' }),
+        shouldRetryWithHeaders: vi.fn(),
+      } as unknown as A2AAuthProvider;
+      vi.mocked(A2AAuthProviderFactory.create).mockResolvedValue(mockHandler);
+
+      const loadAgentSpy = vi
+        .fn()
+        .mockResolvedValue({ name: 'RemoteAgentWithAuth' });
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: loadAgentSpy,
+        clearCache: vi.fn(),
+      } as unknown as A2AClientManager);
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      expect(A2AAuthProviderFactory.create).toHaveBeenCalledWith({
+        authConfig: mockAuth,
+        agentName: 'RemoteAgentWithAuth',
+      });
+      expect(loadAgentSpy).toHaveBeenCalledWith(
+        'RemoteAgentWithAuth',
+        'https://example.com/card',
+        mockHandler,
+      );
+      expect(registry.getDefinition('RemoteAgentWithAuth')).toEqual(
+        remoteAgent,
+      );
     });
 
     it('should log remote agent registration in debug mode', async () => {
