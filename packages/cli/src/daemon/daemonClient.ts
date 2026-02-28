@@ -14,6 +14,20 @@ import {
 } from '@google/gemini-cli-core';
 import type { CliArgs } from '../config/config.js';
 
+interface DaemonMessage {
+  type: string;
+  content?: string;
+}
+
+function isDaemonMessage(value: unknown): value is DaemonMessage {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    'type' in value &&
+    typeof (value as Record<string, unknown>)['type'] === 'string'
+  );
+}
+
 export function getDaemonSocketPath(): string {
   if (process.platform === 'win32') {
     throw new Error('Daemon mode is currently not supported on Windows.');
@@ -128,22 +142,25 @@ export async function runDaemonClientCommands(
 
       client.write(JSON.stringify(payload) + '\n');
 
+      let buffer = '';
       client.on('data', (data) => {
-        // Output might contain chunks of text or specific formatted messages.
-        // For Phase 1 we can just assume the daemon streams back raw text or json lines.
-        const lines = data.toString().split('\n');
-        for (let i = 0; i < lines.length - 1; i++) {
-          const line = lines[i];
+        buffer += data.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line for next data event
+
+        for (const line of lines) {
           if (!line) continue;
           try {
-            const msg = JSON.parse(line);
+            const raw: unknown = JSON.parse(line);
+            if (!isDaemonMessage(raw)) continue;
+            const msg = raw;
             if (msg.type === 'output') {
-              writeToStdout(msg.content);
+              writeToStdout(msg.content ?? '');
             } else if (msg.type === 'error') {
-              writeToStderr(msg.content + '\n');
+              writeToStderr((msg.content ?? '') + '\n');
               process.exit(1);
             } else if (msg.type === 'verbose' && argv.verbose) {
-              writeToStderr(msg.content + '\n');
+              writeToStderr((msg.content ?? '') + '\n');
             } else if (msg.type === 'end') {
               client.end();
               process.exit(ExitCodes.SUCCESS);
