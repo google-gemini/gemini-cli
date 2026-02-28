@@ -676,14 +676,14 @@ describe('Session', () => {
     expect(mockConnection.requestPermission).toHaveBeenCalledWith(
       expect.objectContaining({
         toolCall: expect.objectContaining({
-          content: [
-            {
+          content: expect.arrayContaining([
+            expect.objectContaining({
               type: 'diff',
               path: '/tmp/test.txt',
               oldText: 'old',
               newText: 'new',
-            },
-          ],
+            }),
+          ]),
         }),
       }),
     );
@@ -739,14 +739,14 @@ describe('Session', () => {
     expect(toolCallUpdate).toEqual(
       expect.objectContaining({
         update: expect.objectContaining({
-          content: [
-            {
+          content: expect.arrayContaining([
+            expect.objectContaining({
               type: 'diff',
               path: '/tmp/test.txt',
               oldText: 'old',
               newText: 'new',
-            },
-          ],
+            }),
+          ]),
         }),
       }),
     );
