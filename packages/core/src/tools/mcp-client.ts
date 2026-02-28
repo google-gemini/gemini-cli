@@ -27,6 +27,7 @@ import type {
 import {
   ListResourcesResultSchema,
   ListRootsRequestSchema,
+  PaginatedResultSchema,
   ReadResourceResultSchema,
   ResourceListChangedNotificationSchema,
   ToolListChangedNotificationSchema,
@@ -1320,14 +1321,28 @@ async function listResources(
   let cursor: string | undefined;
   try {
     do {
-      const response = await mcpClient.request(
+      // Use PaginatedResultSchema instead of ListResourcesResultSchema so
+      // that a server returning { resources: null } does not fail Zod
+      // validation.  PaginatedResultSchema is a loose object that passes
+      // through extra keys, so the raw `resources` value is preserved.  We
+      // then coerce null/undefined to [] before re-validating with the
+      // strict schema.
+      const rawResponse = await mcpClient.request(
         {
           method: 'resources/list',
           params: cursor ? { cursor } : {},
         },
-        ListResourcesResultSchema,
+        PaginatedResultSchema,
       );
-      resources.push(...(response.resources ?? []));
+      const rawResources = (rawResponse as Record<string, unknown>)[
+        'resources'
+      ];
+      const coerced = {
+        ...rawResponse,
+        resources: rawResources ?? [],
+      };
+      const response = ListResourcesResultSchema.parse(coerced);
+      resources.push(...response.resources);
       cursor = response.nextCursor ?? undefined;
     } while (cursor);
   } catch (error) {

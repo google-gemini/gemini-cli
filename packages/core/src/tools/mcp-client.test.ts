@@ -814,6 +814,78 @@ describe('mcp-client', () => {
       );
     });
 
+    it('should treat null resources from MCP server as empty list', async () => {
+      // Some MCP servers return { resources: null } instead of
+      // { resources: [] }.  The listResources helper coerces null to []
+      // before strict Zod validation, so this should not throw.
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
+        getServerCapabilities: vi
+          .fn()
+          .mockReturnValue({ resources: {}, tools: {} }),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'testTool',
+              description: 'A test tool',
+              inputSchema: { type: 'object', properties: {} },
+            },
+          ],
+        }),
+        request: vi.fn().mockImplementation(({ method }) => {
+          if (method === 'resources/list') {
+            // Simulate a server that returns null instead of an empty array
+            return Promise.resolve({ resources: null });
+          }
+          return Promise.resolve({ prompts: [] });
+        }),
+      } as unknown as ClientLib.Client;
+      vi.mocked(ClientLib.Client).mockReturnValue(mockedClient);
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+      } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+        workspaceContext,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        false,
+        '0.0.1',
+      );
+      await client.connect();
+      // Should not throw — null resources are coerced to []
+      await client.discover({} as Config);
+      // Resources should be set as empty
+      expect(resourceRegistry.setResourcesForServer).toHaveBeenCalledWith(
+        'test-server',
+        [],
+      );
+    });
+
     it('refreshes registry when resource list change notification is received', async () => {
       let listCallCount = 0;
       let resourceListHandler:
@@ -842,6 +914,7 @@ describe('mcp-client', () => {
                 resources: [
                   {
                     uri: 'file:///tmp/one.txt',
+                    name: 'one',
                   },
                 ],
               });
@@ -850,6 +923,7 @@ describe('mcp-client', () => {
               resources: [
                 {
                   uri: 'file:///tmp/two.txt',
+                  name: 'two',
                 },
               ],
             });
