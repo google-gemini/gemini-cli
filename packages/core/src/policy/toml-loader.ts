@@ -22,70 +22,79 @@ import { isNodeError } from '../utils/errors.js';
 /**
  * Schema for a single policy rule in the TOML file (before transformation).
  */
-const PolicyRuleSchema = z.object({
-  toolName: z.union([z.string(), z.array(z.string())]).optional(),
-  mcpName: z.string().optional(),
-  argsPattern: z.string().optional(),
-  commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
-  commandRegex: z.string().optional(),
-  decision: z.nativeEnum(PolicyDecision),
-  // Priority must be in range [0, 999] to prevent tier overflow.
-  // With tier transformation (tier + priority/1000), this ensures:
-  // - Tier 1 (default): range [1.000, 1.999]
-  // - Tier 2 (user): range [2.000, 2.999]
-  // - Tier 3 (admin): range [3.000, 3.999]
-  priority: z
-    .number({
-      required_error: 'priority is required',
-      invalid_type_error: 'priority must be a number',
-    })
-    .int({ message: 'priority must be an integer' })
-    .min(0, { message: 'priority must be >= 0' })
-    .max(999, {
-      message:
-        'priority must be <= 999 to prevent tier overflow. Priorities >= 1000 would jump to the next tier.',
-    }),
-  modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
-  toolAnnotations: z.record(z.any()).optional(),
-  allow_redirection: z.boolean().optional(),
-  deny_message: z.string().optional(),
-});
+const PolicyRuleSchema = z
+  .object({
+    toolName: z.union([z.string(), z.array(z.string())]).optional(),
+    mcpName: z.string().optional(),
+    argsPattern: z.string().optional(),
+    commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
+    commandRegex: z.string().optional(),
+    decision: z.nativeEnum(PolicyDecision),
+    // Priority must be in range [0, 999] to prevent tier overflow.
+    // With tier transformation (tier + priority/1000), this ensures:
+    // - Tier 1 (default): range [1.000, 1.999]
+    // - Tier 2 (user): range [2.000, 2.999]
+    // - Tier 3 (admin): range [3.000, 3.999]
+    priority: z
+      .number({
+        required_error: 'priority is required',
+        invalid_type_error: 'priority must be a number',
+      })
+      .int({ message: 'priority must be an integer' })
+      .min(0, { message: 'priority must be >= 0' })
+      .max(999, {
+        message:
+          'priority must be <= 999 to prevent tier overflow. Priorities >= 1000 would jump to the next tier.',
+      }),
+    modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
+    toolAnnotations: z.record(z.any()).optional(),
+    allow_redirection: z.boolean().optional(),
+    deny_message: z.string().optional(),
+    // Inline safety checker attached to a rule via TOML `[rule.safety_checker]` syntax.
+    // Used in built-in policy files (e.g. write.toml) to pair a rule with a checker.
+    safety_checker: z.record(z.unknown()).optional(),
+  })
+  .strict();
 
 /**
  * Schema for a single safety checker rule in the TOML file.
  */
-const SafetyCheckerRuleSchema = z.object({
-  toolName: z.union([z.string(), z.array(z.string())]).optional(),
-  mcpName: z.string().optional(),
-  argsPattern: z.string().optional(),
-  commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
-  commandRegex: z.string().optional(),
-  priority: z.number().int().default(0),
-  modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
-  toolAnnotations: z.record(z.any()).optional(),
-  checker: z.discriminatedUnion('type', [
-    z.object({
-      type: z.literal('in-process'),
-      name: z.nativeEnum(InProcessCheckerType),
-      required_context: z.array(z.string()).optional(),
-      config: z.record(z.unknown()).optional(),
-    }),
-    z.object({
-      type: z.literal('external'),
-      name: z.string(),
-      required_context: z.array(z.string()).optional(),
-      config: z.record(z.unknown()).optional(),
-    }),
-  ]),
-});
+const SafetyCheckerRuleSchema = z
+  .object({
+    toolName: z.union([z.string(), z.array(z.string())]).optional(),
+    mcpName: z.string().optional(),
+    argsPattern: z.string().optional(),
+    commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
+    commandRegex: z.string().optional(),
+    priority: z.number().int().default(0),
+    modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
+    toolAnnotations: z.record(z.any()).optional(),
+    checker: z.discriminatedUnion('type', [
+      z.object({
+        type: z.literal('in-process'),
+        name: z.nativeEnum(InProcessCheckerType),
+        required_context: z.array(z.string()).optional(),
+        config: z.record(z.unknown()).optional(),
+      }),
+      z.object({
+        type: z.literal('external'),
+        name: z.string(),
+        required_context: z.array(z.string()).optional(),
+        config: z.record(z.unknown()).optional(),
+      }),
+    ]),
+  })
+  .strict();
 
 /**
  * Schema for the entire policy TOML file.
  */
-const PolicyFileSchema = z.object({
-  rule: z.array(PolicyRuleSchema).optional(),
-  safety_checker: z.array(SafetyCheckerRuleSchema).optional(),
-});
+const PolicyFileSchema = z
+  .object({
+    rule: z.array(PolicyRuleSchema).optional(),
+    safety_checker: z.array(SafetyCheckerRuleSchema).optional(),
+  })
+  .strict();
 
 /**
  * Type for a raw policy rule from TOML (before transformation).
@@ -329,7 +338,8 @@ export async function loadPoliciesFromToml(
             message: 'Schema validation failed',
             details: formatSchemaError(validationResult.error, 0),
             suggestion:
-              'Ensure all required fields (decision, priority) are present with correct types',
+              'Ensure all required fields (decision, priority) are present with correct types. ' +
+              'Check for misspelled field names (e.g. "toolname" vs "toolName")',
           });
           continue;
         }

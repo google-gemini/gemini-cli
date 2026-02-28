@@ -598,6 +598,51 @@ priority = 100
       expect(result.rules[0].decision).toBe(PolicyDecision.ALLOW);
     });
 
+    it('should reject a rule with a misspelled field name (toolname vs toolName)', async () => {
+      // This is the exact scenario from issue #20635:
+      // A typo like "toolname" (lowercase n) instead of "toolName" should
+      // produce a schema validation error, NOT silently match all tools.
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolname = "glob"
+decision = "allow"
+priority = 200
+`);
+      expect(result.rules).toHaveLength(0);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('schema_validation');
+      expect(error.details).toContain('toolname');
+    });
+
+    it('should reject a rule with an unknown field', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "glob"
+decision = "allow"
+priority = 100
+unknownField = "value"
+`);
+      expect(result.rules).toHaveLength(0);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('schema_validation');
+      expect(error.details).toContain('unknownField');
+    });
+
+    it('should reject unknown top-level sections in the policy file', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rules]]
+toolName = "glob"
+decision = "allow"
+priority = 100
+`);
+      expect(result.rules).toHaveLength(0);
+      expect(result.errors).toHaveLength(1);
+      const error = result.errors[0];
+      expect(error.errorType).toBe('schema_validation');
+    });
+
     it('should return a file_read error if stat fails with something other than ENOENT', async () => {
       // We can't easily trigger a stat error other than ENOENT without mocks,
       // but we can test that it handles it.
