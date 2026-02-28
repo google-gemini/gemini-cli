@@ -12,6 +12,7 @@ import type {
   SettingsFile,
 } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
+import { checkExhaustive } from '@google/gemini-cli-core';
 
 export const SettingsContext = React.createContext<LoadedSettings | undefined>(
   undefined,
@@ -66,7 +67,7 @@ export const useSettingsStore = (): SettingsStoreValue => {
           case SettingScope.SystemDefaults:
             return snapshot.systemDefaults;
           default:
-            throw new Error(`Invalid scope: ${scope}`);
+            checkExhaustive(scope);
         }
       },
     }),

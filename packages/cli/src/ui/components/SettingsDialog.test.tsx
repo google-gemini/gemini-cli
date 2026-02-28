@@ -25,12 +25,13 @@ import { render } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsDialog } from './SettingsDialog.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import { SettingScope } from '../../config/settings.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { VimModeProvider } from '../contexts/VimModeContext.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { act } from 'react';
-import { saveModifiedSettings, TEST_ONLY } from '../../utils/settingsUtils.js';
+import { TEST_ONLY } from '../../utils/settingsUtils.js';
+import { SettingsContext } from '../contexts/SettingsContext.js';
 import {
   getSettingsSchema,
   type SettingDefinition,
@@ -81,14 +82,6 @@ vi.mock('../contexts/VimModeContext.js', async () => {
   };
 });
 
-vi.mock('../../utils/settingsUtils.js', async () => {
-  const actual = await vi.importActual('../../utils/settingsUtils.js');
-  return {
-    ...actual,
-    saveModifiedSettings: vi.fn(),
-  };
-});
-
 // Shared test schemas
 enum StringEnum {
   FOO = 'foo',
@@ -126,6 +119,62 @@ const ENUM_FAKE_SCHEMA: SettingsSchemaType = {
     properties: {
       theme: {
         ...ENUM_SETTING,
+      },
+    },
+  },
+} as unknown as SettingsSchemaType;
+
+const ARRAY_FAKE_SCHEMA: SettingsSchemaType = {
+  context: {
+    type: 'object',
+    label: 'Context',
+    category: 'Context',
+    requiresRestart: false,
+    default: {},
+    description: 'Context settings.',
+    showInDialog: false,
+    properties: {
+      fileFiltering: {
+        type: 'object',
+        label: 'File Filtering',
+        category: 'Context',
+        requiresRestart: false,
+        default: {},
+        description: 'File filtering settings.',
+        showInDialog: false,
+        properties: {
+          customIgnoreFilePaths: {
+            type: 'array',
+            label: 'Custom Ignore File Paths',
+            category: 'Context',
+            requiresRestart: false,
+            default: [] as string[],
+            description: 'Additional ignore file paths.',
+            showInDialog: true,
+            items: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+  security: {
+    type: 'object',
+    label: 'Security',
+    category: 'Security',
+    requiresRestart: false,
+    default: {},
+    description: 'Security settings.',
+    showInDialog: false,
+    properties: {
+      allowedExtensions: {
+        type: 'array',
+        label: 'Extension Source Regex Allowlist',
+        category: 'Security',
+        requiresRestart: false,
+        default: [] as string[],
+        description: 'Allowed extension source regex patterns.',
+        showInDialog: true,
+        items: { type: 'string' },
       },
     },
   },
@@ -185,7 +234,7 @@ const TOOLS_SHELL_FAKE_SCHEMA: SettingsSchemaType = {
 
 // Helper function to render SettingsDialog with standard wrapper
 const renderDialog = (
-  settings: LoadedSettings,
+  settings: ReturnType<typeof createMockSettings>,
   onSelect: ReturnType<typeof vi.fn>,
   options?: {
     onRestartRequest?: ReturnType<typeof vi.fn>;
@@ -193,14 +242,15 @@ const renderDialog = (
   },
 ) =>
   render(
-    <KeypressProvider>
-      <SettingsDialog
-        settings={settings}
-        onSelect={onSelect}
-        onRestartRequest={options?.onRestartRequest}
-        availableTerminalHeight={options?.availableTerminalHeight}
-      />
-    </KeypressProvider>,
+    <SettingsContext.Provider value={settings}>
+      <KeypressProvider>
+        <SettingsDialog
+          onSelect={onSelect}
+          onRestartRequest={options?.onRestartRequest}
+          availableTerminalHeight={options?.availableTerminalHeight}
+        />
+      </KeypressProvider>
+    </SettingsContext.Provider>,
   );
 
 describe('SettingsDialog', () => {
@@ -394,9 +444,8 @@ describe('SettingsDialog', () => {
 
   describe('Settings Toggling', () => {
     it('should toggle setting with Enter key', async () => {
-      vi.mocked(saveModifiedSettings).mockClear();
-
       const settings = createMockSettings();
+      const setValueSpy = vi.spyOn(settings, 'setValue');
       const onSelect = vi.fn();
 
       const { stdin, unmount, lastFrame, waitUntilReady } = renderDialog(
@@ -414,29 +463,16 @@ describe('SettingsDialog', () => {
       await act(async () => {
         stdin.write(TerminalKeys.ENTER as string);
       });
-      await waitUntilReady();
 
-      // Wait for the setting change to be processed
+      // Wait for setValue to be called
       await waitFor(() => {
-        expect(
-          vi.mocked(saveModifiedSettings).mock.calls.length,
-        ).toBeGreaterThan(0);
+        expect(setValueSpy).toHaveBeenCalled();
       });
 
-      // Wait for the mock to be called
-      await waitFor(() => {
-        expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
-      });
-
-      expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
-        new Set<string>(['general.vimMode']),
-        expect.objectContaining({
-          general: expect.objectContaining({
-            vimMode: true,
-          }),
-        }),
-        expect.any(LoadedSettings),
+      expect(setValueSpy).toHaveBeenCalledWith(
         SettingScope.User,
+        'general.vimMode',
+        true,
       );
 
       unmount();
@@ -455,13 +491,13 @@ describe('SettingsDialog', () => {
           expectedValue: StringEnum.FOO,
         },
       ])('$name', async ({ initialValue, expectedValue }) => {
-        vi.mocked(saveModifiedSettings).mockClear();
         vi.mocked(getSettingsSchema).mockReturnValue(ENUM_FAKE_SCHEMA);
 
         const settings = createMockSettings();
         if (initialValue !== undefined) {
           settings.setValue(SettingScope.User, 'ui.theme', initialValue);
         }
+        const setValueSpy = vi.spyOn(settings, 'setValue');
 
         const onSelect = vi.fn();
 
@@ -482,19 +518,12 @@ describe('SettingsDialog', () => {
         await waitUntilReady();
 
         await waitFor(() => {
-          expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
+          expect(setValueSpy).toHaveBeenCalledWith(
+            SettingScope.User,
+            'ui.theme',
+            expectedValue,
+          );
         });
-
-        expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
-          new Set<string>(['ui.theme']),
-          expect.objectContaining({
-            ui: expect.objectContaining({
-              theme: expectedValue,
-            }),
-          }),
-          expect.any(LoadedSettings),
-          SettingScope.User,
-        );
 
         unmount();
       });
@@ -773,11 +802,13 @@ describe('SettingsDialog', () => {
       const onSelect = vi.fn();
 
       const { stdin, unmount, waitUntilReady } = render(
-        <VimModeProvider settings={settings}>
-          <KeypressProvider>
-            <SettingsDialog settings={settings} onSelect={onSelect} />
-          </KeypressProvider>
-        </VimModeProvider>,
+        <SettingsContext.Provider value={settings}>
+          <VimModeProvider settings={settings}>
+            <KeypressProvider>
+              <SettingsDialog onSelect={onSelect} />
+            </KeypressProvider>
+          </VimModeProvider>
+        </SettingsContext.Provider>,
       );
       await waitUntilReady();
 
@@ -861,7 +892,7 @@ describe('SettingsDialog', () => {
       // Should not show restart prompt initially
       await waitFor(() => {
         expect(lastFrame()).not.toContain(
-          'To see changes, Gemini CLI must be restarted',
+          'Changes that require a restart have been modified',
         );
       });
 
@@ -957,63 +988,41 @@ describe('SettingsDialog', () => {
           pager: 'less',
         },
       },
-    ])(
-      'should $name',
-      async ({ toggleCount, shellSettings, expectedSiblings }) => {
-        vi.mocked(saveModifiedSettings).mockClear();
+    ])('should $name', async ({ toggleCount, shellSettings }) => {
+      vi.mocked(getSettingsSchema).mockReturnValue(TOOLS_SHELL_FAKE_SCHEMA);
 
-        vi.mocked(getSettingsSchema).mockReturnValue(TOOLS_SHELL_FAKE_SCHEMA);
+      const settings = createMockSettings({
+        tools: {
+          shell: shellSettings,
+        },
+      });
+      const setValueSpy = vi.spyOn(settings, 'setValue');
 
-        const settings = createMockSettings({
-          tools: {
-            shell: shellSettings,
-          },
+      const onSelect = vi.fn();
+
+      const { stdin, unmount } = renderDialog(settings, onSelect);
+
+      for (let i = 0; i < toggleCount; i++) {
+        act(() => {
+          stdin.write(TerminalKeys.ENTER as string);
         });
+      }
 
-        const onSelect = vi.fn();
+      await waitFor(() => {
+        expect(setValueSpy).toHaveBeenCalled();
+      });
 
-        const { stdin, unmount, waitUntilReady } = renderDialog(
-          settings,
-          onSelect,
-        );
-        await waitUntilReady();
+      // With the store pattern, setValue is called atomically per key.
+      // Sibling preservation is handled by LoadedSettings internally.
+      const calls = setValueSpy.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      calls.forEach((call) => {
+        // Each call should target only 'tools.shell.showColor'
+        expect(call[1]).toBe('tools.shell.showColor');
+      });
 
-        for (let i = 0; i < toggleCount; i++) {
-          await act(async () => {
-            stdin.write(TerminalKeys.ENTER as string);
-          });
-          await waitUntilReady();
-        }
-
-        await waitFor(() => {
-          expect(
-            vi.mocked(saveModifiedSettings).mock.calls.length,
-          ).toBeGreaterThan(0);
-        });
-
-        const calls = vi.mocked(saveModifiedSettings).mock.calls;
-        calls.forEach((call) => {
-          const [modifiedKeys, pendingSettings] = call;
-
-          if (modifiedKeys.has('tools.shell.showColor')) {
-            const shellSettings = pendingSettings.tools?.shell as
-              | Record<string, unknown>
-              | undefined;
-
-            Object.entries(expectedSiblings).forEach(([key, value]) => {
-              expect(shellSettings?.[key]).toBe(value);
-              expect(modifiedKeys.has(`tools.shell.${key}`)).toBe(false);
-            });
-
-            expect(modifiedKeys.size).toBe(1);
-          }
-        });
-
-        expect(calls.length).toBeGreaterThan(0);
-
-        unmount();
-      },
-    );
+      unmount();
+    });
   });
 
   describe('Keyboard Shortcuts Edge Cases', () => {
@@ -1319,7 +1328,7 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         expect(lastFrame()).toContain(
-          'To see changes, Gemini CLI must be restarted',
+          'Changes that require a restart have been modified',
         );
       });
 
@@ -1366,7 +1375,7 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         expect(lastFrame()).toContain(
-          'To see changes, Gemini CLI must be restarted',
+          'Changes that require a restart have been modified',
         );
       });
 
@@ -1385,9 +1394,11 @@ describe('SettingsDialog', () => {
       const onSelect = vi.fn();
 
       const { stdin, unmount, rerender, waitUntilReady } = render(
-        <KeypressProvider>
-          <SettingsDialog settings={settings} onSelect={onSelect} />
-        </KeypressProvider>,
+        <SettingsContext.Provider value={settings}>
+          <KeypressProvider>
+            <SettingsDialog onSelect={onSelect} />
+          </KeypressProvider>
+        </SettingsContext.Provider>,
       );
       await waitUntilReady();
 
@@ -1424,14 +1435,13 @@ describe('SettingsDialog', () => {
           path: '',
         },
       });
-      await act(async () => {
-        rerender(
+      rerender(
+        <SettingsContext.Provider value={settings}>
           <KeypressProvider>
-            <SettingsDialog settings={settings} onSelect={onSelect} />
-          </KeypressProvider>,
-        );
-      });
-      await waitUntilReady();
+            <SettingsDialog onSelect={onSelect} />
+          </KeypressProvider>
+        </SettingsContext.Provider>,
+      );
 
       // Press Escape to exit
       await act(async () => {
@@ -1441,6 +1451,74 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         expect(onSelect).toHaveBeenCalledWith(undefined, 'User');
+      });
+
+      unmount();
+    });
+  });
+
+  describe('Array Settings Editing', () => {
+    const typeInput = async (
+      stdin: { write: (data: string) => void },
+      input: string,
+    ) => {
+      for (const ch of input) {
+        await act(async () => {
+          stdin.write(ch);
+        });
+      }
+    };
+
+    it('should parse comma-separated input as string arrays', async () => {
+      vi.mocked(getSettingsSchema).mockReturnValue(ARRAY_FAKE_SCHEMA);
+      const settings = createMockSettings();
+      const setValueSpy = vi.spyOn(settings, 'setValue');
+
+      const { stdin, unmount } = renderDialog(settings, vi.fn());
+
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER as string); // Start editing first array setting
+      });
+      await typeInput(stdin, 'first/path, second/path,third/path');
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER as string); // Commit
+      });
+
+      await waitFor(() => {
+        expect(setValueSpy).toHaveBeenCalledWith(
+          SettingScope.User,
+          'context.fileFiltering.customIgnoreFilePaths',
+          ['first/path', 'second/path', 'third/path'],
+        );
+      });
+
+      unmount();
+    });
+
+    it('should parse JSON array input for allowedExtensions', async () => {
+      vi.mocked(getSettingsSchema).mockReturnValue(ARRAY_FAKE_SCHEMA);
+      const settings = createMockSettings();
+      const setValueSpy = vi.spyOn(settings, 'setValue');
+
+      const { stdin, unmount } = renderDialog(settings, vi.fn());
+
+      await act(async () => {
+        stdin.write(TerminalKeys.DOWN_ARROW as string); // Move to second array setting
+      });
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER as string); // Start editing
+      });
+      await typeInput(stdin, '["^github\\\\.com/.*$", "^gitlab\\\\.com/.*$"]');
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER as string); // Commit
+      });
+
+      await waitFor(() => {
+        expect(setValueSpy).toHaveBeenCalledWith(
+          SettingScope.User,
+          'security.allowedExtensions',
+          ['^github\\.com/.*$', '^gitlab\\.com/.*$'],
+        );
       });
 
       unmount();

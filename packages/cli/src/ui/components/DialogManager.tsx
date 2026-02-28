@@ -281,7 +281,6 @@ export const DialogManager = ({
     return (
       <Box flexDirection="column">
         <SettingsDialog
-          settings={settings}
           onSelect={() => uiActions.closeSettingsDialog()}
           onRestartRequest={async () => {
             await runExitCleanup();
