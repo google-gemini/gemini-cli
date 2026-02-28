@@ -622,7 +622,11 @@ The agent did not use the todo list because this task could be completed by a ti
           maxItems: 4,
           items: {
             type: 'object',
-            required: [ASK_USER_QUESTION_PARAM_QUESTION, ASK_USER_QUESTION_PARAM_HEADER, ASK_USER_QUESTION_PARAM_TYPE],
+            required: [
+              ASK_USER_QUESTION_PARAM_QUESTION,
+              ASK_USER_QUESTION_PARAM_HEADER,
+              ASK_USER_QUESTION_PARAM_TYPE,
+            ],
             properties: {
               [ASK_USER_QUESTION_PARAM_QUESTION]: {
                 type: 'string',
@@ -647,7 +651,10 @@ The agent did not use the todo list because this task could be completed by a ti
                   "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
                 items: {
                   type: 'object',
-                  required: [ASK_USER_OPTION_PARAM_LABEL, ASK_USER_OPTION_PARAM_DESCRIPTION],
+                  required: [
+                    ASK_USER_OPTION_PARAM_LABEL,
+                    ASK_USER_OPTION_PARAM_DESCRIPTION,
+                  ],
                   properties: {
                     [ASK_USER_OPTION_PARAM_LABEL]: {
                       type: 'string',
