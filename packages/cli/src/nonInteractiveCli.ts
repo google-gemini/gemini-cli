@@ -377,11 +377,26 @@ export async function runNonInteractive({
                 type: JsonStreamEventType.RESULT,
                 timestamp: new Date().toISOString(),
                 status: 'success',
+                error: {
+                  type: 'AgentExecutionStopped',
+                  message: stopMessage,
+                },
                 stats: streamFormatter.convertToStreamStats(
                   metrics,
                   durationMs,
                 ),
               });
+            } else if (config.getOutputFormat() === OutputFormat.JSON) {
+              const formatter = new JsonFormatter();
+              const stats = uiTelemetryService.getMetrics();
+              textOutput.write(
+                formatter.format(config.getSessionId(), responseText, stats, {
+                  type: 'AgentExecutionStopped',
+                  message: stopMessage,
+                }),
+              );
+            } else {
+              textOutput.ensureTrailingNewline(); // Ensure a final newline
             }
             return;
           } else if (event.type === GeminiEventType.AgentExecutionBlocked) {
