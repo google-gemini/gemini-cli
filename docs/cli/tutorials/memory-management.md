@@ -105,7 +105,7 @@ excellent for debugging why the agent might be ignoring a rule.
 If you edit a `GEMINI.md` file while a session is running, the agent won't know
 immediately. Force a reload with:
 
-**Command:** `/memory refresh`
+**Command:** `/memory reload`
 
 ## Best practices
 
