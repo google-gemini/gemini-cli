@@ -11,6 +11,8 @@ document includes:
   set up your development environment and workflow.
 - **[Documentation contribution process](#documentation-contribution-process):**
   How to contribute documentation to Gemini CLI.
+- **[Non-code contribution process](#non-code-contribution-process):** How to
+  contribute UX feedback, user research, and other non-code improvements.
 
 We're looking forward to seeing your contributions!
 
@@ -552,3 +554,44 @@ If you have questions about contributing documentation:
 - Reach out to the maintainers.
 
 We appreciate your contributions to making Gemini CLI documentation better!
+
+## Non-code contribution process
+
+Not a developer? You can still make a significant impact! Non-code contributions
+are essential for making Gemini CLI usable and accessible to everyone.
+
+### UX feedback
+
+The best UX insights come from real usage. If you encounter confusing
+interactions, unclear error messages, or awkward workflows:
+
+1. Use the **UX Feedback** issue template.
+2. Include screenshots or terminal recordings when possible.
+3. Describe your experience level — beginner perspectives are especially
+   valuable.
+
+### User research
+
+If you have UX research skills, we welcome structured findings:
+
+1. Use the **User Research Insight** issue template.
+2. Describe your methodology (usability test, interview, heuristic evaluation,
+   etc.).
+3. Include supporting evidence (quotes, data, recordings).
+
+### Documentation review (user perspective)
+
+Read our docs as a user, not an editor:
+
+1. Follow the quickstart guide from scratch.
+2. Document where you got stuck or confused.
+3. File a UX Feedback issue with your findings.
+
+### First-time experience report
+
+Your first hour with Gemini CLI is uniquely valuable data that experienced users
+can never reproduce. We encourage new users to:
+
+1. Record their first session (terminal recording or notes).
+2. Note every moment of confusion or delight.
+3. Submit as a UX Feedback issue.

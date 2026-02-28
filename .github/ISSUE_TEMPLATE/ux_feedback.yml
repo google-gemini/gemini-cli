@@ -1,0 +1,50 @@
+name: 'UX Feedback'
+description: 'Report a usability issue or suggest a UX improvement'
+labels:
+  - 'status/need-triage'
+body:
+  - type: 'markdown'
+    attributes:
+      value: |-
+        > [!IMPORTANT]
+        > Thanks for taking the time to share your experience!
+        >
+        > UX feedback from all experience levels is valuable — especially from beginners.
+        > Please search **[existing issues](https://github.com/google-gemini/gemini-cli/issues)** to see if similar feedback has already been shared.
+
+  - type: 'textarea'
+    id: 'scenario'
+    attributes:
+      label: 'What were you trying to do?'
+      description: 'Describe the task or goal you were working on.'
+    validations:
+      required: true
+
+  - type: 'textarea'
+    id: 'experience'
+    attributes:
+      label: 'What was your experience?'
+      description: 'Describe what happened. Was anything confusing, slow, or frustrating?'
+    validations:
+      required: true
+
+  - type: 'textarea'
+    id: 'expected'
+    attributes:
+      label: 'What would have been better?'
+      description: 'Describe how you think the experience could be improved.'
+
+  - type: 'textarea'
+    id: 'screenshots'
+    attributes:
+      label: 'Screenshots or recordings'
+      description: 'If possible, add screenshots or terminal recordings (e.g., asciinema).'
+
+  - type: 'dropdown'
+    id: 'experience-level'
+    attributes:
+      label: 'Your experience level with CLI tools'
+      options:
+        - 'Beginner (rarely use terminal)'
+        - 'Intermediate (use terminal sometimes)'
+        - 'Advanced (terminal is my primary tool)'
