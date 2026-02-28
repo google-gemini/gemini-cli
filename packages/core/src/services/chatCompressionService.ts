@@ -236,7 +236,7 @@ export class ChatCompressionService {
     model: string,
     config: Config,
     hasFailedCompressionAttempt: boolean,
-    abortSignal?: AbortSignal,
+    abortSignal: AbortSignal,
   ): Promise<{ newHistory: Content[] | null; info: ChatCompressionInfo }> {
     const curatedHistory = chat.getHistory(true);
 
@@ -365,8 +365,7 @@ export class ChatCompressionService {
       ],
       systemInstruction: { text: getCompressionPrompt(config) },
       promptId,
-      // TODO(joshualitt): wire up a sensible abort signal,
-      abortSignal: abortSignal ?? new AbortController().signal,
+      abortSignal,
       role: LlmRole.UTILITY_COMPRESSOR,
     });
     const summary = getResponseText(summaryResponse) ?? '';
@@ -395,7 +394,7 @@ export class ChatCompressionService {
         systemInstruction: { text: getCompressionPrompt(config) },
         promptId: `${promptId}-verify`,
         role: LlmRole.UTILITY_COMPRESSOR,
-        abortSignal: abortSignal ?? new AbortController().signal,
+        abortSignal,
       });
 
     const finalSummary = (
