@@ -1281,6 +1281,13 @@
           "markdownDescription": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.\n\n- Category: `Tools`\n- Requires restart: `yes`",
           "$ref": "#/$defs/BooleanOrString"
         },
+        "sandboxFlags": {
+          "title": "Sandbox Flags",
+          "description": "Additional flags to pass to the sandbox container engine (Docker or Podman). Environment variables can be used and will be expanded.",
+          "markdownDescription": "Additional flags to pass to the sandbox container engine (Docker or Podman). Environment variables can be used and will be expanded.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: ``",
+          "default": "",
+          "type": "string"
+        },
         "shell": {
           "title": "Shell",
           "description": "Settings for shell execution.",

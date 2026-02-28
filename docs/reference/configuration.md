@@ -756,6 +756,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`tools.sandboxFlags`** (string):
+  - **Description:** Additional flags to pass to the sandbox container engine
+    (Docker or Podman). Environment variables can be used and will be expanded.
+  - **Default:** `""`
+  - **Requires restart:** Yes
+
 - **`tools.shell.enableInteractiveShell`** (boolean):
   - **Description:** Use node-pty for an interactive shell experience. Fallback
     to child_process still applies.

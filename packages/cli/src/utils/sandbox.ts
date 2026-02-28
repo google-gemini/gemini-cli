@@ -1,16 +1,20 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec, execSync, spawn, type ChildProcess } from 'node:child_process';
+import {
+  execSync,
+  spawn,
+  spawnSync,
+  type ChildProcess,
+} from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { quote, parse } from 'shell-quote';
-import { promisify } from 'node:util';
+import { quote } from 'shell-quote';
 import type { Config, SandboxConfig } from '@google/gemini-cli-core';
 import {
   coreEvents,
@@ -18,6 +22,11 @@ import {
   FatalSandboxError,
   GEMINI_DIR,
   homedir,
+  SandboxOrchestrator,
+  LOCAL_DEV_SANDBOX_IMAGE_NAME,
+  SANDBOX_NETWORK_NAME,
+  SANDBOX_PROXY_NAME,
+  spawnAsync,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
@@ -27,13 +36,30 @@ import {
   parseImageName,
   ports,
   entrypoint,
-  LOCAL_DEV_SANDBOX_IMAGE_NAME,
-  SANDBOX_NETWORK_NAME,
-  SANDBOX_PROXY_NAME,
   BUILTIN_SEATBELT_PROFILES,
 } from './sandboxUtils.js';
 
-const execAsync = promisify(exec);
+async function waitForProxy(
+  proxyUrl: string,
+  timeoutMs: number = 30000,
+  retryDelayMs: number = 500,
+  now: () => number = Date.now,
+): Promise<void> {
+  const start = now();
+  while (now() - start < timeoutMs) {
+    try {
+      await spawnAsync('curl', ['-s', proxyUrl], {
+        timeout: 500,
+      });
+      return;
+    } catch {
+      await new Promise((r) => setTimeout(r, retryDelayMs));
+    }
+  }
+  throw new FatalSandboxError(
+    `Timed out waiting for proxy at ${proxyUrl} to start after ${timeoutMs / 1000} seconds`,
+  );
+}
 
 export async function start_sandbox(
   config: SandboxConfig,
@@ -70,26 +96,16 @@ export async function start_sandbox(
         );
       }
       debugLogger.log(`using macos seatbelt (profile: ${profile}) ...`);
-      // if DEBUG is set, convert to --inspect-brk in NODE_OPTIONS
-      const nodeOptions = [
-        ...(process.env['DEBUG'] ? ['--inspect-brk'] : []),
-        ...nodeArgs,
-      ].join(' ');
+      const cacheDir = (
+        await spawnAsync('getconf', ['DARWIN_USER_CACHE_DIR'])
+      ).stdout.trim();
 
-      const args = [
-        '-D',
-        `TARGET_DIR=${fs.realpathSync(process.cwd())}`,
-        '-D',
-        `TMP_DIR=${fs.realpathSync(os.tmpdir())}`,
-        '-D',
-        `HOME_DIR=${fs.realpathSync(homedir())}`,
-        '-D',
-        `CACHE_DIR=${fs.realpathSync((await execAsync('getconf DARWIN_USER_CACHE_DIR')).stdout.trim())}`,
-      ];
+      const targetDirReal = fs.realpathSync(process.cwd());
+      const tmpDirReal = fs.realpathSync(os.tmpdir());
+      const homeDirReal = fs.realpathSync(homedir());
+      const cacheDirReal = fs.realpathSync(cacheDir);
 
       // Add included directories from the workspace context
-      // Always add 5 INCLUDE_DIR parameters to ensure .sb files can reference them
-      const MAX_INCLUDE_DIRS = 5;
       const targetDir = fs.realpathSync(cliConfig?.getTargetDir() || '');
       const includedDirs: string[] = [];
 
@@ -106,21 +122,24 @@ export async function start_sandbox(
         }
       }
 
-      for (let i = 0; i < MAX_INCLUDE_DIRS; i++) {
-        let dirPath = '/dev/null'; // Default to a safe path that won't cause issues
+      const args = SandboxOrchestrator.getSeatbeltArgs(
+        targetDirReal,
+        tmpDirReal,
+        homeDirReal,
+        cacheDirReal,
+        profileFile,
+        includedDirs,
+      );
 
-        if (i < includedDirs.length) {
-          dirPath = includedDirs[i];
-        }
-
-        args.push('-D', `INCLUDE_DIR_${i}=${dirPath}`);
-      }
+      // if DEBUG is set, convert to --inspect-brk in NODE_OPTIONS
+      const nodeOptions = [
+        ...(process.env['DEBUG'] ? ['--inspect-brk'] : []),
+        ...nodeArgs,
+      ].join(' ');
 
       const finalArgv = cliArgs;
 
       args.push(
-        '-f',
-        profileFile,
         'sh',
         '-c',
         [
@@ -161,6 +180,7 @@ export async function start_sandbox(
           if (proxyProcess?.pid) {
             process.kill(-proxyProcess.pid, 'SIGTERM');
           }
+          return;
         };
         process.off('exit', stopProxy);
         process.on('exit', stopProxy);
@@ -185,9 +205,7 @@ export async function start_sandbox(
           );
         });
         debugLogger.log('waiting for proxy to start ...');
-        await execAsync(
-          `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
-        );
+        await waitForProxy('http://localhost:8877', 30000, 500);
       }
       // spawn child and let it inherit stdio
       process.stdin.pause();
@@ -255,7 +273,11 @@ export async function start_sandbox(
 
     // stop if image is missing
     if (
-      !(await ensureSandboxImageIsPresent(config.command, image, cliConfig))
+      !(await SandboxOrchestrator.ensureSandboxImageIsPresent(
+        config.command,
+        image,
+        cliConfig,
+      ))
     ) {
       const remedy =
         image === LOCAL_DEV_SANDBOX_IMAGE_NAME
@@ -268,26 +290,13 @@ export async function start_sandbox(
 
     // use interactive mode and auto-remove container on exit
     // run init binary inside container to forward signals & reap zombies
-    const args = ['run', '-i', '--rm', '--init', '--workdir', containerWorkdir];
-
-    // add custom flags from SANDBOX_FLAGS
-    if (process.env['SANDBOX_FLAGS']) {
-      const flags = parse(process.env['SANDBOX_FLAGS'], process.env).filter(
-        (f): f is string => typeof f === 'string',
-      );
-      args.push(...flags);
-    }
-
-    // add TTY only if stdin is TTY as well, i.e. for piped input don't init TTY in container
-    if (process.stdin.isTTY) {
-      args.push('-t');
-    }
-
-    // allow access to host.docker.internal
-    args.push('--add-host', 'host.docker.internal:host-gateway');
-
-    // mount current directory as working directory in sandbox (set via --workdir)
-    args.push('--volume', `${workdir}:${containerWorkdir}`);
+    const args = await SandboxOrchestrator.getContainerRunArgs(
+      config,
+      workdir,
+      containerWorkdir,
+      process.env['SANDBOX_FLAGS'],
+      !process.stdin.isTTY,
+    );
 
     // mount user settings directory inside container, after creating if missing
     // note user/home changes inside sandbox and we mount at BOTH paths for consistency
@@ -409,17 +418,38 @@ export async function start_sandbox(
 
       // if using proxy, switch to internal networking through proxy
       if (proxy) {
-        execSync(
-          `${config.command} network inspect ${SANDBOX_NETWORK_NAME} || ${config.command} network create --internal ${SANDBOX_NETWORK_NAME}`,
-        );
+        try {
+          await spawnAsync(config.command, [
+            'network',
+            'inspect',
+            SANDBOX_NETWORK_NAME,
+          ]);
+        } catch {
+          await spawnAsync(config.command, [
+            'network',
+            'create',
+            '--internal',
+            SANDBOX_NETWORK_NAME,
+          ]);
+        }
         args.push('--network', SANDBOX_NETWORK_NAME);
         // if proxy command is set, create a separate network w/ host access (i.e. non-internal)
         // we will run proxy in its own container connected to both host network and internal network
         // this allows proxy to work even on rootless podman on macos with host<->vm<->container isolation
         if (proxyCommand) {
-          execSync(
-            `${config.command} network inspect ${SANDBOX_PROXY_NAME} || ${config.command} network create ${SANDBOX_PROXY_NAME}`,
-          );
+          try {
+            await spawnAsync(config.command, [
+              'network',
+              'inspect',
+              SANDBOX_PROXY_NAME,
+            ]);
+          } catch {
+            await spawnAsync(config.command, [
+              'network',
+              'create',
+              SANDBOX_PROXY_NAME,
+            ]);
+          }
         }
       }
     }
@@ -436,9 +466,12 @@ export async function start_sandbox(
       debugLogger.log(`ContainerName: ${containerName}`);
     } else {
       let index = 0;
-      const containerNameCheck = (
-        await execAsync(`${config.command} ps -a --format "{{.Names}}"`)
-      ).stdout.trim();
+      const { stdout: containerNameCheck } = await spawnAsync(config.command, [
+        'ps',
+        '-a',
+        '--format',
+        '{{.Names}}',
+      ]);
       while (containerNameCheck.includes(`${imageName}-${index}`)) {
         index++;
       }
@@ -606,8 +639,8 @@ export async function start_sandbox(
       // The entrypoint script then handles dropping privileges to the correct user.
       args.push('--user', 'root');
 
-      const uid = (await execAsync('id -u')).stdout.trim();
-      const gid = (await execAsync('id -g')).stdout.trim();
+      const uid = (await spawnAsync('id', ['-u'])).stdout.trim();
+      const gid = (await spawnAsync('id', ['-g'])).stdout.trim();
 
       // Instead of passing --user to the main sandbox container, we let it
       // start as root, then create a user with the host's UID/GID, and
@@ -660,8 +693,13 @@ export async function start_sandbox(
       // install handlers to stop proxy on exit/signal
       const stopProxy = () => {
         debugLogger.log('stopping proxy container ...');
-        execSync(`${config.command} rm -f ${SANDBOX_PROXY_NAME}`);
+        try {
+          spawnSync(config.command, ['rm', '-f', SANDBOX_PROXY_NAME]);
+        } catch {
+          // ignore
+        }
       };
+
       process.off('exit', stopProxy);
       process.on('exit', stopProxy);
       process.off('SIGINT', stopProxy);
@@ -681,18 +719,19 @@ export async function start_sandbox(
           process.kill(-sandboxProcess.pid, 'SIGTERM');
         }
         throw new FatalSandboxError(
-          `Proxy container command '${proxyContainerCommand}' exited with code ${code}, signal ${signal}`,
+          `Proxy container command exited with code ${code}, signal ${signal}`,
         );
       });
       debugLogger.log('waiting for proxy to start ...');
-      await execAsync(
-        `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
-      );
+      await waitForProxy('http://localhost:8877', 30000, 500);
       // connect proxy container to sandbox network
       // (workaround for older versions of docker that don't support multiple --network args)
-      await execAsync(
-        `${config.command} network connect ${SANDBOX_NETWORK_NAME} ${SANDBOX_PROXY_NAME}`,
-      );
+      await spawnAsync(config.command, [
+        'network',
+        'connect',
+        SANDBOX_NETWORK_NAME,
+        SANDBOX_PROXY_NAME,
+      ]);
     }
 
     // spawn child and let it inherit stdio
@@ -720,146 +759,4 @@ export async function start_sandbox(
   } finally {
     patcher.cleanup();
   }
-}
-
-// Helper functions to ensure sandbox image is present
-async function imageExists(sandbox: string, image: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const args = ['images', '-q', image];
-    const checkProcess = spawn(sandbox, args);
-
-    let stdoutData = '';
-    if (checkProcess.stdout) {
-      checkProcess.stdout.on('data', (data) => {
-        stdoutData += data.toString();
-      });
-    }
-
-    checkProcess.on('error', (err) => {
-      debugLogger.warn(
-        `Failed to start '${sandbox}' command for image check: ${err.message}`,
-      );
-      resolve(false);
-    });
-
-    checkProcess.on('close', (code) => {
-      // Non-zero code might indicate docker daemon not running, etc.
-      // The primary success indicator is non-empty stdoutData.
-      if (code !== 0) {
-        // console.warn(`'${sandbox} images -q ${image}' exited with code ${code}.`);
-      }
-      resolve(stdoutData.trim() !== '');
-    });
-  });
-}
-
-async function pullImage(
-  sandbox: string,
-  image: string,
-  cliConfig?: Config,
-): Promise<boolean> {
-  debugLogger.debug(`Attempting to pull image ${image} using ${sandbox}...`);
-  return new Promise((resolve) => {
-    const args = ['pull', image];
-    const pullProcess = spawn(sandbox, args, { stdio: 'pipe' });
-
-    let stderrData = '';
-
-    const onStdoutData = (data: Buffer) => {
-      if (cliConfig?.getDebugMode() || process.env['DEBUG']) {
-        debugLogger.log(data.toString().trim()); // Show pull progress
-      }
-    };
-
-    const onStderrData = (data: Buffer) => {
-      stderrData += data.toString();
-      // eslint-disable-next-line no-console
-      console.error(data.toString().trim()); // Show pull errors/info from the command itself
-    };
-
-    const onError = (err: Error) => {
-      debugLogger.warn(
-        `Failed to start '${sandbox} pull ${image}' command: ${err.message}`,
-      );
-      cleanup();
-      resolve(false);
-    };
-
-    const onClose = (code: number | null) => {
-      if (code === 0) {
-        debugLogger.log(`Successfully pulled image ${image}.`);
-        cleanup();
-        resolve(true);
-      } else {
-        debugLogger.warn(
-          `Failed to pull image ${image}. '${sandbox} pull ${image}' exited with code ${code}.`,
-        );
-        if (stderrData.trim()) {
-          // Details already printed by the stderr listener above
-        }
-        cleanup();
-        resolve(false);
-      }
-    };
-
-    const cleanup = () => {
-      if (pullProcess.stdout) {
-        pullProcess.stdout.removeListener('data', onStdoutData);
-      }
-      if (pullProcess.stderr) {
-        pullProcess.stderr.removeListener('data', onStderrData);
-      }
-      pullProcess.removeListener('error', onError);
-      pullProcess.removeListener('close', onClose);
-      if (pullProcess.connected) {
-        pullProcess.disconnect();
-      }
-    };
-
-    if (pullProcess.stdout) {
-      pullProcess.stdout.on('data', onStdoutData);
-    }
-    if (pullProcess.stderr) {
-      pullProcess.stderr.on('data', onStderrData);
-    }
-    pullProcess.on('error', onError);
-    pullProcess.on('close', onClose);
-  });
-}
-
-async function ensureSandboxImageIsPresent(
-  sandbox: string,
-  image: string,
-  cliConfig?: Config,
-): Promise<boolean> {
-  debugLogger.log(`Checking for sandbox image: ${image}`);
-  if (await imageExists(sandbox, image)) {
-    debugLogger.log(`Sandbox image ${image} found locally.`);
-    return true;
-  }
-
-  debugLogger.log(`Sandbox image ${image} not found locally.`);
-  if (image === LOCAL_DEV_SANDBOX_IMAGE_NAME) {
-    // user needs to build the image themselves
-    return false;
-  }
-
-  if (await pullImage(sandbox, image, cliConfig)) {
-    // After attempting to pull, check again to be certain
-    if (await imageExists(sandbox, image)) {
-      debugLogger.log(`Sandbox image ${image} is now available after pulling.`);
-      return true;
-    } else {
-      debugLogger.warn(
-        `Sandbox image ${image} still not found after a pull attempt. This might indicate an issue with the image name or registry, or the pull command reported success but failed to make the image available.`,
-      );
-      return false;
-    }
-  }
-
-  coreEvents.emitFeedback(
-    'error',
-    `Failed to obtain sandbox image ${image} after check and pull attempt.`,
-  );
-  return false; // Pull command failed or image still not present
 }

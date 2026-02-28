@@ -10,9 +10,6 @@ import { readFile } from 'node:fs/promises';
 import { quote } from 'shell-quote';
 import { debugLogger, GEMINI_DIR } from '@google/gemini-cli-core';
 
-export const LOCAL_DEV_SANDBOX_IMAGE_NAME = 'gemini-cli-sandbox';
-export const SANDBOX_NETWORK_NAME = 'gemini-cli-sandbox';
-export const SANDBOX_PROXY_NAME = 'gemini-cli-sandbox-proxy';
 export const BUILTIN_SEATBELT_PROFILES = [
   'permissive-open',
   'permissive-proxied',

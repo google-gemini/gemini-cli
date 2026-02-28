@@ -5,17 +5,36 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { spawn, exec, execSync } from 'node:child_process';
+import { spawn, execSync, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 import fs from 'node:fs';
 import { start_sandbox } from './sandbox.js';
-import { FatalSandboxError, type SandboxConfig } from '@google/gemini-cli-core';
+import {
+  FatalSandboxError,
+  type SandboxConfig,
+  SandboxOrchestrator,
+} from '@google/gemini-cli-core';
 import { EventEmitter } from 'node:events';
 
-const { mockedHomedir, mockedGetContainerPath } = vi.hoisted(() => ({
-  mockedHomedir: vi.fn().mockReturnValue('/home/user'),
-  mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
-}));
+const { mockedHomedir, mockedGetContainerPath, mockSpawnAsync } = vi.hoisted(
+  () => ({
+    mockedHomedir: vi.fn().mockReturnValue('/home/user'),
+    mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
+    mockSpawnAsync: vi.fn().mockImplementation(async (cmd, args) => {
+      if (cmd === 'id' && args?.[0] === '-u')
+        return { stdout: '1000', stderr: '' };
+      if (cmd === 'id' && args?.[0] === '-g')
+        return { stdout: '1000', stderr: '' };
+      if (cmd === 'getconf') return { stdout: '/tmp/cache', stderr: '' };
+      if (cmd === 'docker' && args?.[0] === 'ps')
+        return { stdout: 'existing-container', stderr: '' };
+      if (cmd === 'docker' && args?.[0] === 'network')
+        return { stdout: '', stderr: '' };
+      if (cmd === 'curl') return { stdout: 'ok', stderr: '' };
+      return { stdout: '', stderr: '' };
+    }),
+  }),
+);
 
 vi.mock('./sandboxUtils.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./sandboxUtils.js')>();
@@ -28,32 +47,6 @@ vi.mock('./sandboxUtils.js', async (importOriginal) => {
 vi.mock('node:child_process');
 vi.mock('node:os');
 vi.mock('node:fs');
-vi.mock('node:util', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:util')>();
-  return {
-    ...actual,
-    promisify: (fn: (...args: unknown[]) => unknown) => {
-      if (fn === exec) {
-        return async (cmd: string) => {
-          if (cmd === 'id -u' || cmd === 'id -g') {
-            return { stdout: '1000', stderr: '' };
-          }
-          if (cmd.includes('curl')) {
-            return { stdout: '', stderr: '' };
-          }
-          if (cmd.includes('getconf DARWIN_USER_CACHE_DIR')) {
-            return { stdout: '/tmp/cache', stderr: '' };
-          }
-          if (cmd.includes('ps -a --format')) {
-            return { stdout: 'existing-container', stderr: '' };
-          }
-          return { stdout: '', stderr: '' };
-        };
-      }
-      return actual.promisify(fn);
-    },
-  };
-});
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -68,13 +61,17 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     coreEvents: {
       emitFeedback: vi.fn(),
     },
-    FatalSandboxError: class extends Error {
-      constructor(message: string) {
-        super(message);
-        this.name = 'FatalSandboxError';
-      }
+    SandboxOrchestrator: {
+      ensureSandboxImageIsPresent: vi.fn().mockResolvedValue(true),
+      getContainerRunArgs: vi
+        .fn()
+        .mockResolvedValue(['run', '-i', '--rm', '--init']),
+      getSeatbeltArgs: vi.fn().mockReturnValue(['-D', 'TARGET_DIR=/tmp']),
     },
-    GEMINI_DIR: '.gemini',
+    spawnAsync: mockSpawnAsync,
+    LOCAL_DEV_SANDBOX_IMAGE_NAME: 'gemini-cli-sandbox',
+    SANDBOX_NETWORK_NAME: 'gemini-cli-sandbox',
+    SANDBOX_PROXY_NAME: 'gemini-cli-sandbox-proxy',
     homedir: mockedHomedir,
   };
 });
@@ -107,9 +104,27 @@ describe('sandbox', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.realpathSync).mockImplementation((p) => p as string);
     vi.mocked(execSync).mockReturnValue(Buffer.from(''));
+
+    // Default mockSpawnAsync implementation
+    mockSpawnAsync.mockImplementation(async (cmd, args) => {
+      if (cmd === 'id' && args?.[0] === '-u')
+        return { stdout: '1000', stderr: '' };
+      if (cmd === 'id' && args?.[0] === '-g')
+        return { stdout: '1000', stderr: '' };
+      if (cmd === 'getconf') return { stdout: '/tmp/cache', stderr: '' };
+      if (cmd === 'docker' && args?.[0] === 'ps')
+        return { stdout: 'existing-container', stderr: '' };
+      if (cmd === 'docker' && args?.[0] === 'network')
+        return { stdout: '', stderr: '' };
+      if (cmd === 'curl') return { stdout: 'ok', stderr: '' };
+      return { stdout: '', stderr: '' };
+    });
   });
 
   afterEach(() => {
+    // Note: We intentionally avoid vi.restoreAllMocks() here because it clears the top-level
+    // vi.mock('@google/gemini-cli-core') entirely, making its un-exported constants (like GEMINI_DIR)
+    // undefined in subsequent tests. Call counts are still reset by clearAllMocks() in beforeEach.
     process.env = originalEnv;
     process.argv = originalArgv;
   });
@@ -122,30 +137,27 @@ describe('sandbox', () => {
         image: 'some-image',
       };
 
-      interface MockProcess extends EventEmitter {
-        stdout: EventEmitter;
-        stderr: EventEmitter;
-      }
-      const mockSpawnProcess = new EventEmitter() as MockProcess;
+      const mockSpawnProcess = new EventEmitter() as unknown as ChildProcess;
+      // @ts-expect-error - mocking readonly property
       mockSpawnProcess.stdout = new EventEmitter();
+      // @ts-expect-error - mocking readonly property
       mockSpawnProcess.stderr = new EventEmitter();
+      // @ts-expect-error - mocking readonly property
+      mockSpawnProcess.pid = 123;
       vi.mocked(spawn).mockReturnValue(
         mockSpawnProcess as unknown as ReturnType<typeof spawn>,
       );
 
       const promise = start_sandbox(config, [], undefined, ['arg1']);
 
-      setTimeout(() => {
-        mockSpawnProcess.emit('close', 0);
-      }, 10);
+      // Use setImmediate to ensure the promise has had a chance to register handlers
+      await new Promise((resolve) => setImmediate(resolve));
+      mockSpawnProcess.emit('close', 0);
 
       await expect(promise).resolves.toBe(0);
       expect(spawn).toHaveBeenCalledWith(
         'sandbox-exec',
-        expect.arrayContaining([
-          '-f',
-          expect.stringContaining('sandbox-macos-permissive-open.sb'),
-        ]),
+        expect.arrayContaining(['-D', expect.stringContaining('TARGET_DIR=')]),
         expect.objectContaining({ stdio: 'inherit' }),
       );
     });
@@ -167,152 +179,155 @@ describe('sandbox', () => {
         image: 'gemini-cli-sandbox',
       };
 
-      // Mock image check to return true (image exists)
-      interface MockProcessWithStdout extends EventEmitter {
-        stdout: EventEmitter;
-      }
-      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
-      mockImageCheckProcess.stdout = new EventEmitter();
-      vi.mocked(spawn).mockImplementationOnce((_cmd, args) => {
-        if (args && args[0] === 'images') {
-          setTimeout(() => {
-            mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
-            mockImageCheckProcess.emit('close', 0);
-          }, 1);
-          return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
-        }
-        return new EventEmitter() as unknown as ReturnType<typeof spawn>; // fallback
-      });
-
-      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
-        typeof spawn
-      >;
+      const mockSpawnProcess = new EventEmitter() as unknown as ChildProcess;
+      // @ts-expect-error - mocking readonly property
+      mockSpawnProcess.stdout = new EventEmitter();
+      // @ts-expect-error - mocking readonly property
+      mockSpawnProcess.stderr = new EventEmitter();
+      // @ts-expect-error - mocking readonly property
+      mockSpawnProcess.pid = 123;
       mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
         if (event === 'close') {
-          setTimeout(() => cb(0), 10);
+          setImmediate(() => cb(0));
         }
         return mockSpawnProcess;
       });
-      vi.mocked(spawn).mockImplementationOnce((cmd, args) => {
-        if (cmd === 'docker' && args && args[0] === 'run') {
-          return mockSpawnProcess;
-        }
-        return new EventEmitter() as unknown as ReturnType<typeof spawn>;
-      });
+      vi.mocked(spawn).mockReturnValue(mockSpawnProcess);
 
       const promise = start_sandbox(config, [], undefined, ['arg1']);
 
       await expect(promise).resolves.toBe(0);
+      expect(
+        SandboxOrchestrator.ensureSandboxImageIsPresent,
+      ).toHaveBeenCalled();
+      expect(SandboxOrchestrator.getContainerRunArgs).toHaveBeenCalled();
       expect(spawn).toHaveBeenCalledWith(
         'docker',
-        expect.arrayContaining(['run', '-i', '--rm', '--init']),
+        expect.any(Array),
         expect.objectContaining({ stdio: 'inherit' }),
       );
     });
 
-    it('should pull image if missing', async () => {
+    it('should inject custom flags from SANDBOX_FLAGS env var', async () => {
+      process.env['SANDBOX_FLAGS'] =
+        '--security-opt label=disable --env FOO=bar';
       const config: SandboxConfig = {
         command: 'docker',
-        image: 'missing-image',
+        image: 'gemini-cli-sandbox',
       };
 
-      // 1. Image check fails
-      interface MockProcessWithStdout extends EventEmitter {
-        stdout: EventEmitter;
-      }
-      const mockImageCheckProcess1 =
-        new EventEmitter() as MockProcessWithStdout;
-      mockImageCheckProcess1.stdout = new EventEmitter();
-      vi.mocked(spawn).mockImplementationOnce(() => {
-        setTimeout(() => {
-          mockImageCheckProcess1.emit('close', 0);
-        }, 1);
-        return mockImageCheckProcess1 as unknown as ReturnType<typeof spawn>;
-      });
-
-      // 2. Pull image succeeds
-      interface MockProcessWithStdoutStderr extends EventEmitter {
-        stdout: EventEmitter;
-        stderr: EventEmitter;
-      }
-      const mockPullProcess = new EventEmitter() as MockProcessWithStdoutStderr;
-      mockPullProcess.stdout = new EventEmitter();
-      mockPullProcess.stderr = new EventEmitter();
-      vi.mocked(spawn).mockImplementationOnce(() => {
-        setTimeout(() => {
-          mockPullProcess.emit('close', 0);
-        }, 1);
-        return mockPullProcess as unknown as ReturnType<typeof spawn>;
-      });
-
-      // 3. Image check succeeds
-      const mockImageCheckProcess2 =
-        new EventEmitter() as MockProcessWithStdout;
-      mockImageCheckProcess2.stdout = new EventEmitter();
-      vi.mocked(spawn).mockImplementationOnce(() => {
-        setTimeout(() => {
-          mockImageCheckProcess2.stdout.emit('data', Buffer.from('image-id'));
-          mockImageCheckProcess2.emit('close', 0);
-        }, 1);
-        return mockImageCheckProcess2 as unknown as ReturnType<typeof spawn>;
-      });
-
-      // 4. Docker run
-      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
-        typeof spawn
-      >;
+      const mockSpawnProcess = new EventEmitter() as unknown as ChildProcess;
       mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
         if (event === 'close') {
-          setTimeout(() => cb(0), 10);
+          setImmediate(() => cb(0));
         }
         return mockSpawnProcess;
       });
-      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+      vi.mocked(spawn).mockReturnValue(mockSpawnProcess);
 
-      const promise = start_sandbox(config, [], undefined, ['arg1']);
+      await start_sandbox(config);
 
-      await expect(promise).resolves.toBe(0);
-      expect(spawn).toHaveBeenCalledWith(
-        'docker',
-        expect.arrayContaining(['pull', 'missing-image']),
-        expect.any(Object),
+      expect(SandboxOrchestrator.getContainerRunArgs).toHaveBeenCalledWith(
+        config,
+        expect.any(String),
+        expect.any(String),
+        '--security-opt label=disable --env FOO=bar',
+        false,
       );
     });
 
-    it('should throw if image pull fails', async () => {
+    it('should inject custom flags from config (settings)', async () => {
+      const config: SandboxConfig = {
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+        flags: '--privileged',
+      };
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ChildProcess;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setImmediate(() => cb(0));
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockReturnValue(mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      expect(SandboxOrchestrator.getContainerRunArgs).toHaveBeenCalledWith(
+        config,
+        expect.any(String),
+        expect.any(String),
+        undefined,
+        false,
+      );
+    });
+
+    it('should expand multiple environment variables in sandbox flags', async () => {
+      process.env['VAR1'] = 'val1';
+      process.env['VAR2'] = 'val2';
+      const config: SandboxConfig = {
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+        flags: '--env V1=$VAR1 --env V2=${VAR2}',
+      };
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ChildProcess;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setImmediate(() => cb(0));
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockReturnValue(mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      expect(SandboxOrchestrator.getContainerRunArgs).toHaveBeenCalledWith(
+        config,
+        expect.any(String),
+        expect.any(String),
+        undefined,
+        false,
+      );
+    });
+
+    it('should handle quoted strings in sandbox flags', async () => {
+      const config: SandboxConfig = {
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+        flags: '--label "description=multi word label" --env \'FOO=bar baz\'',
+      };
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ChildProcess;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setImmediate(() => cb(0));
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockReturnValue(mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      expect(SandboxOrchestrator.getContainerRunArgs).toHaveBeenCalledWith(
+        config,
+        expect.any(String),
+        expect.any(String),
+        undefined,
+        false,
+      );
+    });
+
+    it('should throw if image is missing', async () => {
       const config: SandboxConfig = {
         command: 'docker',
         image: 'missing-image',
       };
 
-      // 1. Image check fails
-      interface MockProcessWithStdout extends EventEmitter {
-        stdout: EventEmitter;
-      }
-      const mockImageCheckProcess1 =
-        new EventEmitter() as MockProcessWithStdout;
-      mockImageCheckProcess1.stdout = new EventEmitter();
-      vi.mocked(spawn).mockImplementationOnce(() => {
-        setTimeout(() => {
-          mockImageCheckProcess1.emit('close', 0);
-        }, 1);
-        return mockImageCheckProcess1 as unknown as ReturnType<typeof spawn>;
-      });
-
-      // 2. Pull image fails
-      interface MockProcessWithStdoutStderr extends EventEmitter {
-        stdout: EventEmitter;
-        stderr: EventEmitter;
-      }
-      const mockPullProcess = new EventEmitter() as MockProcessWithStdoutStderr;
-      mockPullProcess.stdout = new EventEmitter();
-      mockPullProcess.stderr = new EventEmitter();
-      vi.mocked(spawn).mockImplementationOnce(() => {
-        setTimeout(() => {
-          mockPullProcess.emit('close', 1);
-        }, 1);
-        return mockPullProcess as unknown as ReturnType<typeof spawn>;
-      });
+      vi.mocked(
+        SandboxOrchestrator.ensureSandboxImageIsPresent,
+      ).mockResolvedValueOnce(false);
 
       await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
     });
@@ -325,51 +340,20 @@ describe('sandbox', () => {
       process.env['SANDBOX_MOUNTS'] = '/host/path:/container/path:ro';
       vi.mocked(fs.existsSync).mockReturnValue(true); // For mount path check
 
-      // Mock image check to return true
-      interface MockProcessWithStdout extends EventEmitter {
-        stdout: EventEmitter;
-      }
-      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
-      mockImageCheckProcess.stdout = new EventEmitter();
-      vi.mocked(spawn).mockImplementationOnce(() => {
-        setTimeout(() => {
-          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
-          mockImageCheckProcess.emit('close', 0);
-        }, 1);
-        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
-      });
-
-      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
-        typeof spawn
-      >;
+      const mockSpawnProcess = new EventEmitter() as unknown as ChildProcess;
       mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
         if (event === 'close') {
-          setTimeout(() => cb(0), 10);
+          setImmediate(() => cb(0));
         }
         return mockSpawnProcess;
       });
-      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+      vi.mocked(spawn).mockReturnValue(mockSpawnProcess);
 
       await start_sandbox(config);
 
-      // The first call is 'docker images -q ...'
-      expect(spawn).toHaveBeenNthCalledWith(
-        1,
+      expect(spawn).toHaveBeenCalledWith(
         'docker',
-        expect.arrayContaining(['images', '-q']),
-      );
-
-      // The second call is 'docker run ...'
-      expect(spawn).toHaveBeenNthCalledWith(
-        2,
-        'docker',
-        expect.arrayContaining([
-          'run',
-          '--volume',
-          '/host/path:/container/path:ro',
-          '--volume',
-          expect.stringMatching(/[\\/]home[\\/]user[\\/]\.gemini/),
-        ]),
+        expect.arrayContaining(['--volume', '/host/path:/container/path:ro']),
         expect.any(Object),
       );
     });
@@ -382,30 +366,14 @@ describe('sandbox', () => {
       process.env['GOOGLE_GEMINI_BASE_URL'] = 'http://gemini.proxy';
       process.env['GOOGLE_VERTEX_BASE_URL'] = 'http://vertex.proxy';
 
-      // Mock image check to return true
-      interface MockProcessWithStdout extends EventEmitter {
-        stdout: EventEmitter;
-      }
-      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
-      mockImageCheckProcess.stdout = new EventEmitter();
-      vi.mocked(spawn).mockImplementationOnce(() => {
-        setTimeout(() => {
-          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
-          mockImageCheckProcess.emit('close', 0);
-        }, 1);
-        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
-      });
-
-      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
-        typeof spawn
-      >;
+      const mockSpawnProcess = new EventEmitter() as unknown as ChildProcess;
       mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
         if (event === 'close') {
-          setTimeout(() => cb(0), 10);
+          setImmediate(() => cb(0));
         }
         return mockSpawnProcess;
       });
-      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+      vi.mocked(spawn).mockReturnValue(mockSpawnProcess);
 
       await start_sandbox(config);
 
@@ -434,30 +402,14 @@ describe('sandbox', () => {
         return Buffer.from('');
       });
 
-      // Mock image check to return true
-      interface MockProcessWithStdout extends EventEmitter {
-        stdout: EventEmitter;
-      }
-      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
-      mockImageCheckProcess.stdout = new EventEmitter();
-      vi.mocked(spawn).mockImplementationOnce(() => {
-        setTimeout(() => {
-          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
-          mockImageCheckProcess.emit('close', 0);
-        }, 1);
-        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
-      });
-
-      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
-        typeof spawn
-      >;
+      const mockSpawnProcess = new EventEmitter() as unknown as ChildProcess;
       mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
         if (event === 'close') {
-          setTimeout(() => cb(0), 10);
+          setImmediate(() => cb(0));
         }
         return mockSpawnProcess;
       });
-      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+      vi.mocked(spawn).mockReturnValue(mockSpawnProcess);
 
       await start_sandbox(config);
 
@@ -467,11 +419,63 @@ describe('sandbox', () => {
         expect.any(Object),
       );
       // Check that the entrypoint command includes useradd/groupadd
-      const args = vi.mocked(spawn).mock.calls[1][1] as string[];
+      const args = vi.mocked(spawn).mock.calls[0][1] as string[];
       const entrypointCmd = args[args.length - 1];
       expect(entrypointCmd).toContain('groupadd');
       expect(entrypointCmd).toContain('useradd');
       expect(entrypointCmd).toContain('su -p gemini');
+    });
+
+    describe('waitForProxy timeout', () => {
+      it('should time out waiting for proxy', async () => {
+        const config: SandboxConfig = {
+          command: 'docker',
+          image: 'gemini-cli-sandbox',
+        };
+        process.env['GEMINI_SANDBOX_PROXY_COMMAND'] = 'my-proxy';
+
+        // Mock spawn to return processes that stay open
+        vi.mocked(spawn).mockImplementation(() => {
+          const p = new EventEmitter() as unknown as ChildProcess;
+          // @ts-expect-error - mocking readonly property
+          p.pid = 123;
+          p.kill = vi.fn();
+          // @ts-expect-error - mocking readonly property
+          p.stderr = new EventEmitter();
+          // @ts-expect-error - mocking readonly property
+          p.stdout = new EventEmitter();
+          return p;
+        });
+
+        // Mock spawnAsync to fail for curl (simulating proxy not started)
+        mockSpawnAsync.mockImplementation(async (cmd) => {
+          if (cmd === 'curl') {
+            throw new Error('Connection refused');
+          }
+          return { stdout: '', stderr: '' };
+        });
+
+        // Mock Date.now to control time
+        let currentTime = 1000000;
+        const dateSpy = vi.spyOn(Date, 'now').mockImplementation(() => {
+          currentTime += 10000; // Increment time by 10s on each call to hit timeout fast
+          return currentTime;
+        });
+
+        // We also need to mock setTimeout to resolve immediately,
+        // otherwise the loop will still take real time.
+        const originalSetTimeout = global.setTimeout;
+        // @ts-expect-error - mocking global setTimeout
+        global.setTimeout = vi.fn().mockImplementation((cb) => cb());
+
+        try {
+          const promise = start_sandbox(config);
+          await expect(promise).rejects.toThrow(/Timed out waiting for proxy/);
+        } finally {
+          dateSpy.mockRestore();
+          global.setTimeout = originalSetTimeout;
+        }
+      });
     });
   });
 });

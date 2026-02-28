@@ -1245,6 +1245,18 @@ const SETTINGS_SCHEMA = {
         `,
         showInDialog: false,
       },
+      sandboxFlags: {
+        type: 'string',
+        label: 'Sandbox Flags',
+        category: 'Tools',
+        requiresRestart: true,
+        default: '',
+        description: oneLine`
+          Additional flags to pass to the sandbox container engine (Docker or Podman).
+          Environment variables can be used and will be expanded.
+        `,
+        showInDialog: true,
+      },
       shell: {
         type: 'object',
         label: 'Shell',
