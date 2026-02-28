@@ -165,16 +165,20 @@ describe('GeminiChat', () => {
             : {
                 thinkingBudget: DEFAULT_THINKING_MODE,
               };
-          return {
-            model,
-            generateContentConfig: {
-              temperature: modelConfigKey.isRetry ? 1 : 0,
-              thinkingConfig,
-            },
-          };
+          return makeResolvedModelConfig(model, {
+            temperature: modelConfigKey.isRetry ? 1 : 0,
+            thinkingConfig,
+          });
         }),
       },
       isInteractive: vi.fn().mockReturnValue(false),
+      getModelSeed: vi.fn().mockReturnValue(undefined),
+      getModelTemperature: vi.fn().mockReturnValue(undefined),
+      getModelTopK: vi.fn().mockReturnValue(undefined),
+      getModelTopP: vi.fn().mockReturnValue(undefined),
+      getModelThinkingLevel: vi.fn().mockReturnValue(undefined),
+      getModelIncludeThoughts: vi.fn().mockReturnValue(undefined),
+      getModelThinkingBudget: vi.fn().mockReturnValue(undefined),
       getEnableHooks: vi.fn().mockReturnValue(false),
       getActiveModel: vi.fn().mockImplementation(() => currentActiveModel),
       setActiveModel: vi
@@ -2552,6 +2556,157 @@ describe('GeminiChat', () => {
         type: StreamEventType.CHUNK,
         value: response,
       });
+    });
+  });
+
+  describe('Global Config Parameters', () => {
+    beforeEach(() => {
+      vi.mocked(mockConfig.getModelSeed).mockReturnValue(undefined);
+      vi.mocked(mockConfig.getModelTemperature).mockReturnValue(undefined);
+      vi.mocked(mockConfig.getModelTopK).mockReturnValue(undefined);
+      vi.mocked(mockConfig.getModelTopP).mockReturnValue(undefined);
+      vi.mocked(mockConfig.getModelThinkingLevel).mockReturnValue(undefined);
+      vi.mocked(mockConfig.getModelIncludeThoughts).mockReturnValue(undefined);
+      vi.mocked(mockConfig.getModelThinkingBudget).mockReturnValue(undefined);
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'Response' }], role: 'model' },
+                finishReason: 'STOP',
+              },
+            ],
+          } as unknown as GenerateContentResponse;
+        })(),
+      );
+    });
+
+    it('should propagate global seed to generateContentStream API call', async () => {
+      vi.mocked(mockConfig.getModelSeed).mockReturnValue(54321);
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'Hello',
+        'prompt-id-seed',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      // Consume stream to trigger the actual generation call
+      for await (const _ of stream) {
+        // no-op
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            seed: 54321,
+          }),
+        }),
+        expect.any(String),
+        expect.any(String),
+      );
+    });
+
+    it('should prioritize global seed over resolved config seed', async () => {
+      vi.mocked(mockConfig.getModelSeed).mockReturnValue(54321);
+      vi.mocked(
+        mockConfig.modelConfigService.getResolvedConfig,
+      ).mockReturnValue(
+        makeResolvedModelConfig('gemini-pro', {
+          seed: 11111,
+          temperature: 0.5,
+        }),
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'Hello',
+        'prompt-id-seed-priority',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // no-op
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            seed: 54321,
+          }),
+        }),
+        expect.any(String),
+        expect.any(String),
+      );
+    });
+
+    it('should propagate global temperature, topK, and topP to generateContentStream API call', async () => {
+      vi.mocked(mockConfig.getModelTemperature).mockReturnValue(1.5);
+      vi.mocked(mockConfig.getModelTopK).mockReturnValue(42);
+      vi.mocked(mockConfig.getModelTopP).mockReturnValue(0.7);
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'Hello',
+        'prompt-id-generation-params',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // no-op
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            temperature: 1.5,
+            topK: 42,
+            topP: 0.7,
+          }),
+        }),
+        expect.any(String),
+        expect.any(String),
+      );
+    });
+
+    it('should propagate global thinking parameters to generateContentStream API call', async () => {
+      const { ThinkingLevel } = await import('@google/genai');
+      vi.mocked(mockConfig.getModelThinkingLevel).mockReturnValue(
+        ThinkingLevel.MEDIUM,
+      );
+      vi.mocked(mockConfig.getModelIncludeThoughts).mockReturnValue(false);
+      vi.mocked(mockConfig.getModelThinkingBudget).mockReturnValue(100);
+
+      const stream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'Hello',
+        'prompt-id-thinking-params',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // no-op
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            thinkingConfig: expect.objectContaining({
+              thinkingLevel: ThinkingLevel.MEDIUM,
+              includeThoughts: false,
+              thinkingBudget: 100,
+            }),
+          }),
+        }),
+        expect.any(String),
+        expect.any(String),
+      );
     });
   });
 });
