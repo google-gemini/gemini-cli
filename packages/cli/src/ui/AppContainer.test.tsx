@@ -2916,7 +2916,7 @@ describe('AppContainer State Management', () => {
           unmount();
         });
 
-        it('should exit copy mode on any key press', async () => {
+        it('should exit copy mode on non-scroll key press', async () => {
           await setupCopyModeTest(isAlternateMode);
 
           // Enter copy mode
@@ -2935,6 +2935,61 @@ describe('AppContainer State Management', () => {
 
           // Should have re-enabled mouse
           expect(enableMouseEvents).toHaveBeenCalled();
+          unmount();
+        });
+
+        it('should not exit copy mode on PageDown and should pass it through', async () => {
+          const childHandler = vi.fn().mockReturnValue(false);
+          await setupCopyModeTest(true, childHandler);
+
+          // Enter copy mode
+          act(() => {
+            stdin.write('\x13'); // Ctrl+S
+          });
+          rerender();
+          expect(disableMouseEvents).toHaveBeenCalled();
+
+          childHandler.mockClear();
+          (enableMouseEvents as Mock).mockClear();
+
+          // PageDown should be passed through to lower-priority handlers.
+          act(() => {
+            stdin.write('\x1b[6~');
+          });
+          rerender();
+
+          expect(enableMouseEvents).not.toHaveBeenCalled();
+          expect(childHandler).toHaveBeenCalled();
+          expect(childHandler).toHaveBeenCalledWith(
+            expect.objectContaining({ name: 'pagedown' }),
+          );
+          unmount();
+        });
+
+        it('should not exit copy mode on Shift+Down and should pass it through', async () => {
+          const childHandler = vi.fn().mockReturnValue(false);
+          await setupCopyModeTest(true, childHandler);
+
+          // Enter copy mode
+          act(() => {
+            stdin.write('\x13'); // Ctrl+S
+          });
+          rerender();
+          expect(disableMouseEvents).toHaveBeenCalled();
+
+          childHandler.mockClear();
+          (enableMouseEvents as Mock).mockClear();
+
+          act(() => {
+            stdin.write('\x1b[1;2B'); // Shift+Down
+          });
+          rerender();
+
+          expect(enableMouseEvents).not.toHaveBeenCalled();
+          expect(childHandler).toHaveBeenCalled();
+          expect(childHandler).toHaveBeenCalledWith(
+            expect.objectContaining({ name: 'down', shift: true }),
+          );
           unmount();
         });
 
