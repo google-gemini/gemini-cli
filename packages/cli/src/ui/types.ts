@@ -15,6 +15,7 @@ import {
   type SkillDefinition,
   type AgentDefinition,
   type ApprovalMode,
+  type SessionMetrics,
   CoreToolCallStatus,
   checkExhaustive,
 } from '@google/gemini-cli-core';
@@ -203,15 +204,18 @@ export type HistoryItemStats = HistoryItemQuotaBase & {
   type: 'stats';
   duration: string;
   quotas?: RetrieveUserQuotaResponse;
+  stats?: SessionMetrics;
   creditBalance?: number;
 };
 
 export type HistoryItemModelStats = HistoryItemQuotaBase & {
   type: 'model_stats';
+  stats?: SessionMetrics;
 };
 
 export type HistoryItemToolStats = HistoryItemBase & {
   type: 'tool_stats';
+  stats?: SessionMetrics;
 };
 
 export type HistoryItemModel = HistoryItemBase & {
