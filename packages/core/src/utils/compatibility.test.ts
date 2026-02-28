@@ -177,58 +177,44 @@ describe('compatibility', () => {
       );
     });
 
-    it.each<{
-      platform: NodeJS.Platform;
-      release: string;
-      externalTerminal: string;
-      desc: string;
-    }>([
-      {
-        platform: 'darwin',
-        release: '20.6.0',
-        externalTerminal: 'iTerm2 or Ghostty',
-        desc: 'macOS',
-      },
-      {
-        platform: 'win32',
-        release: '10.0.22000',
-        externalTerminal: 'Windows Terminal',
-        desc: 'Windows',
-      }, // Valid Windows 11 release to not trigger the Windows 10 warning
-      {
-        platform: 'linux',
-        release: '5.10.0',
-        externalTerminal: 'Ghostty',
-        desc: 'Linux',
-      },
-    ])(
-      'should return JetBrains warning when detected and in alternate buffer ($desc)',
-      ({ platform, release, externalTerminal }) => {
-        vi.mocked(os.platform).mockReturnValue(platform);
-        vi.mocked(os.release).mockReturnValue(release);
-        vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
-
-        const warnings = getCompatibilityWarnings({ isAlternateBuffer: true });
-        expect(warnings).toContainEqual(
-          expect.objectContaining({
-            id: 'jetbrains-terminal',
-            message: expect.stringContaining(
-              `Warning: JetBrains mouse scrolling is unreliable. Disabling alternate buffer mode in settings or using an external terminal (e.g., ${externalTerminal}) is recommended.`,
-            ),
-            priority: WarningPriority.High,
-          }),
-        );
-      },
-    );
-
-    it('should not return JetBrains warning when detected but NOT in alternate buffer', () => {
+    it('should return JetBrains warning when detected on macOS', () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
       vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
 
-      const warnings = getCompatibilityWarnings({ isAlternateBuffer: false });
-      expect(
-        warnings.find((w) => w.id === 'jetbrains-terminal'),
-      ).toBeUndefined();
+      const warnings = getCompatibilityWarnings();
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'jetbrains-terminal',
+          message: expect.stringContaining('iTerm2 or Terminal.app'),
+        }),
+      );
+    });
+
+    it('should return JetBrains warning with Windows Terminal recommendation on Windows', () => {
+      vi.mocked(os.platform).mockReturnValue('win32');
+      vi.mocked(os.release).mockReturnValue('10.0.22000');
+      vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
+
+      const warnings = getCompatibilityWarnings();
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'jetbrains-terminal',
+          message: expect.stringContaining('Windows Terminal'),
+        }),
+      );
+    });
+
+    it('should return JetBrains warning with native terminal recommendation on Linux', () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
+
+      const warnings = getCompatibilityWarnings();
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'jetbrains-terminal',
+          message: expect.stringContaining('native terminal emulator'),
+        }),
+      );
     });
 
     it('should return 256-color warning when 256 colors are not supported', () => {
@@ -291,7 +277,8 @@ describe('compatibility', () => {
       const warnings = getCompatibilityWarnings({ isAlternateBuffer: true });
       expect(warnings).toHaveLength(3);
       expect(warnings[0].message).toContain('Windows 10 detected');
-      expect(warnings[1].message).toContain('JetBrains');
+      expect(warnings[1].message).toContain('JetBrains terminal detected');
+      expect(warnings[1].message).toContain('Windows Terminal');
       expect(warnings[2].message).toContain(
         'True color (24-bit) support not detected',
       );
