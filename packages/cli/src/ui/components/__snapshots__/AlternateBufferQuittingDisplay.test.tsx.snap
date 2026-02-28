@@ -9,9 +9,10 @@ exports[`AlternateBufferQuittingDisplay > renders with a tool awaiting confirmat
 
 
 Tips for getting started:
-1. /help for more information
-2. Ask coding questions, edit code or run commands
-3. Be specific for the best results
+1. Create GEMINI.md files to customize your interactions
+2. /help for more information
+3. Ask coding questions, edit code or run commands
+4. Be specific for the best results
 
 Action Required (was prompted):
 
@@ -28,9 +29,10 @@ exports[`AlternateBufferQuittingDisplay > renders with active and pending tool m
 
 
 Tips for getting started:
-1. /help for more information
-2. Ask coding questions, edit code or run commands
-3. Be specific for the best results
+1. Create GEMINI.md files to customize your interactions
+2. /help for more information
+3. Ask coding questions, edit code or run commands
+4. Be specific for the best results
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool1 Description for tool 1                                          │
 │                                                                          │
@@ -51,9 +53,10 @@ exports[`AlternateBufferQuittingDisplay > renders with empty history and no pend
 
 
 Tips for getting started:
-1. /help for more information
-2. Ask coding questions, edit code or run commands
-3. Be specific for the best results
+1. Create GEMINI.md files to customize your interactions
+2. /help for more information
+3. Ask coding questions, edit code or run commands
+4. Be specific for the best results
 "
 `;
 
@@ -66,9 +69,10 @@ exports[`AlternateBufferQuittingDisplay > renders with history but no pending it
 
 
 Tips for getting started:
-1. /help for more information
-2. Ask coding questions, edit code or run commands
-3. Be specific for the best results
+1. Create GEMINI.md files to customize your interactions
+2. /help for more information
+3. Ask coding questions, edit code or run commands
+4. Be specific for the best results
 ╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool1 Description for tool 1                                          │
 │                                                                          │
@@ -89,9 +93,10 @@ exports[`AlternateBufferQuittingDisplay > renders with pending items but no hist
 
 
 Tips for getting started:
-1. /help for more information
-2. Ask coding questions, edit code or run commands
-3. Be specific for the best results
+1. Create GEMINI.md files to customize your interactions
+2. /help for more information
+3. Ask coding questions, edit code or run commands
+4. Be specific for the best results
 "
 `;
 
@@ -104,9 +109,10 @@ exports[`AlternateBufferQuittingDisplay > renders with user and gemini messages 
 
 
 Tips for getting started:
-1. /help for more information
-2. Ask coding questions, edit code or run commands
-3. Be specific for the best results
+1. Create GEMINI.md files to customize your interactions
+2. /help for more information
+3. Ask coding questions, edit code or run commands
+4. Be specific for the best results
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
  > Hello Gemini                                                                 
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -42,7 +42,7 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
     <Box flexDirection="column">
       {/* User Email /auth */}
       <Box>
-        <Text color={theme.text.primary}>
+        <Text color={theme.text.primary} wrap="truncate-end">
           {authType === AuthType.LOGIN_WITH_GOOGLE ? (
             <Text>{email ?? 'Logged in with Google'}</Text>
           ) : (
@@ -54,7 +54,7 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
 
       {/* Tier Name /upgrade */}
       <Box>
-        <Text color={theme.text.primary}>
+        <Text color={theme.text.primary} wrap="truncate-end">
           {tierName ?? 'Gemini Code Assist for individuals'}
         </Text>
         <Text color={theme.text.secondary}> /upgrade</Text>

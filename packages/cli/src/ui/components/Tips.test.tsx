@@ -1,28 +1,28 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import { render } from '../../test-utils/render.js';
 import { Tips } from './Tips.js';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { Config } from '@google/gemini-cli-core';
 
 describe('Tips', () => {
-  it('renders correct tips', async () => {
-    const config = {} as unknown as Config;
+  it.each([
+    { fileCount: 0, description: 'renders all tips including GEMINI.md tip' },
+    { fileCount: 5, description: 'renders fewer tips when GEMINI.md exists' },
+  ])('$description', async ({ fileCount }) => {
+    const config = {
+      getGeminiMdFileCount: vi.fn().mockReturnValue(fileCount),
+    } as unknown as Config;
 
     const { lastFrame, waitUntilReady, unmount } = render(
       <Tips config={config} />,
     );
     await waitUntilReady();
-    const output = lastFrame();
-    expect(output).toContain('1. /help for more information');
-    expect(output).toContain(
-      '2. Ask coding questions, edit code or run commands',
-    );
-    expect(output).toContain('3. Be specific for the best results');
+    expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
 });
