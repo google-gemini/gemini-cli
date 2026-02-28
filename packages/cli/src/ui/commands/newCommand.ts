@@ -1,0 +1,20 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { SessionStartSource } from '@google/gemini-cli-core';
+import { startNewSession } from '../../utils/sessionUtils.js';
+import type { SlashCommand } from './types.js';
+import { CommandKind } from './types.js';
+
+export const newCommand: SlashCommand = {
+  name: 'new',
+  description: 'Start a new chat session',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: async (context, _args) => {
+    await startNewSession(context, SessionStartSource.New, false);
+  },
+};

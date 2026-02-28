@@ -3,17 +3,10 @@
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-
-import {
-  uiTelemetryService,
-  SessionEndReason,
-  SessionStartSource,
-  flushTelemetry,
-} from '@google/gemini-cli-core';
+import { startNewSession } from '../../utils/sessionUtils.js';
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
-import { MessageType } from '../types.js';
-import { randomUUID } from 'node:crypto';
+import { SessionStartSource } from '@google/gemini-cli-core';
 
 export const clearCommand: SlashCommand = {
   name: 'clear',
