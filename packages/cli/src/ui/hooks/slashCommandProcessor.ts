@@ -546,11 +546,33 @@ export const useSlashCommandProcessor = (
                   actions.quit(result.messages);
                   return { type: 'handled' };
 
-                case 'submit_prompt':
+                case 'submit_prompt': {
+                  let parsedArgs: Record<string, unknown> | undefined;
+                  if (args) {
+                    try {
+                      const jsonArgs = JSON.parse(args) as unknown;
+                      if (
+                        jsonArgs &&
+                        typeof jsonArgs === 'object' &&
+                        !Array.isArray(jsonArgs)
+                      ) {
+                        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                        parsedArgs = jsonArgs as Record<string, unknown>;
+                      } else {
+                        parsedArgs = { raw: args };
+                      }
+                    } catch {
+                      parsedArgs = { raw: args };
+                    }
+                  }
+
                   return {
                     type: 'submit_prompt',
                     content: result.content,
+                    commandName: commandToExecute.name,
+                    commandArgs: parsedArgs,
                   };
+                }
                 case 'confirm_shell_commands': {
                   const callId = `expansion-${Date.now()}`;
                   const { outcome, approvedCommands } = await new Promise<{

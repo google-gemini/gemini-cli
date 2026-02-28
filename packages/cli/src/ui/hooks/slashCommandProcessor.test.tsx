@@ -12,7 +12,7 @@ import { useSlashCommandProcessor } from './slashCommandProcessor.js';
 import type { SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
 import type { LoadedSettings } from '../../config/settings.js';
-import { MessageType } from '../types.js';
+import { type SlashCommandProcessorResult, MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
@@ -721,72 +721,139 @@ describe('useSlashCommandProcessor', () => {
 
       expect(mockSetQuittingMessages).toHaveBeenCalledWith(['bye']);
     });
-    it('should handle "submit_prompt" action returned from a file-based command', async () => {
-      const fileCommand = createTestCommand(
-        {
-          name: 'filecmd',
-          description: 'A command from a file',
+    describe('submit_prompt actions', () => {
+      it('should handle submit_prompt with JSON arguments by parsing them into an object', async () => {
+        const command = createTestCommand({
+          name: 'mycommand',
           action: async () => ({
             type: 'submit_prompt',
-            content: [{ text: 'The actual prompt from the TOML file.' }],
+            content: 'raw prompt content',
           }),
-        },
-        CommandKind.FILE,
-      );
+        });
 
-      const result = await setupProcessorHook({
-        fileCommands: [fileCommand],
+        const result = await setupProcessorHook({
+          builtinCommands: [command],
+        });
+
+        let actionResult: SlashCommandProcessorResult | false | undefined;
+        await act(async () => {
+          actionResult = await result.current.handleSlashCommand(
+            '/mycommand {"target": "prod", "force": true}',
+          );
+        });
+
+        expect(actionResult).toEqual(
+          expect.objectContaining({
+            type: 'submit_prompt',
+            commandName: 'mycommand',
+            commandArgs: { target: 'prod', force: true },
+          }),
+        );
       });
-      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
-      let actionResult;
-      await act(async () => {
-        actionResult = await result.current.handleSlashCommand('/filecmd');
-      });
-
-      expect(actionResult).toEqual({
-        type: 'submit_prompt',
-        content: [{ text: 'The actual prompt from the TOML file.' }],
-      });
-
-      expect(mockAddItem).toHaveBeenCalledWith(
-        { type: MessageType.USER, text: '/filecmd' },
-        expect.any(Number),
-      );
-    });
-
-    it('should handle "submit_prompt" action returned from a mcp-based command', async () => {
-      const mcpCommand = createTestCommand(
-        {
-          name: 'mcpcmd',
-          description: 'A command from mcp',
+      it('should handle submit_prompt with non-JSON arguments by passing undefined commandArgs', async () => {
+        const command = createTestCommand({
+          name: 'mycommand',
           action: async () => ({
             type: 'submit_prompt',
-            content: [{ text: 'The actual prompt from the mcp command.' }],
+            content: 'raw prompt content',
           }),
-        },
-        CommandKind.MCP_PROMPT,
-      );
+        });
 
-      const result = await setupProcessorHook({
-        mcpCommands: [mcpCommand],
+        const result = await setupProcessorHook({
+          builtinCommands: [command],
+        });
+
+        let actionResult: SlashCommandProcessorResult | false | undefined;
+        await act(async () => {
+          actionResult =
+            await result.current.handleSlashCommand('/mycommand prod');
+        });
+
+        expect(actionResult).toEqual(
+          expect.objectContaining({
+            type: 'submit_prompt',
+            commandName: 'mycommand',
+            commandArgs: undefined,
+          }),
+        );
       });
-      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
 
-      let actionResult;
-      await act(async () => {
-        actionResult = await result.current.handleSlashCommand('/mcpcmd');
+      it('should handle "submit_prompt" action returned from a file-based command', async () => {
+        const fileCommand = createTestCommand(
+          {
+            name: 'filecmd',
+            description: 'A command from a file',
+            action: async () => ({
+              type: 'submit_prompt',
+              content: [{ text: 'The actual prompt from the TOML file.' }],
+            }),
+          },
+          CommandKind.FILE,
+        );
+
+        const result = await setupProcessorHook({
+          fileCommands: [fileCommand],
+        });
+        await waitFor(() =>
+          expect(result.current.slashCommands).toHaveLength(1),
+        );
+
+        let actionResult;
+        await act(async () => {
+          actionResult = await result.current.handleSlashCommand('/filecmd');
+        });
+
+        expect(actionResult).toEqual({
+          type: 'submit_prompt',
+          content: [{ text: 'The actual prompt from the TOML file.' }],
+          commandName: 'filecmd',
+          commandArgs: undefined,
+        });
+
+        expect(mockAddItem).toHaveBeenCalledWith(
+          { type: MessageType.USER, text: '/filecmd' },
+          expect.any(Number),
+        );
       });
 
-      expect(actionResult).toEqual({
-        type: 'submit_prompt',
-        content: [{ text: 'The actual prompt from the mcp command.' }],
-      });
+      it('should handle "submit_prompt" action returned from a mcp-based command', async () => {
+        const mcpCommand = createTestCommand(
+          {
+            name: 'mcpcmd',
+            description: 'A command from mcp',
+            action: async () => ({
+              type: 'submit_prompt',
+              content: [{ text: 'The actual prompt from the mcp command.' }],
+            }),
+          },
+          CommandKind.MCP_PROMPT,
+        );
 
-      expect(mockAddItem).toHaveBeenCalledWith(
-        { type: MessageType.USER, text: '/mcpcmd' },
-        expect.any(Number),
-      );
+        const result = await setupProcessorHook({
+          mcpCommands: [mcpCommand],
+        });
+        await waitFor(() =>
+          expect(result.current.slashCommands).toHaveLength(1),
+        );
+
+        let actionResult;
+        await act(async () => {
+          actionResult = await result.current.handleSlashCommand('/mcpcmd');
+        });
+
+        expect(actionResult).toEqual({
+          type: 'submit_prompt',
+          content: [{ text: 'The actual prompt from the mcp command.' }],
+          commandName: 'mcpcmd',
+          commandArgs: undefined,
+        });
+
+        expect(mockAddItem).toHaveBeenCalledWith(
+          { type: MessageType.USER, text: '/mcpcmd' },
+          expect.any(Number),
+        );
+      });
     });
   });
 

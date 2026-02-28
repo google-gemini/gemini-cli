@@ -13,10 +13,10 @@ import { HookEventHandler } from './hookEventHandler.js';
 import type { Config } from '../config/config.js';
 import type { HookConfig, HookExecutionResult } from './types.js';
 import {
-  NotificationType,
-  SessionStartSource,
   HookEventName,
   HookType,
+  NotificationType,
+  SessionStartSource,
 } from './types.js';
 import type { HookPlanner } from './hookPlanner.js';
 import type { HookRunner } from './hookRunner.js';
@@ -576,6 +576,58 @@ describe('HookEventHandler', () => {
 
       expect(result).toBe(mockAggregated);
     });
+
+    it('should fire BeforeAgent event with command context', async () => {
+      const mockPlan = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: './before_agent.sh',
+          } as unknown as HookConfig,
+          eventName: HookEventName.BeforeAgent,
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.BeforeAgent,
+        hookConfigs: mockPlan.map((p) => p.hookConfig),
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue([]);
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      const prompt = 'Please help me with this task';
+      const commandName = 'deploy';
+      const commandArgs = { env: 'prod' };
+
+      const result = await hookEventHandler.fireBeforeAgentEvent(
+        prompt,
+        commandName,
+        commandArgs,
+      );
+
+      expect(mockHookRunner.executeHooksParallel).toHaveBeenCalledWith(
+        [mockPlan[0].hookConfig],
+        HookEventName.BeforeAgent,
+        expect.objectContaining({
+          prompt,
+          command_name: commandName,
+          command_args: commandArgs,
+        }),
+        expect.any(Function),
+        expect.any(Function),
+      );
+
+      expect(result).toBe(mockAggregated);
+    });
   });
 
   describe('fireNotificationEvent', () => {
@@ -839,6 +891,65 @@ describe('HookEventHandler', () => {
         llmResponse as unknown as GenerateContentResponse,
       );
       expect(mockCoreEvents.emitFeedback).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('fireAfterAgentEvent', () => {
+    it('should fire AfterAgent event with correct context', async () => {
+      const mockPlan = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: './after_agent.sh',
+          } as unknown as HookConfig,
+          eventName: HookEventName.AfterAgent,
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.AfterAgent,
+        hookConfigs: mockPlan.map((p) => p.hookConfig),
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue([]);
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      const prompt = 'Please help me with this task';
+      const response = 'Done';
+      const commandName = 'deploy';
+      const commandArgs = { env: 'prod' };
+
+      const result = await hookEventHandler.fireAfterAgentEvent(
+        prompt,
+        response,
+        false,
+        commandName,
+        commandArgs,
+      );
+
+      expect(mockHookRunner.executeHooksParallel).toHaveBeenCalledWith(
+        [mockPlan[0].hookConfig],
+        HookEventName.AfterAgent,
+        expect.objectContaining({
+          prompt,
+          prompt_response: response,
+          stop_hook_active: false,
+          command_name: commandName,
+          command_args: commandArgs,
+        }),
+        expect.any(Function),
+        expect.any(Function),
+      );
+
+      expect(result).toBe(mockAggregated);
     });
   });
 
