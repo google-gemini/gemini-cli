@@ -181,6 +181,7 @@ function classifyValidationRequiredError(
  * - 404 errors are classified as `ModelNotFoundError`.
  * - 403 errors with `VALIDATION_REQUIRED` from cloudcode-pa domains are classified
  *   as `ValidationRequiredError`.
+ * - 503 errors are classified as `RetryableQuotaError` (capacity issues trigger fallback).
  * - 429 errors are classified as either `TerminalQuotaError` or `RetryableQuotaError`:
  *   - CloudCode API: `RATE_LIMIT_EXCEEDED` → `RetryableQuotaError`, `QUOTA_EXHAUSTED` → `TerminalQuotaError`.
  *   - If the error indicates a daily limit (in QuotaFailure), it's a `TerminalQuotaError`.

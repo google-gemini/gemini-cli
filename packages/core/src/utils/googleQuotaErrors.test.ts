@@ -68,16 +68,17 @@ describe('classifyGoogleError', () => {
   it('should return RetryableQuotaError for 503 Service Unavailable', () => {
     const apiError: GoogleApiError = {
       code: 503,
-      message: 'Service Unavailable',
+      message:
+        'No capacity available for model gemini-3-flash-preview on the server',
       details: [],
     };
     vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
-    const originalError = new Error('Service Unavailable');
+    const originalError = new Error(apiError.message);
     const result = classifyGoogleError(originalError);
     expect(result).toBeInstanceOf(RetryableQuotaError);
     if (result instanceof RetryableQuotaError) {
       expect(result.cause).toBe(apiError);
-      expect(result.message).toBe('Service Unavailable');
+      expect(result.message).toBe(apiError.message);
     }
   });
 
