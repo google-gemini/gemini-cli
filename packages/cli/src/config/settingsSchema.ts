@@ -710,7 +710,7 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: false,
             description:
-              'Force enable the alternate screen buffer even in potentially buggy terminals.',
+              'Force enable the alternate screen buffer even in potentially buggy terminals. Can also be controlled via the `GEMINI_CLI_FORCE_ALT_BUFFER=1` environment variable.',
             showInDialog: true,
           },
           disableAltBuffer: {
@@ -719,7 +719,8 @@ const SETTINGS_SCHEMA = {
             category: 'UI',
             requiresRestart: true,
             default: false,
-            description: 'Disable the alternate screen buffer globally.',
+            description:
+              'Disable the alternate screen buffer globally. Can also be controlled via the `GEMINI_CLI_DISABLE_ALT_BUFFER=1` environment variable.',
             showInDialog: true,
           },
           disableMouse: {
@@ -728,7 +729,8 @@ const SETTINGS_SCHEMA = {
             category: 'UI',
             requiresRestart: true,
             default: false,
-            description: 'Disable mouse event tracking.',
+            description:
+              'Disable mouse event tracking. Can also be controlled via the `GEMINI_CLI_DISABLE_MOUSE=1` environment variable.',
             showInDialog: true,
           },
           assumeTrustedTerminal: {
@@ -738,7 +740,7 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: false,
             description:
-              'Assume the terminal is fully capable and skip capability fallbacks.',
+              'Assume the terminal is fully capable and skip capability fallbacks. Can also be controlled via the `GEMINI_CLI_ASSUME_TRUSTED_TERMINAL=1` environment variable.',
             showInDialog: true,
           },
         },

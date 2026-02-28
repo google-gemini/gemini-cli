@@ -314,23 +314,27 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`ui.compatibility.forceAltBuffer`** (boolean):
   - **Description:** Force enable the alternate screen buffer even in
-    potentially buggy terminals.
+    potentially buggy terminals. Can also be controlled via the
+    `GEMINI_CLI_FORCE_ALT_BUFFER=1` environment variable.
   - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`ui.compatibility.disableAltBuffer`** (boolean):
-  - **Description:** Disable the alternate screen buffer globally.
+  - **Description:** Disable the alternate screen buffer globally. Can also be
+    controlled via the `GEMINI_CLI_DISABLE_ALT_BUFFER=1` environment variable.
   - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`ui.compatibility.disableMouse`** (boolean):
-  - **Description:** Disable mouse event tracking.
+  - **Description:** Disable mouse event tracking. Can also be controlled via
+    the `GEMINI_CLI_DISABLE_MOUSE=1` environment variable.
   - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`ui.compatibility.assumeTrustedTerminal`** (boolean):
   - **Description:** Assume the terminal is fully capable and skip capability
-    fallbacks.
+    fallbacks. Can also be controlled via the
+    `GEMINI_CLI_ASSUME_TRUSTED_TERMINAL=1` environment variable.
   - **Default:** `false`
   - **Requires restart:** Yes
 

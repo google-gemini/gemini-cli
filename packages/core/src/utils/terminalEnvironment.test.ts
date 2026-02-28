@@ -8,6 +8,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   detectTerminalEnvironment,
   getTerminalCapabilities,
+  getTerminalWarnings,
+  WarningPriority,
 } from './terminalEnvironment.js';
 
 describe('terminalEnvironment', () => {
@@ -154,6 +156,64 @@ describe('terminalEnvironment', () => {
       expect(capabilities.supportsAltBuffer).toBe(true);
       expect(capabilities.supportsReliableBackbufferClear).toBe(true);
       expect(Object.keys(reasons).length).toBe(0);
+    });
+  });
+
+  describe('getTerminalWarnings', () => {
+    const defaultEnv = {
+      isTmux: false,
+      isJetBrains: false,
+      isWindowsTerminal: false,
+      isVSCode: false,
+      isITerm2: false,
+      isGhostty: false,
+      isAppleTerminal: false,
+      isWindows10: false,
+      supports256Colors: true,
+      supportsTrueColor: true,
+    };
+
+    it('returns Windows 10 warning', () => {
+      const env = { ...defaultEnv, isWindows10: true };
+      const warnings = getTerminalWarnings(env);
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'windows-10',
+          priority: WarningPriority.High,
+        }),
+      );
+    });
+
+    it('returns JetBrains warning in alt buffer', () => {
+      const env = { ...defaultEnv, isJetBrains: true };
+      const warnings = getTerminalWarnings(env, { isAlternateBuffer: true });
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'jetbrains-terminal',
+          priority: WarningPriority.High,
+        }),
+      );
+    });
+
+    it('returns 256-color warning', () => {
+      const env = { ...defaultEnv, supports256Colors: false };
+      const warnings = getTerminalWarnings(env);
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: '256-color',
+        }),
+      );
+    });
+
+    it('returns true-color warning', () => {
+      const env = { ...defaultEnv, supportsTrueColor: false };
+      const warnings = getTerminalWarnings(env);
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'true-color',
+          priority: WarningPriority.Low,
+        }),
+      );
     });
   });
 });

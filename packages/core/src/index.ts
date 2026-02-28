@@ -90,8 +90,11 @@ export * from './utils/terminalSerializer.js';
 export {
   detectTerminalEnvironment,
   getTerminalCapabilities,
+  getTerminalWarnings,
+  WarningPriority,
   type TerminalCapabilities,
   type TerminalEnvironment,
+  type StartupWarning,
 } from './utils/terminalEnvironment.js';
 export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
