@@ -151,6 +151,16 @@ export async function setupUser(
         };
       }
 
+      // Bugfix / Defense: If this is a personal/free tier user, they do not inherently require
+      // a Google Cloud Project to be bound on the client side. We bypass raising an error.
+      if (loadRes.currentTier.id === UserTierId.FREE) {
+        return {
+          projectId: 'managed-personal-account',
+          userTier: loadRes.currentTier.id,
+          userTierName: loadRes.currentTier.name,
+        };
+      }
+
       // If user is not setup for standard tier, inform them about all other tiers they are ineligible for.
       throwIneligibleOrProjectIdError(loadRes);
     }
@@ -204,6 +214,16 @@ export async function setupUser(
       return {
         projectId,
         userTier: tier.id ?? UserTierId.STANDARD,
+        userTierName: tier.name,
+      };
+    }
+
+    // Bugfix / Defense: Prevent throwing ProjectIdRequiredError unnecessarily for explicitly free/personal tiers
+    // when onboard request successfully finishes but doesn't return a GCP project for personal tier accounts.
+    if (tier.id === UserTierId.FREE) {
+      return {
+        projectId: 'managed-personal-account',
+        userTier: tier.id,
         userTierName: tier.name,
       };
     }
