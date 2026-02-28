@@ -90,6 +90,7 @@ export function getAuthTypeFromEnv(): AuthType | undefined {
 
 export type ContentGeneratorConfig = {
   apiKey?: string;
+  baseUrl?: string;
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
@@ -99,6 +100,7 @@ export async function createContentGeneratorConfig(
   config: Config,
   authType: AuthType | undefined,
   apiKey?: string,
+  baseUrl?: string,
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey =
     apiKey ||
@@ -127,6 +129,7 @@ export async function createContentGeneratorConfig(
 
   if (authType === AuthType.USE_GEMINI && geminiApiKey) {
     contentGeneratorConfig.apiKey = geminiApiKey;
+    contentGeneratorConfig.baseUrl = baseUrl;
     contentGeneratorConfig.vertexai = false;
 
     return contentGeneratorConfig;
@@ -214,7 +217,11 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
-      const httpOptions = { headers };
+      const httpOptions: { headers: Record<string, string>; baseUrl?: string } =
+        { headers };
+      if (config.baseUrl) {
+        httpOptions.baseUrl = config.baseUrl;
+      }
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,

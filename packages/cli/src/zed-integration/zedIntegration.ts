@@ -87,6 +87,7 @@ export class GeminiAgent {
   private sessions: Map<string, Session> = new Map();
   private clientCapabilities: acp.ClientCapabilities | undefined;
   private apiKey: string | undefined;
+  private baseUrl: string | undefined;
 
   constructor(
     private config: Config,
@@ -113,6 +114,17 @@ export class GeminiAgent {
           'api-key': {
             provider: 'google',
           },
+        },
+      },
+      {
+        id: 'gemini-custom-url',
+        name: 'Gemini API (Custom URL)',
+        description: 'Use an API key and custom base URL',
+        _meta: {
+          'api-key': {
+            provider: 'google',
+          },
+          'base-url': {},
         },
       },
       {
@@ -148,8 +160,13 @@ export class GeminiAgent {
   }
 
   async authenticate(req: acp.AuthenticateRequest): Promise<void> {
-    const { methodId } = req;
-    const method = z.nativeEnum(AuthType).parse(methodId);
+    const methodId = req.methodId;
+    let method = AuthType.USE_GEMINI;
+    if (methodId === 'gemini-custom-url') {
+      method = AuthType.USE_GEMINI;
+    } else {
+      method = z.nativeEnum(AuthType).parse(methodId);
+    }
     const selectedAuthType = this.settings.merged.security.auth.selectedType;
 
     // Only clear credentials when switching to a different auth method
@@ -160,6 +177,8 @@ export class GeminiAgent {
     const meta = hasMeta(req) ? req._meta : undefined;
     const apiKey =
       typeof meta?.['api-key'] === 'string' ? meta['api-key'] : undefined;
+    const baseUrl =
+      typeof meta?.['base-url'] === 'string' ? meta['base-url'] : undefined;
 
     // Refresh auth with the requested method
     // This will reuse existing credentials if they're valid,
@@ -168,7 +187,14 @@ export class GeminiAgent {
       if (apiKey) {
         this.apiKey = apiKey;
       }
-      await this.config.refreshAuth(method, apiKey ?? this.apiKey);
+      if (baseUrl) {
+        this.baseUrl = baseUrl;
+      }
+      await this.config.refreshAuth(
+        method,
+        apiKey ?? this.apiKey,
+        baseUrl ?? this.baseUrl,
+      );
     } catch (e) {
       throw new acp.RequestError(-32000, getAcpErrorMessage(e));
     }
@@ -198,7 +224,7 @@ export class GeminiAgent {
     let isAuthenticated = false;
     let authErrorMessage = '';
     try {
-      await config.refreshAuth(authType, this.apiKey);
+      await config.refreshAuth(authType, this.apiKey, this.baseUrl);
       isAuthenticated = true;
 
       // Extra validation for Gemini API key
