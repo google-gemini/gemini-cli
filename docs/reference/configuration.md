@@ -815,7 +815,9 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`tools.useRipgrep`** (boolean):
   - **Description:** Use ripgrep for file content search instead of the fallback
-    implementation. Provides faster search performance.
+    implementation. Provides faster search performance. On Linux, installing
+    ripgrep system-wide (e.g. `apt install ripgrep`) is recommended to avoid
+    download timeouts in restricted or proxy environments.
   - **Default:** `true`
 
 - **`tools.truncateToolOutputThreshold`** (number):
