@@ -75,6 +75,15 @@ they appear in the UI.
 | Error Verbosity                      | `ui.errorVerbosity`                    | Controls whether recoverable errors are hidden (low) or fully shown (full).                                                                                       | `"low"`  |
 | Screen Reader Mode                   | `ui.accessibility.screenReader`        | Render output in plain-text to be more screen reader accessible                                                                                                   | `false`  |
 
+### Voice
+
+| UI Label              | Setting                  | Description                                                                                                                                                     | Default     |
+| --------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| Voice Input           | `voice.enabled`          | Enable voice input. When enabled, press **Alt+R** or **Ctrl+Q** to start/stop recording.                                                                        | `false`     |
+| Transcription Backend | `voice.provider`         | Transcription backend to use: `gemini` (zero-install, uses existing Gemini API auth) or `whisper` (local binary).                                               | `"gemini"`  |
+| Silence Detection     | `voice.silenceThreshold` | RMS energy threshold (0–1000) below which audio is discarded as silence. Lower values capture quieter speech (e.g. whispering). `0` disables silence detection. | `80`        |
+| Whisper Binary Path   | `voice.whisperPath`      | Path to the Whisper executable. Only used when `voice.provider` is `"whisper"` (e.g. `/usr/local/bin/whisper`).                                                 | `undefined` |
+
 ### IDE
 
 | UI Label | Setting       | Description                  | Default |

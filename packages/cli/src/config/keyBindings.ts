@@ -97,6 +97,9 @@ export enum Command {
   CLEAR_SCREEN = 'app.clearScreen',
   RESTART_APP = 'app.restart',
   SUSPEND_APP = 'app.suspend',
+
+  // Voice Input
+  VOICE_INPUT = 'input.voice',
 }
 
 /**
@@ -297,6 +300,12 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
   [Command.RESTART_APP]: [{ key: 'r' }],
   [Command.SUSPEND_APP]: [{ key: 'z', ctrl: true }],
+
+  // Voice Input
+  [Command.VOICE_INPUT]: [
+    { key: 'r', alt: true }, // Alt+R
+    { key: 'q', ctrl: true }, // Ctrl+Q
+  ],
 };
 
 interface CommandCategory {
@@ -390,6 +399,10 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.OPEN_EXTERNAL_EDITOR,
       Command.PASTE_CLIPBOARD,
     ],
+  },
+  {
+    title: 'Voice Input',
+    commands: [Command.VOICE_INPUT],
   },
   {
     title: 'App Controls',
@@ -525,4 +538,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
   [Command.RESTART_APP]: 'Restart the application.',
   [Command.SUSPEND_APP]: 'Suspend the CLI and move it to the background.',
+
+  // Voice Input
+  [Command.VOICE_INPUT]: 'Toggle voice input recording (Alt+R or Ctrl+Q).',
 };

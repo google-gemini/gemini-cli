@@ -90,6 +90,11 @@ export const handleSlashCommand = async (
         switch (result.type) {
           case 'submit_prompt':
             return result.content;
+          case 'message': {
+            const prefix = result.messageType?.toUpperCase() || 'INFO';
+            process.stdout.write(`[${prefix}] ${result.content}\n`);
+            return;
+          }
           case 'confirm_shell_commands':
             // This result indicates a command attempted to confirm shell commands.
             // However note that currently, ShellTool is excluded in non-interactive

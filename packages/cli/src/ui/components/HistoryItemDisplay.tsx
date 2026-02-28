@@ -24,6 +24,8 @@ import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import { ToolStatsDisplay } from './ToolStatsDisplay.js';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import { Help } from './Help.js';
+import { VoiceHelp } from './VoiceHelp.js';
+import { VoiceStatus } from './VoiceStatus.js';
 import type { SlashCommand } from '../commands/types.js';
 import { ExtensionsList } from './views/ExtensionsList.js';
 import { getMCPServerStatus } from '@google/gemini-cli-core';
@@ -126,6 +128,10 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'help' && commands && (
         <Help commands={commands} />
+      )}
+      {itemForDisplay.type === 'voice_help' && <VoiceHelp />}
+      {itemForDisplay.type === 'voice_status' && (
+        <VoiceStatus item={itemForDisplay} />
       )}
       {itemForDisplay.type === 'stats' && (
         <StatsDisplay

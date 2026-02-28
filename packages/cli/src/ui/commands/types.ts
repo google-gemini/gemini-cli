@@ -92,6 +92,7 @@ export interface CommandContext {
     removeComponent: () => void;
     toggleBackgroundShell: () => void;
     toggleShortcutsHelp: () => void;
+    toggleVoice: () => void;
   };
   // Session-specific data
   session: {
