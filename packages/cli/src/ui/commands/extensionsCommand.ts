@@ -209,7 +209,7 @@ async function restartAction(
   const s = extensionsToRestart.length > 1 ? 's' : '';
 
   const restartingMessage = {
-    type: MessageType.INFO,
+    type: 'info' as const,
     text: `Restarting ${extensionsToRestart.length} extension${s}...`,
     color: theme.text.primary,
   };

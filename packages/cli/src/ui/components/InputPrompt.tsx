@@ -71,6 +71,11 @@ import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import {
+  useVoiceContext,
+  onVoiceTranscript,
+} from '../contexts/VoiceContext.js';
+import Spinner from 'ink-spinner';
 import { shouldDismissShortcutsHelpOnHotkey } from '../utils/shortcutsHelp.js';
 import { useRepeatedKeyPress } from '../hooks/useRepeatedKeyPress.js';
 
@@ -319,6 +324,26 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     },
     [],
   );
+
+  // Voice input hook - MUST be before handleSubmit
+  // NOTE: Transcript is delivered via events, not context, to avoid infinite render loops
+  const {
+    isEnabled: voiceEnabled,
+    state: voiceState,
+    toggleRecording,
+    cancelRecording,
+  } = useVoiceContext();
+
+  // Handle voice transcript via event listener (not context) to avoid re-renders
+  useEffect(() => {
+    const handleTranscript = (transcript: string) => {
+      // Insert transcribed text at cursor position with trailing space for next input
+      buffer.insert(transcript + ' ');
+    };
+
+    const unsubscribe = onVoiceTranscript(handleTranscript);
+    return unsubscribe;
+  }, [buffer]);
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
@@ -630,6 +655,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      // Hide the shortcuts panel if voice is active or if other keys are pressed
+      if (shortcutsHelpVisible) {
+        setShortcutsHelpVisible(false);
+      }
+
+      // Cancel active voice transcription if escape is hit
+      if (key.name === 'escape') {
+        if (voiceState.isRecording || voiceState.isTranscribing) {
+          cancelRecording();
+          resetEscapeState();
+          return true;
+        }
+      }
+
       if (
         key.name === 'escape' &&
         (streamingState === StreamingState.Responding ||
@@ -664,7 +703,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       } else {
         resetPlainTabPress();
       }
-
       if (key.name === 'paste') {
         if (shortcutsHelpVisible) {
           setShortcutsHelpVisible(false);
@@ -760,6 +798,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (keyMatchers[Command.ESCAPE](key)) {
+        if (voiceState.isRecording) {
+          void cancelRecording();
+          return true;
+        }
+
         const cancelSearch = (
           setActive: (active: boolean) => void,
           resetCompletion: () => void,
@@ -808,9 +851,21 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      if (keyMatchers[Command.QUIT](key)) {
+        if (voiceState.isRecording) {
+          void toggleRecording();
+          return true;
+        }
+      }
+
       if (keyMatchers[Command.CLEAR_SCREEN](key)) {
         setBannerVisible(false);
         onClearScreen();
+        return true;
+      }
+
+      if (voiceEnabled && keyMatchers[Command.VOICE_INPUT](key)) {
+        void toggleRecording();
         return true;
       }
 
@@ -1221,6 +1276,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       registerPlainTabPress,
       resetPlainTabPress,
       toggleCleanUiDetailsVisible,
+      history,
+      voiceEnabled,
+      toggleRecording,
+      cancelRecording,
+      voiceState.isRecording,
     ],
   );
 
@@ -1401,6 +1461,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     statusText = 'Accepting edits';
   }
 
+  // Voice input status
+  // ⚠️ Voice state intentionally overrides mode indicators
+  // (recording must always be visible regardless of approval mode)
+  if (voiceState.isRecording) {
+    statusColor = theme.status.error;
+    statusText = '🎤 Recording... (Alt+R/Ctrl+Q to stop, Esc to cancel)';
+  } else if (voiceState.isTranscribing) {
+    statusColor = theme.status.warning;
+    statusText = 'Transcribing...';
+  }
+
+  // Dynamic placeholder reflecting voice state
+  const effectivePlaceholder = voiceState.isRecording
+    ? 'Speak now...'
+    : voiceState.isTranscribing
+      ? 'Transcribing your speech...'
+      : placeholder;
+
   const suggestionsNode = shouldShowSuggestions ? (
     <Box paddingRight={2}>
       <SuggestionsDisplay
@@ -1482,24 +1560,28 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               <Text color={theme.text.accent}>(r:) </Text>
             ) : showYoloStyling ? (
               '*'
+            ) : voiceState.isRecording ? (
+              '🎤'
+            ) : voiceState.isTranscribing ? (
+              <Spinner type="dots" />
             ) : (
               '>'
             )}{' '}
           </Text>
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
-            {buffer.text.length === 0 && placeholder ? (
+            {buffer.text.length === 0 && effectivePlaceholder ? (
               showCursor ? (
                 <Text
                   terminalCursorFocus={showCursor}
                   terminalCursorPosition={0}
                 >
-                  {chalk.inverse(placeholder.slice(0, 1))}
+                  {chalk.inverse(effectivePlaceholder.slice(0, 1))}
                   <Text color={theme.text.secondary}>
-                    {placeholder.slice(1)}
+                    {effectivePlaceholder.slice(1)}
                   </Text>
                 </Text>
               ) : (
-                <Text color={theme.text.secondary}>{placeholder}</Text>
+                <Text color={theme.text.secondary}>{effectivePlaceholder}</Text>
               )
             ) : (
               linesToRender

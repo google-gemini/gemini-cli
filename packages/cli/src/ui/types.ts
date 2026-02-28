@@ -183,6 +183,19 @@ export type HistoryItemHelp = HistoryItemBase & {
   timestamp: Date;
 };
 
+export type HistoryItemVoiceHelp = HistoryItemBase & {
+  type: 'voice_help';
+  timestamp: Date;
+};
+
+export type HistoryItemVoiceStatus = HistoryItemBase & {
+  type: 'voice_status';
+  timestamp: Date;
+  enabled: boolean;
+  provider: string;
+  sensitivityLabel: string;
+  whisperPath: string;
+};
 export interface HistoryItemQuotaBase extends HistoryItemBase {
   selectedAuthType?: string;
   userEmail?: string;
@@ -374,6 +387,8 @@ export type HistoryItemWithoutId =
   | HistoryItemWarning
   | HistoryItemAbout
   | HistoryItemHelp
+  | HistoryItemVoiceHelp
+  | HistoryItemVoiceStatus
   | HistoryItemToolGroup
   | HistoryItemStats
   | HistoryItemModelStats
@@ -415,6 +430,8 @@ export enum MessageType {
   CHAT_LIST = 'chat_list',
   HOOKS_LIST = 'hooks_list',
   HINT = 'hint',
+  VOICE_HELP = 'voice_help',
+  VOICE_STATUS = 'voice_status',
 }
 
 // Simplified message structure for internal feedback
@@ -441,6 +458,19 @@ export type Message =
       type: MessageType.HELP;
       timestamp: Date;
       content?: string; // Optional content, not really used for HELP
+    }
+  | {
+      type: MessageType.VOICE_HELP;
+      timestamp: Date;
+      content?: string;
+    }
+  | {
+      type: MessageType.VOICE_STATUS;
+      timestamp: Date;
+      enabled: boolean;
+      provider: string;
+      sensitivityLabel: string;
+      whisperPath: string;
     }
   | {
       type: MessageType.STATS;

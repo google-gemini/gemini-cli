@@ -209,3 +209,7 @@ export * from './utils/terminal.js';
 
 // Export types from @google/genai
 export type { Content, Part, FunctionCall } from '@google/genai';
+// Voice services
+export * from './services/voice/types.js';
+export { GeminiRestBackend } from './services/voice/GeminiRestBackend.js';
+export { LocalWhisperBackend } from './services/voice/LocalWhisperBackend.js';
