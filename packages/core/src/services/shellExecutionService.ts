@@ -726,12 +726,15 @@ export class ShellExecutionService {
           }
         });
 
-        const handleOutput = (data: Buffer) => {
+        const handleOutput = (data: Buffer, forcedEncoding?: string) => {
           processingChain = processingChain.then(
             () =>
               new Promise<void>((resolve) => {
                 if (!decoder) {
-                  const encoding = getCachedEncodingForBuffer(data);
+                  // Use forcedEncoding when the caller already knows the encoding
+                  // (e.g. PTY path where data is Buffer.from(string, 'utf-8'))
+                  const encoding =
+                    forcedEncoding ?? getCachedEncodingForBuffer(data);
                   try {
                     decoder = new TextDecoder(encoding);
                   } catch {
@@ -783,8 +786,13 @@ export class ShellExecutionService {
         };
 
         ptyProcess.onData((data: string) => {
+          // node-pty / ConPTY already decodes shell output into a JS string.
+          // Converting to Buffer via Buffer.from(data, 'utf-8') always produces
+          // UTF-8 bytes. Decoding those bytes with the system code page
+          // (e.g. 'gb2312' on Chinese Windows) would corrupt CJK characters.
+          // Force 'utf-8' so TextDecoder matches the Buffer.from encoding.
           const bufferData = Buffer.from(data, 'utf-8');
-          handleOutput(bufferData);
+          handleOutput(bufferData, 'utf-8');
         });
 
         ptyProcess.onExit(

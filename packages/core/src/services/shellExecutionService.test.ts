@@ -292,6 +292,32 @@ describe('ShellExecutionService', () => {
       expect(result.output.trim()).toBe('你好');
     });
 
+    it('should not garble CJK characters from PTY when system encoding is gb2312 (Windows CP936)', async () => {
+      // node-pty / ConPTY decodes shell output to a JS string before handing it
+      // to onData. We then do Buffer.from(string, 'utf-8'), so the buffer is
+      // always UTF-8. If the system code page is CP936 (gb2312), using
+      // getCachedEncodingForBuffer would decode UTF-8 bytes as GB2312 and
+      // produce garbled output. The fix forces 'utf-8' in the PTY path.
+      const { getCachedEncodingForBuffer } = await import(
+        '../utils/systemEncoding.js'
+      );
+      vi.mocked(getCachedEncodingForBuffer).mockReturnValue('gb2312');
+
+      const chineseText = '你好世界'; // "Hello World" in Chinese
+      const { result } = await simulateExecution(
+        'Get-Content file.md',
+        (pty) => {
+          pty.onData.mock.calls[0][0](chineseText);
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        },
+      );
+
+      // Should preserve the original CJK characters, not produce garbled output
+      expect(result.output).toContain(chineseText);
+
+      vi.mocked(getCachedEncodingForBuffer).mockReturnValue('utf-8');
+    });
+
     it('should handle commands with no output', async () => {
       mockSerializeTerminalToObject.mockReturnValue(
         createMockSerializeTerminalToObjectReturnValue(''),
