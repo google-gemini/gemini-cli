@@ -1960,6 +1960,68 @@ describe('useGeminiStream', () => {
       );
     });
 
+    it('should send proper approval payload for exit_plan_mode when switching to YOLO mode', async () => {
+      const awaitingApprovalToolCalls: TrackedToolCall[] = [
+        createMockToolCall('replace', 'call1', 'edit'),
+        {
+          request: {
+            callId: 'call-exit-plan',
+            name: 'exit_plan_mode',
+            args: { plan_path: 'plans/plan.md' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: CoreToolCallStatus.AwaitingApproval,
+          responseSubmittedToGemini: false,
+          confirmationDetails: {
+            type: 'exit_plan_mode' as const,
+            title: 'Plan Approval',
+            planPath: '/test/plans/plan.md',
+            onConfirm: vi.fn(),
+          },
+          tool: {
+            name: 'exit_plan_mode',
+            displayName: 'Exit Plan Mode',
+            description: 'Exit plan mode',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+          correlationId: 'corr-call-exit-plan',
+        } as unknown as TrackedWaitingToolCall,
+      ];
+
+      const { result } = renderTestHook(awaitingApprovalToolCalls);
+
+      await act(async () => {
+        await result.current.handleApprovalModeChange(ApprovalMode.YOLO);
+      });
+
+      // Both tool calls should be auto-approved
+      expect(mockMessageBus.publish).toHaveBeenCalledTimes(2);
+
+      // Regular tool should NOT have a payload
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          correlationId: 'corr-call1',
+          outcome: ToolConfirmationOutcome.ProceedOnce,
+        }),
+      );
+
+      // exit_plan_mode should have a proper approval payload
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          correlationId: 'corr-call-exit-plan',
+          outcome: ToolConfirmationOutcome.ProceedOnce,
+          payload: {
+            approved: true,
+            approvalMode: ApprovalMode.AUTO_EDIT,
+          },
+        }),
+      );
+    });
+
     it('should only auto-approve edit tools when switching to AUTO_EDIT mode', async () => {
       const awaitingApprovalToolCalls: TrackedToolCall[] = [
         createMockToolCall('replace', 'call1', 'edit'),
