@@ -657,21 +657,8 @@ export class PolicyEngine {
     const processedTools = new Set<string>();
     let globalVerdict: PolicyDecision | undefined;
 
-    const normalizeDecision = (
-      decision: PolicyDecision,
-      isHeadless: boolean,
-    ): PolicyDecision => {
-      if (isHeadless && decision === PolicyDecision.ASK_USER) {
-        return PolicyDecision.DENY;
-      }
-      return decision;
-    };
-
     for (const rule of this.rules) {
-      const normalizedDecision = normalizeDecision(
-        rule.decision,
-        this.nonInteractive,
-      );
+      const normalizedDecision = this.applyNonInteractiveMode(rule.decision);
 
       if (rule.argsPattern) {
         if (rule.toolName && normalizedDecision !== PolicyDecision.DENY) {
