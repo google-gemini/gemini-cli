@@ -57,7 +57,7 @@ describe('Workspace-Level Policies', () => {
     // Mock readdir to return a policy file for each tier
     const mockReaddir = vi.fn(async (path: string) => {
       const normalizedPath = nodePath.normalize(path);
-      if (normalizedPath.endsWith('default/policies'))
+      if (normalizedPath.endsWith(nodePath.join('default', 'policies')))
         return [
           {
             name: 'default.toml',
@@ -65,11 +65,11 @@ describe('Workspace-Level Policies', () => {
             isDirectory: () => false,
           },
         ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
-      if (normalizedPath.endsWith('user/policies'))
+      if (normalizedPath.endsWith(nodePath.join('user', 'policies')))
         return [
           { name: 'user.toml', isFile: () => true, isDirectory: () => false },
         ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
-      if (normalizedPath.endsWith('workspace/policies'))
+      if (normalizedPath.endsWith(nodePath.join('workspace', 'policies')))
         return [
           {
             name: 'workspace.toml',
@@ -77,7 +77,7 @@ describe('Workspace-Level Policies', () => {
             isDirectory: () => false,
           },
         ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
-      if (normalizedPath.endsWith('system/policies'))
+      if (normalizedPath.endsWith(nodePath.join('system', 'policies')))
         return [
           { name: 'admin.toml', isFile: () => true, isDirectory: () => false },
         ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
