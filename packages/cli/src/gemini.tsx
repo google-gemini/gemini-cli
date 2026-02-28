@@ -402,6 +402,30 @@ export async function main() {
     });
   }
 
+  // Check for daemon client commands
+  if (argv.daemonStatus || argv.daemonStop || argv.client || argv.close) {
+    let input = argv.promptInteractive || argv.prompt || argv.query || '';
+    if (argv.client && !process.stdin.isTTY) {
+      const { readStdin } = await import('./utils/readStdin.js');
+      const stdinData = await readStdin();
+      if (stdinData) {
+        input = input ? `${stdinData}\n\n${input}` : stdinData;
+      }
+    }
+    const { runDaemonClientCommands } = await import(
+      './daemon/daemonClient.js'
+    );
+    await runDaemonClientCommands(argv, input);
+    return;
+  }
+
+  // Check for daemon server start
+  if (argv.daemon) {
+    const { startDaemon } = await import('./daemon/daemonServer.js');
+    await startDaemon(settings, argv);
+    return;
+  }
+
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
     writeToStderr(
