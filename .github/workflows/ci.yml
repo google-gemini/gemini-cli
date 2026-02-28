@@ -37,6 +37,7 @@ jobs:
     permissions: 'read-all'
     name: 'Merge Queue Skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
+    if: "github.repository == 'google-gemini/gemini-cli'"
     outputs:
       skip: '${{ steps.merge-queue-ci-skipper.outputs.skip-check }}'
     steps:
@@ -49,7 +50,7 @@ jobs:
     name: 'Lint'
     runs-on: 'gemini-cli-ubuntu-16-core'
     needs: 'merge_queue_skipper'
-    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
+    if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
     env:
       GEMINI_LINT_TEMP_DIR: '${{ github.workspace }}/.gemini-linters'
     steps:
@@ -116,6 +117,7 @@ jobs:
   link_checker:
     name: 'Link Checker'
     runs-on: 'ubuntu-latest'
+    if: "github.repository == 'google-gemini/gemini-cli'"
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -129,7 +131,7 @@ jobs:
     runs-on: 'gemini-cli-ubuntu-16-core'
     needs:
       - 'merge_queue_skipper'
-    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
+    if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
     permissions:
       contents: 'read'
       checks: 'write'
@@ -216,7 +218,7 @@ jobs:
     runs-on: 'macos-latest'
     needs:
       - 'merge_queue_skipper'
-    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
+    if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
     permissions:
       contents: 'read'
       checks: 'write'
@@ -311,7 +313,7 @@ jobs:
     name: 'CodeQL'
     runs-on: 'gemini-cli-ubuntu-16-core'
     needs: 'merge_queue_skipper'
-    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
+    if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
     permissions:
       actions: 'read'
       contents: 'read'
@@ -334,7 +336,7 @@ jobs:
   bundle_size:
     name: 'Check Bundle Size'
     needs: 'merge_queue_skipper'
-    if: "${{github.event_name == 'pull_request' && needs.merge_queue_skipper.outputs.skip == 'false'}}"
+    if: "github.repository == 'google-gemini/gemini-cli' && github.event_name == 'pull_request' && needs.merge_queue_skipper.outputs.skip == 'false'"
     runs-on: 'gemini-cli-ubuntu-16-core'
     permissions:
       contents: 'read' # For checkout
@@ -359,7 +361,7 @@ jobs:
     name: 'Slow Test - Win - ${{ matrix.shard }}'
     runs-on: 'gemini-cli-windows-16-core'
     needs: 'merge_queue_skipper'
-    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
+    if: "github.repository == 'google-gemini/gemini-cli' && needs.merge_queue_skipper.outputs.skip == 'false'"
     timeout-minutes: 60
     strategy:
       matrix:
@@ -451,7 +453,7 @@ jobs:
 
   ci:
     name: 'CI'
-    if: 'always()'
+    if: "github.repository == 'google-gemini/gemini-cli' && always()"
     needs:
       - 'lint'
       - 'link_checker'
@@ -464,14 +466,22 @@ jobs:
     steps:
       - name: 'Check all job results'
         run: |
-          if [[ (${{ needs.lint.result }} != 'success' && ${{ needs.lint.result }} != 'skipped') || \
-               (${{ needs.link_checker.result }} != 'success' && ${{ needs.link_checker.result }} != 'skipped') || \
-               (${{ needs.test_linux.result }} != 'success' && ${{ needs.test_linux.result }} != 'skipped') || \
-               (${{ needs.test_mac.result }} != 'success' && ${{ needs.test_mac.result }} != 'skipped') || \
-               (${{ needs.test_windows.result }} != 'success' && ${{ needs.test_windows.result }} != 'skipped') || \
-               (${{ needs.codeql.result }} != 'success' && ${{ needs.codeql.result }} != 'skipped') || \
-               (${{ needs.bundle_size.result }} != 'success' && ${{ needs.bundle_size.result }} != 'skipped') ]]; then
+          if [[ (${NEEDS_LINT_RESULT} != 'success' && ${NEEDS_LINT_RESULT} != 'skipped') || \
+               (${NEEDS_LINK_CHECKER_RESULT} != 'success' && ${NEEDS_LINK_CHECKER_RESULT} != 'skipped') || \
+               (${NEEDS_TEST_LINUX_RESULT} != 'success' && ${NEEDS_TEST_LINUX_RESULT} != 'skipped') || \
+               (${NEEDS_TEST_MAC_RESULT} != 'success' && ${NEEDS_TEST_MAC_RESULT} != 'skipped') || \
+               (${NEEDS_TEST_WINDOWS_RESULT} != 'success' && ${NEEDS_TEST_WINDOWS_RESULT} != 'skipped') || \
+               (${NEEDS_CODEQL_RESULT} != 'success' && ${NEEDS_CODEQL_RESULT} != 'skipped') || \
+               (${NEEDS_BUNDLE_SIZE_RESULT} != 'success' && ${NEEDS_BUNDLE_SIZE_RESULT} != 'skipped') ]]; then
             echo "One or more CI jobs failed."
             exit 1
           fi
           echo "All CI jobs passed!"
+        env:
+          NEEDS_LINT_RESULT: '${{ needs.lint.result }}'
+          NEEDS_LINK_CHECKER_RESULT: '${{ needs.link_checker.result }}'
+          NEEDS_TEST_LINUX_RESULT: '${{ needs.test_linux.result }}'
+          NEEDS_TEST_MAC_RESULT: '${{ needs.test_mac.result }}'
+          NEEDS_TEST_WINDOWS_RESULT: '${{ needs.test_windows.result }}'
+          NEEDS_CODEQL_RESULT: '${{ needs.codeql.result }}'
+          NEEDS_BUNDLE_SIZE_RESULT: '${{ needs.bundle_size.result }}'

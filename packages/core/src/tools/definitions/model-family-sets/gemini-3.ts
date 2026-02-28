@@ -97,7 +97,7 @@ export const GEMINI_3_SET: CoreToolSet = {
             'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
           type: 'string',
         },
-        include: {
+        include_pattern: {
           description: `Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).`,
           type: 'string',
         },
@@ -144,7 +144,7 @@ export const GEMINI_3_SET: CoreToolSet = {
             "Directory or file to search. Directories are searched recursively. Relative paths are resolved against current working directory. Defaults to current working directory ('.') if omitted.",
           type: 'string',
         },
-        include: {
+        include_pattern: {
           description:
             "Glob pattern to filter files (e.g., '*.ts', 'src/**'). Recommended for large repositories to reduce noise. Defaults to all files if omitted.",
           type: 'string',
@@ -558,7 +558,7 @@ The agent did not use the todo list because this task could be completed by a ti
   ask_user: {
     name: ASK_USER_TOOL_NAME,
     description:
-      'Ask the user one or more questions to gather preferences, clarify requirements, or make decisions.',
+      'Ask the user one or more questions to gather preferences, clarify requirements, or make decisions. When using this tool, prefer providing multiple-choice options with detailed descriptions and enable multi-select where appropriate to provide maximum flexibility.',
     parametersJsonSchema: {
       type: 'object',
       required: ['questions'],
