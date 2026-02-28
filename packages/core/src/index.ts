@@ -131,6 +131,7 @@ export * from './ide/ide-installer.js';
 export { IDE_DEFINITIONS, type IdeInfo } from './ide/detect-ide.js';
 export * from './ide/constants.js';
 export * from './ide/types.js';
+export { AsExternalUriRequestSchema } from './ide/types.js';
 
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';

@@ -10,7 +10,8 @@ import {
   IdeContextNotificationSchema,
   OpenDiffRequestSchema,
   AsExternalUriRequestSchema,
-} from '@google/gemini-cli-core/src/ide/types.js';
+  tmpdir,
+} from '@google/gemini-cli-core';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -24,7 +25,7 @@ import { randomUUID } from 'node:crypto';
 import { type Server as HTTPServer } from 'node:http';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
-import { tmpdir } from '@google/gemini-cli-core';
+import * as net from 'node:net';
 import type { z } from 'zod';
 import type { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
@@ -497,12 +498,11 @@ const createMcpServer = (
         }
 
         // Required for security: Only allow loopback hosts
-        // Use normalized hostname to handle both IPv4 and IPv6 (stripping [] from IPv6)
-        const hostname = parsedUrl.hostname.replace(/^\[(.*)\]$/, '$1');
-        const loopbackHosts = ['localhost', '127.0.0.1', '::1'];
-        if (!loopbackHosts.includes(hostname)) {
+        const hostname = parsedUrl.hostname;
+        // @ts-expect-error: isLoopback might be missing in @types/node@20
+        if (!net.isLoopback(hostname)) {
           throw new Error(
-            `Invalid host: ${hostname}. Only loopback hosts (localhost, 127.0.0.1, ::1) are allowed.`,
+            `Invalid host: ${hostname}. Only loopback hosts are allowed.`,
           );
         }
 
