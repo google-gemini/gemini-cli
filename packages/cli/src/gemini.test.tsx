@@ -217,6 +217,7 @@ vi.mock('./utils/events.js', async (importOriginal) => {
 });
 
 import * as readStdinModule from './utils/readStdin.js';
+import * as sessionCleanupModule from './utils/sessionCleanup.js';
 
 vi.mock('./utils/sandbox.js', () => ({
   sandbox_command: vi.fn(() => ''), // Default to no sandbox command
@@ -248,6 +249,16 @@ vi.mock('./ui/utils/mouse.js', () => ({
   disableMouseEvents: vi.fn(),
   isIncompleteMouseSequence: vi.fn(),
 }));
+
+vi.mock('./utils/sessionCleanup.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./utils/sessionCleanup.js')>();
+  return {
+    ...actual,
+    cleanupExpiredSessions: vi.fn().mockResolvedValue(undefined),
+    cleanupToolOutputFiles: vi.fn().mockResolvedValue(undefined),
+  };
+});
 
 vi.mock('./validateNonInterActiveAuth.js', () => ({
   validateNonInteractiveAuth: vi.fn().mockResolvedValue('google'),
@@ -747,11 +758,8 @@ describe('gemini.tsx main function kitty protocol', () => {
     emitFeedbackSpy.mockRestore();
   });
 
-  it.skip('should log error when cleanupExpiredSessions fails', async () => {
-    const { cleanupExpiredSessions } = await import(
-      './utils/sessionCleanup.js'
-    );
-    vi.mocked(cleanupExpiredSessions).mockRejectedValue(
+  it('should log error when cleanupExpiredSessions fails', async () => {
+    vi.mocked(sessionCleanupModule.cleanupExpiredSessions).mockRejectedValue(
       new Error('Cleanup failed'),
     );
     const debugLoggerErrorSpy = vi
@@ -783,18 +791,19 @@ describe('gemini.tsx main function kitty protocol', () => {
       }),
     );
 
-    // The mock is already set up at the top of the test
-
+    process.env['GEMINI_API_KEY'] = 'test-key';
+    vi.stubEnv('SANDBOX', 'true');
     try {
       await main();
     } catch (e) {
       if (!(e instanceof MockProcessExitError)) throw e;
+    } finally {
+      delete process.env['GEMINI_API_KEY'];
     }
 
     expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'Failed to cleanup expired sessions: Cleanup failed',
-      ),
+      'Failed to cleanup expired sessions:',
+      expect.objectContaining({ message: 'Cleanup failed' }),
     );
     expect(processExitSpy).toHaveBeenCalledWith(0); // Should not exit on cleanup failure
     processExitSpy.mockRestore();
