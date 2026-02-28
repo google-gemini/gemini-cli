@@ -234,7 +234,8 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       };
     }
 
-    const { content, ai_proposed_content, modified_by_user } = this.params;
+    const { ai_proposed_content, modified_by_user } = this.params;
+    const content = this.params.content;
     const correctedContentResult = await getCorrectedFileContent(
       this.config,
       this.resolvedPath,
