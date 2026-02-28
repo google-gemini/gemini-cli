@@ -376,4 +376,113 @@ describe('ToolExecutor', () => {
       }),
     );
   });
+
+  it('should return cancelled result with partial output when signal is aborted', async () => {
+    const mockTool = new MockTool({
+      name: 'slowTool',
+    });
+    const invocation = mockTool.build({});
+
+    const partialOutput = 'Some partial output before cancellation';
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockImplementation(
+      async () => ({
+        llmContent: partialOutput,
+        returnDisplay: `[Cancelled] ${partialOutput}`,
+      }),
+    );
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-cancel-partial',
+        name: 'slowTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-cancel',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: controller.signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(result.status).toBe(CoreToolCallStatus.Cancelled);
+    if (result.status === CoreToolCallStatus.Cancelled) {
+      const response = result.response.responseParts[0]?.functionResponse
+        ?.response as Record<string, unknown>;
+      expect(response).toEqual({
+        error: '[Operation Cancelled] User cancelled tool execution.',
+        output: partialOutput,
+      });
+      expect(result.response.resultDisplay).toBe(
+        `[Cancelled] ${partialOutput}`,
+      );
+    }
+  });
+
+  it('should truncate large shell output even on cancellation', async () => {
+    // 1. Setup Config for Truncation
+    vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10);
+    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
+
+    const mockTool = new MockTool({ name: SHELL_TOOL_NAME });
+    const invocation = mockTool.build({});
+    const longOutput = 'This is a very long output that should be truncated.';
+
+    // 2. Mock execution returning long content
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+      llmContent: longOutput,
+      returnDisplay: longOutput,
+    });
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-trunc-cancel',
+        name: SHELL_TOOL_NAME,
+        args: { command: 'echo long' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-trunc-cancel',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    // 3. Abort immediately
+    const controller = new AbortController();
+    controller.abort();
+
+    // 4. Execute
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: controller.signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    // 5. Verify Truncation Logic was applied in cancelled path
+    expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
+      longOutput,
+      SHELL_TOOL_NAME,
+      'call-trunc-cancel',
+      expect.any(String),
+      'test-session-id',
+    );
+
+    expect(result.status).toBe(CoreToolCallStatus.Cancelled);
+    if (result.status === CoreToolCallStatus.Cancelled) {
+      const response = result.response.responseParts[0]?.functionResponse
+        ?.response as Record<string, unknown>;
+      expect(response['output']).toBe('TruncatedContent...');
+      expect(result.response.outputFile).toBe('/tmp/truncated_output.txt');
+    }
+  });
 });

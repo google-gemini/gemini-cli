@@ -34,6 +34,7 @@ import type {
   CancelledToolCall,
 } from './types.js';
 import { CoreToolCallStatus } from './types.js';
+import type { PartListUnion, Part } from '@google/genai';
 import {
   GeminiCliOperation,
   GEN_AI_TOOL_CALL_ID,
@@ -130,9 +131,10 @@ export class ToolExecutor {
           const toolResult: ToolResult = await promise;
 
           if (signal.aborted) {
-            completedToolCall = this.createCancelledResult(
+            completedToolCall = await this.createCancelledResult(
               call,
               'User cancelled tool execution.',
+              toolResult,
             );
           } else if (toolResult.error === undefined) {
             completedToolCall = await this.createSuccessResult(
@@ -155,7 +157,7 @@ export class ToolExecutor {
         } catch (executionError: unknown) {
           spanMetadata.error = executionError;
           if (signal.aborted) {
-            completedToolCall = this.createCancelledResult(
+            completedToolCall = await this.createCancelledResult(
               call,
               'User cancelled tool execution.',
             );
@@ -178,10 +180,55 @@ export class ToolExecutor {
     );
   }
 
-  private createCancelledResult(
+  private async truncateOutputIfNeeded(
+    call: ToolCall,
+    content: PartListUnion,
+  ): Promise<{ truncatedContent: PartListUnion; outputFile?: string }> {
+    if (typeof content !== 'string' || call.request.name !== SHELL_TOOL_NAME) {
+      return { truncatedContent: content };
+    }
+
+    const threshold = this.config.getTruncateToolOutputThreshold();
+    if (threshold <= 0 || content.length <= threshold) {
+      return { truncatedContent: content };
+    }
+
+    const toolName = call.request.name;
+    const callId = call.request.callId;
+    const originalContentLength = content.length;
+
+    const { outputFile } = await saveTruncatedToolOutput(
+      content,
+      toolName,
+      callId,
+      this.config.storage.getProjectTempDir(),
+      this.config.getSessionId(),
+    );
+
+    const truncatedContent = formatTruncatedToolOutput(
+      content,
+      outputFile,
+      threshold,
+    );
+
+    logToolOutputTruncated(
+      this.config,
+      new ToolOutputTruncatedEvent(call.request.prompt_id, {
+        toolName,
+        originalContentLength,
+        truncatedContentLength: truncatedContent.length,
+        threshold,
+      }),
+    );
+
+    return { truncatedContent, outputFile };
+  }
+
+  private async createCancelledResult(
     call: ToolCall,
     reason: string,
-  ): CancelledToolCall {
+    toolResult?: ToolResult,
+  ): Promise<CancelledToolCall> {
     const errorMessage = `[Operation Cancelled] ${reason}`;
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
@@ -191,24 +238,52 @@ export class ToolExecutor {
       throw new Error('Cancelled tool call missing tool/invocation references');
     }
 
+    let responseParts: Part[] = [];
+    let outputFile: string | undefined;
+
+    if (toolResult?.llmContent) {
+      // Attempt to truncate and save output if we have content, even in cancellation case
+      // This is to handle cases where the tool may have produced output before cancellation
+      const { truncatedContent: output, outputFile: truncatedOutputFile } =
+        await this.truncateOutputIfNeeded(call, toolResult?.llmContent);
+
+      outputFile = truncatedOutputFile;
+      responseParts = convertToFunctionResponse(
+        call.request.name,
+        call.request.callId,
+        output,
+        this.config.getActiveModel(),
+      );
+
+      // Inject the cancellation error into the response object
+      const mainPart = responseParts[0];
+      if (mainPart?.functionResponse?.response) {
+        const respObj = mainPart.functionResponse.response;
+        respObj['error'] = errorMessage;
+      }
+    } else {
+      responseParts = [
+        {
+          functionResponse: {
+            id: call.request.callId,
+            name: call.request.name,
+            response: { error: errorMessage },
+          },
+        },
+      ];
+    }
+
     return {
       status: CoreToolCallStatus.Cancelled,
       request: call.request,
       response: {
         callId: call.request.callId,
-        responseParts: [
-          {
-            functionResponse: {
-              id: call.request.callId,
-              name: call.request.name,
-              response: { error: errorMessage },
-            },
-          },
-        ],
-        resultDisplay: undefined,
+        responseParts,
+        resultDisplay: toolResult?.returnDisplay,
         error: undefined,
         errorType: undefined,
-        contentLength: errorMessage.length,
+        outputFile,
+        contentLength: JSON.stringify(responseParts).length,
       },
       tool: call.tool,
       invocation: call.invocation,
@@ -223,37 +298,11 @@ export class ToolExecutor {
     call: ToolCall,
     toolResult: ToolResult,
   ): Promise<SuccessfulToolCall> {
-    let content = toolResult.llmContent;
-    let outputFile: string | undefined;
+    const { truncatedContent: content, outputFile } =
+      await this.truncateOutputIfNeeded(call, toolResult.llmContent);
+
     const toolName = call.request.originalRequestName || call.request.name;
     const callId = call.request.callId;
-
-    if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
-      const threshold = this.config.getTruncateToolOutputThreshold();
-
-      if (threshold > 0 && content.length > threshold) {
-        const originalContentLength = content.length;
-        const { outputFile: savedPath } = await saveTruncatedToolOutput(
-          content,
-          toolName,
-          callId,
-          this.config.storage.getProjectTempDir(),
-          this.config.getSessionId(),
-        );
-        outputFile = savedPath;
-        content = formatTruncatedToolOutput(content, outputFile, threshold);
-
-        logToolOutputTruncated(
-          this.config,
-          new ToolOutputTruncatedEvent(call.request.prompt_id, {
-            toolName,
-            originalContentLength,
-            truncatedContentLength: content.length,
-            threshold,
-          }),
-        );
-      }
-    }
 
     const response = convertToFunctionResponse(
       toolName,
