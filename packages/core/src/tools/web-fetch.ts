@@ -69,8 +69,8 @@ function checkRateLimit(url: string): {
     hostRequestHistory.set(hostname, history);
     return { allowed: true };
   } catch (_e) {
-    // If URL parsing fails, we fallback to allowed (should be caught by parsePrompt anyway)
-    return { allowed: true };
+    // Fail-closed: deny requests with unparseable URLs for security.
+    return { allowed: false, waitTimeMs: 0 };
   }
 }
 
