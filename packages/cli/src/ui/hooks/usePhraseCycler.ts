@@ -11,7 +11,7 @@ import type { LoadingPhrasesMode } from '../../config/settings.js';
 
 export const PHRASE_CHANGE_INTERVAL_MS = 15000;
 export const INTERACTIVE_SHELL_WAITING_PHRASE =
-  'Interactive shell awaiting input... press tab to focus shell';
+  '! Shell awaiting input (Tab to focus)';
 
 /**
  * Custom hook to manage cycling through loading phrases.
@@ -74,12 +74,12 @@ export const usePhraseCycler = (
           phraseList = wittyPhrases;
           break;
         case 'all':
-          // Show a tip on the first request after startup, then continue with 1/6 chance
+          // Show a tip on the first request after startup, then continue with 1/2 chance
           if (!hasShownFirstRequestTipRef.current) {
             phraseList = INFORMATIVE_TIPS;
             hasShownFirstRequestTipRef.current = true;
           } else {
-            const showTip = Math.random() < 1 / 6;
+            const showTip = Math.random() < 1 / 2;
             phraseList = showTip ? INFORMATIVE_TIPS : wittyPhrases;
           }
           break;

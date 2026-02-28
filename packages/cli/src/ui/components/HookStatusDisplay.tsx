@@ -6,7 +6,6 @@
 
 import type React from 'react';
 import { Text } from 'ink';
-import { theme } from '../semantic-colors.js';
 import { type ActiveHook } from '../types.js';
 
 interface HookStatusDisplayProps {
@@ -31,9 +30,5 @@ export const HookStatusDisplay: React.FC<HookStatusDisplayProps> = ({
 
   const text = `${label}: ${displayNames.join(', ')}`;
 
-  return (
-    <Text color={theme.status.warning} wrap="truncate">
-      {text}
-    </Text>
-  );
+  return <Text color="inherit">{text}</Text>;
 };

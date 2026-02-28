@@ -24,6 +24,7 @@ interface LoadingIndicatorProps {
   thought?: ThoughtSummary | null;
   thoughtLabel?: string;
   showCancelAndTimer?: boolean;
+  forceRealStatusOnly?: boolean;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
@@ -34,6 +35,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   thought,
   thoughtLabel,
   showCancelAndTimer = true,
+  forceRealStatusOnly = false,
 }) => {
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
@@ -54,16 +56,17 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       ? currentLoadingPhrase
       : thought?.subject
         ? (thoughtLabel ?? thought.subject)
-        : currentLoadingPhrase;
-  const hasThoughtIndicator =
-    currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
-    Boolean(thought?.subject?.trim());
-  const thinkingIndicator = hasThoughtIndicator ? '💬 ' : '';
+        : forceRealStatusOnly
+          ? streamingState === StreamingState.Responding
+            ? 'Waiting for model...'
+            : undefined
+          : currentLoadingPhrase;
+  const thinkingIndicator = '';
 
   const cancelAndTimerContent =
     showCancelAndTimer &&
     streamingState !== StreamingState.WaitingForConfirmation
-      ? `(esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)})`
+      ? `esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)}`
       : null;
 
   if (inline) {
