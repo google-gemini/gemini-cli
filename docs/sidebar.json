@@ -181,7 +181,7 @@
             "slug": "docs/reference/memport"
           },
           { "label": "Policy engine", "slug": "docs/reference/policy-engine" },
-          { "label": "Tools API", "slug": "docs/reference/tools-api" }
+          { "label": "Tools reference", "slug": "docs/reference/tools" }
         ]
       }
     ]

@@ -301,7 +301,7 @@ gemini
 
 ### Tools & Extensions
 
-- [**Built-in Tools Overview**](./docs/tools/index.md)
+- [**Built-in Tools Overview**](./docs/reference/tools.md)
   - [File System Operations](./docs/tools/file-system.md)
   - [Shell Commands](./docs/tools/shell.md)
   - [Web Fetch & Search](./docs/tools/web-fetch.md)
@@ -323,7 +323,7 @@ gemini
 - [**Enterprise Guide**](./docs/cli/enterprise.md) - Deploy and manage in a
   corporate environment.
 - [**Telemetry & Monitoring**](./docs/cli/telemetry.md) - Usage tracking.
-- [**Tools API Development**](./docs/core/tools-api.md) - Create custom tools.
+- [**Tools reference**](./docs/reference/tools.md) - Built-in tools overview.
 - [**Local development**](./docs/local-development.md) - Local development
   tooling.
 
