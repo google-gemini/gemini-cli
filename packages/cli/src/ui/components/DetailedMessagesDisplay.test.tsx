@@ -76,7 +76,7 @@ describe('DetailedMessagesDisplay', () => {
     unmount();
   });
 
-  it('hides the F12 hint in low error verbosity mode', async () => {
+  it('shows the F12 hint even in low error verbosity mode', async () => {
     const messages: ConsoleMessageItem[] = [
       { type: 'error', content: 'Error message', count: 1 },
     ];
@@ -95,7 +95,7 @@ describe('DetailedMessagesDisplay', () => {
       },
     );
     await waitUntilReady();
-    expect(lastFrame()).not.toContain('(F12 to close)');
+    expect(lastFrame()).toContain('(F12 to close)');
     unmount();
   });
 
