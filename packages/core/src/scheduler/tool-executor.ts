@@ -18,6 +18,11 @@ import {
   runInDevTraceSpan,
 } from '../index.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  isMcpToolName,
+  DiscoveredMCPTool,
+  DiscoveredMCPToolInvocation,
+} from '../tools/mcp-tool.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
@@ -228,20 +233,54 @@ export class ToolExecutor {
     const toolName = call.request.originalRequestName || call.request.name;
     const callId = call.request.callId;
 
-    if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
+    // We truncate string output for tools that can produce arbitrarily large
+    // text, like shell or MCP tools.
+    const isMcpTool =
+      isMcpToolName(toolName) ||
+      call.tool instanceof DiscoveredMCPTool ||
+      ('invocation' in call &&
+        call.invocation instanceof DiscoveredMCPToolInvocation);
+    const isShellTool = toolName === SHELL_TOOL_NAME;
+
+    if (isShellTool || isMcpTool) {
+      let contentToTruncate: string | undefined;
+      if (typeof content === 'string') {
+        contentToTruncate = content;
+      } else if (Array.isArray(content) && content.length === 1) {
+        const part = content[0];
+        if (typeof part === 'string') {
+          contentToTruncate = part;
+        } else if (
+          part &&
+          typeof part === 'object' &&
+          'text' in part &&
+          typeof part.text === 'string'
+        ) {
+          contentToTruncate = part.text;
+        }
+      }
+
       const threshold = this.config.getTruncateToolOutputThreshold();
 
-      if (threshold > 0 && content.length > threshold) {
-        const originalContentLength = content.length;
+      if (
+        contentToTruncate &&
+        threshold > 0 &&
+        contentToTruncate.length > threshold
+      ) {
+        const originalContentLength = contentToTruncate.length;
         const { outputFile: savedPath } = await saveTruncatedToolOutput(
-          content,
+          contentToTruncate,
           toolName,
           callId,
           this.config.storage.getProjectTempDir(),
           this.config.getSessionId(),
         );
         outputFile = savedPath;
-        content = formatTruncatedToolOutput(content, outputFile, threshold);
+        content = formatTruncatedToolOutput(
+          contentToTruncate,
+          outputFile,
+          threshold,
+        );
 
         logToolOutputTruncated(
           this.config,

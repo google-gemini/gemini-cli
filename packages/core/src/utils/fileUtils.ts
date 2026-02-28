@@ -592,12 +592,47 @@ export function sanitizeFilenamePart(part: string): string {
 /**
  * Formats a truncated message for tool output.
  * Shows the first 20% and last 80% of the allowed characters with a marker in between.
+ * Uses Intl.Segmenter to ensure Unicode characters (like emojis) are not split.
  */
 export function formatTruncatedToolOutput(
   contentStr: string,
   outputFile: string,
   maxChars: number,
 ): string {
+  // Use Intl.Segmenter for Unicode-aware character counting and slicing
+  // if available, otherwise fall back to standard string methods.
+  const segmenter =
+    typeof Intl !== 'undefined' && 'Segmenter' in Intl
+      ? new Intl.Segmenter()
+      : undefined;
+
+  if (segmenter) {
+    const segments = Array.from(segmenter.segment(contentStr));
+    const totalChars = segments.length;
+    if (totalChars <= maxChars) return contentStr;
+
+    const headChars = Math.floor(maxChars * 0.2);
+    const tailChars = maxChars - headChars;
+
+    const head = segments
+      .slice(0, headChars)
+      .map((s) => s.segment)
+      .join('');
+    const tail = segments
+      .slice(-tailChars)
+      .map((s) => s.segment)
+      .join('');
+    const omittedChars = totalChars - headChars - tailChars;
+
+    return `Output too large. Showing first ${headChars.toLocaleString()} and last ${tailChars.toLocaleString()} characters. For full output see: ${outputFile}
+${head}
+
+... [${omittedChars.toLocaleString()} characters omitted] ...
+
+${tail}`;
+  }
+
+  // Fallback for environments without Intl.Segmenter (e.g., very old Node.js)
   if (contentStr.length <= maxChars) return contentStr;
 
   const headChars = Math.floor(maxChars * 0.2);
