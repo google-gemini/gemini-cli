@@ -259,9 +259,9 @@ export class ShellExecutionService {
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           COLORTERM: 'truecolor',
-          ...sanitizeEnvironment(process.env, sanitizationConfig),
           PAGER: 'cat',
           GIT_PAGER: 'cat',
+          ...sanitizeEnvironment(process.env, sanitizationConfig),
         },
       });
 
