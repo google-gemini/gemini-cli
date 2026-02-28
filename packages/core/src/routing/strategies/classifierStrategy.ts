@@ -20,6 +20,7 @@ import {
   isFunctionResponse,
 } from '../../utils/messageInspectors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 import { LlmRole } from '../../telemetry/types.js';
 import { AuthType } from '../../core/contentGenerator.js';
 
@@ -132,6 +133,7 @@ export class ClassifierStrategy implements RoutingStrategy {
     context: RoutingContext,
     config: Config,
     baseLlmClient: BaseLlmClient,
+    _localLiteRtLmClient: LocalLiteRtLmClient,
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
     try {
