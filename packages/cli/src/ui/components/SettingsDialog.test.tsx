@@ -65,6 +65,20 @@ vi.mock('../../config/settingsSchema.js', async (importOriginal) => {
   return {
     ...original,
     getSettingsSchema: vi.fn(original.getSettingsSchema),
+    SETTING_CATEGORY_ORDER: [
+      'General',
+      'UI',
+      'Model',
+      'Context',
+      'Tools',
+      'IDE',
+      'Privacy',
+      'Extensions',
+      'Security',
+      'Experimental',
+      'Admin',
+      'Advanced',
+    ],
   };
 });
 
@@ -81,11 +95,59 @@ vi.mock('../contexts/VimModeContext.js', async () => {
   };
 });
 
-vi.mock('../../utils/settingsUtils.js', async () => {
-  const actual = await vi.importActual('../../utils/settingsUtils.js');
+vi.mock('../../utils/settingsUtils.js', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('../../utils/settingsUtils.js')>();
+  const CATEGORY_ORDER = [
+    'General',
+    'UI',
+    'Model',
+    'Context',
+    'Tools',
+    'IDE',
+    'Privacy',
+    'Extensions',
+    'Security',
+    'Experimental',
+    'Admin',
+    'Advanced',
+  ];
   return {
-    ...actual,
+    ...original,
     saveModifiedSettings: vi.fn(),
+    SETTING_CATEGORY_ORDER: CATEGORY_ORDER,
+    getDialogSettingsByCategory: vi.fn(() => {
+      // Use original logic but with our local order to avoid hoisting issues
+      const categories: Record<
+        string,
+        Array<SettingDefinition & { key: string }>
+      > = {};
+      Object.values(original.getFlattenedSchema())
+        .filter(
+          (definition: SettingDefinition) => definition.showInDialog !== false,
+        )
+        .forEach((definition: SettingDefinition & { key: string }) => {
+          const category = definition.category;
+          if (!categories[category]) {
+            categories[category] = [];
+          }
+          categories[category].push(definition);
+        });
+
+      const ordered: Record<
+        string,
+        Array<SettingDefinition & { key: string }>
+      > = {};
+      CATEGORY_ORDER.forEach((cat) => {
+        if (categories[cat]) ordered[cat] = categories[cat];
+      });
+      Object.keys(categories)
+        .sort()
+        .forEach((cat) => {
+          if (!ordered[cat]) ordered[cat] = categories[cat];
+        });
+      return ordered;
+    }),
   };
 });
 
@@ -291,7 +353,7 @@ describe('SettingsDialog', () => {
         const lines = output.trim().split('\n');
 
         expect(lines.length).toBeGreaterThanOrEqual(24);
-        expect(lines.length).toBeLessThanOrEqual(25);
+        expect(lines.length).toBeLessThanOrEqual(27);
       });
       unmount();
     });
@@ -312,9 +374,9 @@ describe('SettingsDialog', () => {
       // 'general.vimMode' has description 'Enable Vim keybindings' in settingsSchema.ts
       expect(output).toContain('Vim Mode');
       expect(output).toContain('Enable Vim keybindings');
-      // 'general.enableAutoUpdate' has description 'Enable automatic updates.'
-      expect(output).toContain('Enable Auto Update');
-      expect(output).toContain('Enable automatic updates.');
+      // 'general.disableAutoUpdate' has description 'Disable automatic updates.'
+      expect(output).toContain('Auto Update');
+      expect(output).toContain('Disable automatic updates.');
       unmount();
     });
   });
@@ -351,7 +413,7 @@ describe('SettingsDialog', () => {
       await waitUntilReady();
 
       await waitFor(() => {
-        expect(lastFrame()).toContain('Enable Auto Update');
+        expect(lastFrame()).toContain('Auto Update');
       });
 
       // Navigate up
@@ -801,8 +863,8 @@ describe('SettingsDialog', () => {
           path: '',
         },
         system: {
-          settings: { hideWindowTitle: true },
-          originalSettings: { hideWindowTitle: true },
+          settings: { hideWindowTitle: false },
+          originalSettings: { hideWindowTitle: false },
           path: '',
         },
         workspace: {
@@ -1495,7 +1557,7 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         expect(lastFrame()).toContain('yolo');
-        expect(lastFrame()).toContain('Disable YOLO Mode');
+        expect(lastFrame()).toContain('YOLO Mode');
       });
 
       unmount();
@@ -1586,7 +1648,7 @@ describe('SettingsDialog', () => {
       await waitFor(() => {
         expect(lastFrame()).toContain('nonexistentsetting');
         expect(lastFrame()).not.toContain('Vim Mode'); // Should not contain any settings
-        expect(lastFrame()).not.toContain('Enable Auto Update'); // Should not contain any settings
+        expect(lastFrame()).not.toContain('Auto Update'); // Should not contain any settings
       });
 
       unmount();
@@ -1613,12 +1675,12 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: true,
-            enableAutoUpdate: false,
+            disableAutoUpdate: false,
             debugKeystrokeLogging: true,
           },
           ui: {
-            hideWindowTitle: true,
-            hideTips: true,
+            hideWindowTitle: false,
+            hideTips: false,
             showMemoryUsage: true,
             showLineNumbers: true,
             showCitations: true,
@@ -1658,7 +1720,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            enableAutoUpdate: false,
+            disableAutoUpdate: false,
           },
           ui: {
             showMemoryUsage: true,
@@ -1672,7 +1734,7 @@ describe('SettingsDialog', () => {
           },
           model: {
             maxSessionTurns: 100,
-            skipNextSpeakerCheck: false,
+            skipNextSpeakerCheck: true,
           },
         },
         systemSettings: {},
@@ -1746,7 +1808,7 @@ describe('SettingsDialog', () => {
           },
           model: {
             maxSessionTurns: 50,
-            skipNextSpeakerCheck: true,
+            skipNextSpeakerCheck: false,
           },
         },
         systemSettings: {},
@@ -1758,7 +1820,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            enableAutoUpdate: true,
+            disableAutoUpdate: true,
             debugKeystrokeLogging: false,
           },
           ui: {

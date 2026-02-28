@@ -48,7 +48,7 @@ export const SessionRetentionWarningDialog = ({
       padding={1}
     >
       <Box marginBottom={1} justifyContent="center" width="100%">
-        <Text bold>Keep chat history</Text>
+        <Text bold>Chat history retention</Text>
       </Box>
 
       <Box flexDirection="column" gap={1} marginBottom={1}>
@@ -70,7 +70,7 @@ export const SessionRetentionWarningDialog = ({
       <Box marginTop={1}>
         <Text color={theme.text.secondary}>
           Set a custom limit <Text color={theme.text.primary}>/settings</Text>{' '}
-          and change &quot;Keep chat history&quot;.
+          and change &quot;Chat history retention&quot;.
         </Text>
       </Box>
     </Box>

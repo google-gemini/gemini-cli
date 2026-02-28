@@ -14,7 +14,7 @@ describe('Tips', () => {
     [0, '3. Create GEMINI.md files'],
     [5, '3. /help for more information'],
   ])(
-    'renders correct tips when file count is %i',
+    'renders correct hideTips when file count is %i',
     async (count, expectedText) => {
       const config = {
         getGeminiMdFileCount: vi.fn().mockReturnValue(count),

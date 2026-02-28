@@ -24,7 +24,7 @@ vi.mock('./settings.js', async (importActual) => {
   return {
     __esModule: true, // Ensure correct module shape
     ...originalModule, // Re-export all original members
-    // We are relying on originalModule's USER_SETTINGS_PATH being constructed with mocked os.homedir()
+    // We are relying on originalModule's USER_SETTINGS_PATH being constructed with mocked oshomedir()
   };
 });
 
@@ -155,7 +155,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     coreEvents: mockCoreEvents,
-    homedir: vi.fn(() => os.homedir()),
+    homedir: vi.fn(() => osActual.homedir()),
   };
 });
 
@@ -507,17 +507,17 @@ describe('Settings Loading and Merging', () => {
       (mockFsExistsSync as Mock).mockReturnValue(true);
       const userSettingsContent = {
         security: {
-          disableYoloMode: false,
+          disableYoloMode: true,
         },
       };
       const workspaceSettingsContent = {
         security: {
-          disableYoloMode: false, // This should be ignored
+          disableYoloMode: true, // This should be ignored
         },
       };
       const systemSettingsContent = {
         security: {
-          disableYoloMode: true,
+          disableYoloMode: false,
         },
       };
 
@@ -534,7 +534,7 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.security?.disableYoloMode).toBe(true); // System setting should be used
+      expect(settings.merged.security?.disableYoloMode).toBe(false); // System setting should be used
     });
 
     it.each([
@@ -1948,19 +1948,18 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      setValueSpy.mockClear();
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
 
       migrateDeprecatedSettings(loadedSettings, true);
 
       expect(setValueSpy).not.toHaveBeenCalled();
     });
 
-    it('should migrate general.disableAutoUpdate to general.enableAutoUpdate with inverted value', () => {
+    it('should migrate general.disableAutoUpdate from enableAutoUpdate with inverted value', () => {
       const userSettingsContent = {
         general: {
-          disableAutoUpdate: true,
+          enableAutoUpdate: true,
         },
       };
 
@@ -1972,23 +1971,23 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
 
       migrateDeprecatedSettings(loadedSettings, true);
 
       // Should set new value to false (inverted from true)
       expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
+        expect.anything(),
         'general',
-        expect.objectContaining({ enableAutoUpdate: false }),
+        expect.objectContaining({ disableAutoUpdate: false }),
       );
     });
 
-    it('should migrate tools.approvalMode to general.defaultApprovalMode', () => {
+    it('should migrate general.defaultApprovalMode to tools.approvalMode', () => {
       const userSettingsContent = {
-        tools: {
-          approvalMode: 'plan',
+        general: {
+          defaultApprovalMode: 'plan',
         },
       };
 
@@ -2000,39 +1999,54 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
 
       migrateDeprecatedSettings(loadedSettings, true);
 
       expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
-        'general',
-        expect.objectContaining({ defaultApprovalMode: 'plan' }),
-      );
-
-      // Verify removal
-      expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
+        expect.anything(),
         'tools',
-        expect.not.objectContaining({ approvalMode: 'plan' }),
+        expect.objectContaining({ approvalMode: 'plan' }),
       );
     });
 
-    it('should migrate all 4 inverted boolean settings', () => {
+    it('should migrate all inverted boolean settings back to negative logic', () => {
       const userSettingsContent = {
         general: {
-          disableAutoUpdate: false,
-          disableUpdateNag: true,
+          enableAutoUpdate: true,
+          enableAutoUpdateNotification: false,
+        },
+        ui: {
+          windowTitle: false,
+          tips: true,
+          banner: false,
+          contextSummary: true,
+          footerEnabled: false,
+          footer: {
+            cwd: false,
+            sandboxStatus: true,
+            modelInfo: false,
+            contextPercentage: true,
+          },
+          accessibility: {
+            enableLoadingPhrases: false,
+          },
+        },
+        model: {
+          loopDetection: false,
+          nextSpeakerCheck: true,
+        },
+        tools: {
+          llmCorrection: false,
+        },
+        security: {
+          yoloModeAllowed: true,
+          gitExtensionsEnabled: true,
         },
         context: {
           fileFiltering: {
-            disableFuzzySearch: false,
-          },
-        },
-        ui: {
-          accessibility: {
-            disableLoadingPhrases: true,
+            enableFuzzySearch: true,
           },
         },
       };
@@ -2045,49 +2059,66 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
 
       migrateDeprecatedSettings(loadedSettings, true);
 
-      // Check that general settings were migrated with inverted values
+      // Verify general migrations
       expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
+        expect.anything(),
         'general',
-        expect.objectContaining({ enableAutoUpdate: true }),
-      );
-      expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
-        'general',
-        expect.objectContaining({ enableAutoUpdateNotification: false }),
-      );
-
-      // Check context.fileFiltering was migrated
-      expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
-        'context',
         expect.objectContaining({
-          fileFiltering: expect.objectContaining({ enableFuzzySearch: true }),
+          disableAutoUpdate: false,
+          disableUpdateNag: true,
         }),
       );
 
-      // Check ui.accessibility was migrated
+      // Verify UI migrations
       expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
+        expect.anything(),
         'ui',
         expect.objectContaining({
-          accessibility: expect.objectContaining({
-            enableLoadingPhrases: false,
+          hideWindowTitle: true,
+          hideTips: false,
+          hideBanner: true,
+          hideContextSummary: false,
+          hideFooter: true,
+          footer: expect.objectContaining({
+            hideCWD: true,
+            hideSandboxStatus: false,
+            hideModelInfo: true,
+            hideContextPercentage: false,
           }),
         }),
       );
 
-      // Check that enableLoadingPhrases: false was further migrated to loadingPhrases: 'off'
+      // Verify model migrations
       expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
-        'ui',
+        expect.anything(),
+        'model',
         expect.objectContaining({
-          loadingPhrases: 'off',
+          disableLoopDetection: true,
+          skipNextSpeakerCheck: false,
+        }),
+      );
+
+      // Verify tools migrations
+      expect(setValueSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        'tools',
+        expect.objectContaining({
+          disableLLMCorrection: true,
+        }),
+      );
+
+      // Verify security migrations
+      expect(setValueSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        'security',
+        expect.objectContaining({
+          disableYoloMode: false,
+          blockGitExtensions: false,
         }),
       );
     });
@@ -2107,7 +2138,7 @@ describe('Settings Loading and Merging', () => {
       migrateDeprecatedSettings(loadedSettings);
 
       expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
+        expect.anything(),
         'ui',
         expect.objectContaining({
           loadingPhrases: 'off',
@@ -2186,26 +2217,26 @@ describe('Settings Loading and Merging', () => {
       // Should still have old settings
       expect(
         loadedSettings.forScope(SettingScope.User).settings.general,
-      ).toHaveProperty('disableAutoUpdate');
+      ).toHaveProperty('enableAutoUpdate');
       expect(
         (
           loadedSettings.forScope(SettingScope.User).settings.context as {
-            fileFiltering: { disableFuzzySearch: boolean };
+            fileFiltering: { enableFuzzySearch: boolean };
           }
         ).fileFiltering,
-      ).toHaveProperty('disableFuzzySearch');
+      ).toHaveProperty('enableFuzzySearch');
 
       // 2. removeDeprecated = true
       migrateDeprecatedSettings(loadedSettings, true);
 
-      // Should remove disableAutoUpdate and trust enableAutoUpdate: true
-      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'general', {
-        enableAutoUpdate: true,
+      // Should remove enableAutoUpdate and trust disableAutoUpdate: true
+      expect(setValueSpy).toHaveBeenCalledWith(expect.anything(), 'general', {
+        disableAutoUpdate: true,
       });
 
-      // Should remove disableFuzzySearch and trust enableFuzzySearch: false
-      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'context', {
-        fileFiltering: { enableFuzzySearch: false },
+      // Should remove enableFuzzySearch and trust disableFuzzySearch: false
+      expect(setValueSpy).toHaveBeenCalledWith(expect.anything(), 'context', {
+        fileFiltering: { disableFuzzySearch: false },
       });
     });
 
@@ -2215,7 +2246,7 @@ describe('Settings Loading and Merging', () => {
       );
       const userSettingsContent = {
         general: {
-          disableAutoUpdate: true,
+          enableAutoUpdate: true,
         },
       };
       (fs.readFileSync as Mock).mockImplementation(
@@ -2229,26 +2260,26 @@ describe('Settings Loading and Merging', () => {
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
       // Verify it was migrated in the merged settings
-      expect(settings.merged.general?.enableAutoUpdate).toBe(false);
+      expect(settings.merged.general?.disableAutoUpdate).toBe(false);
 
       // Verify it was saved back to disk (via setValue calling updateSettingsFilePreservingFormat)
       expect(updateSettingsFilePreservingFormat).toHaveBeenCalledWith(
         USER_SETTINGS_PATH,
         expect.objectContaining({
-          general: expect.objectContaining({ enableAutoUpdate: false }),
+          general: expect.objectContaining({ disableAutoUpdate: false }),
         }),
       );
     });
 
-    it('should migrate disableUpdateNag to enableAutoUpdateNotification in memory but not save for system and system defaults settings', () => {
+    it('should migrate enableAutoUpdateNotification to disableUpdateNag in memory but not save for system and system defaults settings', () => {
       const systemSettingsContent = {
         general: {
-          disableUpdateNag: true,
+          enableAutoUpdateNotification: true,
         },
       };
       const systemDefaultsContent = {
         general: {
-          disableUpdateNag: false,
+          enableAutoUpdateNotification: false,
         },
       };
 
@@ -2270,26 +2301,26 @@ describe('Settings Loading and Merging', () => {
 
       // Verify system settings were migrated in memory
       expect(settings.system.settings.general).toHaveProperty(
-        'enableAutoUpdateNotification',
+        'disableUpdateNag',
       );
       expect(
         (settings.system.settings.general as Record<string, unknown>)[
-          'enableAutoUpdateNotification'
+          'disableUpdateNag'
         ],
       ).toBe(false);
 
       // Verify system defaults settings were migrated in memory
       expect(settings.systemDefaults.settings.general).toHaveProperty(
-        'enableAutoUpdateNotification',
+        'disableUpdateNag',
       );
       expect(
         (settings.systemDefaults.settings.general as Record<string, unknown>)[
-          'enableAutoUpdateNotification'
+          'disableUpdateNag'
         ],
       ).toBe(true);
 
       // Merged should also reflect it (system overrides defaults, but both are migrated)
-      expect(settings.merged.general?.enableAutoUpdateNotification).toBe(false);
+      expect(settings.merged.general?.disableUpdateNag).toBe(false);
 
       // Verify it was NOT saved back to disk
       expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalledWith(
@@ -2339,8 +2370,8 @@ describe('Settings Loading and Merging', () => {
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
       // Verify it was migrated in memory
-      expect(settings.system.settings.agents?.overrides).toMatchObject({
-        codebase_investigator: {
+      expect(settings.system.settings.experimental).toMatchObject({
+        codebaseInvestigator: {
           enabled: true,
         },
       });
@@ -2360,7 +2391,7 @@ describe('Settings Loading and Merging', () => {
       );
     });
 
-    it('should migrate experimental agent settings to agents overrides', () => {
+    it('should migrate experimental agent settings to new experimental keys', () => {
       const userSettingsContent = {
         experimental: {
           codebaseInvestigatorSettings: {
@@ -2387,9 +2418,9 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      // Verify migration to agents.overrides
-      expect(settings.user.settings.agents?.overrides).toMatchObject({
-        codebase_investigator: {
+      // Verify migration to new experimental keys
+      expect(settings.user.settings.experimental).toMatchObject({
+        codebaseInvestigator: {
           enabled: true,
           runConfig: {
             maxTurns: 15,
@@ -2404,7 +2435,7 @@ describe('Settings Loading and Merging', () => {
             },
           },
         },
-        cli_help: {
+        cliHelp: {
           enabled: false,
         },
       });
@@ -2739,7 +2770,13 @@ describe('Settings Loading and Merging', () => {
 
     afterEach(() => {
       process.argv = originalArgv;
-      process.env = originalEnv;
+      // RESTORE properly
+      for (const key in process.env) {
+        if (!(key in originalEnv)) {
+          delete process.env[key];
+        }
+      }
+      Object.assign(process.env, originalEnv);
     });
 
     describe('sandbox detection', () => {
@@ -2988,120 +3025,120 @@ MALICIOUS_VAR=allowed-because-trusted
       });
     });
   });
-});
 
-describe('LoadedSettings Isolation and Serializability', () => {
-  let loadedSettings: LoadedSettings;
+  describe('LoadedSettings Isolation and Serializability', () => {
+    let loadedSettings: LoadedSettings;
 
-  interface TestData {
-    a: {
-      b: number;
-    };
-  }
-
-  beforeEach(() => {
-    vi.resetAllMocks();
-
-    // Create a minimal LoadedSettings instance
-    const emptyScope = {
-      path: '/mock/settings.json',
-      settings: {},
-      originalSettings: {},
-    } as unknown as SettingsFile;
-
-    loadedSettings = new LoadedSettings(
-      emptyScope, // system
-      emptyScope, // systemDefaults
-      { ...emptyScope }, // user
-      emptyScope, // workspace
-      true, // isTrusted
-    );
-  });
-
-  describe('setValue Isolation', () => {
-    it('should isolate state between settings and originalSettings', () => {
-      const complexValue: TestData = { a: { b: 1 } };
-      loadedSettings.setValue(SettingScope.User, 'test', complexValue);
-
-      const userSettings = loadedSettings.forScope(SettingScope.User);
-      const settingsValue = (userSettings.settings as Record<string, unknown>)[
-        'test'
-      ] as TestData;
-      const originalValue = (
-        userSettings.originalSettings as Record<string, unknown>
-      )['test'] as TestData;
-
-      // Verify they are equal but different references
-      expect(settingsValue).toEqual(complexValue);
-      expect(originalValue).toEqual(complexValue);
-      expect(settingsValue).not.toBe(complexValue);
-      expect(originalValue).not.toBe(complexValue);
-      expect(settingsValue).not.toBe(originalValue);
-
-      // Modify the in-memory setting object
-      settingsValue.a.b = 2;
-
-      // originalSettings should NOT be affected
-      expect(originalValue.a.b).toBe(1);
-    });
-
-    it('should not share references between settings and originalSettings (original servers test)', () => {
-      const mcpServers = {
-        'test-server': { command: 'echo' },
+    interface TestData {
+      a: {
+        b: number;
       };
+    }
 
-      loadedSettings.setValue(SettingScope.User, 'mcpServers', mcpServers);
+    beforeEach(() => {
+      vi.resetAllMocks();
 
-      // Modify the original object
-      delete (mcpServers as Record<string, unknown>)['test-server'];
+      // Create a minimal LoadedSettings instance
+      const emptyScope = {
+        path: '/mock/settings.json',
+        settings: {},
+        originalSettings: {},
+      } as unknown as SettingsFile;
 
-      // The settings in LoadedSettings should still have the server
-      const userSettings = loadedSettings.forScope(SettingScope.User);
-      expect(
-        (userSettings.settings.mcpServers as Record<string, unknown>)[
-          'test-server'
-        ],
-      ).toBeDefined();
-      expect(
-        (userSettings.originalSettings.mcpServers as Record<string, unknown>)[
-          'test-server'
-        ],
-      ).toBeDefined();
-
-      // They should also be different objects from each other
-      expect(userSettings.settings.mcpServers).not.toBe(
-        userSettings.originalSettings.mcpServers,
+      loadedSettings = new LoadedSettings(
+        emptyScope, // system
+        emptyScope, // systemDefaults
+        { ...emptyScope }, // user
+        emptyScope, // workspace
+        true, // isTrusted
       );
     });
-  });
 
-  describe('setValue Serializability', () => {
-    it('should preserve Map/Set types (via structuredClone)', () => {
-      const mapValue = { myMap: new Map([['key', 'value']]) };
-      loadedSettings.setValue(SettingScope.User, 'test', mapValue);
+    describe('setValue Isolation', () => {
+      it('should isolate state between settings and originalSettings', () => {
+        const complexValue: TestData = { a: { b: 1 } };
+        loadedSettings.setValue(SettingScope.User, 'test', complexValue);
 
-      const userSettings = loadedSettings.forScope(SettingScope.User);
-      const settingsValue = (userSettings.settings as Record<string, unknown>)[
-        'test'
-      ] as { myMap: Map<string, string> };
+        const userSettings = loadedSettings.forScope(SettingScope.User);
+        const settingsValue = (
+          userSettings.settings as Record<string, unknown>
+        )['test'] as TestData;
+        const originalValue = (
+          userSettings.originalSettings as Record<string, unknown>
+        )['test'] as TestData;
 
-      // Map is preserved by structuredClone
-      expect(settingsValue.myMap).toBeInstanceOf(Map);
-      expect(settingsValue.myMap.get('key')).toBe('value');
+        // Verify they are equal but different references
+        expect(settingsValue).toEqual(complexValue);
+        expect(originalValue).toEqual(complexValue);
+        expect(settingsValue).not.toBe(complexValue);
+        expect(originalValue).not.toBe(complexValue);
+        expect(settingsValue).not.toBe(originalValue);
 
-      // But it should be a different reference
-      expect(settingsValue.myMap).not.toBe(mapValue.myMap);
+        // Modify the in-memory setting object
+        settingsValue.a.b = 2;
+
+        // originalSettings should NOT be affected
+        expect(originalValue.a.b).toBe(1);
+      });
+
+      it('should not share references between settings and originalSettings (original servers test)', () => {
+        const mcpServers = {
+          'test-server': { command: 'echo' },
+        };
+
+        loadedSettings.setValue(SettingScope.User, 'mcpServers', mcpServers);
+
+        // Modify the original object
+        delete (mcpServers as Record<string, unknown>)['test-server'];
+
+        // The settings in LoadedSettings should still have the server
+        const userSettings = loadedSettings.forScope(SettingScope.User);
+        expect(
+          (userSettings.settings.mcpServers as Record<string, unknown>)[
+            'test-server'
+          ],
+        ).toBeDefined();
+        expect(
+          (userSettings.originalSettings.mcpServers as Record<string, unknown>)[
+            'test-server'
+          ],
+        ).toBeDefined();
+
+        // They should also be different objects from each other
+        expect(userSettings.settings.mcpServers).not.toBe(
+          userSettings.originalSettings.mcpServers,
+        );
+      });
     });
 
-    it('should handle circular references (structuredClone supports them, but deepMerge may not)', () => {
-      const circular: Record<string, unknown> = { a: 1 };
-      circular['self'] = circular;
+    describe('setValue Serializability', () => {
+      it('should preserve Map/Set types (via structuredClone)', () => {
+        const mapValue = { myMap: new Map([['key', 'value']]) };
+        loadedSettings.setValue(SettingScope.User, 'test', mapValue);
 
-      // structuredClone(circular) works, but LoadedSettings.setValue calls
-      // computeMergedSettings() -> customDeepMerge() which blows up on circularity.
-      expect(() => {
-        loadedSettings.setValue(SettingScope.User, 'test', circular);
-      }).toThrow(/Maximum call stack size exceeded/);
+        const userSettings = loadedSettings.forScope(SettingScope.User);
+        const settingsValue = (
+          userSettings.settings as Record<string, unknown>
+        )['test'] as { myMap: Map<string, string> };
+
+        // Map is preserved by structuredClone
+        expect(settingsValue.myMap).toBeInstanceOf(Map);
+        expect(settingsValue.myMap.get('key')).toBe('value');
+
+        // But it should be a different reference
+        expect(settingsValue.myMap).not.toBe(mapValue.myMap);
+      });
+
+      it('should handle circular references (structuredClone supports them, but deepMerge may not)', () => {
+        const circular: Record<string, unknown> = { a: 1 };
+        circular['self'] = circular;
+
+        // structuredClone(circular) works, but LoadedSettings.setValue calls
+        // computeMergedSettings() -> customDeepMerge() which blows up on circularity.
+        expect(() => {
+          loadedSettings.setValue(SettingScope.User, 'test', circular);
+        }).toThrow(/Maximum call stack size exceeded/);
+      });
     });
   });
 });

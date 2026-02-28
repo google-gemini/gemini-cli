@@ -390,7 +390,7 @@ describe('<Footer />', () => {
           settings: createMockSettings({
             ui: {
               footer: {
-                hideCWD: true,
+                cwd: true,
                 hideSandboxStatus: true,
                 hideModelInfo: true,
               },
@@ -412,7 +412,7 @@ describe('<Footer />', () => {
           settings: createMockSettings({
             ui: {
               footer: {
-                hideCWD: false,
+                cwd: false,
                 hideSandboxStatus: false,
                 hideModelInfo: true,
               },
@@ -434,7 +434,7 @@ describe('<Footer />', () => {
           settings: createMockSettings({
             ui: {
               footer: {
-                hideCWD: true,
+                cwd: true,
                 hideSandboxStatus: false,
                 hideModelInfo: true,
               },

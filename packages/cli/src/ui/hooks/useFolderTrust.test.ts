@@ -26,7 +26,7 @@ import * as trustedFolders from '../../config/trustedFolders.js';
 import { coreEvents, ExitCodes, isHeadlessMode } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
 
-const mockedCwd = vi.hoisted(() => vi.fn());
+const cwd = vi.hoisted(() => vi.fn());
 const mockedExit = vi.hoisted(() => vi.fn());
 
 vi.mock('@google/gemini-cli-core', async () => {
@@ -47,7 +47,7 @@ vi.mock('node:process', async () => {
     await vi.importActual<typeof import('node:process')>('node:process');
   return {
     ...actual,
-    cwd: mockedCwd,
+    cwd,
     exit: mockedExit,
     platform: 'linux',
   };
@@ -97,7 +97,7 @@ describe('useFolderTrust', () => {
       mockTrustedFolders,
     );
     isWorkspaceTrustedSpy = vi.spyOn(trustedFolders, 'isWorkspaceTrusted');
-    mockedCwd.mockReturnValue('/test/path');
+    cwd.mockReturnValue('/test/path');
     onTrustChange = vi.fn();
     addItem = vi.fn();
   });

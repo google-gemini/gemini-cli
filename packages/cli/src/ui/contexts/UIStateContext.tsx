@@ -138,7 +138,7 @@ export interface UIState {
   commandConfirmationRequest: ConfirmationRequest | null;
   authConsentRequest: ConfirmationRequest | null;
   confirmUpdateExtensionRequests: ConfirmationRequest[];
-  loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
+  disableLoopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
   permissionConfirmationRequest: PermissionConfirmationRequest | null;
   geminiMdFileCount: number;
   streamingState: StreamingState;

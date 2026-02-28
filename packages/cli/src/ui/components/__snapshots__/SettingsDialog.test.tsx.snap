@@ -5,34 +5,35 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │  > Settings                                                                                      │
 │                                                                                                  │
+│  All │ General │ UI │ Model │ Context │ Tools │ IDE │ Security │ Experimental │ Advanced         │
+│                                                                                                  │
+│                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Vim Mode                                                                               false  │
+│                                                                                                  │
+│  General ──────────────────────────────────────────────────────────────────────────────────────  │
+│                                                                                                  │
+│  ● Vim Mode                                                                                 Off  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Default Approval Mode                                                                Default  │
+│    Approval Mode                                                                        Default  │
 │    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
 │                                                                                                  │
-│    Enable Auto Update                                                                      true  │
-│    Enable automatic updates.                                                                     │
+│    Auto Update                                                                              Off  │
+│    Disable automatic updates.                                                                    │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
-│                                                                                                  │
+│    Notifications                                                                            Off  │
+│    Enable run-event notifications for action-required prompts and session completion. Cu…        │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Plan Model Routing                                                                      true  │
-│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│    Plan Model Routing                                                                        On  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro …       │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -51,34 +52,35 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │  > Settings                                                                                      │
 │                                                                                                  │
+│  All │ General │ UI │ Model │ Context │ Tools │ IDE │ Security │ Experimental │ Advanced         │
+│                                                                                                  │
+│                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Vim Mode                                                                               true*  │
+│                                                                                                  │
+│  General ──────────────────────────────────────────────────────────────────────────────────────  │
+│                                                                                                  │
+│  ● Vim Mode                                                                                 On*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Default Approval Mode                                                                Default  │
+│    Approval Mode                                                                        Default  │
 │    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
 │                                                                                                  │
-│    Enable Auto Update                                                                      true  │
-│    Enable automatic updates.                                                                     │
+│    Auto Update                                                                              Off  │
+│    Disable automatic updates.                                                                    │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
-│                                                                                                  │
+│    Notifications                                                                            Off  │
+│    Enable run-event notifications for action-required prompts and session completion. Cu…        │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Plan Model Routing                                                                      true  │
-│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│    Plan Model Routing                                                                        On  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro …       │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -97,34 +99,35 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │  > Settings                                                                                      │
 │                                                                                                  │
+│  All │ General │ UI │ Model │ Context │ Tools │ IDE │ Security │ Experimental │ Advanced         │
+│                                                                                                  │
+│                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Vim Mode                                                                              false*  │
+│                                                                                                  │
+│  General ──────────────────────────────────────────────────────────────────────────────────────  │
+│                                                                                                  │
+│  ● Vim Mode                                                                                Off*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Default Approval Mode                                                                Default  │
+│    Approval Mode                                                                        Default  │
 │    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
 │                                                                                                  │
-│    Enable Auto Update                                                                     true*  │
-│    Enable automatic updates.                                                                     │
+│    Auto Update                                                                              On*  │
+│    Disable automatic updates.                                                                    │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
-│                                                                                                  │
+│    Notifications                                                                            Off  │
+│    Enable run-event notifications for action-required prompts and session completion. Cu…        │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Plan Model Routing                                                                      true  │
-│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│    Plan Model Routing                                                                        On  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro …       │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                               false*  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -143,34 +146,35 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │  > Settings                                                                                      │
 │                                                                                                  │
+│  All │ General │ UI │ Model │ Context │ Tools │ IDE │ Security │ Experimental │ Advanced         │
+│                                                                                                  │
+│                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Vim Mode                                                                               false  │
+│                                                                                                  │
+│  General ──────────────────────────────────────────────────────────────────────────────────────  │
+│                                                                                                  │
+│  ● Vim Mode                                                                                 Off  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Default Approval Mode                                                                Default  │
+│    Approval Mode                                                                        Default  │
 │    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
 │                                                                                                  │
-│    Enable Auto Update                                                                      true  │
-│    Enable automatic updates.                                                                     │
+│    Auto Update                                                                              Off  │
+│    Disable automatic updates.                                                                    │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
-│                                                                                                  │
+│    Notifications                                                                            Off  │
+│    Enable run-event notifications for action-required prompts and session completion. Cu…        │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Plan Model Routing                                                                      true  │
-│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│    Plan Model Routing                                                                        On  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro …       │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -189,34 +193,35 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │  > Settings                                                                                      │
 │                                                                                                  │
+│  All │ General │ UI │ Model │ Context │ Tools │ IDE │ Security │ Experimental │ Advanced         │
+│                                                                                                  │
+│                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Vim Mode                                                                               false  │
+│                                                                                                  │
+│  General ──────────────────────────────────────────────────────────────────────────────────────  │
+│                                                                                                  │
+│  ● Vim Mode                                                                                 Off  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Default Approval Mode                                                                Default  │
+│    Approval Mode                                                                        Default  │
 │    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
 │                                                                                                  │
-│    Enable Auto Update                                                                      true  │
-│    Enable automatic updates.                                                                     │
+│    Auto Update                                                                              Off  │
+│    Disable automatic updates.                                                                    │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
-│                                                                                                  │
+│    Notifications                                                                            Off  │
+│    Enable run-event notifications for action-required prompts and session completion. Cu…        │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Plan Model Routing                                                                      true  │
-│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│    Plan Model Routing                                                                        On  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro …       │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -235,34 +240,35 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │    Settings                                                                                      │
 │                                                                                                  │
+│  All │ General │ UI │ Model │ Context │ Tools │ IDE │ Security │ Experimental │ Advanced         │
+│                                                                                                  │
+│                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│    Vim Mode                                                                               false  │
+│                                                                                                  │
+│  General ──────────────────────────────────────────────────────────────────────────────────────  │
+│                                                                                                  │
+│    Vim Mode                                                                                 Off  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Default Approval Mode                                                                Default  │
+│    Approval Mode                                                                        Default  │
 │    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
 │                                                                                                  │
-│    Enable Auto Update                                                                      true  │
-│    Enable automatic updates.                                                                     │
+│    Auto Update                                                                              Off  │
+│    Disable automatic updates.                                                                    │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
-│                                                                                                  │
+│    Notifications                                                                            Off  │
+│    Enable run-event notifications for action-required prompts and session completion. Cu…        │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Plan Model Routing                                                                      true  │
-│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│    Plan Model Routing                                                                        On  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro …       │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -281,34 +287,35 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │  > Settings                                                                                      │
 │                                                                                                  │
+│  All │ General │ UI │ Model │ Context │ Tools │ IDE │ Security │ Experimental │ Advanced         │
+│                                                                                                  │
+│                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Vim Mode                                                                              false*  │
+│                                                                                                  │
+│  General ──────────────────────────────────────────────────────────────────────────────────────  │
+│                                                                                                  │
+│  ● Vim Mode                                                                                Off*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Default Approval Mode                                                                Default  │
+│    Approval Mode                                                                        Default  │
 │    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
 │                                                                                                  │
-│    Enable Auto Update                                                                    false*  │
-│    Enable automatic updates.                                                                     │
+│    Auto Update                                                                             Off*  │
+│    Disable automatic updates.                                                                    │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
-│                                                                                                  │
+│    Notifications                                                                            Off  │
+│    Enable run-event notifications for action-required prompts and session completion. Cu…        │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Plan Model Routing                                                                      true  │
-│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│    Plan Model Routing                                                                        On  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro …       │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -327,34 +334,35 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │  > Settings                                                                                      │
 │                                                                                                  │
+│  All │ General │ UI │ Model │ Context │ Tools │ IDE │ Security │ Experimental │ Advanced         │
+│                                                                                                  │
+│                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Vim Mode                                                                               false  │
+│                                                                                                  │
+│  General ──────────────────────────────────────────────────────────────────────────────────────  │
+│                                                                                                  │
+│  ● Vim Mode                                                                                 Off  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Default Approval Mode                                                                Default  │
+│    Approval Mode                                                                        Default  │
 │    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
 │                                                                                                  │
-│    Enable Auto Update                                                                      true  │
-│    Enable automatic updates.                                                                     │
+│    Auto Update                                                                              Off  │
+│    Disable automatic updates.                                                                    │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
-│                                                                                                  │
+│    Notifications                                                                            Off  │
+│    Enable run-event notifications for action-required prompts and session completion. Cu…        │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Plan Model Routing                                                                      true  │
-│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│    Plan Model Routing                                                                        On  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro …       │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -373,34 +381,35 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │  > Settings                                                                                      │
 │                                                                                                  │
+│  All │ General │ UI │ Model │ Context │ Tools │ IDE │ Security │ Experimental │ Advanced         │
+│                                                                                                  │
+│                                                                                                  │
 │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
 │ │ Search to filter                                                                             │ │
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
-│  ▲                                                                                               │
-│  ● Vim Mode                                                                               true*  │
+│                                                                                                  │
+│  General ──────────────────────────────────────────────────────────────────────────────────────  │
+│                                                                                                  │
+│  ● Vim Mode                                                                                 On*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Default Approval Mode                                                                Default  │
+│    Approval Mode                                                                        Default  │
 │    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
 │                                                                                                  │
-│    Enable Auto Update                                                                    false*  │
-│    Enable automatic updates.                                                                     │
+│    Auto Update                                                                             Off*  │
+│    Disable automatic updates.                                                                    │
 │                                                                                                  │
-│    Enable Notifications                                                                   false  │
-│    Enable run-event notifications for action-required prompts and session completion. …          │
-│                                                                                                  │
+│    Notifications                                                                            Off  │
+│    Enable run-event notifications for action-required prompts and session completion. Cu…        │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
-│    Plan Model Routing                                                                      true  │
-│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│    Plan Model Routing                                                                        On  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro …       │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                true*  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │

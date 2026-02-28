@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   // Schema utilities
   getSettingsByCategory,
@@ -553,7 +553,7 @@ describe('SettingsUtils', () => {
           new Set(),
           updatedPendingSettings,
         );
-        expect(displayValue).toBe('true'); // Should show true (no * since value matches default)
+        expect(displayValue).toBe('On'); // Should show On (no * since value matches default)
 
         // Test that modified settings also show the * indicator
         const modifiedSettings = new Set([key]);
@@ -564,7 +564,7 @@ describe('SettingsUtils', () => {
           modifiedSettings,
           {},
         );
-        expect(displayValueWithModified).toBe('true*'); // Should show true* because it's in modified settings and default is true
+        expect(displayValueWithModified).toBe('On*'); // Should show On* because it's in modified settings and default is true
       });
     });
   });
@@ -953,7 +953,7 @@ describe('SettingsUtils', () => {
           mergedSettings,
           modifiedSettings,
         );
-        expect(result).toBe('false*');
+        expect(result).toBe('Off*');
       });
 
       it('should show default value when setting is not in scope', () => {
@@ -969,7 +969,7 @@ describe('SettingsUtils', () => {
           mergedSettings,
           modifiedSettings,
         );
-        expect(result).toBe('false'); // shows default value
+        expect(result).toBe('Off'); // shows default value
       });
 
       it('should show value with * when changed from default', () => {
@@ -985,7 +985,7 @@ describe('SettingsUtils', () => {
           mergedSettings,
           modifiedSettings,
         );
-        expect(result).toBe('true*');
+        expect(result).toBe('On*');
       });
 
       it('should show default value without * when setting does not exist in scope', () => {
@@ -1001,7 +1001,7 @@ describe('SettingsUtils', () => {
           mergedSettings,
           modifiedSettings,
         );
-        expect(result).toBe('false'); // default value (false) without *
+        expect(result).toBe('Off'); // default value (false) without *
       });
 
       it('should show value with * when user changes from default', () => {
@@ -1021,7 +1021,7 @@ describe('SettingsUtils', () => {
           modifiedSettings,
           pendingSettings,
         );
-        expect(result).toBe('true*'); // changed from default (false) to true
+        expect(result).toBe('On*'); // changed from default (false) to true
       });
     });
 

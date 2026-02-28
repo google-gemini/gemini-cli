@@ -17,7 +17,7 @@ vi.mock('../../utils/processUtils.js', () => ({
 }));
 
 const mockedExit = vi.hoisted(() => vi.fn());
-const mockedCwd = vi.hoisted(() => vi.fn());
+const cwd = vi.hoisted(() => vi.fn());
 const mockedRows = vi.hoisted(() => ({ current: 24 }));
 
 vi.mock('node:process', async () => {
@@ -26,7 +26,7 @@ vi.mock('node:process', async () => {
   return {
     ...actual,
     exit: mockedExit,
-    cwd: mockedCwd,
+    cwd,
   };
 });
 
@@ -38,7 +38,7 @@ describe('FolderTrustDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
-    mockedCwd.mockReturnValue('/home/user/project');
+    cwd.mockReturnValue('/home/user/project');
     mockedRows.current = 24;
   });
 
@@ -292,7 +292,7 @@ describe('FolderTrustDialog', () => {
 
   describe('directory display', () => {
     it('should correctly display the folder name for a nested directory', async () => {
-      mockedCwd.mockReturnValue('/home/user/project');
+      cwd.mockReturnValue('/home/user/project');
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <FolderTrustDialog onSelect={vi.fn()} />,
       );
@@ -302,7 +302,7 @@ describe('FolderTrustDialog', () => {
     });
 
     it('should correctly display the parent folder name for a nested directory', async () => {
-      mockedCwd.mockReturnValue('/home/user/project');
+      cwd.mockReturnValue('/home/user/project');
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <FolderTrustDialog onSelect={vi.fn()} />,
       );
@@ -312,7 +312,7 @@ describe('FolderTrustDialog', () => {
     });
 
     it('should correctly display an empty parent folder name for a directory directly under root', async () => {
-      mockedCwd.mockReturnValue('/project');
+      cwd.mockReturnValue('/project');
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <FolderTrustDialog onSelect={vi.fn()} />,
       );

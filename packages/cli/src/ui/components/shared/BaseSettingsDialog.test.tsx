@@ -107,7 +107,7 @@ describe('BaseSettingsDialog', () => {
       title: 'Test Settings',
       items: createMockItems(),
       selectedScope: SettingScope.User,
-      maxItemsToShow: 8,
+      maxListHeight: 24,
       onItemToggle: mockOnItemToggle,
       onEditCommit: mockOnEditCommit,
       onItemClear: mockOnItemClear,
@@ -310,7 +310,7 @@ describe('BaseSettingsDialog', () => {
       const { rerender, stdin, lastFrame, waitUntilReady, unmount } =
         await renderDialog({
           items,
-          maxItemsToShow: 5,
+          maxListHeight: 15,
         });
 
       // Move focus down to item 2 ("Number Setting")
@@ -333,7 +333,7 @@ describe('BaseSettingsDialog', () => {
               title="Test Settings"
               items={filteredItems}
               selectedScope={SettingScope.User}
-              maxItemsToShow={5}
+              maxListHeight={15}
               onItemToggle={mockOnItemToggle}
               onEditCommit={mockOnEditCommit}
               onItemClear={mockOnItemClear}
@@ -371,7 +371,7 @@ describe('BaseSettingsDialog', () => {
       const { rerender, stdin, lastFrame, waitUntilReady, unmount } =
         await renderDialog({
           items,
-          maxItemsToShow: 5,
+          maxListHeight: 15,
         });
 
       // Move focus down to item 2 ("Number Setting")
@@ -393,7 +393,7 @@ describe('BaseSettingsDialog', () => {
               title="Test Settings"
               items={filteredItems}
               selectedScope={SettingScope.User}
-              maxItemsToShow={5}
+              maxListHeight={15}
               onItemToggle={mockOnItemToggle}
               onEditCommit={mockOnEditCommit}
               onItemClear={mockOnItemClear}

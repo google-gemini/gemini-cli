@@ -1366,7 +1366,7 @@ export class Config implements McpContext {
   }
 
   getDisableLoopDetection(): boolean {
-    return this.disableLoopDetection ?? false;
+    return this.disableLoopDetection;
   }
 
   setModel(newModel: string, isTemporary: boolean = true): void {
