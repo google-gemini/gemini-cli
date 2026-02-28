@@ -127,6 +127,16 @@ describe('agentSettings', () => {
 
       expect(result.status).toBe('success');
       expect(result.modifiedScopes).toHaveLength(2);
+      expect(mockSetValue).toHaveBeenCalledWith(
+        SettingScope.User,
+        'agents.overrides.test-agent.enabled',
+        true,
+      );
+      expect(mockSetValue).toHaveBeenCalledWith(
+        SettingScope.Workspace,
+        'agents.overrides.test-agent.enabled',
+        true,
+      );
     });
   });
 
