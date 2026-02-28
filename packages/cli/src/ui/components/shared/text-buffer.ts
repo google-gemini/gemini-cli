@@ -1596,6 +1596,47 @@ function generatePastedTextId(
   return id;
 }
 
+function collectPlaceholderIdsFromLines(lines: string[]): Set<string> {
+  const ids = new Set<string>();
+  const pasteRegex = new RegExp(PASTED_TEXT_PLACEHOLDER_REGEX.source, 'g');
+  for (const line of lines) {
+    if (!line) continue;
+    for (const match of line.matchAll(pasteRegex)) {
+      const placeholderId = match[0];
+      if (placeholderId) {
+        ids.add(placeholderId);
+      }
+    }
+  }
+  return ids;
+}
+
+function pruneOrphanedPastedContent(
+  pastedContent: Record<string, string>,
+  expandedPasteId: string | null,
+  beforeChangedLines: string[],
+  allLines: string[],
+): Record<string, string> {
+  if (Object.keys(pastedContent).length === 0) return pastedContent;
+
+  const beforeIds = collectPlaceholderIdsFromLines(beforeChangedLines);
+  if (beforeIds.size === 0) return pastedContent;
+
+  const afterIds = collectPlaceholderIdsFromLines(allLines);
+  const removedIds = [...beforeIds].filter(
+    (id) => !afterIds.has(id) && id !== expandedPasteId,
+  );
+  if (removedIds.length === 0) return pastedContent;
+
+  const pruned = { ...pastedContent };
+  for (const id of removedIds) {
+    if (pruned[id]) {
+      delete pruned[id];
+    }
+  }
+  return pruned;
+}
+
 export type TextBufferAction =
   | { type: 'insert'; payload: string; isPaste?: boolean }
   | {
@@ -2220,9 +2261,11 @@ function textBufferReducerLogic(
       const newLines = [...nextState.lines];
       let newCursorRow = cursorRow;
       let newCursorCol = cursorCol;
+      let beforeChangedLines: string[] = [];
 
       if (newCursorCol > 0) {
         const lineContent = currentLine(newCursorRow);
+        beforeChangedLines = [lineContent];
         const prevWordStart = findPrevWordStartInLine(
           lineContent,
           newCursorCol,
@@ -2235,6 +2278,7 @@ function textBufferReducerLogic(
         // Act as a backspace
         const prevLineContent = currentLine(cursorRow - 1);
         const currentLineContentVal = currentLine(cursorRow);
+        beforeChangedLines = [prevLineContent, currentLineContentVal];
         const newCol = cpLen(prevLineContent);
         newLines[cursorRow - 1] = prevLineContent + currentLineContentVal;
         newLines.splice(cursorRow, 1);
@@ -2242,12 +2286,20 @@ function textBufferReducerLogic(
         newCursorCol = newCol;
       }
 
+      const newPastedContent = pruneOrphanedPastedContent(
+        nextState.pastedContent,
+        nextState.expandedPaste?.id ?? null,
+        beforeChangedLines,
+        newLines,
+      );
+
       return {
         ...nextState,
         lines: newLines,
         cursorRow: newCursorRow,
         cursorCol: newCursorCol,
         preferredCol: null,
+        pastedContent: newPastedContent,
       };
     }
 
@@ -2264,23 +2316,34 @@ function textBufferReducerLogic(
 
       const nextState = currentState;
       const newLines = [...nextState.lines];
+      let beforeChangedLines: string[] = [];
 
       if (cursorCol >= lineLen) {
         // Act as a delete, joining with the next line
         const nextLineContent = currentLine(cursorRow + 1);
+        beforeChangedLines = [lineContent, nextLineContent];
         newLines[cursorRow] = lineContent + nextLineContent;
         newLines.splice(cursorRow + 1, 1);
       } else {
+        beforeChangedLines = [lineContent];
         const nextWordStart = findNextWordStartInLine(lineContent, cursorCol);
         const end = nextWordStart === null ? lineLen : nextWordStart;
         newLines[cursorRow] =
           cpSlice(lineContent, 0, cursorCol) + cpSlice(lineContent, end);
       }
 
+      const newPastedContent = pruneOrphanedPastedContent(
+        nextState.pastedContent,
+        nextState.expandedPaste?.id ?? null,
+        beforeChangedLines,
+        newLines,
+      );
+
       return {
         ...nextState,
         lines: newLines,
         preferredCol: null,
+        pastedContent: newPastedContent,
       };
     }
 
@@ -2292,22 +2355,39 @@ function textBufferReducerLogic(
       if (cursorCol < currentLineLen(cursorRow)) {
         const nextState = currentState;
         const newLines = [...nextState.lines];
+        const beforeChangedLines = [lineContent];
         newLines[cursorRow] = cpSlice(lineContent, 0, cursorCol);
+        const newPastedContent = pruneOrphanedPastedContent(
+          nextState.pastedContent,
+          nextState.expandedPaste?.id ?? null,
+          beforeChangedLines,
+          newLines,
+        );
         return {
           ...nextState,
           lines: newLines,
+          preferredCol: null,
+          pastedContent: newPastedContent,
         };
       } else if (cursorRow < lines.length - 1) {
         // Act as a delete
         const nextState = currentState;
         const nextLineContent = currentLine(cursorRow + 1);
         const newLines = [...nextState.lines];
+        const beforeChangedLines = [lineContent, nextLineContent];
         newLines[cursorRow] = lineContent + nextLineContent;
         newLines.splice(cursorRow + 1, 1);
+        const newPastedContent = pruneOrphanedPastedContent(
+          nextState.pastedContent,
+          nextState.expandedPaste?.id ?? null,
+          beforeChangedLines,
+          newLines,
+        );
         return {
           ...nextState,
           lines: newLines,
           preferredCol: null,
+          pastedContent: newPastedContent,
         };
       }
       return currentState;
@@ -2321,12 +2401,20 @@ function textBufferReducerLogic(
         const nextState = currentState;
         const lineContent = currentLine(cursorRow);
         const newLines = [...nextState.lines];
+        const beforeChangedLines = [lineContent];
         newLines[cursorRow] = cpSlice(lineContent, cursorCol);
+        const newPastedContent = pruneOrphanedPastedContent(
+          nextState.pastedContent,
+          nextState.expandedPaste?.id ?? null,
+          beforeChangedLines,
+          newLines,
+        );
         return {
           ...nextState,
           lines: newLines,
           cursorCol: 0,
           preferredCol: null,
+          pastedContent: newPastedContent,
         };
       }
       return currentState;

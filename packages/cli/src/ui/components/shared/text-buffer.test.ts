@@ -578,6 +578,47 @@ describe('textBufferReducer', () => {
     });
   });
 
+  describe('kill_line_left action', () => {
+    it('should clean up pastedContent when deleting a placeholder line-left', () => {
+      const placeholder = '[Pasted Text: 6 lines]';
+      const stateWithPlaceholder = createStateWithTransformations({
+        lines: [placeholder],
+        cursorRow: 0,
+        cursorCol: cpLen(placeholder),
+        pastedContent: {
+          [placeholder]: 'line1\nline2\nline3\nline4\nline5\nline6',
+        },
+      });
+
+      const state = textBufferReducer(stateWithPlaceholder, {
+        type: 'kill_line_left',
+      });
+
+      expect(state.lines).toEqual(['']);
+      expect(state.cursorCol).toBe(0);
+      expect(Object.keys(state.pastedContent)).toHaveLength(0);
+    });
+  });
+
+  describe('kill_line_right action', () => {
+    it('should reset preferredCol when deleting to end of line', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello world'],
+        cursorRow: 0,
+        cursorCol: 5,
+        preferredCol: 9,
+      };
+
+      const state = textBufferReducer(stateWithText, {
+        type: 'kill_line_right',
+      });
+
+      expect(state.lines).toEqual(['hello']);
+      expect(state.preferredCol).toBe(null);
+    });
+  });
+
   describe('toggle_paste_expansion action', () => {
     const placeholder = '[Pasted Text: 6 lines]';
     const content = 'line1\nline2\nline3\nline4\nline5\nline6';
@@ -934,6 +975,107 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).text).toBe('');
       // pastedContent is cleaned up when placeholder is deleted atomically
       expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
+    });
+
+    it('deleteWordLeft: should clean up pastedContent and avoid #2 suffix on repaste', () => {
+      const { result } = renderHook(() => useTextBuffer({ viewport }));
+      const largeText = '1\n2\n3\n4\n5\n6';
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toBe('[Pasted Text: 6 lines]');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+
+      act(() => {
+        for (let i = 0; i < 12; i++) {
+          result.current.deleteWordLeft();
+        }
+      });
+      expect(getBufferState(result).text).toBe('');
+      expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toBe('[Pasted Text: 6 lines]');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+    });
+
+    it('deleteWordRight: should clean up pastedContent and avoid #2 suffix on repaste', () => {
+      const { result } = renderHook(() => useTextBuffer({ viewport }));
+      const largeText = '1\n2\n3\n4\n5\n6';
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toBe('[Pasted Text: 6 lines]');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+
+      act(() => result.current.move('home'));
+      act(() => {
+        for (let i = 0; i < 12; i++) {
+          result.current.deleteWordRight();
+        }
+      });
+      expect(getBufferState(result).text).not.toContain(
+        '[Pasted Text: 6 lines]',
+      );
+      expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toContain('[Pasted Text: 6 lines]');
+      expect(getBufferState(result).text).not.toContain('#2');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+    });
+
+    it('killLineLeft: should clean up pastedContent and avoid #2 suffix on repaste', () => {
+      const { result } = renderHook(() => useTextBuffer({ viewport }));
+      const largeText = '1\n2\n3\n4\n5\n6';
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toBe('[Pasted Text: 6 lines]');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+
+      act(() => result.current.killLineLeft());
+      expect(getBufferState(result).text).toBe('');
+      expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toBe('[Pasted Text: 6 lines]');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+    });
+
+    it('killLineRight: should clean up pastedContent and avoid #2 suffix on repaste', () => {
+      const { result } = renderHook(() => useTextBuffer({ viewport }));
+      const largeText = '1\n2\n3\n4\n5\n6';
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toBe('[Pasted Text: 6 lines]');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
+
+      act(() => {
+        for (let i = 0; i < 40; i++) {
+          result.current.move('left');
+        }
+      });
+      act(() => result.current.killLineRight());
+      expect(getBufferState(result).text).toBe('');
+      expect(Object.keys(result.current.pastedContent)).toHaveLength(0);
+
+      act(() => result.current.insert(largeText, { paste: true }));
+      expect(getBufferState(result).text).toBe('[Pasted Text: 6 lines]');
+      expect(result.current.pastedContent['[Pasted Text: 6 lines]']).toBe(
+        largeText,
+      );
     });
 
     it('newline: should create a new line and move cursor', () => {
