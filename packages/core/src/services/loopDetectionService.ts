@@ -118,6 +118,9 @@ export class LoopDetectionService {
   private llmCheckInterval = DEFAULT_LLM_CHECK_INTERVAL;
   private lastCheckTurn = 0;
 
+  // Detected loop type tracking
+  private detectedLoopType: string | null = null;
+
   // Session-level disable flag
   private disabledForSession = false;
 
@@ -208,6 +211,7 @@ export class LoopDetectionService {
       this.toolCallRepetitionCount = 1;
     }
     if (this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD) {
+      this.detectedLoopType = 'consecutive_identical_tool_calls';
       logLoopDetected(
         this.config,
         new LoopDetectedEvent(
@@ -321,6 +325,7 @@ export class LoopDetectionService {
       const chunkHash = createHash('sha256').update(currentChunk).digest('hex');
 
       if (this.isLoopDetectedForChunk(currentChunk, chunkHash)) {
+        this.detectedLoopType = 'chanting_identical_sentences';
         logLoopDetected(
           this.config,
           new LoopDetectedEvent(
@@ -575,6 +580,7 @@ export class LoopDetectionService {
     result: Record<string, unknown>,
     modelName: string,
   ): void {
+    this.detectedLoopType = 'llm_detected_loop';
     if (
       typeof result['unproductive_state_analysis'] === 'string' &&
       result['unproductive_state_analysis']
@@ -600,6 +606,13 @@ export class LoopDetectionService {
   }
 
   /**
+   * Returns the type of the most recently detected loop, or null if none.
+   */
+  getDetectedLoopType(): string | null {
+    return this.detectedLoopType;
+  }
+
+  /**
    * Resets all loop detection state.
    */
   reset(promptId: string): void {
@@ -608,6 +621,7 @@ export class LoopDetectionService {
     this.resetContentTracking();
     this.resetLlmCheckTracking();
     this.loopDetected = false;
+    this.detectedLoopType = null;
   }
 
   private resetToolCallCount(): void {

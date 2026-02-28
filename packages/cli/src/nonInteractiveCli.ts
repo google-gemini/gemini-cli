@@ -9,6 +9,7 @@ import type {
   ToolCallRequestInfo,
   ResumedSessionData,
   UserFeedbackPayload,
+  RetryAttemptPayload,
 } from '@google/gemini-cli-core';
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
@@ -94,6 +95,10 @@ export async function runNonInteractive({
     };
 
     const startTime = Date.now();
+    let retryCount = 0;
+    let loopDetected = false;
+    let detectedLoopType: string | undefined;
+    const debugMode = config.getDebugMode();
     const streamFormatter =
       config.getOutputFormat() === OutputFormat.STREAM_JSON
         ? new StreamJsonFormatter()
@@ -181,6 +186,27 @@ export async function runNonInteractive({
       }
     };
 
+    const handleRetryAttempt = (payload: RetryAttemptPayload) => {
+      retryCount++;
+      if (!debugMode) return;
+      if (streamFormatter) {
+        streamFormatter.emitEvent({
+          type: JsonStreamEventType.RETRY,
+          timestamp: new Date().toISOString(),
+          attempt: payload.attempt,
+          max_attempts: payload.maxAttempts,
+          delay_ms: payload.delayMs,
+          error: payload.error,
+          model: payload.model,
+        });
+      } else if (config.getOutputFormat() === OutputFormat.TEXT) {
+        const errorSuffix = payload.error ? `: ${payload.error}` : '';
+        process.stderr.write(
+          `[RETRY] Attempt ${payload.attempt}/${payload.maxAttempts} for model ${payload.model} (delay: ${payload.delayMs}ms)${errorSuffix}\n`,
+        );
+      }
+    };
+
     let errorToHandle: unknown | undefined;
     try {
       consolePatcher.patch();
@@ -199,6 +225,8 @@ export async function runNonInteractive({
       setupStdinCancellation();
 
       coreEvents.on(CoreEvent.UserFeedback, handleUserFeedback);
+      coreEvents.on(CoreEvent.RetryAttempt, handleRetryAttempt);
+
       coreEvents.drainBacklogs();
 
       // Handle EPIPE errors when the output is piped to a command that closes early.
@@ -228,12 +256,18 @@ export async function runNonInteractive({
       }
 
       // Emit init event for streaming JSON
+      const authMethod = debugMode
+        ? config.getContentGeneratorConfig()?.authType
+        : undefined;
+      const userTier = debugMode ? config.getUserTierName() : undefined;
       if (streamFormatter) {
         streamFormatter.emitEvent({
           type: JsonStreamEventType.INIT,
           timestamp: new Date().toISOString(),
           session_id: config.getSessionId(),
           model: config.getModel(),
+          ...(authMethod && { auth_method: authMethod }),
+          ...(userTier && { user_tier: userTier }),
         });
       }
 
@@ -345,7 +379,33 @@ export async function runNonInteractive({
             }
             toolCallRequests.push(event.value);
           } else if (event.type === GeminiEventType.LoopDetected) {
-            if (streamFormatter) {
+            const loopType = event.value?.loopType;
+            loopDetected = true;
+            if (loopType) {
+              detectedLoopType = loopType;
+            }
+
+            if (debugMode) {
+              if (streamFormatter) {
+                streamFormatter.emitEvent({
+                  type: JsonStreamEventType.LOOP_DETECTED,
+                  timestamp: new Date().toISOString(),
+                  ...(loopType && { loop_type: loopType }),
+                });
+                // Keep emitting the legacy warning event for existing parsers.
+                streamFormatter.emitEvent({
+                  type: JsonStreamEventType.ERROR,
+                  timestamp: new Date().toISOString(),
+                  severity: 'warning',
+                  message: 'Loop detected, stopping execution',
+                });
+              } else if (config.getOutputFormat() === OutputFormat.TEXT) {
+                const loopTypeStr = loopType ? ` (${loopType})` : '';
+                process.stderr.write(
+                  `[WARNING] Loop detected${loopTypeStr}, stopping execution\n`,
+                );
+              }
+            } else if (streamFormatter) {
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.ERROR,
                 timestamp: new Date().toISOString(),
@@ -380,6 +440,7 @@ export async function runNonInteractive({
                 stats: streamFormatter.convertToStreamStats(
                   metrics,
                   durationMs,
+                  { retryCount, includeDiagnostics: debugMode },
                 ),
               });
             }
@@ -479,13 +540,27 @@ export async function runNonInteractive({
                 stats: streamFormatter.convertToStreamStats(
                   metrics,
                   durationMs,
+                  { retryCount, includeDiagnostics: debugMode },
                 ),
               });
             } else if (config.getOutputFormat() === OutputFormat.JSON) {
               const formatter = new JsonFormatter();
               const stats = uiTelemetryService.getMetrics();
               textOutput.write(
-                formatter.format(config.getSessionId(), responseText, stats),
+                formatter.format(
+                  config.getSessionId(),
+                  responseText,
+                  stats,
+                  undefined,
+                  authMethod,
+                  userTier,
+                  {
+                    includeDiagnostics: debugMode,
+                    retryCount,
+                    loopDetected,
+                    loopType: detectedLoopType,
+                  },
+                ),
               );
             } else {
               textOutput.ensureTrailingNewline(); // Ensure a final newline
@@ -503,13 +578,29 @@ export async function runNonInteractive({
               type: JsonStreamEventType.RESULT,
               timestamp: new Date().toISOString(),
               status: 'success',
-              stats: streamFormatter.convertToStreamStats(metrics, durationMs),
+              stats: streamFormatter.convertToStreamStats(metrics, durationMs, {
+                retryCount,
+                includeDiagnostics: debugMode,
+              }),
             });
           } else if (config.getOutputFormat() === OutputFormat.JSON) {
             const formatter = new JsonFormatter();
             const stats = uiTelemetryService.getMetrics();
             textOutput.write(
-              formatter.format(config.getSessionId(), responseText, stats),
+              formatter.format(
+                config.getSessionId(),
+                responseText,
+                stats,
+                undefined,
+                authMethod,
+                userTier,
+                {
+                  includeDiagnostics: debugMode,
+                  retryCount,
+                  loopDetected,
+                  loopType: detectedLoopType,
+                },
+              ),
             );
           } else {
             textOutput.ensureTrailingNewline(); // Ensure a final newline
@@ -524,6 +615,7 @@ export async function runNonInteractive({
       cleanupStdinCancellation();
 
       consolePatcher.cleanup();
+      coreEvents.off(CoreEvent.RetryAttempt, handleRetryAttempt);
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     }
 

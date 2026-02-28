@@ -18,10 +18,20 @@ export interface JsonError {
   code?: string | number;
 }
 
+export interface JsonOutputStats extends SessionMetrics {
+  api_requests?: number;
+  api_errors?: number;
+  retry_count?: number;
+  loop_detected?: boolean;
+  loop_type?: string;
+}
+
 export interface JsonOutput {
   session_id?: string;
+  auth_method?: string;
+  user_tier?: string;
   response?: string;
-  stats?: SessionMetrics;
+  stats?: JsonOutputStats;
   error?: JsonError;
 }
 
@@ -33,6 +43,8 @@ export enum JsonStreamEventType {
   TOOL_RESULT = 'tool_result',
   ERROR = 'error',
   RESULT = 'result',
+  RETRY = 'retry',
+  LOOP_DETECTED = 'loop_detected',
 }
 
 export interface BaseJsonStreamEvent {
@@ -44,6 +56,8 @@ export interface InitEvent extends BaseJsonStreamEvent {
   type: JsonStreamEventType.INIT;
   session_id: string;
   model: string;
+  auth_method?: string;
+  user_tier?: string;
 }
 
 export interface MessageEvent extends BaseJsonStreamEvent {
@@ -86,6 +100,9 @@ export interface StreamStats {
   input: number;
   duration_ms: number;
   tool_calls: number;
+  api_requests?: number;
+  api_errors?: number;
+  retry_count?: number;
 }
 
 export interface ResultEvent extends BaseJsonStreamEvent {
@@ -98,10 +115,26 @@ export interface ResultEvent extends BaseJsonStreamEvent {
   stats?: StreamStats;
 }
 
+export interface RetryEvent extends BaseJsonStreamEvent {
+  type: JsonStreamEventType.RETRY;
+  attempt: number;
+  max_attempts: number;
+  delay_ms: number;
+  error?: string;
+  model: string;
+}
+
+export interface LoopDetectedStreamEvent extends BaseJsonStreamEvent {
+  type: JsonStreamEventType.LOOP_DETECTED;
+  loop_type?: string;
+}
+
 export type JsonStreamEvent =
   | InitEvent
   | MessageEvent
   | ToolUseEvent
   | ToolResultEvent
   | ErrorEvent
-  | ResultEvent;
+  | ResultEvent
+  | RetryEvent
+  | LoopDetectedStreamEvent;

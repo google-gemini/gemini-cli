@@ -14,6 +14,7 @@ import type {
   UserFeedbackPayload,
 } from '@google/gemini-cli-core';
 import {
+  AuthType,
   ToolErrorType,
   GeminiEventType,
   OutputFormat,
@@ -183,6 +184,7 @@ describe('runNonInteractive', () => {
       getIdeMode: vi.fn().mockReturnValue(false),
 
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
+      getUserTierName: vi.fn().mockReturnValue(undefined),
       getDebugMode: vi.fn().mockReturnValue(false),
       getOutputFormat: vi.fn().mockReturnValue('text'),
       getModel: vi.fn().mockReturnValue('test-model'),
@@ -731,6 +733,79 @@ describe('runNonInteractive', () => {
         2,
       ),
     );
+  });
+
+  it('should include debug diagnostics in JSON output when debug mode is enabled', async () => {
+    const events: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'Hello World' },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+      },
+    ];
+    const debugMetrics: SessionMetrics = {
+      models: {
+        'gemini-2.5-pro': {
+          api: {
+            totalRequests: 2,
+            totalErrors: 1,
+            totalLatencyMs: 1234,
+          },
+          tokens: {
+            input: 10,
+            prompt: 10,
+            candidates: 5,
+            total: 15,
+            cached: 0,
+            thoughts: 0,
+            tool: 0,
+          },
+          roles: {},
+        },
+      },
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: {
+          accept: 0,
+          reject: 0,
+          modify: 0,
+          auto_accept: 0,
+        },
+        byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
+    };
+
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+    vi.mocked(mockConfig.getDebugMode).mockReturnValue(true);
+    vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
+      authType: AuthType.USE_GEMINI,
+    });
+    vi.mocked(mockConfig.getUserTierName).mockReturnValue('free');
+    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(debugMetrics);
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Test input',
+      prompt_id: 'prompt-id-json-debug',
+    });
+
+    const parsed = JSON.parse(getWrittenOutput());
+    expect(parsed.auth_method).toBe('gemini-api-key');
+    expect(parsed.user_tier).toBe('free');
+    expect(parsed.stats.api_requests).toBe(2);
+    expect(parsed.stats.api_errors).toBe(1);
+    expect(parsed.stats.retry_count).toBe(0);
   });
 
   it('should write JSON output with stats for tool-only commands (no text response)', async () => {
@@ -1415,6 +1490,10 @@ describe('runNonInteractive', () => {
         CoreEvent.UserFeedback,
         expect.any(Function),
       );
+      expect(mockCoreEvents.on).toHaveBeenCalledWith(
+        CoreEvent.RetryAttempt,
+        expect.any(Function),
+      );
       expect(mockCoreEvents.drainBacklogs).toHaveBeenCalledTimes(1);
     });
 
@@ -1438,6 +1517,10 @@ describe('runNonInteractive', () => {
 
       expect(mockCoreEvents.off).toHaveBeenCalledWith(
         CoreEvent.UserFeedback,
+        expect.any(Function),
+      );
+      expect(mockCoreEvents.off).toHaveBeenCalledWith(
+        CoreEvent.RetryAttempt,
         expect.any(Function),
       );
     });
@@ -1722,6 +1805,75 @@ describe('runNonInteractive', () => {
       expect(sanitizedOutput).toMatchSnapshot();
     },
   );
+
+  it('should emit loop_detected and legacy warning error events in debug stream-json mode', async () => {
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
+      OutputFormat.STREAM_JSON,
+    );
+    vi.mocked(mockConfig.getDebugMode).mockReturnValue(true);
+    vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+    });
+    vi.mocked(mockConfig.getUserTierName).mockReturnValue('pro');
+    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      MOCK_SESSION_METRICS,
+    );
+
+    const events: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.LoopDetected,
+        value: { loopType: 'llm_detected_loop' },
+      },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 0 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'Loop debug test',
+      prompt_id: 'prompt-id-loop-debug',
+    });
+
+    const outputLines = getWrittenOutput()
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+
+    expect(outputLines[0]).toMatchObject({
+      type: 'init',
+      auth_method: 'oauth-personal',
+      user_tier: 'pro',
+    });
+    expect(outputLines).toContainEqual(
+      expect.objectContaining({
+        type: 'loop_detected',
+        loop_type: 'llm_detected_loop',
+      }),
+    );
+    expect(outputLines).toContainEqual(
+      expect.objectContaining({
+        type: 'error',
+        severity: 'warning',
+        message: 'Loop detected, stopping execution',
+      }),
+    );
+    expect(outputLines).toContainEqual(
+      expect.objectContaining({
+        type: 'result',
+        stats: expect.objectContaining({
+          api_requests: 0,
+          api_errors: 0,
+          retry_count: 0,
+        }),
+      }),
+    );
+  });
 
   it('should log error when tool recording fails', async () => {
     const toolCallEvent: ServerGeminiStreamEvent = {

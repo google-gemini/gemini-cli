@@ -39,6 +39,7 @@ export class StreamJsonFormatter {
   convertToStreamStats(
     metrics: SessionMetrics,
     durationMs: number,
+    options?: { retryCount?: number; includeDiagnostics?: boolean },
   ): StreamStats {
     let totalTokens = 0;
     let inputTokens = 0;
@@ -55,7 +56,7 @@ export class StreamJsonFormatter {
       input += modelMetrics.tokens.input;
     }
 
-    return {
+    const stats: StreamStats = {
       total_tokens: totalTokens,
       input_tokens: inputTokens,
       output_tokens: outputTokens,
@@ -64,5 +65,19 @@ export class StreamJsonFormatter {
       duration_ms: durationMs,
       tool_calls: metrics.tools.totalCalls,
     };
+
+    if (options?.includeDiagnostics) {
+      let apiRequests = 0;
+      let apiErrors = 0;
+      for (const modelMetrics of Object.values(metrics.models)) {
+        apiRequests += modelMetrics.api.totalRequests;
+        apiErrors += modelMetrics.api.totalErrors;
+      }
+      stats.api_requests = apiRequests;
+      stats.api_errors = apiErrors;
+      stats.retry_count = options.retryCount ?? 0;
+    }
+
+    return stats;
   }
 }
