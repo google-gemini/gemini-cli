@@ -34,6 +34,12 @@ async function handleEnable(args: Args): Promise<void> {
 
   // Get all servers including extensions
   const { mcpServers, blockedServerNames } = await getMcpServersFromConfig();
+  if (blockedServerNames.map(normalizeServerId).includes(name)) {
+    debugLogger.log(
+      `${RED}Error:${RESET} MCP server '${args.name}' is blocked by administrator.`,
+    );
+    return;
+  }
   const allKnownServers = [...Object.keys(mcpServers), ...blockedServerNames];
   const normalizedServerNames = allKnownServers.map(normalizeServerId);
   if (!normalizedServerNames.includes(name)) {
