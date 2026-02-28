@@ -17,6 +17,12 @@ import {
   SHELL_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
+  SHELL_PARAM_COMMAND,
+  PARAM_DESCRIPTION,
+  PARAM_DIR_PATH,
+  SHELL_PARAM_IS_BACKGROUND,
+  EXIT_PLAN_PARAM_PLAN_PATH,
+  SKILL_PARAM_NAME,
 } from './base-declarations.js';
 
 /**
@@ -47,12 +53,12 @@ export function getShellToolDescription(
 
   if (os.platform() === 'win32') {
     const backgroundInstructions = enableInteractiveShell
-      ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use PowerShell background constructs.'
+      ? `To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true. Do NOT use PowerShell background constructs.`
       : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
     return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${efficiencyGuidelines}${returnedInfo}`;
   } else {
     const backgroundInstructions = enableInteractiveShell
-      ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use `&` to background commands.'
+      ? `To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true. Do NOT use \`&\` to background commands.`
       : 'Command can start background processes using `&`.';
     return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${efficiencyGuidelines}${returnedInfo}`;
   }
@@ -84,27 +90,27 @@ export function getShellDeclaration(
     parametersJsonSchema: {
       type: 'object',
       properties: {
-        command: {
+        [SHELL_PARAM_COMMAND]: {
           type: 'string',
           description: getCommandDescription(),
         },
-        description: {
+        [PARAM_DESCRIPTION]: {
           type: 'string',
           description:
             'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
         },
-        dir_path: {
+        [PARAM_DIR_PATH]: {
           type: 'string',
           description:
             '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
         },
-        is_background: {
+        [SHELL_PARAM_IS_BACKGROUND]: {
           type: 'boolean',
           description:
             'Set to true if this command should be run in the background (e.g. for long-running servers or watchers). The command will be started, allowed to run for a brief moment to check for immediate errors, and then moved to the background.',
         },
       },
-      required: ['command'],
+      required: [SHELL_PARAM_COMMAND],
     },
   };
 }
@@ -121,9 +127,9 @@ export function getExitPlanModeDeclaration(
       'Finalizes the planning phase and transitions to implementation by presenting the plan for user approval. This tool MUST be used to exit Plan Mode before any source code edits can be performed. Call this whenever a plan is ready or the user requests implementation.',
     parametersJsonSchema: {
       type: 'object',
-      required: ['plan_path'],
+      required: [EXIT_PLAN_PARAM_PLAN_PATH],
       properties: {
-        plan_path: {
+        [EXIT_PLAN_PARAM_PLAN_PATH]: {
           type: 'string',
           description: `The file path to the finalized plan (e.g., "${plansDir}/feature-x.md"). This path MUST be within the designated plans directory: ${plansDir}/`,
         },
@@ -146,11 +152,13 @@ export function getActivateSkillDeclaration(
   let schema: z.ZodTypeAny;
   if (skillNames.length === 0) {
     schema = z.object({
-      name: z.string().describe('No skills are currently available.'),
+      [SKILL_PARAM_NAME]: z
+        .string()
+        .describe('No skills are currently available.'),
     });
   } else {
     schema = z.object({
-      name: z
+      [SKILL_PARAM_NAME]: z
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         .enum(skillNames as [string, ...string[]])
         .describe('The name of the skill to activate.'),
