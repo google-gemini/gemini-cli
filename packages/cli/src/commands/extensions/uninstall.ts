@@ -70,9 +70,13 @@ export const uninstallCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const names = argv['names'];
+    let namesArray: string[] = [];
+    if (Array.isArray(names)) {
+      namesArray = names.filter((n): n is string => typeof n === 'string');
+    }
     await handleUninstall({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      names: argv['names'] as string[],
+      names: namesArray,
     });
     await exitCli();
   },

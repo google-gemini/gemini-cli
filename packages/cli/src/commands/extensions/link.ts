@@ -78,11 +78,11 @@ export const linkCommand: CommandModule = {
       })
       .check((_) => true),
   handler: async (argv) => {
+    const path = argv['path'];
+    const consent = argv['consent'];
     await handleLink({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      path: argv['path'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      consent: argv['consent'] as boolean | undefined,
+      path: typeof path === 'string' ? path : '',
+      consent: typeof consent === 'boolean' ? consent : undefined,
     });
     await exitCli();
   },

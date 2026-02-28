@@ -39,9 +39,9 @@ export const enableCommand: CommandModule = {
       demandOption: true,
     }),
   handler: async (argv) => {
+    const name = argv['name'];
     await handleEnable({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      name: argv['name'] as string,
+      name: typeof name === 'string' ? name : '',
     });
     await exitCli();
   },

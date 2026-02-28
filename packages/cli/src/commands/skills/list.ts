@@ -21,7 +21,7 @@ export async function handleList(args: { all?: boolean }) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     {
       debug: false,
-    } as Partial<CliArgs> as CliArgs,
+    } as unknown as CliArgs,
     { cwd: workspaceDir },
   );
 
@@ -73,8 +73,8 @@ export const listCommand: CommandModule = {
       default: false,
     }),
   handler: async (argv) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    await handleList({ all: argv['all'] as boolean });
+    const all = argv['all'];
+    await handleList({ all: typeof all === 'boolean' ? all : false });
     await exitCli();
   },
 };
