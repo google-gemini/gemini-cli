@@ -554,7 +554,11 @@ export function getShellConfiguration(): ShellConfiguration {
       ) {
         return {
           executable: comSpec,
-          argsPrefix: ['-NoProfile', '-Command'],
+          // -NonInteractive prevents PSReadLine from intercepting console input
+          // events inside the ConPTY session, which otherwise causes interactive
+          // TUI tools (e.g. pnpm create vite) to receive malformed key events
+          // and exit when arrow keys are pressed.
+          argsPrefix: ['-NoProfile', '-NonInteractive', '-Command'],
           shell: 'powershell',
         };
       }
@@ -563,7 +567,7 @@ export function getShellConfiguration(): ShellConfiguration {
     // Default to PowerShell for all other Windows configurations.
     return {
       executable: 'powershell.exe',
-      argsPrefix: ['-NoProfile', '-Command'],
+      argsPrefix: ['-NoProfile', '-NonInteractive', '-Command'],
       shell: 'powershell',
     };
   }
