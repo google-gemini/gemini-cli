@@ -15,7 +15,7 @@ import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
 import {
   type TextBuffer,
   logicalPosToOffset,
-  PASTED_TEXT_PLACEHOLDER_REGEX,
+  expandPastePlaceholders,
   getTransformUnderCursor,
   LARGE_PASTE_LINE_THRESHOLD,
   LARGE_PASTE_CHAR_THRESHOLD,
@@ -324,10 +324,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     (submittedValue: string) => {
       let processedValue = submittedValue;
       if (buffer.pastedContent) {
-        // Replace placeholders like [Pasted Text: 6 lines] with actual content
-        processedValue = processedValue.replace(
-          PASTED_TEXT_PLACEHOLDER_REGEX,
-          (match) => buffer.pastedContent[match] || match,
+        processedValue = expandPastePlaceholders(
+          processedValue,
+          buffer.pastedContent,
         );
       }
 
