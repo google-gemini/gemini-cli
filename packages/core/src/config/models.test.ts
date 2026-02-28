@@ -20,6 +20,7 @@ import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   supportsMultimodalFunctionResponse,
   GEMINI_MODEL_ALIAS_PRO,
+  GEMINI_MODEL_ALIAS_PRO_LATEST,
   GEMINI_MODEL_ALIAS_FLASH,
   GEMINI_MODEL_ALIAS_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
@@ -143,6 +144,12 @@ describe('getDisplayString', () => {
     expect(getDisplayString(GEMINI_MODEL_ALIAS_PRO)).toBe(PREVIEW_GEMINI_MODEL);
   });
 
+  it('should return concrete model name for gemini-pro-latest alias', () => {
+    expect(getDisplayString(GEMINI_MODEL_ALIAS_PRO_LATEST)).toBe(
+      PREVIEW_GEMINI_MODEL,
+    );
+  });
+
   it('should return concrete model name for flash alias', () => {
     expect(getDisplayString(GEMINI_MODEL_ALIAS_FLASH)).toBe(
       PREVIEW_GEMINI_FLASH_MODEL,
@@ -181,6 +188,23 @@ describe('supportsMultimodalFunctionResponse', () => {
 
 describe('resolveModel', () => {
   describe('delegation logic', () => {
+    it('should resolve gemini-pro-latest to Preview Pro model', () => {
+      expect(resolveModel(GEMINI_MODEL_ALIAS_PRO_LATEST)).toBe(
+        PREVIEW_GEMINI_MODEL,
+      );
+    });
+
+    it('should resolve gemini-pro-latest to Gemini 3.1 Pro when useGemini3_1 is true', () => {
+      expect(resolveModel(GEMINI_MODEL_ALIAS_PRO_LATEST, true)).toBe(
+        PREVIEW_GEMINI_3_1_MODEL,
+      );
+    });
+
+    it('should resolve gemini-pro-latest to Gemini 3.1 Pro Custom Tools when useGemini3_1 and useCustomToolModel are true', () => {
+      expect(resolveModel(GEMINI_MODEL_ALIAS_PRO_LATEST, true, true)).toBe(
+        PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+      );
+    });
     it('should return the Preview Pro model when auto-gemini-3 is requested', () => {
       const model = resolveModel(PREVIEW_GEMINI_MODEL_AUTO);
       expect(model).toBe(PREVIEW_GEMINI_MODEL);
