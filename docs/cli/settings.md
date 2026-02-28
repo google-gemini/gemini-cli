@@ -72,6 +72,7 @@ they appear in the UI.
 | Incremental Rendering                | `ui.incrementalRendering`              | Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled. | `true`   |
 | Show Spinner                         | `ui.showSpinner`                       | Show the spinner during operations.                                                                                                                               | `true`   |
 | Loading Phrases                      | `ui.loadingPhrases`                    | What to show while the model is working: tips, witty comments, both, or nothing.                                                                                  | `"tips"` |
+| Error Verbosity                      | `ui.errorVerbosity`                    | Controls whether recoverable errors are hidden (low) or fully shown (full).                                                                                       | `"low"`  |
 | Screen Reader Mode                   | `ui.accessibility.screenReader`        | Render output in plain-text to be more screen reader accessible                                                                                                   | `false`  |
 
 ### IDE
@@ -79,6 +80,12 @@ they appear in the UI.
 | UI Label | Setting       | Description                  | Default |
 | -------- | ------------- | ---------------------------- | ------- |
 | IDE Mode | `ide.enabled` | Enable IDE integration mode. | `false` |
+
+### Billing
+
+| UI Label         | Setting                   | Description                                                                                                                                                | Default |
+| ---------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Overage Strategy | `billing.overageStrategy` | How to handle quota exhaustion when AI credits are available. 'ask' prompts each time, 'always' automatically uses credits, 'never' disables credit usage. | `"ask"` |
 
 ### Model
 
