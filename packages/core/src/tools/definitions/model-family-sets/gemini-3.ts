@@ -60,8 +60,18 @@ import {
   READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
   MEMORY_PARAM_FACT,
   TODOS_PARAM_TODOS,
+  TODOS_ITEM_PARAM_DESCRIPTION,
+  TODOS_ITEM_PARAM_STATUS,
   DOCS_PARAM_PATH,
   ASK_USER_PARAM_QUESTIONS,
+  ASK_USER_QUESTION_PARAM_QUESTION,
+  ASK_USER_QUESTION_PARAM_HEADER,
+  ASK_USER_QUESTION_PARAM_TYPE,
+  ASK_USER_QUESTION_PARAM_OPTIONS,
+  ASK_USER_QUESTION_PARAM_MULTI_SELECT,
+  ASK_USER_QUESTION_PARAM_PLACEHOLDER,
+  ASK_USER_OPTION_PARAM_LABEL,
+  ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
 } from '../base-declarations.js';
 import {
@@ -562,17 +572,17 @@ The agent did not use the todo list because this task could be completed by a ti
             type: 'object',
             description: 'A single todo item.',
             properties: {
-              description: {
+              [TODOS_ITEM_PARAM_DESCRIPTION]: {
                 type: 'string',
                 description: 'The description of the task.',
               },
-              status: {
+              [TODOS_ITEM_PARAM_STATUS]: {
                 type: 'string',
                 description: 'The current status of the task.',
                 enum: ['pending', 'in_progress', 'completed', 'cancelled'],
               },
             },
-            required: ['description', 'status'],
+            required: [TODOS_ITEM_PARAM_DESCRIPTION, TODOS_ITEM_PARAM_STATUS],
             additionalProperties: false,
           },
         },
@@ -612,39 +622,39 @@ The agent did not use the todo list because this task could be completed by a ti
           maxItems: 4,
           items: {
             type: 'object',
-            required: ['question', 'header', 'type'],
+            required: [ASK_USER_QUESTION_PARAM_QUESTION, ASK_USER_QUESTION_PARAM_HEADER, ASK_USER_QUESTION_PARAM_TYPE],
             properties: {
-              question: {
+              [ASK_USER_QUESTION_PARAM_QUESTION]: {
                 type: 'string',
                 description:
                   'The complete question to ask the user. Should be clear, specific, and end with a question mark.',
               },
-              header: {
+              [ASK_USER_QUESTION_PARAM_HEADER]: {
                 type: 'string',
                 description:
                   'Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".',
               },
-              type: {
+              [ASK_USER_QUESTION_PARAM_TYPE]: {
                 type: 'string',
                 enum: ['choice', 'text', 'yesno'],
                 default: 'choice',
                 description:
                   "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
               },
-              options: {
+              [ASK_USER_QUESTION_PARAM_OPTIONS]: {
                 type: 'array',
                 description:
                   "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
                 items: {
                   type: 'object',
-                  required: ['label', 'description'],
+                  required: [ASK_USER_OPTION_PARAM_LABEL, ASK_USER_OPTION_PARAM_DESCRIPTION],
                   properties: {
-                    label: {
+                    [ASK_USER_OPTION_PARAM_LABEL]: {
                       type: 'string',
                       description:
                         'The display text for this option (1-5 words). Example: "OAuth 2.0"',
                     },
-                    description: {
+                    [ASK_USER_OPTION_PARAM_DESCRIPTION]: {
                       type: 'string',
                       description:
                         'Brief explanation of this option. Example: "Industry standard, supports SSO"',
@@ -652,12 +662,12 @@ The agent did not use the todo list because this task could be completed by a ti
                   },
                 },
               },
-              multiSelect: {
+              [ASK_USER_QUESTION_PARAM_MULTI_SELECT]: {
                 type: 'boolean',
                 description:
                   "Only applies when type='choice'. Set to true to allow selecting multiple options.",
               },
-              placeholder: {
+              [ASK_USER_QUESTION_PARAM_PLACEHOLDER]: {
                 type: 'string',
                 description:
                   "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",

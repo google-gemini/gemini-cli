@@ -75,6 +75,8 @@ export const WEB_SEARCH_PARAM_QUERY = 'query';
 // -- write_todos --
 export const WRITE_TODOS_TOOL_NAME = 'write_todos';
 export const TODOS_PARAM_TODOS = 'todos';
+export const TODOS_ITEM_PARAM_DESCRIPTION = 'description';
+export const TODOS_ITEM_PARAM_STATUS = 'status';
 
 // -- web_fetch --
 export const WEB_FETCH_TOOL_NAME = 'web_fetch';
@@ -102,6 +104,16 @@ export const SKILL_PARAM_NAME = 'name';
 // -- ask_user --
 export const ASK_USER_TOOL_NAME = 'ask_user';
 export const ASK_USER_PARAM_QUESTIONS = 'questions';
+// ask_user question item params
+export const ASK_USER_QUESTION_PARAM_QUESTION = 'question';
+export const ASK_USER_QUESTION_PARAM_HEADER = 'header';
+export const ASK_USER_QUESTION_PARAM_TYPE = 'type';
+export const ASK_USER_QUESTION_PARAM_OPTIONS = 'options';
+export const ASK_USER_QUESTION_PARAM_MULTI_SELECT = 'multiSelect';
+export const ASK_USER_QUESTION_PARAM_PLACEHOLDER = 'placeholder';
+// ask_user option item params
+export const ASK_USER_OPTION_PARAM_LABEL = 'label';
+export const ASK_USER_OPTION_PARAM_DESCRIPTION = 'description';
 
 // -- exit_plan_mode --
 export const EXIT_PLAN_MODE_TOOL_NAME = 'exit_plan_mode';
