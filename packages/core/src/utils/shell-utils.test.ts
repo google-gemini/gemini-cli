@@ -23,6 +23,7 @@ import {
   hasRedirection,
   resolveExecutable,
   stripEnvPrefix,
+  envPrefixHasSubstitution,
 } from './shell-utils.js';
 import path from 'node:path';
 
@@ -591,5 +592,41 @@ describe('stripEnvPrefix', async () => {
 
   it('should handle env vars with complex values', () => {
     expect(stripEnvPrefix('FOO="bar baz" ls -la')).toBe('ls -la');
+  });
+
+  it('should not strip outer command when input has no env prefix but contains nested substitutions', () => {
+    expect(stripEnvPrefix('echo $(VAR=foo bar)')).toBe('echo $(VAR=foo bar)');
+  });
+
+  it('should correctly strip env prefix even with substitutions in arguments', () => {
+    expect(stripEnvPrefix('CI=true echo $(whoami)')).toBe('echo $(whoami)');
+  });
+});
+
+describe('envPrefixHasSubstitution', async () => {
+  it('should return false for simple literal assignments', () => {
+    expect(envPrefixHasSubstitution('CI=true npm test')).toBe(false);
+  });
+
+  it('should return false for multiple literal assignments', () => {
+    expect(envPrefixHasSubstitution('CI=true NODE_ENV=prod npm test')).toBe(
+      false,
+    );
+  });
+
+  it('should return true for assignment with command substitution', () => {
+    expect(envPrefixHasSubstitution('VAR=$(whoami) ls')).toBe(true);
+  });
+
+  it('should return true for assignment with backtick substitution', () => {
+    expect(envPrefixHasSubstitution('VAR=`whoami` ls')).toBe(true);
+  });
+
+  it('should return false when substitution is in command args, not prefix', () => {
+    expect(envPrefixHasSubstitution('CI=true echo $(whoami)')).toBe(false);
+  });
+
+  it('should return false when no env prefix exists', () => {
+    expect(envPrefixHasSubstitution('npm test')).toBe(false);
   });
 });

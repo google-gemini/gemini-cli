@@ -901,20 +901,74 @@ export function stripEnvPrefix(command: string): string | undefined {
 
   const root = tree.rootNode;
   // Walk the tree to find the first 'command' node
-  const stack: Node[] = [root];
-  while (stack.length > 0) {
-    const node = stack.pop()!;
+  const queue: Node[] = [root];
+  while (queue.length > 0) {
+    const node = queue.shift()!;
     if (node.type === 'command') {
       const nameNode = node.childForFieldName('name');
       if (nameNode) {
-        // Return from the command name to the end of the command node
+        // This is the first command found in a top-down traversal.
         return command.slice(nameNode.startIndex, node.endIndex).trim();
       }
+    }
+    for (let i = 0; i < node.childCount; i++) {
+      const child = node.child(i);
+      if (child) queue.push(child);
+    }
+  }
+}
+
+/**
+ * Checks whether the environment variable prefix portion of a command
+ * contains command substitutions or other constructs with side effects.
+ * This prevents a security bypass where e.g. `VAR=$(malicious) safe_cmd`
+ * would be allowed because `safe_cmd` alone passes policy checks.
+ */
+export function envPrefixHasSubstitution(command: string): boolean {
+  const tree = parseCommandTree(command);
+  if (!tree) return true; // fail closed
+
+  const root = tree.rootNode;
+  const queue: Node[] = [root];
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    if (node.type === 'command') {
+      const nameNode = node.childForFieldName('name');
+      if (nameNode) {
+        // Everything before nameNode.startIndex is the env prefix.
+        // Check if that prefix region contains substitution nodes.
+        const prefixEnd = nameNode.startIndex;
+        return hasSubstitutionInRange(root, 0, prefixEnd);
+      }
+    }
+    for (let i = 0; i < node.childCount; i++) {
+      const child = node.child(i);
+      if (child) queue.push(child);
+    }
+  }
+  return false;
+}
+
+function hasSubstitutionInRange(
+  root: Node,
+  start: number,
+  end: number,
+): boolean {
+  const stack: Node[] = [root];
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    if (node.startIndex >= end) continue;
+    if (node.endIndex <= start) continue;
+    if (
+      node.type === 'command_substitution' ||
+      node.type === 'process_substitution'
+    ) {
+      return true;
     }
     for (let i = node.childCount - 1; i >= 0; i--) {
       const child = node.child(i);
       if (child) stack.push(child);
     }
   }
-  return undefined;
+  return false;
 }
