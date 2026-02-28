@@ -186,7 +186,7 @@ describe('aboutCommand', () => {
     vi.mocked(getCodeAssistServer).mockReturnValue({
       projectId: 'ca-server-project',
     } as CodeAssistServer);
-    process.env['GOOGLE_CLOUD_PROJECT'] = 'env-project';
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'env-project');
 
     if (!aboutCommand.action) {
       throw new Error('The about command must have an action.');
@@ -203,7 +203,7 @@ describe('aboutCommand', () => {
 
   it('should fall back to env var when Code Assist server has no project', async () => {
     vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
-    process.env['GOOGLE_CLOUD_PROJECT'] = 'env-project';
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'env-project');
 
     if (!aboutCommand.action) {
       throw new Error('The about command must have an action.');
@@ -220,7 +220,7 @@ describe('aboutCommand', () => {
 
   it('should return empty string when no GCP project available', async () => {
     vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
-    delete process.env['GOOGLE_CLOUD_PROJECT'];
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
 
     if (!aboutCommand.action) {
       throw new Error('The about command must have an action.');
