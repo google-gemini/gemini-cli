@@ -131,7 +131,7 @@ export function useSuspend({
       process.kill(0, 'SIGTSTP');
     } else if (ctrlZPressCount > 0) {
       handleWarning(
-        'Press Ctrl+Z again to suspend. Undo has moved to Cmd + Z or Alt/Opt + Z.',
+        'Press Ctrl+Z again to suspend. Undo has moved to Cmd+Z or Alt+Z.',
       );
       ctrlZTimerRef.current = setTimeout(() => {
         setCtrlZPressCount(0);
