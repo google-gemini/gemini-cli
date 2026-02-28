@@ -1063,7 +1063,11 @@ name = "invalid-name"
         options?: Parameters<typeof actualFs.readdir>[1],
       ) => {
         const normalizedPath = nodePath.normalize(path.toString());
-        if (normalizedPath.includes('gemini-cli-test/user/policies')) {
+        if (
+          normalizedPath.includes(
+            nodePath.normalize('gemini-cli-test/user/policies'),
+          )
+        ) {
           return [
             {
               name: 'user-plan.toml',
@@ -1085,7 +1089,11 @@ name = "invalid-name"
         options?: Parameters<typeof actualFs.stat>[1],
       ) => {
         const normalizedPath = nodePath.normalize(path.toString());
-        if (normalizedPath.includes('gemini-cli-test/user/policies')) {
+        if (
+          normalizedPath.includes(
+            nodePath.normalize('gemini-cli-test/user/policies'),
+          )
+        ) {
           return {
             isDirectory: () => true,
             isFile: () => false,
