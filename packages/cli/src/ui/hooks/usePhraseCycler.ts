@@ -20,6 +20,7 @@ export const INTERACTIVE_SHELL_WAITING_PHRASE =
  * @param shouldShowFocusHint Whether to show the shell focus hint.
  * @param loadingPhrasesMode Which phrases to show: tips, witty, all, or off.
  * @param customPhrases Optional list of custom phrases to use instead of built-in witty phrases.
+ * @param maxLength Optional maximum length for the selected phrase.
  * @returns The current loading phrase.
  */
 export const usePhraseCycler = (
@@ -28,6 +29,7 @@ export const usePhraseCycler = (
   shouldShowFocusHint: boolean,
   loadingPhrasesMode: LoadingPhrasesMode = 'tips',
   customPhrases?: string[],
+  maxLength?: number,
 ) => {
   const [currentLoadingPhrase, setCurrentLoadingPhrase] = useState<
     string | undefined
@@ -65,31 +67,48 @@ export const usePhraseCycler = (
 
     const setRandomPhrase = () => {
       let phraseList: readonly string[];
+      let currentMode = loadingPhrasesMode;
 
-      switch (loadingPhrasesMode) {
+      // In 'all' mode, we decide once per phrase cycle what to show
+      if (loadingPhrasesMode === 'all') {
+        if (!hasShownFirstRequestTipRef.current) {
+          currentMode = 'tips';
+          hasShownFirstRequestTipRef.current = true;
+        } else {
+          currentMode = Math.random() < 1 / 2 ? 'tips' : 'witty';
+        }
+      }
+
+      switch (currentMode) {
         case 'tips':
           phraseList = INFORMATIVE_TIPS;
           break;
         case 'witty':
           phraseList = wittyPhrases;
           break;
-        case 'all':
-          // Show a tip on the first request after startup, then continue with 1/2 chance
-          if (!hasShownFirstRequestTipRef.current) {
-            phraseList = INFORMATIVE_TIPS;
-            hasShownFirstRequestTipRef.current = true;
-          } else {
-            const showTip = Math.random() < 1 / 2;
-            phraseList = showTip ? INFORMATIVE_TIPS : wittyPhrases;
-          }
-          break;
         default:
           phraseList = INFORMATIVE_TIPS;
           break;
       }
 
-      const randomIndex = Math.floor(Math.random() * phraseList.length);
-      setCurrentLoadingPhrase(phraseList[randomIndex]);
+      // If we have a maxLength, we need to account for potential prefixes.
+      // Tips are prefixed with "Tip: " in the Composer UI.
+      const prefixLength = currentMode === 'tips' ? 5 : 0;
+      const adjustedMaxLength =
+        maxLength !== undefined ? maxLength - prefixLength : undefined;
+
+      const filteredList =
+        adjustedMaxLength !== undefined
+          ? phraseList.filter((p) => p.length <= adjustedMaxLength)
+          : phraseList;
+
+      if (filteredList.length > 0) {
+        const randomIndex = Math.floor(Math.random() * filteredList.length);
+        setCurrentLoadingPhrase(filteredList[randomIndex]);
+      } else {
+        // If no phrases fit, try to fallback to a very short list or nothing
+        setCurrentLoadingPhrase(undefined);
+      }
     };
 
     // Select an initial random phrase
@@ -112,6 +131,7 @@ export const usePhraseCycler = (
     shouldShowFocusHint,
     loadingPhrasesMode,
     customPhrases,
+    maxLength,
   ]);
 
   return currentLoadingPhrase;

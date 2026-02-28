@@ -23,6 +23,7 @@ export interface UseLoadingIndicatorProps {
   loadingPhrasesMode?: LoadingPhrasesMode;
   customWittyPhrases?: string[];
   errorVerbosity?: 'low' | 'full';
+  maxLength?: number;
 }
 
 export const useLoadingIndicator = ({
@@ -32,6 +33,7 @@ export const useLoadingIndicator = ({
   loadingPhrasesMode,
   customWittyPhrases,
   errorVerbosity = 'full',
+  maxLength,
 }: UseLoadingIndicatorProps) => {
   const [timerResetKey, setTimerResetKey] = useState(0);
   const isTimerActive = streamingState === StreamingState.Responding;
@@ -46,6 +48,7 @@ export const useLoadingIndicator = ({
     shouldShowFocusHint,
     loadingPhrasesMode,
     customWittyPhrases,
+    maxLength,
   );
 
   const [retainedElapsedTime, setRetainedElapsedTime] = useState(0);
