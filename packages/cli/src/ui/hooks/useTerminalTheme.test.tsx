@@ -196,6 +196,36 @@ describe('useTerminalTheme', () => {
     expect(mockHandleThemeSelect).not.toHaveBeenCalled();
   });
 
+  it('should switch theme even if terminal background report is identical to previousColor if current theme is mismatched', () => {
+    // Background is dark at startup
+    config.setTerminalBackground('#000000');
+    vi.mocked(config.setTerminalBackground).mockClear();
+    // But theme is light
+    mockSettings.merged.ui.theme = 'default-light';
+
+    const refreshStatic = vi.fn();
+    const { unmount } = renderHook(() =>
+      useTerminalTheme(mockHandleThemeSelect, config, refreshStatic),
+    );
+
+    const handler = mockSubscribe.mock.calls[0][0];
+
+    // Terminal reports the same dark background
+    handler('rgb:0000/0000/0000');
+
+    expect(config.setTerminalBackground).not.toHaveBeenCalled();
+    expect(themeManager.setTerminalBackground).not.toHaveBeenCalled();
+    expect(refreshStatic).not.toHaveBeenCalled();
+    // But it SHOULD select the dark theme because of the mismatch!
+    expect(mockHandleThemeSelect).toHaveBeenCalledWith(
+      'default',
+      expect.anything(),
+    );
+
+    mockSettings.merged.ui.theme = 'default';
+    unmount();
+  });
+
   it('should not switch theme if autoThemeSwitching is disabled', () => {
     mockSettings.merged.ui.autoThemeSwitching = false;
     const { unmount } = renderHook(() =>
