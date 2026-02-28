@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  OpenDialogActionReturn,
-  CommandContext,
-  SlashCommand,
+import {
+  type OpenDialogActionReturn,
+  type CommandContext,
+  type SlashCommand,
+  CommandKind,
 } from './types.js';
-import { CommandKind } from './types.js';
 
 export const resumeCommand: SlashCommand = {
   name: 'resume',

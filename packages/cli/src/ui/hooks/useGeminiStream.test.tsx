@@ -13,21 +13,19 @@ import { waitFor } from '../../test-utils/async.js';
 import { useGeminiStream } from './useGeminiStream.js';
 import { useKeypress } from './useKeypress.js';
 import * as atCommandProcessor from './atCommandProcessor.js';
-import type {
-  TrackedToolCall,
-  TrackedCompletedToolCall,
-  TrackedExecutingToolCall,
-  TrackedCancelledToolCall,
-  TrackedWaitingToolCall,
-} from './useToolScheduler.js';
-import { useToolScheduler } from './useToolScheduler.js';
-import type {
-  Config,
-  EditorType,
-  AnyToolInvocation,
-  SpanMetadata,
-} from '@google/gemini-cli-core';
 import {
+  type TrackedToolCall,
+  type TrackedCompletedToolCall,
+  type TrackedExecutingToolCall,
+  type TrackedCancelledToolCall,
+  type TrackedWaitingToolCall,
+  useToolScheduler,
+} from './useToolScheduler.js';
+import {
+  type Config,
+  type EditorType,
+  type AnyToolInvocation,
+  type SpanMetadata,
   CoreToolCallStatus,
   ApprovalMode,
   AuthType,
@@ -45,8 +43,11 @@ import {
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import type { SlashCommandProcessorResult } from '../types.js';
-import { MessageType, StreamingState } from '../types.js';
+import {
+  type SlashCommandProcessorResult,
+  MessageType,
+  StreamingState,
+} from '../types.js';
 
 import type { LoadedSettings } from '../../config/settings.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';

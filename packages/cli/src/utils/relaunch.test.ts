@@ -15,8 +15,7 @@ import {
 } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { RELAUNCH_EXIT_CODE } from './processUtils.js';
-import type { ChildProcess } from 'node:child_process';
-import { spawn } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 
 const mocks = vi.hoisted(() => ({
   writeToStderr: vi.fn(),

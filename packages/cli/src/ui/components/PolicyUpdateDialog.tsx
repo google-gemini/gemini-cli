@@ -5,16 +5,18 @@
  */
 
 import { Box, Text } from 'ink';
-import { useCallback, useRef } from 'react';
 import type React from 'react';
+import { useCallback, useRef } from 'react';
 import {
   type Config,
   type PolicyUpdateConfirmationRequest,
   PolicyIntegrityManager,
 } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
-import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import {
+  type RadioSelectItem,
+  RadioButtonSelect,
+} from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 

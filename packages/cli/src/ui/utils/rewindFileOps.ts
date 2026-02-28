@@ -4,18 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ConversationRecord,
-  MessageRecord,
-} from '@google/gemini-cli-core';
-import fs from 'node:fs/promises';
-import * as Diff from 'diff';
 import {
+  type ConversationRecord,
+  type MessageRecord,
   coreEvents,
   debugLogger,
   getFileDiffFromResultDisplay,
   computeModelAddedAndRemovedLines,
 } from '@google/gemini-cli-core';
+import fs from 'node:fs/promises';
+import * as Diff from 'diff';
 
 export interface FileChangeDetail {
   fileName: string;

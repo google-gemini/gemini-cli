@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { HistoryItemCompression } from '../types.js';
-import { MessageType } from '../types.js';
-import type { SlashCommand } from './types.js';
-import { CommandKind } from './types.js';
+import { type HistoryItemCompression, MessageType } from '../types.js';
+import { type SlashCommand, CommandKind } from './types.js';
 
 export const compressCommand: SlashCommand = {
   name: 'compress',

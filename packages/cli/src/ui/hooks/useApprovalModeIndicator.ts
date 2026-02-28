@@ -12,8 +12,7 @@ import {
 } from '@google/gemini-cli-core';
 import { useKeypress } from './useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
-import type { HistoryItemWithoutId } from '../types.js';
-import { MessageType } from '../types.js';
+import { type HistoryItemWithoutId, MessageType } from '../types.js';
 
 export interface UseApprovalModeIndicatorArgs {
   config: Config;

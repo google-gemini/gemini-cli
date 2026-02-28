@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { KeyBindingConfig } from './keyBindings.js';
 import {
+  type KeyBindingConfig,
   Command,
   commandCategories,
   commandDescriptions,

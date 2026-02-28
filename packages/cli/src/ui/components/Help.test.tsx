@@ -7,8 +7,7 @@
 import { render } from '../../test-utils/render.js';
 import { describe, it, expect } from 'vitest';
 import { Help } from './Help.js';
-import type { SlashCommand } from '../commands/types.js';
-import { CommandKind } from '../commands/types.js';
+import { type SlashCommand, CommandKind } from '../commands/types.js';
 
 const mockCommands: readonly SlashCommand[] = [
   {

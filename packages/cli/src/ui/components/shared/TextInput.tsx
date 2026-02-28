@@ -6,9 +6,8 @@
 
 import type React from 'react';
 import { useCallback } from 'react';
-import type { Key } from '../../hooks/useKeypress.js';
+import { type Key, useKeypress } from '../../hooks/useKeypress.js';
 import { Text, Box } from 'ink';
-import { useKeypress } from '../../hooks/useKeypress.js';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
 import type { TextBuffer } from './text-buffer.js';

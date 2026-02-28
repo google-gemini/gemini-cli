@@ -13,8 +13,8 @@ import {
   beforeEach,
   afterEach,
 } from 'vitest';
-import type { Config } from '@google/gemini-cli-core';
 import {
+  type Config,
   OutputFormat,
   FatalInputError,
   debugLogger,

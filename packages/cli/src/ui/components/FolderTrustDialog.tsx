@@ -9,8 +9,10 @@ import type React from 'react';
 import { useEffect, useState, useCallback } from 'react';
 import { theme } from '../semantic-colors.js';
 import stripAnsi from 'strip-ansi';
-import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import {
+  type RadioSelectItem,
+  RadioButtonSelect,
+} from './shared/RadioButtonSelect.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { Scrollable } from './shared/Scrollable.js';
 import { useKeypress } from '../hooks/useKeypress.js';

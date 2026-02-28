@@ -6,8 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { mcpCommand } from './mcp.js';
-import { type Argv } from 'yargs';
-import yargs from 'yargs';
+import yargs, { type Argv } from 'yargs';
 
 describe('mcp command', () => {
   it('should have correct command definition', () => {

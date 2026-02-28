@@ -11,8 +11,9 @@ import {
   type SlashCommand,
   type CommandContext,
 } from '../ui/commands/types.js';
-import type { MessageActionReturn, Config } from '@google/gemini-cli-core';
 import {
+  type MessageActionReturn,
+  type Config,
   isNightly,
   startupProfiler,
   getAdminErrorMessage,

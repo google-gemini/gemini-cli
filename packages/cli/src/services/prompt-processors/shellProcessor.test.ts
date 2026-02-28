@@ -8,8 +8,8 @@ import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import { ConfirmationRequiredError, ShellProcessor } from './shellProcessor.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { CommandContext } from '../../ui/commands/types.js';
-import type { Config } from '@google/gemini-cli-core';
 import {
+  type Config,
   ApprovalMode,
   getShellConfiguration,
   PolicyDecision,

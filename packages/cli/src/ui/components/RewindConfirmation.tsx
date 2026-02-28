@@ -8,8 +8,10 @@ import { Box, Text } from 'ink';
 import type React from 'react';
 import { useMemo } from 'react';
 import { theme } from '../semantic-colors.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
-import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
+import {
+  RadioButtonSelect,
+  type RadioSelectItem,
+} from './shared/RadioButtonSelect.js';
 import type { FileChangeStats } from '../utils/rewindFileOps.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { formatTimeAgo } from '../utils/formatters.js';

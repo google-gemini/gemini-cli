@@ -7,8 +7,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
-import type { Config, CodeAssistServer } from '@google/gemini-cli-core';
-import { UserTierId, getCodeAssistServer } from '@google/gemini-cli-core';
+import {
+  type Config,
+  type CodeAssistServer,
+  UserTierId,
+  getCodeAssistServer,
+} from '@google/gemini-cli-core';
 import { usePrivacySettings } from './usePrivacySettings.js';
 import { waitFor } from '../../test-utils/async.js';
 

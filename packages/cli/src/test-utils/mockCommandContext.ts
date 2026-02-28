@@ -6,8 +6,7 @@
 
 import { vi } from 'vitest';
 import type { CommandContext } from '../ui/commands/types.js';
-import type { LoadedSettings } from '../config/settings.js';
-import { mergeSettings } from '../config/settings.js';
+import { type LoadedSettings, mergeSettings } from '../config/settings.js';
 import type { GitService } from '@google/gemini-cli-core';
 import type { SessionStatsState } from '../ui/contexts/SessionContext.js';
 

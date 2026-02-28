@@ -31,6 +31,10 @@ import {
   AuthType,
   type AgentDefinition,
   CoreToolCallStatus,
+  ShellExecutionService,
+  writeToStdout,
+  enableMouseEvents,
+  disableMouseEvents,
 } from '@google/gemini-cli-core';
 
 // Mock coreEvents
@@ -105,8 +109,8 @@ import {
   type UIActions,
 } from './contexts/UIActionsContext.js';
 import { KeypressProvider } from './contexts/KeypressContext.js';
-import { OverflowProvider } from './contexts/OverflowContext.js';
 import {
+  OverflowProvider,
   useOverflowActions,
   type OverflowActions,
 } from './contexts/OverflowContext.js';
@@ -229,12 +233,6 @@ import * as useKeypressModule from './hooks/useKeypress.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
-import {
-  ShellExecutionService,
-  writeToStdout,
-  enableMouseEvents,
-  disableMouseEvents,
-} from '@google/gemini-cli-core';
 import { type ExtensionManager } from '../config/extension-manager.js';
 import {
   WARNING_PROMPT_DURATION_MS,

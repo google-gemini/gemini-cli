@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { ToolMessageProps } from './ToolMessage.js';
-import { ToolMessage } from './ToolMessage.js';
+import { type ToolMessageProps, ToolMessage } from './ToolMessage.js';
 import { StreamingState } from '../../types.js';
 import { StreamingContext } from '../../contexts/StreamingContext.js';
 import { renderWithProviders } from '../../../test-utils/render.js';

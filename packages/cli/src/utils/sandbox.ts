@@ -11,8 +11,9 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { quote, parse } from 'shell-quote';
 import { promisify } from 'node:util';
-import type { Config, SandboxConfig } from '@google/gemini-cli-core';
 import {
+  type Config,
+  type SandboxConfig,
   coreEvents,
   debugLogger,
   FatalSandboxError,

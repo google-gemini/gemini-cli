@@ -8,12 +8,10 @@ import { useState, useCallback } from 'react';
 import type { HistoryItemWithoutId } from '../types.js';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
-import type {
-  Config,
-  ConversationRecord,
-  ResumedSessionData,
-} from '@google/gemini-cli-core';
 import {
+  type Config,
+  type ConversationRecord,
+  type ResumedSessionData,
   coreEvents,
   convertSessionToClientHistory,
 } from '@google/gemini-cli-core';

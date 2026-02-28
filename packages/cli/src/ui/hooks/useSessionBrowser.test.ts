@@ -19,8 +19,6 @@ import {
   type ConversationRecord,
   type MessageRecord,
   CoreToolCallStatus,
-} from '@google/gemini-cli-core';
-import {
   coreEvents,
   convertSessionToClientHistory,
 } from '@google/gemini-cli-core';

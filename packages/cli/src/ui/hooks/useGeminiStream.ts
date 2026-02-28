@@ -54,17 +54,18 @@ import type {
   RetryAttemptPayload,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
-import type {
-  HistoryItem,
-  HistoryItemThinking,
-  HistoryItemWithoutId,
-  HistoryItemToolGroup,
-  HistoryItemInfo,
-  IndividualToolCallDisplay,
-  SlashCommandProcessorResult,
-  HistoryItemModel,
+import {
+  type HistoryItem,
+  type HistoryItemThinking,
+  type HistoryItemWithoutId,
+  type HistoryItemToolGroup,
+  type HistoryItemInfo,
+  type IndividualToolCallDisplay,
+  type SlashCommandProcessorResult,
+  type HistoryItemModel,
+  StreamingState,
+  MessageType,
 } from '../types.js';
-import { StreamingState, MessageType } from '../types.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
