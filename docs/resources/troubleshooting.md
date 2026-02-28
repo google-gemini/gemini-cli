@@ -55,10 +55,13 @@ topics on:
     - Set the `NODE_USE_SYSTEM_CA=1` environment variable to tell Node.js to use
       the operating system's native certificate store (where corporate
       certificates are typically already installed).
-      - Example: `export NODE_USE_SYSTEM_CA=1`
+      - Example: `export NODE_USE_SYSTEM_CA=1` (Windows PowerShell:
+        `$env:NODE_USE_SYSTEM_CA=1`)
     - Set the `NODE_EXTRA_CA_CERTS` environment variable to the absolute path of
       your corporate root CA certificate file.
       - Example: `export NODE_EXTRA_CA_CERTS=/path/to/your/corporate-ca.crt`
+        (Windows PowerShell:
+        `$env:NODE_EXTRA_CA_CERTS="C:\path\to\your\corporate-ca.crt"`)
 
 ## Common error messages and solutions
 

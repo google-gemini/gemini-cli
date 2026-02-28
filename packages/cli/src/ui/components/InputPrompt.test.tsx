@@ -411,6 +411,73 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should submit command in shell mode when Enter pressed with suggestions visible but no arrow navigation', async () => {
+    props.shellModeActive = true;
+    props.buffer.setText('ls ');
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [
+        { label: 'dir1', value: 'dir1' },
+        { label: 'dir2', value: 'dir2' },
+      ],
+      activeSuggestionIndex: 0,
+    });
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    // Press Enter without navigating — should dismiss suggestions and fall
+    // through to the main submit handler.
+    await act(async () => {
+      stdin.write('\r');
+    });
+    await waitFor(() => {
+      expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+      expect(props.onSubmit).toHaveBeenCalledWith('ls'); // Assert fall-through (text is trimmed)
+    });
+    expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should accept suggestion in shell mode when Enter pressed after arrow navigation', async () => {
+    props.shellModeActive = true;
+    props.buffer.setText('ls ');
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [
+        { label: 'dir1', value: 'dir1' },
+        { label: 'dir2', value: 'dir2' },
+      ],
+      activeSuggestionIndex: 1,
+    });
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    // Press ArrowDown to navigate, then Enter to accept
+    await act(async () => {
+      stdin.write('\u001B[B'); // ArrowDown — sets hasUserNavigatedSuggestions
+    });
+    await waitFor(() =>
+      expect(mockCommandCompletion.navigateDown).toHaveBeenCalled(),
+    );
+
+    await act(async () => {
+      stdin.write('\r'); // Enter — should accept navigated suggestion
+    });
+    await waitFor(() => {
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(1);
+    });
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('should NOT call shell history methods when not in shell mode', async () => {
     props.buffer.setText('some text');
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
