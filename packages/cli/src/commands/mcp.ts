@@ -10,8 +10,8 @@ import { addCommand } from './mcp/add.js';
 import { removeCommand } from './mcp/remove.js';
 import { listCommand } from './mcp/list.js';
 import { enableCommand, disableCommand } from './mcp/enableDisable.js';
-import { initializeOutputListenersAndFlush } from '../gemini.js';
 import { defer } from '../deferred.js';
+import { initializeOutputListenersAndFlush } from '../utils/outputListeners.js';
 
 export const mcpCommand: CommandModule = {
   command: 'mcp',

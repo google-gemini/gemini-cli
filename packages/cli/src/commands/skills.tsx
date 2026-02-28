@@ -11,8 +11,8 @@ import { disableCommand } from './skills/disable.js';
 import { installCommand } from './skills/install.js';
 import { linkCommand } from './skills/link.js';
 import { uninstallCommand } from './skills/uninstall.js';
-import { initializeOutputListenersAndFlush } from '../gemini.js';
 import { defer } from '../deferred.js';
+import { initializeOutputListenersAndFlush } from '../utils/outputListeners.js';
 
 export const skillsCommand: CommandModule = {
   command: 'skills <command>',
