@@ -11,6 +11,7 @@ import { shortAsciiLogo, longAsciiLogo, tinyAsciiLogo } from './AsciiArt.js';
 import { getAsciiArtWidth } from '../utils/textUtils.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useSnowfall } from '../hooks/useSnowfall.js';
+import { isDemo } from '@google/gemini-cli-core';
 
 interface HeaderProps {
   customAsciiArt?: string; // For user-defined ASCII art
@@ -49,7 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
       flexDirection="column"
     >
       <ThemedGradient>{title}</ThemedGradient>
-      {nightly && (
+      {nightly && !isDemo() && (
         <Box width="100%" flexDirection="row" justifyContent="flex-end">
           <ThemedGradient>v{version}</ThemedGradient>
         </Box>

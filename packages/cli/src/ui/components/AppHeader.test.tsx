@@ -9,8 +9,8 @@ import {
   persistentStateMock,
 } from '../../test-utils/render.js';
 import { AppHeader } from './AppHeader.js';
-import { describe, it, expect, vi } from 'vitest';
-import { makeFakeConfig } from '@google/gemini-cli-core';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { makeFakeConfig, AuthType } from '@google/gemini-cli-core';
 import crypto from 'node:crypto';
 
 vi.mock('../utils/terminalSetup.js', () => ({
@@ -18,6 +18,10 @@ vi.mock('../utils/terminalSetup.js', () => ({
 }));
 
 describe('<AppHeader />', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('should render the banner with default text', async () => {
     const mockConfig = makeFakeConfig();
     const uiState = {
@@ -260,5 +264,56 @@ describe('<AppHeader />', () => {
 
     expect(session2.lastFrame()).not.toContain('Tips');
     session2.unmount();
+  });
+
+  describe('isDemo mode', () => {
+    it('should hide user identity and version when enabled', async () => {
+      vi.stubEnv('IS_DEMO', 'true');
+      const mockConfig = makeFakeConfig();
+      // Ensure authType is set so UserIdentity *would* render
+      vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      });
+      vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue('Pro Plan');
+
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <AppHeader version="1.2.3" />,
+        {
+          config: mockConfig,
+          uiState: { history: [], nightly: true },
+        },
+      );
+      await waitUntilReady();
+
+      const frame = lastFrame();
+      expect(frame).not.toContain('Logged in with Google');
+      expect(frame).not.toContain('Plan: Pro Plan');
+      expect(frame).not.toContain('v1.2.3');
+      unmount();
+    });
+
+    it('should show user identity and version when disabled', async () => {
+      vi.stubEnv('IS_DEMO', 'false');
+      const mockConfig = makeFakeConfig();
+      vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      });
+      vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue('Pro Plan');
+
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <AppHeader version="1.2.3" />,
+        {
+          config: mockConfig,
+          uiState: { history: [], nightly: true },
+        },
+      );
+      await waitUntilReady();
+
+      const frame = lastFrame();
+      expect(frame).toContain('Logged in with Google');
+      expect(frame).toContain('Plan: Pro Plan');
+      expect(frame).toContain('v1.2.3');
+      unmount();
+    });
   });
 });

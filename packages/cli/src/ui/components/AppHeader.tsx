@@ -14,6 +14,7 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { Banner } from './Banner.js';
 import { useBanner } from '../hooks/useBanner.js';
 import { useTips } from '../hooks/useTips.js';
+import { isDemo } from '@google/gemini-cli-core';
 
 interface AppHeaderProps {
   version: string;
@@ -50,7 +51,7 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
           )}
         </>
       )}
-      {settings.merged.ui.showUserIdentity !== false && (
+      {settings.merged.ui.showUserIdentity !== false && !isDemo() && (
         <UserIdentity config={config} />
       )}
       {!(settings.merged.ui.hideTips || config.getScreenReader()) &&

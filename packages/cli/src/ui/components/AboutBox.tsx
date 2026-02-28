@@ -9,7 +9,7 @@ import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { useSettings } from '../contexts/SettingsContext.js';
-import { getDisplayString } from '@google/gemini-cli-core';
+import { getDisplayString, isDemo } from '@google/gemini-cli-core';
 
 interface AboutBoxProps {
   cliVersion: string;
@@ -105,7 +105,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
           <Text color={theme.text.primary}>{osVersion}</Text>
         </Box>
       </Box>
-      {showUserIdentity && (
+      {showUserIdentity && !isDemo() && (
         <Box flexDirection="row">
           <Box width="35%">
             <Text bold color={theme.text.link}>
