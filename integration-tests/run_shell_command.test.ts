@@ -18,6 +18,7 @@ const { shell } = getShellConfiguration();
 function getLineCountCommand(): { command: string; tool: string } {
   switch (shell) {
     case 'powershell':
+      return { command: `Measure-Object -Line`, tool: 'Measure-Object' };
     case 'cmd':
       return { command: `find /c /v`, tool: 'find' };
     case 'bash':
@@ -238,8 +239,12 @@ describe('run_shell_command', () => {
   });
 
   it('should succeed in yolo mode', async () => {
+    const isWindows = process.platform === 'win32';
     await rig.setup('should succeed in yolo mode', {
-      settings: { tools: { core: ['run_shell_command'] } },
+      settings: {
+        tools: { core: ['run_shell_command'] },
+        shell: isWindows ? { enableInteractiveShell: false } : undefined,
+      },
     });
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
