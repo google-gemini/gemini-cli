@@ -64,6 +64,10 @@ import type { RetryAvailabilityContext } from '../utils/retry.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import type { LlmRole } from '../telemetry/types.js';
+import {
+  isReadOnlyTask,
+  injectReadOnlyDenyRules,
+} from '../utils/readOnlyMode.js';
 
 const MAX_TURNS = 100;
 
@@ -796,6 +800,16 @@ export class GeminiClient {
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
+    }
+
+    // Enforce read-only constraints if the prompt explicitly prohibits file writes.
+    if (!isInvalidStreamRetry) {
+      const promptText = Array.isArray(request)
+        ? request.map((p) => partToString(p)).join(' ')
+        : partToString(request);
+      if (isReadOnlyTask(promptText)) {
+        injectReadOnlyDenyRules(this.config.getPolicyEngine());
+      }
     }
 
     const hooksEnabled = this.config.getEnableHooks();
