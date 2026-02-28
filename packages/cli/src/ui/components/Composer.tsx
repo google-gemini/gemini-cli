@@ -151,11 +151,30 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         : undefined,
     );
   const hideShortcutsHintForSuggestions = hideUiDetailsForSuggestions;
+  const isModelIdle = uiState.streamingState === StreamingState.Idle;
+  const isBufferEmpty = uiState.buffer.text.length === 0;
+  const canShowShortcutsHint =
+    isModelIdle && isBufferEmpty && !hasPendingActionRequired;
+  const [showShortcutsHintDebounced, setShowShortcutsHintDebounced] =
+    useState(canShowShortcutsHint);
+
+  useEffect(() => {
+    if (!canShowShortcutsHint) {
+      setShowShortcutsHintDebounced(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setShowShortcutsHintDebounced(true);
+    }, 200);
+
+    return () => clearTimeout(timeout);
+  }, [canShowShortcutsHint]);
+
   const showShortcutsHint =
     settings.merged.ui.showShortcutsHint &&
     !hideShortcutsHintForSuggestions &&
-    !hideMinimalModeHintWhileBusy &&
-    !hasPendingActionRequired;
+    showShortcutsHintDebounced;
   const showMinimalModeBleedThrough =
     !hideUiDetailsForSuggestions && Boolean(minimalModeBleedThrough);
   const showMinimalInlineLoading = !showUiDetails && showLoadingIndicator;
@@ -210,8 +229,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                 inline
                 thought={
                   uiState.streamingState ===
-                    StreamingState.WaitingForConfirmation ||
-                  settings.merged.ui.loadingPhrases === 'off'
+                  StreamingState.WaitingForConfirmation
                     ? undefined
                     : uiState.thought
                 }
@@ -254,8 +272,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                   inline
                   thought={
                     uiState.streamingState ===
-                      StreamingState.WaitingForConfirmation ||
-                    settings.merged.ui.loadingPhrases === 'off'
+                    StreamingState.WaitingForConfirmation
                       ? undefined
                       : uiState.thought
                   }

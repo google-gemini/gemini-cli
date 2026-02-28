@@ -266,7 +266,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
         "description": "Optional: A regular expression pattern to exclude from the search results. If a line matches both the pattern and the exclude_pattern, it will be omitted.",
         "type": "string",
       },
-      "include": {
+      "include_pattern": {
         "description": "Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).",
         "type": "string",
       },
@@ -333,7 +333,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
         "description": "If true, treats the \`pattern\` as a literal string instead of a regular expression. Defaults to false (basic regex) if omitted.",
         "type": "boolean",
       },
-      "include": {
+      "include_pattern": {
         "description": "Glob pattern to filter files (e.g., '*.ts', 'src/**'). Recommended for large repositories to reduce noise. Defaults to all files if omitted.",
         "type": "string",
       },
@@ -859,7 +859,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: ask_user 1`] = `
 {
-  "description": "Ask the user one or more questions to gather preferences, clarify requirements, or make decisions.",
+  "description": "Ask the user one or more questions to gather preferences, clarify requirements, or make decisions. When using this tool, prefer providing multiple-choice options with detailed descriptions and enable multi-select where appropriate to provide maximum flexibility.",
   "name": "ask_user",
   "parametersJsonSchema": {
     "properties": {
@@ -1053,7 +1053,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
         "description": "Optional: A regular expression pattern to exclude from the search results. If a line matches both the pattern and the exclude_pattern, it will be omitted.",
         "type": "string",
       },
-      "include": {
+      "include_pattern": {
         "description": "Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).",
         "type": "string",
       },
@@ -1120,7 +1120,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
         "description": "If true, treats the \`pattern\` as a literal string instead of a regular expression. Defaults to false (basic regex) if omitted.",
         "type": "boolean",
       },
-      "include": {
+      "include_pattern": {
         "description": "Glob pattern to filter files (e.g., '*.ts', 'src/**'). Recommended for large repositories to reduce noise. Defaults to all files if omitted.",
         "type": "string",
       },

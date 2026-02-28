@@ -225,8 +225,10 @@ import type {
 } from '../services/modelConfigService.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
+import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 
 vi.mock('../core/baseLlmClient.js');
+vi.mock('../core/localLiteRtLmClient.js');
 vi.mock('../core/tokenLimits.js', () => ({
   tokenLimit: vi.fn(),
 }));
@@ -499,6 +501,7 @@ describe('Server Config (config.ts)', () => {
       expect(createContentGeneratorConfig).toHaveBeenCalledWith(
         config,
         authType,
+        undefined,
       );
       // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
@@ -935,6 +938,31 @@ describe('Server Config (config.ts)', () => {
       };
       const config = new Config(paramsWithUndefinedRipgrep);
       expect(config.getUseRipgrep()).toBe(true);
+    });
+  });
+
+  describe('UseAlternateBuffer Configuration', () => {
+    it('should default useAlternateBuffer to false when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getUseAlternateBuffer()).toBe(false);
+    });
+
+    it('should set useAlternateBuffer to true when provided as true', () => {
+      const paramsWithAlternateBuffer: ConfigParameters = {
+        ...baseParams,
+        useAlternateBuffer: true,
+      };
+      const config = new Config(paramsWithAlternateBuffer);
+      expect(config.getUseAlternateBuffer()).toBe(true);
+    });
+
+    it('should set useAlternateBuffer to false when explicitly provided as false', () => {
+      const paramsWithAlternateBuffer: ConfigParameters = {
+        ...baseParams,
+        useAlternateBuffer: false,
+      };
+      const config = new Config(paramsWithAlternateBuffer);
+      expect(config.getUseAlternateBuffer()).toBe(false);
     });
   });
 
@@ -1414,6 +1442,79 @@ describe('Server Config (config.ts)', () => {
       // Defaults for unspecified fields
       expect(browserConfig.customConfig.sessionMode).toBe('persistent');
     });
+  });
+});
+
+describe('GemmaModelRouterSettings', () => {
+  const MODEL = DEFAULT_GEMINI_MODEL;
+  const SANDBOX: SandboxConfig = {
+    command: 'docker',
+    image: 'gemini-cli-sandbox',
+  };
+  const TARGET_DIR = '/path/to/target';
+  const DEBUG_MODE = false;
+  const QUESTION = 'test question';
+  const USER_MEMORY = 'Test User Memory';
+  const TELEMETRY_SETTINGS = { enabled: false };
+  const EMBEDDING_MODEL = 'gemini-embedding';
+  const SESSION_ID = 'test-session-id';
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    embeddingModel: EMBEDDING_MODEL,
+    sandbox: SANDBOX,
+    targetDir: TARGET_DIR,
+    debugMode: DEBUG_MODE,
+    question: QUESTION,
+    userMemory: USER_MEMORY,
+    telemetry: TELEMETRY_SETTINGS,
+    sessionId: SESSION_ID,
+    model: MODEL,
+    usageStatisticsEnabled: false,
+  };
+
+  it('should default gemmaModelRouter.enabled to false', () => {
+    const config = new Config(baseParams);
+    expect(config.getGemmaModelRouterEnabled()).toBe(false);
+  });
+
+  it('should return default gemma model router settings when not provided', () => {
+    const config = new Config(baseParams);
+    const settings = config.getGemmaModelRouterSettings();
+    expect(settings.enabled).toBe(false);
+    expect(settings.classifier?.host).toBe('http://localhost:9379');
+    expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
+  });
+
+  it('should override default gemma model router settings when provided', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      gemmaModelRouter: {
+        enabled: true,
+        classifier: {
+          host: 'http://custom:1234',
+          model: 'custom-gemma',
+        },
+      },
+    };
+    const config = new Config(params);
+    const settings = config.getGemmaModelRouterSettings();
+    expect(settings.enabled).toBe(true);
+    expect(settings.classifier?.host).toBe('http://custom:1234');
+    expect(settings.classifier?.model).toBe('custom-gemma');
+  });
+
+  it('should merge partial gemma model router settings with defaults', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      gemmaModelRouter: {
+        enabled: true,
+      },
+    };
+    const config = new Config(params);
+    const settings = config.getGemmaModelRouterSettings();
+    expect(settings.enabled).toBe(true);
+    expect(settings.classifier?.host).toBe('http://localhost:9379');
+    expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
   });
 });
 
@@ -2065,6 +2166,71 @@ describe('Config getHooks', () => {
 
       expect(onModelChange).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('LocalLiteRtLmClient Lifecycle', () => {
+  const MODEL = 'gemini-pro';
+  const SANDBOX: SandboxConfig = {
+    command: 'docker',
+    image: 'gemini-cli-sandbox',
+  };
+  const TARGET_DIR = '/path/to/target';
+  const DEBUG_MODE = false;
+  const QUESTION = 'test question';
+  const USER_MEMORY = 'Test User Memory';
+  const TELEMETRY_SETTINGS = { enabled: false };
+  const EMBEDDING_MODEL = 'gemini-embedding';
+  const SESSION_ID = 'test-session-id';
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    embeddingModel: EMBEDDING_MODEL,
+    sandbox: SANDBOX,
+    targetDir: TARGET_DIR,
+    debugMode: DEBUG_MODE,
+    question: QUESTION,
+    userMemory: USER_MEMORY,
+    telemetry: TELEMETRY_SETTINGS,
+    sessionId: SESSION_ID,
+    model: MODEL,
+    usageStatisticsEnabled: false,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getExperiments).mockResolvedValue({
+      experimentIds: [],
+      flags: {},
+    });
+  });
+
+  it('should successfully initialize LocalLiteRtLmClient on first call and reuse it', () => {
+    const config = new Config(baseParams);
+    const client1 = config.getLocalLiteRtLmClient();
+    const client2 = config.getLocalLiteRtLmClient();
+
+    expect(client1).toBeDefined();
+    expect(client1).toBe(client2); // Should return the same instance
+  });
+
+  it('should configure LocalLiteRtLmClient with settings from getGemmaModelRouterSettings', () => {
+    const customHost = 'http://my-custom-host:9999';
+    const customModel = 'my-custom-gemma-model';
+    const params: ConfigParameters = {
+      ...baseParams,
+      gemmaModelRouter: {
+        enabled: true,
+        classifier: {
+          host: customHost,
+          model: customModel,
+        },
+      },
+    };
+
+    const config = new Config(params);
+    config.getLocalLiteRtLmClient();
+
+    expect(LocalLiteRtLmClient).toHaveBeenCalledWith(config);
   });
 });
 
