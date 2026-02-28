@@ -18,14 +18,14 @@ export interface EditorDisplay {
 }
 
 class EditorSettingsManager {
-  private readonly availableEditors: EditorDisplay[];
+  private availableEditors: EditorDisplay[] | undefined;
 
-  constructor() {
+  private computeAvailableEditors(): EditorDisplay[] {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const editorTypes = Object.keys(
       EDITOR_DISPLAY_NAMES,
     ).sort() as EditorType[];
-    this.availableEditors = [
+    return [
       {
         name: 'None',
         type: 'not_set',
@@ -50,6 +50,9 @@ class EditorSettingsManager {
   }
 
   getAvailableEditorDisplays(): EditorDisplay[] {
+    if (!this.availableEditors) {
+      this.availableEditors = this.computeAvailableEditors();
+    }
     return this.availableEditors;
   }
 }
