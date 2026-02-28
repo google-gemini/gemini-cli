@@ -916,6 +916,7 @@ export function stripEnvPrefix(command: string): string | undefined {
       if (child) queue.push(child);
     }
   }
+  return undefined;
 }
 
 /**
