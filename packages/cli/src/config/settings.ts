@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { platform } from 'node:os';
 import * as dotenv from 'dotenv';
 import process from 'node:process';
+import { z } from 'zod';
 import {
   CoreEvent,
   FatalConfigError,
@@ -642,11 +643,9 @@ export function loadSettings(
         const content = fs.readFileSync(filePath, 'utf-8');
         const rawSettings: unknown = JSON.parse(stripJsonComments(content));
 
-        if (
-          typeof rawSettings !== 'object' ||
-          rawSettings === null ||
-          Array.isArray(rawSettings)
-        ) {
+        const parsedRecord = z.record(z.unknown()).safeParse(rawSettings);
+
+        if (!parsedRecord.success) {
           settingsErrors.push({
             message: 'Settings file is not a valid JSON object.',
             path: filePath,
@@ -655,8 +654,7 @@ export function loadSettings(
           return { settings: {} };
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const settingsObject = rawSettings as Record<string, unknown>;
+        const settingsObject = parsedRecord.data;
 
         // Validate settings structure with Zod
         const validationResult = validateSettings(settingsObject);
@@ -672,7 +670,7 @@ export function loadSettings(
           });
         }
 
-        return { settings: settingsObject as Settings, rawJson: content };
+        return { settings: validationResult.data, rawJson: content };
       }
     } catch (error: unknown) {
       settingsErrors.push({
