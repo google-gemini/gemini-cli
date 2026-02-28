@@ -331,7 +331,7 @@ export function renderOperationalGuidelines(
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
 
 ## Security and Safety Rules
-- **Explain Critical Commands:** Before executing commands with ${formatToolName(SHELL_TOOL_NAME)} that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
+- **Explain Critical Commands:** Before executing commands with ${formatToolName(SHELL_TOOL_NAME)} that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this). You MUST NOT use ${formatToolName(ASK_USER_TOOL_NAME)} to ask for permission to run a command.
 - **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
 
 ## Tool Usage
@@ -472,7 +472,7 @@ ${options.planModeToolsList}
 ## Rules
 1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`${options.plansDir}/\`. If the user asks you to modify source code directly, you MUST explain that you are in Plan Mode and must first create a plan and get approval.
 2. **Write Constraint:** ${formatToolName(WRITE_FILE_TOOL_NAME)} and ${formatToolName(EDIT_TOOL_NAME)} may ONLY be used to write .md plan files to \`${options.plansDir}/\`. They cannot modify source code.
-3. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use ${formatToolName(ASK_USER_TOOL_NAME)} to clarify.
+3. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use ${formatToolName(ASK_USER_TOOL_NAME)} to clarify. Use multi-select to offer flexibility and include detailed descriptions for each option to help the user understand the implications of their choice.
 4. **Inquiries and Directives:** Distinguish between Inquiries and Directives to minimize unnecessary planning.
    - **Inquiries:** If the request is an **Inquiry** (e.g., "How does X work?"), answer directly. DO NOT create a plan.
    - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below.
