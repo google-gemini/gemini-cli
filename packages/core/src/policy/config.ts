@@ -514,6 +514,40 @@ export function createPolicyUpdater(
       }
 
       if (message.persist) {
+        // Validation safeguards for auto-adding to persistent policy
+        if (!toolName || toolName === '*') {
+          coreEvents.emitFeedback(
+            'warning',
+            'Policy for all tools was not auto-saved for safety reasons. You can add it manually to your policy file if desired.',
+          );
+          return;
+        }
+
+        const broadPatternRegex = /^\s*(\^)?\.\*(\$)?\s*$/;
+        if (
+          message.argsPattern &&
+          broadPatternRegex.test(message.argsPattern)
+        ) {
+          coreEvents.emitFeedback(
+            'warning',
+            `Policy for "${toolName}" with all arguments was not auto-saved for safety reasons. You can add it manually to your policy file if desired.`,
+          );
+          return;
+        }
+
+        const isMcpTool = !!message.mcpName;
+        if (
+          (message.isSensitive || isMcpTool) &&
+          !message.argsPattern &&
+          !message.commandPrefix
+        ) {
+          coreEvents.emitFeedback(
+            'warning',
+            `Broad approval for "${toolName}" was not auto-saved for safety reasons. Approvals for sensitive tools must be specific to be auto-saved.`,
+          );
+          return;
+        }
+
         persistenceQueue = persistenceQueue.then(async () => {
           try {
             const policyFile = storage.getAutoSavedPolicyPath();
@@ -568,6 +602,36 @@ export function createPolicyUpdater(
             } else if (message.argsPattern) {
               // message.argsPattern was already validated above
               newRule.argsPattern = message.argsPattern;
+            }
+
+            // De-duplicate: check if an identical rule already exists
+            const isDuplicate = existingData.rule.some((r) => {
+              const matchesTool = r.toolName === newRule.toolName;
+              const matchesMcp = r.mcpName === newRule.mcpName;
+              const matchesPattern = r.argsPattern === newRule.argsPattern;
+
+              const rPrefix = r.commandPrefix;
+              const newPrefix = newRule.commandPrefix;
+
+              let matchesPrefix = false;
+              if (Array.isArray(rPrefix) && Array.isArray(newPrefix)) {
+                matchesPrefix =
+                  rPrefix.length === newPrefix.length &&
+                  rPrefix.every((v, i) => v === newPrefix[i]);
+              } else {
+                matchesPrefix = rPrefix === newPrefix;
+              }
+
+              return (
+                matchesTool && matchesMcp && matchesPattern && matchesPrefix
+              );
+            });
+
+            if (isDuplicate) {
+              debugLogger.debug(
+                `Policy rule for ${toolName} already exists in persistent policy, skipping.`,
+              );
+              return;
             }
 
             // Add to rules

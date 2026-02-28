@@ -1480,6 +1480,16 @@ const SETTINGS_SCHEMA = {
           'Enable the "Allow for all future sessions" option in tool confirmation dialogs.',
         showInDialog: true,
       },
+      autoAddPolicy: {
+        type: 'boolean',
+        label: 'Auto-add to Policy',
+        category: 'Security',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Automatically add "Proceed always" approvals to your persistent policy.',
+        showInDialog: true,
+      },
       blockGitExtensions: {
         type: 'boolean',
         label: 'Blocks extensions from Git',

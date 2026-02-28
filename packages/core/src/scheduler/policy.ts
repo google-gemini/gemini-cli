@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { escapeJsonRegex } from '../policy/utils.js';
 import { ToolErrorType } from '../tools/tool-error.js';
+import {
+  MCP_QUALIFIED_NAME_SEPARATOR,
+  DiscoveredMCPTool,
+} from '../tools/mcp-tool.js';
 import {
   ApprovalMode,
   PolicyDecision,
@@ -22,9 +27,36 @@ import {
   type AnyDeclarativeTool,
   type PolicyUpdateOptions,
 } from '../tools/tools.js';
-import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
+import {
+  EDIT_TOOL_NAMES,
+  READ_FILE_TOOL_NAME,
+  LS_TOOL_NAME,
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+  WRITE_TODOS_TOOL_NAME,
+  GET_INTERNAL_DOCS_TOOL_NAME,
+} from '../tools/tool-names.js';
 import type { ValidatingToolCall } from './types.js';
+
+interface ToolWithParams {
+  params: Record<string, unknown>;
+}
+
+function hasParams(
+  tool: AnyDeclarativeTool,
+): tool is AnyDeclarativeTool & ToolWithParams {
+  const t = tool as unknown;
+  return (
+    typeof t === 'object' &&
+    t !== null &&
+    'params' in t &&
+    typeof (t as { params: unknown }).params === 'object' &&
+    (t as { params: unknown }).params !== null
+  );
+}
 
 /**
  * Helper to format the policy denial error.
@@ -99,7 +131,6 @@ export async function updatePolicy(
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
     deps.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-    return;
   }
 
   // Specialized Tools (MCP)
@@ -108,6 +139,7 @@ export async function updatePolicy(
       tool,
       outcome,
       confirmationDetails,
+      deps.config,
       deps.messageBus,
     );
     return;
@@ -118,6 +150,7 @@ export async function updatePolicy(
     tool,
     outcome,
     confirmationDetails,
+    deps.config,
     deps.messageBus,
   );
 }
@@ -139,6 +172,99 @@ function isAutoEditTransition(
   );
 }
 
+type SpecificityGenerator = (
+  tool: AnyDeclarativeTool,
+  confirmationDetails?: SerializableConfirmationDetails,
+) => string | undefined;
+
+const specificityGenerators: Record<string, SpecificityGenerator> = {
+  [READ_FILE_TOOL_NAME]: (tool) => {
+    if (!hasParams(tool)) return undefined;
+    const filePath = tool.params['file_path'];
+    if (typeof filePath !== 'string') return undefined;
+    const escapedPath = escapeJsonRegex(filePath);
+    return `.*"file_path":"${escapedPath}".*`;
+  },
+  [LS_TOOL_NAME]: (tool) => {
+    if (!hasParams(tool)) return undefined;
+    const dirPath = tool.params['dir_path'];
+    if (typeof dirPath !== 'string') return undefined;
+    const escapedPath = escapeJsonRegex(dirPath);
+    return `.*"dir_path":"${escapedPath}".*`;
+  },
+  [GLOB_TOOL_NAME]: (tool) => specificityGenerators[LS_TOOL_NAME](tool),
+  [GREP_TOOL_NAME]: (tool) => specificityGenerators[LS_TOOL_NAME](tool),
+  [READ_MANY_FILES_TOOL_NAME]: (tool) => {
+    if (!hasParams(tool)) return undefined;
+    const include = tool.params['include'];
+    if (!Array.isArray(include) || include.length === 0) return undefined;
+    const lookaheads = include
+      .map((p) => escapeJsonRegex(String(p)))
+      .map((p) => `(?=.*"${p}")`)
+      .join('');
+    const pattern = `.*"include":\\[${lookaheads}.*\\].*`;
+
+    // Limit regex length for safety
+    if (pattern.length > 2048) {
+      return '.*"include":\\[.*\\].*';
+    }
+
+    return pattern;
+  },
+  [WEB_FETCH_TOOL_NAME]: (tool) => {
+    if (!hasParams(tool)) return undefined;
+    const url = tool.params['url'];
+    if (typeof url === 'string') {
+      const escaped = escapeJsonRegex(url);
+      return `.*"url":"${escaped}".*`;
+    }
+
+    const prompt = tool.params['prompt'];
+    if (typeof prompt !== 'string') return undefined;
+    const urlMatches = prompt.matchAll(/https?:\/\/[^\s"']+/g);
+    const urls = Array.from(urlMatches)
+      .map((m) => m[0])
+      .slice(0, 3);
+    if (urls.length === 0) return undefined;
+    const lookaheads = urls
+      .map((u) => escapeJsonRegex(u))
+      .map((u) => `(?=.*${u})`)
+      .join('');
+    return `.*${lookaheads}.*`;
+  },
+  [WEB_SEARCH_TOOL_NAME]: (tool) => {
+    if (!hasParams(tool)) return undefined;
+    const query = tool.params['query'];
+    if (typeof query === 'string') {
+      const escaped = escapeJsonRegex(query);
+      return `.*"query":"${escaped}".*`;
+    }
+    // Fallback to a pattern that matches any arguments
+    // but isn't just ".*" to satisfy the auto-add safeguard.
+    return '\\{.*\\}';
+  },
+  [WRITE_TODOS_TOOL_NAME]: (tool) => {
+    if (!hasParams(tool)) return undefined;
+    const todos = tool.params['todos'];
+    if (!Array.isArray(todos)) return undefined;
+    const escaped = todos
+      .filter(
+        (v): v is { description: string } => typeof v?.description === 'string',
+      )
+      .map((v) => escapeJsonRegex(v.description))
+      .join('|');
+    if (!escaped) return undefined;
+    return `.*"todos":\\[.*(?:${escaped}).*\\].*`;
+  },
+  [GET_INTERNAL_DOCS_TOOL_NAME]: (tool) => {
+    if (!hasParams(tool)) return undefined;
+    const filePath = tool.params['file_path'];
+    if (typeof filePath !== 'string') return undefined;
+    const escaped = escapeJsonRegex(filePath);
+    return `.*"file_path":"${escaped}".*`;
+  },
+};
+
 /**
  * Handles policy updates for standard tools (Shell, Info, etc.), including
  * session-level and persistent approvals.
@@ -147,6 +273,7 @@ async function handleStandardPolicyUpdate(
   tool: AnyDeclarativeTool,
   outcome: ToolConfirmationOutcome,
   confirmationDetails: SerializableConfirmationDetails | undefined,
+  config: Config,
   messageBus: MessageBus,
 ): Promise<void> {
   if (
@@ -159,10 +286,27 @@ async function handleStandardPolicyUpdate(
       options.commandPrefix = confirmationDetails.rootCommands;
     }
 
+    if (confirmationDetails?.type === 'edit') {
+      // Generate a specific argsPattern for file edits to prevent broad approvals
+      const escapedPath = escapeJsonRegex(confirmationDetails.filePath);
+      options.argsPattern = `.*"file_path":"${escapedPath}".*`;
+    } else {
+      const generator = specificityGenerators[tool.name];
+      if (generator) {
+        options.argsPattern = generator(tool, confirmationDetails);
+      }
+    }
+
+    const persist =
+      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave ||
+      (outcome === ToolConfirmationOutcome.ProceedAlways &&
+        config.getAutoAddPolicy());
+
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
       toolName: tool.name,
-      persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
+      persist,
+      isSensitive: tool.isSensitive,
       ...options,
     });
   }
@@ -179,6 +323,7 @@ async function handleMcpPolicyUpdate(
     SerializableConfirmationDetails,
     { type: 'mcp' }
   >,
+  config: Config,
   messageBus: MessageBus,
 ): Promise<void> {
   const isMcpAlways =
@@ -192,17 +337,31 @@ async function handleMcpPolicyUpdate(
   }
 
   let toolName = tool.name;
-  const persist = outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave;
+  const persist =
+    outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave ||
+    (outcome === ToolConfirmationOutcome.ProceedAlways &&
+      config.getAutoAddPolicy());
 
   // If "Always allow all tools from this server", use the wildcard pattern
   if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
-    toolName = `${confirmationDetails.serverName}__*`;
+    toolName = `${confirmationDetails.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}*`;
   }
+
+  // MCP tools are treated as sensitive, so we MUST provide a specific argsPattern
+  // or commandPrefix to satisfy the auto-add safeguard in createPolicyUpdater.
+  // For single-tool approvals, we default to a pattern that matches the JSON structure
+  // of the arguments string (e.g. \{.*\}).
+  const argsPattern =
+    outcome !== ToolConfirmationOutcome.ProceedAlwaysServer
+      ? '\\{.*\\}'
+      : undefined;
 
   await messageBus.publish({
     type: MessageBusType.UPDATE_POLICY,
     toolName,
     mcpName: confirmationDetails.serverName,
     persist,
+    isSensitive: tool.isSensitive,
+    argsPattern,
   });
 }

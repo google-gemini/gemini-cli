@@ -179,6 +179,7 @@ describe('createPolicyUpdater', () => {
       toolName,
       persist: true,
       mcpName,
+      argsPattern: '{"issue": ".*"}',
     });
 
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -189,6 +190,7 @@ describe('createPolicyUpdater', () => {
     const writtenContent = writeCall[0] as string;
     expect(writtenContent).toContain(`mcpName = "${mcpName}"`);
     expect(writtenContent).toContain(`toolName = "${simpleToolName}"`);
+    expect(writtenContent).toContain(`argsPattern = '{"issue": ".*"}'`);
     expect(writtenContent).toContain('priority = 200');
   });
 
@@ -218,6 +220,7 @@ describe('createPolicyUpdater', () => {
       toolName,
       persist: true,
       mcpName,
+      argsPattern: '{"query": ".*"}',
     });
 
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -240,5 +243,7 @@ describe('createPolicyUpdater', () => {
     } catch {
       expect(writtenContent).toContain(`toolName = 'search"tool"'`);
     }
+
+    expect(writtenContent).toContain(`argsPattern = '{"query": ".*"}'`);
   });
 });

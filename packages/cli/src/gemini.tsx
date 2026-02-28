@@ -594,6 +594,13 @@ export async function main() {
     const messageBus = config.getMessageBus();
     createPolicyUpdater(policyEngine, messageBus, config.storage);
 
+    // Listen for settings changes to update reactive config properties
+    coreEvents.on(CoreEvent.SettingsChanged, () => {
+      if (settings.merged.security.autoAddPolicy !== undefined) {
+        config.setAutoAddPolicy(settings.merged.security.autoAddPolicy);
+      }
+    });
+
     // Register SessionEnd hook to fire on graceful exit
     // This runs before telemetry shutdown in runExitCleanup()
     registerCleanup(async () => {

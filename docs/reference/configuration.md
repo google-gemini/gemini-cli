@@ -866,6 +866,11 @@ their corresponding top-level category object in your `settings.json` file.
     confirmation dialogs.
   - **Default:** `false`
 
+- **`security.autoAddPolicy`** (boolean):
+  - **Description:** Automatically add "Proceed always" approvals to your
+    persistent policy.
+  - **Default:** `true`
+
 - **`security.blockGitExtensions`** (boolean):
   - **Description:** Blocks installing and loading extensions from Git.
   - **Default:** `false`
