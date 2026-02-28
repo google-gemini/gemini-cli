@@ -222,19 +222,16 @@ export class LoggingContentGenerator implements ContentGenerator {
     }
 
     // Case 3: Custom base URL set via GOOGLE_GEMINI_BASE_URL or GEMINI_API_BASE_URL.
+    // resolveCustomBaseUrl() already validates the URL, so new URL() won't throw here.
     const customBaseUrl = resolveCustomBaseUrl();
     if (customBaseUrl) {
-      try {
-        const parsed = new URL(customBaseUrl);
-        const port = parsed.port
-          ? parseInt(parsed.port, 10)
-          : parsed.protocol === 'https:'
-            ? 443
-            : 80;
-        return { address: parsed.hostname, port };
-      } catch {
-        // Invalid URL — fall through to default
-      }
+      const parsed = new URL(customBaseUrl);
+      const port = parsed.port
+        ? parseInt(parsed.port, 10)
+        : parsed.protocol === 'https:'
+          ? 443
+          : 80;
+      return { address: parsed.hostname, port };
     }
 
     // Case 4: Default to the public Gemini API endpoint.
