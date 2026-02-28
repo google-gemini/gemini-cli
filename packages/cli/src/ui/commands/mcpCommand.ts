@@ -23,6 +23,7 @@ import {
 } from '@google/gemini-cli-core';
 import { appEvents, AppEvent } from '../../utils/events.js';
 import { MessageType, type HistoryItemMcpStatus } from '../types.js';
+import { loadSettings, SettingScope } from '../../config/settings.js';
 
 const authCommand: SlashCommand = {
   name: 'auth',
@@ -346,6 +347,114 @@ const refreshCommand: SlashCommand = {
   },
 };
 
+const removeCommand: SlashCommand = {
+  name: 'remove',
+  altNames: ['rm', 'delete'],
+  description: 'Remove an MCP server',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: async (
+    context: CommandContext,
+    args: string,
+  ): Promise<void | SlashCommandActionReturn> => {
+    const { config } = context.services;
+    if (!config) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Config not loaded.',
+      };
+    }
+
+    const parts = args.trim().split(' ').filter(Boolean);
+    const serverName = parts[0];
+
+    if (!serverName) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Usage: /mcp remove <server> [--scope=<user|project>]',
+      };
+    }
+
+    let scope: SettingScope = SettingScope.Workspace;
+
+    // Parse --scope flag if present
+    if (parts.length > 1) {
+      // Handle --scope=<scope> and --scope <scope>
+      if (parts.length === 2 && parts[1].startsWith('--scope=')) {
+        parts.push(...parts[1].split('='));
+        parts.splice(1, 1);
+      }
+
+      if (parts[1] === '--scope') {
+        switch (parts[2]?.toLowerCase()) {
+          case 'workspace':
+          case 'project':
+            scope = SettingScope.Workspace;
+            break;
+          case 'user':
+            scope = SettingScope.User;
+            break;
+          default:
+            return {
+              type: 'message',
+              messageType: 'error',
+              content: `Unsupported scope ${parts[2]}, should be one of "user" or "project"`,
+            };
+        }
+      }
+    }
+
+    const settings = loadSettings();
+    const existingSettings = settings.forScope(scope).settings;
+    const mcpServers = existingSettings.mcpServers || {};
+
+    if (!mcpServers[serverName]) {
+      const scopeStr = scope === SettingScope.User ? 'user' : 'project';
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Server "${serverName}" not found in ${scopeStr} settings.`,
+      };
+    }
+
+    delete mcpServers[serverName];
+    settings.setValue(scope, 'mcpServers', mcpServers);
+
+    const scopeStr = scope === SettingScope.User ? 'user' : 'project';
+    context.ui.addItem({
+      type: 'info',
+      text: `Removed MCP server '${serverName}' from ${scopeStr} settings. Restarting MCP servers...`,
+    });
+
+    const mcpClientManager = config.getMcpClientManager();
+    if (mcpClientManager) {
+      await mcpClientManager.restart();
+    }
+
+    // Update the client with the new tools
+    const geminiClient = config.getGeminiClient();
+    if (geminiClient?.isInitialized()) {
+      await geminiClient.setTools();
+    }
+
+    // Reload the slash commands to reflect the changes.
+    context.ui.reloadCommands();
+
+    return listCommand.action!(context, '');
+  },
+  completion: async (context: CommandContext, partialArg: string) => {
+    const { config } = context.services;
+    if (!config) return [];
+
+    const mcpServers = config.getMcpClientManager()?.getMcpServers() || {};
+    return Object.keys(mcpServers).filter((name) =>
+      name.startsWith(partialArg),
+    );
+  },
+};
+
 export const mcpCommand: SlashCommand = {
   name: 'mcp',
   description: 'Manage configured Model Context Protocol (MCP) servers',
@@ -357,6 +466,7 @@ export const mcpCommand: SlashCommand = {
     schemaCommand,
     authCommand,
     refreshCommand,
+    removeCommand,
   ],
   action: async (context: CommandContext) => listAction(context),
 };
