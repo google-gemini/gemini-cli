@@ -75,9 +75,9 @@ An unproductive state requires BOTH of the following to be true:
 2. The repetition produces NO net change or forward progress toward the user's goal.
 
 Specific patterns to look for:
-- **Alternating cycles:** The assistant cycles between a small set of actions (e.g., tool_A → tool_B → tool_A → tool_B) with no observable change in state across iterations.
-- **Semantic repetition:** The assistant calls the same tool with semantically equivalent arguments (same file, same line range, same content) repeatedly, without advancing the task.
-- **Cognitive loops:** The assistant repeatedly asks the same question, expresses the same confusion, or regenerates the same analysis without acting on it.
+- **Alternating cycles with no net effect:** The assistant cycles between the same actions (e.g., edit_file → run_build → edit_file → run_build) where each iteration applies the same edit and encounters the same error, making zero progress. Note: alternating between actions is only a loop if the arguments and outcomes are substantively identical each cycle. If the assistant is modifying different code or getting different errors, that is debugging progress, not a loop.
+- **Semantic repetition with identical outcomes:** The assistant calls the same tool with semantically equivalent arguments (same file, same line range, same content) multiple times consecutively, and each call produces the same outcome. This does NOT include build/test commands that are re-run after making code changes between invocations — re-running a build to verify a fix is normal workflow.
+- **Stuck reasoning:** The assistant produces multiple consecutive text responses that restate the same plan, question, or analysis without taking any new action or making a decision. This does NOT include command output that happens to contain repeated status lines or warnings.
 
 ## What is NOT an unproductive state
 
