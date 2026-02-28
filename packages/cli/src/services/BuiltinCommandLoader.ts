@@ -38,6 +38,7 @@ import { hooksCommand } from '../ui/commands/hooksCommand.js';
 import { ideCommand } from '../ui/commands/ideCommand.js';
 import { initCommand } from '../ui/commands/initCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
+import { newCommand } from '../ui/commands/newCommand.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
 import { modelCommand } from '../ui/commands/modelCommand.js';
 import { oncallCommand } from '../ui/commands/oncallCommand.js';
@@ -90,6 +91,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
           : chatCommand.subCommands,
       },
       clearCommand,
+      newCommand,
       commandsCommand,
       compressCommand,
       copyCommand,
