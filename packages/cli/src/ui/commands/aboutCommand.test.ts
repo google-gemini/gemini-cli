@@ -9,7 +9,12 @@ import { aboutCommand } from './aboutCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
-import { IdeClient, getVersion } from '@google/gemini-cli-core';
+import {
+  IdeClient,
+  getVersion,
+  getCodeAssistServer,
+  type CodeAssistServer,
+} from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -25,6 +30,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       getCachedGoogleAccount: vi.fn().mockReturnValue('test-email@example.com'),
     })),
     getVersion: vi.fn(),
+    getCodeAssistServer: vi.fn(),
   };
 });
 
@@ -172,6 +178,59 @@ describe('aboutCommand', () => {
     expect(mockContext.ui.addItem).toHaveBeenCalledWith(
       expect.objectContaining({
         tier: 'Enterprise Tier',
+      }),
+    );
+  });
+
+  it('should prefer GCP project from Code Assist server over env var', async () => {
+    vi.mocked(getCodeAssistServer).mockReturnValue({
+      projectId: 'ca-server-project',
+    } as CodeAssistServer);
+    process.env['GOOGLE_CLOUD_PROJECT'] = 'env-project';
+
+    if (!aboutCommand.action) {
+      throw new Error('The about command must have an action.');
+    }
+
+    await aboutCommand.action(mockContext, '');
+
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gcpProject: 'ca-server-project',
+      }),
+    );
+  });
+
+  it('should fall back to env var when Code Assist server has no project', async () => {
+    vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
+    process.env['GOOGLE_CLOUD_PROJECT'] = 'env-project';
+
+    if (!aboutCommand.action) {
+      throw new Error('The about command must have an action.');
+    }
+
+    await aboutCommand.action(mockContext, '');
+
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gcpProject: 'env-project',
+      }),
+    );
+  });
+
+  it('should return empty string when no GCP project available', async () => {
+    vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
+    delete process.env['GOOGLE_CLOUD_PROJECT'];
+
+    if (!aboutCommand.action) {
+      throw new Error('The about command must have an action.');
+    }
+
+    await aboutCommand.action(mockContext, '');
+
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gcpProject: '',
       }),
     );
   });

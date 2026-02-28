@@ -13,6 +13,7 @@ import {
   UserAccountManager,
   debugLogger,
   getVersion,
+  getCodeAssistServer,
 } from '@google/gemini-cli-core';
 
 export const aboutCommand: SlashCommand = {
@@ -34,7 +35,7 @@ export const aboutCommand: SlashCommand = {
     const cliVersion = await getVersion();
     const selectedAuthType =
       context.services.settings.merged.security.auth.selectedType || '';
-    const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'] || '';
+    const gcpProject = getGcpProject(context);
     const ideClient = await getIdeClientName(context);
 
     const userAccountManager = new UserAccountManager();
@@ -62,6 +63,21 @@ export const aboutCommand: SlashCommand = {
     context.ui.addItem(aboutItem);
   },
 };
+
+/**
+ * Resolves the GCP project ID.
+ * Prefers the project ID from the Code Assist server (set during auth),
+ * falling back to the GOOGLE_CLOUD_PROJECT environment variable.
+ */
+function getGcpProject(context: CommandContext): string {
+  if (context.services.config) {
+    const caServer = getCodeAssistServer(context.services.config);
+    if (caServer?.projectId) {
+      return caServer.projectId;
+    }
+  }
+  return process.env['GOOGLE_CLOUD_PROJECT'] || '';
+}
 
 async function getIdeClientName(context: CommandContext) {
   if (!context.services.config?.getIdeMode()) {
