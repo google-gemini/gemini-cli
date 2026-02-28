@@ -119,6 +119,7 @@ export async function getCorrectedFileContent(
     abortSignal,
     config.getDisableLLMCorrection(),
     aggressiveUnescape,
+    filePath,
   );
 
   return { originalContent, correctedContent, fileExists };

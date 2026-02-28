@@ -20,6 +20,7 @@ let mockGenerateJson: any;
 import {
   ensureCorrectFileContent,
   unescapeStringForGeminiBug,
+  repairPythonStringLiterals,
   resetEditCorrectorCaches_TEST_ONLY,
 } from './editCorrector.js';
 
@@ -95,6 +96,70 @@ describe('editCorrector', () => {
     });
   });
 
+describe('repairPythonStringLiterals', () => {
+    it('should repair a broken f-string across two lines', () => {
+      const broken = 'f.write(f"{sid}\n")';
+      const expected = 'f.write(f"{sid}\\n")';
+      expect(repairPythonStringLiterals(broken)).toBe(expected);
+    });
+
+    it('should repair a broken regular string across two lines', () => {
+      const broken = 'x = "hello\nworld"';
+      const expected = 'x = "hello\\nworld"';
+      expect(repairPythonStringLiterals(broken)).toBe(expected);
+    });
+
+    it('should repair a broken single-quoted string', () => {
+      const broken = "x = 'hello\nworld'";
+      const expected = "x = 'hello\\nworld'";
+      expect(repairPythonStringLiterals(broken)).toBe(expected);
+    });
+
+    it('should not modify triple-quoted strings', () => {
+      const tripleQuoted = '    x = """hello\nworld\nfoo"""';
+      expect(repairPythonStringLiterals(tripleQuoted)).toBe(tripleQuoted);
+    });
+
+    it('should not modify properly closed strings', () => {
+      const correct = 'x = "hello world"\ny = "foo bar"';
+      expect(repairPythonStringLiterals(correct)).toBe(correct);
+    });
+
+    it('should not modify strings with escaped newlines', () => {
+      const correct = 'x = "hello\\nworld"';
+      expect(repairPythonStringLiterals(correct)).toBe(correct);
+    });
+
+    it('should handle multiple broken strings in the same file', () => {
+      const broken = 'a = "line1\nstill line1"\nb = "line2\nstill line2"';
+      const expected = 'a = "line1\\nstill line1"\nb = "line2\\nstill line2"';
+      expect(repairPythonStringLiterals(broken)).toBe(expected);
+    });
+
+    it('should handle a broken f-string with format spec', () => {
+      const broken = 'log.info(f"Processing {item}\n for user {user}")';
+      const expected = 'log.info(f"Processing {item}\\n for user {user}")';
+      expect(repairPythonStringLiterals(broken)).toBe(expected);
+    });
+
+    it('should not modify lines with comments containing quotes', () => {
+      const correct = "x = 42  # this isn't a string\ny = 10";
+      expect(repairPythonStringLiterals(correct)).toBe(correct);
+    });
+
+    it('should return empty string for empty input', () => {
+      expect(repairPythonStringLiterals('')).toBe('');
+    });
+
+    it('should handle the exact issue pattern from the bug report', () => {
+      const broken =
+        '    f.write(f"{sid}\n")';
+      const expected =
+        '    f.write(f"{sid}\\n")';
+      expect(repairPythonStringLiterals(broken)).toBe(expected);
+    });
+  });
+    
   describe('ensureCorrectFileContent', () => {
     let mockBaseLlmClientInstance: Mocked<BaseLlmClient>;
     const abortSignal = new AbortController().signal;
