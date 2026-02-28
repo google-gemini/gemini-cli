@@ -24,7 +24,7 @@ import { useRegistrySearch } from '../../hooks/useRegistrySearch.js';
 
 import { useUIState } from '../../contexts/UIStateContext.js';
 
-interface ExtensionRegistryViewProps {
+export interface ExtensionRegistryViewProps {
   onSelect?: (extension: RegistryExtension) => void;
   onClose?: () => void;
   extensionManager: ExtensionManager;
