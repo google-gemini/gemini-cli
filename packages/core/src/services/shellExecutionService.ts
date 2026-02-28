@@ -568,6 +568,8 @@ export class ShellExecutionService {
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const args = [...argsPrefix, guardedCommand];
 
+      const isWindowsPlatform = os.platform() === 'win32';
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(executable, args, {
         cwd,
@@ -584,7 +586,16 @@ export class ShellExecutionService {
           PAGER: shellExecutionConfig.pager ?? 'cat',
           GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
         },
-        handleFlowControl: true,
+        // handleFlowControl intercepts XON/XOFF (Ctrl+S/Q) and prevents them
+        // from reaching the child.  On Windows, the flag can interfere with
+        // ConPTY's internal input routing and cause interactive TUI tools to
+        // miss key events, so we disable it there.
+        handleFlowControl: !isWindowsPlatform,
+        // On Windows, explicitly request ConPTY (introduced in Windows 10 1809).
+        // Without this, @lydell/node-pty may silently fall back to WinPTY, which
+        // has known incompatibilities with interactive Node.js TUI applications
+        // that rely on VT-sequence-based arrow-key navigation.
+        ...(isWindowsPlatform ? { useConpty: true } : {}),
       });
 
       const result = new Promise<ShellExecutionResult>((resolve) => {
@@ -940,6 +951,16 @@ export class ShellExecutionService {
       } catch {
         return false;
       }
+    }
+
+    // For PTY processes, prefer the activePtys map over process.kill(pid, 0).
+    // On Windows, process.kill(pid, 0) is unreliable for ConPTY-managed processes
+    // because the reported PID belongs to the shell wrapper (e.g. powershell.exe)
+    // whose signal-0 check behaves inconsistently across Windows 10 builds.
+    // Trusting the map avoids false-negatives that would silently drop arrow-key
+    // writes to the PTY before the process has actually exited.
+    if (this.activePtys.has(pid)) {
+      return true;
     }
 
     try {
