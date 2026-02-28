@@ -17,7 +17,8 @@ import {
 export const TRACKER_CREATE_TASK_DEFINITION: ToolDefinition = {
   base: {
     name: TRACKER_CREATE_TASK_TOOL_NAME,
-    description: 'Creates a new task in the tracker.',
+    description:
+      'Creates a new task in the tracker. Use this immediately to decompose complex goals, research tasks, or multi-step requests into atomic units, regardless of whether the request was a list or a paragraph.',
     parametersJsonSchema: {
       type: 'object',
       properties: {

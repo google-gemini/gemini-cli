@@ -18,6 +18,9 @@ import {
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
+  TRACKER_CREATE_TASK_TOOL_NAME,
+  TRACKER_LIST_TASKS_TOOL_NAME,
+  TRACKER_UPDATE_TASK_TOOL_NAME,
 } from '../tools/tool-names.js';
 
 // --- Options Structs ---
@@ -30,6 +33,7 @@ export interface SystemPromptOptions {
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
   planningWorkflow?: PlanningWorkflowOptions;
+  taskTracker?: boolean;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
@@ -112,6 +116,8 @@ ${
     ? renderPlanningWorkflow(options.planningWorkflow)
     : renderPrimaryWorkflows(options.primaryWorkflows)
 }
+
+${options.taskTracker ? renderTaskTracker() : ''}
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
@@ -386,6 +392,23 @@ ${trimmed}
 
   if (sections.length === 0) return '';
   return `\n---\n\n<loaded_context>\n${sections.join('\n')}\n</loaded_context>`;
+}
+
+export function renderTaskTracker(): string {
+  const trackerCreate = `\`${TRACKER_CREATE_TASK_TOOL_NAME}\``;
+  const trackerList = `\`${TRACKER_LIST_TASKS_TOOL_NAME}\``;
+  const trackerUpdate = `\`${TRACKER_UPDATE_TASK_TOOL_NAME}\``;
+
+  return `
+# TASK MANAGEMENT PROTOCOL
+You are operating with a persistent file-based task tracking system located at \`.tracker/tasks/\`. You must adhere to the following rules:
+
+1.  **NO IN-MEMORY LISTS**: Do not maintain a mental list of tasks or write markdown checkboxes in the chat. Use the provided tools (${trackerCreate}, ${trackerList}, ${trackerUpdate}) for all state management.
+2.  **ATOMICITY**: If a user request involves multiple steps (e.g., "Refactor the backend") or represents a complex task, you must first break this into discrete entries using ${trackerCreate} before writing any code.
+3.  **PLAN MODE INTEGRATION**: If you construct or are following a documented plan (e.g., in Plan Mode), use the tracker to represent the granular execution state of that plan. Maintain a bidirectional understanding between the plan document and the task graph.
+4.  **VERIFICATION**: Before marking a task as complete, verify the work is actually done (e.g., run the test, check the file existence).
+5.  **STATE OVER CHAT**: If the user says "I think we finished that," but the tool says it is 'pending', trust the tool--or verify explicitly before updating.
+6.  **DEPENDENCY MANAGEMENT**: Respect task topology. Never attempt to execute a task if its dependencies are not marked as 'closed'. If you are blocked, focus only on the leaf nodes of the task graph.`.trim();
 }
 
 export function renderPlanningWorkflow(
