@@ -54,7 +54,7 @@ export function getFsErrorMessage(
     const code = error.code;
     const path = error.path;
 
-    if (code && code in errorMessageGenerators) {
+    if (code && Object.hasOwn(errorMessageGenerators, code)) {
       return errorMessageGenerators[code](path);
     }
 

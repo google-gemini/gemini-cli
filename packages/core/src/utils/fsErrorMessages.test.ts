@@ -174,6 +174,15 @@ describe('getFsErrorMessage', () => {
         'Some unknown error occurred (EUNKNOWN)',
       );
     });
+
+    it('should not match Object.prototype properties like toString', () => {
+      const error = createNodeError(
+        'toString',
+        'Unexpected error',
+        '/some/path',
+      );
+      expect(getFsErrorMessage(error)).toBe('Unexpected error (toString)');
+    });
   });
 
   describe('non-Node errors', () => {
