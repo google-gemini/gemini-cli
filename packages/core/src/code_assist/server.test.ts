@@ -83,6 +83,16 @@ describe('CodeAssistServer', () => {
       responseType: 'json',
       body: expect.any(String),
       signal: undefined,
+      retryConfig: {
+        retryDelay: 1000,
+        retry: 3,
+        noResponseRetries: 3,
+        statusCodesToRetry: [
+          [429, 429],
+          [499, 499],
+          [500, 599],
+        ],
+      },
     });
 
     const requestBody = JSON.parse(mockRequest.mock.calls[0][0].body);
@@ -401,6 +411,7 @@ describe('CodeAssistServer', () => {
         'Content-Type': 'application/json',
       },
       signal: undefined,
+      retry: false,
     });
 
     expect(results).toHaveLength(2);

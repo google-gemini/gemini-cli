@@ -18,6 +18,49 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.31.0 - 2026-02-27
+
+- **Gemini 3.1 Pro Preview:** Gemini CLI now supports the new Gemini 3.1 Pro
+  Preview model
+  ([#19676](https://github.com/google-gemini/gemini-cli/pull/19676) by
+  @sehoon38).
+- **Experimental Browser Agent:** We've introduced a new experimental browser
+  agent to interact with web pages
+  ([#19284](https://github.com/google-gemini/gemini-cli/pull/19284) by
+  @gsquared94).
+- **Policy Engine Updates:** The policy engine now supports project-level
+  policies, MCP server wildcards, and tool annotation matching
+  ([#18682](https://github.com/google-gemini/gemini-cli/pull/18682) by
+  @Abhijit-2592,
+  [#20024](https://github.com/google-gemini/gemini-cli/pull/20024) by @jerop).
+- **Web Fetch Improvements:** We've implemented an experimental direct web fetch
+  feature and added rate limiting to mitigate DDoS risks
+  ([#19557](https://github.com/google-gemini/gemini-cli/pull/19557) by @mbleigh,
+  [#19567](https://github.com/google-gemini/gemini-cli/pull/19567) by
+  @mattKorwel).
+
+## Announcements: v0.30.0 - 2026-02-25
+
+- **SDK & Custom Skills:** Introduced the initial SDK package, enabling dynamic
+  system instructions, `SessionContext` for SDK tool calls, and support for
+  custom skills
+  ([#18861](https://github.com/google-gemini/gemini-cli/pull/18861) by
+  @mbleigh).
+- **Policy Engine Enhancements:** Added a new `--policy` flag for user-defined
+  policies, introduced strict seatbelt profiles, and deprecated
+  `--allowed-tools` in favor of the policy engine
+  ([#18500](https://github.com/google-gemini/gemini-cli/pull/18500) by
+  @allenhutchison).
+- **UI & Themes:** Added a generic searchable list for settings and extensions,
+  new Solarized themes, text wrapping for markdown tables, and a clean UI toggle
+  prototype ([#19064](https://github.com/google-gemini/gemini-cli/pull/19064) by
+  @rmedranollamas).
+- **Vim & Terminal Interaction:** Improved Vim support to feel more complete and
+  added support for Ctrl-Z terminal suspension
+  ([#18755](https://github.com/google-gemini/gemini-cli/pull/18755) by
+  @ppgranger, [#18931](https://github.com/google-gemini/gemini-cli/pull/18931)
+  by @scidomino).
+
 ## Announcements: v0.29.0 - 2026-02-17
 
 - **Plan Mode:** A new comprehensive planning capability with `/plan`,

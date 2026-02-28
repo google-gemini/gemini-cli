@@ -10,9 +10,19 @@ confirmation.
 To create your first policy:
 
 1.  **Create the policy directory** if it doesn't exist:
+
+    **macOS/Linux**
+
     ```bash
     mkdir -p ~/.gemini/policies
     ```
+
+    **Windows (PowerShell)**
+
+    ```powershell
+    New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\policies"
+    ```
+
 2.  **Create a new policy file** (e.g., `~/.gemini/policies/my-rules.toml`). You
     can use any filename ending in `.toml`; all such files in this directory
     will be loaded and combined:
@@ -97,9 +107,10 @@ has a designated number that forms the base of the final priority calculation.
 | Tier      | Base | Description                                                                |
 | :-------- | :--- | :------------------------------------------------------------------------- |
 | Default   | 1    | Built-in policies that ship with the Gemini CLI.                           |
-| Workspace | 2    | Policies defined in the current workspace's configuration directory.       |
-| User      | 3    | Custom policies defined by the user.                                       |
-| Admin     | 4    | Policies managed by an administrator (e.g., in an enterprise environment). |
+| Extension | 2    | Policies defined in extensions.                                            |
+| Workspace | 3    | Policies defined in the current workspace's configuration directory.       |
+| User      | 4    | Custom policies defined by the user.                                       |
+| Admin     | 5    | Policies managed by an administrator (e.g., in an enterprise environment). |
 
 Within a TOML policy file, you assign a priority value from **0 to 999**. The
 engine transforms this into a final priority using the following formula:
