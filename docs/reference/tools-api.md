@@ -13,9 +13,9 @@ content, and perform various actions beyond simple text generation.
   - `displayName`: A user-friendly name.
   - `description`: A clear explanation of what the tool does, which is provided
     to the Gemini model.
-  - `parameterSchema`: A JSON schema defining the parameters that the tool
-    accepts. This is crucial for the Gemini model to understand how to call the
-    tool correctly.
+  - `schema.parametersJsonSchema`: A JSON schema defining the parameters that
+    the tool accepts. This is crucial for the Gemini model to understand how to
+    call the tool correctly.
   - `validateToolParams()`: A method to validate incoming parameters.
   - `getDescription()`: A method to provide a human-readable description of what
     the tool will do with specific parameters before execution.
