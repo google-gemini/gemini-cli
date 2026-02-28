@@ -169,10 +169,7 @@ export class Storage {
   }
 
   getAutoSavedPolicyPath(): string {
-    return path.join(
-      this.getWorkspacePoliciesDir(),
-      AUTO_SAVED_POLICY_FILENAME,
-    );
+    return path.join(Storage.getUserPoliciesDir(), AUTO_SAVED_POLICY_FILENAME);
   }
 
   ensureProjectTempDirExists(): void {
@@ -287,6 +284,10 @@ export class Storage {
       return path.join(this.getProjectTempDir(), this.sessionId, 'plans');
     }
     return path.join(this.getProjectTempDir(), 'plans');
+  }
+
+  getProjectTempTrackerDir(): string {
+    return path.join(this.getProjectTempDir(), 'tracker');
   }
 
   getPlansDir(): string {

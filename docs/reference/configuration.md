@@ -137,6 +137,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`general.plan.modelRouting`** (boolean):
+  - **Description:** Automatically switch between Pro and Flash models based on
+    Plan Mode status. Uses Pro for the planning phase and Flash for the
+    implementation phase.
+  - **Default:** `true`
+
 - **`general.retryFetchErrors`** (boolean):
   - **Description:** Retry on "exception TypeError: fetch failed sending
     request" errors.
@@ -316,6 +322,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"tips"`
   - **Values:** `"tips"`, `"witty"`, `"all"`, `"off"`
 
+- **`ui.errorVerbosity`** (enum):
+  - **Description:** Controls whether recoverable errors are hidden (low) or
+    fully shown (full).
+  - **Default:** `"low"`
+  - **Values:** `"low"`, `"full"`
+
 - **`ui.customWittyPhrases`** (array):
   - **Description:** Custom witty phrases to display during loading. When
     provided, the CLI cycles through these instead of the defaults.
@@ -350,6 +362,15 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable collection of usage statistics
   - **Default:** `true`
   - **Requires restart:** Yes
+
+#### `billing`
+
+- **`billing.overageStrategy`** (enum):
+  - **Description:** How to handle quota exhaustion when AI credits are
+    available. 'ask' prompts each time, 'always' automatically uses credits,
+    'never' disables credit usage.
+  - **Default:** `"ask"`
+  - **Values:** `"ask"`, `"always"`, `"never"`
 
 #### `model`
 
@@ -644,6 +665,27 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Override settings for specific agents, e.g. to disable the
     agent, set a custom model config, or run config.
   - **Default:** `{}`
+  - **Requires restart:** Yes
+
+- **`agents.browser.sessionMode`** (enum):
+  - **Description:** Session mode: 'persistent', 'isolated', or 'existing'.
+  - **Default:** `"persistent"`
+  - **Values:** `"persistent"`, `"isolated"`, `"existing"`
+  - **Requires restart:** Yes
+
+- **`agents.browser.headless`** (boolean):
+  - **Description:** Run browser in headless mode.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`agents.browser.profilePath`** (string):
+  - **Description:** Path to browser profile directory for session persistence.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
+- **`agents.browser.visualModel`** (string):
+  - **Description:** Model override for the visual agent.
+  - **Default:** `undefined`
   - **Requires restart:** Yes
 
 #### `context`
@@ -987,6 +1029,23 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.gemmaModelRouter.enabled`** (boolean):
+  - **Description:** Enable the Gemma Model Router. Requires a local endpoint
+    serving Gemma via the Gemini API using LiteRT-LM shim.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.classifier.host`** (string):
+  - **Description:** The host of the classifier.
+  - **Default:** `"http://localhost:9379"`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.classifier.model`** (string):
+  - **Description:** The model to use for the classifier. Only tested on
+    `gemma3-1b-gpu-custom`.
+  - **Default:** `"gemma3-1b-gpu-custom"`
+  - **Requires restart:** Yes
+
 #### `skills`
 
 - **`skills.enabled`** (boolean):
@@ -1273,19 +1332,27 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GEMINI_MODEL`**:
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
-  - Example: `export GEMINI_MODEL="gemini-3-flash-preview"`
+  - Example: `export GEMINI_MODEL="gemini-3-flash-preview"` (Windows PowerShell:
+    `$env:GEMINI_MODEL="gemini-3-flash-preview"`)
+- **`GEMINI_CLI_IDE_PID`**:
+  - Manually specifies the PID of the IDE process to use for integration. This
+    is useful when running Gemini CLI in a standalone terminal while still
+    wanting to associate it with a specific IDE instance.
+  - Overrides the automatic IDE detection logic.
 - **`GEMINI_CLI_HOME`**:
   - Specifies the root directory for Gemini CLI's user-level configuration and
     storage.
   - By default, this is the user's system home directory. The CLI will create a
     `.gemini` folder inside this directory.
   - Useful for shared compute environments or keeping CLI state isolated.
-  - Example: `export GEMINI_CLI_HOME="/path/to/user/config"`
+  - Example: `export GEMINI_CLI_HOME="/path/to/user/config"` (Windows
+    PowerShell: `$env:GEMINI_CLI_HOME="C:\path\to\user\config"`)
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
   - Ensure you have the necessary permissions.
-  - Example: `export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"`.
+  - Example: `export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"` (Windows PowerShell:
+    `$env:GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"`).
 - **`GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID.
   - Required for using Code Assist or Vertex AI.
@@ -1296,18 +1363,23 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
     you have `GOOGLE_CLOUD_PROJECT` set in your global environment in Cloud
     Shell, it will be overridden by this default. To use a different project in
     Cloud Shell, you must define `GOOGLE_CLOUD_PROJECT` in a `.env` file.
-  - Example: `export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
+  - Example: `export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"` (Windows
+    PowerShell: `$env:GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`).
 - **`GOOGLE_APPLICATION_CREDENTIALS`** (string):
   - **Description:** The path to your Google Application Credentials JSON file.
   - **Example:**
     `export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/credentials.json"`
+    (Windows PowerShell:
+    `$env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\your\credentials.json"`)
 - **`GOOGLE_GENAI_API_VERSION`**:
   - Specifies the API version to use for Gemini API requests.
   - When set, overrides the default API version used by the SDK.
-  - Example: `export GOOGLE_GENAI_API_VERSION="v1"`
+  - Example: `export GOOGLE_GENAI_API_VERSION="v1"` (Windows PowerShell:
+    `$env:GOOGLE_GENAI_API_VERSION="v1"`)
 - **`OTLP_GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID for Telemetry in Google Cloud
-  - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
+  - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"` (Windows
+    PowerShell: `$env:OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`).
 - **`GEMINI_TELEMETRY_ENABLED`**:
   - Set to `true` or `1` to enable telemetry. Any other value is treated as
     disabling it.
@@ -1335,7 +1407,8 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GOOGLE_CLOUD_LOCATION`**:
   - Your Google Cloud Project Location (e.g., us-central1).
   - Required for using Vertex AI in non-express mode.
-  - Example: `export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"`.
+  - Example: `export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"` (Windows
+    PowerShell: `$env:GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"`).
 - **`GEMINI_SANDBOX`**:
   - Alternative to the `sandbox` setting in `settings.json`.
   - Accepts `true`, `false`, `docker`, `podman`, or a custom command string.

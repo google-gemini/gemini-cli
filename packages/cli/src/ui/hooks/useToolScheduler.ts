@@ -14,6 +14,7 @@ import {
   Scheduler,
   type EditorType,
   type ToolCallsUpdateMessage,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 
@@ -114,8 +115,23 @@ export function useToolScheduler(
 
   useEffect(() => {
     const handler = (event: ToolCallsUpdateMessage) => {
+      // Only process updates for the root scheduler.
+      // Subagent internal tools should not be displayed in the main tool list.
+      if (event.schedulerId !== ROOT_SCHEDULER_ID) {
+        return;
+      }
+
       // Update output timer for UI spinners (Side Effect)
-      if (event.toolCalls.some((tc) => tc.status === 'executing')) {
+      const hasExecuting = event.toolCalls.some(
+        (tc) =>
+          tc.status === CoreToolCallStatus.Executing ||
+          ((tc.status === CoreToolCallStatus.Success ||
+            tc.status === CoreToolCallStatus.Error) &&
+            'tailToolCallRequest' in tc &&
+            tc.tailToolCallRequest != null),
+      );
+
+      if (hasExecuting) {
         setLastToolOutputTime(Date.now());
       }
 
@@ -238,9 +254,23 @@ function adaptToolCalls(
     const prev = prevMap.get(coreCall.request.callId);
     const responseSubmittedToGemini = prev?.responseSubmittedToGemini ?? false;
 
+    let status = coreCall.status;
+    // If a tool call has completed but scheduled a tail call, it is in a transitional
+    // state. Force the UI to render it as "executing".
+    if (
+      (status === CoreToolCallStatus.Success ||
+        status === CoreToolCallStatus.Error) &&
+      'tailToolCallRequest' in coreCall &&
+      coreCall.tailToolCallRequest != null
+    ) {
+      status = CoreToolCallStatus.Executing;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return {
       ...coreCall,
+      status,
       responseSubmittedToGemini,
-    };
+    } as TrackedToolCall;
   });
 }

@@ -9,6 +9,9 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Box, Text, ResizeObserver, type DOMElement } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
+import { isNarrowWidth } from '../../utils/isNarrowWidth.js';
+import { Command } from '../../../config/keyBindings.js';
+import { formatCommand } from '../../utils/keybindingUtils.js';
 
 /**
  * Minimum height for the MaxSizedBox component.
@@ -84,6 +87,9 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
 
   const totalHiddenLines = hiddenLinesCount + additionalHiddenLinesCount;
 
+  const isNarrow = maxWidth !== undefined && isNarrowWidth(maxWidth);
+  const showMoreKey = formatCommand(Command.SHOW_MORE_LINES);
+
   useEffect(() => {
     if (totalHiddenLines > 0) {
       addOverflowingId?.(id);
@@ -116,8 +122,9 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
     >
       {totalHiddenLines > 0 && overflowDirection === 'top' && (
         <Text color={theme.text.secondary} wrap="truncate">
-          ... first {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
-          hidden ...
+          {isNarrow
+            ? `... ${totalHiddenLines} hidden (${showMoreKey}) ...`
+            : `... first ${totalHiddenLines} line${totalHiddenLines === 1 ? '' : 's'} hidden (${showMoreKey} to show) ...`}
         </Text>
       )}
       <Box
@@ -137,8 +144,9 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
       </Box>
       {totalHiddenLines > 0 && overflowDirection === 'bottom' && (
         <Text color={theme.text.secondary} wrap="truncate">
-          ... last {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
-          hidden ...
+          {isNarrow
+            ? `... ${totalHiddenLines} hidden (${showMoreKey}) ...`
+            : `... last ${totalHiddenLines} line${totalHiddenLines === 1 ? '' : 's'} hidden (${showMoreKey} to show) ...`}
         </Text>
       )}
     </Box>

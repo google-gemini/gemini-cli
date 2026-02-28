@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="156" viewBox="0 0 920 156">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="156" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="19" fill="#333333" textLength="405" lengthAdjust="spacingAndGlyphs">┌───────┬──────────────────────────┬────────┐</text>
+    <text x="0" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="36" fill="#89b4fa" textLength="45" lengthAdjust="spacingAndGlyphs">Short</text>
+    <text x="72" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="90" y="36" fill="#89b4fa" textLength="36" lengthAdjust="spacingAndGlyphs">Long</text>
+    <text x="315" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="333" y="36" fill="#89b4fa" textLength="54" lengthAdjust="spacingAndGlyphs">Medium</text>
+    <text x="396" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="53" fill="#333333" textLength="405" lengthAdjust="spacingAndGlyphs">├───────┼──────────────────────────┼────────┤</text>
+    <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="70" fill="#ffffff" textLength="63" lengthAdjust="spacingAndGlyphs"> Tiny  </text>
+    <text x="72" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="81" y="70" fill="#ffffff" textLength="234" lengthAdjust="spacingAndGlyphs"> This is a very long text </text>
+    <text x="315" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="324" y="70" fill="#ffffff" textLength="72" lengthAdjust="spacingAndGlyphs"> Not so </text>
+    <text x="396" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="72" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="81" y="87" fill="#ffffff" textLength="234" lengthAdjust="spacingAndGlyphs"> that definitely needs to </text>
+    <text x="315" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="324" y="87" fill="#ffffff" textLength="72" lengthAdjust="spacingAndGlyphs"> long   </text>
+    <text x="396" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="72" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="81" y="104" fill="#ffffff" textLength="234" lengthAdjust="spacingAndGlyphs"> wrap to the next line    </text>
+    <text x="315" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="396" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="121" fill="#333333" textLength="405" lengthAdjust="spacingAndGlyphs">└───────┴──────────────────────────┴────────┘</text>
+  </g>
+</svg>

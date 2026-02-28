@@ -170,6 +170,28 @@ messages and how to resolve them.
   - **Solution:** Run `/ide enable` to try and reconnect. If the issue
     continues, open a new terminal window or restart your IDE.
 
+### Manual PID override
+
+If automatic IDE detection fails, or if you are running Gemini CLI in a
+standalone terminal and want to manually associate it with a specific IDE
+instance, you can set the `GEMINI_CLI_IDE_PID` environment variable to the
+process ID (PID) of your IDE.
+
+**macOS/Linux**
+
+```bash
+export GEMINI_CLI_IDE_PID=12345
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:GEMINI_CLI_IDE_PID=12345
+```
+
+When this variable is set, Gemini CLI will skip automatic detection and attempt
+to connect using the provided PID.
+
 ### Configuration errors
 
 - **Message:**
