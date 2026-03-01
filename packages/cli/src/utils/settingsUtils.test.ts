@@ -753,7 +753,7 @@ describe('SettingsUtils', () => {
       it('should return empty array when no settings require restart', () => {
         const modifiedSettings = new Set<string>([
           'requiresRestart',
-          'hideTips',
+          'hideStarterTips',
         ]);
         const result = getRestartRequiredFromModified(modifiedSettings);
 

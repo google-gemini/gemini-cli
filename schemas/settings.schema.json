@@ -292,10 +292,10 @@
           "default": true,
           "type": "boolean"
         },
-        "hideTips": {
-          "title": "Hide Tips",
-          "description": "Hide helpful tips in the UI",
-          "markdownDescription": "Hide helpful tips in the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+        "hideStarterTips": {
+          "title": "Hide Starter Tips",
+          "description": "Hide starter tips in the UI. Note: Tips automatically hide after 10 sessions.",
+          "markdownDescription": "Hide starter tips in the UI. Note: Tips automatically hide after 10 sessions.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
