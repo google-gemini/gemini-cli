@@ -261,7 +261,6 @@ export const DialogManager = ({
             process.exit(RELAUNCH_EXIT_CODE);
           }}
           availableTerminalHeight={terminalHeight - staticExtraHeight}
-          config={config}
         />
       </Box>
     );

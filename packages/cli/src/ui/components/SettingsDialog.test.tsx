@@ -14,7 +14,6 @@
  * - Focus section switching between settings and scope selector
  * - Scope selection and settings persistence across scopes
  * - Restart-required vs immediate settings behavior
- * - VimModeContext integration
  * - Complex user interaction workflows
  * - Error handling and edge cases
  * - Display values for inherited and overridden settings
@@ -27,7 +26,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsDialog } from './SettingsDialog.js';
 import { SettingScope } from '../../config/settings.js';
 import { createMockSettings } from '../../test-utils/settings.js';
-import { VimModeProvider } from '../contexts/VimModeContext.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { act } from 'react';
 import { TEST_ONLY } from '../../utils/settingsUtils.js';
@@ -38,10 +36,6 @@ import {
   type SettingsSchemaType,
 } from '../../config/settingsSchema.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
-
-// Mock the VimModeContext
-const mockToggleVimEnabled = vi.fn().mockResolvedValue(undefined);
-const mockSetVimMode = vi.fn();
 
 vi.mock('../contexts/UIStateContext.js', () => ({
   useUIState: () => ({
@@ -66,19 +60,6 @@ vi.mock('../../config/settingsSchema.js', async (importOriginal) => {
   return {
     ...original,
     getSettingsSchema: vi.fn(original.getSettingsSchema),
-  };
-});
-
-vi.mock('../contexts/VimModeContext.js', async () => {
-  const actual = await vi.importActual('../contexts/VimModeContext.js');
-  return {
-    ...actual,
-    useVimMode: () => ({
-      vimEnabled: false,
-      vimMode: 'INSERT' as const,
-      toggleVimEnabled: mockToggleVimEnabled,
-      setVimMode: mockSetVimMode,
-    }),
   };
 });
 
@@ -260,7 +241,6 @@ describe('SettingsDialog', () => {
       terminalCapabilityManager,
       'isKittyProtocolEnabled',
     ).mockReturnValue(true);
-    mockToggleVimEnabled.mockRejectedValue(undefined);
   });
 
   afterEach(() => {
@@ -726,30 +706,6 @@ describe('SettingsDialog', () => {
     });
   });
 
-  describe('Error Handling', () => {
-    it('should handle vim mode toggle errors gracefully', async () => {
-      mockToggleVimEnabled.mockRejectedValue(new Error('Toggle failed'));
-
-      const settings = createMockSettings();
-      const onSelect = vi.fn();
-
-      const { stdin, unmount, waitUntilReady } = renderDialog(
-        settings,
-        onSelect,
-      );
-      await waitUntilReady();
-
-      // Try to toggle a setting (this might trigger vim mode toggle)
-      await act(async () => {
-        stdin.write(TerminalKeys.ENTER as string); // Enter
-      });
-      await waitUntilReady();
-
-      // Should not crash
-      unmount();
-    });
-  });
-
   describe('Complex State Management', () => {
     it('should track modified settings correctly', async () => {
       const settings = createMockSettings();
@@ -794,33 +750,6 @@ describe('SettingsDialog', () => {
         for (let i = 0; i < 10; i++) {
           stdin.write(TerminalKeys.DOWN_ARROW as string); // Down arrow
         }
-      });
-      await waitUntilReady();
-
-      unmount();
-    });
-  });
-
-  describe('VimMode Integration', () => {
-    it('should sync with VimModeContext when vim mode is toggled', async () => {
-      const settings = createMockSettings();
-      const onSelect = vi.fn();
-
-      const { stdin, unmount, waitUntilReady } = render(
-        <SettingsContext.Provider value={settings}>
-          <VimModeProvider settings={settings}>
-            <KeypressProvider>
-              <SettingsDialog onSelect={onSelect} />
-            </KeypressProvider>
-          </VimModeProvider>
-        </SettingsContext.Provider>,
-      );
-      await waitUntilReady();
-
-      // Navigate to and toggle vim mode setting
-      // This would require knowing the exact position of vim mode setting
-      await act(async () => {
-        stdin.write(TerminalKeys.ENTER as string); // Enter
       });
       await waitUntilReady();
 

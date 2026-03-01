@@ -18,7 +18,6 @@ import {
   getDisplayValue,
   getSettingDefinition,
   getDialogRestartRequiredSettings,
-  getEffectiveDefaultValue,
   getEffectiveValue,
   isInSettingsScope,
   getEditValue,
@@ -28,15 +27,13 @@ import {
   useSettingsStore,
   type SettingsState,
 } from '../contexts/SettingsContext.js';
-import { useVimMode } from '../contexts/VimModeContext.js';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 import {
   type SettingsType,
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
-import { coreEvents, debugLogger } from '@google/gemini-cli-core';
-import type { Config } from '@google/gemini-cli-core';
+import { debugLogger } from '@google/gemini-cli-core';
 
 import { useSearchBuffer } from '../hooks/useSearchBuffer.js';
 import {
@@ -56,7 +53,6 @@ interface SettingsDialogProps {
   onSelect: (settingName: string | undefined, scope: SettingScope) => void;
   onRestartRequest?: () => void;
   availableTerminalHeight?: number;
-  config?: Config;
 }
 
 const MAX_ITEMS_TO_SHOW = 8;
@@ -92,12 +88,10 @@ export function SettingsDialog({
   onSelect,
   onRestartRequest,
   availableTerminalHeight,
-  config,
 }: SettingsDialogProps): React.JSX.Element {
   // Reactive settings from store (re-renders on any settings change)
   const { settings, setSetting } = useSettingsStore();
 
-  const { vimEnabled, toggleVimEnabled } = useVimMode();
   const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
     SettingScope.User,
   );
@@ -307,15 +301,8 @@ export function SettingsDialog({
         newValue,
       );
       setSetting(selectedScope, key, newValue);
-
-      // Special handling for vim mode to sync with VimModeContext
-      if (key === 'general.vimMode' && newValue !== vimEnabled) {
-        toggleVimEnabled().catch((error) => {
-          coreEvents.emitFeedback('error', 'Failed to toggle vim mode:', error);
-        });
-      }
     },
-    [settings, selectedScope, setSetting, vimEnabled, toggleVimEnabled],
+    [settings, selectedScope, setSetting],
   );
 
   // For inline editor
@@ -338,24 +325,8 @@ export function SettingsDialog({
   const handleItemClear = useCallback(
     (key: string, _item: SettingsDialogItem) => {
       setSetting(selectedScope, key, undefined);
-
-      // Special handling for vim mode
-      if (key === 'general.vimMode') {
-        const defaultValue = getEffectiveDefaultValue(key, config);
-        const booleanDefaultValue =
-          typeof defaultValue === 'boolean' ? defaultValue : false;
-        if (booleanDefaultValue !== vimEnabled) {
-          toggleVimEnabled().catch((error) => {
-            coreEvents.emitFeedback(
-              'error',
-              'Failed to toggle vim mode:',
-              error,
-            );
-          });
-        }
-      }
     },
-    [config, selectedScope, setSetting, vimEnabled, toggleVimEnabled],
+    [selectedScope, setSetting],
   );
 
   const handleClose = useCallback(() => {
