@@ -717,15 +717,18 @@ better discoverability of features:
   Status Line in favor of clean, professional text and the standard terminal
   spinner.
 
-### 2. Balanced Ambient Content
+### 3. Concise System Copy
 
-- **Loading Phrases Default:** The default `ui.loadingPhrases` setting has been
-  changed from `tips` to **`all`**. This ensures that users see both informative
-  tips and witty phrases by default, rather than just tips.
-- **Probabilistic Balance:** The random selection logic in `all` mode was
-  updated to a **50/50 split** between tips and wit (previously 1/6 tips, 5/6
-  wit). This provides a more even distribution of content while Gemini is
-  processing.
+- **Pause State:** Now displays as `↑ Awaiting approval` (using the up arrow
+  unicode symbol) rather than `[Paused]`.
+- **Shell Focus Hint:** The long interactive shell toast has been shortened to
+  `! Shell awaiting input (Tab to focus)` for better readability and less row
+  collision.
+- **Ambient Layer:** The "Tip:" prefix has been removed from ambient tips and
+  wit to create a cleaner, more integrated look.
+- **Width-Aware Selection:** The phrase cycler now dynamically filters tips and
+  wit based on the available terminal width, ensuring that only phrases that fit
+  without colliding with the system status are selected.
 
 ---
 
@@ -748,8 +751,9 @@ review against the updated specification.
 - **Responsive:**
   - Tips/Wit disappear on narrow windows or if they collide with long statuses.
   - Status text wraps onto multiple lines only when the window is narrow.
-- **Cleaning:** No more `💬` or `⏸️` emojis. No more empty line at the bottom of
-  the footer.
+  - **Width-Aware:** Only tips that fit the remaining width are selected.
+- **Cleaning:** No more `💬`, `⏸️`, `Tip:` emojis/labels, or hardcoded trailing
+  ellipses (`…`). No more empty line at the bottom of the footer.
 
 ### Identified Gaps / Future Triage
 
