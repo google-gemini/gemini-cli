@@ -146,7 +146,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
           if (!item) return null;
           return {
             key: id,
-            label: id,
+            label: item.header,
             description: item.description as string,
           };
         })

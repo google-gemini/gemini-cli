@@ -1,31 +1,31 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`<Footer /> > displays "Limit reached" message when remaining is 0 1`] = `
-" Path                                                          /docs        /model       /stats
+" workspace (/directory)                                        sandbox      /model       /stats
  ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   limit reached
 "
 `;
 
 exports[`<Footer /> > displays the usage indicator when usage is low 1`] = `
-" Path                                                          /docs        /model       /stats
+" workspace (/directory)                                        sandbox      /model       /stats
  ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   daily 15%
 "
 `;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders complete footer in narrow terminal (baseline narrow) > complete-footer-narrow 1`] = `
-" Path                                     /docs        /model       Context
+" workspace (/directory)                   sandbox      /model       context
  ~/.../more/directories/to/make/it/long   no sandbox   gemini-pro   86%
 "
 `;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders complete footer with all sections visible (baseline) > complete-footer-wide 1`] = `
-" Path                                                          /docs        /model       Context
+" workspace (/directory)                                        sandbox      /model       context
  ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   86% left
 "
 `;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders footer with CWD and model info hidden to test alignment (only sandbox visible) > footer-only-sandbox 1`] = `
-" /docs
+" sandbox
  no sandbox
 "
 `;
@@ -33,13 +33,13 @@ exports[`<Footer /> > footer configuration filtering (golden snapshots) > render
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders footer with all optional sections hidden (minimal footer) > footer-minimal 1`] = `""`;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders footer with only model info hidden (partial filtering) > footer-no-model 1`] = `
-" Path                                                          /docs
+" workspace (/directory)                                        sandbox
  ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox
 "
 `;
 
 exports[`<Footer /> > hides the usage indicator when usage is not near limit 1`] = `
-" Path                                                          /docs        /model       /stats
+" workspace (/directory)                                        sandbox      /model       /stats
  ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   daily 85%
 "
 `;

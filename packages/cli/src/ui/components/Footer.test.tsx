@@ -622,7 +622,7 @@ describe('<Footer />', () => {
 
       const output = lastFrame();
       const modelIdx = output.indexOf('/model');
-      const cwdIdx = output.indexOf('Path');
+      const cwdIdx = output.indexOf('workspace (/directory)');
       expect(modelIdx).toBeLessThan(cwdIdx);
       unmount();
     });
@@ -653,9 +653,9 @@ describe('<Footer />', () => {
       const output = lastFrame();
       expect(output).toBeDefined();
       // Headers should be present
-      expect(output).toContain('Path');
-      expect(output).toContain('Branch');
-      expect(output).toContain('/docs');
+      expect(output).toContain('workspace (/directory)');
+      expect(output).toContain('branch');
+      expect(output).toContain('sandbox');
       expect(output).toContain('/model');
       // Data should be present
       expect(output).toContain('main');
@@ -708,8 +708,8 @@ describe('<Footer />', () => {
 
       const output = lastFrame();
       expect(output).toBeDefined();
-      expect(output).not.toContain('Branch');
-      expect(output).toContain('Path');
+      expect(output).not.toContain('branch');
+      expect(output).toContain('workspace (/directory)');
       expect(output).toContain('/model');
       unmount();
     });

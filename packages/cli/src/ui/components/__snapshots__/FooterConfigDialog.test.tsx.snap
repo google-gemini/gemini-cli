@@ -7,16 +7,16 @@ exports[`<FooterConfigDialog /> > renders correctly with default settings 1`] = 
 │                                                                                                  │
 │  Select which items to display in the footer.                                                    │
 │                                                                                                  │
-│  > [✓] cwd                Current working directory                                              │
-│    [✓] git-branch         Current git branch name (not shown when unavailable)                   │
-│    [✓] sandbox-status     Sandbox type and trust indicator                                       │
-│    [✓] model-name         Current model identifier                                               │
-│    [✓] usage-limit        Remaining usage on daily limit (not shown when unavailable)            │
-│    [ ] context-remaining  Percentage of context window remaining                                 │
-│    [ ] memory-usage       Memory used by the application                                         │
-│    [ ] session-id         Unique identifier for the current session                              │
-│    [ ] code-changes       Lines added/removed in the session (not shown when zero)               │
-│    [ ] token-count        Total tokens used in the session (not shown when zero)                 │
+│  > [✓] workspace (/directory)  Current working directory                                         │
+│    [✓] branch                  Current git branch name (not shown when unavailable)              │
+│    [✓] sandbox                 Sandbox type and trust indicator                                  │
+│    [✓] /model                  Current model identifier                                          │
+│    [✓] /stats                  Remaining usage on daily limit (not shown when unavailable)       │
+│    [ ] context                 Percentage of context window remaining                            │
+│    [ ] memory                  Memory used by the application                                    │
+│    [ ] session                 Unique identifier for the current session                         │
+│    [ ] diff                    Lines added/removed in the session (not shown when zero)          │
+│    [ ] tokens                  Total tokens used in the session (not shown when zero)            │
 │                                                                                                  │
 │    [✓] Show footer labels                                                                        │
 │    Reset to default footer                                                                       │
@@ -25,8 +25,8 @@ exports[`<FooterConfigDialog /> > renders correctly with default settings 1`] = 
 │                                                                                                  │
 │  ┌────────────────────────────────────────────────────────────────────────────────────────────┐  │
 │  │ Preview:                                                                                   │  │
-│  │ Path             Branch   /docs    /model           /stats                                 │  │
-│  │ ~/project/path   main     docker   gemini-2.5-pro   daily 97%                              │  │
+│  │ workspace (/directory)   branch   sandbox   /model           /stats                        │  │
+│  │ ~/project/path           main     docker    gemini-2.5-pro   daily 97%                     │  │
 │  └────────────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

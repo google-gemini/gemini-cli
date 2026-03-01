@@ -9,17 +9,17 @@ import type { MergedSettings } from './settings.js';
 export const ALL_ITEMS = [
   {
     id: 'cwd',
-    header: 'Path',
+    header: 'workspace (/directory)',
     description: 'Current working directory',
   },
   {
     id: 'git-branch',
-    header: 'Branch',
+    header: 'branch',
     description: 'Current git branch name (not shown when unavailable)',
   },
   {
     id: 'sandbox-status',
-    header: '/docs',
+    header: 'sandbox',
     description: 'Sandbox type and trust indicator',
   },
   {
@@ -29,7 +29,7 @@ export const ALL_ITEMS = [
   },
   {
     id: 'context-remaining',
-    header: 'Context',
+    header: 'context',
     description: 'Percentage of context window remaining',
   },
   {
@@ -39,22 +39,22 @@ export const ALL_ITEMS = [
   },
   {
     id: 'memory-usage',
-    header: 'Memory',
+    header: 'memory',
     description: 'Memory used by the application',
   },
   {
     id: 'session-id',
-    header: 'Session',
+    header: 'session',
     description: 'Unique identifier for the current session',
   },
   {
     id: 'code-changes',
-    header: 'Diff',
+    header: 'diff',
     description: 'Lines added/removed in the session (not shown when zero)',
   },
   {
     id: 'token-count',
-    header: 'Tokens',
+    header: 'tokens',
     description: 'Total tokens used in the session (not shown when zero)',
   },
 ] as const;
