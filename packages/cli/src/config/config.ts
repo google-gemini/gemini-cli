@@ -76,6 +76,7 @@ export interface CliArgs {
   prompt: string | undefined;
   promptInteractive: string | undefined;
 
+  voice?: boolean;
   yolo: boolean | undefined;
   approvalMode: string | undefined;
   policy: string[] | undefined;
@@ -141,6 +142,11 @@ export async function parseArguments(
           nargs: 1,
           description:
             'Execute the provided prompt and continue in interactive mode',
+        })
+        .option('voice', {
+          type: 'boolean',
+          description: 'Enable hands-free voice mode (experimental).',
+          default: false,
         })
         .option('sandbox', {
           alias: 's',
@@ -311,6 +317,12 @@ export async function parseArguments(
       }
       if (argv['prompt'] && argv['promptInteractive']) {
         return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
+      }
+      if (argv['voice'] && argv['prompt']) {
+        return 'Cannot use both --voice and --prompt (-p) together';
+      }
+      if (argv['voice'] && argv['promptInteractive']) {
+        return 'Cannot use both --voice and --prompt-interactive (-i) together';
       }
       if (argv['yolo'] && argv['approvalMode']) {
         return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';

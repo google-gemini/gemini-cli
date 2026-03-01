@@ -110,6 +110,7 @@ import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 import { runDeferredCommand } from './deferred.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
+import { VoiceSession } from './voice/voiceSession.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -605,6 +606,15 @@ export async function main() {
       await cleanupExpiredSessions(config, settings.merged);
     } catch (e) {
       debugLogger.error('Failed to cleanup expired sessions:', e);
+    }
+
+    // Handle --voice flag
+    if (argv.voice) {
+      writeToStdout('Enabled Hands-Free Voice Mode (experimental)\n');
+      const session = new VoiceSession(config, settings);
+      await session.start();
+      await runExitCleanup();
+      process.exit(ExitCodes.SUCCESS);
     }
 
     if (config.getListExtensions()) {
