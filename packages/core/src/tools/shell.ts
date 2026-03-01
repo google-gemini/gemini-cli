@@ -68,8 +68,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    isSensitive?: boolean,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+      undefined,
+      undefined,
+      isSensitive,
+    );
   }
 
   getDescription(): string {
@@ -479,6 +488,9 @@ export class ShellTool extends BaseDeclarativeTool<
       messageBus,
       false, // output is not markdown
       true, // output can be updated
+      undefined,
+      undefined,
+      true,
     );
   }
 
@@ -504,6 +516,7 @@ export class ShellTool extends BaseDeclarativeTool<
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    isSensitive?: boolean,
   ): ToolInvocation<ShellToolParams, ToolResult> {
     return new ShellToolInvocation(
       this.config,
@@ -511,6 +524,7 @@ export class ShellTool extends BaseDeclarativeTool<
       messageBus,
       _toolName,
       _toolDisplayName,
+      isSensitive,
     );
   }
 

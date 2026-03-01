@@ -818,9 +818,10 @@ export async function loadCliConfig(
     model: resolvedModel,
     maxSessionTurns: settings.model?.maxSessionTurns,
     experimentalZedIntegration: argv.experimentalAcp || false,
-    listExtensions: argv.listExtensions || false,
     listSessions: argv.listSessions || false,
     deleteSession: argv.deleteSession,
+    autoAddPolicy:
+      settings.security?.autoAddPolicy && !settings.admin?.secureModeEnabled,
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,

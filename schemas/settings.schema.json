@@ -1281,6 +1281,13 @@
           "markdownDescription": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.\n\n- Category: `Tools`\n- Requires restart: `yes`",
           "$ref": "#/$defs/BooleanOrString"
         },
+        "sandboxFlags": {
+          "title": "Sandbox Flags",
+          "description": "Additional flags to pass to the sandbox container engine (Docker or Podman). Environment variables can be used and will be expanded.",
+          "markdownDescription": "Additional flags to pass to the sandbox container engine (Docker or Podman). Environment variables can be used and will be expanded.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: ``",
+          "default": "",
+          "type": "string"
+        },
         "shell": {
           "title": "Shell",
           "description": "Settings for shell execution.",
@@ -1449,6 +1456,13 @@
           "description": "Enable the \"Allow for all future sessions\" option in tool confirmation dialogs.",
           "markdownDescription": "Enable the \"Allow for all future sessions\" option in tool confirmation dialogs.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
+          "type": "boolean"
+        },
+        "autoAddPolicy": {
+          "title": "Auto-add to Policy",
+          "description": "Automatically add \"Proceed always\" approvals to your persistent policy.",
+          "markdownDescription": "Automatically add \"Proceed always\" approvals to your persistent policy.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "blockGitExtensions": {

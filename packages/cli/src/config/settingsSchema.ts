@@ -1245,6 +1245,18 @@ const SETTINGS_SCHEMA = {
         `,
         showInDialog: false,
       },
+      sandboxFlags: {
+        type: 'string',
+        label: 'Sandbox Flags',
+        category: 'Tools',
+        requiresRestart: true,
+        default: '',
+        description: oneLine`
+          Additional flags to pass to the sandbox container engine (Docker or Podman).
+          Environment variables can be used and will be expanded.
+        `,
+        showInDialog: true,
+      },
       shell: {
         type: 'object',
         label: 'Shell',
@@ -1478,6 +1490,16 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Enable the "Allow for all future sessions" option in tool confirmation dialogs.',
+        showInDialog: true,
+      },
+      autoAddPolicy: {
+        type: 'boolean',
+        label: 'Auto-add to Policy',
+        category: 'Security',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Automatically add "Proceed always" approvals to your persistent policy.',
         showInDialog: true,
       },
       blockGitExtensions: {

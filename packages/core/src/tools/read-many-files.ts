@@ -114,8 +114,17 @@ class ReadManyFilesToolInvocation extends BaseToolInvocation<
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    isSensitive?: boolean,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+      undefined,
+      undefined,
+      isSensitive,
+    );
   }
 
   getDescription(): string {
@@ -474,6 +483,9 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
+      undefined,
+      undefined,
+      true,
     );
   }
 
@@ -482,6 +494,7 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    isSensitive?: boolean,
   ): ToolInvocation<ReadManyFilesParams, ToolResult> {
     return new ReadManyFilesToolInvocation(
       this.config,
@@ -489,6 +502,7 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
       messageBus,
       _toolName,
       _toolDisplayName,
+      isSensitive,
     );
   }
 

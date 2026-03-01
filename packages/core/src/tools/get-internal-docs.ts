@@ -79,8 +79,17 @@ class GetInternalDocsInvocation extends BaseToolInvocation<
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    isSensitive?: boolean,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+      undefined,
+      undefined,
+      isSensitive,
+    );
   }
 
   override async shouldConfirmExecute(
@@ -165,6 +174,9 @@ export class GetInternalDocsTool extends BaseDeclarativeTool<
       messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ false,
+      undefined,
+      undefined,
+      true,
     );
   }
 
@@ -173,12 +185,14 @@ export class GetInternalDocsTool extends BaseDeclarativeTool<
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
+    isSensitive?: boolean,
   ): ToolInvocation<GetInternalDocsParams, ToolResult> {
     return new GetInternalDocsInvocation(
       params,
       messageBus,
       _toolName ?? GetInternalDocsTool.Name,
       _toolDisplayName,
+      isSensitive,
     );
   }
 

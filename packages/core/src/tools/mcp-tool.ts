@@ -93,6 +93,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     private readonly toolDescription?: string,
     private readonly toolParameterSchema?: unknown,
     toolAnnotationsData?: Record<string, unknown>,
+    isSensitive: boolean = false,
   ) {
     // Use composite format for policy checks: serverName__toolName
     // This enables server wildcards (e.g., "google-workspace__*")
@@ -105,6 +106,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       displayName,
       serverName,
       toolAnnotationsData,
+      isSensitive,
     );
   }
 
@@ -283,6 +285,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       false, // canUpdateOutput,
       extensionName,
       extensionId,
+      true, // isSensitive
     );
     this._isReadOnly = isReadOnly;
   }
@@ -331,6 +334,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     messageBus: MessageBus,
     _toolName?: string,
     _displayName?: string,
+    isSensitive?: boolean,
   ): ToolInvocation<ToolParams, ToolResult> {
     return new DiscoveredMCPToolInvocation(
       this.mcpTool,
@@ -344,6 +348,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.description,
       this.parameterSchema,
       this._toolAnnotations,
+      isSensitive,
     );
   }
 }

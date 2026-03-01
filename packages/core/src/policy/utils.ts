@@ -12,6 +12,20 @@ export function escapeRegex(text: string): string {
 }
 
 /**
+ * Escapes a string for use in a regular expression that matches a JSON-stringified value.
+ *
+ * This is necessary because some characters (like backslashes and quotes) are
+ * escaped twice in the final JSON string representation used for policy matching.
+ */
+export function escapeJsonRegex(text: string): string {
+  // 1. Get the JSON-escaped version of the string (e.g. C:\foo -> C:\\foo)
+  // 2. Remove the surrounding quotes
+  const jsonEscaped = JSON.stringify(text).slice(1, -1);
+  // 3. Regex-escape the result (e.g. C:\\foo -> C:\\\\foo)
+  return escapeRegex(jsonEscaped);
+}
+
+/**
  * Basic validation for regular expressions to prevent common ReDoS patterns.
  * This is a heuristic check and not a substitute for a full ReDoS scanner.
  */

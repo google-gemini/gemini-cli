@@ -434,8 +434,17 @@ class EditToolInvocation
     messageBus: MessageBus,
     toolName?: string,
     displayName?: string,
+    isSensitive?: boolean,
   ) {
-    super(params, messageBus, toolName, displayName);
+    super(
+      params,
+      messageBus,
+      toolName,
+      displayName,
+      undefined,
+      undefined,
+      isSensitive,
+    );
   }
 
   override toolLocations(): ToolLocation[] {
@@ -956,6 +965,9 @@ export class EditTool
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
+      undefined,
+      undefined,
+      true,
     );
   }
 
@@ -1001,6 +1013,9 @@ export class EditTool
   protected createInvocation(
     params: EditToolParams,
     messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
+    isSensitive?: boolean,
   ): ToolInvocation<EditToolParams, ToolResult> {
     return new EditToolInvocation(
       this.config,
@@ -1008,6 +1023,7 @@ export class EditTool
       messageBus,
       this.name,
       this.displayName,
+      isSensitive,
     );
   }
 
