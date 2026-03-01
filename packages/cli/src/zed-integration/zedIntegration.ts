@@ -521,6 +521,8 @@ export class Session {
     const pendingSend = new AbortController();
     this.pendingPrompt = pendingSend;
 
+    await this.config.waitForMcpInit();
+
     const promptId = Math.random().toString(16).slice(2);
     const chat = this.chat;
 
