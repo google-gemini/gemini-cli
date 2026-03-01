@@ -6,7 +6,10 @@
 
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import chalk from 'chalk';
-import { parseMarkdownToANSI } from './markdownParsingUtils.js';
+import {
+  parseMarkdownToANSI,
+  stripTrailingPunctuation,
+} from './markdownParsingUtils.js';
 
 // Mock the theme to use explicit colors instead of empty strings from the default theme.
 // This ensures that ansiColorize actually applies ANSI codes that we can verify.
@@ -218,6 +221,218 @@ describe('parsingUtils', () => {
           `${primary('Bold with ')}${accent('code')}${primary(' inside')}`,
         ),
       );
+    });
+
+    it('should strip trailing period from bare URL', () => {
+      const input = 'Visit https://example.com.';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('Visit ')}${link('https://example.com')}${primary('.')}`,
+      );
+    });
+
+    it('should strip trailing comma from bare URL', () => {
+      const input = 'See https://example.com, then continue';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('See ')}${link('https://example.com')}${primary(',')}${primary(' then continue')}`,
+      );
+    });
+
+    it('should strip multiple trailing punctuation from bare URL', () => {
+      const input = 'Is it https://example.com?!';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('Is it ')}${link('https://example.com')}${primary('?!')}`,
+      );
+    });
+
+    it('should preserve balanced parentheses in bare URL (Wikipedia)', () => {
+      const input = 'See https://en.wikipedia.org/wiki/Foo_(bar) for details';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('See ')}${link('https://en.wikipedia.org/wiki/Foo_(bar)')}${primary(' for details')}`,
+      );
+    });
+
+    it('should strip trailing period after balanced parens in bare URL', () => {
+      const input = 'See https://en.wikipedia.org/wiki/Foo_(bar).';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('See ')}${link('https://en.wikipedia.org/wiki/Foo_(bar)')}${primary('.')}`,
+      );
+    });
+
+    it('should not modify bare URL without trailing punctuation', () => {
+      const input = 'Visit https://example.com/path now';
+      const output = parseMarkdownToANSI(input);
+      expect(output).toBe(
+        `${primary('Visit ')}${link('https://example.com/path')}${primary(' now')}`,
+      );
+    });
+  });
+
+  describe('stripTrailingPunctuation', () => {
+    it('should strip a trailing period', () => {
+      expect(stripTrailingPunctuation('https://example.com.')).toEqual({
+        cleanUrl: 'https://example.com',
+        trailing: '.',
+      });
+    });
+
+    it('should strip a trailing comma', () => {
+      expect(stripTrailingPunctuation('https://example.com,')).toEqual({
+        cleanUrl: 'https://example.com',
+        trailing: ',',
+      });
+    });
+
+    it('should strip trailing semicolon', () => {
+      expect(stripTrailingPunctuation('https://example.com;')).toEqual({
+        cleanUrl: 'https://example.com',
+        trailing: ';',
+      });
+    });
+
+    it('should strip trailing colon', () => {
+      expect(stripTrailingPunctuation('https://example.com/path:')).toEqual({
+        cleanUrl: 'https://example.com/path',
+        trailing: ':',
+      });
+    });
+
+    it('should strip trailing exclamation mark', () => {
+      expect(stripTrailingPunctuation('https://example.com!')).toEqual({
+        cleanUrl: 'https://example.com',
+        trailing: '!',
+      });
+    });
+
+    it('should strip trailing question mark', () => {
+      expect(stripTrailingPunctuation('https://example.com?')).toEqual({
+        cleanUrl: 'https://example.com',
+        trailing: '?',
+      });
+    });
+
+    it('should strip multiple trailing punctuation chars', () => {
+      expect(stripTrailingPunctuation('https://example.com?!')).toEqual({
+        cleanUrl: 'https://example.com',
+        trailing: '?!',
+      });
+    });
+
+    it('should strip trailing quotes', () => {
+      expect(stripTrailingPunctuation('https://example.com"')).toEqual({
+        cleanUrl: 'https://example.com',
+        trailing: '"',
+      });
+    });
+
+    it('should strip trailing single quote', () => {
+      expect(stripTrailingPunctuation("https://example.com'")).toEqual({
+        cleanUrl: 'https://example.com',
+        trailing: "'",
+      });
+    });
+
+    it('should preserve balanced parentheses', () => {
+      expect(
+        stripTrailingPunctuation('https://en.wikipedia.org/wiki/Foo_(bar)'),
+      ).toEqual({
+        cleanUrl: 'https://en.wikipedia.org/wiki/Foo_(bar)',
+        trailing: '',
+      });
+    });
+
+    it('should strip unbalanced trailing paren', () => {
+      expect(stripTrailingPunctuation('https://example.com)')).toEqual({
+        cleanUrl: 'https://example.com',
+        trailing: ')',
+      });
+    });
+
+    it('should strip period after balanced parens', () => {
+      expect(
+        stripTrailingPunctuation('https://en.wikipedia.org/wiki/Foo_(bar).'),
+      ).toEqual({
+        cleanUrl: 'https://en.wikipedia.org/wiki/Foo_(bar)',
+        trailing: '.',
+      });
+    });
+
+    it('should handle nested balanced parentheses', () => {
+      expect(stripTrailingPunctuation('https://example.com/a_(b_(c))')).toEqual(
+        {
+          cleanUrl: 'https://example.com/a_(b_(c))',
+          trailing: '',
+        },
+      );
+    });
+
+    it('should strip trailing bracket', () => {
+      expect(stripTrailingPunctuation('https://example.com]')).toEqual({
+        cleanUrl: 'https://example.com',
+        trailing: ']',
+      });
+    });
+
+    it('should strip trailing angle bracket', () => {
+      expect(stripTrailingPunctuation('https://example.com>')).toEqual({
+        cleanUrl: 'https://example.com',
+        trailing: '>',
+      });
+    });
+
+    it('should strip trailing curly brace', () => {
+      expect(stripTrailingPunctuation('https://example.com}')).toEqual({
+        cleanUrl: 'https://example.com',
+        trailing: '}',
+      });
+    });
+
+    it('should return unchanged URL with no trailing punctuation', () => {
+      expect(stripTrailingPunctuation('https://example.com/path')).toEqual({
+        cleanUrl: 'https://example.com/path',
+        trailing: '',
+      });
+    });
+
+    it('should handle URL with query params and trailing period', () => {
+      expect(
+        stripTrailingPunctuation('https://example.com/search?q=test.'),
+      ).toEqual({
+        cleanUrl: 'https://example.com/search?q=test',
+        trailing: '.',
+      });
+    });
+
+    it('should strip CJK fullwidth period', () => {
+      expect(stripTrailingPunctuation('https://example.com\u3002')).toEqual({
+        cleanUrl: 'https://example.com',
+        trailing: '\u3002',
+      });
+    });
+
+    it('should strip CJK fullwidth comma', () => {
+      expect(stripTrailingPunctuation('https://example.com\uFF0C')).toEqual({
+        cleanUrl: 'https://example.com',
+        trailing: '\uFF0C',
+      });
+    });
+
+    it('should handle empty string', () => {
+      expect(stripTrailingPunctuation('')).toEqual({
+        cleanUrl: '',
+        trailing: '',
+      });
+    });
+
+    it('should not strip periods that are part of the domain', () => {
+      expect(stripTrailingPunctuation('https://www.example.com/path')).toEqual({
+        cleanUrl: 'https://www.example.com/path',
+        trailing: '',
+      });
     });
   });
 });
