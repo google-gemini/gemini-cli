@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useMemo, useState } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { useUIState } from '../contexts/UIStateContext.js';
 import {
   type ConversationRecord,
@@ -50,6 +50,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
 }) => {
   const [isRewinding, setIsRewinding] = useState(false);
   const { terminalWidth, terminalHeight } = useUIState();
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const {
     selectedMessageId,
     getStats,
@@ -182,6 +183,22 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
     );
   }
 
+  if (isScreenReaderEnabled) {
+    return (
+      <Box flexDirection="column" width={terminalWidth}>
+        <Text bold>Rewind - Select a conversation point:</Text>
+        {items.map((item, idx) => (
+          <Text key={item.key}>
+            {idx + 1}.{' '}
+            {item.value.id === 'current-position'
+              ? 'Stay at current position'
+              : getCleanedRewindText(item.value)}
+          </Text>
+        ))}
+        <Text>Press Esc to exit, Enter to select, arrow keys to navigate.</Text>
+      </Box>
+    );
+  }
   return (
     <Box
       borderStyle="round"
