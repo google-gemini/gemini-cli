@@ -42,6 +42,15 @@ export async function crawl(options: CrawlOptions): Promise<{
     const cachedResults = cache.read(cacheKey);
 
     if (cachedResults) {
+      if (
+        options.maxFiles !== undefined &&
+        cachedResults.length > options.maxFiles
+      ) {
+        return {
+          files: cachedResults.slice(0, options.maxFiles),
+          truncated: true,
+        };
+      }
       // The cache does not store the truncated flag, but we didn't cache it if it was truncated.
       return { files: cachedResults, truncated: false };
     }

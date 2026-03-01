@@ -13,7 +13,7 @@ import { crawl } from './crawler.js';
 import type { FzfResultItem } from 'fzf';
 import { AsyncFzf } from 'fzf';
 import { coreEvents } from '../events.js';
-import { unescapePath } from '../paths.js';
+import { isSubpath, unescapePath } from '../paths.js';
 import type { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../../config/constants.js';
 
@@ -244,8 +244,17 @@ class DirectoryFileSearch implements FileSearch {
     pattern = pattern || '*';
 
     const dir = pattern.endsWith('/') ? pattern : path.dirname(pattern);
+    let crawlDirectory = path.join(this.options.projectRoot, dir);
+
+    if (
+      !isSubpath(this.options.projectRoot, crawlDirectory) &&
+      this.options.projectRoot !== crawlDirectory
+    ) {
+      crawlDirectory = this.options.projectRoot;
+    }
+
     const { files: results, truncated } = await crawl({
-      crawlDirectory: path.join(this.options.projectRoot, dir),
+      crawlDirectory,
       cwd: this.options.projectRoot,
       maxDepth: 0,
       ignore: this.ignore,
