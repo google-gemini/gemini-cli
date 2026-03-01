@@ -8,8 +8,6 @@ with a forward slash (`/`), an at symbol (`@`), or an exclamation mark (`!`).
 
 Slash commands provide meta-level control over the CLI itself.
 
-### Built-in Commands
-
 ### `/about`
 
 - **Description:** Show version info. Share this information when filing issues.
@@ -61,9 +59,9 @@ Slash commands provide meta-level control over the CLI itself.
         modifications, see the
         [Checkpointing documentation](../cli/checkpointing.md).
   - **`share [filename]`**
-    - **Description** Writes the current conversation to a provided Markdown or
+    - **Description:** Writes the current conversation to a provided Markdown or
       JSON file. If no filename is provided, then the CLI will generate one.
-    - **Usage** `/chat share file.md` or `/chat share file.json`.
+    - **Usage:** `/chat share file.md` or `/chat share file.json`.
 
 ### `/clear`
 

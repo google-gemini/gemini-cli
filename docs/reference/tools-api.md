@@ -110,8 +110,8 @@ its specific functionality.
 ## Extending with custom tools
 
 While direct programmatic registration of new tools by users isn't explicitly
-detailed as a primary workflow in the provided files for typical end-users, the
-architecture supports extension through:
+detailed as a primary workflow in this documentation, the architecture supports
+extension through:
 
 - **Command-based discovery:** Advanced users or project administrators can
   define a `tools.discoveryCommand` in `settings.json`. This command, when run
