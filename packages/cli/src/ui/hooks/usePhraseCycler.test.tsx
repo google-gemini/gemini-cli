@@ -21,20 +21,20 @@ const TestComponent = ({
   isActive,
   isWaiting,
   isInteractiveShellWaiting = false,
-  loadingPhrasesMode = 'all',
+  loadingPhraseLayout = 'all_inline',
   customPhrases,
 }: {
   isActive: boolean;
   isWaiting: boolean;
   isInteractiveShellWaiting?: boolean;
-  loadingPhrasesMode?: LoadingPhrasesMode;
+  loadingPhraseLayout?: LoadingPhrasesMode;
   customPhrases?: string[];
 }) => {
   const { currentTip, currentWittyPhrase } = usePhraseCycler(
     isActive,
     isWaiting,
     isInteractiveShellWaiting,
-    loadingPhrasesMode,
+    loadingPhraseLayout,
     customPhrases,
   );
   return <Text>{currentTip || currentWittyPhrase}</Text>;
@@ -293,7 +293,7 @@ describe('usePhraseCycler', () => {
         <TestComponent
           isActive={config.isActive}
           isWaiting={false}
-          loadingPhrasesMode="witty"
+          loadingPhraseLayout="wit_inline"
           customPhrases={config.customPhrases}
         />
       );

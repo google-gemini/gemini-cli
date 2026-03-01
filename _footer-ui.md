@@ -730,17 +730,20 @@ better discoverability of features:
   wit based on the available terminal width, ensuring that only phrases that fit
   without colliding with the system status are selected.
 
-### 4. Witty Phrase Positioning
+### 4. Loading Phrase Layout
 
-A new setting `ui.wittyPhrasePosition` allows controlling where entertainment
-phrases are displayed:
+A single setting `ui.loadingPhraseLayout` now controls both the content and the
+position of loading phrases:
 
-- **`status`**: Replaces the status text when the model is thinking but hasn't
-  emitted a specific thought yet.
-- **`inline` (Default)**: Appends the witty phrase in gray immediately following
-  the real system status (e.g., `⠏ Searching... Loading wit.exe`).
-- **`ambient`**: Displays witty phrases on the far right, interspersed with
-  tips.
+- **`none`**: Pure status only (no tips or witty phrases).
+- **`tips`**: Informative tips only (displayed on the far right).
+- **`wit_status`**: Witty phrases only, replacing the status text (Legacy
+  behavior).
+- **`wit_inline`**: Witty phrases only, following the status in gray.
+- **`wit_ambient`**: Witty phrases only, displayed on the far right.
+- **`all_inline` (Default)**: Informative tips on the right, witty phrases
+  inline (after status).
+- **`all_ambient`**: Both tips and witty phrases cycle on the far right.
 
 ---
 
@@ -755,12 +758,13 @@ review against the updated specification.
 - **Divider Options:**
   - `New Layout`: Divider above everything.
   - `New Layout (Divider Down)`: Divider between status and indicators.
+- **Loading Phrases:** Unified via `ui.loadingPhraseLayout` (Defaults to
+  `all_inline`).
 - **Input State:** Drafted text remains visible during tool approval; the input
   box is greyed out and focus is removed.
 - **Toasts:** Claims 100% width, left-aligned, prominent warning color.
   Overrides ambient tips.
 - **Hooks:** Uses `↪` (Before) / `↩` (After) icons. Text is white and italic.
-- **Witty Phrases:** Default to `inline` position (gray text after status).
 - **Responsive:**
   - Tips/Wit disappear on narrow windows or if they collide with long statuses.
   - Status text wraps onto multiple lines only when the window is narrow.

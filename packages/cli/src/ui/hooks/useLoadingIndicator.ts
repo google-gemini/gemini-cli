@@ -20,7 +20,7 @@ export interface UseLoadingIndicatorProps {
   streamingState: StreamingState;
   shouldShowFocusHint: boolean;
   retryStatus: RetryAttemptPayload | null;
-  loadingPhrasesMode?: LoadingPhrasesMode;
+  loadingPhraseLayout?: LoadingPhrasesMode;
   customWittyPhrases?: string[];
   errorVerbosity?: 'low' | 'full';
   maxLength?: number;
@@ -30,7 +30,7 @@ export const useLoadingIndicator = ({
   streamingState,
   shouldShowFocusHint,
   retryStatus,
-  loadingPhrasesMode,
+  loadingPhraseLayout,
   customWittyPhrases,
   errorVerbosity = 'full',
   maxLength,
@@ -46,7 +46,7 @@ export const useLoadingIndicator = ({
     isPhraseCyclingActive,
     isWaiting,
     shouldShowFocusHint,
-    loadingPhrasesMode,
+    loadingPhraseLayout,
     customWittyPhrases,
     maxLength,
   );
