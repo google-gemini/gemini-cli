@@ -12,7 +12,7 @@ exports[`MainContent tool group border SVG snapshots > should render SVG snapsho
 ░░░         ░░░░░░░░░  
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  google_web_search                                                                         │
+│ ⊶  google_web_search                                                                         │
 │                                                                                              │
 │ Searching...                                                                                 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯"
@@ -30,7 +30,7 @@ exports[`MainContent tool group border SVG snapshots > should render SVG snapsho
 ░░░         ░░░░░░░░░  
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  run_shell_command                                                                         │
+│ ⊶  run_shell_command                                                                         │
 │                                                                                              │
 │ Running command...                                                                           │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯"
@@ -48,7 +48,7 @@ exports[`MainContent tool group border SVG snapshots > should render SVG snapsho
 ░░░         ░░░░░░░░░  
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  google_web_search                                                                         │
+│ ⊶  google_web_search                                                                         │
 │                                                                                              │
 │ Searching...                                                                                 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯"

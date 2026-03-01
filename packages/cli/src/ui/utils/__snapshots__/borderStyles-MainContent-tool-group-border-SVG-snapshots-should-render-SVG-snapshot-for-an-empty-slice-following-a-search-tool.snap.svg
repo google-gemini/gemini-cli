@@ -111,7 +111,8 @@
     <text x="180" y="138" fill="#b86a8d" textLength="9" lengthAdjust="spacingAndGlyphs">░</text>
     <text x="0" y="172" fill="#f9e2af" textLength="864" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────╮</text>
     <text x="0" y="189" fill="#f9e2af" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="9" y="189" fill="#ffffff" textLength="846" lengthAdjust="spacingAndGlyphs"> ⊷  google_web_search                                                                         </text>
+    <text x="18" y="189" fill="#f9e2af" textLength="9" lengthAdjust="spacingAndGlyphs">⊶</text>
+    <text x="27" y="189" fill="#ffffff" textLength="828" lengthAdjust="spacingAndGlyphs">  google_web_search                                                                         </text>
     <text x="855" y="189" fill="#f9e2af" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="206" fill="#f9e2af" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="855" y="206" fill="#f9e2af" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>

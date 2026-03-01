@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { ToolCallStatus, mapCoreStatusToDisplayStatus } from '../../types.js';
-import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
+import { CliSpinner } from '../CliSpinner.js';
 import {
   SHELL_COMMAND_NAME,
   SHELL_NAME,
@@ -145,7 +145,7 @@ export const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
 }) => {
   const status = mapCoreStatusToDisplayStatus(coreStatus);
   const isShell = isShellTool(name);
-  const statusColor = isShell ? theme.ui.symbol : theme.status.warning;
+  const statusColor = isShell ? theme.ui.active : theme.status.warning;
 
   return (
     <Box minWidth={STATUS_INDICATOR_WIDTH}>
@@ -153,10 +153,9 @@ export const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
         <Text color={theme.status.success}>{TOOL_STATUS.PENDING}</Text>
       )}
       {status === ToolCallStatus.Executing && (
-        <GeminiRespondingSpinner
-          spinnerType="toggle"
-          nonRespondingDisplay={TOOL_STATUS.EXECUTING}
-        />
+        <Text color={statusColor}>
+          <CliSpinner type="toggle" />
+        </Text>
       )}
       {status === ToolCallStatus.Success && (
         <Text color={theme.status.success} aria-label={'Success:'}>

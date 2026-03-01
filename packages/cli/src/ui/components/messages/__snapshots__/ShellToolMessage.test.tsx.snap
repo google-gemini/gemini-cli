@@ -2,7 +2,7 @@
 
 exports[`<ShellToolMessage /> > Height Constraints > defaults to ACTIVE_SHELL_MAX_LINES in alternate buffer when availableTerminalHeight is undefined 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command A shell command                                             │
+│ ⊶  Shell Command A shell command                                             │
 │                                                                              │
 │ Line 86                                                                      │
 │ Line 87                                                                      │
@@ -131,7 +131,7 @@ exports[`<ShellToolMessage /> > Height Constraints > fully expands in alternate 
 
 exports[`<ShellToolMessage /> > Height Constraints > respects availableTerminalHeight when it is smaller than ACTIVE_SHELL_MAX_LINES 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command A shell command                                             │
+│ ⊶  Shell Command A shell command                                             │
 │                                                                              │
 │ Line 93                                                                      │
 │ Line 94                                                                      │
@@ -168,7 +168,7 @@ exports[`<ShellToolMessage /> > Height Constraints > stays constrained in altern
 
 exports[`<ShellToolMessage /> > Height Constraints > uses ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is large 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command A shell command                                             │
+│ ⊶  Shell Command A shell command                                             │
 │                                                                              │
 │ Line 86                                                                      │
 │ Line 87                                                                      │
@@ -190,7 +190,7 @@ exports[`<ShellToolMessage /> > Height Constraints > uses ACTIVE_SHELL_MAX_LINES
 
 exports[`<ShellToolMessage /> > Height Constraints > uses full availableTerminalHeight when focused in alternate buffer mode 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command A shell command                      (Shift+Tab to unfocus) │
+│ ⊶  Shell Command A shell command                      (Shift+Tab to unfocus) │
 │                                                                              │
 │ Line 3                                                                       │
 │ Line 4                                                                       │
@@ -295,7 +295,7 @@ exports[`<ShellToolMessage /> > Height Constraints > uses full availableTerminal
 
 exports[`<ShellToolMessage /> > Snapshots > renders in Alternate Buffer mode while focused 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command A shell command                      (Shift+Tab to unfocus) │
+│ ⊶  Shell Command A shell command                      (Shift+Tab to unfocus) │
 │                                                                              │
 │ Test result                                                                  │
 "
@@ -303,7 +303,7 @@ exports[`<ShellToolMessage /> > Snapshots > renders in Alternate Buffer mode whi
 
 exports[`<ShellToolMessage /> > Snapshots > renders in Alternate Buffer mode while unfocused 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command A shell command                                             │
+│ ⊶  Shell Command A shell command                                             │
 │                                                                              │
 │ Test result                                                                  │
 "
@@ -319,7 +319,7 @@ exports[`<ShellToolMessage /> > Snapshots > renders in Error state 1`] = `
 
 exports[`<ShellToolMessage /> > Snapshots > renders in Executing state 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command A shell command                                             │
+│ ⊶  Shell Command A shell command                                             │
 │                                                                              │
 │ Test result                                                                  │
 "

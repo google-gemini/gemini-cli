@@ -26,6 +26,11 @@ import {
 } from '@google/gemini-cli-core';
 import os from 'node:os';
 import { createMockSettings } from '../../../test-utils/settings.js';
+import { Text } from 'ink';
+
+vi.mock('../CliSpinner.js', () => ({
+  CliSpinner: () => <Text>⊶</Text>,
+}));
 
 describe('<ToolGroupMessage />', () => {
   afterEach(() => {

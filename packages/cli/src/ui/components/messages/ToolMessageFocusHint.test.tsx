@@ -20,6 +20,12 @@ import {
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 
+import { Text } from 'ink';
+
+vi.mock('../CliSpinner.js', () => ({
+  CliSpinner: () => <Text>⊶</Text>,
+}));
+
 vi.mock('../GeminiRespondingSpinner.js', () => ({
   GeminiRespondingSpinner: () => null,
 }));
