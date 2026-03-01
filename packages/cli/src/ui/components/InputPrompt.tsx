@@ -142,6 +142,8 @@ export function isLargePaste(text: string): boolean {
 }
 
 const DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS = 350;
+const WHEEL_TICK_MS = 18;
+const MAX_PENDING_WHEEL_STEPS = 40;
 
 /**
  * Attempt to toggle expansion of a paste placeholder in the buffer.
@@ -253,8 +255,50 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     number | null
   >(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingWheelStepsRef = useRef(0);
+  const wheelTimerRef = useRef<NodeJS.Timeout | null>(null);
   const innerBoxRef = useRef<DOMElement>(null);
   const hasUserNavigatedSuggestions = useRef(false);
+
+  const pumpWheelQueue = useCallback(() => {
+    if (pendingWheelStepsRef.current === 0) {
+      wheelTimerRef.current = null;
+      return;
+    }
+
+    const direction: 1 | -1 = pendingWheelStepsRef.current > 0 ? 1 : -1;
+    pendingWheelStepsRef.current -= direction;
+    buffer.scrollBy(direction);
+
+    wheelTimerRef.current = setTimeout(pumpWheelQueue, WHEEL_TICK_MS);
+  }, [buffer]);
+
+  const enqueueWheelSteps = useCallback(
+    (direction: 1 | -1) => {
+      pendingWheelStepsRef.current = Math.max(
+        -MAX_PENDING_WHEEL_STEPS,
+        Math.min(
+          MAX_PENDING_WHEEL_STEPS,
+          pendingWheelStepsRef.current + direction,
+        ),
+      );
+
+      if (!wheelTimerRef.current) {
+        pumpWheelQueue();
+      }
+    },
+    [pumpWheelQueue],
+  );
+
+  useEffect(
+    () => () => {
+      if (wheelTimerRef.current) {
+        clearTimeout(wheelTimerRef.current);
+        wheelTimerRef.current = null;
+      }
+    },
+    [],
+  );
 
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
   const [commandSearchActive, setCommandSearchActive] = useState(false);
@@ -562,6 +606,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         setSuppressCompletion(false);
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleClipboardPaste();
+      }
+
+      // Scroll input viewport on trackpad/mouse wheel without moving cursor
+      // guard with focus so only the active input box scrolls
+      if (
+        focus &&
+        (event.name === 'scroll-up' || event.name === 'scroll-down')
+      ) {
+        enqueueWheelSteps(event.name === 'scroll-down' ? 1 : -1);
       }
     },
     { isActive: focus },
@@ -1233,6 +1286,25 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
     buffer.visualCursor;
   const scrollVisualRow = buffer.visualScrollRow;
+  const viewportHeight = linesToRender.length;
+  const totalVisualRows = buffer.allVisualLines.length;
+  const maxScrollRows = Math.max(0, totalVisualRows - viewportHeight);
+  const showInputScrollbar = maxScrollRows > 0 && viewportHeight > 0;
+  const scrollbarThumbSize = showInputScrollbar
+    ? Math.max(
+        1,
+        Math.floor(
+          (viewportHeight * viewportHeight) /
+            Math.max(totalVisualRows, viewportHeight),
+        ),
+      )
+    : 0;
+  const scrollbarThumbTop = showInputScrollbar
+    ? Math.round(
+        (scrollVisualRow * Math.max(0, viewportHeight - scrollbarThumbSize)) /
+          Math.max(1, maxScrollRows),
+      )
+    : 0;
 
   const getGhostTextLines = useCallback(() => {
     if (
@@ -1611,24 +1683,39 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                     cursorVisualColAbsolute === cpLen(lineText) &&
                     currentLineGhost;
 
+                  const isThumbRow =
+                    showInputScrollbar &&
+                    visualIdxInRenderedSet >= scrollbarThumbTop &&
+                    visualIdxInRenderedSet <
+                      scrollbarThumbTop + scrollbarThumbSize;
+                  const scrollbarChar = isThumbRow ? '█' : '│';
+                  const scrollbarColor = isThumbRow
+                    ? theme.text.secondary
+                    : theme.ui.dark;
+
                   return (
                     <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
-                      <Text
-                        terminalCursorFocus={showCursor && isOnCursorLine}
-                        terminalCursorPosition={cpIndexToOffset(
-                          lineText,
-                          cursorVisualColAbsolute,
-                        )}
-                      >
-                        {renderedLine}
-                        {showCursorBeforeGhost &&
-                          (showCursor ? chalk.inverse(' ') : ' ')}
-                        {currentLineGhost && (
-                          <Text color={theme.text.secondary}>
-                            {currentLineGhost}
-                          </Text>
-                        )}
-                      </Text>
+                      <Box flexGrow={1}>
+                        <Text
+                          terminalCursorFocus={showCursor && isOnCursorLine}
+                          terminalCursorPosition={cpIndexToOffset(
+                            lineText,
+                            cursorVisualColAbsolute,
+                          )}
+                        >
+                          {renderedLine}
+                          {showCursorBeforeGhost &&
+                            (showCursor ? chalk.inverse(' ') : ' ')}
+                          {currentLineGhost && (
+                            <Text color={theme.text.secondary}>
+                              {currentLineGhost}
+                            </Text>
+                          )}
+                        </Text>
+                      </Box>
+                      {showInputScrollbar && (
+                        <Text color={scrollbarColor}>{scrollbarChar}</Text>
+                      )}
                     </Box>
                   );
                 })

@@ -8,7 +8,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import pathMod from 'node:path';
 import * as path from 'node:path';
-import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+} from 'react';
 import { LRUCache } from 'mnemonist';
 import {
   coreEvents,
@@ -2761,6 +2768,20 @@ export function useTextBuffer({
   } = visualLayout;
 
   const [scrollRowState, setScrollRowState] = useState<number>(0);
+  const manualScrollPendingRef = useRef<boolean>(false);
+
+  // Scroll viewport without moving cursor — for mouse wheel
+  const scrollBy = useCallback(
+    (delta: number): void => {
+      const totalVisualLines = visualLines.length;
+      const maxScroll = Math.max(0, totalVisualLines - viewport.height);
+      manualScrollPendingRef.current = true;
+      setScrollRowState((prev) =>
+        Math.max(0, Math.min(prev + delta, maxScroll)),
+      );
+    },
+    [visualLines.length, viewport.height],
+  );
 
   useEffect(() => {
     if (onChange) {
@@ -2780,6 +2801,16 @@ export function useTextBuffer({
     const { height } = viewport;
     const totalVisualLines = visualLines.length;
     const maxScrollStart = Math.max(0, totalVisualLines - height);
+
+    if (manualScrollPendingRef.current) {
+      manualScrollPendingRef.current = false;
+      const clamped = clamp(scrollRowState, 0, maxScrollStart);
+      if (clamped !== scrollRowState) {
+        setScrollRowState(clamped);
+      }
+      return;
+    }
+
     let newVisualScrollRow = scrollRowState;
 
     if (visualCursor[0] < scrollRowState) {
@@ -3486,6 +3517,7 @@ export function useTextBuffer({
       getOffset,
       moveToVisualPosition,
       getLogicalPositionFromVisual,
+      scrollBy,
       getExpandedPasteAtLine: getExpandedPasteAtLineCallback,
       togglePasteExpansion,
       expandedPaste,
@@ -3576,6 +3608,7 @@ export function useTextBuffer({
       getOffset,
       moveToVisualPosition,
       getLogicalPositionFromVisual,
+      scrollBy,
       getExpandedPasteAtLineCallback,
       togglePasteExpansion,
       expandedPaste,
@@ -3763,6 +3796,7 @@ export interface TextBuffer {
   getOffset: () => number;
   moveToOffset(offset: number): void;
   moveToVisualPosition(visualRow: number, visualCol: number): void;
+  scrollBy(delta: number): void;
   /**
    * Convert visual coordinates to logical position without moving cursor.
    * Returns null if the position is out of bounds.
