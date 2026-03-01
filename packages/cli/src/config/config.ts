@@ -657,9 +657,10 @@ export async function loadCliConfig(
 
     switch (approvalMode) {
       case ApprovalMode.PLAN:
-        // In plan non-interactive mode, all tools that require approval are excluded.
-        // TODO(#16625): Replace this default exclusion logic with specific rules for plan mode.
-        extraExcludes.push(...defaultExcludes.filter(toolExclusionFilter));
+        // In plan mode, we allow write_file and replace because they are
+        // restricted to the plans directory by the policy engine.
+        // We only exclude the shell tool by default.
+        extraExcludes.push(...[SHELL_TOOL_NAME].filter(toolExclusionFilter));
         break;
       case ApprovalMode.DEFAULT:
         // In default non-interactive mode, all tools that require approval are excluded.

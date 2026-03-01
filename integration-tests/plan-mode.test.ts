@@ -72,7 +72,6 @@ describe('Plan Mode', () => {
         experimental: { plan: true },
         tools: {
           core: ['write_file', 'read_file', 'list_directory'],
-          allowed: ['write_file'],
         },
         general: {
           defaultApprovalMode: 'plan',
