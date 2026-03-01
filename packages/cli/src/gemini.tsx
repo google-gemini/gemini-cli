@@ -705,6 +705,14 @@ export async function main() {
         };
         // Use the existing session ID to continue recording to the same session
         config.setSessionId(resumedSessionData.conversation.sessionId);
+
+        // Warn the user if the session was found in a different project
+        if (result.isCrossProject) {
+          coreEvents.emitFeedback(
+            'warning',
+            `Resuming session from a different project folder. The original project context may differ from the current directory.`,
+          );
+        }
       } catch (error) {
         coreEvents.emitFeedback(
           'error',
