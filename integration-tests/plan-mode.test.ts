@@ -36,12 +36,6 @@ describe('Plan Mode', () => {
       },
     );
 
-    // Disable the interactive terminal setup prompt in tests
-    writeFileSync(
-      join(rig.homeDir!, GEMINI_DIR, 'state.json'),
-      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
-    );
-
     // We use a prompt that asks for both a read-only action and a write action.
     // "List files" (read-only) followed by "touch denied.txt" (write).
     const result = await rig.run({
@@ -70,10 +64,10 @@ describe('Plan Mode', () => {
     });
   });
 
-  it('should allow write_file only in the plans directory in plan mode', async () => {
+  it('should allow write_file to the plans directory in plan mode', async () => {
     const plansDir = '.gemini/tmp/v1/session/plans';
     const testName =
-      'should allow write_file only in the plans directory in plan mode';
+      'should allow write_file to the plans directory in plan mode';
 
     await rig.setup(testName, {
       settings: {
@@ -90,6 +84,12 @@ describe('Plan Mode', () => {
       },
     });
 
+    // Disable the interactive terminal setup prompt in tests
+    writeFileSync(
+      join(rig.homeDir!, GEMINI_DIR, 'state.json'),
+      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
+    );
+
     const run = await rig.runInteractive({
       approvalMode: 'plan',
     });
@@ -101,32 +101,61 @@ describe('Plan Mode', () => {
       args.includes('plan.md'),
     );
 
-    await run.type(
-      'Now create a file called hello.txt in the current directory.',
-    );
-    await run.type('\r');
-
     const toolLogs = rig.readToolLogs();
-    const writeLogs = toolLogs.filter(
-      (l) => l.toolRequest.name === 'write_file',
-    );
-
-    const planWrite = writeLogs.find(
+    const planWrite = toolLogs.find(
       (l) =>
+        l.toolRequest.name === 'write_file' &&
         l.toolRequest.args.includes('plans') &&
         l.toolRequest.args.includes('plan.md'),
     );
+    expect(planWrite?.toolRequest.success).toBe(true);
+  });
 
-    const blockedWrite = writeLogs.find((l) =>
-      l.toolRequest.args.includes('hello.txt'),
+  it('should deny write_file to non-plans directory in plan mode', async () => {
+    const plansDir = '.gemini/tmp/v1/session/plans';
+    const testName =
+      'should deny write_file to non-plans directory in plan mode';
+
+    await rig.setup(testName, {
+      settings: {
+        experimental: { plan: true },
+        tools: {
+          core: ['write_file', 'read_file', 'list_directory'],
+        },
+        general: {
+          defaultApprovalMode: 'plan',
+          plan: {
+            directory: plansDir,
+          },
+        },
+      },
+    });
+
+    // Disable the interactive terminal setup prompt in tests
+    writeFileSync(
+      join(rig.homeDir!, GEMINI_DIR, 'state.json'),
+      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
     );
 
-    // Model is undeterministic, sometimes a blocked write appears in tool logs and sometimes it doesn't
-    if (blockedWrite) {
-      expect(blockedWrite?.toolRequest.success).toBe(false);
-    }
+    const run = await rig.runInteractive({
+      approvalMode: 'plan',
+    });
 
-    expect(planWrite?.toolRequest.success).toBe(true);
+    await run.type('Create a file called hello.txt in the current directory.');
+    await run.type('\r');
+
+    const toolLogs = rig.readToolLogs();
+    const writeLog = toolLogs.find(
+      (l) =>
+        l.toolRequest.name === 'write_file' &&
+        l.toolRequest.args.includes('hello.txt'),
+    );
+
+    // In Plan Mode, writes outside the plans directory should be blocked.
+    // Model is undeterministic, sometimes it doesn't even try, but if it does, it must fail.
+    if (writeLog) {
+      expect(writeLog.toolRequest.success).toBe(false);
+    }
   });
 
   it('should be able to enter plan mode from default mode', async () => {
@@ -139,6 +168,12 @@ describe('Plan Mode', () => {
         },
       },
     });
+
+    // Disable the interactive terminal setup prompt in tests
+    writeFileSync(
+      join(rig.homeDir!, GEMINI_DIR, 'state.json'),
+      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
+    );
 
     // Start in default mode and ask to enter plan mode.
     await rig.run({
