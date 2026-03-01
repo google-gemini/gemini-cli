@@ -50,7 +50,7 @@ const renderWithContext = (
 
 describe('<LoadingIndicator />', () => {
   const defaultProps = {
-    currentLoadingPhrase: 'Loading...',
+    currentLoadingPhrase: 'Working...',
     elapsedTime: 5,
   };
 
@@ -71,7 +71,7 @@ describe('<LoadingIndicator />', () => {
     await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('MockRespondingSpinner');
-    expect(output).toContain('Loading...');
+    expect(output).toContain('Working...');
     expect(output).toContain('esc to cancel, 5s');
   });
 
@@ -229,7 +229,7 @@ describe('<LoadingIndicator />', () => {
   it('should display fallback phrase if thought is empty', async () => {
     const props = {
       thought: null,
-      currentLoadingPhrase: 'Loading...',
+      currentLoadingPhrase: 'Working...',
       elapsedTime: 5,
     };
     const { lastFrame, unmount, waitUntilReady } = renderWithContext(
@@ -238,7 +238,7 @@ describe('<LoadingIndicator />', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('Loading...');
+    expect(output).toContain('Working...');
     unmount();
   });
 
@@ -330,7 +330,7 @@ describe('<LoadingIndicator />', () => {
       const output = lastFrame();
       // Check for single line output
       expect(output?.trim().includes('\n')).toBe(false);
-      expect(output).toContain('Loading...');
+      expect(output).toContain('Working...');
       expect(output).toContain('esc to cancel, 5s');
       expect(output).toContain('Right');
       unmount();
@@ -354,7 +354,7 @@ describe('<LoadingIndicator />', () => {
       // 3. Right Content
       expect(lines).toHaveLength(3);
       if (lines) {
-        expect(lines[0]).toContain('Loading...');
+        expect(lines[0]).toContain('Working...');
         expect(lines[0]).not.toContain('esc to cancel, 5s');
         expect(lines[1]).toContain('esc to cancel, 5s');
         expect(lines[2]).toContain('Right');
