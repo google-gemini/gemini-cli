@@ -13,6 +13,7 @@ import type {
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
 import {
+  convertSessionToClientHistory,
   GeminiEventType,
   FatalInputError,
   promptIdContext,
@@ -35,7 +36,6 @@ import type { Content, Part } from '@google/genai';
 import readline from 'node:readline';
 import stripAnsi from 'strip-ansi';
 
-import { convertSessionToHistoryFormats } from './ui/hooks/useSessionBrowser.js';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
@@ -71,11 +71,11 @@ export async function runNonInteractive({
       },
     });
 
-    if (config.storage && process.env['GEMINI_CLI_ACTIVITY_LOG_FILE']) {
-      const { registerActivityLogger } = await import(
-        './utils/activityLogger.js'
+    if (process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET']) {
+      const { setupInitialActivityLogger } = await import(
+        './utils/devtoolsService.js'
       );
-      registerActivityLogger(config);
+      await setupInitialActivityLogger(config);
     }
 
     const { stdout: workingStdout } = createWorkingStdio();
@@ -220,9 +220,9 @@ export async function runNonInteractive({
       // Initialize chat.  Resume if resume data is passed.
       if (resumedSessionData) {
         await geminiClient.resumeChat(
-          convertSessionToHistoryFormats(
+          convertSessionToClientHistory(
             resumedSessionData.conversation.messages,
-          ).clientHistory,
+          ),
           resumedSessionData,
         );
       }
@@ -250,6 +250,7 @@ export async function runNonInteractive({
         // Otherwise, slashCommandResult falls through to the default prompt
         // handling.
         if (slashCommandResult) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           query = slashCommandResult as Part[];
         }
       }
@@ -271,6 +272,7 @@ export async function runNonInteractive({
             error || 'Exiting due to an error processing the @ command.',
           );
         }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         query = processedQuery as Part[];
       }
 

@@ -85,6 +85,17 @@ describe('SettingsUtils', () => {
         default: {},
         description: 'Advanced settings for power users.',
         showInDialog: false,
+        properties: {
+          autoConfigureMemory: {
+            type: 'boolean',
+            label: 'Auto Configure Max Old Space Size',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description: 'Automatically configure Node.js memory limits',
+            showInDialog: true,
+          },
+        },
       },
       ui: {
         type: 'object',
@@ -395,11 +406,15 @@ describe('SettingsUtils', () => {
         expect(uiKeys).not.toContain('ui.theme'); // This is now marked false
       });
 
-      it('should not include Advanced category settings', () => {
+      it('should include Advanced category settings', () => {
         const categories = getDialogSettingsByCategory();
 
-        // Advanced settings should be filtered out
-        expect(categories['Advanced']).toBeUndefined();
+        // Advanced settings should now be included because of autoConfigureMemory
+        expect(categories['Advanced']).toBeDefined();
+        const advancedSettings = categories['Advanced'];
+        expect(advancedSettings.map((s) => s.key)).toContain(
+          'advanced.autoConfigureMemory',
+        );
       });
 
       it('should include settings with showInDialog=true', () => {

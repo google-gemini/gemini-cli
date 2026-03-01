@@ -54,11 +54,14 @@ export async function checkPolicy(
       ? toolCall.tool.serverName
       : undefined;
 
+  const toolAnnotations = toolCall.tool.toolAnnotations;
+
   const result = await config
     .getPolicyEngine()
     .check(
       { name: toolCall.request.name, args: toolCall.request.args },
       serverName,
+      toolAnnotations,
     );
 
   const { decision } = result;
@@ -77,7 +80,10 @@ export async function checkPolicy(
     }
   }
 
-  return { decision, rule: result.rule };
+  return {
+    decision,
+    rule: result.rule,
+  };
 }
 
 /**

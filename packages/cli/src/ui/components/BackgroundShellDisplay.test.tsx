@@ -5,7 +5,7 @@
  */
 
 import { render } from '../../test-utils/render.js';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BackgroundShellDisplay } from './BackgroundShellDisplay.js';
 import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
@@ -14,22 +14,16 @@ import { type Key, type KeypressHandler } from '../contexts/KeypressContext.js';
 import { ScrollProvider } from '../contexts/ScrollProvider.js';
 import { Box } from 'ink';
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 // Mock dependencies
 const mockDismissBackgroundShell = vi.fn();
 const mockSetActiveBackgroundShellPid = vi.fn();
 const mockSetIsBackgroundShellListOpen = vi.fn();
-const mockHandleWarning = vi.fn();
-const mockSetEmbeddedShellFocused = vi.fn();
 
 vi.mock('../contexts/UIActionsContext.js', () => ({
   useUIActions: () => ({
     dismissBackgroundShell: mockDismissBackgroundShell,
     setActiveBackgroundShellPid: mockSetActiveBackgroundShellPid,
     setIsBackgroundShellListOpen: mockSetIsBackgroundShellListOpen,
-    handleWarning: mockHandleWarning,
-    setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
   }),
 }));
 
@@ -103,6 +97,10 @@ vi.mock('./shared/ScrollableList.js', () => ({
   ),
 }));
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 const createMockKey = (overrides: Partial<Key>): Key => ({
   name: '',
   ctrl: false,
@@ -142,81 +140,84 @@ describe('<BackgroundShellDisplay />', () => {
   });
 
   it('renders the output of the active shell', async () => {
-    const { lastFrame } = render(
+    const width = 80;
+    const { lastFrame, waitUntilReady, unmount } = render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
           activePid={shell1.pid}
-          width={80}
+          width={width}
           height={24}
           isFocused={false}
           isListOpenProp={false}
         />
       </ScrollProvider>,
+      width,
     );
-    await act(async () => {
-      await delay(0);
-    });
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('renders tabs for multiple shells', async () => {
-    const { lastFrame } = render(
+    const width = 100;
+    const { lastFrame, waitUntilReady, unmount } = render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
           activePid={shell1.pid}
-          width={100}
+          width={width}
           height={24}
           isFocused={false}
           isListOpenProp={false}
         />
       </ScrollProvider>,
+      width,
     );
-    await act(async () => {
-      await delay(0);
-    });
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('highlights the focused state', async () => {
-    const { lastFrame } = render(
+    const width = 80;
+    const { lastFrame, waitUntilReady, unmount } = render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
           activePid={shell1.pid}
-          width={80}
+          width={width}
           height={24}
-          isFocused={true} // Focused
+          isFocused={true}
           isListOpenProp={false}
         />
       </ScrollProvider>,
+      width,
     );
-    await act(async () => {
-      await delay(0);
-    });
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('resizes the PTY on mount and when dimensions change', async () => {
-    const { rerender } = render(
+    const width = 80;
+    const { rerender, waitUntilReady, unmount } = render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
           activePid={shell1.pid}
-          width={80}
+          width={width}
           height={24}
           isFocused={false}
           isListOpenProp={false}
         />
       </ScrollProvider>,
+      width,
     );
-    await act(async () => {
-      await delay(0);
-    });
+    await waitUntilReady();
 
     expect(ShellExecutionService.resizePty).toHaveBeenCalledWith(
       shell1.pid,
@@ -236,143 +237,152 @@ describe('<BackgroundShellDisplay />', () => {
         />
       </ScrollProvider>,
     );
-    await act(async () => {
-      await delay(0);
-    });
+    await waitUntilReady();
 
     expect(ShellExecutionService.resizePty).toHaveBeenCalledWith(
       shell1.pid,
       96,
       27,
     );
+    unmount();
   });
 
   it('renders the process list when isListOpenProp is true', async () => {
-    const { lastFrame } = render(
+    const width = 80;
+    const { lastFrame, waitUntilReady, unmount } = render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
           activePid={shell1.pid}
-          width={80}
+          width={width}
           height={24}
           isFocused={true}
           isListOpenProp={true}
         />
       </ScrollProvider>,
+      width,
     );
-    await act(async () => {
-      await delay(0);
-    });
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('selects the current process and closes the list when Ctrl+L is pressed in list view', async () => {
-    render(
+    const width = 80;
+    const { waitUntilReady, unmount } = render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
           activePid={shell1.pid}
-          width={80}
+          width={width}
           height={24}
           isFocused={true}
           isListOpenProp={true}
         />
       </ScrollProvider>,
+      width,
     );
-    await act(async () => {
-      await delay(0);
-    });
+    await waitUntilReady();
 
     // Simulate down arrow to select the second process (handled by RadioButtonSelect)
-    act(() => {
+    await act(async () => {
       simulateKey({ name: 'down' });
     });
+    await waitUntilReady();
 
     // Simulate Ctrl+L (handled by BackgroundShellDisplay)
-    act(() => {
+    await act(async () => {
       simulateKey({ name: 'l', ctrl: true });
     });
+    await waitUntilReady();
 
     expect(mockSetActiveBackgroundShellPid).toHaveBeenCalledWith(shell2.pid);
     expect(mockSetIsBackgroundShellListOpen).toHaveBeenCalledWith(false);
+    unmount();
   });
 
   it('kills the highlighted process when Ctrl+K is pressed in list view', async () => {
-    render(
+    const width = 80;
+    const { waitUntilReady, unmount } = render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
           activePid={shell1.pid}
-          width={80}
+          width={width}
           height={24}
           isFocused={true}
           isListOpenProp={true}
         />
       </ScrollProvider>,
+      width,
     );
-    await act(async () => {
-      await delay(0);
-    });
+    await waitUntilReady();
 
     // Initial state: shell1 (active) is highlighted
 
     // Move to shell2
-    act(() => {
+    await act(async () => {
       simulateKey({ name: 'down' });
     });
+    await waitUntilReady();
 
     // Press Ctrl+K
-    act(() => {
+    await act(async () => {
       simulateKey({ name: 'k', ctrl: true });
     });
+    await waitUntilReady();
 
     expect(mockDismissBackgroundShell).toHaveBeenCalledWith(shell2.pid);
+    unmount();
   });
 
   it('kills the active process when Ctrl+K is pressed in output view', async () => {
-    render(
+    const width = 80;
+    const { waitUntilReady, unmount } = render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
           activePid={shell1.pid}
-          width={80}
+          width={width}
           height={24}
           isFocused={true}
           isListOpenProp={false}
         />
       </ScrollProvider>,
+      width,
     );
-    await act(async () => {
-      await delay(0);
-    });
+    await waitUntilReady();
 
-    act(() => {
+    await act(async () => {
       simulateKey({ name: 'k', ctrl: true });
     });
+    await waitUntilReady();
 
     expect(mockDismissBackgroundShell).toHaveBeenCalledWith(shell1.pid);
+    unmount();
   });
 
   it('scrolls to active shell when list opens', async () => {
     // shell2 is active
-    const { lastFrame } = render(
+    const width = 80;
+    const { lastFrame, waitUntilReady, unmount } = render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
           activePid={shell2.pid}
-          width={80}
+          width={width}
           height={24}
           isFocused={true}
           isListOpenProp={true}
         />
       </ScrollProvider>,
+      width,
     );
-    await act(async () => {
-      await delay(0);
-    });
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 
   it('keeps exit code status color even when selected', async () => {
@@ -387,73 +397,23 @@ describe('<BackgroundShellDisplay />', () => {
     };
     mockShells.set(exitedShell.pid, exitedShell);
 
-    const { lastFrame } = render(
+    const width = 80;
+    const { lastFrame, waitUntilReady, unmount } = render(
       <ScrollProvider>
         <BackgroundShellDisplay
           shells={mockShells}
           activePid={exitedShell.pid}
-          width={80}
+          width={width}
           height={24}
           isFocused={true}
           isListOpenProp={true}
         />
       </ScrollProvider>,
+      width,
     );
-    await act(async () => {
-      await delay(0);
-    });
+    await waitUntilReady();
 
     expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('unfocuses the shell when Shift+Tab is pressed', async () => {
-    render(
-      <ScrollProvider>
-        <BackgroundShellDisplay
-          shells={mockShells}
-          activePid={shell1.pid}
-          width={80}
-          height={24}
-          isFocused={true}
-          isListOpenProp={false}
-        />
-      </ScrollProvider>,
-    );
-    await act(async () => {
-      await delay(0);
-    });
-
-    act(() => {
-      simulateKey({ name: 'tab', shift: true });
-    });
-
-    expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
-  });
-
-  it('shows a warning when Tab is pressed', async () => {
-    render(
-      <ScrollProvider>
-        <BackgroundShellDisplay
-          shells={mockShells}
-          activePid={shell1.pid}
-          width={80}
-          height={24}
-          isFocused={true}
-          isListOpenProp={false}
-        />
-      </ScrollProvider>,
-    );
-    await act(async () => {
-      await delay(0);
-    });
-
-    act(() => {
-      simulateKey({ name: 'tab' });
-    });
-
-    expect(mockHandleWarning).toHaveBeenCalledWith(
-      'Press Shift+Tab to focus out.',
-    );
-    expect(mockSetEmbeddedShellFocused).not.toHaveBeenCalled();
+    unmount();
   });
 });

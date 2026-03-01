@@ -6,11 +6,14 @@
 
 import { type McpToolContext, BeforeToolHookOutput } from '../hooks/types.js';
 import type { Config } from '../config/config.js';
-import type { ToolResult, AnyDeclarativeTool } from '../tools/tools.js';
+import type {
+  ToolResult,
+  AnyDeclarativeTool,
+  AnyToolInvocation,
+} from '../tools/tools.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { AnsiOutput, ShellExecutionConfig } from '../index.js';
-import type { AnyToolInvocation } from '../tools/tools.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
 
@@ -72,7 +75,9 @@ export async function executeToolWithHooks(
   shellExecutionConfig?: ShellExecutionConfig,
   setPidCallback?: (pid: number) => void,
   config?: Config,
+  originalRequestName?: string,
 ): Promise<ToolResult> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const toolInput = (invocation.params || {}) as Record<string, unknown>;
   let inputWasModified = false;
   let modifiedKeys: string[] = [];
@@ -86,6 +91,7 @@ export async function executeToolWithHooks(
       toolName,
       toolInput,
       mcpContext,
+      originalRequestName,
     );
 
     // Check if hook requested to stop entire agent execution
@@ -192,6 +198,7 @@ export async function executeToolWithHooks(
         error: toolResult.error,
       },
       mcpContext,
+      originalRequestName,
     );
 
     // Check if hook requested to stop entire agent execution
@@ -237,6 +244,12 @@ export async function executeToolWithHooks(
       } else {
         toolResult.llmContent = wrappedContext;
       }
+    }
+
+    // Check if the hook requested a tail tool call
+    const tailToolCallRequest = afterOutput?.getTailToolCallRequest();
+    if (tailToolCallRequest) {
+      toolResult.tailToolCallRequest = tailToolCallRequest;
     }
   }
 

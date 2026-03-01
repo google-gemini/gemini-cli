@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -13,11 +13,14 @@ import { ThemeDialog } from './ThemeDialog.js';
 import { SettingsDialog } from './SettingsDialog.js';
 import { AuthInProgress } from '../auth/AuthInProgress.js';
 import { AuthDialog } from '../auth/AuthDialog.js';
+import { BannedAccountDialog } from '../auth/BannedAccountDialog.js';
 import { ApiAuthDialog } from '../auth/ApiAuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
 import { ValidationDialog } from './ValidationDialog.js';
+import { OverageMenuDialog } from './OverageMenuDialog.js';
+import { EmptyWalletDialog } from './EmptyWalletDialog.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
 import { SessionBrowser } from './SessionBrowser.js';
@@ -34,6 +37,10 @@ import { AdminSettingsChangedDialog } from './AdminSettingsChangedDialog.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 import { NewAgentsNotification } from './NewAgentsNotification.js';
 import { AgentConfigDialog } from './AgentConfigDialog.js';
+import { SessionRetentionWarningDialog } from './SessionRetentionWarningDialog.js';
+import { useCallback } from 'react';
+import { SettingScope } from '../../config/settings.js';
+import { PolicyUpdateDialog } from './PolicyUpdateDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -55,7 +62,55 @@ export const DialogManager = ({
     terminalHeight,
     staticExtraHeight,
     terminalWidth: uiTerminalWidth,
+    shouldShowRetentionWarning,
+    sessionsToDeleteCount,
   } = uiState;
+
+  const handleKeep120Days = useCallback(() => {
+    settings.setValue(
+      SettingScope.User,
+      'general.sessionRetention.warningAcknowledged',
+      true,
+    );
+    settings.setValue(
+      SettingScope.User,
+      'general.sessionRetention.enabled',
+      true,
+    );
+    settings.setValue(
+      SettingScope.User,
+      'general.sessionRetention.maxAge',
+      '120d',
+    );
+  }, [settings]);
+
+  const handleKeep30Days = useCallback(() => {
+    settings.setValue(
+      SettingScope.User,
+      'general.sessionRetention.warningAcknowledged',
+      true,
+    );
+    settings.setValue(
+      SettingScope.User,
+      'general.sessionRetention.enabled',
+      true,
+    );
+    settings.setValue(
+      SettingScope.User,
+      'general.sessionRetention.maxAge',
+      '30d',
+    );
+  }, [settings]);
+
+  if (shouldShowRetentionWarning && sessionsToDeleteCount !== undefined) {
+    return (
+      <SessionRetentionWarningDialog
+        onKeep120Days={handleKeep120Days}
+        onKeep30Days={handleKeep30Days}
+        sessionsToDeleteCount={sessionsToDeleteCount ?? 0}
+      />
+    );
+  }
 
   if (uiState.adminSettingsChanged) {
     return <AdminSettingsChangedDialog />;
@@ -71,25 +126,54 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.proQuotaRequest) {
+  if (uiState.quota.proQuotaRequest) {
     return (
       <ProQuotaDialog
-        failedModel={uiState.proQuotaRequest.failedModel}
-        fallbackModel={uiState.proQuotaRequest.fallbackModel}
-        message={uiState.proQuotaRequest.message}
-        isTerminalQuotaError={uiState.proQuotaRequest.isTerminalQuotaError}
-        isModelNotFoundError={!!uiState.proQuotaRequest.isModelNotFoundError}
+        failedModel={uiState.quota.proQuotaRequest.failedModel}
+        fallbackModel={uiState.quota.proQuotaRequest.fallbackModel}
+        message={uiState.quota.proQuotaRequest.message}
+        isTerminalQuotaError={
+          uiState.quota.proQuotaRequest.isTerminalQuotaError
+        }
+        isModelNotFoundError={
+          !!uiState.quota.proQuotaRequest.isModelNotFoundError
+        }
+        authType={uiState.quota.proQuotaRequest.authType}
         onChoice={uiActions.handleProQuotaChoice}
       />
     );
   }
-  if (uiState.validationRequest) {
+  if (uiState.quota.validationRequest) {
     return (
       <ValidationDialog
-        validationLink={uiState.validationRequest.validationLink}
-        validationDescription={uiState.validationRequest.validationDescription}
-        learnMoreUrl={uiState.validationRequest.learnMoreUrl}
+        validationLink={uiState.quota.validationRequest.validationLink}
+        validationDescription={
+          uiState.quota.validationRequest.validationDescription
+        }
+        learnMoreUrl={uiState.quota.validationRequest.learnMoreUrl}
         onChoice={uiActions.handleValidationChoice}
+      />
+    );
+  }
+  if (uiState.quota.overageMenuRequest) {
+    return (
+      <OverageMenuDialog
+        failedModel={uiState.quota.overageMenuRequest.failedModel}
+        fallbackModel={uiState.quota.overageMenuRequest.fallbackModel}
+        resetTime={uiState.quota.overageMenuRequest.resetTime}
+        creditBalance={uiState.quota.overageMenuRequest.creditBalance}
+        onChoice={uiActions.handleOverageMenuChoice}
+      />
+    );
+  }
+  if (uiState.quota.emptyWalletRequest) {
+    return (
+      <EmptyWalletDialog
+        failedModel={uiState.quota.emptyWalletRequest.failedModel}
+        fallbackModel={uiState.quota.emptyWalletRequest.fallbackModel}
+        resetTime={uiState.quota.emptyWalletRequest.resetTime}
+        onGetCredits={uiState.quota.emptyWalletRequest.onGetCredits}
+        onChoice={uiActions.handleEmptyWalletChoice}
       />
     );
   }
@@ -106,6 +190,16 @@ export const DialogManager = ({
       <FolderTrustDialog
         onSelect={uiActions.handleFolderTrustSelect}
         isRestarting={uiState.isRestarting}
+        discoveryResults={uiState.folderDiscoveryResults}
+      />
+    );
+  }
+  if (uiState.isPolicyUpdateDialogOpen) {
+    return (
+      <PolicyUpdateDialog
+        config={config}
+        request={uiState.policyUpdateConfirmationRequest!}
+        onClose={() => uiActions.setIsPolicyUpdateDialogOpen(false)}
       />
     );
   }
@@ -113,6 +207,20 @@ export const DialogManager = ({
     return (
       <LoopDetectionConfirmation
         onComplete={uiState.loopDetectionConfirmationRequest.onComplete}
+      />
+    );
+  }
+
+  if (uiState.permissionConfirmationRequest) {
+    const files = uiState.permissionConfirmationRequest.files;
+    const filesList = files.map((f) => `- ${f}`).join('\n');
+    return (
+      <ConsentPrompt
+        prompt={`The following files are outside your workspace:\n\n${filesList}\n\nDo you want to allow this read?`}
+        onConfirm={(allowed) => {
+          uiState.permissionConfirmationRequest?.onComplete({ allowed });
+        }}
+        terminalWidth={terminalWidth}
       />
     );
   }
@@ -213,6 +321,21 @@ export const DialogManager = ({
       </Box>
     );
   }
+  if (uiState.accountSuspensionInfo) {
+    return (
+      <Box flexDirection="column">
+        <BannedAccountDialog
+          accountSuspensionInfo={uiState.accountSuspensionInfo}
+          onExit={() => {
+            process.exit(1);
+          }}
+          onChangeAuth={() => {
+            uiActions.clearAccountSuspension();
+          }}
+        />
+      </Box>
+    );
+  }
   if (uiState.isAuthenticating) {
     return (
       <AuthInProgress
@@ -235,6 +358,7 @@ export const DialogManager = ({
       </Box>
     );
   }
+
   if (uiState.isAuthDialogOpen) {
     return (
       <Box flexDirection="column">

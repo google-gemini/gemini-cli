@@ -125,6 +125,7 @@ export class FileCommandLoader implements ICommandLoader {
       } catch (error) {
         if (
           !signal.aborted &&
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           (error as { code?: string })?.code !== 'ENOENT'
         ) {
           coreEvents.emitFeedback(

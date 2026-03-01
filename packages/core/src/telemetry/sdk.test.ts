@@ -75,6 +75,9 @@ describe('Telemetry SDK', () => {
       getSessionId: () => 'test-session',
       getTelemetryUseCliAuth: () => false,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
   });
 
@@ -353,6 +356,7 @@ describe('Telemetry SDK', () => {
       expect(callback).not.toHaveBeenCalled();
 
       await initializeTelemetry(mockConfig);
+      await new Promise((resolve) => setTimeout(resolve, 10));
       expect(callback).toHaveBeenCalled();
     });
   });

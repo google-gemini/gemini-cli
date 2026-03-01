@@ -17,8 +17,6 @@ import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getConsentForOauth } from '../utils/authConsent.js';
 
-export const OAUTH_DISPLAY_MESSAGE_EVENT = 'oauth-display-message' as const;
-
 /**
  * OAuth configuration for an MCP server.
  */
@@ -27,6 +25,7 @@ export interface MCPOAuthConfig {
   clientId?: string;
   clientSecret?: string;
   authorizationUrl?: string;
+  issuer?: string;
   tokenUrl?: string;
   scopes?: string[];
   audiences?: string[];
@@ -143,6 +142,7 @@ export class MCPOAuthProvider {
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return (await response.json()) as OAuthClientRegistrationResponse;
   }
 
@@ -160,14 +160,14 @@ export class MCPOAuthProvider {
   }
 
   private async discoverAuthServerMetadataForRegistration(
-    authorizationUrl: string,
+    issuer: string,
   ): Promise<{
     issuerUrl: string;
     metadata: NonNullable<
       Awaited<ReturnType<typeof OAuthUtils.discoverAuthorizationServerMetadata>>
     >;
   }> {
-    const authUrl = new URL(authorizationUrl);
+    const authUrl = new URL(issuer);
 
     // Preserve path components for issuers with path-based discovery (e.g., Keycloak)
     // Extract issuer by removing the OIDC protocol-specific path suffix
@@ -377,6 +377,7 @@ export class MCPOAuthProvider {
         }
 
         server.listen(listenPort, () => {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const address = server.address() as net.AddressInfo;
           serverPort = address.port;
           debugLogger.log(
@@ -580,6 +581,7 @@ export class MCPOAuthProvider {
 
     // Try to parse as JSON first, fall back to form-urlencoded
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(responseText) as OAuthTokenResponse;
     } catch {
       // Parse form-urlencoded response
@@ -702,6 +704,7 @@ export class MCPOAuthProvider {
 
     // Try to parse as JSON first, fall back to form-urlencoded
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(responseText) as OAuthTokenResponse;
     } catch {
       // Parse form-urlencoded response
@@ -780,6 +783,7 @@ export class MCPOAuthProvider {
               config = {
                 ...config,
                 authorizationUrl: discoveredConfig.authorizationUrl,
+                issuer: discoveredConfig.issuer,
                 tokenUrl: discoveredConfig.tokenUrl,
                 scopes: config.scopes || discoveredConfig.scopes || [],
                 // Preserve existing client credentials
@@ -810,6 +814,7 @@ export class MCPOAuthProvider {
             ...config,
             authorizationUrl: discoveredConfig.authorizationUrl,
             tokenUrl: discoveredConfig.tokenUrl,
+            issuer: discoveredConfig.issuer,
             scopes: config.scopes || discoveredConfig.scopes || [],
             registrationUrl: discoveredConfig.registrationUrl,
             // Preserve existing client credentials
@@ -848,18 +853,14 @@ export class MCPOAuthProvider {
 
       // If no registration URL was previously discovered, try to discover it
       if (!registrationUrl) {
-        // Extract server URL from authorization URL
-        if (!config.authorizationUrl) {
-          throw new Error(
-            'Cannot perform dynamic registration without authorization URL',
-          );
+        // Use the issuer to discover registration endpoint
+        if (!config.issuer) {
+          throw new Error('Cannot perform dynamic registration without issuer');
         }
 
         debugLogger.debug('→ Attempting dynamic client registration...');
         const { metadata: authServerMetadata } =
-          await this.discoverAuthServerMetadataForRegistration(
-            config.authorizationUrl,
-          );
+          await this.discoverAuthServerMetadataForRegistration(config.issuer);
         registrationUrl = authServerMetadata.registration_endpoint;
       }
 

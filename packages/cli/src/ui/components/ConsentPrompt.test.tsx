@@ -31,15 +31,16 @@ describe('ConsentPrompt', () => {
     vi.clearAllMocks();
   });
 
-  it('renders a string prompt with MarkdownDisplay', () => {
+  it('renders a string prompt with MarkdownDisplay', async () => {
     const prompt = 'Are you sure?';
-    const { unmount } = render(
+    const { waitUntilReady, unmount } = render(
       <ConsentPrompt
         prompt={prompt}
         onConfirm={onConfirm}
         terminalWidth={terminalWidth}
       />,
     );
+    await waitUntilReady();
 
     expect(MockedMarkdownDisplay).toHaveBeenCalledWith(
       {
@@ -52,68 +53,74 @@ describe('ConsentPrompt', () => {
     unmount();
   });
 
-  it('renders a ReactNode prompt directly', () => {
+  it('renders a ReactNode prompt directly', async () => {
     const prompt = <Text>Are you sure?</Text>;
-    const { lastFrame, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = render(
       <ConsentPrompt
         prompt={prompt}
         onConfirm={onConfirm}
         terminalWidth={terminalWidth}
       />,
     );
+    await waitUntilReady();
 
     expect(MockedMarkdownDisplay).not.toHaveBeenCalled();
     expect(lastFrame()).toContain('Are you sure?');
     unmount();
   });
 
-  it('calls onConfirm with true when "Yes" is selected', () => {
+  it('calls onConfirm with true when "Yes" is selected', async () => {
     const prompt = 'Are you sure?';
-    const { unmount } = render(
+    const { waitUntilReady, unmount } = render(
       <ConsentPrompt
         prompt={prompt}
         onConfirm={onConfirm}
         terminalWidth={terminalWidth}
       />,
     );
+    await waitUntilReady();
 
     const onSelect = MockedRadioButtonSelect.mock.calls[0][0].onSelect;
-    act(() => {
+    await act(async () => {
       onSelect(true);
     });
+    await waitUntilReady();
 
     expect(onConfirm).toHaveBeenCalledWith(true);
     unmount();
   });
 
-  it('calls onConfirm with false when "No" is selected', () => {
+  it('calls onConfirm with false when "No" is selected', async () => {
     const prompt = 'Are you sure?';
-    const { unmount } = render(
+    const { waitUntilReady, unmount } = render(
       <ConsentPrompt
         prompt={prompt}
         onConfirm={onConfirm}
         terminalWidth={terminalWidth}
       />,
     );
+    await waitUntilReady();
 
     const onSelect = MockedRadioButtonSelect.mock.calls[0][0].onSelect;
-    act(() => {
+    await act(async () => {
       onSelect(false);
     });
+    await waitUntilReady();
 
     expect(onConfirm).toHaveBeenCalledWith(false);
     unmount();
   });
 
-  it('passes correct items to RadioButtonSelect', () => {
+  it('passes correct items to RadioButtonSelect', async () => {
     const prompt = 'Are you sure?';
-    const { unmount } = render(
+    const { waitUntilReady, unmount } = render(
       <ConsentPrompt
         prompt={prompt}
         onConfirm={onConfirm}
         terminalWidth={terminalWidth}
       />,
     );
+    await waitUntilReady();
 
     expect(MockedRadioButtonSelect).toHaveBeenCalledWith(
       expect.objectContaining({

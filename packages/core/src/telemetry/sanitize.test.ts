@@ -14,6 +14,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { HookCallEvent, EVENT_HOOK_CALL } from './types.js';
+import { HookType } from '../hooks/types.js';
 import type { Config } from '../config/config.js';
 
 /**
@@ -26,9 +27,12 @@ function createMockConfig(logPromptsEnabled: boolean): Config {
   return {
     getTelemetryLogPromptsEnabled: () => logPromptsEnabled,
     getSessionId: () => 'test-session-id',
+    getExperiments: () => undefined,
+    getExperimentsAsync: async () => undefined,
     getModel: () => 'gemini-1.5-flash',
     isInteractive: () => true,
     getUserEmail: () => undefined,
+    getContentGeneratorConfig: () => undefined,
   } as unknown as Config;
 }
 
@@ -38,7 +42,7 @@ describe('Telemetry Sanitization', () => {
       it('should create an event with all fields', () => {
         const event = new HookCallEvent(
           'BeforeTool',
-          'command',
+          HookType.Command,
           'test-hook',
           { tool_name: 'ReadFile' },
           100,
@@ -67,7 +71,7 @@ describe('Telemetry Sanitization', () => {
       it('should create an event with minimal fields', () => {
         const event = new HookCallEvent(
           'BeforeTool',
-          'command',
+          HookType.Command,
           'test-hook',
           { tool_name: 'ReadFile' },
           100,
@@ -88,7 +92,7 @@ describe('Telemetry Sanitization', () => {
       it('should include all fields when logPrompts is enabled', () => {
         const event = new HookCallEvent(
           'BeforeTool',
-          'command',
+          HookType.Command,
           '/path/to/.gemini/hooks/check-secrets.sh --api-key=abc123',
           { tool_name: 'ReadFile', args: { file: 'secret.txt' } },
           100,
@@ -121,7 +125,7 @@ describe('Telemetry Sanitization', () => {
       it('should include hook_input and hook_output as JSON strings', () => {
         const event = new HookCallEvent(
           'BeforeTool',
-          'command',
+          HookType.Command,
           'test-hook',
           { tool_name: 'ReadFile', args: { file: 'test.txt' } },
           100,
@@ -152,7 +156,7 @@ describe('Telemetry Sanitization', () => {
       it('should exclude PII-sensitive fields when logPrompts is disabled', () => {
         const event = new HookCallEvent(
           'BeforeTool',
-          'command',
+          HookType.Command,
           '/path/to/.gemini/hooks/check-secrets.sh --api-key=abc123',
           { tool_name: 'ReadFile', args: { file: 'secret.txt' } },
           100,
@@ -230,7 +234,7 @@ describe('Telemetry Sanitization', () => {
         for (const testCase of testCases) {
           const event = new HookCallEvent(
             'BeforeTool',
-            'command',
+            HookType.Command,
             testCase.input,
             { tool_name: 'ReadFile' },
             100,
@@ -246,7 +250,7 @@ describe('Telemetry Sanitization', () => {
       it('should still include error field even when logPrompts is disabled', () => {
         const event = new HookCallEvent(
           'BeforeTool',
-          'command',
+          HookType.Command,
           'test-hook',
           { tool_name: 'ReadFile' },
           100,
@@ -274,7 +278,7 @@ describe('Telemetry Sanitization', () => {
       it('should handle commands with multiple spaces', () => {
         const event = new HookCallEvent(
           'BeforeTool',
-          'command',
+          HookType.Command,
           'python   script.py   --arg1   --arg2',
           {},
           100,
@@ -288,7 +292,7 @@ describe('Telemetry Sanitization', () => {
       it('should handle mixed path separators', () => {
         const event = new HookCallEvent(
           'BeforeTool',
-          'command',
+          HookType.Command,
           '/path/to\\mixed\\separators.sh',
           {},
           100,
@@ -302,7 +306,7 @@ describe('Telemetry Sanitization', () => {
       it('should handle trailing slashes', () => {
         const event = new HookCallEvent(
           'BeforeTool',
-          'command',
+          HookType.Command,
           '/path/to/directory/',
           {},
           100,
@@ -318,7 +322,7 @@ describe('Telemetry Sanitization', () => {
       it('should format success message correctly', () => {
         const event = new HookCallEvent(
           'BeforeTool',
-          'command',
+          HookType.Command,
           'test-hook',
           {},
           150,
@@ -333,7 +337,7 @@ describe('Telemetry Sanitization', () => {
       it('should format failure message correctly', () => {
         const event = new HookCallEvent(
           'AfterTool',
-          'command',
+          HookType.Command,
           'validation-hook',
           {},
           75,
@@ -352,7 +356,7 @@ describe('Telemetry Sanitization', () => {
 
         const event = new HookCallEvent(
           'BeforeModel',
-          'command',
+          HookType.Command,
           '$GEMINI_PROJECT_DIR/.gemini/hooks/add-context.sh',
           {
             llm_request: {
@@ -392,7 +396,7 @@ describe('Telemetry Sanitization', () => {
 
         const event = new HookCallEvent(
           'BeforeModel',
-          'command',
+          HookType.Command,
           '$GEMINI_PROJECT_DIR/.gemini/hooks/add-context.sh',
           {
             llm_request: {
@@ -436,7 +440,7 @@ describe('Telemetry Sanitization', () => {
       it('should sanitize commands with API keys', () => {
         const event = new HookCallEvent(
           'BeforeTool',
-          'command',
+          HookType.Command,
           'curl https://api.example.com -H "Authorization: Bearer sk-abc123xyz"',
           {},
           100,
@@ -450,7 +454,7 @@ describe('Telemetry Sanitization', () => {
       it('should sanitize commands with database credentials', () => {
         const event = new HookCallEvent(
           'BeforeTool',
-          'command',
+          HookType.Command,
           'psql postgresql://user:password@localhost/db',
           {},
           100,
@@ -464,7 +468,7 @@ describe('Telemetry Sanitization', () => {
       it('should sanitize commands with environment variables containing secrets', () => {
         const event = new HookCallEvent(
           'BeforeTool',
-          'command',
+          HookType.Command,
           'AWS_SECRET_KEY=abc123 aws s3 ls',
           {},
           100,
@@ -478,7 +482,7 @@ describe('Telemetry Sanitization', () => {
       it('should sanitize Python scripts with file paths', () => {
         const event = new HookCallEvent(
           'BeforeTool',
-          'command',
+          HookType.Command,
           'python /home/john.doe/projects/secret-scanner/scan.py --config=/etc/secrets.yml',
           {},
           100,

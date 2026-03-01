@@ -5,7 +5,8 @@ exports[`<DefaultAppLayout /> > hides BackgroundShellDisplay when StreamingState
 Notifications
 CopyModeWarning
 Composer
-ExitWarning"
+ExitWarning
+"
 `;
 
 exports[`<DefaultAppLayout /> > renders BackgroundShellDisplay when shells exist and active 1`] = `
@@ -18,7 +19,8 @@ BackgroundShellDisplay
 Notifications
 CopyModeWarning
 Composer
-ExitWarning"
+ExitWarning
+"
 `;
 
 exports[`<DefaultAppLayout /> > shows BackgroundShellDisplay when StreamingState is NOT WaitingForConfirmation 1`] = `
@@ -31,5 +33,6 @@ BackgroundShellDisplay
 Notifications
 CopyModeWarning
 Composer
-ExitWarning"
+ExitWarning
+"
 `;

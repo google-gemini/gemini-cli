@@ -358,6 +358,7 @@ export class McpServerEnablementManager {
   private async readConfig(): Promise<McpServerEnablementConfig> {
     try {
       const content = await fs.readFile(this.configFilePath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(content) as McpServerEnablementConfig;
     } catch (error) {
       if (

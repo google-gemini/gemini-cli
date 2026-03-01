@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { describe, it, expect } from 'vitest';
 import type { ToolMessageProps } from './ToolMessage.js';
 import { ToolMessage } from './ToolMessage.js';
-import { StreamingState, ToolCallStatus } from '../../types.js';
+import { StreamingState } from '../../types.js';
 import { StreamingContext } from '../../contexts/StreamingContext.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 
 describe('<ToolMessage /> - Raw Markdown Display Snapshots', () => {
   const baseProps: ToolMessageProps = {
@@ -16,7 +18,7 @@ describe('<ToolMessage /> - Raw Markdown Display Snapshots', () => {
     name: 'test-tool',
     description: 'A tool for testing',
     resultDisplay: 'Test **bold** and `code` markdown',
-    status: ToolCallStatus.Success,
+    status: CoreToolCallStatus.Success,
     terminalWidth: 80,
     confirmationDetails: undefined,
     emphasis: 'medium',
@@ -61,8 +63,8 @@ describe('<ToolMessage /> - Raw Markdown Display Snapshots', () => {
     },
   ])(
     'renders with renderMarkdown=$renderMarkdown, useAlternateBuffer=$useAlternateBuffer $description',
-    ({ renderMarkdown, useAlternateBuffer, availableTerminalHeight }) => {
-      const { lastFrame } = renderWithProviders(
+    async ({ renderMarkdown, useAlternateBuffer, availableTerminalHeight }) => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <StreamingContext.Provider value={StreamingState.Idle}>
           <ToolMessage
             {...baseProps}
@@ -74,7 +76,9 @@ describe('<ToolMessage /> - Raw Markdown Display Snapshots', () => {
           useAlternateBuffer,
         },
       );
+      await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     },
   );
 });

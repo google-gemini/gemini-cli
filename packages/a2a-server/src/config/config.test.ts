@@ -28,6 +28,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       const mockConfig = {
         ...params,
         initialize: vi.fn(),
+        waitForMcpInit: vi.fn(),
         refreshAuth: vi.fn(),
         getExperiments: vi.fn().mockReturnValue({
           flags: {
@@ -41,9 +42,11 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       };
       return mockConfig;
     }),
-    loadServerHierarchicalMemory: vi
-      .fn()
-      .mockResolvedValue({ memoryContent: '', fileCount: 0, filePaths: [] }),
+    loadServerHierarchicalMemory: vi.fn().mockResolvedValue({
+      memoryContent: { global: '', extension: '', project: '' },
+      fileCount: 0,
+      filePaths: [],
+    }),
     startupProfiler: {
       flush: vi.fn(),
     },
@@ -92,6 +95,7 @@ describe('loadConfig', () => {
           const mockConfig = {
             ...(params as object),
             initialize: vi.fn(),
+            waitForMcpInit: vi.fn(),
             refreshAuth: vi.fn(),
             getExperiments: vi.fn().mockReturnValue({
               flags: {
@@ -263,6 +267,49 @@ describe('loadConfig', () => {
       respectGitIgnore: false,
       respectGeminiIgnore: undefined,
       customIgnoreFilePaths: [testPath],
+    });
+  });
+
+  describe('tool configuration', () => {
+    it('should pass V1 allowedTools to Config properly', async () => {
+      const settings: Settings = {
+        allowedTools: ['shell', 'edit'],
+      };
+      await loadConfig(settings, mockExtensionLoader, taskId);
+      expect(Config).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allowedTools: ['shell', 'edit'],
+        }),
+      );
+    });
+
+    it('should pass V2 tools.allowed to Config properly', async () => {
+      const settings: Settings = {
+        tools: {
+          allowed: ['shell', 'fetch'],
+        },
+      };
+      await loadConfig(settings, mockExtensionLoader, taskId);
+      expect(Config).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allowedTools: ['shell', 'fetch'],
+        }),
+      );
+    });
+
+    it('should prefer V1 allowedTools over V2 tools.allowed if both present', async () => {
+      const settings: Settings = {
+        allowedTools: ['v1-tool'],
+        tools: {
+          allowed: ['v2-tool'],
+        },
+      };
+      await loadConfig(settings, mockExtensionLoader, taskId);
+      expect(Config).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allowedTools: ['v1-tool'],
+        }),
+      );
     });
   });
 });

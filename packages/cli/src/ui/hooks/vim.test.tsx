@@ -156,6 +156,15 @@ describe('useVim hook', () => {
       vimMoveWordForward: vi.fn(),
       vimMoveWordBackward: vi.fn(),
       vimMoveWordEnd: vi.fn(),
+      vimMoveBigWordForward: vi.fn(),
+      vimMoveBigWordBackward: vi.fn(),
+      vimMoveBigWordEnd: vi.fn(),
+      vimDeleteBigWordForward: vi.fn(),
+      vimDeleteBigWordBackward: vi.fn(),
+      vimDeleteBigWordEnd: vi.fn(),
+      vimChangeBigWordForward: vi.fn(),
+      vimChangeBigWordBackward: vi.fn(),
+      vimChangeBigWordEnd: vi.fn(),
       vimDeleteChar: vi.fn(),
       vimInsertAtCursor: vi.fn(),
       vimAppendAtCursor: vi.fn().mockImplementation(() => {
@@ -567,6 +576,105 @@ describe('useVim hook', () => {
       exitInsertMode(result);
 
       expect(mockBuffer.replaceRangeByOffset).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Big Word movement', () => {
+    it('should handle W (next big word)', () => {
+      const testBuffer = createMockBuffer('hello world test');
+      const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'W' }));
+      });
+
+      expect(testBuffer.vimMoveBigWordForward).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle B (previous big word)', () => {
+      const testBuffer = createMockBuffer('hello world test', [0, 6]);
+      const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'B' }));
+      });
+
+      expect(testBuffer.vimMoveBigWordBackward).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle E (end of big word)', () => {
+      const testBuffer = createMockBuffer('hello world test');
+      const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'E' }));
+      });
+
+      expect(testBuffer.vimMoveBigWordEnd).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle dW (delete big word forward)', () => {
+      const testBuffer = createMockBuffer('hello.world test', [0, 0]);
+      const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'd' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'W' }));
+      });
+
+      expect(testBuffer.vimDeleteBigWordForward).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle cW (change big word forward)', () => {
+      const testBuffer = createMockBuffer('hello.world test', [0, 0]);
+      const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'c' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'W' }));
+      });
+
+      expect(testBuffer.vimChangeBigWordForward).toHaveBeenCalledWith(1);
+      expect(result.current.mode).toBe('INSERT');
+    });
+
+    it('should handle dB (delete big word backward)', () => {
+      const testBuffer = createMockBuffer('hello.world test', [0, 11]);
+      const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'd' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'B' }));
+      });
+
+      expect(testBuffer.vimDeleteBigWordBackward).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle dE (delete big word end)', () => {
+      const testBuffer = createMockBuffer('hello.world test', [0, 0]);
+      const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'd' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'E' }));
+      });
+
+      expect(testBuffer.vimDeleteBigWordEnd).toHaveBeenCalledWith(1);
     });
   });
 
@@ -1600,6 +1708,7 @@ describe('useVim hook', () => {
         cursorRow: 0,
         cursorCol: 6,
         actionType: 'vim_delete_to_end_of_line' as const,
+        count: 1,
         expectedLines: ['hello '],
         expectedCursorRow: 0,
         expectedCursorCol: 6,
@@ -1611,6 +1720,7 @@ describe('useVim hook', () => {
         cursorRow: 0,
         cursorCol: 11,
         actionType: 'vim_delete_to_end_of_line' as const,
+        count: 1,
         expectedLines: ['hello world'],
         expectedCursorRow: 0,
         expectedCursorCol: 11,
@@ -1622,6 +1732,7 @@ describe('useVim hook', () => {
         cursorRow: 0,
         cursorCol: 6,
         actionType: 'vim_change_to_end_of_line' as const,
+        count: 1,
         expectedLines: ['hello '],
         expectedCursorRow: 0,
         expectedCursorCol: 6,
@@ -1633,6 +1744,7 @@ describe('useVim hook', () => {
         cursorRow: 0,
         cursorCol: 0,
         actionType: 'vim_change_to_end_of_line' as const,
+        count: 1,
         expectedLines: [''],
         expectedCursorRow: 0,
         expectedCursorCol: 0,

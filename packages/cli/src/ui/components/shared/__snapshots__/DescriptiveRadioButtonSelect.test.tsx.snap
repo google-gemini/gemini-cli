@@ -6,7 +6,8 @@ exports[`DescriptiveRadioButtonSelect > should render correctly with custom prop
 ● 2. Bar Title
      This is Bar.
   3. Baz Title
-     This is Baz."
+     This is Baz.
+"
 `;
 
 exports[`DescriptiveRadioButtonSelect > should render correctly with default props 1`] = `
@@ -15,5 +16,6 @@ exports[`DescriptiveRadioButtonSelect > should render correctly with default pro
   Bar Title
   This is Bar.
   Baz Title
-  This is Baz."
+  This is Baz.
+"
 `;

@@ -71,6 +71,7 @@ export const uninstallCommand: CommandModule = {
       }),
   handler: async (argv) => {
     await handleUninstall({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       names: argv['names'] as string[],
     });
     await exitCli();

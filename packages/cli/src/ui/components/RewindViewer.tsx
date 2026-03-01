@@ -162,18 +162,20 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
         stats={confirmationStats}
         terminalWidth={terminalWidth}
         timestamp={selectedMessage?.timestamp}
-        onConfirm={async (outcome) => {
+        onConfirm={(outcome) => {
           if (outcome === RewindOutcome.Cancel) {
             clearSelection();
           } else {
-            const userPrompt = interactions.find(
-              (m) => m.id === selectedMessageId,
-            );
-            if (userPrompt) {
-              const cleanedText = getCleanedRewindText(userPrompt);
-              setIsRewinding(true);
-              await onRewind(selectedMessageId, cleanedText, outcome);
-            }
+            void (async () => {
+              const userPrompt = interactions.find(
+                (m) => m.id === selectedMessageId,
+              );
+              if (userPrompt) {
+                const cleanedText = getCleanedRewindText(userPrompt);
+                setIsRewinding(true);
+                await onRewind(selectedMessageId, cleanedText, outcome);
+              }
+            })();
           }
         }}
       />

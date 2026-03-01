@@ -9,6 +9,7 @@ import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { useSettings } from '../contexts/SettingsContext.js';
+import { getDisplayString } from '@google/gemini-cli-core';
 
 interface AboutBoxProps {
   cliVersion: string;
@@ -79,7 +80,9 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
           </Text>
         </Box>
         <Box>
-          <Text color={theme.text.primary}>{modelVersion}</Text>
+          <Text color={theme.text.primary}>
+            {getDisplayString(modelVersion)}
+          </Text>
         </Box>
       </Box>
       <Box flexDirection="row">

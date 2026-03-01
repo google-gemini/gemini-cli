@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -13,6 +13,7 @@ import {
   unescapePath,
   isSubpath,
   shortenPath,
+  normalizePath,
   resolveToRealPath,
 } from './paths.js';
 
@@ -24,122 +25,118 @@ vi.mock('node:fs', async (importOriginal) => {
   };
 });
 
+const mockPlatform = (platform: string) => {
+  vi.stubGlobal(
+    'process',
+    Object.create(process, {
+      platform: {
+        get: () => platform,
+      },
+    }),
+  );
+};
+
 describe('escapePath', () => {
-  it.each([
-    ['spaces', 'my file.txt', 'my\\ file.txt'],
-    ['tabs', 'file\twith\ttabs.txt', 'file\\\twith\\\ttabs.txt'],
-    ['parentheses', 'file(1).txt', 'file\\(1\\).txt'],
-    ['square brackets', 'file[backup].txt', 'file\\[backup\\].txt'],
-    ['curly braces', 'file{temp}.txt', 'file\\{temp\\}.txt'],
-    ['semicolons', 'file;name.txt', 'file\\;name.txt'],
-    ['ampersands', 'file&name.txt', 'file\\&name.txt'],
-    ['pipes', 'file|name.txt', 'file\\|name.txt'],
-    ['asterisks', 'file*.txt', 'file\\*.txt'],
-    ['question marks', 'file?.txt', 'file\\?.txt'],
-    ['dollar signs', 'file$name.txt', 'file\\$name.txt'],
-    ['backticks', 'file`name.txt', 'file\\`name.txt'],
-    ['single quotes', "file'name.txt", "file\\'name.txt"],
-    ['double quotes', 'file"name.txt', 'file\\"name.txt'],
-    ['hash symbols', 'file#name.txt', 'file\\#name.txt'],
-    ['exclamation marks', 'file!name.txt', 'file\\!name.txt'],
-    ['tildes', 'file~name.txt', 'file\\~name.txt'],
-    [
-      'less than and greater than signs',
-      'file<name>.txt',
-      'file\\<name\\>.txt',
-    ],
-  ])('should escape %s', (_, input, expected) => {
-    expect(escapePath(input)).toBe(expected);
+  afterEach(() => vi.unstubAllGlobals());
+
+  describe('in posix', () => {
+    beforeEach(() => mockPlatform('linux'));
+
+    it.each([
+      ['spaces', 'my file.txt', 'my\\ file.txt'],
+      ['tabs', 'file\twith\ttabs.txt', 'file\\\twith\\\ttabs.txt'],
+      ['parentheses', 'file(1).txt', 'file\\(1\\).txt'],
+      ['square brackets', 'file[backup].txt', 'file\\[backup\\].txt'],
+      ['curly braces', 'file{temp}.txt', 'file\\{temp\\}.txt'],
+      ['semicolons', 'file;name.txt', 'file\\;name.txt'],
+      ['ampersands', 'file&name.txt', 'file\\&name.txt'],
+      ['pipes', 'file|name.txt', 'file\\|name.txt'],
+      ['asterisks', 'file*.txt', 'file\\*.txt'],
+      ['question marks', 'file?.txt', 'file\\?.txt'],
+      ['dollar signs', 'file$name.txt', 'file\\$name.txt'],
+      ['backticks', 'file`name.txt', 'file\\`name.txt'],
+      ['single quotes', "file'name.txt", "file\\'name.txt"],
+      ['double quotes', 'file"name.txt', 'file\\"name.txt'],
+      ['hash symbols', 'file#name.txt', 'file\\#name.txt'],
+      ['exclamation marks', 'file!name.txt', 'file\\!name.txt'],
+      ['tildes', 'file~name.txt', 'file\\~name.txt'],
+      [
+        'less than and greater than signs',
+        'file<name>.txt',
+        'file\\<name\\>.txt',
+      ],
+      [
+        'multiple special characters',
+        'my file (backup) [v1.2].txt',
+        'my\\ file\\ \\(backup\\)\\ \\[v1.2\\].txt',
+      ],
+      ['normal file', 'normalfile.txt', 'normalfile.txt'],
+      ['normal path', 'path/to/normalfile.txt', 'path/to/normalfile.txt'],
+      [
+        'real world example 1',
+        'My Documents/Project (2024)/file [backup].txt',
+        'My\\ Documents/Project\\ \\(2024\\)/file\\ \\[backup\\].txt',
+      ],
+      [
+        'real world example 2',
+        'file with $special &chars!.txt',
+        'file\\ with\\ \\$special\\ \\&chars\\!.txt',
+      ],
+      ['empty string', '', ''],
+      [
+        'all special chars',
+        ' ()[]{};&|*?$`\'"#!<>',
+        '\\ \\(\\)\\[\\]\\{\\}\\;\\&\\|\\*\\?\\$\\`\\\'\\"\\#\\!\\<\\>',
+      ],
+    ])('should escape %s', (_, input, expected) => {
+      expect(escapePath(input)).toBe(expected);
+    });
   });
 
-  it('should handle multiple special characters', () => {
-    expect(escapePath('my file (backup) [v1.2].txt')).toBe(
-      'my\\ file\\ \\(backup\\)\\ \\[v1.2\\].txt',
-    );
-  });
+  describe('in windows', () => {
+    beforeEach(() => mockPlatform('win32'));
 
-  it('should not double-escape already escaped characters', () => {
-    expect(escapePath('my\\ file.txt')).toBe('my\\ file.txt');
-    expect(escapePath('file\\(name\\).txt')).toBe('file\\(name\\).txt');
-  });
-
-  it('should handle escaped backslashes correctly', () => {
-    // Double backslash (escaped backslash) followed by space should escape the space
-    expect(escapePath('path\\\\ file.txt')).toBe('path\\\\\\ file.txt');
-    // Triple backslash (escaped backslash + escaping backslash) followed by space should not double-escape
-    expect(escapePath('path\\\\\\ file.txt')).toBe('path\\\\\\ file.txt');
-    // Quadruple backslash (two escaped backslashes) followed by space should escape the space
-    expect(escapePath('path\\\\\\\\ file.txt')).toBe('path\\\\\\\\\\ file.txt');
-  });
-
-  it('should handle complex escaped backslash scenarios', () => {
-    // Escaped backslash before special character that needs escaping
-    expect(escapePath('file\\\\(test).txt')).toBe('file\\\\\\(test\\).txt');
-    // Multiple escaped backslashes
-    expect(escapePath('path\\\\\\\\with space.txt')).toBe(
-      'path\\\\\\\\with\\ space.txt',
-    );
-  });
-
-  it('should handle paths without special characters', () => {
-    expect(escapePath('normalfile.txt')).toBe('normalfile.txt');
-    expect(escapePath('path/to/normalfile.txt')).toBe('path/to/normalfile.txt');
-  });
-
-  it('should handle complex real-world examples', () => {
-    expect(escapePath('My Documents/Project (2024)/file [backup].txt')).toBe(
-      'My\\ Documents/Project\\ \\(2024\\)/file\\ \\[backup\\].txt',
-    );
-    expect(escapePath('file with $special &chars!.txt')).toBe(
-      'file\\ with\\ \\$special\\ \\&chars\\!.txt',
-    );
-  });
-
-  it('should handle empty strings', () => {
-    expect(escapePath('')).toBe('');
-  });
-
-  it('should handle paths with only special characters', () => {
-    expect(escapePath(' ()[]{};&|*?$`\'"#!~<>')).toBe(
-      '\\ \\(\\)\\[\\]\\{\\}\\;\\&\\|\\*\\?\\$\\`\\\'\\"\\#\\!\\~\\<\\>',
-    );
+    it.each([
+      [
+        'spaces',
+        'C:\\path with spaces\\file.txt',
+        '"C:\\path with spaces\\file.txt"',
+      ],
+      ['parentheses', 'file(1).txt', '"file(1).txt"'],
+      ['special chars', 'file&name.txt', '"file&name.txt"'],
+      ['caret', 'file^name.txt', '"file^name.txt"'],
+      ['normal path', 'C:\\path\\to\\file.txt', 'C:\\path\\to\\file.txt'],
+    ])('should escape %s', (_, input, expected) => {
+      expect(escapePath(input)).toBe(expected);
+    });
   });
 });
 
 describe('unescapePath', () => {
-  it.each([
-    ['spaces', 'my\\ file.txt', 'my file.txt'],
-    ['tabs', 'file\\\twith\\\ttabs.txt', 'file\twith\ttabs.txt'],
-    ['parentheses', 'file\\(1\\).txt', 'file(1).txt'],
-    ['square brackets', 'file\\[backup\\].txt', 'file[backup].txt'],
-    ['curly braces', 'file\\{temp\\}.txt', 'file{temp}.txt'],
-  ])('should unescape %s', (_, input, expected) => {
-    expect(unescapePath(input)).toBe(expected);
-  });
+  afterEach(() => vi.unstubAllGlobals());
 
-  it('should unescape multiple special characters', () => {
-    expect(unescapePath('my\\ file\\ \\(backup\\)\\ \\[v1.2\\].txt')).toBe(
-      'my file (backup) [v1.2].txt',
-    );
-  });
+  describe('in posix', () => {
+    beforeEach(() => mockPlatform('linux'));
 
-  it('should handle paths without escaped characters', () => {
-    expect(unescapePath('normalfile.txt')).toBe('normalfile.txt');
-    expect(unescapePath('path/to/normalfile.txt')).toBe(
-      'path/to/normalfile.txt',
-    );
-  });
+    it.each([
+      ['spaces', 'my\\ file.txt', 'my file.txt'],
+      ['tabs', 'file\\\twith\\\ttabs.txt', 'file\twith\ttabs.txt'],
+      ['parentheses', 'file\\(1\\).txt', 'file(1).txt'],
+      ['square brackets', 'file\\[backup\\].txt', 'file[backup].txt'],
+      ['curly braces', 'file\\{temp\\}.txt', 'file{temp}.txt'],
+      [
+        'multiple special characters',
+        'my\\ file\\ \\(backup\\)\\ \\[v1.2\\].txt',
+        'my file (backup) [v1.2].txt',
+      ],
+      ['normal file', 'normalfile.txt', 'normalfile.txt'],
+      ['normal path', 'path/to/normalfile.txt', 'path/to/normalfile.txt'],
+      ['empty string', '', ''],
+    ])('should unescape %s', (_, input, expected) => {
+      expect(unescapePath(input)).toBe(expected);
+    });
 
-  it('should handle all special characters', () => {
-    expect(
-      unescapePath(
-        '\\ \\(\\)\\[\\]\\{\\}\\;\\&\\|\\*\\?\\$\\`\\\'\\"\\#\\!\\~\\<\\>',
-      ),
-    ).toBe(' ()[]{};&|*?$`\'"#!~<>');
-  });
-
-  it('should be the inverse of escapePath', () => {
-    const testCases = [
+    it.each([
       'my file.txt',
       'file(1).txt',
       'file[backup].txt',
@@ -147,29 +144,35 @@ describe('unescapePath', () => {
       'file with $special &chars!.txt',
       ' ()[]{};&|*?$`\'"#!~<>',
       'file\twith\ttabs.txt',
-    ];
-
-    testCases.forEach((testCase) => {
-      expect(unescapePath(escapePath(testCase))).toBe(testCase);
+    ])('should unescape escaped %s', (input) => {
+      expect(unescapePath(escapePath(input))).toBe(input);
     });
   });
 
-  it('should handle empty strings', () => {
-    expect(unescapePath('')).toBe('');
-  });
+  describe('in windows', () => {
+    beforeEach(() => mockPlatform('win32'));
 
-  it('should not affect backslashes not followed by special characters', () => {
-    expect(unescapePath('file\\name.txt')).toBe('file\\name.txt');
-    expect(unescapePath('path\\to\\file.txt')).toBe('path\\to\\file.txt');
-  });
+    it.each([
+      [
+        'quoted path',
+        '"C:\\path with spaces\\file.txt"',
+        'C:\\path with spaces\\file.txt',
+      ],
+      ['unquoted path', 'C:\\path\\to\\file.txt', 'C:\\path\\to\\file.txt'],
+      ['partially quoted', '"C:\\path', '"C:\\path'],
+      ['empty string', '', ''],
+    ])('should unescape %s', (_, input, expected) => {
+      expect(unescapePath(input)).toBe(expected);
+    });
 
-  it('should handle escaped backslashes in unescaping', () => {
-    // Should correctly unescape when there are escaped backslashes
-    expect(unescapePath('path\\\\\\ file.txt')).toBe('path\\\\ file.txt');
-    expect(unescapePath('path\\\\\\\\\\ file.txt')).toBe(
-      'path\\\\\\\\ file.txt',
-    );
-    expect(unescapePath('file\\\\\\(test\\).txt')).toBe('file\\\\(test).txt');
+    it.each([
+      'C:\\path\\to\\file.txt',
+      'C:\\path with spaces\\file.txt',
+      'file(1).txt',
+      'file&name.txt',
+    ])('should unescape escaped %s', (input) => {
+      expect(unescapePath(escapePath(input))).toBe(input);
+    });
   });
 });
 
@@ -213,19 +216,9 @@ describe('isSubpath', () => {
 });
 
 describe('isSubpath on Windows', () => {
-  const originalPlatform = process.platform;
+  afterEach(() => vi.unstubAllGlobals());
 
-  beforeAll(() => {
-    Object.defineProperty(process, 'platform', {
-      value: 'win32',
-    });
-  });
-
-  afterAll(() => {
-    Object.defineProperty(process, 'platform', {
-      value: originalPlatform,
-    });
-  });
+  beforeEach(() => mockPlatform('win32'));
 
   it('should return true for a direct subpath on Windows', () => {
     expect(isSubpath('C:\\Users\\Test', 'C:\\Users\\Test\\file.txt')).toBe(
@@ -527,5 +520,48 @@ describe('resolveToRealPath', () => {
     const expected = p;
 
     expect(resolveToRealPath(input)).toBe(expected);
+  });
+});
+
+describe('normalizePath', () => {
+  it('should resolve a relative path to an absolute path', () => {
+    const result = normalizePath('some/relative/path');
+    expect(result).toMatch(/^\/|^[a-z]:\//);
+  });
+
+  it('should convert all backslashes to forward slashes', () => {
+    const result = normalizePath(path.resolve('some', 'path'));
+    expect(result).not.toContain('\\');
+  });
+
+  describe.skipIf(process.platform !== 'win32')('on Windows', () => {
+    it('should lowercase the entire path', () => {
+      const result = normalizePath('C:\\Users\\TEST');
+      expect(result).toBe(result.toLowerCase());
+    });
+
+    it('should normalize drive letters to lowercase', () => {
+      const result = normalizePath('C:\\');
+      expect(result).toMatch(/^c:\//);
+    });
+
+    it('should handle mixed separators', () => {
+      const result = normalizePath('C:/Users\\Test/file.txt');
+      expect(result).not.toContain('\\');
+      expect(result).toMatch(/^c:\/users\/test\/file\.txt$/);
+    });
+  });
+
+  describe.skipIf(process.platform === 'win32')('on POSIX', () => {
+    it('should preserve case', () => {
+      const result = normalizePath('/usr/Local/Bin');
+      expect(result).toContain('Local');
+      expect(result).toContain('Bin');
+    });
+
+    it('should use forward slashes', () => {
+      const result = normalizePath('/usr/local/bin');
+      expect(result).toBe('/usr/local/bin');
+    });
   });
 });

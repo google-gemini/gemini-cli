@@ -7,7 +7,8 @@ exports[`AskUserDialog > Choice question placeholder > uses default placeholder 
   2.  JavaScript
 ● 3.  Enter a custom value
 
-Enter to submit · Esc to cancel"
+Enter to submit · Esc to cancel
+"
 `;
 
 exports[`AskUserDialog > Choice question placeholder > uses placeholder for "Other" option when provided 1`] = `
@@ -17,7 +18,8 @@ exports[`AskUserDialog > Choice question placeholder > uses placeholder for "Oth
   2.  JavaScript
 ● 3.  Type another language...
 
-Enter to submit · Esc to cancel"
+Enter to submit · Esc to cancel
+"
 `;
 
 exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: false) > shows scroll arrows correctly when useAlternateBuffer is false 1`] = `
@@ -30,7 +32,8 @@ exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: false) > shows scrol
        Description 2
 ▼
 
-Enter to select · ↑/↓ to navigate · Esc to cancel"
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
 `;
 
 exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: true) > shows scroll arrows correctly when useAlternateBuffer is true 1`] = `
@@ -68,7 +71,8 @@ exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: true) > shows scroll
        Description 15
   16.  Enter a custom value
 
-Enter to select · ↑/↓ to navigate · Esc to cancel"
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
 `;
 
 exports[`AskUserDialog > Text type questions > renders text input for type: "text" 1`] = `
@@ -77,7 +81,8 @@ exports[`AskUserDialog > Text type questions > renders text input for type: "tex
 > e.g., UserProfileCard
 
 
-Enter to submit · Esc to cancel"
+Enter to submit · Esc to cancel
+"
 `;
 
 exports[`AskUserDialog > Text type questions > shows correct keyboard hints for text type 1`] = `
@@ -86,7 +91,8 @@ exports[`AskUserDialog > Text type questions > shows correct keyboard hints for 
 > Enter your response
 
 
-Enter to submit · Esc to cancel"
+Enter to submit · Esc to cancel
+"
 `;
 
 exports[`AskUserDialog > Text type questions > shows default placeholder when none provided 1`] = `
@@ -95,7 +101,8 @@ exports[`AskUserDialog > Text type questions > shows default placeholder when no
 > Enter your response
 
 
-Enter to submit · Esc to cancel"
+Enter to submit · Esc to cancel
+"
 `;
 
 exports[`AskUserDialog > allows navigating to Review tab and back 1`] = `
@@ -108,7 +115,8 @@ Review your answers:
 Tests → (not answered)
 Docs → (not answered)
 
-Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel"
+Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel
+"
 `;
 
 exports[`AskUserDialog > hides progress header for single question 1`] = `
@@ -120,7 +128,8 @@ exports[`AskUserDialog > hides progress header for single question 1`] = `
       Stateless, good for APIs
   3.  Enter a custom value
 
-Enter to select · ↑/↓ to navigate · Esc to cancel"
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
 `;
 
 exports[`AskUserDialog > renders question and options 1`] = `
@@ -132,7 +141,8 @@ exports[`AskUserDialog > renders question and options 1`] = `
       Stateless, good for APIs
   3.  Enter a custom value
 
-Enter to select · ↑/↓ to navigate · Esc to cancel"
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
 `;
 
 exports[`AskUserDialog > shows Review tab in progress header for multiple questions 1`] = `
@@ -146,7 +156,8 @@ Which framework?
       Progressive framework
   3.  Enter a custom value
 
-Enter to select · ←/→ to switch questions · Esc to cancel"
+Enter to select · ←/→ to switch questions · Esc to cancel
+"
 `;
 
 exports[`AskUserDialog > shows keyboard hints 1`] = `
@@ -158,7 +169,8 @@ exports[`AskUserDialog > shows keyboard hints 1`] = `
       Stateless, good for APIs
   3.  Enter a custom value
 
-Enter to select · ↑/↓ to navigate · Esc to cancel"
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
 `;
 
 exports[`AskUserDialog > shows progress header for multiple questions 1`] = `
@@ -172,7 +184,8 @@ Which database should we use?
       Document database
   3.  Enter a custom value
 
-Enter to select · ←/→ to switch questions · Esc to cancel"
+Enter to select · ←/→ to switch questions · Esc to cancel
+"
 `;
 
 exports[`AskUserDialog > shows warning for unanswered questions on Review tab 1`] = `
@@ -185,5 +198,6 @@ Review your answers:
 License → (not answered)
 README → (not answered)
 
-Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel"
+Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel
+"
 `;

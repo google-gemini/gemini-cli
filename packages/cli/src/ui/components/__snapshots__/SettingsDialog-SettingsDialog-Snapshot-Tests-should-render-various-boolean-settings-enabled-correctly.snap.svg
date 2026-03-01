@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="751" viewBox="0 0 920 751">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="751" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#3d3f51" textLength="900" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────────╮</text>
+    <text x="0" y="19" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="19" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="36" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="36" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs">  &gt; Settings                                                                                      </text>
+    <text x="891" y="36" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="53" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="53" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="70" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="70" fill="#89b4fa" textLength="864" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────╮</text>
+    <text x="891" y="70" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="87" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="87" fill="#89b4fa" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="36" y="85" width="9" height="17" fill="#ffffff" />
+    <text x="36" y="87" fill="#000000" textLength="9" lengthAdjust="spacingAndGlyphs">S</text>
+    <text x="45" y="87" fill="#6c7086" textLength="135" lengthAdjust="spacingAndGlyphs">earch to filter</text>
+    <text x="873" y="87" fill="#89b4fa" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="87" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="104" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="104" fill="#89b4fa" textLength="864" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────────────────────╯</text>
+    <text x="891" y="104" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="121" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="121" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="138" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="138" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">▲</text>
+    <text x="891" y="138" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="155" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="155" fill="#a6e3a1" textLength="9" lengthAdjust="spacingAndGlyphs">●</text>
+    <text x="45" y="155" fill="#a6e3a1" textLength="72" lengthAdjust="spacingAndGlyphs">Vim Mode</text>
+    <text x="828" y="155" fill="#a6e3a1" textLength="45" lengthAdjust="spacingAndGlyphs">true*</text>
+    <text x="891" y="155" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="172" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="172" fill="#6c7086" textLength="198" lengthAdjust="spacingAndGlyphs">Enable Vim keybindings</text>
+    <text x="891" y="172" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="189" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="189" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="206" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="206" fill="#ffffff" textLength="801" lengthAdjust="spacingAndGlyphs">    Default Approval Mode                                                                </text>
+    <text x="810" y="206" fill="#6c7086" textLength="63" lengthAdjust="spacingAndGlyphs">Default</text>
+    <text x="891" y="206" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="223" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="223" fill="#6c7086" textLength="738" lengthAdjust="spacingAndGlyphs">The default approval mode for tool execution. &apos;default&apos; prompts for approval, &apos;au…</text>
+    <text x="891" y="223" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="240" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="240" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="257" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="257" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs">    Enable Auto Update                                                                    false*  </text>
+    <text x="891" y="257" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="274" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="274" fill="#6c7086" textLength="225" lengthAdjust="spacingAndGlyphs">Enable automatic updates.</text>
+    <text x="891" y="274" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="291" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="291" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="308" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="308" fill="#ffffff" textLength="819" lengthAdjust="spacingAndGlyphs">    Enable Notifications                                                                   </text>
+    <text x="828" y="308" fill="#6c7086" textLength="45" lengthAdjust="spacingAndGlyphs">false</text>
+    <text x="891" y="308" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="325" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="325" fill="#6c7086" textLength="756" lengthAdjust="spacingAndGlyphs">Enable run-event notifications for action-required prompts and session completion. …</text>
+    <text x="891" y="325" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="342" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="342" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="359" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="359" fill="#ffffff" textLength="783" lengthAdjust="spacingAndGlyphs">    Plan Directory                                                                     </text>
+    <text x="792" y="359" fill="#6c7086" textLength="81" lengthAdjust="spacingAndGlyphs">undefined</text>
+    <text x="891" y="359" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="376" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="376" fill="#6c7086" textLength="720" lengthAdjust="spacingAndGlyphs">The directory where planning artifacts are stored. If not specified, defaults t…</text>
+    <text x="891" y="376" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="393" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="393" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="410" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="410" fill="#ffffff" textLength="828" lengthAdjust="spacingAndGlyphs">    Plan Model Routing                                                                      </text>
+    <text x="837" y="410" fill="#6c7086" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <text x="891" y="410" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="427" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="427" fill="#6c7086" textLength="765" lengthAdjust="spacingAndGlyphs">Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…</text>
+    <text x="891" y="427" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="444" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="444" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="461" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="461" fill="#ffffff" textLength="846" lengthAdjust="spacingAndGlyphs">    Max Chat Model Attempts                                                                   </text>
+    <text x="855" y="461" fill="#6c7086" textLength="18" lengthAdjust="spacingAndGlyphs">10</text>
+    <text x="891" y="461" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="478" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="478" fill="#6c7086" textLength="729" lengthAdjust="spacingAndGlyphs">Maximum number of attempts for requests to the main chat model. Cannot exceed 10.</text>
+    <text x="891" y="478" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="495" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="495" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="512" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="512" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs">    Debug Keystroke Logging                                                                true*  </text>
+    <text x="891" y="512" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="529" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="529" fill="#6c7086" textLength="450" lengthAdjust="spacingAndGlyphs">Enable debug logging of keystrokes to the console.</text>
+    <text x="891" y="529" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="546" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="546" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="563" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="563" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">▼</text>
+    <text x="891" y="563" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="580" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="580" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="597" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="597" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs">    Apply To                                                                                      </text>
+    <text x="891" y="597" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="614" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="614" fill="#a6e3a1" textLength="9" lengthAdjust="spacingAndGlyphs">●</text>
+    <text x="45" y="614" fill="#a6e3a1" textLength="117" lengthAdjust="spacingAndGlyphs">User Settings</text>
+    <text x="891" y="614" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="631" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="631" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs">    Workspace Settings                                                                            </text>
+    <text x="891" y="631" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="648" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="648" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs">    System Settings                                                                               </text>
+    <text x="891" y="648" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="665" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="665" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="682" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="682" fill="#6c7086" textLength="657" lengthAdjust="spacingAndGlyphs">(Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)</text>
+    <text x="891" y="682" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="699" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="699" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="716" fill="#3d3f51" textLength="900" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────────────────────────╯</text>
+  </g>
+</svg>

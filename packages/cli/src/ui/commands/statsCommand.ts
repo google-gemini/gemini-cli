@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -11,7 +11,10 @@ import type {
 } from '../types.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
-import { UserAccountManager } from '@google/gemini-cli-core';
+import {
+  UserAccountManager,
+  getG1CreditBalance,
+} from '@google/gemini-cli-core';
 import {
   type CommandContext,
   type SlashCommand,
@@ -27,8 +30,10 @@ function getUserIdentity(context: CommandContext) {
   const userEmail = cachedAccount ?? undefined;
 
   const tier = context.services.config?.getUserTierName();
+  const paidTier = context.services.config?.getUserPaidTier();
+  const creditBalance = getG1CreditBalance(paidTier) ?? undefined;
 
-  return { selectedAuthType, userEmail, tier };
+  return { selectedAuthType, userEmail, tier, creditBalance };
 }
 
 async function defaultSessionView(context: CommandContext) {
@@ -43,7 +48,9 @@ async function defaultSessionView(context: CommandContext) {
   }
   const wallDuration = now.getTime() - sessionStartTime.getTime();
 
-  const { selectedAuthType, userEmail, tier } = getUserIdentity(context);
+  const { selectedAuthType, userEmail, tier, creditBalance } =
+    getUserIdentity(context);
+  const currentModel = context.services.config?.getModel();
 
   const statsItem: HistoryItemStats = {
     type: MessageType.STATS,
@@ -51,12 +58,20 @@ async function defaultSessionView(context: CommandContext) {
     selectedAuthType,
     userEmail,
     tier,
+    currentModel,
+    creditBalance,
   };
 
   if (context.services.config) {
-    const quota = await context.services.config.refreshUserQuota();
+    const [quota] = await Promise.all([
+      context.services.config.refreshUserQuota(),
+      context.services.config.refreshAvailableCredits(),
+    ]);
     if (quota) {
       statsItem.quotas = quota;
+      statsItem.pooledRemaining = context.services.config.getQuotaRemaining();
+      statsItem.pooledLimit = context.services.config.getQuotaLimit();
+      statsItem.pooledResetTime = context.services.config.getQuotaResetTime();
     }
   }
 
@@ -89,11 +104,19 @@ export const statsCommand: SlashCommand = {
       autoExecute: true,
       action: (context: CommandContext) => {
         const { selectedAuthType, userEmail, tier } = getUserIdentity(context);
+        const currentModel = context.services.config?.getModel();
+        const pooledRemaining = context.services.config?.getQuotaRemaining();
+        const pooledLimit = context.services.config?.getQuotaLimit();
+        const pooledResetTime = context.services.config?.getQuotaResetTime();
         context.ui.addItem({
           type: MessageType.MODEL_STATS,
           selectedAuthType,
           userEmail,
           tier,
+          currentModel,
+          pooledRemaining,
+          pooledLimit,
+          pooledResetTime,
         } as HistoryItemModelStats);
       },
     },

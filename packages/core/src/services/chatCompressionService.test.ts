@@ -16,7 +16,7 @@ import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import type { Config } from '../config/config.js';
 import * as fileUtils from '../utils/fileUtils.js';
-import { TOOL_OUTPUT_DIR } from '../utils/fileUtils.js';
+import { TOOL_OUTPUTS_DIR } from '../utils/fileUtils.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
 import * as tokenCalculation from '../utils/tokenCalculation.js';
 import { tokenLimit } from '../core/tokenLimits.js';
@@ -176,6 +176,7 @@ describe('ChatCompressionService', () => {
         generateContent: mockGenerateContent,
       }),
       isInteractive: vi.fn().mockReturnValue(false),
+      getActiveModel: vi.fn().mockReturnValue(mockModel),
       getContentGenerator: vi.fn().mockReturnValue({
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
       }),
@@ -183,6 +184,7 @@ describe('ChatCompressionService', () => {
       getMessageBus: vi.fn().mockReturnValue(undefined),
       getHookSystem: () => undefined,
       getNextCompressionTruncationId: vi.fn().mockReturnValue(1),
+      getTruncateToolOutputThreshold: vi.fn().mockReturnValue(40000),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue(testTempDir),
       },
@@ -224,8 +226,10 @@ describe('ChatCompressionService', () => {
       false,
       mockModel,
       mockConfig,
-      true,
+      false,
     );
+    // It should now attempt compression even if previously failed (logic removed)
+    // But since history is small, it will be NOOP due to threshold
     expect(result.info.compressionStatus).toBe(CompressionStatus.NOOP);
     expect(result.newHistory).toBeNull();
   });
@@ -512,7 +516,7 @@ describe('ChatCompressionService', () => {
       );
 
       // Verify a file was actually created in the tool_output subdirectory
-      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUT_DIR);
+      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUTS_DIR);
       const files = fs.readdirSync(toolOutputDir);
       expect(files.length).toBeGreaterThan(0);
       expect(files[0]).toMatch(/grep_.*\.txt/);
@@ -581,10 +585,10 @@ describe('ChatCompressionService', () => {
       const truncatedPart = shellResponse!.parts![0].functionResponse;
       const content = truncatedPart?.response?.['output'] as string;
 
+      // DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 40000 -> head=8000 (20%), tail=32000 (80%)
       expect(content).toContain(
-        'Output too large. Showing the last 4,000 characters of the output.',
+        'Showing first 8,000 and last 32,000 characters',
       );
-      // It's a single line, so NO [LINE WIDTH TRUNCATED]
     });
 
     it('should use character-based truncation for massive single-line raw strings', async () => {
@@ -645,8 +649,9 @@ describe('ChatCompressionService', () => {
       const truncatedPart = rawResponse!.parts![0].functionResponse;
       const content = truncatedPart?.response?.['output'] as string;
 
+      // DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 40000 -> head=8000 (20%), tail=32000 (80%)
       expect(content).toContain(
-        'Output too large. Showing the last 4,000 characters of the output.',
+        'Showing first 8,000 and last 32,000 characters',
       );
     });
 

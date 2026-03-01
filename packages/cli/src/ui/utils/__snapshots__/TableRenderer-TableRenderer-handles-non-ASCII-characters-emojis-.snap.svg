@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="139" viewBox="0 0 560 139">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="560" height="139" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="19" fill="#333333" textLength="405" lengthAdjust="spacingAndGlyphs">┌──────────────┬────────────┬───────────────┐</text>
+    <text x="0" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="36" fill="#89b4fa" textLength="63" lengthAdjust="spacingAndGlyphs">Emoji 😃</text>
+    <text x="126" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="144" y="36" fill="#89b4fa" textLength="90" lengthAdjust="spacingAndGlyphs">Asian 汉字</text>
+    <text x="243" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="261" y="36" fill="#89b4fa" textLength="108" lengthAdjust="spacingAndGlyphs">Mixed 🚀 Text</text>
+    <text x="378" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="53" fill="#333333" textLength="405" lengthAdjust="spacingAndGlyphs">├──────────────┼────────────┼───────────────┤</text>
+    <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="70" fill="#ffffff" textLength="117" lengthAdjust="spacingAndGlyphs"> Start 🌟 End </text>
+    <text x="126" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="135" y="70" fill="#ffffff" textLength="108" lengthAdjust="spacingAndGlyphs"> 你好世界   </text>
+    <text x="243" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="252" y="70" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs"> Rocket 🚀 Man </text>
+    <text x="378" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="87" fill="#ffffff" textLength="117" lengthAdjust="spacingAndGlyphs"> Thumbs 👍 Up </text>
+    <text x="126" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="135" y="87" fill="#ffffff" textLength="108" lengthAdjust="spacingAndGlyphs"> こんにちは </text>
+    <text x="243" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="252" y="87" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs"> Fire 🔥       </text>
+    <text x="378" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="104" fill="#333333" textLength="405" lengthAdjust="spacingAndGlyphs">└──────────────┴────────────┴───────────────┘</text>
+  </g>
+</svg>

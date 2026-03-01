@@ -84,11 +84,24 @@ vi.mock('@google/genai', async () => {
 // Mock tool-names to provide a consistent alias for testing
 vi.mock('./tool-names.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./tool-names.js')>();
+  const mockedAliases: Record<string, string> = {
+    ...actual.TOOL_LEGACY_ALIASES,
+    legacy_test_tool: 'current_test_tool',
+  };
   return {
     ...actual,
-    TOOL_LEGACY_ALIASES: {
-      ...actual.TOOL_LEGACY_ALIASES,
-      legacy_test_tool: 'current_test_tool',
+    TOOL_LEGACY_ALIASES: mockedAliases,
+    // Override getToolAliases to use the mocked aliases map
+    getToolAliases: (name: string): string[] => {
+      const aliases = new Set<string>([name]);
+      const canonicalName = mockedAliases[name] ?? name;
+      aliases.add(canonicalName);
+      for (const [legacyName, currentName] of Object.entries(mockedAliases)) {
+        if (currentName === canonicalName) {
+          aliases.add(legacyName);
+        }
+      }
+      return Array.from(aliases);
     },
   };
 });
@@ -248,6 +261,17 @@ describe('ToolRegistry', () => {
       toolRegistry.registerTool(tool);
       expect(toolRegistry.getTool('mock-tool')).toBe(tool);
     });
+
+    it('should pass modelId to getSchema when getting function declarations', () => {
+      const tool = new MockTool({ name: 'mock-tool' });
+      const getSchemaSpy = vi.spyOn(tool, 'getSchema');
+      toolRegistry.registerTool(tool);
+
+      const modelId = 'test-model-id';
+      toolRegistry.getFunctionDeclarations(modelId);
+
+      expect(getSchemaSpy).toHaveBeenCalledWith(modelId);
+    });
   });
 
   describe('excluded tools', () => {
@@ -289,6 +313,26 @@ describe('ToolRegistry', () => {
         name: 'should match class names',
         tools: [excludedTool],
         excludedTools: ['ExcludedMockTool'],
+      },
+      {
+        name: 'should exclude a tool when its legacy alias is in excludeTools',
+        tools: [
+          new MockTool({
+            name: 'current_test_tool',
+            displayName: 'Current Test Tool',
+          }),
+        ],
+        excludedTools: ['legacy_test_tool'],
+      },
+      {
+        name: 'should exclude a tool when its current name is in excludeTools and tool is registered under current name',
+        tools: [
+          new MockTool({
+            name: 'current_test_tool',
+            displayName: 'Current Test Tool',
+          }),
+        ],
+        excludedTools: ['current_test_tool'],
       },
     ])('$name', ({ tools, excludedTools }) => {
       toolRegistry.registerTool(allowedTool);
@@ -612,6 +656,76 @@ describe('ToolRegistry', () => {
       const retrievedTool = toolRegistry.getTool(legacyName);
       expect(retrievedTool).toBeDefined();
       expect(retrievedTool?.name).toBe(currentName);
+    });
+  });
+
+  describe('plan mode', () => {
+    it('should only return policy-allowed tools in plan mode', () => {
+      // Register several tools
+      const globTool = new MockTool({ name: 'glob', displayName: 'Glob' });
+      const readFileTool = new MockTool({
+        name: 'read_file',
+        displayName: 'ReadFile',
+      });
+      const shellTool = new MockTool({ name: 'shell', displayName: 'Shell' });
+      const writeTool = new MockTool({
+        name: 'write_file',
+        displayName: 'WriteFile',
+      });
+
+      toolRegistry.registerTool(globTool);
+      toolRegistry.registerTool(readFileTool);
+      toolRegistry.registerTool(shellTool);
+      toolRegistry.registerTool(writeTool);
+
+      // Mock config in PLAN mode: exclude shell and write_file
+      mockConfigGetExcludedTools.mockReturnValue(
+        new Set(['shell', 'write_file']),
+      );
+
+      const allTools = toolRegistry.getAllTools();
+      const toolNames = allTools.map((t) => t.name);
+
+      expect(toolNames).toContain('glob');
+      expect(toolNames).toContain('read_file');
+      expect(toolNames).not.toContain('shell');
+      expect(toolNames).not.toContain('write_file');
+    });
+
+    it('should include read-only MCP tools when allowed by policy in plan mode', () => {
+      const readOnlyMcp = createMCPTool(
+        'test-server',
+        'read-only-tool',
+        'A read-only MCP tool',
+      );
+      // Set readOnlyHint to true via toolAnnotations
+      Object.defineProperty(readOnlyMcp, 'isReadOnly', { value: true });
+
+      toolRegistry.registerTool(readOnlyMcp);
+
+      // Policy allows this tool (not in excluded set)
+      mockConfigGetExcludedTools.mockReturnValue(new Set());
+
+      const allTools = toolRegistry.getAllTools();
+      const toolNames = allTools.map((t) => t.name);
+      expect(toolNames).toContain('read-only-tool');
+    });
+
+    it('should exclude non-read-only MCP tools when denied by policy in plan mode', () => {
+      const writeMcp = createMCPTool(
+        'test-server',
+        'write-mcp-tool',
+        'A write MCP tool',
+      );
+
+      toolRegistry.registerTool(writeMcp);
+
+      // Policy excludes this tool
+      mockConfigGetExcludedTools.mockReturnValue(new Set(['write-mcp-tool']));
+
+      const allTools = toolRegistry.getAllTools();
+      const toolNames = allTools.map((t) => t.name);
+      expect(toolNames).not.toContain('write-mcp-tool');
     });
   });
 

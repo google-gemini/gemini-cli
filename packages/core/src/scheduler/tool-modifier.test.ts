@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ToolModificationHandler } from './tool-modifier.js';
 import type { WaitingToolCall, ToolCallRequestInfo } from './types.js';
+import { CoreToolCallStatus } from './types.js';
 import * as modifiableToolModule from '../tools/modifiable-tool.js';
 import * as Diff from 'diff';
 import { MockModifiableTool, MockTool } from '../test-utils/mock-tool.js';
@@ -37,7 +38,7 @@ function createMockWaitingToolCall(
   overrides: Partial<WaitingToolCall> = {},
 ): WaitingToolCall {
   return {
-    status: 'awaiting_approval',
+    status: CoreToolCallStatus.AwaitingApproval,
     request: {
       callId: 'test-call-id',
       name: 'test-tool',

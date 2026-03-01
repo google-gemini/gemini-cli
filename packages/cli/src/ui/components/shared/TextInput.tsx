@@ -13,6 +13,7 @@ import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
 import type { TextBuffer } from './text-buffer.js';
 import { cpSlice, cpIndexToOffset } from '../../utils/textUtils.js';
+import { keyMatchers, Command } from '../../keyMatchers.js';
 
 export interface TextInputProps {
   buffer: TextBuffer;
@@ -45,7 +46,7 @@ export function TextInput({
         return true;
       }
 
-      if (key.name === 'return' && onSubmit) {
+      if (keyMatchers[Command.SUBMIT](key) && onSubmit) {
         onSubmit(text);
         return true;
       }

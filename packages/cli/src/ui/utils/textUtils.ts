@@ -104,11 +104,15 @@ export function cpSlice(str: string, start: number, end?: number): string {
  * Characters stripped:
  * - ANSI escape sequences (via strip-ansi)
  * - VT control sequences (via Node.js util.stripVTControlCharacters)
- * - C0 control chars (0x00-0x1F) except CR/LF which are handled elsewhere
+ * - C0 control chars (0x00-0x1F) except TAB(0x09), LF(0x0A), CR(0x0D)
  * - C1 control chars (0x80-0x9F) that can cause display issues
+ * - BiDi control chars (U+200E, U+200F, U+202A-U+202E, U+2066-U+2069)
+ * - Zero-width chars (U+200B, U+FEFF)
  *
  * Characters preserved:
  * - All printable Unicode including emojis
+ * - ZWJ (U+200D) - needed for complex emoji sequences
+ * - ZWNJ (U+200C) - preserve zero-width non-joiner
  * - DEL (0x7F) - handled functionally by applyOperations, not a display issue
  * - CR/LF (0x0D/0x0A) - needed for line breaks
  * - TAB (0x09) - preserve tabs
@@ -117,28 +121,16 @@ export function stripUnsafeCharacters(str: string): string {
   const strippedAnsi = stripAnsi(str);
   const strippedVT = stripVTControlCharacters(strippedAnsi);
 
-  return toCodePoints(strippedVT)
-    .filter((char) => {
-      const code = char.codePointAt(0);
-      if (code === undefined) return false;
-
-      // Preserve CR/LF/TAB for line handling
-      if (code === 0x0a || code === 0x0d || code === 0x09) return true;
-
-      // Remove C0 control chars (except CR/LF) that can break display
-      // Examples: BELL(0x07) makes noise, BS(0x08) moves cursor, VT(0x0B), FF(0x0C)
-      if (code >= 0x00 && code <= 0x1f) return false;
-
-      // Remove C1 control chars (0x80-0x9f) - legacy 8-bit control codes
-      if (code >= 0x80 && code <= 0x9f) return false;
-
-      // Preserve DEL (0x7f) - it's handled functionally by applyOperations as backspace
-      // and doesn't cause rendering issues when displayed
-
-      // Preserve all other characters including Unicode/emojis
-      return true;
-    })
-    .join('');
+  // Use a regex to strip remaining unsafe control characters
+  // C0: 0x00-0x1F except 0x09 (TAB), 0x0A (LF), 0x0D (CR)
+  // C1: 0x80-0x9F
+  // BiDi: U+200E (LRM), U+200F (RLM), U+202A-U+202E, U+2066-U+2069
+  // Zero-width: U+200B (ZWSP), U+FEFF (BOM)
+  return strippedVT.replace(
+    // eslint-disable-next-line no-control-regex
+    /[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F\u200E\u200F\u202A-\u202E\u2066-\u2069\u200B\uFEFF]/g,
+    '',
+  );
 }
 
 /**
@@ -158,6 +150,13 @@ export function sanitizeForDisplay(str: string, maxLength?: number): string {
   }
 
   return sanitized;
+}
+
+/**
+ * Normalizes escaped newline characters (e.g., "\\n") into actual newline characters.
+ */
+export function normalizeEscapedNewlines(value: string): string {
+  return value.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
 }
 
 const stringWidthCache = new LRUCache<string, number>(
@@ -196,13 +195,6 @@ export const getCachedStringWidth = (str: string): number => {
   return width;
 };
 
-/**
- * Clear the string width cache
- */
-export const clearStringWidthCache = (): void => {
-  stringWidthCache.clear();
-};
-
 const regex = ansiRegex();
 
 /* Recursively traverses a JSON-like structure (objects, arrays, primitives)
@@ -227,6 +219,7 @@ export function escapeAnsiCtrlCodes<T>(obj: T): T {
     }
 
     regex.lastIndex = 0; // needed for global regex
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return obj.replace(regex, (match) =>
       JSON.stringify(match).slice(1, -1),
     ) as T;
@@ -240,7 +233,9 @@ export function escapeAnsiCtrlCodes<T>(obj: T): T {
     let newArr: unknown[] | null = null;
 
     for (let i = 0; i < obj.length; i++) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const value = obj[i];
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const escapedValue = escapeAnsiCtrlCodes(value);
       if (escapedValue !== value) {
         if (newArr === null) {
@@ -249,6 +244,7 @@ export function escapeAnsiCtrlCodes<T>(obj: T): T {
         newArr[i] = escapedValue;
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return (newArr !== null ? newArr : obj) as T;
   }
 
@@ -256,6 +252,7 @@ export function escapeAnsiCtrlCodes<T>(obj: T): T {
   const keys = Object.keys(obj);
 
   for (const key of keys) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const value = (obj as Record<string, unknown>)[key];
     const escapedValue = escapeAnsiCtrlCodes(value);
 
@@ -263,6 +260,7 @@ export function escapeAnsiCtrlCodes<T>(obj: T): T {
       if (newObj === null) {
         newObj = { ...obj };
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (newObj as Record<string, unknown>)[key] = escapedValue;
     }
   }

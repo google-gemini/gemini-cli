@@ -51,7 +51,7 @@ describe('planCommand', () => {
           getApprovalMode: vi.fn(),
           getFileSystemService: vi.fn(),
           storage: {
-            getProjectTempPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
+            getPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
           },
         },
       },
@@ -89,21 +89,6 @@ describe('planCommand', () => {
     expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
       'info',
       'Switched to Plan Mode.',
-    );
-  });
-
-  it('should show "No approved plan found" if no approved plan path in config', async () => {
-    vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(mockContext.services.config!.getApprovedPlanPath).mockReturnValue(
-      undefined,
-    );
-
-    if (!planCommand.action) throw new Error('Action missing');
-    await planCommand.action(mockContext, '');
-
-    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-      'error',
-      'No approved plan found. Please create and approve a plan first.',
     );
   });
 

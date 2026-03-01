@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync, spawn, spawnSync } from 'node:child_process';
+import { exec, execSync, spawn, spawnSync } from 'node:child_process';
+import { promisify } from 'node:util';
+import { once } from 'node:events';
 import { debugLogger } from './debugLogger.js';
-import { coreEvents, CoreEvent } from './events.js';
+import { coreEvents, CoreEvent, type EditorSelectedPayload } from './events.js';
 
 const GUI_EDITORS = [
   'vscode',
@@ -22,6 +24,9 @@ const EDITORS = [...GUI_EDITORS, ...TERMINAL_EDITORS] as const;
 const GUI_EDITORS_SET = new Set<string>(GUI_EDITORS);
 const TERMINAL_EDITORS_SET = new Set<string>(TERMINAL_EDITORS);
 const EDITORS_SET = new Set<string>(EDITORS);
+
+export const NO_EDITOR_AVAILABLE_ERROR =
+  'No external editor is available. Please run /editor to configure one.';
 
 export const DEFAULT_GUI_EDITOR: GuiEditorType = 'vscode';
 
@@ -73,12 +78,26 @@ interface DiffCommand {
   args: string[];
 }
 
+const execAsync = promisify(exec);
+
+function getCommandExistsCmd(cmd: string): string {
+  return process.platform === 'win32'
+    ? `where.exe ${cmd}`
+    : `command -v ${cmd}`;
+}
+
 function commandExists(cmd: string): boolean {
   try {
-    execSync(
-      process.platform === 'win32' ? `where.exe ${cmd}` : `command -v ${cmd}`,
-      { stdio: 'ignore' },
-    );
+    execSync(getCommandExistsCmd(cmd), { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function commandExistsAsync(cmd: string): Promise<boolean> {
+  try {
+    await execAsync(getCommandExistsCmd(cmd));
     return true;
   } catch {
     return false;
@@ -108,17 +127,29 @@ const editorCommands: Record<
   hx: { win32: ['hx'], default: ['hx'] },
 };
 
-export function checkHasEditorType(editor: EditorType): boolean {
+function getEditorCommands(editor: EditorType): string[] {
   const commandConfig = editorCommands[editor];
-  const commands =
-    process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
-  return commands.some((cmd) => commandExists(cmd));
+  return process.platform === 'win32'
+    ? commandConfig.win32
+    : commandConfig.default;
+}
+
+export function hasValidEditorCommand(editor: EditorType): boolean {
+  return getEditorCommands(editor).some((cmd) => commandExists(cmd));
+}
+
+export async function hasValidEditorCommandAsync(
+  editor: EditorType,
+): Promise<boolean> {
+  return Promise.any(
+    getEditorCommands(editor).map((cmd) =>
+      commandExistsAsync(cmd).then((exists) => exists || Promise.reject()),
+    ),
+  ).catch(() => false);
 }
 
 export function getEditorCommand(editor: EditorType): string {
-  const commandConfig = editorCommands[editor];
-  const commands =
-    process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
+  const commands = getEditorCommands(editor);
   return (
     commands.slice(0, -1).find((cmd) => commandExists(cmd)) ||
     commands[commands.length - 1]
@@ -134,15 +165,55 @@ export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   return true;
 }
 
+function isEditorTypeAvailable(
+  editor: string | undefined,
+): editor is EditorType {
+  return (
+    !!editor && isValidEditorType(editor) && allowEditorTypeInSandbox(editor)
+  );
+}
+
 /**
  * Check if the editor is valid and can be used.
  * Returns false if preferred editor is not set / invalid / not available / not allowed in sandbox.
  */
 export function isEditorAvailable(editor: string | undefined): boolean {
-  if (editor && isValidEditorType(editor)) {
-    return checkHasEditorType(editor) && allowEditorTypeInSandbox(editor);
+  return isEditorTypeAvailable(editor) && hasValidEditorCommand(editor);
+}
+
+/**
+ * Check if the editor is valid and can be used.
+ * Returns false if preferred editor is not set / invalid / not available / not allowed in sandbox.
+ */
+export async function isEditorAvailableAsync(
+  editor: string | undefined,
+): Promise<boolean> {
+  return (
+    isEditorTypeAvailable(editor) && (await hasValidEditorCommandAsync(editor))
+  );
+}
+
+/**
+ * Resolves an editor to use for external editing without blocking the event loop.
+ * 1. If a preferred editor is set and available, uses it.
+ * 2. If no preferred editor is set (or preferred is unavailable), requests selection from user and waits for it.
+ */
+export async function resolveEditorAsync(
+  preferredEditor: EditorType | undefined,
+  signal?: AbortSignal,
+): Promise<EditorType | undefined> {
+  if (preferredEditor && (await isEditorAvailableAsync(preferredEditor))) {
+    return preferredEditor;
   }
-  return false;
+
+  coreEvents.emit(CoreEvent.RequestEditorSelection);
+
+  return (
+    once(coreEvents, CoreEvent.EditorSelected, { signal })
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      .then(([payload]) => (payload as EditorSelectedPayload).editor)
+      .catch(() => undefined)
+  );
 }
 
 /**

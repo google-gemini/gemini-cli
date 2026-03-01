@@ -47,6 +47,7 @@ import type {
 } from '../services/modelConfigService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
+import { LlmRole } from '../telemetry/types.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents } from '../utils/events.js';
 
@@ -213,6 +214,7 @@ describe('Gemini Client (client.ts)', () => {
       getGlobalMemory: vi.fn().mockReturnValue(''),
       getEnvironmentMemory: vi.fn().mockReturnValue(''),
       isJitContextEnabled: vi.fn().mockReturnValue(false),
+      getToolOutputMaskingEnabled: vi.fn().mockReturnValue(false),
       getDisableLoopDetection: vi.fn().mockReturnValue(false),
 
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
@@ -227,7 +229,6 @@ describe('Gemini Client (client.ts)', () => {
       getIdeModeFeature: vi.fn().mockReturnValue(false),
       getIdeMode: vi.fn().mockReturnValue(true),
       getDebugMode: vi.fn().mockReturnValue(false),
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
       getWorkspaceContext: vi.fn().mockReturnValue({
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
@@ -243,6 +244,7 @@ describe('Gemini Client (client.ts)', () => {
       getShowModelInfoInChat: vi.fn().mockReturnValue(false),
       getContinueOnFailedApiCall: vi.fn(),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
+      getIncludeDirectoryTree: vi.fn().mockReturnValue(true),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
       },
@@ -291,6 +293,7 @@ describe('Gemini Client (client.ts)', () => {
     it('should call chat.addHistory with the provided content', async () => {
       const mockChat = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
       } as unknown as GeminiChat;
       client['chat'] = mockChat;
 
@@ -389,6 +392,7 @@ describe('Gemini Client (client.ts)', () => {
         getHistory: mockGetHistory,
         addHistory: vi.fn(),
         setHistory: vi.fn(),
+        setTools: vi.fn(),
         getLastPromptTokenCount: vi.fn(),
       } as unknown as GeminiChat;
     });
@@ -805,6 +809,7 @@ describe('Gemini Client (client.ts)', () => {
 
       const mockChat = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       } as unknown as GeminiChat;
@@ -868,6 +873,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -888,7 +894,7 @@ ${JSON.stringify(
       // Assert
       expect(ideContextStore.get).toHaveBeenCalled();
       expect(mockTurnRunFn).toHaveBeenCalledWith(
-        { model: 'default-routed-model' },
+        { model: 'default-routed-model', isChatModel: true },
         initialRequest,
         expect.any(AbortSignal),
         undefined,
@@ -926,6 +932,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1003,6 +1010,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1119,6 +1127,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1167,6 +1176,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1232,6 +1242,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1289,6 +1300,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1349,6 +1361,7 @@ ${JSON.stringify(
       const lastPromptTokenCount = 900;
       const mockChat: Partial<GeminiChat> = {
         getLastPromptTokenCount: vi.fn().mockReturnValue(lastPromptTokenCount),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
       };
       client['chat'] = mockChat as GeminiChat;
@@ -1409,6 +1422,7 @@ ${JSON.stringify(
       const lastPromptTokenCount = 900;
       const mockChat: Partial<GeminiChat> = {
         getLastPromptTokenCount: vi.fn().mockReturnValue(lastPromptTokenCount),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
       };
       client['chat'] = mockChat as GeminiChat;
@@ -1467,6 +1481,7 @@ ${JSON.stringify(
           .fn()
           .mockReturnValue([{ role: 'user', parts: [{ text: 'old' }] }]),
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getChatRecordingService: vi.fn().mockReturnValue({
           getConversation: vi.fn(),
           getConversationFilePath: vi.fn(),
@@ -1479,6 +1494,7 @@ ${JSON.stringify(
           .fn()
           .mockReturnValue([{ role: 'user', parts: [{ text: 'old' }] }]),
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getChatRecordingService: vi.fn().mockReturnValue({
           getConversation: vi.fn(),
           getConversationFilePath: vi.fn(),
@@ -1616,6 +1632,7 @@ ${JSON.stringify(
       const lastPromptTokenCount = 10000;
       const mockChat: Partial<GeminiChat> = {
         getLastPromptTokenCount: vi.fn().mockReturnValue(lastPromptTokenCount),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
       };
       client['chat'] = mockChat as GeminiChat;
@@ -1689,6 +1706,7 @@ ${JSON.stringify(
 
         const mockChat: Partial<GeminiChat> = {
           addHistory: vi.fn(),
+          setTools: vi.fn(),
           getHistory: vi.fn().mockReturnValue([]),
           getLastPromptTokenCount: vi.fn(),
         };
@@ -1706,7 +1724,7 @@ ${JSON.stringify(
         expect(mockConfig.getModelRouterService).toHaveBeenCalled();
         expect(mockRouterService.route).toHaveBeenCalled();
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'routed-model' },
+          { model: 'routed-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
@@ -1724,7 +1742,7 @@ ${JSON.stringify(
 
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'routed-model' },
+          { model: 'routed-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
@@ -1742,7 +1760,7 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         // Should stick to the first model
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'routed-model' },
+          { model: 'routed-model', isChatModel: true },
           [{ text: 'Continue' }],
           expect.any(AbortSignal),
           undefined,
@@ -1760,7 +1778,7 @@ ${JSON.stringify(
 
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'routed-model' },
+          { model: 'routed-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
@@ -1782,7 +1800,7 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(2);
         // Should use the newly routed model
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'new-routed-model' },
+          { model: 'new-routed-model', isChatModel: true },
           [{ text: 'A new topic' }],
           expect.any(AbortSignal),
           undefined,
@@ -1810,7 +1828,7 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         expect(mockTurnRunFn).toHaveBeenNthCalledWith(
           1,
-          { model: 'original-model' },
+          { model: 'original-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
@@ -1833,7 +1851,7 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(2);
         expect(mockTurnRunFn).toHaveBeenNthCalledWith(
           2,
-          { model: 'fallback-model' },
+          { model: 'fallback-model', isChatModel: true },
           [{ text: 'Continue' }],
           expect.any(AbortSignal),
           undefined,
@@ -1855,7 +1873,7 @@ ${JSON.stringify(
 
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
         mockConfig,
-        'Global JIT Memory',
+        'Full JIT Memory',
       );
     });
 
@@ -1892,6 +1910,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1918,7 +1937,7 @@ ${JSON.stringify(
       // First call with original request
       expect(mockTurnRunFn).toHaveBeenNthCalledWith(
         1,
-        { model: 'default-routed-model' },
+        { model: 'default-routed-model', isChatModel: true },
         initialRequest,
         expect.any(AbortSignal),
         undefined,
@@ -1927,7 +1946,7 @@ ${JSON.stringify(
       // Second call with "Please continue."
       expect(mockTurnRunFn).toHaveBeenNthCalledWith(
         2,
-        { model: 'default-routed-model' },
+        { model: 'default-routed-model', isChatModel: true },
         [{ text: 'System: Please continue.' }],
         expect.any(AbortSignal),
         undefined,
@@ -1947,6 +1966,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -1984,6 +2004,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -2028,6 +2049,7 @@ ${JSON.stringify(
         const mockChat: Partial<GeminiChat> = {
           addHistory: vi.fn(),
           setHistory: vi.fn(),
+          setTools: vi.fn(),
           // Assume history is not empty for delta checks
           getHistory: vi
             .fn()
@@ -2443,6 +2465,7 @@ ${JSON.stringify(
           addHistory: vi.fn(),
           getHistory: vi.fn().mockReturnValue([]), // Default empty history
           setHistory: vi.fn(),
+          setTools: vi.fn(),
           getLastPromptTokenCount: vi.fn(),
         };
         client['chat'] = mockChat as GeminiChat;
@@ -2783,6 +2806,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -2820,6 +2844,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -2857,6 +2882,7 @@ ${JSON.stringify(
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
+        setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
       };
@@ -2889,6 +2915,7 @@ ${JSON.stringify(
         { model: 'test-model' },
         contents,
         abortSignal,
+        LlmRole.MAIN,
       );
 
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
@@ -2903,6 +2930,7 @@ ${JSON.stringify(
           contents,
         },
         'test-session-id',
+        LlmRole.MAIN,
       );
     });
 
@@ -2914,6 +2942,7 @@ ${JSON.stringify(
         { model: initialModel },
         contents,
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
@@ -2921,6 +2950,7 @@ ${JSON.stringify(
           model: initialModel,
         }),
         'test-session-id',
+        LlmRole.MAIN,
       );
     });
 
@@ -3069,6 +3099,7 @@ ${JSON.stringify(
 
         const mockChat: Partial<GeminiChat> = {
           addHistory: vi.fn(),
+          setTools: vi.fn(),
           getHistory: vi.fn().mockReturnValue([]),
           getLastPromptTokenCount: vi.fn(),
         };
@@ -3103,6 +3134,7 @@ ${JSON.stringify(
 
         const mockChat: Partial<GeminiChat> = {
           addHistory: vi.fn(),
+          setTools: vi.fn(),
           getHistory: vi.fn().mockReturnValue([]),
           getLastPromptTokenCount: vi.fn(),
         };

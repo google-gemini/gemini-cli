@@ -5,33 +5,23 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { format } from 'node:util';
+import { coreEvents } from '@google/gemini-cli-core';
 import { handleList, listCommand } from './list.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
 import { loadCliConfig } from '../../config/config.js';
 import type { Config } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 
-const emitConsoleLog = vi.hoisted(() => vi.fn());
-const debugLogger = vi.hoisted(() => ({
-  log: vi.fn((message, ...args) => {
-    emitConsoleLog('log', format(message, ...args));
-  }),
-  error: vi.fn((message, ...args) => {
-    emitConsoleLog('error', format(message, ...args));
-  }),
-}));
-
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...actual,
-    coreEvents: {
-      emitConsoleLog,
+  const { mockCoreDebugLogger } = await import(
+    '../../test-utils/mockDebugLogger.js'
+  );
+  return mockCoreDebugLogger(
+    await importOriginal<typeof import('@google/gemini-cli-core')>(),
+    {
+      stripAnsi: false,
     },
-    debugLogger,
-  };
+  );
 });
 
 vi.mock('../../config/settings.js');
@@ -67,7 +57,7 @@ describe('skills list command', () => {
 
       await handleList({});
 
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         'No skills discovered.',
       );
@@ -98,23 +88,23 @@ describe('skills list command', () => {
 
       await handleList({});
 
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         chalk.bold('Discovered Agent Skills:'),
       );
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         expect.stringContaining('skill1'),
       );
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         expect.stringContaining(chalk.green('[Enabled]')),
       );
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         expect.stringContaining('skill2'),
       );
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         expect.stringContaining(chalk.red('[Disabled]')),
       );
@@ -146,11 +136,11 @@ describe('skills list command', () => {
 
       // Default
       await handleList({ all: false });
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         expect.stringContaining('regular'),
       );
-      expect(emitConsoleLog).not.toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).not.toHaveBeenCalledWith(
         'log',
         expect.stringContaining('builtin'),
       );
@@ -159,15 +149,15 @@ describe('skills list command', () => {
 
       // With all: true
       await handleList({ all: true });
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         expect.stringContaining('regular'),
       );
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         expect.stringContaining('builtin'),
       );
-      expect(emitConsoleLog).toHaveBeenCalledWith(
+      expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         expect.stringContaining(chalk.gray(' [Built-in]')),
       );

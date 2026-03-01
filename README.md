@@ -29,10 +29,9 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 ## 📦 Installation
 
-### Pre-requisites before installation
-
-- Node.js version 20 or higher
-- macOS, Linux, or Windows
+See
+[Gemini CLI installation, execution, and releases](./docs/get-started/installation.md)
+for recommended system specifications and a detailed installation guide.
 
 ### Quick Install
 
@@ -383,7 +382,7 @@ See the [Uninstall Guide](docs/cli/uninstall.md) for removal instructions.
 ## 📄 Legal
 
 - **License**: [Apache License 2.0](LICENSE)
-- **Terms of Service**: [Terms & Privacy](./docs/tos-privacy.md)
+- **Terms of Service**: [Terms & Privacy](./docs/resources/tos-privacy.md)
 - **Security**: [Security Policy](SECURITY.md)
 
 ---

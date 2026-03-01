@@ -11,45 +11,41 @@ import {
   replaceRangeInternal,
   pushUndo,
   detachExpandedPaste,
-  isWordCharStrict,
-  isWordCharWithCombining,
   isCombiningMark,
   findNextWordAcrossLines,
   findPrevWordAcrossLines,
+  findNextBigWordAcrossLines,
+  findPrevBigWordAcrossLines,
   findWordEndInLine,
+  findBigWordEndInLine,
 } from './text-buffer.js';
 import { cpLen, toCodePoints } from '../../utils/textUtils.js';
 import { assumeExhaustive } from '@google/gemini-cli-core';
-
-// Check if we're at the end of a base word (on the last base character)
-// Returns true if current position has a base character followed only by combining marks until non-word
-function isAtEndOfBaseWord(lineCodePoints: string[], col: number): boolean {
-  if (!isWordCharStrict(lineCodePoints[col])) return false;
-
-  // Look ahead to see if we have only combining marks followed by non-word
-  let i = col + 1;
-
-  // Skip any combining marks
-  while (i < lineCodePoints.length && isCombiningMark(lineCodePoints[i])) {
-    i++;
-  }
-
-  // If we hit end of line or non-word character, we were at end of base word
-  return i >= lineCodePoints.length || !isWordCharStrict(lineCodePoints[i]);
-}
 
 export type VimAction = Extract<
   TextBufferAction,
   | { type: 'vim_delete_word_forward' }
   | { type: 'vim_delete_word_backward' }
   | { type: 'vim_delete_word_end' }
+  | { type: 'vim_delete_big_word_forward' }
+  | { type: 'vim_delete_big_word_backward' }
+  | { type: 'vim_delete_big_word_end' }
   | { type: 'vim_change_word_forward' }
   | { type: 'vim_change_word_backward' }
   | { type: 'vim_change_word_end' }
+  | { type: 'vim_change_big_word_forward' }
+  | { type: 'vim_change_big_word_backward' }
+  | { type: 'vim_change_big_word_end' }
   | { type: 'vim_delete_line' }
   | { type: 'vim_change_line' }
   | { type: 'vim_delete_to_end_of_line' }
+  | { type: 'vim_delete_to_start_of_line' }
+  | { type: 'vim_delete_to_first_nonwhitespace' }
   | { type: 'vim_change_to_end_of_line' }
+  | { type: 'vim_change_to_start_of_line' }
+  | { type: 'vim_change_to_first_nonwhitespace' }
+  | { type: 'vim_delete_to_first_line' }
+  | { type: 'vim_delete_to_last_line' }
   | { type: 'vim_change_movement' }
   | { type: 'vim_move_left' }
   | { type: 'vim_move_right' }
@@ -58,6 +54,9 @@ export type VimAction = Extract<
   | { type: 'vim_move_word_forward' }
   | { type: 'vim_move_word_backward' }
   | { type: 'vim_move_word_end' }
+  | { type: 'vim_move_big_word_forward' }
+  | { type: 'vim_move_big_word_backward' }
+  | { type: 'vim_move_big_word_end' }
   | { type: 'vim_delete_char' }
   | { type: 'vim_insert_at_cursor' }
   | { type: 'vim_append_at_cursor' }
@@ -93,20 +92,63 @@ export function handleVimAction(
           endRow = nextWord.row;
           endCol = nextWord.col;
         } else {
-          // No more words, delete/change to end of current word or line
+          // No more words. Check if we can delete to the end of the current word.
           const currentLine = lines[endRow] || '';
           const wordEnd = findWordEndInLine(currentLine, endCol);
+
           if (wordEnd !== null) {
-            endCol = wordEnd + 1; // Include the character at word end
-          } else {
-            endCol = cpLen(currentLine);
+            // Found word end, delete up to (and including) it
+            endCol = wordEnd + 1;
           }
+          // If wordEnd is null, we are likely on trailing whitespace, so do nothing.
           break;
         }
       }
 
       if (endRow !== cursorRow || endCol !== cursorCol) {
         const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          cursorCol,
+          endRow,
+          endCol,
+          '',
+        );
+      }
+      return state;
+    }
+
+    case 'vim_delete_big_word_forward':
+    case 'vim_change_big_word_forward': {
+      const { count } = action.payload;
+      let endRow = cursorRow;
+      let endCol = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        const nextWord = findNextBigWordAcrossLines(
+          lines,
+          endRow,
+          endCol,
+          true,
+        );
+        if (nextWord) {
+          endRow = nextWord.row;
+          endCol = nextWord.col;
+        } else {
+          // No more words. Check if we can delete to the end of the current big word.
+          const currentLine = lines[endRow] || '';
+          const wordEnd = findBigWordEndInLine(currentLine, endCol);
+
+          if (wordEnd !== null) {
+            endCol = wordEnd + 1;
+          }
+          break;
+        }
+      }
+
+      if (endRow !== cursorRow || endCol !== cursorCol) {
+        const nextState = pushUndo(state);
         return replaceRangeInternal(
           nextState,
           cursorRow,
@@ -137,6 +179,36 @@ export function handleVimAction(
 
       if (startRow !== cursorRow || startCol !== cursorCol) {
         const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
+          startRow,
+          startCol,
+          cursorRow,
+          cursorCol,
+          '',
+        );
+      }
+      return state;
+    }
+
+    case 'vim_delete_big_word_backward':
+    case 'vim_change_big_word_backward': {
+      const { count } = action.payload;
+      let startRow = cursorRow;
+      let startCol = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        const prevWord = findPrevBigWordAcrossLines(lines, startRow, startCol);
+        if (prevWord) {
+          startRow = prevWord.row;
+          startCol = prevWord.col;
+        } else {
+          break;
+        }
+      }
+
+      if (startRow !== cursorRow || startCol !== cursorCol) {
+        const nextState = pushUndo(state);
         return replaceRangeInternal(
           nextState,
           startRow,
@@ -190,6 +262,59 @@ export function handleVimAction(
 
       if (endRow !== cursorRow || endCol !== cursorCol) {
         const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          cursorCol,
+          endRow,
+          endCol,
+          '',
+        );
+      }
+      return state;
+    }
+
+    case 'vim_delete_big_word_end':
+    case 'vim_change_big_word_end': {
+      const { count } = action.payload;
+      let row = cursorRow;
+      let col = cursorCol;
+      let endRow = cursorRow;
+      let endCol = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        const wordEnd = findNextBigWordAcrossLines(lines, row, col, false);
+        if (wordEnd) {
+          endRow = wordEnd.row;
+          endCol = wordEnd.col + 1; // Include the character at word end
+          // For next iteration, move to start of next word
+          if (i < count - 1) {
+            const nextWord = findNextBigWordAcrossLines(
+              lines,
+              wordEnd.row,
+              wordEnd.col + 1,
+              true,
+            );
+            if (nextWord) {
+              row = nextWord.row;
+              col = nextWord.col;
+            } else {
+              break; // No more words
+            }
+          }
+        } else {
+          break;
+        }
+      }
+
+      // Ensure we don't go past the end of the last line
+      if (endRow < lines.length) {
+        const lineLen = cpLen(lines[endRow] || '');
+        endCol = Math.min(endCol, lineLen);
+      }
+
+      if (endRow !== cursorRow || endCol !== cursorCol) {
+        const nextState = pushUndo(state);
         return replaceRangeInternal(
           nextState,
           cursorRow,
@@ -268,19 +393,251 @@ export function handleVimAction(
 
     case 'vim_delete_to_end_of_line':
     case 'vim_change_to_end_of_line': {
+      const { count } = action.payload;
       const currentLine = lines[cursorRow] || '';
-      if (cursorCol < cpLen(currentLine)) {
+      const totalLines = lines.length;
+
+      if (count === 1) {
+        // Single line: delete from cursor to end of current line
+        if (cursorCol < cpLen(currentLine)) {
+          const nextState = detachExpandedPaste(pushUndo(state));
+          return replaceRangeInternal(
+            nextState,
+            cursorRow,
+            cursorCol,
+            cursorRow,
+            cpLen(currentLine),
+            '',
+          );
+        }
+        return state;
+      } else {
+        // Multi-line: delete from cursor to end of current line, plus (count-1) entire lines below
+        // For example, 2D = delete to EOL + delete next line entirely
+        const linesToDelete = Math.min(count - 1, totalLines - cursorRow - 1);
+        const endRow = cursorRow + linesToDelete;
+
+        if (endRow === cursorRow) {
+          // No additional lines to delete, just delete to EOL
+          if (cursorCol < cpLen(currentLine)) {
+            const nextState = detachExpandedPaste(pushUndo(state));
+            return replaceRangeInternal(
+              nextState,
+              cursorRow,
+              cursorCol,
+              cursorRow,
+              cpLen(currentLine),
+              '',
+            );
+          }
+          return state;
+        }
+
+        // Delete from cursor position to end of endRow (including newlines)
         const nextState = detachExpandedPaste(pushUndo(state));
+        const endLine = lines[endRow] || '';
         return replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
+          endRow,
+          cpLen(endLine),
+          '',
+        );
+      }
+    }
+
+    case 'vim_delete_to_start_of_line': {
+      if (cursorCol > 0) {
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
           cursorRow,
-          cpLen(currentLine),
+          0,
+          cursorRow,
+          cursorCol,
           '',
         );
       }
       return state;
+    }
+
+    case 'vim_delete_to_first_nonwhitespace': {
+      // Delete from cursor to first non-whitespace character (vim 'd^')
+      const currentLine = lines[cursorRow] || '';
+      const lineCodePoints = toCodePoints(currentLine);
+      let firstNonWs = 0;
+      while (
+        firstNonWs < lineCodePoints.length &&
+        /\s/.test(lineCodePoints[firstNonWs])
+      ) {
+        firstNonWs++;
+      }
+      // If line is all whitespace, firstNonWs would be lineCodePoints.length
+      // In VIM, ^ on whitespace-only line goes to column 0
+      if (firstNonWs >= lineCodePoints.length) {
+        firstNonWs = 0;
+      }
+      // Delete between cursor and first non-whitespace (whichever direction)
+      if (cursorCol !== firstNonWs) {
+        const startCol = Math.min(cursorCol, firstNonWs);
+        const endCol = Math.max(cursorCol, firstNonWs);
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          startCol,
+          cursorRow,
+          endCol,
+          '',
+        );
+      }
+      return state;
+    }
+
+    case 'vim_change_to_start_of_line': {
+      // Change from cursor to start of line (vim 'c0')
+      if (cursorCol > 0) {
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          0,
+          cursorRow,
+          cursorCol,
+          '',
+        );
+      }
+      return state;
+    }
+
+    case 'vim_change_to_first_nonwhitespace': {
+      // Change from cursor to first non-whitespace character (vim 'c^')
+      const currentLine = lines[cursorRow] || '';
+      const lineCodePoints = toCodePoints(currentLine);
+      let firstNonWs = 0;
+      while (
+        firstNonWs < lineCodePoints.length &&
+        /\s/.test(lineCodePoints[firstNonWs])
+      ) {
+        firstNonWs++;
+      }
+      // If line is all whitespace, firstNonWs would be lineCodePoints.length
+      // In VIM, ^ on whitespace-only line goes to column 0
+      if (firstNonWs >= lineCodePoints.length) {
+        firstNonWs = 0;
+      }
+      // Change between cursor and first non-whitespace (whichever direction)
+      if (cursorCol !== firstNonWs) {
+        const startCol = Math.min(cursorCol, firstNonWs);
+        const endCol = Math.max(cursorCol, firstNonWs);
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          startCol,
+          cursorRow,
+          endCol,
+          '',
+        );
+      }
+      return state;
+    }
+
+    case 'vim_delete_to_first_line': {
+      // Delete from first line (or line N if count given) to current line (vim 'dgg' or 'd5gg')
+      // count is the target line number (1-based), or 0 for first line
+      const { count } = action.payload;
+      const totalLines = lines.length;
+
+      // Determine target row (0-based)
+      // count=0 means go to first line, count=N means go to line N (1-based)
+      let targetRow: number;
+      if (count > 0) {
+        targetRow = Math.min(count - 1, totalLines - 1);
+      } else {
+        targetRow = 0;
+      }
+
+      // Determine the range to delete (from min to max row, inclusive)
+      const startRow = Math.min(cursorRow, targetRow);
+      const endRow = Math.max(cursorRow, targetRow);
+      const linesToDelete = endRow - startRow + 1;
+
+      if (linesToDelete >= totalLines) {
+        // Deleting all lines - keep one empty line
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return {
+          ...nextState,
+          lines: [''],
+          cursorRow: 0,
+          cursorCol: 0,
+          preferredCol: null,
+        };
+      }
+
+      const nextState = detachExpandedPaste(pushUndo(state));
+      const newLines = [...nextState.lines];
+      newLines.splice(startRow, linesToDelete);
+
+      // Cursor goes to start of the deleted range, clamped to valid bounds
+      const newCursorRow = Math.min(startRow, newLines.length - 1);
+
+      return {
+        ...nextState,
+        lines: newLines,
+        cursorRow: newCursorRow,
+        cursorCol: 0,
+        preferredCol: null,
+      };
+    }
+
+    case 'vim_delete_to_last_line': {
+      // Delete from current line to last line (vim 'dG') or to line N (vim 'd5G')
+      // count is the target line number (1-based), or 0 for last line
+      const { count } = action.payload;
+      const totalLines = lines.length;
+
+      // Determine target row (0-based)
+      // count=0 means go to last line, count=N means go to line N (1-based)
+      let targetRow: number;
+      if (count > 0) {
+        targetRow = Math.min(count - 1, totalLines - 1);
+      } else {
+        targetRow = totalLines - 1;
+      }
+
+      // Determine the range to delete (from min to max row, inclusive)
+      const startRow = Math.min(cursorRow, targetRow);
+      const endRow = Math.max(cursorRow, targetRow);
+      const linesToDelete = endRow - startRow + 1;
+
+      if (linesToDelete >= totalLines) {
+        // Deleting all lines - keep one empty line
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return {
+          ...nextState,
+          lines: [''],
+          cursorRow: 0,
+          cursorCol: 0,
+          preferredCol: null,
+        };
+      }
+
+      const nextState = detachExpandedPaste(pushUndo(state));
+      const newLines = [...nextState.lines];
+      newLines.splice(startRow, linesToDelete);
+
+      // Move cursor to the start of the deleted range (or last line if needed)
+      const newCursorRow = Math.min(startRow, newLines.length - 1);
+
+      return {
+        ...nextState,
+        lines: newLines,
+        cursorRow: newCursorRow,
+        cursorCol: 0,
+        preferredCol: null,
+      };
     }
 
     case 'vim_change_movement': {
@@ -303,88 +660,65 @@ export function handleVimAction(
         }
 
         case 'j': {
-          // Down
-          const linesToChange = Math.min(count, totalLines - cursorRow);
+          // Down - delete/change current line + count lines below
+          const linesToChange = Math.min(count + 1, totalLines - cursorRow);
           if (linesToChange > 0) {
-            if (totalLines === 1) {
-              const currentLine = state.lines[0] || '';
-              return replaceRangeInternal(
-                detachExpandedPaste(pushUndo(state)),
-                0,
-                0,
-                0,
-                cpLen(currentLine),
-                '',
-              );
-            } else {
+            if (linesToChange >= totalLines) {
+              // Deleting all lines - keep one empty line
               const nextState = detachExpandedPaste(pushUndo(state));
-              const { startOffset, endOffset } = getLineRangeOffsets(
-                cursorRow,
-                linesToChange,
-                nextState.lines,
-              );
-              const { startRow, startCol, endRow, endCol } =
-                getPositionFromOffsets(startOffset, endOffset, nextState.lines);
-              return replaceRangeInternal(
-                nextState,
-                startRow,
-                startCol,
-                endRow,
-                endCol,
-                '',
-              );
+              return {
+                ...nextState,
+                lines: [''],
+                cursorRow: 0,
+                cursorCol: 0,
+                preferredCol: null,
+              };
             }
+
+            const nextState = detachExpandedPaste(pushUndo(state));
+            const newLines = [...nextState.lines];
+            newLines.splice(cursorRow, linesToChange);
+
+            return {
+              ...nextState,
+              lines: newLines,
+              cursorRow: Math.min(cursorRow, newLines.length - 1),
+              cursorCol: 0,
+              preferredCol: null,
+            };
           }
           return state;
         }
 
         case 'k': {
-          // Up
-          const upLines = Math.min(count, cursorRow + 1);
-          if (upLines > 0) {
-            if (state.lines.length === 1) {
-              const currentLine = state.lines[0] || '';
-              return replaceRangeInternal(
-                detachExpandedPaste(pushUndo(state)),
-                0,
-                0,
-                0,
-                cpLen(currentLine),
-                '',
-              );
-            } else {
-              const startRow = Math.max(0, cursorRow - count + 1);
-              const linesToChange = cursorRow - startRow + 1;
+          // Up - delete/change current line + count lines above
+          const startRow = Math.max(0, cursorRow - count);
+          const linesToChange = cursorRow - startRow + 1;
+
+          if (linesToChange > 0) {
+            if (linesToChange >= totalLines) {
+              // Deleting all lines - keep one empty line
               const nextState = detachExpandedPaste(pushUndo(state));
-              const { startOffset, endOffset } = getLineRangeOffsets(
-                startRow,
-                linesToChange,
-                nextState.lines,
-              );
-              const {
-                startRow: newStartRow,
-                startCol,
-                endRow,
-                endCol,
-              } = getPositionFromOffsets(
-                startOffset,
-                endOffset,
-                nextState.lines,
-              );
-              const resultState = replaceRangeInternal(
-                nextState,
-                newStartRow,
-                startCol,
-                endRow,
-                endCol,
-                '',
-              );
               return {
-                ...resultState,
-                cursorRow: startRow,
+                ...nextState,
+                lines: [''],
+                cursorRow: 0,
                 cursorCol: 0,
+                preferredCol: null,
               };
             }
+
+            const nextState = detachExpandedPaste(pushUndo(state));
+            const newLines = [...nextState.lines];
+            newLines.splice(startRow, linesToChange);
+
+            return {
+              ...nextState,
+              lines: newLines,
+              cursorRow: Math.min(startRow, newLines.length - 1),
+              cursorCol: 0,
+              preferredCol: null,
+            };
           }
           return state;
         }
@@ -540,6 +874,30 @@ export function handleVimAction(
       };
     }
 
+    case 'vim_move_big_word_forward': {
+      const { count } = action.payload;
+      let row = cursorRow;
+      let col = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        const nextWord = findNextBigWordAcrossLines(lines, row, col, true);
+        if (nextWord) {
+          row = nextWord.row;
+          col = nextWord.col;
+        } else {
+          // No more words to move to
+          break;
+        }
+      }
+
+      return {
+        ...state,
+        cursorRow: row,
+        cursorCol: col,
+        preferredCol: null,
+      };
+    }
+
     case 'vim_move_word_backward': {
       const { count } = action.payload;
       let row = cursorRow;
@@ -563,44 +921,59 @@ export function handleVimAction(
       };
     }
 
+    case 'vim_move_big_word_backward': {
+      const { count } = action.payload;
+      let row = cursorRow;
+      let col = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        const prevWord = findPrevBigWordAcrossLines(lines, row, col);
+        if (prevWord) {
+          row = prevWord.row;
+          col = prevWord.col;
+        } else {
+          break;
+        }
+      }
+
+      return {
+        ...state,
+        cursorRow: row,
+        cursorCol: col,
+        preferredCol: null,
+      };
+    }
+
     case 'vim_move_word_end': {
       const { count } = action.payload;
       let row = cursorRow;
       let col = cursorCol;
 
       for (let i = 0; i < count; i++) {
-        // Special handling for the first iteration when we're at end of word
-        if (i === 0) {
-          const currentLine = lines[row] || '';
-          const lineCodePoints = toCodePoints(currentLine);
-
-          // Check if we're at the end of a word (on the last base character)
-          const atEndOfWord =
-            col < lineCodePoints.length &&
-            isWordCharStrict(lineCodePoints[col]) &&
-            (col + 1 >= lineCodePoints.length ||
-              !isWordCharWithCombining(lineCodePoints[col + 1]) ||
-              // Or if we're on a base char followed only by combining marks until non-word
-              (isWordCharStrict(lineCodePoints[col]) &&
-                isAtEndOfBaseWord(lineCodePoints, col)));
-
-          if (atEndOfWord) {
-            // We're already at end of word, find next word end
-            const nextWord = findNextWordAcrossLines(
-              lines,
-              row,
-              col + 1,
-              false,
-            );
-            if (nextWord) {
-              row = nextWord.row;
-              col = nextWord.col;
-              continue;
-            }
-          }
-        }
-
         const wordEnd = findNextWordAcrossLines(lines, row, col, false);
+        if (wordEnd) {
+          row = wordEnd.row;
+          col = wordEnd.col;
+        } else {
+          break;
+        }
+      }
+
+      return {
+        ...state,
+        cursorRow: row,
+        cursorCol: col,
+        preferredCol: null,
+      };
+    }
+
+    case 'vim_move_big_word_end': {
+      const { count } = action.payload;
+      let row = cursorRow;
+      let col = cursorCol;
+
+      for (let i = 0; i < count; i++) {
+        const wordEnd = findNextBigWordAcrossLines(lines, row, col, false);
         if (wordEnd) {
           row = wordEnd.row;
           col = wordEnd.col;
@@ -750,6 +1123,11 @@ export function handleVimAction(
       const lineCodePoints = toCodePoints(currentLine);
       while (col < lineCodePoints.length && /\s/.test(lineCodePoints[col])) {
         col++;
+      }
+
+      // If line is all whitespace or empty, ^ goes to column 0 (standard Vim behavior)
+      if (col >= lineCodePoints.length) {
+        col = 0;
       }
 
       return {

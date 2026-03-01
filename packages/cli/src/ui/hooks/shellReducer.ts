@@ -104,10 +104,15 @@ export function shellReducer(
       }
       shell.output = newOutput;
 
+      const nextState = { ...state, lastShellOutputTime: Date.now() };
+
       if (state.isBackgroundShellVisible) {
-        return { ...state, backgroundShells: new Map(state.backgroundShells) };
+        return {
+          ...nextState,
+          backgroundShells: new Map(state.backgroundShells),
+        };
       }
-      return state;
+      return nextState;
     }
     case 'SYNC_BACKGROUND_SHELLS': {
       return { ...state, backgroundShells: new Map(state.backgroundShells) };

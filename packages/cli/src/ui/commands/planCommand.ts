@@ -37,17 +37,13 @@ export const planCommand: SlashCommand = {
     const approvedPlanPath = config.getApprovedPlanPath();
 
     if (!approvedPlanPath) {
-      coreEvents.emitFeedback(
-        'error',
-        'No approved plan found. Please create and approve a plan first.',
-      );
       return;
     }
 
     try {
       const content = await processSingleFileContent(
         approvedPlanPath,
-        config.storage.getProjectTempPlansDir(),
+        config.storage.getPlansDir(),
         config.getFileSystemService(),
       );
       const fileName = path.basename(approvedPlanPath);

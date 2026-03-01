@@ -24,6 +24,7 @@ export interface AddDirectoriesResult {
 export class WorkspaceContext {
   private directories = new Set<string>();
   private initialDirectories: Set<string>;
+  private readOnlyPaths = new Set<string>();
   private onDirectoriesChangedListeners = new Set<() => void>();
 
   /**
@@ -113,6 +114,24 @@ export class WorkspaceContext {
     return result;
   }
 
+  /**
+   * Adds a path to the read-only list.
+   * These paths are allowed for reading but not for writing (unless they are also in the workspace).
+   */
+  addReadOnlyPath(pathToAdd: string): void {
+    try {
+      // Check if it exists
+      if (!fs.existsSync(pathToAdd)) {
+        return;
+      }
+      // Resolve symlinks
+      const resolved = fs.realpathSync(path.resolve(this.targetDir, pathToAdd));
+      this.readOnlyPaths.add(resolved);
+    } catch (e) {
+      debugLogger.warn(`Failed to add read-only path ${pathToAdd}:`, e);
+    }
+  }
+
   private resolveAndValidateDir(directory: string): string {
     const absolutePath = path.resolve(this.targetDir, directory);
 
@@ -165,6 +184,34 @@ export class WorkspaceContext {
 
       for (const dir of this.directories) {
         if (this.isPathWithinRoot(fullyResolvedPath, dir)) {
+          return true;
+        }
+      }
+      return false;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  /**
+   * Checks if a path is allowed to be read.
+   * This includes workspace paths and explicitly added read-only paths.
+   * @param pathToCheck The path to validate
+   * @returns True if the path is readable, false otherwise
+   */
+  isPathReadable(pathToCheck: string): boolean {
+    if (this.isPathWithinWorkspace(pathToCheck)) {
+      return true;
+    }
+    try {
+      const fullyResolvedPath = this.fullyResolvedPath(pathToCheck);
+
+      for (const allowedPath of this.readOnlyPaths) {
+        // Allow exact matches or subpaths (if allowedPath is a directory)
+        if (
+          fullyResolvedPath === allowedPath ||
+          this.isPathWithinRoot(fullyResolvedPath, allowedPath)
+        ) {
           return true;
         }
       }

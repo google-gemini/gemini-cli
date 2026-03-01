@@ -56,6 +56,7 @@ export type KeyMatchers = {
 export function createKeyMatchers(
   config: KeyBindingConfig = defaultKeyBindings,
 ): KeyMatchers {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const matchers = {} as { [C in Command]: KeyMatcher };
 
   for (const command of Object.values(Command)) {

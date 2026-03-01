@@ -7,7 +7,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob } from 'glob';
-import yaml from 'js-yaml';
+import { load } from 'js-yaml';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
 
@@ -40,8 +40,9 @@ function parseFrontmatter(
   content: string,
 ): { name: string; description: string } | null {
   try {
-    const parsed = yaml.load(content);
+    const parsed = load(content);
     if (parsed && typeof parsed === 'object') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const { name, description } = parsed as Record<string, unknown>;
       if (typeof name === 'string' && typeof description === 'string') {
         return { name, description };
@@ -121,10 +122,12 @@ export async function loadSkillsFromDir(
       return [];
     }
 
-    const skillFiles = await glob(['SKILL.md', '*/SKILL.md'], {
+    const pattern = ['SKILL.md', '*/SKILL.md'];
+    const skillFiles = await glob(pattern, {
       cwd: absoluteSearchPath,
       absolute: true,
       nodir: true,
+      ignore: ['**/node_modules/**', '**/.git/**'],
     });
 
     for (const skillFile of skillFiles) {
@@ -171,8 +174,11 @@ export async function loadSkillFromFile(
       return null;
     }
 
+    // Sanitize name for use as a filename/directory name (e.g. replace ':' with '-')
+    const sanitizedName = frontmatter.name.replace(/[:\\/<>*?"|]/g, '-');
+
     return {
-      name: frontmatter.name,
+      name: sanitizedName,
       description: frontmatter.description,
       location: filePath,
       body: match[2]?.trim() ?? '',

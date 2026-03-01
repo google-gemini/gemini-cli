@@ -17,10 +17,10 @@ import {
   COMMON_IGNORE_PATTERNS,
   GEMINI_IGNORE_FILE_NAME,
   // DEFAULT_FILE_EXCLUDES,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import * as core from '@google/gemini-cli-core';
 import * as os from 'node:os';
-import { ToolCallStatus } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
@@ -145,6 +145,7 @@ describe('handleAtCommand', () => {
   afterEach(async () => {
     abortController.abort();
     await fsPromises.rm(testRootDir, { recursive: true, force: true });
+    vi.unstubAllGlobals();
   });
 
   it('should pass through query if no @ command is present', async () => {
@@ -179,9 +180,6 @@ describe('handleAtCommand', () => {
     expect(result).toEqual({
       processedQuery: [{ text: queryWithSpaces }],
     });
-    expect(mockOnDebugMessage).toHaveBeenCalledWith(
-      'Lone @ detected, will be treated as text in the modified query.',
-    );
   });
 
   it('should process a valid text file path', async () => {
@@ -214,7 +212,9 @@ describe('handleAtCommand', () => {
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
-        tools: [expect.objectContaining({ status: ToolCallStatus.Success })],
+        tools: [
+          expect.objectContaining({ status: CoreToolCallStatus.Success }),
+        ],
       }),
       125,
     );
@@ -292,8 +292,8 @@ describe('handleAtCommand', () => {
       path.join(testRootDir, 'path', 'to', 'my file.txt'),
       fileContent,
     );
-    const escapedpath = path.join(testRootDir, 'path', 'to', 'my\\ file.txt');
-    const query = `@${escapedpath}`;
+
+    const query = `@${core.escapePath(filePath)}`;
 
     const result = await handleAtCommand({
       query,
@@ -316,11 +316,82 @@ describe('handleAtCommand', () => {
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
-        tools: [expect.objectContaining({ status: ToolCallStatus.Success })],
+        tools: [
+          expect.objectContaining({ status: CoreToolCallStatus.Success }),
+        ],
       }),
       125,
     );
   }, 10000);
+
+  it('should correctly handle double-quoted paths with spaces', async () => {
+    // Mock platform to win32 so unescapePath strips quotes
+    vi.stubGlobal(
+      'process',
+      Object.create(process, {
+        platform: {
+          get: () => 'win32',
+        },
+      }),
+    );
+
+    const fileContent = 'Content of file with spaces';
+    const filePath = await createTestFile(
+      path.join(testRootDir, 'my folder', 'my file.txt'),
+      fileContent,
+    );
+    // On Windows, the user might provide: @"path/to/my file.txt"
+    const query = `@"${filePath}"`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 126,
+      signal: abortController.signal,
+    });
+
+    const relativePath = getRelativePath(filePath);
+    expect(result).toEqual({
+      processedQuery: [
+        { text: `@${relativePath}` },
+        { text: '\n--- Content from referenced files ---' },
+        { text: `\nContent from @${relativePath}:\n` },
+        { text: fileContent },
+        { text: '\n--- End of content ---' },
+      ],
+    });
+  });
+
+  it('should correctly handle file paths with narrow non-breaking space (NNBSP)', async () => {
+    const nnbsp = '\u202F';
+    const fileContent = 'NNBSP file content.';
+    const filePath = await createTestFile(
+      path.join(testRootDir, `my${nnbsp}file.txt`),
+      fileContent,
+    );
+    const relativePath = getRelativePath(filePath);
+    const query = `@${filePath}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 129,
+      signal: abortController.signal,
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.processedQuery).toEqual([
+      { text: `@${relativePath}` },
+      { text: '\n--- Content from referenced files ---' },
+      { text: `\nContent from @${relativePath}:\n` },
+      { text: fileContent },
+      { text: '\n--- End of content ---' },
+    ]);
+  });
 
   it('should handle multiple @file references', async () => {
     const content1 = 'Content file1';
@@ -440,9 +511,6 @@ describe('handleAtCommand', () => {
     );
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Glob search for '**/*${invalidFile}*' found no files or an error. Path ${invalidFile} will be skipped.`,
-    );
-    expect(mockOnDebugMessage).toHaveBeenCalledWith(
-      'Lone @ detected, will be treated as text in the modified query.',
     );
   });
 
@@ -896,8 +964,8 @@ describe('handleAtCommand', () => {
         path.join(testRootDir, 'spaced file.txt'),
         fileContent,
       );
-      const escapedPath = path.join(testRootDir, 'spaced\\ file.txt');
-      const query = `Check @${escapedPath}, it has spaces.`;
+
+      const query = `Check @${core.escapePath(filePath)}, it has spaces.`;
 
       const result = await handleAtCommand({
         query,
@@ -1194,40 +1262,6 @@ describe('handleAtCommand', () => {
         expect.stringContaining(`using glob: ${path.join(subDirPath, '**')}`),
       );
     });
-
-    it('should skip absolute paths outside workspace', async () => {
-      const outsidePath = '/tmp/outside-workspace.txt';
-      const query = `Check @${outsidePath} please.`;
-
-      const mockWorkspaceContext = {
-        isPathWithinWorkspace: vi.fn((path: string) =>
-          path.startsWith(testRootDir),
-        ),
-        getDirectories: () => [testRootDir],
-        addDirectory: vi.fn(),
-        getInitialDirectories: () => [testRootDir],
-        setDirectories: vi.fn(),
-        onDirectoriesChanged: vi.fn(() => () => {}),
-      } as unknown as ReturnType<typeof mockConfig.getWorkspaceContext>;
-      mockConfig.getWorkspaceContext = () => mockWorkspaceContext;
-
-      const result = await handleAtCommand({
-        query,
-        config: mockConfig,
-        addItem: mockAddItem,
-        onDebugMessage: mockOnDebugMessage,
-        messageId: 502,
-        signal: abortController.signal,
-      });
-
-      expect(result).toEqual({
-        processedQuery: [{ text: `Check @${outsidePath} please.` }],
-      });
-
-      expect(mockOnDebugMessage).toHaveBeenCalledWith(
-        `Path ${outsidePath} is not in the workspace and will be skipped.`,
-      );
-    });
   });
 
   it("should not add the user's turn to history, as that is the caller's responsibility", async () => {
@@ -1252,7 +1286,9 @@ describe('handleAtCommand', () => {
     // Assert
     // It SHOULD be called for the tool_group
     expect(mockAddItem).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'tool_group' }),
+      expect.objectContaining({
+        type: 'tool_group',
+      }),
       999,
     );
 
@@ -1297,7 +1333,9 @@ describe('handleAtCommand', () => {
         signal: abortController.signal,
       });
 
-      expect(readResource).toHaveBeenCalledWith(resourceUri);
+      expect(readResource).toHaveBeenCalledWith(resourceUri, {
+        signal: abortController.signal,
+      });
       const processedParts = Array.isArray(result.processedQuery)
         ? result.processedQuery
         : [];
@@ -1307,7 +1345,9 @@ describe('handleAtCommand', () => {
       });
       expect(containsResourceText).toBe(true);
       expect(mockAddItem).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'tool_group' }),
+        expect.objectContaining({
+          type: 'tool_group',
+        }),
         expect.any(Number),
       );
     });
@@ -1399,7 +1439,7 @@ describe('handleAtCommand', () => {
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'tool_group',
-        tools: [expect.objectContaining({ status: ToolCallStatus.Error })],
+        tools: [expect.objectContaining({ status: CoreToolCallStatus.Error })],
       }),
       134,
     );
