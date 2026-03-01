@@ -275,6 +275,32 @@ export class LoggingContentGenerator implements ContentGenerator {
     logApiResponse(this.config, event);
   }
 
+  private _fixGaxiosErrorData(error: unknown): void {
+    // Fix for raw ASCII buffer strings appearing in dev with the latest
+    // Gaxios updates.
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'response' in error &&
+      typeof error.response === 'object' &&
+      error.response !== null &&
+      'data' in error.response
+    ) {
+      const response = error.response as { data: unknown };
+      const data = response.data;
+      if (typeof data === 'string' && data.includes(',')) {
+        try {
+          const charCodes = data.split(',').map(Number);
+          if (charCodes.every((code) => !isNaN(code))) {
+            response.data = String.fromCharCode(...charCodes);
+          }
+        } catch (_e) {
+          // If parsing fails, just leave it alone
+        }
+      }
+    }
+  }
+
   private _logApiError(
     durationMs: number,
     error: unknown,
@@ -381,6 +407,9 @@ export class LoggingContentGenerator implements ContentGenerator {
         } catch (error) {
           spanMetadata.error = error;
           const durationMs = Date.now() - startTime;
+
+          this._fixGaxiosErrorData(error);
+
           this._logApiError(
             durationMs,
             error,
@@ -448,6 +477,9 @@ export class LoggingContentGenerator implements ContentGenerator {
           );
         } catch (error) {
           const durationMs = Date.now() - startTime;
+
+          this._fixGaxiosErrorData(error);
+
           this._logApiError(
             durationMs,
             error,
