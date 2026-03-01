@@ -1,4 +1,9 @@
-import { create, all } from 'mathjs';
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { CALCULATOR_TOOL_NAME } from './definitions/base-declarations.js';
 import {
   BaseDeclarativeTool,
@@ -7,15 +12,6 @@ import {
   type ToolResult,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-
-// Create a sandboxed mathjs instance for safer evaluation.
-const math = create(all);
-// Disable unsafe functions that could be exploited with untrusted input.
-// We cast to any because we're purposefully removing core functions for security.
-/* eslint-disable @typescript-eslint/no-explicit-any */
-delete (math as any).import;
-delete (math as any).createUnit;
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 export interface CalculatorParams extends Record<string, unknown> {
   expression: string;
@@ -77,6 +73,7 @@ class CalculatorInvocation extends BaseToolInvocation<
 
 /**
  * Evaluates a mathematical expression deterministically.
+ * Supports +, -, *, /, ^, %, and parentheses.
  * @param expression The mathematical expression to evaluate.
  * @returns The result of the evaluation as a string, or an error message.
  */
@@ -87,9 +84,113 @@ export function calculator(expression: string): string {
       return 'Expression too long.';
     }
 
-    const result = math.evaluate(expression);
-    return String(result);
-  } catch {
+    const tokens = tokenize(expression);
+    if (tokens.length === 0) {
+      return 'Invalid mathematical expression.';
+    }
+
+    let pos = 0;
+
+    function parseExpression(): number {
+      let left = parseTerm();
+      while (
+        pos < tokens.length &&
+        (tokens[pos] === '+' || tokens[pos] === '-')
+      ) {
+        const op = tokens[pos++];
+        const right = parseTerm();
+        if (op === '+') left += right;
+        else left -= right;
+      }
+      return left;
+    }
+
+    function parseTerm(): number {
+      let left = parseFactor();
+      while (
+        pos < tokens.length &&
+        (tokens[pos] === '*' || tokens[pos] === '/' || tokens[pos] === '%')
+      ) {
+        const op = tokens[pos++];
+        const right = parseFactor();
+        if (op === '*') left *= right;
+        else if (op === '/') {
+          if (right === 0) throw new Error('Division by zero');
+          left /= right;
+        } else if (op === '%') {
+          if (right === 0) throw new Error('Modulo by zero');
+          left %= right;
+        }
+      }
+      return left;
+    }
+
+    function parseFactor(): number {
+      let left = parsePower();
+      while (pos < tokens.length && tokens[pos] === '^') {
+        pos++;
+        const right = parseFactor(); // Right-associative exponentiation
+        left = Math.pow(left, right);
+      }
+      return left;
+    }
+
+    function parsePower(): number {
+      if (pos >= tokens.length) throw new Error('Unexpected end of expression');
+
+      if (tokens[pos] === '-') {
+        pos++;
+        return -parsePower();
+      }
+      if (tokens[pos] === '+') {
+        pos++;
+        return parsePower();
+      }
+
+      if (tokens[pos] === '(') {
+        pos++;
+        const res = parseExpression();
+        if (pos >= tokens.length || tokens[pos] !== ')') {
+          throw new Error('Missing closing parenthesis');
+        }
+        pos++;
+        return res;
+      }
+
+      const val = parseFloat(tokens[pos++]);
+      if (isNaN(val)) throw new Error('Not a number');
+      return val;
+    }
+
+    const result = parseExpression();
+    if (pos < tokens.length) {
+      throw new Error('Unexpected tokens at end');
+    }
+
+    // Format result to avoid scientific notation for simple numbers
+    // but keep enough precision.
+    return Number.isFinite(result)
+      ? String(Number(result.toFixed(10)))
+      : String(result);
+  } catch (e) {
+    if (
+      e instanceof Error &&
+      (e.message === 'Expression too long' ||
+        e.message === 'Division by zero' ||
+        e.message === 'Modulo by zero')
+    ) {
+      return e.message + '.';
+    }
     return 'Invalid mathematical expression.';
   }
+}
+
+function tokenize(str: string): string[] {
+  const result: string[] = [];
+  const regex = /\d+(\.\d+)?|[+\-*/%^()]/g;
+  let m;
+  while ((m = regex.exec(str)) !== null) {
+    result.push(m[0]);
+  }
+  return result;
 }

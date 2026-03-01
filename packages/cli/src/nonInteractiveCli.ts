@@ -30,6 +30,7 @@ import {
   ToolErrorType,
   Scheduler,
   ROOT_SCHEDULER_ID,
+  calculator,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -46,7 +47,6 @@ import {
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
-import { calculator } from '@google/gemini-cli-core';
 
 function isMathQuery(input: string): boolean {
   const trimmed = input.trim();
@@ -80,8 +80,9 @@ export async function runNonInteractive({
     });
 
     if (process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET']) {
-      const { setupInitialActivityLogger } =
-        await import('./utils/devtoolsService.js');
+      const { setupInitialActivityLogger } = await import(
+        './utils/devtoolsService.js'
+      );
       await setupInitialActivityLogger(config);
     }
 
