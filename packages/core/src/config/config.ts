@@ -35,6 +35,7 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
+import { CalculatorTool } from '../tools/calculator.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
@@ -1837,9 +1838,8 @@ export class Config implements McpContext {
     if (this.experimentalJitContext && this.contextManager) {
       await this.contextManager.refresh();
     } else {
-      const { refreshServerHierarchicalMemory } = await import(
-        '../utils/memoryDiscovery.js'
-      );
+      const { refreshServerHierarchicalMemory } =
+        await import('../utils/memoryDiscovery.js');
       await refreshServerHierarchicalMemory(this);
     }
     if (this.geminiClient?.isInitialized()) {
@@ -2839,6 +2839,11 @@ export class Config implements McpContext {
         registry.registerTool(new WriteTodosTool(this.messageBus)),
       );
     }
+
+    maybeRegister(CalculatorTool, () =>
+      registry.registerTool(new CalculatorTool(this.messageBus)),
+    );
+
     if (this.isPlanEnabled()) {
       maybeRegister(ExitPlanModeTool, () =>
         registry.registerTool(new ExitPlanModeTool(this, this.messageBus)),

@@ -24,6 +24,7 @@ export const WEB_SEARCH_TOOL_NAME = 'google_web_search';
 
 export const WRITE_TODOS_TOOL_NAME = 'write_todos';
 export const WEB_FETCH_TOOL_NAME = 'web_fetch';
+export const CALCULATOR_TOOL_NAME = 'calculator';
 export const READ_MANY_FILES_TOOL_NAME = 'read_many_files';
 
 export const MEMORY_TOOL_NAME = 'save_memory';

@@ -46,6 +46,14 @@ import {
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
+import { calculator } from '@google/gemini-cli-core';
+
+function isMathQuery(input: string): boolean {
+  const trimmed = input.trim();
+  // Only allow pure math characters
+  const mathPattern = /^[0-9+\-*/().^%\s]+$/;
+  return mathPattern.test(trimmed);
+}
 
 interface RunNonInteractiveParams {
   config: Config;
@@ -72,9 +80,8 @@ export async function runNonInteractive({
     });
 
     if (process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET']) {
-      const { setupInitialActivityLogger } = await import(
-        './utils/devtoolsService.js'
-      );
+      const { setupInitialActivityLogger } =
+        await import('./utils/devtoolsService.js');
       await setupInitialActivityLogger(config);
     }
 
@@ -238,6 +245,12 @@ export async function runNonInteractive({
       }
 
       let query: Part[] | undefined;
+
+      if (isMathQuery(input)) {
+        textOutput.write(calculator(input));
+        textOutput.ensureTrailingNewline();
+        return;
+      }
 
       if (isSlashCommand(input)) {
         const slashCommandResult = await handleSlashCommand(

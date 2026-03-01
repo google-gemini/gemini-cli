@@ -24,6 +24,7 @@ import {
   MEMORY_TOOL_NAME,
   GET_INTERNAL_DOCS_TOOL_NAME,
   ASK_USER_TOOL_NAME,
+  CALCULATOR_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
 } from '../base-declarations.js';
 import {
@@ -653,6 +654,20 @@ The agent did not use the todo list because this task could be completed by a ti
           },
         },
       },
+    },
+  },
+  calculator: {
+    name: CALCULATOR_TOOL_NAME,
+    description: 'Evaluates mathematical expressions deterministically.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        expression: {
+          type: 'string',
+          description: 'The mathematical expression to evaluate.',
+        },
+      },
+      required: ['expression'],
     },
   },
 

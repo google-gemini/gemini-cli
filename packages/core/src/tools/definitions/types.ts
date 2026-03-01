@@ -46,6 +46,7 @@ export interface CoreToolSet {
   write_todos: FunctionDeclaration;
   get_internal_docs: FunctionDeclaration;
   ask_user: FunctionDeclaration;
+  calculator: FunctionDeclaration;
   enter_plan_mode: FunctionDeclaration;
   exit_plan_mode: (plansDir: string) => FunctionDeclaration;
   activate_skill: (skillNames: string[]) => FunctionDeclaration;
