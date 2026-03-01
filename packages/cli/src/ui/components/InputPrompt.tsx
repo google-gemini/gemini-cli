@@ -7,7 +7,7 @@
 import type React from 'react';
 import clipboardy from 'clipboardy';
 import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import { Box, Text, useStdout, type DOMElement, getBoundingBox } from 'ink';
+import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
@@ -226,7 +226,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     shortcutsHelpVisible,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
-  const [isPromptMouseFocused, setIsPromptMouseFocused] = useState(false);
   const { handlePress: registerPlainTabPress, resetCount: resetPlainTabPress } =
     useRepeatedKeyPress({
       windowMs: DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS,
@@ -340,6 +339,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     commandSearchActive,
   );
 
+  const isAlternateBuffer = useAlternateBuffer();
   const resetCompletionState = completion.resetCompletionState;
   const resetReverseSearchCompletionState =
     reverseSearchCompletion.resetCompletionState;
@@ -547,8 +547,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     { isActive: focus },
   );
 
-  const isAlternateBuffer = useAlternateBuffer();
-
   // Double-click to expand/collapse paste placeholders
   useMouseClick(
     innerBoxRef,
@@ -609,32 +607,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         handleClipboardPaste();
       }
 
-      if (event.name === 'left-press' && innerBoxRef.current) {
-        const { x, y, width, height } = getBoundingBox(innerBoxRef.current);
-        const mouseX = event.col - 1;
-        const mouseY = event.row - 1;
-        const relativeX = mouseX - x;
-        const relativeY = mouseY - y;
-
-        const isInside =
-          relativeX >= 0 &&
-          relativeX < width &&
-          relativeY >= 0 &&
-          relativeY < height;
-
-        setIsPromptMouseFocused(isInside);
-      }
-
       if (
-        focus &&
+        showCursor &&
         (event.name === 'scroll-up' || event.name === 'scroll-down') &&
         innerBoxRef.current
       ) {
-        // Obey user's "tapped" logic: only scroll if the prompt was tapped (focused via click)
-        if (!isPromptMouseFocused) {
-          return;
-        }
-
         // If there's no actual content to scroll inside the prompt, we can skip handling entirely.
         const viewportRows = buffer.viewportVisualLines.length;
         const totalRows = buffer.allVisualLines.length;
