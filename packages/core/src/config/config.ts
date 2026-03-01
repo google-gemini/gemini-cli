@@ -491,6 +491,7 @@ export interface ConfigParameters {
   };
   checkpointing?: boolean;
   proxy?: string;
+  vertexAiLocation?: string;
   cwd: string;
   fileDiscoveryService?: FileDiscoveryService;
   includeDirectories?: string[];
@@ -855,6 +856,9 @@ export class Config implements McpContext {
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
+    if (params.vertexAiLocation) {
+      process.env['GOOGLE_CLOUD_LOCATION'] = params.vertexAiLocation;
+    }
     this.cwd = params.cwd ?? process.cwd();
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;

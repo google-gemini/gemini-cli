@@ -950,6 +950,16 @@ const SETTINGS_SCHEMA = {
         description: 'Skip the next speaker check.',
         showInDialog: true,
       },
+      vertexAiLocation: {
+        type: 'string',
+        label: 'Vertex AI Location',
+        category: 'Model',
+        requiresRestart: true,
+        default: undefined as string | undefined,
+        description:
+          'The Google Cloud location for Vertex AI (e.g. "global", "us-central1"). Defaults to "us-central1". Use "global" to access preview models.',
+        showInDialog: true,
+      },
     },
   },
 

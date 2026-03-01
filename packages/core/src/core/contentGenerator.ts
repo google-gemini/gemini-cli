@@ -91,6 +91,7 @@ export function getAuthTypeFromEnv(): AuthType | undefined {
 export type ContentGeneratorConfig = {
   apiKey?: string;
   vertexai?: boolean;
+  location?: string;
   authType?: AuthType;
   proxy?: string;
 };
@@ -138,6 +139,7 @@ export async function createContentGeneratorConfig(
   ) {
     contentGeneratorConfig.apiKey = googleApiKey;
     contentGeneratorConfig.vertexai = true;
+    contentGeneratorConfig.location = googleCloudLocation;
 
     return contentGeneratorConfig;
   }
@@ -219,6 +221,7 @@ export async function createContentGenerator(
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
         vertexai: config.vertexai,
+        location: config.location,
         httpOptions,
         ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
       });
