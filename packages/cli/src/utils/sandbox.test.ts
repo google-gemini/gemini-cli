@@ -5,7 +5,7 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { spawn, exec, execSync } from 'node:child_process';
+import { spawn, exec, execFile, execSync } from 'node:child_process';
 import os from 'node:os';
 import fs from 'node:fs';
 import { start_sandbox } from './sandbox.js';
@@ -46,6 +46,26 @@ vi.mock('node:util', async (importOriginal) => {
           }
           if (cmd.includes('ps -a --format')) {
             return { stdout: 'existing-container', stderr: '' };
+          }
+          return { stdout: '', stderr: '' };
+        };
+      }
+      if (fn === execFile) {
+        return async (file: string, args: string[]) => {
+          if (file === 'lxc' && args[0] === 'list') {
+            const output = process.env['TEST_LXC_LIST_OUTPUT'];
+            if (output === 'throw') {
+              throw new Error('lxc command not found');
+            }
+            return { stdout: output ?? '[]', stderr: '' };
+          }
+          if (
+            file === 'lxc' &&
+            args[0] === 'config' &&
+            args[1] === 'device' &&
+            args[2] === 'add'
+          ) {
+            return { stdout: '', stderr: '' };
           }
           return { stdout: '', stderr: '' };
         };
@@ -472,6 +492,85 @@ describe('sandbox', () => {
       expect(entrypointCmd).toContain('groupadd');
       expect(entrypointCmd).toContain('useradd');
       expect(entrypointCmd).toContain('su -p gemini');
+    });
+
+    describe('LXC sandbox', () => {
+      const LXC_RUNNING = JSON.stringify([
+        { name: 'gemini-sandbox', status: 'Running' },
+      ]);
+      const LXC_STOPPED = JSON.stringify([
+        { name: 'gemini-sandbox', status: 'Stopped' },
+      ]);
+
+      beforeEach(() => {
+        delete process.env['TEST_LXC_LIST_OUTPUT'];
+      });
+
+      it('should run lxc exec with correct args for a running container', async () => {
+        process.env['TEST_LXC_LIST_OUTPUT'] = LXC_RUNNING;
+        const config: SandboxConfig = {
+          command: 'lxc',
+          image: 'gemini-sandbox',
+        };
+
+        const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >;
+        mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+          if (event === 'close') {
+            setTimeout(() => cb(0), 10);
+          }
+          return mockSpawnProcess;
+        });
+
+        vi.mocked(spawn).mockImplementation((cmd) => {
+          if (cmd === 'lxc') {
+            return mockSpawnProcess;
+          }
+          return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+        });
+
+        const promise = start_sandbox(config, [], undefined, ['arg1']);
+        await expect(promise).resolves.toBe(0);
+
+        expect(spawn).toHaveBeenCalledWith(
+          'lxc',
+          expect.arrayContaining(['exec', 'gemini-sandbox', '--cwd']),
+          expect.objectContaining({ stdio: 'inherit' }),
+        );
+      });
+
+      it('should throw FatalSandboxError if lxc list fails', async () => {
+        process.env['TEST_LXC_LIST_OUTPUT'] = 'throw';
+        const config: SandboxConfig = {
+          command: 'lxc',
+          image: 'gemini-sandbox',
+        };
+
+        await expect(start_sandbox(config)).rejects.toThrow(
+          /Failed to query LXC container/,
+        );
+      });
+
+      it('should throw FatalSandboxError if container is not running', async () => {
+        process.env['TEST_LXC_LIST_OUTPUT'] = LXC_STOPPED;
+        const config: SandboxConfig = {
+          command: 'lxc',
+          image: 'gemini-sandbox',
+        };
+
+        await expect(start_sandbox(config)).rejects.toThrow(/is not running/);
+      });
+
+      it('should throw FatalSandboxError if container is not found in list', async () => {
+        process.env['TEST_LXC_LIST_OUTPUT'] = '[]';
+        const config: SandboxConfig = {
+          command: 'lxc',
+          image: 'gemini-sandbox',
+        };
+
+        await expect(start_sandbox(config)).rejects.toThrow(/not found/);
+      });
     });
   });
 });
