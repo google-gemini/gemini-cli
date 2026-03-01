@@ -144,6 +144,7 @@ import { CheckerRunner } from '../safety/checker-runner.js';
 import { ContextBuilder } from '../safety/context-builder.js';
 import { CheckerRegistry } from '../safety/registry.js';
 import { ConsecaSafetyChecker } from '../safety/conseca/conseca.js';
+import { deepMergeObjects } from '../utils/deepMerge.js';
 
 export interface AccessibilitySettings {
   /** @deprecated Use ui.loadingPhrases instead. */
@@ -1040,32 +1041,19 @@ export class Config implements McpContext {
     this.geminiClient = new GeminiClient(this);
     this.modelRouterService = new ModelRouterService(this);
 
-    // HACK: The settings loading logic doesn't currently merge the default
-    // generation config with the user's settings. This means if a user provides
-    // any `generation` settings (e.g., just `overrides`), the default `aliases`
-    // are lost. This hack manually merges the default aliases back in if they
-    // are missing from the user's config.
-    // TODO(12593): Fix the settings loading logic to properly merge defaults and
-    // remove this hack.
-    let modelConfigServiceConfig = params.modelConfigServiceConfig;
-    if (modelConfigServiceConfig) {
-      if (!modelConfigServiceConfig.aliases) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          aliases: DEFAULT_MODEL_CONFIGS.aliases,
-        };
-      }
-      if (!modelConfigServiceConfig.overrides) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          overrides: DEFAULT_MODEL_CONFIGS.overrides,
-        };
-      }
-    }
+    // Deep-merge user-provided model config with defaults so that partial user
+    // settings never silently remove unrelated default values (fixes #12593).
+    const modelConfigServiceConfig = params.modelConfigServiceConfig
+      ? (deepMergeObjects(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          DEFAULT_MODEL_CONFIGS as Record<string, unknown>,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          params.modelConfigServiceConfig as Record<string, unknown>,
+           
+        ) as ModelConfigServiceConfig)
+      : DEFAULT_MODEL_CONFIGS;
 
-    this.modelConfigService = new ModelConfigService(
-      modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
-    );
+    this.modelConfigService = new ModelConfigService(modelConfigServiceConfig);
   }
 
   isInitialized(): boolean {
