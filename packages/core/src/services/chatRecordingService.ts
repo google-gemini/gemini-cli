@@ -192,6 +192,7 @@ export class ChatRecordingService {
             startTime: new Date().toISOString(),
             lastUpdated: new Date().toISOString(),
             messages: [],
+            kind: this.kind,
           },
           { allowEmpty: true },
         );
