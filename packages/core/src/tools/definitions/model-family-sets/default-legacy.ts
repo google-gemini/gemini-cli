@@ -345,7 +345,11 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
       1. \`file_path\` MUST be the valid path to the file you want to modify.
       2. \`old_string\` MUST be the exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).
       3. \`new_string\` MUST be the exact literal text to replace \`old_string\` with.
-      4. \`instruction\` is the detailed instruction of what needs to be changed.`,
+      4. \`instruction\` is the detailed instruction of what needs to be changed.
+      5. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
+      **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the instance(s) to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations and \`allow_multiple\` is not true, the tool will fail.
+      6. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
+      **Multiple replacements:** Set \`allow_multiple\` to true if you want to replace ALL occurrences that match \`old_string\` exactly.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
