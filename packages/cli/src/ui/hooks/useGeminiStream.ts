@@ -722,6 +722,8 @@ export const useGeminiStream = (
     ): Promise<{
       queryToSend: PartListUnion | null;
       shouldProceed: boolean;
+      commandName?: string;
+      commandArgs?: Record<string, unknown>;
     }> => {
       if (turnCancelledRef.current) {
         return { queryToSend: null, shouldProceed: false };
@@ -761,6 +763,8 @@ export const useGeminiStream = (
 
                 return {
                   queryToSend: localQueryToSendToGemini,
+                  commandName: slashCommandResult.commandName,
+                  commandArgs: slashCommandResult.commandArgs,
                   shouldProceed: true,
                 };
               }
@@ -1376,12 +1380,13 @@ export const useGeminiStream = (
             prompt_id = config.getSessionId() + '########' + getPromptCount();
           }
           return promptIdContext.run(prompt_id, async () => {
-            const { queryToSend, shouldProceed } = await prepareQueryForGemini(
-              query,
-              userMessageTimestamp,
-              abortSignal,
-              prompt_id!,
-            );
+            const { queryToSend, shouldProceed, commandName, commandArgs } =
+              await prepareQueryForGemini(
+                query,
+                userMessageTimestamp,
+                abortSignal,
+                prompt_id!,
+              );
 
             if (!shouldProceed || queryToSend === null) {
               return;
@@ -1420,6 +1425,8 @@ export const useGeminiStream = (
                 undefined,
                 false,
                 query,
+                commandName,
+                commandArgs,
               );
               const processingStatus = await processGeminiStreamEvents(
                 stream,

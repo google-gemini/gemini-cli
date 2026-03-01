@@ -119,12 +119,16 @@ export class GeminiClient {
       cumulativeResponse: string;
       activeCalls: number;
       originalRequest: PartListUnion;
+      commandName?: string;
+      commandArgs?: Record<string, unknown>;
     }
   >();
 
   private async fireBeforeAgentHookSafe(
     request: PartListUnion,
     prompt_id: string,
+    commandName?: string,
+    commandArgs?: Record<string, unknown>,
   ): Promise<BeforeAgentHookReturn> {
     let hookState = this.hookStateMap.get(prompt_id);
     if (!hookState) {
@@ -133,6 +137,8 @@ export class GeminiClient {
         cumulativeResponse: '',
         activeCalls: 0,
         originalRequest: request,
+        commandName,
+        commandArgs,
       };
       this.hookStateMap.set(prompt_id, hookState);
     }
@@ -149,7 +155,11 @@ export class GeminiClient {
 
     const hookOutput = await this.config
       .getHookSystem()
-      ?.fireBeforeAgentEvent(partToString(request));
+      ?.fireBeforeAgentEvent(
+        partToString(request),
+        hookState.commandName,
+        hookState.commandArgs,
+      );
     hookState.hasFiredBeforeAgent = true;
 
     if (hookOutput?.shouldStopExecution()) {
@@ -202,7 +212,13 @@ export class GeminiClient {
 
     const hookOutput = await this.config
       .getHookSystem()
-      ?.fireAfterAgentEvent(partToString(finalRequest), finalResponseText);
+      ?.fireAfterAgentEvent(
+        partToString(finalRequest),
+        finalResponseText,
+        false,
+        hookState.commandName,
+        hookState.commandArgs,
+      );
 
     return hookOutput;
   }
@@ -554,6 +570,8 @@ export class GeminiClient {
     boundedTurns: number,
     isInvalidStreamRetry: boolean,
     displayContent?: PartListUnion,
+    commandName?: string,
+    commandArgs?: Record<string, unknown>,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Re-initialize turn (it was empty before if in loop, or new instance)
     let turn = new Turn(this.getChat(), prompt_id);
@@ -745,6 +763,8 @@ export class GeminiClient {
           boundedTurns - 1,
           true,
           displayContent,
+          commandName,
+          commandArgs,
         );
         return turn;
       }
@@ -778,6 +798,8 @@ export class GeminiClient {
             boundedTurns - 1,
             false, // isInvalidStreamRetry is false
             displayContent,
+            commandName,
+            commandArgs,
           );
           return turn;
         }
@@ -793,6 +815,8 @@ export class GeminiClient {
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
     displayContent?: PartListUnion,
+    commandName?: string,
+    commandArgs?: Record<string, unknown>,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
@@ -809,7 +833,12 @@ export class GeminiClient {
     }
 
     if (hooksEnabled && messageBus) {
-      const hookResult = await this.fireBeforeAgentHookSafe(request, prompt_id);
+      const hookResult = await this.fireBeforeAgentHookSafe(
+        request,
+        prompt_id,
+        commandName,
+        commandArgs,
+      );
       if (hookResult) {
         if (
           'type' in hookResult &&
@@ -849,6 +878,8 @@ export class GeminiClient {
         boundedTurns,
         isInvalidStreamRetry,
         displayContent,
+        commandName,
+        commandArgs,
       );
 
       // Fire AfterAgent hook if we have a turn and no pending tools
@@ -902,6 +933,8 @@ export class GeminiClient {
             boundedTurns - 1,
             false,
             displayContent,
+            commandName,
+            commandArgs,
           );
         }
       }

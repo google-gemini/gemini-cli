@@ -530,6 +530,8 @@ export interface AfterToolOutput extends HookOutput {
  */
 export interface BeforeAgentInput extends HookInput {
   prompt: string;
+  command_name?: string;
+  command_args?: Record<string, unknown>;
 }
 
 /**
@@ -573,6 +575,8 @@ export interface AfterAgentInput extends HookInput {
   prompt: string;
   prompt_response: string;
   stop_hook_active: boolean;
+  command_name?: string;
+  command_args?: Record<string, unknown>;
 }
 
 /**

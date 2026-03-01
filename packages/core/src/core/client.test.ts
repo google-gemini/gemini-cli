@@ -48,6 +48,7 @@ import type {
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
 import { LlmRole } from '../telemetry/types.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents } from '../utils/events.js';
 
@@ -697,6 +698,53 @@ describe('Gemini Client (client.ts)', () => {
         type: GeminiEventType.ChatCompressed,
         value: compressionInfo,
       });
+    });
+
+    it('should propagate commandName and commandArgs to BeforeAgent and AfterAgent hooks', async () => {
+      // Arrange
+      vi.mocked(mockConfig.getEnableHooks).mockReturnValue(true);
+      vi.mocked(mockConfig.getMessageBus).mockReturnValue(
+        {} as unknown as MessageBus,
+      );
+      mockTurnRunFn.mockReturnValue(
+        (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })(),
+      );
+
+      const commandName = 'deploy';
+      const commandArgs = { target: 'prod' };
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-test-hooks',
+        undefined,
+        false,
+        undefined,
+        commandName,
+        commandArgs,
+      );
+
+      await fromAsync(stream);
+
+      // Assert
+      // 1. Verify BeforeAgent call
+      expect(mockHookSystem.fireBeforeAgentEvent).toHaveBeenCalledWith(
+        'Hi',
+        commandName,
+        commandArgs,
+      );
+
+      // 2. Verify AfterAgent call
+      expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
+        'Hi', // Prompt
+        'Mock Response', // Response
+        false, // stopHookActive
+        commandName,
+        commandArgs,
+      );
     });
 
     it('does not emit ModelInfo event if signal is aborted', async () => {
@@ -2988,6 +3036,9 @@ ${JSON.stringify(
         expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
           partToString(request),
           'Hook Response',
+          false,
+          undefined,
+          undefined,
         );
 
         // Map should be empty
@@ -3029,6 +3080,9 @@ ${JSON.stringify(
         expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
           partToString(request),
           'Response 1\nResponse 2',
+          false,
+          undefined,
+          undefined,
         );
 
         expect(client['hookStateMap'].size).toBe(0);
@@ -3059,6 +3113,9 @@ ${JSON.stringify(
         expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
           partToString(request), // Should be 'Do something'
           expect.stringContaining('Ok'),
+          false,
+          undefined,
+          undefined,
         );
       });
 
