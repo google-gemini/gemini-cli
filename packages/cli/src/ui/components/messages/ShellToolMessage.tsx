@@ -78,7 +78,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     embeddedShellFocused,
   );
 
-  const { setEmbeddedShellFocused } = useUIActions();
+  const { setEmbeddedShellFocused, setActivePtyId } = useUIActions();
   const wasFocusedRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -102,6 +102,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
 
   const handleFocus = () => {
     if (isThisShellFocusable) {
+      setActivePtyId(ptyId);
       setEmbeddedShellFocused(true);
     }
   };

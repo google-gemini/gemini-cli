@@ -119,6 +119,9 @@ export const Scrollable: React.FC<ScrollableProps> = ({
 
   const scrollBy = useCallback(
     (delta: number) => {
+      if (!hasFocus) {
+        return;
+      }
       const { scrollHeight, innerHeight } = sizeRef.current;
       const maxScroll = Math.max(0, scrollHeight - innerHeight);
       const current = Math.min(getScrollTop(), maxScroll);
@@ -129,7 +132,7 @@ export const Scrollable: React.FC<ScrollableProps> = ({
       setPendingScrollTop(next);
       setScrollTop(next);
     },
-    [getScrollTop, setPendingScrollTop],
+    [getScrollTop, setPendingScrollTop, hasFocus],
   );
 
   const { scrollbarColor, flashScrollbar, scrollByWithAnimation } =
@@ -210,7 +213,7 @@ export const Scrollable: React.FC<ScrollableProps> = ({
       overflowX="hidden"
       scrollTop={scrollTop}
       flexGrow={flexGrow}
-      scrollbarThumbColor={scrollbarColor}
+      scrollbarThumbColor={hasFocus ? scrollbarColor : undefined}
     >
       {/*
         This inner box is necessary to prevent the parent from shrinking
