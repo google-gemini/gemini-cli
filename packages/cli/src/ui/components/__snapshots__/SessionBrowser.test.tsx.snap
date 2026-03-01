@@ -17,8 +17,8 @@ exports[`SessionBrowser component > renders a list of sessions and marks current
  Sort: s         Reverse: r      First/Last: g/G
 
    Index │ Msgs │ Age  │ Name
- ❯ #1    │ 5    │ 10mo │ Second conversation about dogs (current)
-   #2    │ 2    │ 10mo │ First conversation about cats
+   #1    │ 5    │ 10mo │ Second conversation about dogs (current)
+ ❯ #2    │ 2    │ 10mo │ First conversation about cats
  ▼
 "
 `;
