@@ -50,7 +50,8 @@ export async function validateNonInteractiveAuth(
 
     return authType;
   } catch (error) {
-    if (nonInteractiveConfig.getOutputFormat() === OutputFormat.JSON) {
+    const outputFormat = nonInteractiveConfig.getOutputFormat();
+    if ([OutputFormat.JSON, OutputFormat.STREAM_JSON].includes(outputFormat)) {
       handleError(
         error instanceof Error ? error : new Error(String(error)),
         nonInteractiveConfig,

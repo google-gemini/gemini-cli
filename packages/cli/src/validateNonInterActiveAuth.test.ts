@@ -467,4 +467,126 @@ describe('validateNonInterActiveAuth', () => {
       }
     });
   });
+
+  describe('Stream JSON output mode', () => {
+    let stdoutWriteSpy: MockInstance;
+
+    beforeEach(() => {
+      stdoutWriteSpy = vi
+        .spyOn(process.stdout, 'write')
+        .mockImplementation(() => true);
+    });
+
+    afterEach(() => {
+      stdoutWriteSpy.mockRestore();
+    });
+
+    it(`emits a stream-json RESULT event when no auth is configured and exits with code ${ExitCodes.FATAL_AUTHENTICATION_ERROR}`, async () => {
+      const nonInteractiveConfig = createLocalMockConfig({
+        getOutputFormat: vi.fn().mockReturnValue(OutputFormat.STREAM_JSON),
+        getContentGeneratorConfig: vi
+          .fn()
+          .mockReturnValue({ authType: undefined }),
+      });
+
+      let thrown: Error | undefined;
+      try {
+        await validateNonInteractiveAuth(
+          undefined,
+          undefined,
+          nonInteractiveConfig,
+          mockSettings,
+        );
+      } catch (e) {
+        thrown = e as Error;
+      }
+
+      expect(thrown?.message).toBe(
+        `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
+      );
+      expect(processExitSpy).toHaveBeenCalledWith(
+        ExitCodes.FATAL_AUTHENTICATION_ERROR,
+      );
+
+      // Verify a structured RESULT event was written to stdout
+      expect(stdoutWriteSpy).toHaveBeenCalled();
+      const writtenOutput = stdoutWriteSpy.mock.calls[0]?.[0] as string;
+      const parsed = JSON.parse(writtenOutput);
+      expect(parsed.type).toBe('result');
+      expect(parsed.status).toBe('error');
+      expect(parsed.error.message).toContain('Please set an Auth method');
+    });
+
+    it(`emits a stream-json RESULT event when enforced auth mismatches current auth and exits with code ${ExitCodes.FATAL_AUTHENTICATION_ERROR}`, async () => {
+      mockSettings.merged.security.auth.enforcedType = AuthType.USE_GEMINI;
+      const nonInteractiveConfig = createLocalMockConfig({
+        getOutputFormat: vi.fn().mockReturnValue(OutputFormat.STREAM_JSON),
+        getContentGeneratorConfig: vi
+          .fn()
+          .mockReturnValue({ authType: undefined }),
+      });
+
+      let thrown: Error | undefined;
+      try {
+        await validateNonInteractiveAuth(
+          AuthType.LOGIN_WITH_GOOGLE,
+          undefined,
+          nonInteractiveConfig,
+          mockSettings,
+        );
+      } catch (e) {
+        thrown = e as Error;
+      }
+
+      expect(thrown?.message).toBe(
+        `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
+      );
+
+      // Verify a structured RESULT event was written to stdout
+      expect(stdoutWriteSpy).toHaveBeenCalled();
+      const writtenOutput = stdoutWriteSpy.mock.calls[0]?.[0] as string;
+      const parsed = JSON.parse(writtenOutput);
+      expect(parsed.type).toBe('result');
+      expect(parsed.status).toBe('error');
+      expect(parsed.error.message).toContain(
+        "The enforced authentication type is 'gemini-api-key', but the current type is 'oauth-personal'",
+      );
+    });
+
+    it(`emits a stream-json RESULT event when validateAuthMethod fails and exits with code ${ExitCodes.FATAL_AUTHENTICATION_ERROR}`, async () => {
+      vi.spyOn(auth, 'validateAuthMethod').mockReturnValue('Auth error!');
+      process.env['GEMINI_API_KEY'] = 'fake-key';
+
+      const nonInteractiveConfig = createLocalMockConfig({
+        getOutputFormat: vi.fn().mockReturnValue(OutputFormat.STREAM_JSON),
+        getContentGeneratorConfig: vi
+          .fn()
+          .mockReturnValue({ authType: undefined }),
+      });
+
+      let thrown: Error | undefined;
+      try {
+        await validateNonInteractiveAuth(
+          AuthType.USE_GEMINI,
+          undefined,
+          nonInteractiveConfig,
+          mockSettings,
+        );
+      } catch (e) {
+        thrown = e as Error;
+      }
+
+      expect(thrown?.message).toBe(
+        `process.exit(${ExitCodes.FATAL_AUTHENTICATION_ERROR}) called`,
+      );
+
+      // Verify a structured RESULT event was written to stdout
+      expect(stdoutWriteSpy).toHaveBeenCalled();
+      const writtenOutput = stdoutWriteSpy.mock.calls[0]?.[0] as string;
+      const parsed = JSON.parse(writtenOutput);
+      expect(parsed.type).toBe('result');
+      expect(parsed.status).toBe('error');
+      expect(parsed.error.message).toContain('Auth error!');
+    });
+  });
 });
