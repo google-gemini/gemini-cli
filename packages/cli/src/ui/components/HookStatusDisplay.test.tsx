@@ -64,4 +64,18 @@ describe('<HookStatusDisplay />', () => {
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
+
+  it('should show generic message when only system/extension hooks are active', async () => {
+    const props = {
+      activeHooks: [
+        { name: 'ext-hook', eventName: 'BeforeAgent', source: 'extensions' },
+      ],
+    };
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <HookStatusDisplay {...props} />,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toContain('Working...');
+    unmount();
+  });
 });

@@ -42,6 +42,7 @@ import { TodoTray } from './messages/Todo.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { isContextUsageHigh } from '../utils/contextUsage.js';
 import { theme } from '../semantic-colors.js';
+import { GENERIC_WORKING_LABEL } from '../textConstants.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
@@ -59,14 +60,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const isAlternateBuffer = useAlternateBuffer();
   const { showApprovalModeIndicator } = uiState;
   const newLayoutSetting = settings.merged.ui.newFooterLayout;
-  const { loadingPhraseLayout } = settings.merged.ui;
-  const wittyPosition: 'status' | 'inline' | 'ambient' =
-    loadingPhraseLayout === 'wit_status'
-      ? 'status'
-      : loadingPhraseLayout === 'wit_inline' ||
-          loadingPhraseLayout === 'all_inline'
-        ? 'inline'
-        : 'ambient';
+  const { showTips, showWit } = settings.merged.ui;
+
   const isExperimentalLayout = newLayoutSetting !== 'legacy';
   const showUiDetails = uiState.cleanUiDetailsVisible;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
@@ -205,15 +200,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
   const ambientText = isInteractiveShellWaiting
     ? undefined
-    : (loadingPhraseLayout === 'tips' ||
-      loadingPhraseLayout === 'all_inline' ||
-      loadingPhraseLayout === 'all_ambient'
-        ? uiState.currentTip
-        : undefined) ||
-      (loadingPhraseLayout === 'wit_ambient' ||
-      loadingPhraseLayout === 'all_ambient'
-        ? uiState.currentWittyPhrase
-        : undefined);
+    : (showTips ? uiState.currentTip : undefined) ||
+      (showWit ? uiState.currentWittyPhrase : undefined);
 
   let estimatedStatusLength = 0;
   if (
@@ -232,14 +220,14 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       .join(', ');
     estimatedStatusLength = hookLabel.length + hookNames.length + 10; // +10 for spinner and spacing
   } else if (showLoadingIndicator) {
-    const thoughtText = uiState.thought?.subject || 'Waiting for model...';
+    const thoughtText = uiState.thought?.subject || GENERIC_WORKING_LABEL;
     const inlineWittyLength =
-      wittyPosition === 'inline' && uiState.currentWittyPhrase
+      showWit && uiState.currentWittyPhrase
         ? uiState.currentWittyPhrase.length + 1
         : 0;
     estimatedStatusLength = thoughtText.length + 25 + inlineWittyLength; // Spinner(3) + timer(15) + padding + witty
   } else if (hasPendingActionRequired) {
-    estimatedStatusLength = 25; // "↑ Awaiting approval"
+    estimatedStatusLength = 20; // "↑ Action required"
   }
 
   const estimatedAmbientLength = ambientText?.length || 0;
@@ -252,8 +240,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     isExperimentalLayout &&
     uiState.streamingState !== StreamingState.Idle &&
     !hasPendingActionRequired &&
+    (showTips || showWit) &&
     ambientText &&
-    loadingPhraseLayout !== 'none' &&
     !willCollideAmbient &&
     !isNarrow;
 
@@ -263,7 +251,12 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     if (!showAmbientLine) {
       if (willCollideShortcuts) return null; // If even the shortcut hint would collide, hide completely so Status takes absolute precedent
       return (
-        <Box flexDirection="row" justifyContent="flex-end" marginLeft={1}>
+        <Box
+          flexDirection="row"
+          justifyContent="flex-end"
+          marginLeft={1}
+          marginRight={1}
+        >
           {isExperimentalLayout ? (
             <ShortcutsHint />
           ) : (
@@ -273,8 +266,17 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       );
     }
     return (
-      <Box flexDirection="row" justifyContent="flex-end" marginLeft={1}>
-        <Text color={theme.text.secondary} wrap="truncate-end">
+      <Box
+        flexDirection="row"
+        justifyContent="flex-end"
+        marginLeft={1}
+        marginRight={1}
+      >
+        <Text
+          color={theme.text.secondary}
+          wrap="truncate-end"
+          italic={ambientText === uiState.currentWittyPhrase}
+        >
           {ambientText}
         </Text>
       </Box>
@@ -292,14 +294,29 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       const activeHook = uiState.activeHooks[0];
       const hookIcon = activeHook?.eventName?.startsWith('After') ? '↩' : '↪';
 
+      const USER_HOOK_SOURCES = ['user', 'project', 'runtime'];
+      const hasUserHooks = uiState.activeHooks.some(
+        (h) => !h.source || USER_HOOK_SOURCES.includes(h.source),
+      );
+
       return (
         <Box flexDirection="row" alignItems="center">
           <Box marginRight={1}>
-            <GeminiRespondingSpinner nonRespondingDisplay={hookIcon} />
+            <GeminiRespondingSpinner
+              nonRespondingDisplay={hasUserHooks ? hookIcon : undefined}
+              isHookActive={hasUserHooks}
+            />
           </Box>
           <Text color={theme.text.primary} italic wrap="truncate-end">
             <HookStatusDisplay activeHooks={uiState.activeHooks} />
           </Text>
+          {!hasUserHooks && showWit && uiState.currentWittyPhrase && (
+            <Box marginLeft={1}>
+              <Text color={theme.text.secondary} italic>
+                {uiState.currentWittyPhrase}
+              </Text>
+            </Box>
+          )}
         </Box>
       );
     }
@@ -316,12 +333,12 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           currentLoadingPhrase={
             uiState.currentLoadingPhrase?.includes('Tab to focus')
               ? uiState.currentLoadingPhrase
-              : !isExperimentalLayout && loadingPhraseLayout !== 'none'
+              : !isExperimentalLayout && (showTips || showWit)
                 ? uiState.currentLoadingPhrase
                 : isExperimentalLayout &&
                     uiState.streamingState === StreamingState.Responding &&
                     !uiState.thought
-                  ? 'Waiting for model...'
+                  ? GENERIC_WORKING_LABEL
                   : undefined
           }
           thoughtLabel={
@@ -332,16 +349,20 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           elapsedTime={uiState.elapsedTime}
           forceRealStatusOnly={isExperimentalLayout}
           showCancelAndTimer={!isExperimentalLayout}
+          showTips={showTips}
+          showWit={showWit}
           wittyPhrase={uiState.currentWittyPhrase}
-          wittyPosition={wittyPosition}
         />
       );
     }
     if (hasPendingActionRequired) {
-      return <Text color={theme.status.warning}>↑ Awaiting approval</Text>;
+      return <Text color={theme.status.warning}>↑ Action required</Text>;
     }
     return null;
   };
+
+  const statusNode = renderStatusNode();
+  const hasStatusMessage = Boolean(statusNode) || hasToast;
 
   return (
     <Box
@@ -365,6 +386,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       {showUiDetails && <TodoTray />}
 
       <Box width="100%" flexDirection="column">
+        {showUiDetails && hasStatusMessage && <HorizontalLine />}
         {!isExperimentalLayout ? (
           <Box width="100%" flexDirection="column">
             <Box
@@ -390,7 +412,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                         : uiState.thought
                     }
                     currentLoadingPhrase={
-                      loadingPhraseLayout === 'none'
+                      !showTips && !showWit
                         ? undefined
                         : uiState.currentLoadingPhrase
                     }
@@ -433,7 +455,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                           : uiState.thought
                       }
                       currentLoadingPhrase={
-                        loadingPhraseLayout === 'none'
+                        !showTips && !showWit
                           ? undefined
                           : uiState.currentLoadingPhrase
                       }
@@ -494,7 +516,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
               </Box>
             )}
             {showShortcutsHelp && <ShortcutsHelp />}
-            {showUiDetails && <HorizontalLine />}
             {showUiDetails && (
               <Box
                 justifyContent={
@@ -580,8 +601,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           </Box>
         ) : (
           <Box width="100%" flexDirection="column">
-            {showUiDetails && newLayoutSetting === 'new' && <HorizontalLine />}
-
             {showUiDetails && (
               <Box
                 width="100%"
@@ -608,7 +627,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                       flexShrink={0}
                       marginLeft={1}
                     >
-                      {renderStatusNode()}
+                      {statusNode}
                     </Box>
                     <Box flexShrink={0} marginLeft={2}>
                       {renderAmbientNode()}
@@ -619,7 +638,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             )}
 
             {showUiDetails && newLayoutSetting === 'new_divider_down' && (
-              <HorizontalLine />
+              <HorizontalLine color={theme.ui.dark} dim />
             )}
 
             {showUiDetails && (

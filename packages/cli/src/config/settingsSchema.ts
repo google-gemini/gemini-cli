@@ -633,25 +633,26 @@ const SETTINGS_SCHEMA = {
           { value: 'new_divider_down', label: 'New Layout (Divider Down)' },
         ],
       },
-      loadingPhraseLayout: {
-        type: 'enum',
-        label: 'Loading Phrase Layout',
+      showTips: {
+        type: 'boolean',
+        label: 'Show Tips',
         category: 'UI',
         requiresRestart: false,
-        default: 'all_inline',
+        default: true,
         description:
-          'Control which loading phrases are shown and where they appear.',
+          'Show informative tips on the right side of the status line.',
         showInDialog: true,
-        options: [
-          { value: 'none', label: 'None' },
-          { value: 'tips', label: 'Tips Only (at right)' },
-          { value: 'wit_status', label: 'Wit Only (in status slot)' },
-          { value: 'wit_inline', label: 'Wit Only (after status)' },
-          { value: 'wit_ambient', label: 'Wit Only (at right)' },
-          { value: 'all_inline', label: 'Tips at right, Wit inline' },
-          { value: 'all_ambient', label: 'Tips and Wit at right' },
-        ],
       },
+      showWit: {
+        type: 'boolean',
+        label: 'Show Witty Phrases',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Show witty phrases while waiting.',
+        showInDialog: true,
+      },
+
       showMemoryUsage: {
         type: 'boolean',
         label: 'Show Memory Usage',

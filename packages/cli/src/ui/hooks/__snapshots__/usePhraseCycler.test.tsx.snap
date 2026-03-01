@@ -8,4 +8,4 @@ exports[`usePhraseCycler > should reset phrase when transitioning from waiting t
 
 exports[`usePhraseCycler > should show "Waiting for user confirmation..." when isWaiting is true 1`] = `"Waiting for user confirmation..."`;
 
-exports[`usePhraseCycler > should show interactive shell waiting message immediately when isInteractiveShellWaiting is true 1`] = `"! Shell awaiting input (Tab to focus)"`;
+exports[`usePhraseCycler > should show interactive shell waiting message immediately when shouldShowFocusHint is true 1`] = `"! Shell awaiting input (Tab to focus)"`;

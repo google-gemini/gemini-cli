@@ -15,31 +15,32 @@ import { formatDuration } from '../utils/formatters.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
+import { GENERIC_WORKING_LABEL } from '../textConstants.js';
 
 interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
   wittyPhrase?: string;
-  wittyPosition?: 'status' | 'inline' | 'ambient';
+  showWit?: boolean;
+  showTips?: boolean;
   elapsedTime: number;
   inline?: boolean;
   rightContent?: React.ReactNode;
   thought?: ThoughtSummary | null;
   thoughtLabel?: string;
   showCancelAndTimer?: boolean;
-  forceRealStatusOnly?: boolean;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   currentLoadingPhrase,
   wittyPhrase,
-  wittyPosition = 'inline',
+  showWit = true,
+  showTips: _showTips = true,
   elapsedTime,
   inline = false,
   rightContent,
   thought,
   thoughtLabel,
   showCancelAndTimer = true,
-  forceRealStatusOnly = false,
 }) => {
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
@@ -60,12 +61,8 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       ? currentLoadingPhrase
       : thought?.subject
         ? (thoughtLabel ?? thought.subject)
-        : forceRealStatusOnly
-          ? wittyPosition === 'status' && wittyPhrase
-            ? wittyPhrase
-            : streamingState === StreamingState.Responding
-              ? 'Waiting for model...'
-              : undefined
+        : streamingState === StreamingState.Responding
+          ? GENERIC_WORKING_LABEL
           : currentLoadingPhrase;
   const thinkingIndicator = '';
 
@@ -76,12 +73,11 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       : null;
 
   const wittyPhraseNode =
-    forceRealStatusOnly &&
-    wittyPosition === 'inline' &&
-    wittyPhrase &&
-    primaryText ? (
+    showWit && wittyPhrase && primaryText === GENERIC_WORKING_LABEL ? (
       <Box marginLeft={1}>
-        <Text color={theme.text.secondary}>{wittyPhrase}</Text>
+        <Text color={theme.text.secondary} italic>
+          {wittyPhrase}
+        </Text>
       </Box>
     ) : null;
 
@@ -98,11 +94,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
           />
         </Box>
         {primaryText && (
-          <Text
-            color={theme.text.primary}
-            italic
-            wrap={isNarrow ? 'wrap' : 'truncate-end'}
-          >
+          <Text color={theme.text.primary} italic wrap="truncate-end">
             {thinkingIndicator}
             {primaryText}
           </Text>
@@ -137,11 +129,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
             />
           </Box>
           {primaryText && (
-            <Text
-              color={theme.text.primary}
-              italic
-              wrap={isNarrow ? 'wrap' : 'truncate-end'}
-            >
+            <Text color={theme.text.primary} italic wrap="truncate-end">
               {thinkingIndicator}
               {primaryText}
             </Text>

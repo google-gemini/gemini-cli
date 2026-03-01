@@ -3340,28 +3340,28 @@ describe('InputPrompt', () => {
         name: 'first line, first char',
         relX: 0,
         relY: 0,
-        mouseCol: 4,
+        mouseCol: 6,
         mouseRow: 2,
       },
       {
         name: 'first line, middle char',
         relX: 6,
         relY: 0,
-        mouseCol: 10,
+        mouseCol: 12,
         mouseRow: 2,
       },
       {
         name: 'second line, first char',
         relX: 0,
         relY: 1,
-        mouseCol: 4,
+        mouseCol: 6,
         mouseRow: 3,
       },
       {
         name: 'second line, end char',
         relX: 5,
         relY: 1,
-        mouseCol: 9,
+        mouseCol: 11,
         mouseRow: 3,
       },
     ])(
@@ -3421,7 +3421,7 @@ describe('InputPrompt', () => {
 
       await act(async () => {
         // Click somewhere in the prompt
-        stdin.write(`\x1b[<0;5;2M`);
+        stdin.write(`\x1b[<0;9;2M`);
       });
 
       await waitFor(() => {
@@ -3621,6 +3621,7 @@ describe('InputPrompt', () => {
       });
 
       // With plain borders: 1(border) + 1(padding) + 2(prompt) = 4 offset (x=4, col=5)
+      // Actually with my change it should be even more offset.
       await act(async () => {
         stdin.write(`\x1b[<0;5;2M`); // Click at col 5, row 2
       });

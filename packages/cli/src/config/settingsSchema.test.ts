@@ -83,22 +83,17 @@ describe('SettingsSchema', () => {
       ).toBe('boolean');
     });
 
-    it('should have loadingPhraseLayout enum property', () => {
-      const definition =
-        getSettingsSchema().ui?.properties?.loadingPhraseLayout;
-      expect(definition).toBeDefined();
-      expect(definition?.type).toBe('enum');
-      expect(definition?.default).toBe('all_inline');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect(definition?.options?.map((o: any) => o.value)).toEqual([
-        'none',
-        'tips',
-        'wit_status',
-        'wit_inline',
-        'wit_ambient',
-        'all_inline',
-        'all_ambient',
-      ]);
+    it('should have showTips property', () => {
+      const showTips = getSettingsSchema().ui?.properties?.showTips;
+      expect(showTips).toBeDefined();
+      expect(showTips?.type).toBe('boolean');
+    });
+
+    it('should have showWit property', () => {
+      const showWit = getSettingsSchema().ui?.properties?.showWit;
+      expect(showWit).toBeDefined();
+      expect(showWit?.type).toBe('boolean');
+      expect(showWit?.default).toBe(true);
     });
 
     it('should have errorVerbosity enum property', () => {

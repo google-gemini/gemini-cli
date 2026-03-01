@@ -209,7 +209,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   setBannerVisible,
 }) => {
   const { stdout } = useStdout();
-  const { merged: settings } = useSettings();
+  const settings = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const {
@@ -469,7 +469,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
 
-      if (settings.experimental?.useOSC52Paste) {
+      if (settings.merged.experimental?.useOSC52Paste) {
         stdout.write('\x1b]52;c;?\x07');
       } else {
         const textToInsert = await clipboardy.read();
@@ -1408,7 +1408,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   }
 
   const suggestionsNode = shouldShowSuggestions ? (
-    <Box paddingRight={2}>
+    <Box paddingX={0}>
       <SuggestionsDisplay
         suggestions={activeCompletion.suggestions}
         activeIndex={activeCompletion.activeSuggestionIndex}
@@ -1451,6 +1451,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           borderRight={false}
           borderColor={borderColor}
           width={terminalWidth}
+          marginLeft={0}
           flexDirection="row"
           alignItems="flex-start"
           height={0}
@@ -1460,11 +1461,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         backgroundBaseColor={theme.background.input}
         backgroundOpacity={1}
         useBackgroundColor={useBackgroundColor}
+        marginX={0}
       >
         <Box
-          flexGrow={1}
           flexDirection="row"
           paddingX={1}
+          backgroundColor={
+            useBackgroundColor ? theme.background.input : undefined
+          }
           borderColor={borderColor}
           borderStyle={useLineFallback ? 'round' : undefined}
           borderTop={false}
@@ -1472,29 +1476,31 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           borderLeft={!useBackgroundColor}
           borderRight={!useBackgroundColor}
         >
-          <Text
-            color={statusColor ?? theme.text.accent}
-            aria-label={statusText || undefined}
-          >
-            {shellModeActive ? (
-              reverseSearchActive ? (
-                <Text
-                  color={theme.text.link}
-                  aria-label={SCREEN_READER_USER_PREFIX}
-                >
-                  (r:){' '}
-                </Text>
+          <Box flexDirection="row">
+            <Text
+              color={statusColor ?? theme.text.accent}
+              aria-label={statusText || undefined}
+            >
+              {shellModeActive ? (
+                reverseSearchActive ? (
+                  <Text
+                    color={theme.text.link}
+                    aria-label={SCREEN_READER_USER_PREFIX}
+                  >
+                    (r:){' '}
+                  </Text>
+                ) : (
+                  '!'
+                )
+              ) : commandSearchActive ? (
+                <Text color={theme.text.accent}>(r:) </Text>
+              ) : showYoloStyling ? (
+                '*'
               ) : (
-                '!'
-              )
-            ) : commandSearchActive ? (
-              <Text color={theme.text.accent}>(r:) </Text>
-            ) : showYoloStyling ? (
-              '*'
-            ) : (
-              '>'
-            )}{' '}
-          </Text>
+                '>'
+              )}{' '}
+            </Text>
+          </Box>
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
             {buffer.text.length === 0 && placeholder ? (
               showCursor ? (
@@ -1673,6 +1679,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           borderRight={false}
           borderColor={borderColor}
           width={terminalWidth}
+          marginLeft={0}
           flexDirection="row"
           alignItems="flex-start"
           height={0}

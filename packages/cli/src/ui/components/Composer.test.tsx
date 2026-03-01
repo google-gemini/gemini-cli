@@ -174,6 +174,8 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     isFocused: true,
     thought: '',
     currentLoadingPhrase: '',
+    currentTip: '',
+    currentWittyPhrase: '',
     elapsedTime: 0,
     ctrlCPressedOnce: false,
     ctrlDPressedOnce: false,

@@ -23,14 +23,22 @@ interface GeminiRespondingSpinnerProps {
    */
   nonRespondingDisplay?: string;
   spinnerType?: SpinnerName;
+  /**
+   * If true, we prioritize showing the nonRespondingDisplay (hook icon)
+   * even if the state is Responding.
+   */
+  isHookActive?: boolean;
 }
 
 export const GeminiRespondingSpinner: React.FC<
   GeminiRespondingSpinnerProps
-> = ({ nonRespondingDisplay, spinnerType = 'dots' }) => {
+> = ({ nonRespondingDisplay, spinnerType = 'dots', isHookActive = false }) => {
   const streamingState = useStreamingContext();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
-  if (streamingState === StreamingState.Responding) {
+
+  // If a hook is active, we want to show the hook icon (nonRespondingDisplay)
+  // to be consistent, instead of the rainbow spinner which means "Gemini is talking".
+  if (streamingState === StreamingState.Responding && !isHookActive) {
     return (
       <GeminiSpinner
         spinnerType={spinnerType}

@@ -516,6 +516,7 @@ export interface PermissionConfirmationRequest {
 export interface ActiveHook {
   name: string;
   eventName: string;
+  source?: string;
   index?: number;
   total?: number;
 }
