@@ -2,59 +2,47 @@
 
 Control your Gemini CLI experience with the `/settings` command. The `/settings`
 command opens a dialog to view and edit all your Gemini CLI settings, including
-your UI experience, keybindings, and accessibility features.
+your UI experience, keybindings, and more.
 
-Your Gemini CLI settings are stored in a `settings.json` file. In addition to
-using the `/settings` command, you can also edit them in one of the following
-locations:
-
-- **User settings**: `~/.gemini/settings.json`
-- **Workspace settings**: `your-project/.gemini/settings.json`
-
-Note: Workspace settings override user settings.
-
-## Settings reference
-
-Here is a list of all the available settings, grouped by category and ordered as
-they appear in the UI.
+## Quick settings overview
 
 <!-- SETTINGS-AUTOGEN:START -->
 
-### General
-
-| UI Label                | Setting                            | Description                                                                                                                                                                    | Default     |
-| ----------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
-| Vim Mode                | `general.vimMode`                  | Enable Vim keybindings                                                                                                                                                         | `false`     |
-| Default Approval Mode   | `general.defaultApprovalMode`      | The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet. | `"default"` |
-| Enable Auto Update      | `general.enableAutoUpdate`         | Enable automatic updates.                                                                                                                                                      | `true`      |
-| Enable Notifications    | `general.enableNotifications`      | Enable run-event notifications for action-required prompts and session completion. Currently macOS only.                                                                       | `false`     |
-| Plan Directory          | `general.plan.directory`           | The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.                                                               | `undefined` |
-| Plan Model Routing      | `general.plan.modelRouting`        | Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.                           | `true`      |
-| Max Chat Model Attempts | `general.maxAttempts`              | Maximum number of attempts for requests to the main chat model. Cannot exceed 10.                                                                                              | `10`        |
-| Debug Keystroke Logging | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.                                                                                                                             | `false`     |
-| Enable Session Cleanup  | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                               | `false`     |
-| Keep chat history       | `general.sessionRetention.maxAge`  | Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")                                                                                        | `undefined` |
-
-### Output
-
-| UI Label      | Setting         | Description                                            | Default  |
-| ------------- | --------------- | ------------------------------------------------------ | -------- |
-| Output Format | `output.format` | The format of the CLI output. Can be `text` or `json`. | `"text"` |
-
-### UI
-
-| UI Label                             | Setting                                | Description                                                                                                                                                       | Default  |
+| Name                                 | Key                                    | Description                                                                                                                                                       | Default  |
 | ------------------------------------ | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Preferred Editor                     | `general.preferredEditor`              | The preferred editor to open files in.                                                                                                                            |          |
+| Vim Mode                             | `general.vimMode`                      | Enable Vim keybindings                                                                                                                                            | `false`  |
+| Default Approval Mode                | `general.defaultApprovalMode`          | The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not s | `default`|
+| DevTools                             | `general.devtools`                     | Enable DevTools inspector on launch.                                                                                                                              | `false`  |
+| Enable Auto Update                   | `general.enableAutoUpdate`             | Enable automatic updates.                                                                                                                                         | `true`   |
+| Enable Auto Update Notification      | `general.enableAutoUpdateNotification` | Enable update notification prompts.                                                                                                                               | `true`   |
+| Enable Notifications                 | `general.enableNotifications`          | Enable run-event notifications for action-required prompts and session completion. Currently macOS only.                                                          | `false`  |
+| Enable Checkpointing                 | `general.checkpointing.enabled`        | Enable session checkpointing for recovery                                                                                                                         | `false`  |
+| Plan Directory                       | `general.plan.directory`               | The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.                                                  |          |
+| Plan Model Routing                   | `general.plan.modelRouting`            | Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.              | `true`   |
+| Retry Fetch Errors                   | `general.retryFetchErrors`             | Retry on "exception TypeError: fetch failed sending request" errors.                                                                                              | `false`  |
+| Max Chat Model Attempts              | `general.maxAttempts`                  | Maximum number of attempts for requests to the main chat model. Cannot exceed 10.                                                                                 | `10`     |
+| Debug Keystroke Logging              | `general.debugKeystrokeLogging`        | Enable debug logging of keystrokes to the console.                                                                                                                | `false`  |
+| Enable Session Cleanup               | `general.sessionRetention.enabled`     | Enable automatic session cleanup                                                                                                                                  | `false`  |
+| Keep chat history                    | `general.sessionRetention.maxAge`      | Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")                                                                           |          |
+| Max Session Count                    | `general.sessionRetention.maxCount`    | Alternative: Maximum number of sessions to keep (most recent)                                                                                                     |          |
+| Min Retention Period                 | `general.sessionRetention.minRetention`| Minimum retention period (safety limit, defaults to "1d")                                                                                                         | `1d`     |
+| Warning Acknowledged                 | `general.sessionRetention.warningAcknowledged`| INTERNAL: Whether the user has acknowledged the session retention warning                                                                                         | `false`  |
+| Output Format                        | `output.format`                        | The format of the CLI output. Can be `text` or `json`.                                                                                                            | `text`   |
+| Theme                                | `ui.theme`                             | The color theme for the UI. See the CLI themes guide for available options.                                                                                       |          |
 | Auto Theme Switching                 | `ui.autoThemeSwitching`                | Automatically switch between default light and dark themes based on terminal background color.                                                                    | `true`   |
 | Terminal Background Polling Interval | `ui.terminalBackgroundPollingInterval` | Interval in seconds to poll the terminal background color.                                                                                                        | `60`     |
+| Custom Themes                        | `ui.customThemes`                      | Custom theme definitions.                                                                                                                                         | `{}`     |
 | Hide Window Title                    | `ui.hideWindowTitle`                   | Hide the window title bar                                                                                                                                         | `false`  |
-| Inline Thinking                      | `ui.inlineThinkingMode`                | Display model thinking inline: off or full.                                                                                                                       | `"off"`  |
+| Inline Thinking                      | `ui.inlineThinkingMode`                | Display model thinking inline: off or full.                                                                                                                       | `off`    |
 | Show Thoughts in Title               | `ui.showStatusInTitle`                 | Show Gemini CLI model thoughts in the terminal window title during the working phase                                                                              | `false`  |
 | Dynamic Window Title                 | `ui.dynamicWindowTitle`                | Update the terminal window title with current status icons (Ready: ◇, Action Required: ✋, Working: ✦)                                                            | `true`   |
 | Show Home Directory Warning          | `ui.showHomeDirectoryWarning`          | Show a warning when running Gemini CLI in the home directory.                                                                                                     | `true`   |
 | Show Compatibility Warnings          | `ui.showCompatibilityWarnings`         | Show warnings about terminal or OS compatibility issues.                                                                                                          | `true`   |
 | Hide Tips                            | `ui.hideTips`                          | Hide helpful tips in the UI                                                                                                                                       | `false`  |
 | Show Shortcuts Hint                  | `ui.showShortcutsHint`                 | Show the "? for shortcuts" hint above the input.                                                                                                                  | `true`   |
+| Show Keyboard Shortcuts Hint         | `ui.showKeyboardShortcutsHint`         | Show keyboard shortcut hints in the UI (e.g. "press Ctrl+O to expand").                                                                                           | `true`   |
+| Compact MCP Tool Outputs             | `ui.compactMcpOutputs`                 | Whether to show MCP tool outputs in a compact one-line summary by default.                                                                                        | `true`   |
 | Hide Banner                          | `ui.hideBanner`                        | Hide the application banner                                                                                                                                       | `false`  |
 | Hide Context Summary                 | `ui.hideContextSummary`                | Hide the context summary (GEMINI.md, MCP servers) above the input.                                                                                                | `false`  |
 | Hide CWD                             | `ui.footer.hideCWD`                    | Hide the current working directory path in the footer.                                                                                                            | `false`  |
@@ -71,95 +59,96 @@ they appear in the UI.
 | Use Background Color                 | `ui.useBackgroundColor`                | Whether to use background colors in the UI.                                                                                                                       | `true`   |
 | Incremental Rendering                | `ui.incrementalRendering`              | Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled. | `true`   |
 | Show Spinner                         | `ui.showSpinner`                       | Show the spinner during operations.                                                                                                                               | `true`   |
-| Loading Phrases                      | `ui.loadingPhrases`                    | What to show while the model is working: tips, witty comments, both, or nothing.                                                                                  | `"tips"` |
-| Error Verbosity                      | `ui.errorVerbosity`                    | Controls whether recoverable errors are hidden (low) or fully shown (full).                                                                                       | `"low"`  |
+| Loading Phrases                      | `ui.loadingPhrases`                    | What to show while the model is working: tips, witty comments, both, or nothing.                                                                                  | `tips`   |
+| Error Verbosity                      | `ui.errorVerbosity`                    | Controls whether recoverable errors are hidden (low) or fully shown (full).                                                                                       | `low`    |
+| Custom Witty Phrases                 | `ui.customWittyPhrases`                | Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.                                              | `[]`     |
+| Enable Loading Phrases               | `ui.accessibility.enableLoadingPhrases`| @deprecated Use ui.loadingPhrases instead. Enable loading phrases during operations.                                                                              | `true`   |
 | Screen Reader Mode                   | `ui.accessibility.screenReader`        | Render output in plain-text to be more screen reader accessible                                                                                                   | `false`  |
-
-### IDE
-
-| UI Label | Setting       | Description                  | Default |
-| -------- | ------------- | ---------------------------- | ------- |
-| IDE Mode | `ide.enabled` | Enable IDE integration mode. | `false` |
-
-### Billing
-
-| UI Label         | Setting                   | Description                                                                                                                                                | Default |
-| ---------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| Overage Strategy | `billing.overageStrategy` | How to handle quota exhaustion when AI credits are available. 'ask' prompts each time, 'always' automatically uses credits, 'never' disables credit usage. | `"ask"` |
-
-### Model
-
-| UI Label                | Setting                      | Description                                                                            | Default     |
-| ----------------------- | ---------------------------- | -------------------------------------------------------------------------------------- | ----------- |
-| Model                   | `model.name`                 | The Gemini model to use for conversations.                                             | `undefined` |
-| Max Session Turns       | `model.maxSessionTurns`      | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.      | `-1`        |
-| Compression Threshold   | `model.compressionThreshold` | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3). | `0.5`       |
-| Disable Loop Detection  | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false`     |
-| Skip Next Speaker Check | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`      |
-
-### Context
-
-| UI Label                             | Setting                                           | Description                                                                                                                                                                                                                                 | Default |
-| ------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| Memory Discovery Max Dirs            | `context.discoveryMaxDirs`                        | Maximum number of directories to search for memory.                                                                                                                                                                                         | `200`   |
-| Load Memory From Include Directories | `context.loadMemoryFromIncludeDirectories`        | Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.                                                                                             | `false` |
-| Respect .gitignore                   | `context.fileFiltering.respectGitIgnore`          | Respect .gitignore files when searching.                                                                                                                                                                                                    | `true`  |
-| Respect .geminiignore                | `context.fileFiltering.respectGeminiIgnore`       | Respect .geminiignore files when searching.                                                                                                                                                                                                 | `true`  |
-| Enable Recursive File Search         | `context.fileFiltering.enableRecursiveFileSearch` | Enable recursive file search functionality when completing @ references in the prompt.                                                                                                                                                      | `true`  |
-| Enable Fuzzy Search                  | `context.fileFiltering.enableFuzzySearch`         | Enable fuzzy search when searching for files.                                                                                                                                                                                               | `true`  |
-| Custom Ignore File Paths             | `context.fileFiltering.customIgnoreFilePaths`     | Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore. Files earlier in the array take precedence over files later in the array, e.g. the first file takes precedence over the second one. | `[]`    |
-
-### Tools
-
-| UI Label                         | Setting                              | Description                                                                                                                                                                | Default |
-| -------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                                                                 | `true`  |
-| Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                                                                                | `false` |
-| Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                                                            | `true`  |
-| Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.                                                                 | `40000` |
-| Disable LLM Correction           | `tools.disableLLMCorrection`         | Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct. | `true`  |
-
-### Security
-
-| UI Label                              | Setting                                         | Description                                                                                                                                                                                                                          | Default |
-| ------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
-| Disable YOLO Mode                     | `security.disableYoloMode`                      | Disable YOLO mode, even if enabled by a flag.                                                                                                                                                                                        | `false` |
-| Allow Permanent Tool Approval         | `security.enablePermanentToolApproval`          | Enable the "Allow for all future sessions" option in tool confirmation dialogs.                                                                                                                                                      | `false` |
-| Blocks extensions from Git            | `security.blockGitExtensions`                   | Blocks installing and loading extensions from Git.                                                                                                                                                                                   | `false` |
-| Extension Source Regex Allowlist      | `security.allowedExtensions`                    | List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.                                                              | `[]`    |
-| Folder Trust                          | `security.folderTrust.enabled`                  | Setting to track whether Folder trust is enabled.                                                                                                                                                                                    | `true`  |
-| Enable Environment Variable Redaction | `security.environmentVariableRedaction.enabled` | Enable redaction of environment variables that may contain secrets.                                                                                                                                                                  | `false` |
-| Enable Context-Aware Security         | `security.enableConseca`                        | Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions. | `false` |
-
-### Advanced
-
-| UI Label                          | Setting                        | Description                                   | Default |
-| --------------------------------- | ------------------------------ | --------------------------------------------- | ------- |
-| Auto Configure Max Old Space Size | `advanced.autoConfigureMemory` | Automatically configure Node.js memory limits | `false` |
-
-### Experimental
-
-| UI Label                   | Setting                                  | Description                                                                                                                                               | Default |
-| -------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| Enable Tool Output Masking | `experimental.toolOutputMasking.enabled` | Enables tool output masking to save tokens.                                                                                                               | `true`  |
-| Use OSC 52 Paste           | `experimental.useOSC52Paste`             | Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
-| Use OSC 52 Copy            | `experimental.useOSC52Copy`              | Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
-| Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                                                                                           | `false` |
-| Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
-| Direct Web Fetch           | `experimental.directWebFetch`            | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
-| Enable Gemma Model Router  | `experimental.gemmaModelRouter.enabled`  | Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.                                           | `false` |
-
-### Skills
-
-| UI Label            | Setting          | Description          | Default |
-| ------------------- | ---------------- | -------------------- | ------- |
-| Enable Agent Skills | `skills.enabled` | Enable Agent Skills. | `true`  |
-
-### HooksConfig
-
-| UI Label           | Setting                     | Description                                                                      | Default |
-| ------------------ | --------------------------- | -------------------------------------------------------------------------------- | ------- |
-| Enable Hooks       | `hooksConfig.enabled`       | Canonical toggle for the hooks system. When disabled, no hooks will be executed. | `true`  |
-| Hook Notifications | `hooksConfig.notifications` | Show visual indicators when hooks are executing.                                 | `true`  |
+| IDE Mode                             | `ide.enabled`                          | Enable IDE integration mode.                                                                                                                                      | `false`  |
+| Has Seen IDE Integration Nudge       | `ide.hasSeenNudge`                     | Whether the user has seen the IDE integration nudge.                                                                                                              | `false`  |
+| Enable Usage Statistics              | `privacy.usageStatisticsEnabled`       | Enable collection of usage statistics                                                                                                                             | `true`   |
+| Overage Strategy                     | `billing.overageStrategy`              | How to handle quota exhaustion when AI credits are available. 'ask' prompts each time, 'always' automatically uses credits, 'never' disables credit usage.        | `ask`    |
+| Model                                | `model.name`                           | The Gemini model to use for conversations.                                                                                                                        |          |
+| Max Session Turns                    | `model.maxSessionTurns`                | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.                                                                                 | `-1`     |
+| Summarize Tool Output                | `model.summarizeToolOutput`            | Enables or disables summarization of tool output. Configure per-tool token budgets (for example {"run_shell_command": {"tokenBudget": 2000}}). Currently only the |          |
+| Compression Threshold                | `model.compressionThreshold`           | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).                                                                            | `0.5`    |
+| Disable Loop Detection               | `model.disableLoopDetection`           | Disable automatic detection and prevention of infinite loops.                                                                                                     | `false`  |
+| Skip Next Speaker Check              | `model.skipNextSpeakerCheck`           | Skip the next speaker check.                                                                                                                                      | `true`   |
+| Model Config Aliases                 | `modelConfigs.aliases`                 | Named presets for model configs. Can be used in place of a model name and can inherit from other aliases using an `extends` property.                             | `...`    |
+| Custom Model Config Aliases          | `modelConfigs.customAliases`           | Custom named presets for model configs. These are merged with (and override) the built-in aliases.                                                                | `{}`     |
+| Custom Model Config Overrides        | `modelConfigs.customOverrides`         | Custom model config overrides. These are merged with (and added to) the built-in overrides.                                                                       | `[]`     |
+| Model Config Overrides               | `modelConfigs.overrides`               | Apply specific configuration overrides based on matches, with a primary key of model (or alias). The most specific match will be used.                            | `[]`     |
+| Agent Overrides                      | `agents.overrides`                     | Override settings for specific agents, e.g. to disable the agent, set a custom model config, or run config.                                                       | `{}`     |
+| Browser Session Mode                 | `agents.browser.sessionMode`           | Session mode: 'persistent', 'isolated', or 'existing'.                                                                                                            | `persistent`|
+| Browser Headless                     | `agents.browser.headless`              | Run browser in headless mode.                                                                                                                                     | `false`  |
+| Browser Profile Path                 | `agents.browser.profilePath`           | Path to browser profile directory for session persistence.                                                                                                        |          |
+| Browser Visual Model                 | `agents.browser.visualModel`           | Model override for the visual agent.                                                                                                                              |          |
+| Context File Name                    | `context.fileName`                     | The name of the context file or files to load into memory. Accepts either a single string or an array of strings.                                                 |          |
+| Memory Import Format                 | `context.importFormat`                 | The format to use when importing memory.                                                                                                                          |          |
+| Include Directory Tree               | `context.includeDirectoryTree`         | Whether to include the directory tree of the current working directory in the initial request to the model.                                                       | `true`   |
+| Memory Discovery Max Dirs            | `context.discoveryMaxDirs`             | Maximum number of directories to search for memory.                                                                                                               | `200`    |
+| Include Directories                  | `context.includeDirectories`           | Additional directories to include in the workspace context. Missing directories will be skipped with a warning.                                                   | `[]`     |
+| Load Memory From Include Directories | `context.loadMemoryFromIncludeDirectories`| Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.                    | `false`  |
+| Respect .gitignore                   | `context.fileFiltering.respectGitIgnore`| Respect .gitignore files when searching.                                                                                                                          | `true`   |
+| Respect .geminiignore                | `context.fileFiltering.respectGeminiIgnore`| Respect .geminiignore files when searching.                                                                                                                       | `true`   |
+| Enable Recursive File Search         | `context.fileFiltering.enableRecursiveFileSearch`| Enable recursive file search functionality when completing @ references in the prompt.                                                                            | `true`   |
+| Enable Fuzzy Search                  | `context.fileFiltering.enableFuzzySearch`| Enable fuzzy search when searching for files.                                                                                                                     | `true`   |
+| Custom Ignore File Paths             | `context.fileFiltering.customIgnoreFilePaths`| Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore. Files earlier in the array take precedence over files lat | `[]`     |
+| Sandbox                              | `tools.sandbox`                        | Sandbox execution environment. Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.                                  |          |
+| Enable Interactive Shell             | `tools.shell.enableInteractiveShell`   | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                                                        | `true`   |
+| Pager                                | `tools.shell.pager`                    | The pager command to use for shell output. Defaults to `cat`.                                                                                                     | `cat`    |
+| Show Color                           | `tools.shell.showColor`                | Show color in shell output.                                                                                                                                       | `false`  |
+| Inactivity Timeout                   | `tools.shell.inactivityTimeout`        | The maximum time in seconds allowed without output from the shell command. Defaults to 5 minutes.                                                                 | `300`    |
+| Enable Shell Output Efficiency       | `tools.shell.enableShellOutputEfficiency`| Enable shell output efficiency optimizations for better performance.                                                                                              | `true`   |
+| Core Tools                           | `tools.core`                           | Restrict the set of built-in tools with an allowlist. Match semantics mirror tools.allowed; see the built-in tools documentation for available names.             |          |
+| Allowed Tools                        | `tools.allowed`                        | Tool names that bypass the confirmation dialog. Useful for trusted commands (for example ["run_shell_command(git)", "run_shell_command(npm test)"]). See shell too |          |
+| Exclude Tools                        | `tools.exclude`                        | Tool names to exclude from discovery.                                                                                                                             |          |
+| Tool Discovery Command               | `tools.discoveryCommand`               | Command to run for tool discovery.                                                                                                                                |          |
+| Tool Call Command                    | `tools.callCommand`                    | Defines a custom shell command for invoking discovered tools. The command must take the tool name as the first argument, read JSON arguments from stdin, and emit |          |
+| Use Ripgrep                          | `tools.useRipgrep`                     | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                                                   | `true`   |
+| Tool Output Truncation Threshold     | `tools.truncateToolOutputThreshold`    | Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.                                                        | `40000`  |
+| Disable LLM Correction               | `tools.disableLLMCorrection`           | Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self- | `true`   |
+| MCP Server Command                   | `mcp.serverCommand`                    | Command to start an MCP server.                                                                                                                                   |          |
+| Allow MCP Servers                    | `mcp.allowed`                          | A list of MCP servers to allow.                                                                                                                                   |          |
+| Exclude MCP Servers                  | `mcp.excluded`                         | A list of MCP servers to exclude.                                                                                                                                 |          |
+| Use WriteTodos                       | `useWriteTodos`                        | Enable the write_todos tool.                                                                                                                                      | `true`   |
+| Disable YOLO Mode                    | `security.disableYoloMode`             | Disable YOLO mode, even if enabled by a flag.                                                                                                                     | `false`  |
+| Allow Permanent Tool Approval        | `security.enablePermanentToolApproval` | Enable the "Allow for all future sessions" option in tool confirmation dialogs.                                                                                   | `false`  |
+| Blocks extensions from Git           | `security.blockGitExtensions`          | Blocks installing and loading extensions from Git.                                                                                                                | `false`  |
+| Extension Source Regex Allowlist     | `security.allowedExtensions`           | List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions se | `[]`     |
+| Folder Trust                         | `security.folderTrust.enabled`         | Setting to track whether Folder trust is enabled.                                                                                                                 | `true`   |
+| Allowed Environment Variables        | `security.environmentVariableRedaction.allowed`| Environment variables to always allow (bypass redaction).                                                                                                         | `[]`     |
+| Blocked Environment Variables        | `security.environmentVariableRedaction.blocked`| Environment variables to always redact.                                                                                                                           | `[]`     |
+| Enable Environment Variable Redaction | `security.environmentVariableRedaction.enabled`| Enable redaction of environment variables that may contain secrets.                                                                                                | `false`  |
+| Use External Auth                    | `security.auth.useExternal`            | Whether to use an external authentication flow.                                                                                                                   |          |
+| Enable Context-Aware Security        | `security.enableConseca`               | Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, prov | `false`  |
+| Auto Configure Max Old Space Size    | `advanced.autoConfigureMemory`         | Automatically configure Node.js memory limits                                                                                                                     | `false`  |
+| DNS Resolution Order                 | `advanced.dnsResolutionOrder`          | The DNS resolution order.                                                                                                                                         |          |
+| Excluded Project Environment Variables| `advanced.excludedEnvVars`             | Environment variables to exclude from project context.                                                                                                            | `["DEBUG","DEBUG_MODE"]`|
+| Enable Tool Output Masking           | `experimental.toolOutputMasking.enabled`| Enables tool output masking to save tokens.                                                                                                                       | `true`   |
+| Tool Protection Threshold            | `experimental.toolOutputMasking.toolProtectionThreshold`| Minimum number of tokens to protect from masking (most recent tool outputs).                                                                                      | `50000`  |
+| Min Prunable Tokens Threshold        | `experimental.toolOutputMasking.minPrunableTokensThreshold`| Minimum prunable tokens required to trigger a masking pass.                                                                                                       | `30000`  |
+| Protect Latest Turn                  | `experimental.toolOutputMasking.protectLatestTurn`| Ensures the absolute latest turn is never masked, regardless of token count.                                                                                      | `true`   |
+| Enable Agents                        | `experimental.enableAgents`            | Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents                                                                    | `false`  |
+| Extension Management                 | `experimental.extensionManagement`     | Enable extension management features.                                                                                                                             | `true`   |
+| Extension Configuration              | `experimental.extensionConfig`         | Enable requesting and fetching of extension settings.                                                                                                             | `true`   |
+| Extension Registry Explore UI        | `experimental.extensionRegistry`       | Enable extension registry explore UI.                                                                                                                             | `false`  |
+| Extension Reloading                  | `experimental.extensionReloading`      | Enables extension loading/unloading within the CLI session.                                                                                                       | `false`  |
+| JIT Context Loading                  | `experimental.jitContext`              | Enable Just-In-Time (JIT) context loading.                                                                                                                        | `false`  |
+| Use OSC 52 Paste                     | `experimental.useOSC52Paste`           | Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).        | `false`  |
+| Use OSC 52 Copy                      | `experimental.useOSC52Copy`            | Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it).        | `false`  |
+| Plan                                 | `experimental.plan`                    | Enable planning features (Plan Mode and tools).                                                                                                                   | `false`  |
+| Model Steering                       | `experimental.modelSteering`           | Enable model steering (user hints) to guide the model during tool execution.                                                                                      | `false`  |
+| Direct Web Fetch                     | `experimental.directWebFetch`          | Enable web fetch behavior that bypasses LLM summarization.                                                                                                        | `false`  |
+| Enable Gemma Model Router            | `experimental.gemmaModelRouter.enabled`| Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.                                                   | `false`  |
+| Host                                 | `experimental.gemmaModelRouter.classifier.host`| The host of the classifier.                                                                                                                                       | `http://localhost:9379`|
+| Model                                | `experimental.gemmaModelRouter.classifier.model`| The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.                                                                                       | `gemma3-1b-gpu-custom`|
+| Disabled Extensions                  | `extensions.disabled`                  | List of disabled extensions.                                                                                                                                      | `[]`     |
+| Workspaces with Migration Nudge      | `extensions.workspacesWithMigrationNudge`| List of workspaces for which the migration nudge has been shown.                                                                                                  | `[]`     |
+| Enable Agent Skills                  | `skills.enabled`                       | Enable Agent Skills.                                                                                                                                              | `true`   |
+| Disabled Skills                      | `skills.disabled`                      | List of disabled skills.                                                                                                                                          | `[]`     |
+| Enable Hooks                         | `hooksConfig.enabled`                  | Canonical toggle for the hooks system. When disabled, no hooks will be executed.                                                                                 | `true`   |
+| Disabled Hooks                       | `hooksConfig.disabled`                 | List of hook names (commands) that should be disabled. Hooks in this list will not execute even if configured.                                                    | `[]`     |
+| Hook Notifications                   | `hooksConfig.notifications`            | Show visual indicators when hooks are executing.                                                                                                                  | `true`   |
 
 <!-- SETTINGS-AUTOGEN:END -->
