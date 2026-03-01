@@ -69,14 +69,16 @@ describe('policy/utils', () => {
 
     it('should build pattern from a single commandPrefix', () => {
       const result = buildArgsPatterns(undefined, 'ls', undefined);
-      expect(result).toEqual(['"command":"ls(?:[\\s"]|\\\\")']);
+      expect(result).toEqual([
+        '"command":"(?:ls|[^"]*[/\\\\\\\\]ls)(?:[\\s"]|\\\\")',
+      ]);
     });
 
     it('should build patterns from an array of commandPrefixes', () => {
       const result = buildArgsPatterns(undefined, ['ls', 'cd'], undefined);
       expect(result).toEqual([
-        '"command":"ls(?:[\\s"]|\\\\")',
-        '"command":"cd(?:[\\s"]|\\\\")',
+        '"command":"(?:ls|[^"]*[/\\\\\\\\]ls)(?:[\\s"]|\\\\")',
+        '"command":"(?:cd|[^"]*[/\\\\\\\\]cd)(?:[\\s"]|\\\\")',
       ]);
     });
 
@@ -87,7 +89,9 @@ describe('policy/utils', () => {
 
     it('should prioritize commandPrefix over commandRegex and argsPattern', () => {
       const result = buildArgsPatterns('raw', 'prefix', 'regex');
-      expect(result).toEqual(['"command":"prefix(?:[\\s"]|\\\\")']);
+      expect(result).toEqual([
+        '"command":"(?:prefix|[^"]*[/\\\\\\\\]prefix)(?:[\\s"]|\\\\")',
+      ]);
     });
 
     it('should prioritize commandRegex over argsPattern if no commandPrefix', () => {
@@ -98,14 +102,14 @@ describe('policy/utils', () => {
     it('should escape characters in commandPrefix', () => {
       const result = buildArgsPatterns(undefined, 'git checkout -b', undefined);
       expect(result).toEqual([
-        '"command":"git\\ checkout\\ \\-b(?:[\\s"]|\\\\")',
+        '"command":"(?:git\\ checkout\\ \\-b|[^"]*[/\\\\\\\\]git\\ checkout\\ \\-b)(?:[\\s"]|\\\\")',
       ]);
     });
 
     it('should correctly escape quotes in commandPrefix', () => {
       const result = buildArgsPatterns(undefined, 'git "fix"', undefined);
       expect(result).toEqual([
-        '"command":"git\\ \\\\\\"fix\\\\\\"(?:[\\s"]|\\\\")',
+        '"command":"(?:git\\ \\\\\\"fix\\\\\\"|[^"]*[/\\\\\\\\]git\\ \\\\\\"fix\\\\\\")(?:[\\s"]|\\\\")',
       ]);
     });
 
@@ -124,6 +128,22 @@ describe('policy/utils', () => {
       // echo "foo" -> {"command":"echo \"foo\""}
       const validJsonArgs = '{"command":"echo \\"foo\\""}';
       expect(regex.test(validJsonArgs)).toBe(true);
+    });
+
+    it('should match prefixes with optional paths', () => {
+      const prefix = 'build.sh';
+      const patterns = buildArgsPatterns(undefined, prefix, undefined);
+      const regex = new RegExp(patterns[0]!);
+
+      expect(regex.test('{"command":"./build.sh"}')).toBe(true);
+      expect(regex.test('{"command":"/usr/bin/build.sh arg"}')).toBe(true);
+      expect(regex.test('{"command":"C:\\\\path\\\\to\\\\build.sh"}')).toBe(
+        true,
+      );
+      expect(regex.test('{"command":"build.sh"}')).toBe(true);
+
+      // Should NOT match if the base command is actually a different word
+      expect(regex.test('{"command":"notbuild.sh"}')).toBe(false);
     });
 
     it('should NOT match prefixes followed by raw backslashes (security check)', () => {

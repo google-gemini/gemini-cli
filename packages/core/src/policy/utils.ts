@@ -69,10 +69,12 @@ export function buildArgsPatterns(
     // always followed by a space or a closing quote.
     return prefixes.map((prefix) => {
       const jsonPrefix = JSON.stringify(prefix).slice(1, -1);
-      // We allow [\s], ["], or the specific sequence [\"] (for escaped quotes
-      // in JSON). We do NOT allow generic [\\], which would match "git\status"
+      const ePrefix = escapeRegex(jsonPrefix);
+      // We allow an optional path prefix (e.g., ./, /usr/bin/) before the command root.
+      // We allow [\\s], ["], or the specific sequence [\\] (for escaped quotes
+      // in JSON). We do NOT allow generic [\\], which would match "git\\status"
       // -> "gitstatus".
-      return `"command":"${escapeRegex(jsonPrefix)}(?:[\\s"]|\\\\")`;
+      return `"command":"(?:${ePrefix}|[^"]*[/\\\\\\\\]${ePrefix})(?:[\\s"]|\\\\")`;
     });
   }
 
