@@ -695,7 +695,7 @@ export const renderWithProviders = (
       <ConfigContext.Provider value={config}>
         <SettingsContext.Provider value={finalSettings}>
           <UIStateContext.Provider value={finalUiState}>
-            <VimModeProvider settings={finalSettings}>
+            <VimModeProvider>
               <ShellFocusContext.Provider value={shellFocus}>
                 <SessionStatsProvider>
                   <StreamingContext.Provider
