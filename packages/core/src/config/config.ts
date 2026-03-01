@@ -715,6 +715,7 @@ export class Config implements McpContext {
   private compressionTruncationCounter = 0;
   private initialized = false;
   private initPromise: Promise<void> | undefined;
+  private mcpInitializationPromise: Promise<void> | null = null;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
@@ -1123,7 +1124,7 @@ export class Config implements McpContext {
     );
     // We do not await this promise so that the CLI can start up even if
     // MCP servers are slow to connect.
-    const mcpInitialization = Promise.allSettled([
+    this.mcpInitializationPromise = Promise.allSettled([
       this.mcpClientManager.startConfiguredMcpServers(),
       this.getExtensionLoader().start(this),
     ]).then((results) => {
@@ -1135,7 +1136,7 @@ export class Config implements McpContext {
     });
 
     if (!this.interactive || this.experimentalZedIntegration) {
-      await mcpInitialization;
+      await this.mcpInitializationPromise;
     }
 
     if (this.skillsSupport) {
@@ -2231,6 +2232,12 @@ export class Config implements McpContext {
 
   getExperimentalZedIntegration(): boolean {
     return this.experimentalZedIntegration;
+  }
+
+  async waitForMcpInit(): Promise<void> {
+    if (this.mcpInitializationPromise) {
+      await this.mcpInitializationPromise;
+    }
   }
 
   getListExtensions(): boolean {
