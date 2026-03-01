@@ -631,78 +631,119 @@ export class GeminiClient {
     // Re-initialize turn with fresh history
     turn = new Turn(this.getChat(), prompt_id);
 
+    // We use manual signal linking instead of AbortSignal.any to avoid fatal uncaught
+    // exceptions triggered by the @google/genai SDK's custom async iterator wrapper.
+    // The wrapper detaches error listeners during yield suspensions, which makes
+    // synchronous abort calls fatal. Breaking the loop is the only safe way to stop.
     const controller = new AbortController();
-    const linkedSignal = AbortSignal.any([signal, controller.signal]);
-
-    const loopDetected = await this.loopDetector.turnStarted(signal);
-    if (loopDetected) {
-      yield { type: GeminiEventType.LoopDetected };
-      return turn;
-    }
-
-    const routingContext: RoutingContext = {
-      history: this.getChat().getHistory(/*curated=*/ true),
-      request,
-      signal,
-      requestedModel: this.config.getModel(),
+    const onAbort = () => {
+      try {
+        controller.abort();
+      } catch (e) {
+        debugLogger.debug(
+          'Error aborting internal controller from parent signal',
+          e,
+        );
+      }
     };
 
     let modelToUse: string;
-
-    // Determine Model (Stickiness vs. Routing)
-    if (this.currentSequenceModel) {
-      modelToUse = this.currentSequenceModel;
-    } else {
-      const router = this.config.getModelRouterService();
-      const decision = await router.route(routingContext);
-      modelToUse = decision.model;
-    }
-
-    // availability logic
-    const modelConfigKey: ModelConfigKey = {
-      model: modelToUse,
-      isChatModel: true,
-    };
-    const { model: finalModel } = applyModelSelection(
-      this.config,
-      modelConfigKey,
-      { consumeAttempt: false },
-    );
-    modelToUse = finalModel;
-
-    if (!signal.aborted && !this.currentSequenceModel) {
-      yield { type: GeminiEventType.ModelInfo, value: modelToUse };
-    }
-    this.currentSequenceModel = modelToUse;
-
-    // Update tools with the final modelId to ensure model-dependent descriptions are used.
-    await this.setTools(modelToUse);
-
-    const resultStream = turn.run(
-      modelConfigKey,
-      request,
-      linkedSignal,
-      displayContent,
-    );
     let isError = false;
     let isInvalidStream = false;
+    let detectedLoop = false;
 
-    for await (const event of resultStream) {
-      if (this.loopDetector.addAndCheck(event)) {
-        yield { type: GeminiEventType.LoopDetected };
-        controller.abort();
+    try {
+      if (signal.aborted) {
+        onAbort();
         return turn;
       }
-      yield event;
+      signal.addEventListener('abort', onAbort, { once: true });
 
-      this.updateTelemetryTokenCount();
+      const loopDetected = await this.loopDetector.turnStarted(signal);
+      if (loopDetected) {
+        yield { type: GeminiEventType.LoopDetected };
+        detectedLoop = true;
+        onAbort();
+        return turn;
+      }
 
-      if (event.type === GeminiEventType.InvalidStream) {
-        isInvalidStream = true;
+      const routingContext: RoutingContext = {
+        history: this.getChat().getHistory(/*curated=*/ true),
+        request,
+        signal,
+        requestedModel: this.config.getModel(),
+      };
+
+      // Determine Model (Stickiness vs. Routing)
+      if (this.currentSequenceModel) {
+        modelToUse = this.currentSequenceModel;
+      } else {
+        const router = this.config.getModelRouterService();
+        const decision = await router.route(routingContext);
+        modelToUse = decision.model;
       }
-      if (event.type === GeminiEventType.Error) {
-        isError = true;
+
+      // availability logic
+      const modelConfigKey: ModelConfigKey = {
+        model: modelToUse,
+        isChatModel: true,
+      };
+      const { model: finalModel } = applyModelSelection(
+        this.config,
+        modelConfigKey,
+        { consumeAttempt: false },
+      );
+      modelToUse = finalModel;
+
+      if (!signal.aborted && !this.currentSequenceModel) {
+        yield { type: GeminiEventType.ModelInfo, value: modelToUse };
       }
+      this.currentSequenceModel = modelToUse;
+
+      // Update tools with the final modelId to ensure model-dependent descriptions are used.
+      await this.setTools(modelToUse);
+
+      const resultStream = turn.run(
+        modelConfigKey,
+        request,
+        controller.signal,
+        displayContent,
+      );
+
+      for await (const event of resultStream) {
+        if (this.loopDetector.addAndCheck(event)) {
+          yield { type: GeminiEventType.LoopDetected };
+          detectedLoop = true;
+          onAbort();
+          break;
+        }
+        yield event;
+
+        this.updateTelemetryTokenCount();
+
+        if (event.type === GeminiEventType.InvalidStream) {
+          isInvalidStream = true;
+        }
+        if (event.type === GeminiEventType.Error) {
+          isError = true;
+        }
+      }
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.name === 'AbortError' &&
+        controller.signal.aborted
+      ) {
+        // This is a graceful stop triggered by our loop detector or parent signal.
+        return turn;
+      }
+      throw error;
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+    }
+
+    if (detectedLoop) {
+      return turn;
     }
 
     if (isError) {
