@@ -316,7 +316,7 @@ export class ShellExecutionService {
           ...sanitizeEnvironment(process.env, sanitizationConfig),
           [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
             GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
-          TERM: 'xterm-256color',
+          TERM: process.env['TERM'] || 'xterm-256color',
           PAGER: 'cat',
           GIT_PAGER: 'cat',
         },
@@ -580,7 +580,7 @@ export class ShellExecutionService {
             shellExecutionConfig.sanitizationConfig,
           ),
           GEMINI_CLI: '1',
-          TERM: 'xterm-256color',
+          TERM: process.env['TERM'] || 'xterm-256color',
           PAGER: shellExecutionConfig.pager ?? 'cat',
           GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
         },

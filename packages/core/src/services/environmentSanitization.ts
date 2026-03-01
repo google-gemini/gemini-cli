@@ -68,6 +68,7 @@ export const ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES: ReadonlySet<string> =
     'HOME',
     'LANG',
     'SHELL',
+    'TERM',
     'TMPDIR',
     'USER',
     'LOGNAME',

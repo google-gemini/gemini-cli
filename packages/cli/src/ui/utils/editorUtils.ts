@@ -89,6 +89,10 @@ export async function openFileInEditor(
       const result = spawnSync(executable, [...initialArgs, ...args], {
         stdio: 'inherit',
         shell: process.platform === 'win32',
+        env: {
+          ...process.env,
+          TERM: process.env['TERM'] || 'xterm-256color',
+        },
       });
       if (result.error) {
         coreEvents.emitFeedback(
@@ -114,6 +118,10 @@ export async function openFileInEditor(
         const child = spawn(executable, [...initialArgs, ...args], {
           stdio: 'inherit',
           shell: process.platform === 'win32',
+          env: {
+            ...process.env,
+            TERM: process.env['TERM'] || 'xterm-256color',
+          },
         });
 
         child.on('error', (err) => {
