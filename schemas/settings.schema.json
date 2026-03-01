@@ -345,8 +345,8 @@
             },
             "hideCWD": {
               "title": "Hide CWD",
-              "description": "Hide the current working directory path in the footer.",
-              "markdownDescription": "Hide the current working directory path in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+              "description": "Hide the current working directory in the footer.",
+              "markdownDescription": "Hide the current working directory in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             },
