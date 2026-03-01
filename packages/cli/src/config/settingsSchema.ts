@@ -285,17 +285,17 @@ const SETTINGS_SCHEMA = {
               'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.',
             showInDialog: true,
           },
+          modelRouting: {
+            type: 'boolean',
+            label: 'Plan Model Routing',
+            category: 'General',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.',
+            showInDialog: true,
+          },
         },
-      },
-      enablePromptCompletion: {
-        type: 'boolean',
-        label: 'Enable Prompt Completion',
-        category: 'General',
-        requiresRestart: true,
-        default: false,
-        description:
-          'Enable AI-powered prompt completion suggestions while typing.',
-        showInDialog: true,
       },
       retryFetchErrors: {
         type: 'boolean',
@@ -306,6 +306,16 @@ const SETTINGS_SCHEMA = {
         description:
           'Retry on "exception TypeError: fetch failed sending request" errors.',
         showInDialog: false,
+      },
+      maxAttempts: {
+        type: 'number',
+        label: 'Max Chat Model Attempts',
+        category: 'General',
+        requiresRestart: false,
+        default: 10,
+        description:
+          'Maximum number of attempts for requests to the main chat model. Cannot exceed 10.',
+        showInDialog: true,
       },
       debugKeystrokeLogging: {
         type: 'boolean',
@@ -709,6 +719,20 @@ const SETTINGS_SCHEMA = {
           { value: 'off', label: 'Off' },
         ],
       },
+      errorVerbosity: {
+        type: 'enum',
+        label: 'Error Verbosity',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'low',
+        description:
+          'Controls whether recoverable errors are hidden (low) or fully shown (full).',
+        showInDialog: true,
+        options: [
+          { value: 'low', label: 'Low' },
+          { value: 'full', label: 'Full' },
+        ],
+      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',
@@ -818,6 +842,36 @@ const SETTINGS_SCHEMA = {
     ref: 'TelemetrySettings',
   },
 
+  billing: {
+    type: 'object',
+    label: 'Billing',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: {},
+    description: 'Billing and AI credits settings.',
+    showInDialog: false,
+    properties: {
+      overageStrategy: {
+        type: 'enum',
+        label: 'Overage Strategy',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: 'ask',
+        description: oneLine`
+          How to handle quota exhaustion when AI credits are available.
+          'ask' prompts each time, 'always' automatically uses credits,
+          'never' disables credit usage.
+        `,
+        showInDialog: true,
+        options: [
+          { value: 'ask', label: 'Ask each time' },
+          { value: 'always', label: 'Always use credits' },
+          { value: 'never', label: 'Never use credits' },
+        ],
+      },
+    },
+  },
+
   model: {
     type: 'object',
     label: 'Model',
@@ -834,7 +888,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: undefined as string | undefined,
         description: 'The Gemini model to use for conversations.',
-        showInDialog: false,
+        showInDialog: true,
       },
       maxSessionTurns: {
         type: 'number',
@@ -972,6 +1026,60 @@ const SETTINGS_SCHEMA = {
         additionalProperties: {
           type: 'object',
           ref: 'AgentOverride',
+        },
+      },
+      browser: {
+        type: 'object',
+        label: 'Browser Agent',
+        category: 'Advanced',
+        requiresRestart: true,
+        default: {},
+        description: 'Settings specific to the browser agent.',
+        showInDialog: false,
+        properties: {
+          sessionMode: {
+            type: 'enum',
+            label: 'Browser Session Mode',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: 'persistent',
+            description:
+              "Session mode: 'persistent', 'isolated', or 'existing'.",
+            showInDialog: false,
+            options: [
+              { value: 'persistent', label: 'Persistent' },
+              { value: 'isolated', label: 'Isolated' },
+              { value: 'existing', label: 'Existing' },
+            ],
+          },
+          headless: {
+            type: 'boolean',
+            label: 'Browser Headless',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description: 'Run browser in headless mode.',
+            showInDialog: false,
+          },
+          profilePath: {
+            type: 'string',
+            label: 'Browser Profile Path',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description:
+              'Path to browser profile directory for session persistence.',
+            showInDialog: false,
+          },
+          visualModel: {
+            type: 'string',
+            label: 'Browser Visual Model',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description: 'Model override for the visual agent.',
+            showInDialog: false,
+          },
         },
       },
     },
@@ -1493,6 +1601,16 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      enableConseca: {
+        type: 'boolean',
+        label: 'Enable Context-Aware Security',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.',
+        showInDialog: true,
+      },
     },
   },
 
@@ -1702,6 +1820,67 @@ const SETTINGS_SCHEMA = {
         description:
           'Enable model steering (user hints) to guide the model during tool execution.',
         showInDialog: true,
+      },
+      directWebFetch: {
+        type: 'boolean',
+        label: 'Direct Web Fetch',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable web fetch behavior that bypasses LLM summarization.',
+        showInDialog: true,
+      },
+      gemmaModelRouter: {
+        type: 'object',
+        label: 'Gemma Model Router',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: {},
+        description: 'Enable Gemma model router (experimental).',
+        showInDialog: true,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Gemma Model Router',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+            showInDialog: true,
+          },
+          classifier: {
+            type: 'object',
+            label: 'Classifier',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: {},
+            description: 'Classifier configuration.',
+            showInDialog: false,
+            properties: {
+              host: {
+                type: 'string',
+                label: 'Host',
+                category: 'Experimental',
+                requiresRestart: true,
+                default: 'http://localhost:9379',
+                description: 'The host of the classifier.',
+                showInDialog: false,
+              },
+              model: {
+                type: 'string',
+                label: 'Model',
+                category: 'Experimental',
+                requiresRestart: true,
+                default: 'gemma3-1b-gpu-custom',
+                description:
+                  'The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.',
+                showInDialog: false,
+              },
+            },
+          },
+        },
       },
     },
   },
@@ -2448,7 +2627,9 @@ type InferSettings<T extends SettingsSchema> = {
         : T[K]['default']
       : T[K]['default'] extends boolean
         ? boolean
-        : T[K]['default'];
+        : T[K]['default'] extends string
+          ? string
+          : T[K]['default'];
 };
 
 type InferMergedSettings<T extends SettingsSchema> = {
@@ -2460,7 +2641,9 @@ type InferMergedSettings<T extends SettingsSchema> = {
         : T[K]['default']
       : T[K]['default'] extends boolean
         ? boolean
-        : T[K]['default'];
+        : T[K]['default'] extends string
+          ? string
+          : T[K]['default'];
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;

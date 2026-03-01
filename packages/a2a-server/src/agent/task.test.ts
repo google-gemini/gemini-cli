@@ -16,17 +16,17 @@ import {
 import { Task } from './task.js';
 import {
   GeminiEventType,
+  ApprovalMode,
+  ToolConfirmationOutcome,
   type Config,
   type ToolCallRequestInfo,
   type GitService,
   type CompletedToolCall,
-  ApprovalMode,
-  ToolConfirmationOutcome,
+  type ToolCall,
 } from '@google/gemini-cli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus, RequestContext } from '@a2a-js/sdk/server';
 import { CoderAgentEvent } from '../types.js';
-import type { ToolCall } from '@google/gemini-cli-core';
 
 const mockProcessRestorableToolCalls = vi.hoisted(() => vi.fn());
 
@@ -511,7 +511,10 @@ describe('Task', () => {
           {
             request: { callId: '1' },
             status: 'awaiting_approval',
-            confirmationDetails: { onConfirm: onConfirmSpy },
+            confirmationDetails: {
+              type: 'edit',
+              onConfirm: onConfirmSpy,
+            },
           },
         ] as unknown as ToolCall[];
 
@@ -531,7 +534,10 @@ describe('Task', () => {
           {
             request: { callId: '1' },
             status: 'awaiting_approval',
-            confirmationDetails: { onConfirm: onConfirmSpy },
+            confirmationDetails: {
+              type: 'edit',
+              onConfirm: onConfirmSpy,
+            },
           },
         ] as unknown as ToolCall[];
 

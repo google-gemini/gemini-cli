@@ -47,6 +47,8 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     setRemoteAdminSettings: vi.fn(),
     isYoloModeDisabled: vi.fn(() => false),
     isPlanEnabled: vi.fn(() => false),
+    getPlanModeRoutingEnabled: vi.fn().mockResolvedValue(true),
+    getApprovedPlanPath: vi.fn(() => undefined),
     getCoreTools: vi.fn(() => []),
     getAllowedTools: vi.fn(() => []),
     getApprovalMode: vi.fn(() => 'default'),
@@ -128,7 +130,6 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
     getShellExecutionConfig: vi.fn().mockReturnValue({}),
     setShellExecutionConfig: vi.fn(),
-    getEnablePromptCompletion: vi.fn().mockReturnValue(false),
     getEnableToolOutputTruncation: vi.fn().mockReturnValue(true),
     getTruncateToolOutputThreshold: vi.fn().mockReturnValue(1000),
     getTruncateToolOutputLines: vi.fn().mockReturnValue(100),
@@ -140,7 +141,10 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getMcpClientManager: vi.fn().mockReturnValue({
       getMcpInstructions: vi.fn().mockReturnValue(''),
       getMcpServers: vi.fn().mockReturnValue({}),
+      getLastError: vi.fn().mockReturnValue(undefined),
     }),
+    setUserInteractedWithMcp: vi.fn(),
+    emitMcpDiagnostic: vi.fn(),
     getEnableEventDrivenScheduler: vi.fn().mockReturnValue(false),
     getAdminSkillsEnabled: vi.fn().mockReturnValue(false),
     getDisabledSkills: vi.fn().mockReturnValue([]),
@@ -155,6 +159,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getExperiments: vi.fn().mockReturnValue(undefined),
     getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
     validatePathAccess: vi.fn().mockReturnValue(null),
+    getUseAlternateBuffer: vi.fn().mockReturnValue(false),
     ...overrides,
   }) as unknown as Config;
 

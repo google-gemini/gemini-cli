@@ -10,6 +10,7 @@ import type {
   CompletedToolCall,
   ContentGeneratorConfig,
   ErroredToolCall,
+  MessageBus,
 } from '../index.js';
 import {
   CoreToolCallStatus,
@@ -19,11 +20,11 @@ import {
   ToolConfirmationOutcome,
   ToolErrorType,
   ToolRegistry,
-  type MessageBus,
 } from '../index.js';
 import { OutputFormat } from '../output/types.js';
 import { logs } from '@opentelemetry/api-logs';
-import type { Config } from '../config/config.js';
+import type { Config, GeminiCLIExtension } from '../config/config.js';
+import { ApprovalMode } from '../policy/types.js';
 import {
   logApiError,
   logApiRequest,
@@ -95,12 +96,12 @@ import {
   EVENT_HOOK_CALL,
   LlmRole,
 } from './types.js';
+import { HookType } from '../hooks/types.js';
 import * as metrics from './metrics.js';
 import { FileOperation } from './metrics.js';
 import * as sdk from './sdk.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { vi, describe, beforeEach, it, expect, afterEach } from 'vitest';
-import { type GeminiCLIExtension } from '../config/config.js';
 import {
   FinishReason,
   type CallableTool,
@@ -279,6 +280,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     it('should log a user prompt', () => {
@@ -318,6 +320,7 @@ describe('loggers', () => {
         isInteractive: () => false,
         getExperiments: () => undefined,
         getExperimentsAsync: async () => undefined,
+        getContentGeneratorConfig: () => undefined,
       } as unknown as Config;
       const event = new UserPromptEvent(
         11,
@@ -355,7 +358,8 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
-    } as Config;
+      getContentGeneratorConfig: () => undefined,
+    } as unknown as Config;
 
     const mockMetrics = {
       recordApiResponseMetrics: vi.fn(),
@@ -557,7 +561,8 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
-    } as Config;
+      getContentGeneratorConfig: () => undefined,
+    } as unknown as Config;
 
     const mockMetrics = {
       recordApiResponseMetrics: vi.fn(),
@@ -995,6 +1000,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     it('should log flash fallback event', () => {
@@ -1024,6 +1030,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1120,7 +1127,8 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
-    } as Config;
+      getContentGeneratorConfig: () => undefined,
+    } as unknown as Config;
 
     const mockMetrics = {
       recordToolCallMetrics: vi.fn(),
@@ -1740,7 +1748,8 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
-    } as Config;
+      getContentGeneratorConfig: () => undefined,
+    } as unknown as Config;
 
     const mockMetrics = {
       recordFileOperationMetric: vi.fn(),
@@ -1802,6 +1811,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     it('should log a tool output truncated event', () => {
@@ -1841,6 +1851,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1856,6 +1867,7 @@ describe('loggers', () => {
         'test-reason',
         false,
         undefined,
+        ApprovalMode.DEFAULT,
       );
 
       logModelRouting(mockConfig, event);
@@ -1890,6 +1902,7 @@ describe('loggers', () => {
         '[Score: 90 / Threshold: 80] reasoning',
         false,
         undefined,
+        ApprovalMode.DEFAULT,
         true,
         '80',
       );
@@ -1923,6 +1936,7 @@ describe('loggers', () => {
         'test-reason',
         false,
         undefined,
+        ApprovalMode.DEFAULT,
       );
 
       logModelRouting(mockConfig, event);
@@ -2095,6 +2109,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2142,6 +2157,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2189,6 +2205,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2227,6 +2244,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2280,6 +2298,7 @@ describe('loggers', () => {
       isInteractive: () => false,
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2318,6 +2337,7 @@ describe('loggers', () => {
       getExperiments: () => undefined,
       getExperimentsAsync: async () => undefined,
       getTelemetryLogPromptsEnabled: () => false,
+      getContentGeneratorConfig: () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2328,7 +2348,7 @@ describe('loggers', () => {
     it('should log hook call event to Clearcut and OTEL', () => {
       const event = new HookCallEvent(
         'before-tool',
-        'command',
+        HookType.Command,
         '/path/to/script.sh',
         { arg: 'val' },
         150,

@@ -7,6 +7,7 @@
 import { vi, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
 import { coreEvents } from '@google/gemini-cli-core';
+import { themeManager } from './src/ui/themes/theme-manager.js';
 
 // Unset CI environment variable so that ink renders dynamically as it does in a real terminal
 if (process.env.CI !== undefined) {
@@ -23,12 +24,18 @@ if (process.env.NO_COLOR !== undefined) {
   delete process.env.NO_COLOR;
 }
 
+// Force true color output for ink so that snapshots always include color information.
+process.env.FORCE_COLOR = '3';
+
 import './src/test-utils/customMatchers.js';
 
 let consoleErrorSpy: vi.SpyInstance;
 let actWarnings: Array<{ message: string; stack: string }> = [];
 
 beforeEach(() => {
+  // Reset themeManager state to ensure test isolation
+  themeManager.resetForTesting();
+
   actWarnings = [];
   consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation((...args) => {
     const firstArg = args[0];

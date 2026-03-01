@@ -56,6 +56,25 @@ describe('getConsentForOauth', () => {
       );
     });
 
+    it('should handle empty prompt correctly', async () => {
+      const mockEmitConsentRequest = vi.spyOn(coreEvents, 'emitConsentRequest');
+      vi.spyOn(coreEvents, 'listenerCount').mockReturnValue(1);
+
+      mockEmitConsentRequest.mockImplementation((payload) => {
+        payload.onConfirm(true);
+      });
+
+      await getConsentForOauth('');
+
+      expect(mockEmitConsentRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: expect.stringMatching(
+            /^Opening authentication page in your browser\./,
+          ),
+        }),
+      );
+    });
+
     it('should return false when user declines via UI', async () => {
       const mockEmitConsentRequest = vi.spyOn(coreEvents, 'emitConsentRequest');
       vi.spyOn(coreEvents, 'listenerCount').mockReturnValue(1);

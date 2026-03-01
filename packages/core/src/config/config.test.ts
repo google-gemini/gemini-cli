@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ConfigParameters, SandboxConfig } from './config.js';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
+import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -20,8 +21,12 @@ import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryT
 import {
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
+  uiTelemetryService,
 } from '../telemetry/index.js';
-import type { ContentGeneratorConfig } from '../core/contentGenerator.js';
+import type {
+  ContentGeneratorConfig,
+  ContentGenerator,
+} from '../core/contentGenerator.js';
 import {
   AuthType,
   createContentGenerator,
@@ -33,14 +38,21 @@ import { ShellTool } from '../tools/shell.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
 import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
-import { logRipgrepFallback } from '../telemetry/loggers.js';
+import {
+  logRipgrepFallback,
+  logApprovalModeDuration,
+} from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from '../tools/tool-names.js';
 import type { SkillDefinition } from '../skills/skillLoader.js';
 import type { McpClientManager } from '../tools/mcp-client-manager.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
-import { DEFAULT_GEMINI_MODEL } from './models.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+} from './models.js';
 import { Storage } from './storage.js';
 
 vi.mock('fs', async (importOriginal) => {
@@ -130,6 +142,7 @@ vi.mock('../telemetry/loggers.js', async (importOriginal) => {
   return {
     ...actual,
     logRipgrepFallback: vi.fn(),
+    logApprovalModeDuration: vi.fn(),
   };
 });
 
@@ -201,18 +214,21 @@ vi.mock('../services/contextManager.js', () => ({
 
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { tokenLimit } from '../core/tokenLimits.js';
-import { uiTelemetryService } from '../telemetry/index.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
 import { ContextManager } from '../services/contextManager.js';
 import { UserTierId } from '../code_assist/types.js';
-import type { ModelConfigService } from '../services/modelConfigService.js';
-import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
+import type {
+  ModelConfigService,
+  ModelConfigServiceConfig,
+} from '../services/modelConfigService.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
+import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 
 vi.mock('../core/baseLlmClient.js');
+vi.mock('../core/localLiteRtLmClient.js');
 vi.mock('../core/tokenLimits.js', () => ({
   tokenLimit: vi.fn(),
 }));
@@ -245,6 +261,29 @@ describe('Server Config (config.ts)', () => {
     model: MODEL,
     usageStatisticsEnabled: false,
   };
+
+  describe('maxAttempts', () => {
+    it('should default to DEFAULT_MAX_ATTEMPTS', () => {
+      const config = new Config(baseParams);
+      expect(config.getMaxAttempts()).toBe(DEFAULT_MAX_ATTEMPTS);
+    });
+
+    it('should use provided maxAttempts if <= DEFAULT_MAX_ATTEMPTS', () => {
+      const config = new Config({
+        ...baseParams,
+        maxAttempts: 5,
+      });
+      expect(config.getMaxAttempts()).toBe(5);
+    });
+
+    it('should cap maxAttempts at DEFAULT_MAX_ATTEMPTS', () => {
+      const config = new Config({
+        ...baseParams,
+        maxAttempts: 20,
+      });
+      expect(config.getMaxAttempts()).toBe(DEFAULT_MAX_ATTEMPTS);
+    });
+  });
 
   beforeEach(() => {
     // Reset mocks if necessary
@@ -462,6 +501,7 @@ describe('Server Config (config.ts)', () => {
       expect(createContentGeneratorConfig).toHaveBeenCalledWith(
         config,
         authType,
+        undefined,
       );
       // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
@@ -901,6 +941,31 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('UseAlternateBuffer Configuration', () => {
+    it('should default useAlternateBuffer to false when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getUseAlternateBuffer()).toBe(false);
+    });
+
+    it('should set useAlternateBuffer to true when provided as true', () => {
+      const paramsWithAlternateBuffer: ConfigParameters = {
+        ...baseParams,
+        useAlternateBuffer: true,
+      };
+      const config = new Config(paramsWithAlternateBuffer);
+      expect(config.getUseAlternateBuffer()).toBe(true);
+    });
+
+    it('should set useAlternateBuffer to false when explicitly provided as false', () => {
+      const paramsWithAlternateBuffer: ConfigParameters = {
+        ...baseParams,
+        useAlternateBuffer: false,
+      };
+      const config = new Config(paramsWithAlternateBuffer);
+      expect(config.getUseAlternateBuffer()).toBe(false);
+    });
+  });
+
   describe('UseWriteTodos Configuration', () => {
     it('should default useWriteTodos to true when not provided', () => {
       const config = new Config(baseParams);
@@ -1310,6 +1375,147 @@ describe('Server Config (config.ts)', () => {
       expect(mockCoreEvents.emitFeedback).not.toHaveBeenCalled();
     });
   });
+
+  describe('BrowserAgentConfig', () => {
+    it('should return default browser agent config when not provided', () => {
+      const config = new Config(baseParams);
+      const browserConfig = config.getBrowserAgentConfig();
+
+      expect(browserConfig.enabled).toBe(false);
+      expect(browserConfig.model).toBeUndefined();
+      expect(browserConfig.customConfig.sessionMode).toBe('persistent');
+      expect(browserConfig.customConfig.headless).toBe(false);
+      expect(browserConfig.customConfig.profilePath).toBeUndefined();
+      expect(browserConfig.customConfig.visualModel).toBeUndefined();
+    });
+
+    it('should return custom browser agent config from agents.overrides', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+              modelConfig: { model: 'custom-model' },
+            },
+          },
+          browser: {
+            sessionMode: 'existing',
+            headless: true,
+            profilePath: '/path/to/profile',
+            visualModel: 'custom-visual-model',
+          },
+        },
+      };
+      const config = new Config(params);
+      const browserConfig = config.getBrowserAgentConfig();
+
+      expect(browserConfig.enabled).toBe(true);
+      expect(browserConfig.model).toBe('custom-model');
+      expect(browserConfig.customConfig.sessionMode).toBe('existing');
+      expect(browserConfig.customConfig.headless).toBe(true);
+      expect(browserConfig.customConfig.profilePath).toBe('/path/to/profile');
+      expect(browserConfig.customConfig.visualModel).toBe(
+        'custom-visual-model',
+      );
+    });
+
+    it('should apply defaults for partial custom config', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: true,
+          },
+        },
+      };
+      const config = new Config(params);
+      const browserConfig = config.getBrowserAgentConfig();
+
+      expect(browserConfig.enabled).toBe(true);
+      expect(browserConfig.customConfig.headless).toBe(true);
+      // Defaults for unspecified fields
+      expect(browserConfig.customConfig.sessionMode).toBe('persistent');
+    });
+  });
+});
+
+describe('GemmaModelRouterSettings', () => {
+  const MODEL = DEFAULT_GEMINI_MODEL;
+  const SANDBOX: SandboxConfig = {
+    command: 'docker',
+    image: 'gemini-cli-sandbox',
+  };
+  const TARGET_DIR = '/path/to/target';
+  const DEBUG_MODE = false;
+  const QUESTION = 'test question';
+  const USER_MEMORY = 'Test User Memory';
+  const TELEMETRY_SETTINGS = { enabled: false };
+  const EMBEDDING_MODEL = 'gemini-embedding';
+  const SESSION_ID = 'test-session-id';
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    embeddingModel: EMBEDDING_MODEL,
+    sandbox: SANDBOX,
+    targetDir: TARGET_DIR,
+    debugMode: DEBUG_MODE,
+    question: QUESTION,
+    userMemory: USER_MEMORY,
+    telemetry: TELEMETRY_SETTINGS,
+    sessionId: SESSION_ID,
+    model: MODEL,
+    usageStatisticsEnabled: false,
+  };
+
+  it('should default gemmaModelRouter.enabled to false', () => {
+    const config = new Config(baseParams);
+    expect(config.getGemmaModelRouterEnabled()).toBe(false);
+  });
+
+  it('should return default gemma model router settings when not provided', () => {
+    const config = new Config(baseParams);
+    const settings = config.getGemmaModelRouterSettings();
+    expect(settings.enabled).toBe(false);
+    expect(settings.classifier?.host).toBe('http://localhost:9379');
+    expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
+  });
+
+  it('should override default gemma model router settings when provided', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      gemmaModelRouter: {
+        enabled: true,
+        classifier: {
+          host: 'http://custom:1234',
+          model: 'custom-gemma',
+        },
+      },
+    };
+    const config = new Config(params);
+    const settings = config.getGemmaModelRouterSettings();
+    expect(settings.enabled).toBe(true);
+    expect(settings.classifier?.host).toBe('http://custom:1234');
+    expect(settings.classifier?.model).toBe('custom-gemma');
+  });
+
+  it('should merge partial gemma model router settings with defaults', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      gemmaModelRouter: {
+        enabled: true,
+      },
+    };
+    const config = new Config(params);
+    const settings = config.getGemmaModelRouterSettings();
+    expect(settings.enabled).toBe(true);
+    expect(settings.classifier?.host).toBe('http://localhost:9379');
+    expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
+  });
 });
 
 describe('setApprovalMode with folder trust', () => {
@@ -1415,6 +1621,84 @@ describe('setApprovalMode with folder trust', () => {
     config.setApprovalMode(ApprovalMode.AUTO_EDIT);
 
     expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  describe('approval mode duration logging', () => {
+    beforeEach(() => {
+      vi.mocked(logApprovalModeDuration).mockClear();
+    });
+
+    it('should initialize lastModeSwitchTime with performance.now() and log positive duration', () => {
+      const startTime = 1000;
+      const endTime = 5000;
+      const performanceSpy = vi.spyOn(performance, 'now');
+
+      performanceSpy.mockReturnValueOnce(startTime);
+      const config = new Config(baseParams);
+      vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+
+      performanceSpy.mockReturnValueOnce(endTime);
+      config.setApprovalMode(ApprovalMode.PLAN);
+
+      expect(logApprovalModeDuration).toHaveBeenCalledWith(
+        config,
+        expect.objectContaining({
+          mode: ApprovalMode.DEFAULT,
+          duration_ms: endTime - startTime,
+        }),
+      );
+      performanceSpy.mockRestore();
+    });
+
+    it('should skip logging if duration is zero or negative', () => {
+      const startTime = 5000;
+      const endTime = 4000;
+      const performanceSpy = vi.spyOn(performance, 'now');
+
+      performanceSpy.mockReturnValueOnce(startTime);
+      const config = new Config(baseParams);
+      vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+
+      performanceSpy.mockReturnValueOnce(endTime);
+      config.setApprovalMode(ApprovalMode.PLAN);
+
+      expect(logApprovalModeDuration).not.toHaveBeenCalled();
+      performanceSpy.mockRestore();
+    });
+
+    it('should update lastModeSwitchTime after logging to prevent double counting', () => {
+      const time1 = 1000;
+      const time2 = 3000;
+      const time3 = 6000;
+      const performanceSpy = vi.spyOn(performance, 'now');
+
+      performanceSpy.mockReturnValueOnce(time1);
+      const config = new Config(baseParams);
+      vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+
+      performanceSpy.mockReturnValueOnce(time2);
+      config.setApprovalMode(ApprovalMode.PLAN);
+      expect(logApprovalModeDuration).toHaveBeenCalledWith(
+        config,
+        expect.objectContaining({
+          mode: ApprovalMode.DEFAULT,
+          duration_ms: time2 - time1,
+        }),
+      );
+
+      vi.mocked(logApprovalModeDuration).mockClear();
+
+      performanceSpy.mockReturnValueOnce(time3);
+      config.setApprovalMode(ApprovalMode.YOLO);
+      expect(logApprovalModeDuration).toHaveBeenCalledWith(
+        config,
+        expect.objectContaining({
+          mode: ApprovalMode.PLAN,
+          duration_ms: time3 - time2,
+        }),
+      );
+      performanceSpy.mockRestore();
+    });
   });
 
   describe('registerCoreTools', () => {
@@ -1745,7 +2029,7 @@ describe('Config getHooks', () => {
     const mockHooks = {
       BeforeTool: [
         {
-          hooks: [{ type: HookType.Command, command: 'echo 1' }],
+          hooks: [{ type: HookType.Command, command: 'echo 1' } as const],
         },
       ],
     };
@@ -1882,6 +2166,71 @@ describe('Config getHooks', () => {
 
       expect(onModelChange).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('LocalLiteRtLmClient Lifecycle', () => {
+  const MODEL = 'gemini-pro';
+  const SANDBOX: SandboxConfig = {
+    command: 'docker',
+    image: 'gemini-cli-sandbox',
+  };
+  const TARGET_DIR = '/path/to/target';
+  const DEBUG_MODE = false;
+  const QUESTION = 'test question';
+  const USER_MEMORY = 'Test User Memory';
+  const TELEMETRY_SETTINGS = { enabled: false };
+  const EMBEDDING_MODEL = 'gemini-embedding';
+  const SESSION_ID = 'test-session-id';
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    embeddingModel: EMBEDDING_MODEL,
+    sandbox: SANDBOX,
+    targetDir: TARGET_DIR,
+    debugMode: DEBUG_MODE,
+    question: QUESTION,
+    userMemory: USER_MEMORY,
+    telemetry: TELEMETRY_SETTINGS,
+    sessionId: SESSION_ID,
+    model: MODEL,
+    usageStatisticsEnabled: false,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getExperiments).mockResolvedValue({
+      experimentIds: [],
+      flags: {},
+    });
+  });
+
+  it('should successfully initialize LocalLiteRtLmClient on first call and reuse it', () => {
+    const config = new Config(baseParams);
+    const client1 = config.getLocalLiteRtLmClient();
+    const client2 = config.getLocalLiteRtLmClient();
+
+    expect(client1).toBeDefined();
+    expect(client1).toBe(client2); // Should return the same instance
+  });
+
+  it('should configure LocalLiteRtLmClient with settings from getGemmaModelRouterSettings', () => {
+    const customHost = 'http://my-custom-host:9999';
+    const customModel = 'my-custom-gemma-model';
+    const params: ConfigParameters = {
+      ...baseParams,
+      gemmaModelRouter: {
+        enabled: true,
+        classifier: {
+          host: customHost,
+          model: customModel,
+        },
+      },
+    };
+
+    const config = new Config(params);
+    config.getLocalLiteRtLmClient();
+
+    expect(LocalLiteRtLmClient).toHaveBeenCalledWith(config);
   });
 });
 
@@ -2052,7 +2401,7 @@ describe('Hooks configuration', () => {
     const initialHooks = {
       BeforeAgent: [
         {
-          hooks: [{ type: HookType.Command, command: 'initial' }],
+          hooks: [{ type: HookType.Command as const, command: 'initial' }],
         },
       ],
     };
@@ -2104,6 +2453,21 @@ describe('Config Quota & Preview Model Access', () => {
         buckets: [
           {
             modelId: 'gemini-3-pro-preview',
+            remainingAmount: '100',
+            remainingFraction: 1.0,
+          },
+        ],
+      });
+
+      await config.refreshUserQuota();
+      expect(config.getHasAccessToPreviewModel()).toBe(true);
+    });
+
+    it('should update hasAccessToPreviewModel to true if quota includes Gemini 3.1 preview model', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-3.1-pro-preview',
             remainingAmount: '100',
             remainingFraction: 1.0,
           },
@@ -2203,7 +2567,8 @@ describe('Config Quota & Preview Model Access', () => {
       vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
       const result = await config.refreshUserQuota();
       expect(result).toBeUndefined();
-      expect(config.getHasAccessToPreviewModel()).toBe(false);
+      // Never set => stays null (unknown); getter returns true so UI shows preview
+      expect(config.getHasAccessToPreviewModel()).toBe(true);
     });
 
     it('should return undefined if retrieveUserQuota fails', async () => {
@@ -2212,8 +2577,8 @@ describe('Config Quota & Preview Model Access', () => {
       );
       const result = await config.refreshUserQuota();
       expect(result).toBeUndefined();
-      // Should remain default (false)
-      expect(config.getHasAccessToPreviewModel()).toBe(false);
+      // Never set => stays null (unknown); getter returns true so UI shows preview
+      expect(config.getHasAccessToPreviewModel()).toBe(true);
     });
   });
 
@@ -2332,6 +2697,29 @@ describe('Config Quota & Preview Model Access', () => {
         plan: false,
       });
       expect(config.isPlanEnabled()).toBe(false);
+    });
+  });
+
+  describe('getPlanModeRoutingEnabled', () => {
+    it('should default to true when not provided', async () => {
+      const config = new Config(baseParams);
+      expect(await config.getPlanModeRoutingEnabled()).toBe(true);
+    });
+
+    it('should return true when explicitly enabled in planSettings', async () => {
+      const config = new Config({
+        ...baseParams,
+        planSettings: { modelRouting: true },
+      });
+      expect(await config.getPlanModeRoutingEnabled()).toBe(true);
+    });
+
+    it('should return false when explicitly disabled in planSettings', async () => {
+      const config = new Config({
+        ...baseParams,
+        planSettings: { modelRouting: false },
+      });
+      expect(await config.getPlanModeRoutingEnabled()).toBe(false);
     });
   });
 });
@@ -2698,5 +3086,87 @@ describe('syncPlanModeTools', () => {
     config.syncPlanModeTools();
 
     expect(setToolsSpy).toHaveBeenCalled();
+  });
+});
+
+describe('Model Persistence Bug Fix (#19864)', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test-session',
+    cwd: '/tmp',
+    targetDir: '/path/to/target',
+    debugMode: false,
+    model: PREVIEW_GEMINI_3_1_MODEL, // User saved preview model
+  };
+
+  it('should NOT reset preview model for CodeAssist auth when refreshUserQuota is not called (no projectId)', async () => {
+    const mockContentConfig = {
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+    } as Partial<ContentGeneratorConfig> as ContentGeneratorConfig;
+
+    const mockContentGenerator = {
+      generateContent: vi.fn(),
+    } as Partial<ContentGenerator> as ContentGenerator;
+
+    vi.mocked(createContentGeneratorConfig).mockResolvedValue(
+      mockContentConfig,
+    );
+    vi.mocked(createContentGenerator).mockResolvedValue(mockContentGenerator);
+    // getCodeAssistServer returns undefined by default, so refreshUserQuota() isn't called;
+    // hasAccessToPreviewModel stays null; reset only when === false, so we don't reset.
+    const config = new Config(baseParams);
+
+    // Verify initial model is the preview model
+    expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
+
+    // Call refreshAuth to simulate restart (CodeAssist auth, no projectId)
+    await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+
+    // Verify the model was NOT reset (bug fix)
+    expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
+    expect(config.getModel()).not.toBe(DEFAULT_GEMINI_MODEL_AUTO);
+  });
+
+  it('should NOT reset preview model for USE_GEMINI (hasAccessToPreviewModel is set to true)', async () => {
+    const mockContentConfig = {
+      authType: AuthType.USE_GEMINI,
+    } as Partial<ContentGeneratorConfig> as ContentGeneratorConfig;
+
+    const mockContentGenerator = {
+      generateContent: vi.fn(),
+    } as Partial<ContentGenerator> as ContentGenerator;
+
+    vi.mocked(createContentGeneratorConfig).mockResolvedValue(
+      mockContentConfig,
+    );
+    vi.mocked(createContentGenerator).mockResolvedValue(mockContentGenerator);
+
+    const config = new Config(baseParams);
+
+    // Verify initial model is the preview model
+    expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
+
+    // Call refreshAuth
+    await config.refreshAuth(AuthType.USE_GEMINI);
+
+    // For USE_GEMINI, hasAccessToPreviewModel should be set to true
+    // So the model should NOT be reset
+    expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
+    expect(config.getHasAccessToPreviewModel()).toBe(true);
+  });
+
+  it('should persist model when user selects it with persistMode=true', () => {
+    const onModelChange = vi.fn();
+    const config = new Config({
+      ...baseParams,
+      model: DEFAULT_GEMINI_MODEL_AUTO, // Initial model
+      onModelChange,
+    });
+
+    // User selects preview model with persist mode enabled
+    config.setModel(PREVIEW_GEMINI_3_1_MODEL, false); // isTemporary = false
+
+    // Verify onModelChange was called to persist the model
+    expect(onModelChange).toHaveBeenCalledWith(PREVIEW_GEMINI_3_1_MODEL);
+    expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
   });
 });

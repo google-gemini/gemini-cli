@@ -8,17 +8,14 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 
-import type { TelemetryTarget } from '@google/gemini-cli-core';
 import {
   AuthType,
   Config,
-  type ConfigParameters,
   FileDiscoveryService,
   ApprovalMode,
   loadServerHierarchicalMemory,
   GEMINI_DIR,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
-  type ExtensionLoader,
   startupProfiler,
   PREVIEW_GEMINI_MODEL,
   homedir,
@@ -26,6 +23,9 @@ import {
   fetchAdminControlsOnce,
   getCodeAssistServer,
   ExperimentFlags,
+  type TelemetryTarget,
+  type ConfigParameters,
+  type ExtensionLoader,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
@@ -66,8 +66,9 @@ export async function loadConfig(
     debugMode: process.env['DEBUG'] === 'true' || false,
     question: '', // Not used in server mode directly like CLI
 
-    coreTools: settings.coreTools || undefined,
-    excludeTools: settings.excludeTools || undefined,
+    coreTools: settings.coreTools || settings.tools?.core || undefined,
+    excludeTools: settings.excludeTools || settings.tools?.exclude || undefined,
+    allowedTools: settings.allowedTools || settings.tools?.allowed || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
     approvalMode:
       process.env['GEMINI_YOLO_MODE'] === 'true'
@@ -165,6 +166,8 @@ export async function loadConfig(
 
   // Needed to initialize ToolRegistry, and git checkpointing if enabled
   await config.initialize();
+
+  await config.waitForMcpInit();
   startupProfiler.flush(config);
 
   await refreshAuthentication(config, adcFilePath, 'Config');

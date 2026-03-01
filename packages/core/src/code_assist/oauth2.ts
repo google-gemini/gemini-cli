@@ -271,9 +271,12 @@ async function initOauthClient(
 
     await triggerPostAuthCallbacks(client.credentials);
   } else {
-    const userConsent = await getConsentForOauth('Code Assist login required.');
-    if (!userConsent) {
-      throw new FatalCancellationError('Authentication cancelled by user.');
+    // In Zed integration, we skip the interactive consent and directly open the browser
+    if (!config.getExperimentalZedIntegration()) {
+      const userConsent = await getConsentForOauth('');
+      if (!userConsent) {
+        throw new FatalCancellationError('Authentication cancelled by user.');
+      }
     }
 
     const webLogin = await authWithWeb(client);
@@ -281,8 +284,7 @@ async function initOauthClient(
     coreEvents.emit(CoreEvent.UserFeedback, {
       severity: 'info',
       message:
-        `\n\nCode Assist login required.\n` +
-        `Attempting to open authentication page in your browser.\n` +
+        `\n\nAttempting to open authentication page in your browser.\n` +
         `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n\n`,
     });
     try {
@@ -491,6 +493,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
               'OAuth callback not received. Unexpected request: ' + req.url,
             ),
           );
+          return;
         }
         // acquire the code from the querystring, and close the web server.
         const qs = new url.URL(req.url!, 'http://127.0.0.1:3000').searchParams;

@@ -42,6 +42,28 @@ export class McpClientManager {
     extensionName: string;
   }> = [];
 
+  /**
+   * Track whether the user has explicitly interacted with MCP in this session
+   * (e.g. by running an /mcp command).
+   */
+  private userInteractedWithMcp: boolean = false;
+
+  /**
+   * Track which MCP diagnostics have already been shown to the user this session
+   * and at what verbosity level.
+   */
+  private shownDiagnostics: Map<string, 'silent' | 'verbose'> = new Map();
+
+  /**
+   * Track whether the MCP "hint" has been shown.
+   */
+  private hintShown: boolean = false;
+
+  /**
+   * Track the last error message for each server.
+   */
+  private lastErrors: Map<string, string> = new Map();
+
   constructor(
     clientVersion: string,
     toolRegistry: ToolRegistry,
@@ -52,6 +74,69 @@ export class McpClientManager {
     this.toolRegistry = toolRegistry;
     this.cliConfig = cliConfig;
     this.eventEmitter = eventEmitter;
+  }
+
+  setUserInteractedWithMcp() {
+    this.userInteractedWithMcp = true;
+  }
+
+  getLastError(serverName: string): string | undefined {
+    return this.lastErrors.get(serverName);
+  }
+
+  /**
+   * Emit an MCP diagnostic message, adhering to the user's intent and
+   * deduplication rules.
+   */
+  emitDiagnostic(
+    severity: 'info' | 'warning' | 'error',
+    message: string,
+    error?: unknown,
+    serverName?: string,
+  ) {
+    // Capture error for later display if it's an error/warning
+    if (severity === 'error' || severity === 'warning') {
+      if (serverName) {
+        this.lastErrors.set(serverName, message);
+      }
+    }
+
+    // Deduplicate
+    const diagnosticKey = `${severity}:${message}`;
+    const previousStatus = this.shownDiagnostics.get(diagnosticKey);
+
+    // If user has interacted, show verbosely unless already shown verbosely
+    if (this.userInteractedWithMcp) {
+      if (previousStatus === 'verbose') {
+        debugLogger.debug(
+          `Deduplicated verbose MCP diagnostic: ${diagnosticKey}`,
+        );
+        return;
+      }
+      this.shownDiagnostics.set(diagnosticKey, 'verbose');
+      coreEvents.emitFeedback(severity, message, error);
+      return;
+    }
+
+    // In silent mode, if it has been shown at all, skip
+    if (previousStatus) {
+      debugLogger.debug(`Deduplicated silent MCP diagnostic: ${diagnosticKey}`);
+      return;
+    }
+    this.shownDiagnostics.set(diagnosticKey, 'silent');
+
+    // Otherwise, be less annoying
+    debugLogger.log(`[MCP ${severity}] ${message}`, error);
+
+    if (severity === 'error' || severity === 'warning') {
+      if (!this.hintShown) {
+        this.hintShown = true;
+        coreEvents.emitFeedback(
+          'info',
+          'MCP issues detected. Run /mcp list for status.',
+        );
+      }
+    }
   }
 
   getBlockedMcpServers() {
@@ -176,6 +261,20 @@ export class McpClientManager {
     name: string,
     config: MCPServerConfig,
   ): Promise<void> {
+    const existing = this.clients.get(name);
+    if (
+      existing &&
+      existing.getServerConfig().extension?.id !== config.extension?.id
+    ) {
+      const extensionText = config.extension
+        ? ` from extension "${config.extension.name}"`
+        : '';
+      debugLogger.warn(
+        `Skipping MCP config for server with name "${name}"${extensionText} as it already exists.`,
+      );
+      return;
+    }
+
     // Always track server config for UI display
     this.allServerConfigs.set(name, config);
 
@@ -191,7 +290,6 @@ export class McpClientManager {
     }
     // User-disabled servers: disconnect if running, don't start
     if (await this.isDisabledByUser(name)) {
-      const existing = this.clients.get(name);
       if (existing) {
         await this.disconnectClient(name);
       }
@@ -203,45 +301,32 @@ export class McpClientManager {
     if (config.extension && !config.extension.isActive) {
       return;
     }
-    const existing = this.clients.get(name);
-    if (existing && existing.getServerConfig().extension !== config.extension) {
-      const extensionText = config.extension
-        ? ` from extension "${config.extension.name}"`
-        : '';
-      debugLogger.warn(
-        `Skipping MCP config for server with name "${name}"${extensionText} as it already exists.`,
-      );
-      return;
-    }
 
     const currentDiscoveryPromise = new Promise<void>((resolve, reject) => {
       (async () => {
         try {
           if (existing) {
+            this.clients.delete(name);
             await existing.disconnect();
           }
 
-          const client =
-            existing ??
-            new McpClient(
-              name,
-              config,
-              this.toolRegistry,
-              this.cliConfig.getPromptRegistry(),
-              this.cliConfig.getResourceRegistry(),
-              this.cliConfig.getWorkspaceContext(),
-              this.cliConfig,
-              this.cliConfig.getDebugMode(),
-              this.clientVersion,
-              async () => {
-                debugLogger.log('Tools changed, updating Gemini context...');
-                await this.scheduleMcpContextRefresh();
-              },
-            );
-          if (!existing) {
-            this.clients.set(name, client);
-            this.eventEmitter?.emit('mcp-client-update', this.clients);
-          }
+          const client = new McpClient(
+            name,
+            config,
+            this.toolRegistry,
+            this.cliConfig.getPromptRegistry(),
+            this.cliConfig.getResourceRegistry(),
+            this.cliConfig.getWorkspaceContext(),
+            this.cliConfig,
+            this.cliConfig.getDebugMode(),
+            this.clientVersion,
+            async () => {
+              debugLogger.log('Tools changed, updating Gemini context...');
+              await this.scheduleMcpContextRefresh();
+            },
+          );
+          this.clients.set(name, client);
+          this.eventEmitter?.emit('mcp-client-update', this.clients);
           try {
             await client.connect();
             await client.discover(this.cliConfig);
@@ -253,7 +338,7 @@ export class McpClientManager {
             if (!isAuthenticationError(error)) {
               // Log the error but don't let a single failed server stop the others
               const errorMessage = getErrorMessage(error);
-              coreEvents.emitFeedback(
+              this.emitDiagnostic(
                 'error',
                 `Error during discovery for MCP server '${name}': ${errorMessage}`,
                 error,
@@ -262,7 +347,7 @@ export class McpClientManager {
           }
         } catch (error) {
           const errorMessage = getErrorMessage(error);
-          coreEvents.emitFeedback(
+          this.emitDiagnostic(
             'error',
             `Error initializing MCP server '${name}': ${errorMessage}`,
             error,
@@ -391,7 +476,7 @@ export class McpClientManager {
         try {
           await client.disconnect();
         } catch (error) {
-          coreEvents.emitFeedback(
+          this.emitDiagnostic(
             'error',
             `Error stopping client '${name}':`,
             error,
