@@ -137,15 +137,21 @@ export type TextEmphasis = 'high' | 'medium' | 'low';
 type ToolStatusIndicatorProps = {
   status: CoreToolCallStatus;
   name: string;
+  isFocused?: boolean;
 };
 
 export const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
   status: coreStatus,
   name,
+  isFocused,
 }) => {
   const status = mapCoreStatusToDisplayStatus(coreStatus);
   const isShell = isShellTool(name);
-  const statusColor = isShell ? theme.ui.active : theme.status.warning;
+  const statusColor = isFocused
+    ? theme.ui.focus
+    : isShell
+      ? theme.ui.active
+      : theme.status.warning;
 
   return (
     <Box minWidth={STATUS_INDICATOR_WIDTH}>
