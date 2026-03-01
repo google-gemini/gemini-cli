@@ -7,7 +7,11 @@
 import type { Mock } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getInstallationInfo, PackageManager } from './installationInfo.js';
-import { updateEventEmitter } from './updateEventEmitter.js';
+import {
+  updateEventEmitter,
+  isUpdateInProgress,
+  setUpdateInProgress,
+} from './updateEventEmitter.js';
 import type { UpdateObject } from '../ui/utils/updateCheck.js';
 import type { LoadedSettings } from '../config/settings.js';
 import EventEmitter from 'node:events';
@@ -180,6 +184,86 @@ describe('handleAutoUpdate', () => {
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
 
     expect(mockSpawn).toHaveBeenCalledOnce();
+  });
+
+  it('should set updateInProgress to true when update spawns', () => {
+    mockGetInstallationInfo.mockReturnValue({
+      updateCommand: 'npm i -g @google/gemini-cli@latest',
+      updateMessage: 'Updating...',
+      isGlobal: true,
+      packageManager: PackageManager.NPM,
+    });
+
+    setUpdateInProgress(false);
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+
+    expect(isUpdateInProgress()).toBe(true);
+
+    // Clean up
+    mockChildProcess.emit('close', 0);
+  });
+
+  it('should clear updateInProgress when update succeeds', async () => {
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'Updating...',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      setUpdateInProgress(false);
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+      expect(isUpdateInProgress()).toBe(true);
+
+      setTimeout(() => {
+        mockChildProcess.emit('close', 0);
+        expect(isUpdateInProgress()).toBe(false);
+        resolve();
+      }, 0);
+    });
+  });
+
+  it('should clear updateInProgress when update fails', async () => {
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'Updating...',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      setUpdateInProgress(false);
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+      expect(isUpdateInProgress()).toBe(true);
+
+      setTimeout(() => {
+        mockChildProcess.emit('close', 1);
+        expect(isUpdateInProgress()).toBe(false);
+        resolve();
+      }, 0);
+    });
+  });
+
+  it('should clear updateInProgress on spawn error', async () => {
+    await new Promise<void>((resolve) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: 'npm i -g @google/gemini-cli@latest',
+        updateMessage: 'Updating...',
+        isGlobal: true,
+        packageManager: PackageManager.NPM,
+      });
+
+      setUpdateInProgress(false);
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+      expect(isUpdateInProgress()).toBe(true);
+
+      setTimeout(() => {
+        mockChildProcess.emit('error', new Error('spawn error'));
+        expect(isUpdateInProgress()).toBe(false);
+        resolve();
+      }, 0);
+    });
   });
 
   it('should emit "update-failed" when the update process fails', async () => {

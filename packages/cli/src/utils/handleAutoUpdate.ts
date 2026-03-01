@@ -7,7 +7,10 @@
 import type { UpdateObject } from '../ui/utils/updateCheck.js';
 import type { LoadedSettings } from '../config/settings.js';
 import { getInstallationInfo, PackageManager } from './installationInfo.js';
-import { updateEventEmitter } from './updateEventEmitter.js';
+import {
+  updateEventEmitter,
+  setUpdateInProgress,
+} from './updateEventEmitter.js';
 import type { HistoryItem } from '../ui/types.js';
 import { MessageType } from '../ui/types.js';
 import { spawnWrapper } from './spawnWrapper.js';
@@ -75,8 +78,10 @@ export function handleAutoUpdate(
   });
   // Un-reference the child process to allow the parent to exit independently.
   updateProcess.unref();
+  setUpdateInProgress(true);
 
   updateProcess.on('close', (code) => {
+    setUpdateInProgress(false);
     if (code === 0) {
       updateEventEmitter.emit('update-success', {
         message:
@@ -90,6 +95,7 @@ export function handleAutoUpdate(
   });
 
   updateProcess.on('error', (err) => {
+    setUpdateInProgress(false);
     updateEventEmitter.emit('update-failed', {
       message: `Automatic update failed. Please try updating manually. (error: ${err.message})`,
     });
