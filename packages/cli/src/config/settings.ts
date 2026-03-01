@@ -87,10 +87,10 @@ const AUTH_ENV_VAR_WHITELIST = [
 
 /**
  * Sanitizes an environment variable value to prevent shell injection.
- * Restricts values to a safe character set: alphanumeric, -, _, ., /
+ * Restricts values to a safe character set: alphanumeric, -, _, ., /, +, =
  */
 export function sanitizeEnvVar(value: string): string {
-  return value.replace(/[^a-zA-Z0-9\-_./]/g, '');
+  return value.replace(/[^a-zA-Z0-9\-_./+=]/g, '');
 }
 
 export function getSystemSettingsPath(): string {
