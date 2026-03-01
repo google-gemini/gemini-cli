@@ -183,10 +183,11 @@ export class GeminiClient {
     currentRequest: PartListUnion,
     prompt_id: string,
     turn?: Turn,
+    stopHookActive: boolean = false,
   ): Promise<DefaultHookOutput | undefined> {
     const hookState = this.hookStateMap.get(prompt_id);
     // Only fire on the outermost call (when activeCalls is 1)
-    if (!hookState || hookState.activeCalls !== 1) {
+    if (!hookState || (hookState.activeCalls !== 1 && !stopHookActive)) {
       return undefined;
     }
 
@@ -202,7 +203,11 @@ export class GeminiClient {
 
     const hookOutput = await this.config
       .getHookSystem()
-      ?.fireAfterAgentEvent(partToString(finalRequest), finalResponseText);
+      ?.fireAfterAgentEvent(
+        partToString(finalRequest),
+        finalResponseText,
+        stopHookActive,
+      );
 
     return hookOutput;
   }
@@ -793,6 +798,7 @@ export class GeminiClient {
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
     displayContent?: PartListUnion,
+    stopHookActive: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
@@ -857,6 +863,7 @@ export class GeminiClient {
           request,
           prompt_id,
           turn,
+          stopHookActive,
         );
 
         // Cast to AfterAgentHookOutput for access to shouldClearContext()
@@ -902,6 +909,7 @@ export class GeminiClient {
             boundedTurns - 1,
             false,
             displayContent,
+            true, // stopHookActive: signal retry to AfterAgent hooks
           );
         }
       }
