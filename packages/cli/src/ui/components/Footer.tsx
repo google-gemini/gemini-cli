@@ -58,6 +58,8 @@ export const Footer: React.FC = () => {
     quotaStats: uiState.quota.stats,
   };
 
+  const { expandMcpOutputs } = uiState;
+
   const showMemoryUsage =
     config.getDebugMode() || settings.merged.ui.showMemoryUsage;
   const isFullErrorVerbosity = settings.merged.ui.errorVerbosity === 'full';
@@ -90,6 +92,9 @@ export const Footer: React.FC = () => {
           {displayVimMode && (
             <Text color={theme.text.secondary}>[{displayVimMode}] </Text>
           )}
+          <Text color={theme.text.secondary}>
+            [{expandMcpOutputs ? 'expanded' : 'compact'}]{' '}
+          </Text>
           {!hideCWD && (
             <Text color={theme.text.primary}>
               {displayPath}
