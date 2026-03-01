@@ -109,15 +109,15 @@
     <text x="162" y="138" fill="#ac6e9c" textLength="9" lengthAdjust="spacingAndGlyphs">░</text>
     <text x="171" y="138" fill="#b26c95" textLength="9" lengthAdjust="spacingAndGlyphs">░</text>
     <text x="180" y="138" fill="#b86a8d" textLength="9" lengthAdjust="spacingAndGlyphs">░</text>
-    <text x="0" y="172" fill="#6c7086" textLength="864" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────╮</text>
-    <text x="0" y="189" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="172" fill="#89b4fa" textLength="864" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────╮</text>
+    <text x="0" y="189" fill="#89b4fa" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="9" y="189" fill="#ffffff" textLength="846" lengthAdjust="spacingAndGlyphs"> ⊷  run_shell_command                                                                         </text>
-    <text x="855" y="189" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="0" y="206" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="855" y="206" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="0" y="223" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="855" y="189" fill="#89b4fa" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="206" fill="#89b4fa" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="855" y="206" fill="#89b4fa" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="223" fill="#89b4fa" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="9" y="223" fill="#ffffff" textLength="846" lengthAdjust="spacingAndGlyphs"> Running command...                                                                           </text>
-    <text x="855" y="223" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="0" y="240" fill="#6c7086" textLength="864" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────────────────────╯</text>
+    <text x="855" y="223" fill="#89b4fa" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="240" fill="#89b4fa" textLength="864" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────────────────────╯</text>
   </g>
 </svg>

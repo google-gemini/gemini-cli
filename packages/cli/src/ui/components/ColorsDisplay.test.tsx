@@ -33,11 +33,11 @@ describe('ColorsDisplay', () => {
       },
       border: {
         default: '#555555',
-        focused: '#0000ff',
       },
       ui: {
         comment: '#666666',
         symbol: '#cccccc',
+        active: '#0000ff',
         dark: '#333333',
         focus: '#0000ff',
         gradient: undefined,
@@ -72,12 +72,13 @@ describe('ColorsDisplay', () => {
         },
         border: {
           default: '#555555',
-          focused: '#0000ff',
         },
         ui: {
           comment: '#666666',
           symbol: '#cccccc',
+          active: '#0000ff',
           dark: '#333333',
+          focus: '#0000ff',
           gradient: undefined,
         },
         status: {

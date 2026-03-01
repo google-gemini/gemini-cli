@@ -203,7 +203,7 @@ describe('getToolGroupBorderAppearance', () => {
     });
   });
 
-  it('returns symbol border for executing shell commands', () => {
+  it('returns active border for executing shell commands', () => {
     const item = {
       type: 'tool_group' as const,
       tools: [
@@ -219,7 +219,37 @@ describe('getToolGroupBorderAppearance', () => {
       ],
       id: 1,
     };
-    // While executing shell commands, it's dim false, border symbol
+    // While executing shell commands, it's dim false, border active
+    const result = getToolGroupBorderAppearance(
+      item,
+      activeShellPtyId,
+      false,
+      [],
+      mockBackgroundShells,
+    );
+    expect(result).toEqual({
+      borderColor: theme.ui.active,
+      borderDimColor: true,
+    });
+  });
+
+  it('returns focus border for focused executing shell commands', () => {
+    const item = {
+      type: 'tool_group' as const,
+      tools: [
+        {
+          callId: '1',
+          name: SHELL_COMMAND_NAME,
+          description: '',
+          status: CoreToolCallStatus.Executing,
+          ptyId: activeShellPtyId,
+          resultDisplay: undefined,
+          confirmationDetails: undefined,
+        } as IndividualToolCallDisplay,
+      ],
+      id: 1,
+    };
+    // When focused, it's dim false, border focus
     const result = getToolGroupBorderAppearance(
       item,
       activeShellPtyId,
@@ -228,12 +258,12 @@ describe('getToolGroupBorderAppearance', () => {
       mockBackgroundShells,
     );
     expect(result).toEqual({
-      borderColor: theme.ui.symbol,
+      borderColor: theme.ui.focus,
       borderDimColor: false,
     });
   });
 
-  it('returns symbol border and dims color for background executing shell command when another shell is active', () => {
+  it('returns active border and dims color for background executing shell command when another shell is active', () => {
     const item = {
       type: 'tool_group' as const,
       tools: [
@@ -257,7 +287,7 @@ describe('getToolGroupBorderAppearance', () => {
       mockBackgroundShells,
     );
     expect(result).toEqual({
-      borderColor: theme.ui.symbol,
+      borderColor: theme.ui.active,
       borderDimColor: true,
     });
   });
@@ -275,7 +305,7 @@ describe('getToolGroupBorderAppearance', () => {
     );
     // Since there are no tools to inspect, it falls back to empty pending, but isCurrentlyInShellTurn=true
     // so it counts as pending shell.
-    expect(result.borderColor).toEqual(theme.ui.symbol);
+    expect(result.borderColor).toEqual(theme.ui.focus);
     // It shouldn't be dim because there are no tools to say it isEmbeddedShellFocused = false
     expect(result.borderDimColor).toBe(false);
   });

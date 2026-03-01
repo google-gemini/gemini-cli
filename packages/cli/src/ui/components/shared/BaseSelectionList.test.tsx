@@ -19,7 +19,6 @@ vi.mock('../../hooks/useSelectionList.js');
 
 const mockTheme = {
   text: { primary: 'COLOR_PRIMARY', secondary: 'COLOR_SECONDARY' },
-  status: { success: 'COLOR_SUCCESS' },
   ui: { focus: 'COLOR_FOCUS' },
   background: { focus: 'COLOR_FOCUS_BG' },
 } as typeof theme;
@@ -27,7 +26,6 @@ const mockTheme = {
 vi.mock('../../semantic-colors.js', () => ({
   theme: {
     text: { primary: 'COLOR_PRIMARY', secondary: 'COLOR_SECONDARY' },
-    status: { success: 'COLOR_SUCCESS' },
     ui: { focus: 'COLOR_FOCUS' },
     background: { focus: 'COLOR_FOCUS_BG' },
   },

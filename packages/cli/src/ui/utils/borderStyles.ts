@@ -113,9 +113,10 @@ export function getToolGroupBorderAppearance(
       isCurrentlyInShellTurn &&
       !!embeddedShellFocused);
 
-  const borderColor =
-    (isShell && isPending) || isEffectivelyFocused
-      ? theme.ui.symbol
+  const borderColor = isEffectivelyFocused
+    ? theme.ui.focus
+    : isShell && isPending
+      ? theme.ui.active
       : isPending
         ? theme.status.warning
         : theme.border.default;

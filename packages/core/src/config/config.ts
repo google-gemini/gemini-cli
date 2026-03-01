@@ -250,11 +250,11 @@ export interface CustomTheme {
   };
   border?: {
     default?: string;
-    focused?: string;
   };
   ui?: {
     comment?: string;
     symbol?: string;
+    active?: string;
     focus?: string;
     gradient?: string[];
   };

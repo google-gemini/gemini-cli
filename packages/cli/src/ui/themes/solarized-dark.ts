@@ -47,11 +47,11 @@ const semanticColors: SemanticColors = {
   },
   border: {
     default: '#073642',
-    focused: '#586e75',
   },
   ui: {
     comment: '#586e75',
     symbol: '#93a1a1',
+    active: '#268bd2',
     dark: '#073642',
     focus: '#859900',
     gradient: ['#268bd2', '#2aa198', '#859900'],

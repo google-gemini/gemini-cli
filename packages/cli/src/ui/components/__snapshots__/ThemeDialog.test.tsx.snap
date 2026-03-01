@@ -34,7 +34,7 @@ exports[`Initial Theme Selection > should default to a dark theme when terminal 
 │                                              │  Value     Name                                 │ │
 │                                              │   #1E1E…  backgroun Main terminal background    │ │
 │                                              │           d.primary color                       │ │
-│                                              │   #2a2…  backgroun  Subtle background for       │ │
+│                                              │   #313…  backgroun  Subtle background for       │ │
 │                                              │          d.message  message blocks              │ │
 │                                              │   #313…   backgroun Background for the input    │ │
 │                                              │           d.input   prompt                      │ │
@@ -59,17 +59,17 @@ exports[`Initial Theme Selection > should default to a dark theme when terminal 
 │                                              │                    if blank)                    │ │
 │                                              │  #3d3f51   border.def Standard border color     │ │
 │                                              │            ault                                 │ │
-│                                              │  #89B4FAborder.fo  Border color when an         │ │
-│                                              │         cused      element is focused           │ │
 │                                              │  #6C7086ui.comme  Color for code comments and   │ │
 │                                              │         nt        metadata                      │ │
 │                                              │  #89DCE ui.symbol Color for technical symbols   │ │
 │                                              │  B                and UI icons                  │ │
+│                                              │  #89B4F ui.active Border color for active or    │ │
+│                                              │  A                running elements              │ │
 │                                              │  #3d3f5 ui.dark    Deeply dimmed color for      │ │
 │                                              │  1                 subtle UI elements           │ │
-│                                              │  #A6E3A ui.focus   Color for focused or         │ │
-│                                              │  1                 selected UI elements (e.g.   │ │
-│                                              │                    menu items)                  │ │
+│                                              │  #A6E3A ui.focus   Color for focused elements   │ │
+│                                              │  1                 (e.g. selected menu items,   │ │
+│                                              │                    focused borders)             │ │
 │                                              │  #F38BA8status.err Color for error messages     │ │
 │                                              │         or         and critical status          │ │
 │                                              │  #A6E3A1status.suc Color for success messages   │ │
@@ -121,7 +121,7 @@ exports[`Initial Theme Selection > should default to a light theme when terminal
 │                                              │  Value     Name                                 │ │
 │                                              │   #FAFA…  backgroun Main terminal background    │ │
 │                                              │           d.primary color                       │ │
-│                                              │   #eae…  backgroun  Subtle background for       │ │
+│                                              │   #e2e…  backgroun  Subtle background for       │ │
 │                                              │          d.message  message blocks              │ │
 │                                              │   #e2e…   backgroun Background for the input    │ │
 │                                              │           d.input   prompt                      │ │
@@ -146,17 +146,17 @@ exports[`Initial Theme Selection > should default to a light theme when terminal
 │                                              │                    if blank)                    │ │
 │                                              │  #d2d6dc   border.def Standard border color     │ │
 │                                              │            ault                                 │ │
-│                                              │  #3B82F6border.fo  Border color when an         │ │
-│                                              │         cused      element is focused           │ │
 │                                              │  #97a0b0ui.comme  Color for code comments and   │ │
 │                                              │         nt        metadata                      │ │
 │                                              │  #06B6D ui.symbol Color for technical symbols   │ │
 │                                              │  4                and UI icons                  │ │
+│                                              │  #3B82F ui.active Border color for active or    │ │
+│                                              │  6                running elements              │ │
 │                                              │  #d2d6d ui.dark    Deeply dimmed color for      │ │
 │                                              │  c                 subtle UI elements           │ │
-│                                              │  #3CA84 ui.focus   Color for focused or         │ │
-│                                              │  B                 selected UI elements (e.g.   │ │
-│                                              │                    menu items)                  │ │
+│                                              │  #3CA84 ui.focus   Color for focused elements   │ │
+│                                              │  B                 (e.g. selected menu items,   │ │
+│                                              │                    focused borders)             │ │
 │                                              │  #DD4C4Cstatus.err Color for error messages     │ │
 │                                              │         or         and critical status          │ │
 │                                              │  #3CA84Bstatus.suc Color for success messages   │ │
@@ -208,7 +208,7 @@ exports[`Initial Theme Selection > should use the theme from settings even if te
 │                                              │  Value     Name                                 │ │
 │                                              │   #1E1E…  backgroun Main terminal background    │ │
 │                                              │           d.primary color                       │ │
-│                                              │   #2a2…  backgroun  Subtle background for       │ │
+│                                              │   #313…  backgroun  Subtle background for       │ │
 │                                              │          d.message  message blocks              │ │
 │                                              │   #313…   backgroun Background for the input    │ │
 │                                              │           d.input   prompt                      │ │
@@ -233,17 +233,17 @@ exports[`Initial Theme Selection > should use the theme from settings even if te
 │                                              │                    if blank)                    │ │
 │                                              │  #3d3f51   border.def Standard border color     │ │
 │                                              │            ault                                 │ │
-│                                              │  #89B4FAborder.fo  Border color when an         │ │
-│                                              │         cused      element is focused           │ │
 │                                              │  #6C7086ui.comme  Color for code comments and   │ │
 │                                              │         nt        metadata                      │ │
 │                                              │  #89DCE ui.symbol Color for technical symbols   │ │
 │                                              │  B                and UI icons                  │ │
+│                                              │  #89B4F ui.active Border color for active or    │ │
+│                                              │  A                running elements              │ │
 │                                              │  #3d3f5 ui.dark    Deeply dimmed color for      │ │
 │                                              │  1                 subtle UI elements           │ │
-│                                              │  #A6E3A ui.focus   Color for focused or         │ │
-│                                              │  1                 selected UI elements (e.g.   │ │
-│                                              │                    menu items)                  │ │
+│                                              │  #A6E3A ui.focus   Color for focused elements   │ │
+│                                              │  1                 (e.g. selected menu items,   │ │
+│                                              │                    focused borders)             │ │
 │                                              │  #F38BA8status.err Color for error messages     │ │
 │                                              │         or         and critical status          │ │
 │                                              │  #A6E3A1status.suc Color for success messages   │ │
@@ -309,7 +309,7 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │                                              │  Value     Name                                 │ │
 │                                              │   #1E1E…  backgroun Main terminal background    │ │
 │                                              │           d.primary color                       │ │
-│                                              │   #2a2…  backgroun  Subtle background for       │ │
+│                                              │   #313…  backgroun  Subtle background for       │ │
 │                                              │          d.message  message blocks              │ │
 │                                              │   #313…   backgroun Background for the input    │ │
 │                                              │           d.input   prompt                      │ │
@@ -334,17 +334,17 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │                                              │                    if blank)                    │ │
 │                                              │  #3d3f51   border.def Standard border color     │ │
 │                                              │            ault                                 │ │
-│                                              │  #89B4FAborder.fo  Border color when an         │ │
-│                                              │         cused      element is focused           │ │
 │                                              │  #6C7086ui.comme  Color for code comments and   │ │
 │                                              │         nt        metadata                      │ │
 │                                              │  #6C708 ui.symbol Color for technical symbols   │ │
 │                                              │  6                and UI icons                  │ │
+│                                              │  #89B4F ui.active Border color for active or    │ │
+│                                              │  A                running elements              │ │
 │                                              │  #3d3f5 ui.dark    Deeply dimmed color for      │ │
 │                                              │  1                 subtle UI elements           │ │
-│                                              │  #A6E3A ui.focus   Color for focused or         │ │
-│                                              │  1                 selected UI elements (e.g.   │ │
-│                                              │                    menu items)                  │ │
+│                                              │  #A6E3A ui.focus   Color for focused elements   │ │
+│                                              │  1                 (e.g. selected menu items,   │ │
+│                                              │                    focused borders)             │ │
 │                                              │  #F38BA8status.err Color for error messages     │ │
 │                                              │         or         and critical status          │ │
 │                                              │  #A6E3A1status.suc Color for success messages   │ │

@@ -103,11 +103,11 @@ describe('<Header />', () => {
       },
       border: {
         default: '',
-        focused: '',
       },
       ui: {
         comment: '',
         symbol: '',
+        active: '',
         dark: '',
         focus: '',
         gradient: undefined,

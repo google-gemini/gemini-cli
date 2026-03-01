@@ -98,7 +98,7 @@ export function ApiAuthDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={theme.border.focused}
+      borderColor={theme.ui.focus}
       flexDirection="column"
       padding={1}
       width="100%"

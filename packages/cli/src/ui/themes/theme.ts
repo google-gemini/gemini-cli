@@ -10,7 +10,6 @@ import type { SemanticColors } from './semantic-tokens.js';
 
 import type { CustomTheme } from '@google/gemini-cli-core';
 import {
-  DEFAULT_BACKGROUND_OPACITY,
   DEFAULT_INPUT_BACKGROUND_OPACITY,
   DEFAULT_SELECTION_OPACITY,
   DEFAULT_BORDER_OPACITY,
@@ -208,7 +207,7 @@ export const lightTheme: ColorsTheme = {
   MessageBackground: interpolateColor(
     '#FAFAFA',
     '#97a0b0',
-    DEFAULT_BACKGROUND_OPACITY,
+    DEFAULT_INPUT_BACKGROUND_OPACITY,
   ),
   FocusBackground: interpolateColor(
     '#FAFAFA',
@@ -242,7 +241,7 @@ export const darkTheme: ColorsTheme = {
   MessageBackground: interpolateColor(
     '#1E1E2E',
     '#6C7086',
-    DEFAULT_BACKGROUND_OPACITY,
+    DEFAULT_INPUT_BACKGROUND_OPACITY,
   ),
   FocusBackground: interpolateColor(
     '#1E1E2E',
@@ -313,7 +312,7 @@ export class Theme {
           interpolateColor(
             this.colors.Background,
             this.colors.Gray,
-            DEFAULT_BACKGROUND_OPACITY,
+            DEFAULT_INPUT_BACKGROUND_OPACITY,
           ),
         input:
           this.colors.InputBackground ??
@@ -336,11 +335,11 @@ export class Theme {
       },
       border: {
         default: this.colors.DarkGray,
-        focused: this.colors.AccentBlue,
       },
       ui: {
         comment: this.colors.Gray,
         symbol: this.colors.AccentCyan,
+        active: this.colors.AccentBlue,
         dark: this.colors.DarkGray,
         focus: this.colors.FocusColor ?? this.colors.AccentGreen,
         gradient: this.colors.GradientColors,
@@ -449,7 +448,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
     MessageBackground: interpolateColor(
       customTheme.background?.primary ?? customTheme.Background ?? '',
       customTheme.text?.secondary ?? customTheme.Gray ?? '',
-      DEFAULT_BACKGROUND_OPACITY,
+      DEFAULT_INPUT_BACKGROUND_OPACITY,
     ),
     FocusBackground: interpolateColor(
       customTheme.background?.primary ?? customTheme.Background ?? '',
@@ -621,11 +620,11 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
     },
     border: {
       default: colors.DarkGray,
-      focused: customTheme.border?.focused ?? colors.AccentBlue,
     },
     ui: {
       comment: customTheme.ui?.comment ?? colors.Comment,
       symbol: customTheme.ui?.symbol ?? colors.Gray,
+      active: customTheme.ui?.active ?? colors.AccentBlue,
       dark: colors.DarkGray,
       focus: colors.FocusColor ?? colors.AccentGreen,
       gradient: customTheme.ui?.gradient ?? colors.GradientColors,

@@ -11,7 +11,7 @@ import type { LoadingPhrasesMode } from '../../config/settings.js';
 
 export const PHRASE_CHANGE_INTERVAL_MS = 15000;
 export const INTERACTIVE_SHELL_WAITING_PHRASE =
-  'Interactive shell awaiting input... press tab to focus shell';
+  'Interactive shell awaiting input...';
 
 /**
  * Custom hook to manage cycling through loading phrases.

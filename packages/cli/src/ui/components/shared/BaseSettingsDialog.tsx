@@ -451,7 +451,7 @@ export function BaseSettingsDialog({
               editingKey
                 ? theme.border.default
                 : focusSection === 'settings'
-                  ? theme.border.focused
+                  ? theme.ui.focus
                   : theme.border.default
             }
             paddingX={1}
