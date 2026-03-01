@@ -867,14 +867,14 @@ export async function* execStreaming(
           // If we have an accumulated error or explicit error event
           if (error) reject(error);
           else {
-            const stderr = Buffer.concat(errorChunks).toString('utf8');
-            const truncatedMsg =
-              stderrTotalBytes >= MAX_STDERR_BYTES ? '...[truncated]' : '';
-            reject(
-              new Error(
-                `Process exited with code ${code}: ${stderr}${truncatedMsg}`,
-              ),
-            );
+            let stderr = Buffer.concat(errorChunks).toString('utf8');
+
+            // If it's too large, keep the TAIL instead of the HEAD
+            if (stderrTotalBytes >= MAX_STDERR_BYTES) {
+              stderr = '\n...[truncated]\n' + stderr.slice(-MAX_STDERR_BYTES);
+            }
+
+            reject(new Error(`Process exited with code ${code}: ${stderr}`));
           }
         }
       }
