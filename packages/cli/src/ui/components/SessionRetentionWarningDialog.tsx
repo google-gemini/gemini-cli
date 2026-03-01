@@ -24,7 +24,7 @@ export const SessionRetentionWarningDialog = ({
 }: SessionRetentionWarningDialogProps) => {
   const options: Array<RadioSelectItem<() => void>> = [
     {
-      label: 'Keep for 30 days (Recommended)',
+      label: 'Keep for 30 days (recommended)',
       value: onKeep30Days,
       key: '30days',
       sublabel: `${sessionsToDeleteCount} session${
@@ -47,14 +47,14 @@ export const SessionRetentionWarningDialog = ({
       width="100%"
       padding={1}
     >
-      <Box marginBottom={1} justifyContent="center" width="100%">
+      <Box marginBottom={1} width="100%">
         <Text bold>Keep chat history</Text>
       </Box>
 
       <Box flexDirection="column" gap={1} marginBottom={1}>
         <Text>
-          To keep your workspace clean, we are introducing a limit on how long
-          chat sessions are stored. Please choose a retention period for your
+          To keep your workspace clean, we&lsquo;re introducing a limit on how
+          long chat sessions are stored. Choose a retention period for your
           existing chats:
         </Text>
       </Box>
@@ -69,8 +69,9 @@ export const SessionRetentionWarningDialog = ({
 
       <Box marginTop={1}>
         <Text color={theme.text.secondary}>
-          Set a custom limit <Text color={theme.text.primary}>/settings</Text>{' '}
-          and change &quot;Keep chat history&quot;.
+          Set a custom limit in{' '}
+          <Text color={theme.text.primary}>/settings</Text> and change
+          &quot;Keep chat history&quot;.
         </Text>
       </Box>
     </Box>

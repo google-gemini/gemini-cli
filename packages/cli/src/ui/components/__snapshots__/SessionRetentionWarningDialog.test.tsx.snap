@@ -3,18 +3,18 @@
 exports[`SessionRetentionWarningDialog > should match snapshot 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
-│                                        Keep chat history                                         │
+│ Keep chat history                                                                                │
 │                                                                                                  │
-│ To keep your workspace clean, we are introducing a limit on how long chat sessions are stored.   │
-│ Please choose a retention period for your existing chats:                                        │
+│ To keep your workspace clean, we‘re introducing a limit on how long chat sessions are stored.    │
+│ Choose a retention period for your existing chats:                                               │
 │                                                                                                  │
 │                                                                                                  │
-│   1. Keep for 30 days (Recommended)                                                              │
+│   1. Keep for 30 days (recommended)                                                              │
 │      123 sessions will be deleted                                                                │
 │ ● 2. Keep for 120 days                                                                           │
 │      No sessions will be deleted at this time                                                    │
 │                                                                                                  │
-│ Set a custom limit /settings and change "Keep chat history".                                     │
+│ Set a custom limit in /settings and change "Keep chat history".                                  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
