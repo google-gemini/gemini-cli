@@ -124,7 +124,18 @@ function ruleMatches(
         return false;
       }
     } else if (toolCall.name !== rule.toolName) {
-      return false;
+      // Check if rule uses an unqualified name that matches the tool part
+      // of a qualified MCP tool call (e.g., rule "notify_user" should match
+      // call "craftMCP__notify_user" when serverName is "craftMCP").
+      if (
+        serverName &&
+        !rule.toolName.includes('__') &&
+        toolCall.name === `${serverName}__${rule.toolName}`
+      ) {
+        // Match: unqualified rule name matches the qualified tool call
+      } else {
+        return false;
+      }
     }
   }
 
