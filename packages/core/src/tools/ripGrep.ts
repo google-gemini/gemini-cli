@@ -5,6 +5,7 @@
  */
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
@@ -37,7 +38,32 @@ function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
 }
 
+/**
+ * Checks if ripgrep (rg) is available in the system PATH.
+ * Prefers system-installed ripgrep to avoid download hangs in restricted/proxy environments.
+ */
+function findRgInSystemPath(): string | null {
+  const whichCmd = process.platform === 'win32' ? 'where' : 'which';
+  const result = spawnSync(whichCmd, ['rg'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  if (result.status !== 0 || !result.stdout?.trim()) {
+    return null;
+  }
+  const pathOutput = result.stdout
+    .trim()
+    .split(/[\r\n]+/)[0]
+    ?.trim();
+  return pathOutput || null;
+}
+
 async function resolveExistingRgPath(): Promise<string | null> {
+  // First check system PATH (avoids 3-5 min hang when download fails in proxy/restricted networks)
+  const systemRg = findRgInSystemPath();
+  if (systemRg) {
+    return systemRg;
+  }
   const binDir = Storage.getGlobalBinDir();
   for (const fileName of getRgCandidateFilenames()) {
     const candidatePath = path.join(binDir, fileName);
@@ -47,6 +73,8 @@ async function resolveExistingRgPath(): Promise<string | null> {
   }
   return null;
 }
+
+const RIPGREP_DOWNLOAD_TIMEOUT_MS = 30_000;
 
 let ripgrepAcquisitionPromise: Promise<string | null> | null = null;
 
@@ -58,8 +86,21 @@ async function ensureRipgrepAvailable(): Promise<string | null> {
   if (!ripgrepAcquisitionPromise) {
     ripgrepAcquisitionPromise = (async () => {
       try {
-        await downloadRipGrep(Storage.getGlobalBinDir());
+        const downloadPromise = downloadRipGrep(Storage.getGlobalBinDir());
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('Ripgrep download timed out')),
+            RIPGREP_DOWNLOAD_TIMEOUT_MS,
+          ),
+        );
+        await Promise.race([downloadPromise, timeoutPromise]);
         return await resolveExistingRgPath();
+      } catch (error) {
+        debugLogger.warn(
+          `Failed to download ripgrep: ${getErrorMessage(error)}. ` +
+            'Install ripgrep (e.g., apt install ripgrep) for faster file search.',
+        );
+        return null;
       } finally {
         ripgrepAcquisitionPromise = null;
       }
