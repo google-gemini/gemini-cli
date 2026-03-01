@@ -158,6 +158,30 @@ describe('retryWithBackoff', () => {
     expect(mockFn).not.toHaveBeenCalled();
   });
 
+  it('should retry on HTTP 499 (Client Closed Request) error', async () => {
+    let attempts = 0;
+    const mockFn = vi.fn(async () => {
+      attempts++;
+      if (attempts === 1) {
+        const error: HttpError = new Error('Simulated 499 error');
+        error.status = 499;
+        throw error;
+      }
+      return 'success';
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 2,
+      initialDelayMs: 10,
+    });
+
+    await vi.runAllTimersAsync();
+
+    const result = await promise;
+    expect(result).toBe('success');
+    expect(mockFn).toHaveBeenCalledTimes(2);
+  });
+
   it('should use default shouldRetry if not provided, retrying on ApiError 429', async () => {
     const mockFn = vi.fn(async () => {
       throw new ApiError({ message: 'Too Many Requests', status: 429 });

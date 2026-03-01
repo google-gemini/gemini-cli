@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="54" viewBox="0 0 920 54">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="54" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#e5e5e5" textLength="900" lengthAdjust="spacingAndGlyphs">yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy</text>
+    <text x="0" y="19" fill="#e5e5e5" textLength="675" lengthAdjust="spacingAndGlyphs">yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy</text>
+  </g>
+</svg>

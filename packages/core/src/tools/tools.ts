@@ -832,6 +832,7 @@ export enum Kind {
   Search = 'search',
   Execute = 'execute',
   Think = 'think',
+  Agent = 'agent',
   Fetch = 'fetch',
   Communicate = 'communicate',
   Plan = 'plan',
