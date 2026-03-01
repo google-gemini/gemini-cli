@@ -304,16 +304,12 @@ export class ShellExecutionService {
       const isWindows = os.platform() === 'win32';
       const { executable, argsPrefix, shell } = getShellConfiguration();
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-
-      // Force PowerShell on Windows to use UTF-8 encoding.
-      // Without this, multibyte characters (e.g., Japanese, Chinese) appear garbled.
-      const isPowerShell =
-        isWindows &&
-        (executable.toLowerCase().includes('powershell') ||
-          executable.toLowerCase().includes('pwsh'));
-      const finalCommand = isPowerShell
-        ? `$OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${guardedCommand}`
-        : guardedCommand;
+      const finalCommand =
+        ShellExecutionService.applyWindowsPowerShellEncodingFix(
+          guardedCommand,
+          executable,
+          isWindows,
+        );
 
       const spawnArgs = [...argsPrefix, finalCommand];
 
@@ -577,19 +573,13 @@ export class ShellExecutionService {
       }
 
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-
-      // Force PowerShell on Windows to use UTF-8 encoding.
-      // Without this, multibyte characters (e.g., Japanese, Chinese) appear garbled.
       const isWindows = process.platform === 'win32';
-      const isPowerShell =
-        isWindows &&
-        (executable.toLowerCase().includes('powershell') ||
-          executable.toLowerCase().includes('pwsh'));
-
-      const finalCommand = isPowerShell
-        ? `$OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${guardedCommand}`
-        : guardedCommand;
-
+      const finalCommand =
+        ShellExecutionService.applyWindowsPowerShellEncodingFix(
+          guardedCommand,
+          executable,
+          isWindows,
+        );
       const args = [...argsPrefix, finalCommand];
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -930,6 +920,25 @@ export class ShellExecutionService {
         };
       }
     }
+  }
+
+  private static applyWindowsPowerShellEncodingFix(
+    command: string,
+    executable: string,
+    isWindows: boolean,
+  ): string {
+    // Force PowerShell on Windows to use UTF-8 encoding.
+    // Without this, multibyte characters (e.g., Japanese, Chinese) appear garbled.
+    const isPowerShell =
+      isWindows &&
+      (executable.toLowerCase().includes('powershell') ||
+        executable.toLowerCase().includes('pwsh'));
+
+    if (isPowerShell) {
+      return `$OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${command}`;
+    }
+
+    return command;
   }
 
   /**
