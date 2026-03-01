@@ -72,6 +72,7 @@ describe('Plan Mode', () => {
         experimental: { plan: true },
         tools: {
           core: ['write_file', 'read_file', 'list_directory'],
+          allowed: ['write_file'],
         },
         general: {
           defaultApprovalMode: 'plan',
@@ -82,24 +83,19 @@ describe('Plan Mode', () => {
       },
     });
 
-    const policyPath = rig.createFile(
-      'plan-overrides.toml',
-      `
-[[rule]]
-toolName = "write_file"
-decision = "allow"
-priority = 70
-modes = ["plan"]
-argsPattern = "file_path":"[^"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md"
-`,
+    const run = await rig.runInteractive({
+      approvalMode: 'plan',
+    });
+
+    await run.sendText(
+      'Create a file called plan.md in the plans directory.\\r',
     );
 
-    await rig.run({
-      approvalMode: 'plan',
-      args: ['--policy', policyPath],
-      stdin:
-        'Create a file called plan.md in the plans directory. Then create a file called hello.txt in the current directory',
-    });
+    await rig.waitForToolCall('write_file', 30000);
+
+    await run.sendText(
+      'Now create a file called hello.txt in the current directory.\\r',
+    );
 
     const toolLogs = rig.readToolLogs();
     const writeLogs = toolLogs.filter(
