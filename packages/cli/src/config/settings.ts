@@ -22,7 +22,7 @@ import {
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { DefaultDark } from '../ui/themes/default.js';
-import { isWorkspaceTrusted } from './trustedFolders.js';
+import { isWorkspaceTrusted, type TrustResult } from './trustedFolders.js';
 import {
   type Settings,
   type MergedSettings,
@@ -303,6 +303,14 @@ export interface LoadedSettingsSnapshot {
   isTrusted: boolean;
   errors: SettingsError[];
   merged: MergedSettings;
+  initialEnvLoadResult?: EnvironmentLoadResult;
+}
+
+export interface EnvironmentLoadResult {
+  envFilePath: string | null;
+  trustResult: TrustResult;
+  isSandboxed: boolean;
+  skippedDueToTrust: boolean;
 }
 
 export class LoadedSettings {
@@ -313,6 +321,7 @@ export class LoadedSettings {
     workspace: SettingsFile,
     isTrusted: boolean,
     errors: SettingsError[] = [],
+    initialEnvLoadResult?: EnvironmentLoadResult,
   ) {
     this.system = system;
     this.systemDefaults = systemDefaults;
@@ -323,6 +332,7 @@ export class LoadedSettings {
       ? workspace
       : this.createEmptyWorkspace(workspace);
     this.errors = errors;
+    this.initialEnvLoadResult = initialEnvLoadResult;
     this._merged = this.computeMergedSettings();
     this._snapshot = this.computeSnapshot();
   }
@@ -333,6 +343,7 @@ export class LoadedSettings {
   workspace: SettingsFile;
   isTrusted: boolean;
   readonly errors: SettingsError[];
+  readonly initialEnvLoadResult?: EnvironmentLoadResult;
 
   private _workspaceFile: SettingsFile;
   private _merged: MergedSettings;
@@ -406,6 +417,9 @@ export class LoadedSettings {
       isTrusted: this.isTrusted,
       errors: [...this.errors],
       merged: structuredClone(this._merged),
+      initialEnvLoadResult: this.initialEnvLoadResult
+        ? structuredClone(this.initialEnvLoadResult)
+        : undefined,
     };
   }
 
@@ -553,7 +567,7 @@ export function loadEnvironment(
   settings: Settings,
   workspaceDir: string,
   isWorkspaceTrustedFn = isWorkspaceTrusted,
-): void {
+): EnvironmentLoadResult {
   const envFilePath = findEnvFile(workspaceDir);
   const trustResult = isWorkspaceTrustedFn(settings, workspaceDir);
 
@@ -616,6 +630,13 @@ export function loadEnvironment(
       // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
     }
   }
+
+  return {
+    envFilePath,
+    trustResult,
+    isSandboxed,
+    skippedDueToTrust: false,
+  };
 }
 
 /**
@@ -744,7 +765,7 @@ export function loadSettings(
 
   // loadEnvironment depends on settings so we have to create a temp version of
   // the settings to avoid a cycle
-  loadEnvironment(tempMergedSettings, workspaceDir);
+  const envLoadResult = loadEnvironment(tempMergedSettings, workspaceDir);
 
   // Check for any fatal errors before proceeding
   const fatalErrors = settingsErrors.filter((e) => e.severity === 'error');
@@ -788,6 +809,7 @@ export function loadSettings(
     },
     isTrusted,
     settingsErrors,
+    envLoadResult,
   );
 
   // Automatically migrate deprecated settings when loading.
