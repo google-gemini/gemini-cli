@@ -1577,12 +1577,21 @@ export const useGeminiStream = (
         for (const call of awaitingApprovalCalls) {
           if (call.correlationId) {
             try {
+              // exit_plan_mode requires a structured payload to properly
+              // approve the plan. Use AUTO_EDIT since YOLO subsumes it.
+              const isExitPlanMode = call.request.name === 'exit_plan_mode';
               await config.getMessageBus().publish({
                 type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
                 correlationId: call.correlationId,
                 confirmed: true,
                 requiresUserConfirmation: false,
                 outcome: ToolConfirmationOutcome.ProceedOnce,
+                ...(isExitPlanMode && {
+                  payload: {
+                    approved: true,
+                    approvalMode: ApprovalMode.AUTO_EDIT,
+                  },
+                }),
               });
             } catch (error) {
               debugLogger.warn(
