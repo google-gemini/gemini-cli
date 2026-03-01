@@ -359,8 +359,8 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
  * @param pathStr The path string to resolve.
  * @returns The resolved real path.
  */
-export function resolveToRealPath(path: string): string {
-  let resolvedPath = path;
+export function resolveToRealPath(pathStr: string): string {
+  let resolvedPath = pathStr;
 
   try {
     if (resolvedPath.startsWith('file://')) {
@@ -373,10 +373,26 @@ export function resolveToRealPath(path: string): string {
   }
 
   try {
-    return fs.realpathSync(resolvedPath);
+    const resolved = path.resolve(resolvedPath);
+
+    // Walk up the directory tree until we find a path that exists
+    let current = resolved;
+    // Stop at root (dirname(root) === root on many systems, or it becomes empty/'.' depending on implementation)
+    while (current && current !== path.dirname(current)) {
+      try {
+        if (fs.existsSync(current)) {
+          const canonical = fs.realpathSync(current);
+          const relativePath = path.relative(current, resolved);
+          return path.join(canonical, relativePath);
+        }
+      } catch (_e) {
+        // Ignore errors for individual segments (e.g. permission issues)
+      }
+      current = path.dirname(current);
+    }
+
+    return resolved;
   } catch (_e) {
-    // If realpathSync fails, it might be because the path doesn't exist.
-    // In that case, we can fall back to the path processed.
     return resolvedPath;
   }
 }

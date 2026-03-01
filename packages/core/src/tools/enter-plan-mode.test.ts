@@ -110,6 +110,8 @@ describe('EnterPlanModeTool', () => {
         ApprovalMode.PLAN,
       );
       expect(result.llmContent).toContain('Switching to Plan mode');
+      expect(result.llmContent).toContain('IMPORTANT');
+      expect(result.llmContent).toContain('/mock/plans/dir/');
       expect(result.returnDisplay).toBe('Switching to Plan mode');
     });
 
@@ -122,7 +124,9 @@ describe('EnterPlanModeTool', () => {
       expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
         ApprovalMode.PLAN,
       );
-      expect(result.llmContent).toBe('Switching to Plan mode.');
+      expect(result.llmContent).toContain('Switching to Plan mode');
+      expect(result.llmContent).toContain('IMPORTANT');
+      expect(result.llmContent).toContain('/mock/plans/dir/');
       expect(result.llmContent).not.toContain(reason);
       expect(result.returnDisplay).toContain(reason);
     });

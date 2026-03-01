@@ -14,12 +14,15 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 
-vi.mock('fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('fs')>();
+let actualFs: typeof import('node:fs');
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
     mkdirSync: vi.fn(),
     realpathSync: vi.fn(actual.realpathSync),
+    existsSync: vi.fn(actual.existsSync),
   };
 });
 
@@ -103,7 +106,10 @@ describe('Storage - Security', () => {
 });
 
 describe('Storage – additional helpers', () => {
-  const projectRoot = '/tmp/project';
+  beforeEach(async () => {
+    actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+  });
+  const projectRoot = path.resolve('/tmp/project');
   const storage = new Storage(projectRoot);
 
   beforeEach(() => {
@@ -279,8 +285,7 @@ describe('Storage – additional helpers', () => {
         name: 'custom absolute path outside throws',
         customDir: '/absolute/path/to/plans',
         expected: '',
-        expectedError:
-          "Custom plans directory '/absolute/path/to/plans' resolves to '/absolute/path/to/plans', which is outside the project root '/tmp/project'.",
+        expectedError: `Custom plans directory '/absolute/path/to/plans' resolves to '${path.resolve('/absolute/path/to/plans')}', which is outside the project root '${path.resolve('/tmp/project')}'.`,
       },
       {
         name: 'absolute path that happens to be inside project root',
@@ -306,8 +311,7 @@ describe('Storage – additional helpers', () => {
         name: 'escaping relative path throws',
         customDir: '../escaped-plans',
         expected: '',
-        expectedError:
-          "Custom plans directory '../escaped-plans' resolves to '/tmp/escaped-plans', which is outside the project root '/tmp/project'.",
+        expectedError: `Custom plans directory '../escaped-plans' resolves to '${path.resolve('/tmp/escaped-plans')}', which is outside the project root '${path.resolve('/tmp/project')}'.`,
       },
       {
         name: 'hidden directory starting with ..',
@@ -318,17 +322,25 @@ describe('Storage – additional helpers', () => {
         name: 'security escape via symbolic link throws',
         customDir: 'symlink-to-outside',
         setup: () => {
+          vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+            if (p.toString().includes('symlink-to-outside')) {
+              return true;
+            }
+            return actualFs.existsSync(p);
+          });
           vi.mocked(fs.realpathSync).mockImplementation((p: fs.PathLike) => {
             if (p.toString().includes('symlink-to-outside')) {
-              return '/outside/project/root';
+              return path.resolve('/outside/project/root');
             }
-            return p.toString();
+            return actualFs.realpathSync(p);
           });
-          return () => vi.mocked(fs.realpathSync).mockRestore();
+          return () => {
+            vi.mocked(fs.existsSync).mockReset();
+            vi.mocked(fs.realpathSync).mockReset();
+          };
         },
         expected: '',
-        expectedError:
-          "Custom plans directory 'symlink-to-outside' resolves to '/outside/project/root', which is outside the project root '/tmp/project'.",
+        expectedError: `Custom plans directory 'symlink-to-outside' resolves to '${path.resolve('/outside/project/root')}', which is outside the project root '${path.resolve('/tmp/project')}'.`,
       },
     ];
 

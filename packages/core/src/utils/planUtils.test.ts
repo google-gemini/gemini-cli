@@ -4,17 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import path from 'node:path';
 import * as fs from 'node:fs';
 import os from 'node:os';
 import { validatePlanPath, validatePlanContent } from './planUtils.js';
 
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    realpathSync: vi.fn(actual.realpathSync),
+    existsSync: vi.fn(actual.existsSync),
+  };
+});
+
 describe('planUtils', () => {
   let tempRootDir: string;
   let plansDir: string;
+  let actualFs: typeof import('node:fs');
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
     tempRootDir = fs.realpathSync(
       fs.mkdtempSync(path.join(os.tmpdir(), 'planUtils-test-')),
     );
@@ -24,8 +35,9 @@ describe('planUtils', () => {
   });
 
   afterEach(() => {
-    if (fs.existsSync(tempRootDir)) {
-      fs.rmSync(tempRootDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+    if (actualFs.existsSync(tempRootDir)) {
+      actualFs.rmSync(tempRootDir, { recursive: true, force: true });
     }
   });
 
@@ -57,8 +69,16 @@ describe('planUtils', () => {
       const outsideFile = path.join(tempRootDir, 'outside.txt');
       fs.writeFileSync(outsideFile, 'secret content');
 
-      // Create a symbolic link pointing outside the plans directory
-      fs.symlinkSync(outsideFile, fullMaliciousPath);
+      // On Windows, symlinkSync often fails without admin rights.
+      // We mock the filesystem behavior to simulate a malicious symlink.
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        if (p.toString() === fullMaliciousPath) return true;
+        return actualFs.existsSync(p);
+      });
+      vi.mocked(fs.realpathSync).mockImplementation((p: fs.PathLike) => {
+        if (p.toString() === fullMaliciousPath) return outsideFile;
+        return actualFs.realpathSync(p);
+      });
 
       const result = await validatePlanPath(
         maliciousPath,
