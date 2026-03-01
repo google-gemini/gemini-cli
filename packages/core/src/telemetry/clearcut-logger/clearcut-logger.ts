@@ -18,6 +18,7 @@ import type {
   LoopDetectedEvent,
   NextSpeakerCheckEvent,
   SlashCommandEvent,
+  RewindEvent,
   MalformedJsonResponseEvent,
   IdeConnectionEvent,
   ConversationFinishedEvent,
@@ -42,6 +43,12 @@ import type {
   ExtensionUpdateEvent,
   LlmLoopCheckEvent,
   HookCallEvent,
+  ApprovalModeSwitchEvent,
+  ApprovalModeDurationEvent,
+  PlanExecutionEvent,
+  ToolOutputMaskingEvent,
+  KeychainAvailabilityEvent,
+  TokenStorageInitializationEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -51,6 +58,7 @@ import {
   safeJsonStringify,
   safeJsonStringifyBooleanValuesOnly,
 } from '../../utils/safeJsonStringify.js';
+import { ASK_USER_TOOL_NAME } from '../../tools/tool-names.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import {
@@ -76,6 +84,7 @@ export enum EventNames {
   LOOP_DETECTION_DISABLED = 'loop_detection_disabled',
   NEXT_SPEAKER_CHECK = 'next_speaker_check',
   SLASH_COMMAND = 'slash_command',
+  REWIND = 'rewind',
   MALFORMED_JSON_RESPONSE = 'malformed_json_response',
   IDE_CONNECTION = 'ide_connection',
   KITTY_SEQUENCE_OVERFLOW = 'kitty_sequence_overflow',
@@ -100,6 +109,14 @@ export enum EventNames {
   WEB_FETCH_FALLBACK_ATTEMPT = 'web_fetch_fallback_attempt',
   LLM_LOOP_CHECK = 'llm_loop_check',
   HOOK_CALL = 'hook_call',
+  APPROVAL_MODE_SWITCH = 'approval_mode_switch',
+  APPROVAL_MODE_DURATION = 'approval_mode_duration',
+  PLAN_EXECUTION = 'plan_execution',
+  TOOL_OUTPUT_MASKING = 'tool_output_masking',
+  KEYCHAIN_AVAILABILITY = 'keychain_availability',
+  TOKEN_STORAGE_INITIALIZATION = 'token_storage_initialization',
+  CONSECA_POLICY_GENERATION = 'conseca_policy_generation',
+  CONSECA_VERDICT = 'conseca_verdict',
 }
 
 export interface LogResponse {
@@ -440,6 +457,7 @@ export class ClearcutLogger {
     if (this.config?.getDebugMode()) {
       debugLogger.log('Flushing log events to Clearcut.');
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const eventsToSend = this.events.toArray() as LogEventEntry[][];
     this.events.clear();
 
@@ -483,6 +501,7 @@ export class ClearcutLogger {
       }
     } catch (e: unknown) {
       if (this.config?.getDebugMode()) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         debugLogger.warn('Error flushing log events:', e as Error);
       }
 
@@ -598,14 +617,17 @@ export class ClearcutLogger {
 
     // Add hardware information only to the start session event
     const cpus = os.cpus();
-    data.push(
-      {
+    if (cpus && cpus.length > 0) {
+      data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_INFO,
         value: cpus[0].model,
-      },
+      });
+    }
+
+    data.push(
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_CORES,
-        value: cpus.length.toString(),
+        value: os.availableParallelism().toString(),
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RAM_TOTAL_GB,
@@ -691,6 +713,30 @@ export class ClearcutLogger {
         user_added_chars: EventMetadataKey.GEMINI_CLI_USER_ADDED_CHARS,
         user_removed_chars: EventMetadataKey.GEMINI_CLI_USER_REMOVED_CHARS,
       };
+
+      if (
+        event.function_name === ASK_USER_TOOL_NAME &&
+        event.metadata['ask_user']
+      ) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const askUser = event.metadata['ask_user'];
+        const askUserMapping: { [key: string]: EventMetadataKey } = {
+          question_types: EventMetadataKey.GEMINI_CLI_ASK_USER_QUESTION_TYPES,
+          dismissed: EventMetadataKey.GEMINI_CLI_ASK_USER_DISMISSED,
+          empty_submission:
+            EventMetadataKey.GEMINI_CLI_ASK_USER_EMPTY_SUBMISSION,
+          answer_count: EventMetadataKey.GEMINI_CLI_ASK_USER_ANSWER_COUNT,
+        };
+
+        for (const [key, gemini_cli_key] of Object.entries(askUserMapping)) {
+          if (askUser[key] !== undefined) {
+            data.push({
+              gemini_cli_key,
+              value: JSON.stringify(askUser[key]),
+            });
+          }
+        }
+      }
 
       for (const [key, gemini_cli_key] of Object.entries(metadataMapping)) {
         if (event.metadata[key] !== undefined) {
@@ -799,6 +845,40 @@ export class ClearcutLogger {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_API_RESPONSE_TOOL_TOKEN_COUNT,
         value: JSON.stringify(event.usage.tool_token_count),
+      },
+      // Context breakdown fields are only populated on turn-ending responses
+      // (when the user gets back control), not during intermediate tool-use
+      // loops. Values still grow across turns as conversation history
+      // accumulates, so downstream consumers should use the last event per
+      // session (MAX) rather than summing across events.
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_SYSTEM_INSTRUCTIONS,
+        value: JSON.stringify(
+          event.usage.context_breakdown?.system_instructions ?? 0,
+        ),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_DEFINITIONS,
+        value: JSON.stringify(
+          event.usage.context_breakdown?.tool_definitions ?? 0,
+        ),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_HISTORY,
+        value: JSON.stringify(event.usage.context_breakdown?.history ?? 0),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_CALLS,
+        value: JSON.stringify(event.usage.context_breakdown?.tool_calls ?? {}),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_MCP_SERVERS,
+        value: JSON.stringify(event.usage.context_breakdown?.mcp_servers ?? 0),
       },
     ];
 
@@ -938,6 +1018,18 @@ export class ClearcutLogger {
     }
 
     this.enqueueLogEvent(this.createLogEvent(EventNames.SLASH_COMMAND, data));
+    this.flushIfNeeded();
+  }
+
+  logRewindEvent(event: RewindEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_REWIND_OUTCOME,
+        value: event.outcome,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.REWIND, data));
     this.flushIfNeeded();
   }
 
@@ -1191,14 +1283,42 @@ export class ClearcutLogger {
           EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_THRESHOLD,
         value: JSON.stringify(event.threshold),
       },
+    ];
+
+    const logEvent = this.createLogEvent(
+      EventNames.TOOL_OUTPUT_TRUNCATED,
+      data,
+    );
+    this.enqueueLogEvent(logEvent);
+    this.flushIfNeeded();
+  }
+
+  logToolOutputMaskingEvent(event: ToolOutputMaskingEvent): void {
+    const data: EventValue[] = [
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_LINES,
-        value: JSON.stringify(event.lines),
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_BEFORE,
+        value: event.tokens_before.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_AFTER,
+        value: event.tokens_after.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_MASKED_COUNT,
+        value: event.masked_count.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_TOTAL_PRUNABLE_TOKENS,
+        value: event.total_prunable_tokens.toString(),
       },
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.TOOL_OUTPUT_TRUNCATED, data),
+      this.createLogEvent(EventNames.TOOL_OUTPUT_MASKING, data),
     );
     this.flushIfNeeded();
   }
@@ -1227,6 +1347,28 @@ export class ClearcutLogger {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE_REASON,
         value: event.error_message,
+      });
+    }
+
+    if (event.reasoning && this.config?.getTelemetryLogPromptsEnabled()) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_REASONING,
+        value: event.reasoning,
+      });
+    }
+
+    if (event.enable_numerical_routing !== undefined) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_NUMERICAL_ENABLED,
+        value: event.enable_numerical_routing.toString(),
+      });
+    }
+
+    if (event.classifier_threshold) {
+      data.push({
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_ROUTING_CLASSIFIER_THRESHOLD,
+        value: event.classifier_threshold,
       });
     }
 
@@ -1467,6 +1609,88 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
+  logApprovalModeSwitchEvent(event: ApprovalModeSwitchEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ACTIVE_APPROVAL_MODE,
+        value: event.from_mode,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_APPROVAL_MODE_TO,
+        value: event.to_mode,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.APPROVAL_MODE_SWITCH, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logApprovalModeDurationEvent(event: ApprovalModeDurationEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ACTIVE_APPROVAL_MODE,
+        value: event.mode,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_APPROVAL_MODE_DURATION_MS,
+        value: event.duration_ms.toString(),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.APPROVAL_MODE_DURATION, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logPlanExecutionEvent(event: PlanExecutionEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_APPROVAL_MODE,
+        value: event.approval_mode,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.PLAN_EXECUTION, data));
+    this.flushIfNeeded();
+  }
+
+  logKeychainAvailabilityEvent(event: KeychainAvailabilityEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_KEYCHAIN_AVAILABLE,
+        value: JSON.stringify(event.available),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.KEYCHAIN_AVAILABILITY, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logTokenStorageInitializationEvent(
+    event: TokenStorageInitializationEvent,
+  ): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOKEN_STORAGE_TYPE,
+        value: event.type,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOKEN_STORAGE_FORCED,
+        value: JSON.stringify(event.forced),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.TOKEN_STORAGE_INITIALIZATION, data),
+    );
+    this.flushIfNeeded();
+  }
+
   /**
    * Adds default fields to data, and returns a new data array.  This fields
    * should exist on all log events.
@@ -1502,6 +1726,14 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_INTERACTIVE,
         value: this.config?.isInteractive().toString() ?? 'false',
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ACTIVE_APPROVAL_MODE,
+        value:
+          typeof this.config?.getPolicyEngine === 'function' &&
+          typeof this.config.getPolicyEngine()?.getApprovalMode === 'function'
+            ? this.config.getPolicyEngine().getApprovalMode()
+            : '',
       },
     ];
     if (this.config?.getExperiments()) {

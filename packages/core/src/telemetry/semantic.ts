@@ -19,12 +19,115 @@ import type {
   Part,
   PartUnion,
 } from '@google/genai';
+import { truncateString } from '../utils/textUtils.js';
+
+// 160KB limit for the total size of string content in a log entry.
+// The total log entry size limit is 256KB. We leave ~96KB (approx 37%) for JSON overhead (escaping, structure) and other fields.
+const GLOBAL_TEXT_LIMIT = 160 * 1024;
+
+interface StringReference {
+  get: () => string | undefined;
+  set: (val: string) => void;
+  len: () => number;
+}
+
+function getStringReferences(parts: AnyPart[]): StringReference[] {
+  const refs: StringReference[] = [];
+  for (const part of parts) {
+    if (part instanceof TextPart) {
+      refs.push({
+        get: () => part.content,
+        set: (val: string) => (part.content = val),
+        len: () => part.content.length,
+      });
+    } else if (part instanceof ReasoningPart) {
+      refs.push({
+        get: () => part.content,
+        set: (val: string) => (part.content = val),
+        len: () => part.content.length,
+      });
+    } else if (part instanceof ToolCallRequestPart) {
+      if (part.arguments) {
+        refs.push({
+          get: () => part.arguments,
+          set: (val: string) => (part.arguments = val),
+          len: () => part.arguments?.length ?? 0,
+        });
+      }
+    } else if (part instanceof ToolCallResponsePart) {
+      if (part.response) {
+        refs.push({
+          get: () => part.response,
+          set: (val: string) => (part.response = val),
+          len: () => part.response?.length ?? 0,
+        });
+      }
+    } else if (part instanceof GenericPart) {
+      if (part.type === 'executableCode' && typeof part['code'] === 'string') {
+        refs.push({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          get: () => part['code'] as string,
+          set: (val: string) => (part['code'] = val),
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          len: () => (part['code'] as string).length,
+        });
+      } else if (
+        part.type === 'codeExecutionResult' &&
+        typeof part['output'] === 'string'
+      ) {
+        refs.push({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          get: () => part['output'] as string,
+          set: (val: string) => (part['output'] = val),
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          len: () => (part['output'] as string).length,
+        });
+      }
+    }
+  }
+  return refs;
+}
+
+function limitTotalLength(parts: AnyPart[]): void {
+  const refs = getStringReferences(parts);
+  const totalLength = refs.reduce((sum, ref) => sum + ref.len(), 0);
+
+  if (totalLength <= GLOBAL_TEXT_LIMIT) {
+    return;
+  }
+
+  // Calculate the average budget per part for "large" parts.
+  // We identify parts that are larger than the fair share (average) and truncate them.
+  const averageSize = GLOBAL_TEXT_LIMIT / refs.length;
+
+  // Filter out parts that are already small enough to not need truncation
+  const largeRefs = refs.filter((ref) => ref.len() > averageSize);
+  const smallRefsLength = refs
+    .filter((ref) => ref.len() <= averageSize)
+    .reduce((sum, ref) => sum + ref.len(), 0);
+
+  // Distribute the remaining budget among large parts
+  const remainingBudget = GLOBAL_TEXT_LIMIT - smallRefsLength;
+  const budgetPerLargePart = Math.max(
+    1,
+    Math.floor(remainingBudget / largeRefs.length),
+  );
+
+  for (const ref of largeRefs) {
+    const original = ref.get();
+    if (original) {
+      ref.set(truncateString(original, budgetPerLargePart));
+    }
+  }
+}
 
 export function toInputMessages(contents: Content[]): InputMessages {
   const messages: ChatMessage[] = [];
   for (const content of contents) {
     messages.push(toChatMessage(content));
   }
+  const allParts = messages.flatMap((m) => m.parts);
+  limitTotalLength(allParts);
   return messages;
 }
 
@@ -81,6 +184,7 @@ export function toSystemInstruction(
       }
     }
   }
+  limitTotalLength(parts);
   return parts;
 }
 
@@ -94,6 +198,8 @@ export function toOutputMessages(candidates?: Candidate[]): OutputMessages {
       });
     }
   }
+  const allParts = messages.flatMap((m) => m.parts);
+  limitTotalLength(allParts);
   return messages;
 }
 
@@ -134,7 +240,7 @@ export function toChatMessage(content?: Content): ChatMessage {
   return message;
 }
 
-export function toOTelPart(part: Part): AnyPart {
+function toOTelPart(part: Part): AnyPart {
   if (part.thought) {
     if (part.text) {
       return new ReasoningPart(part.text);
@@ -181,7 +287,7 @@ export enum OTelRole {
   TOOL = 'tool',
 }
 
-export function toOTelRole(role?: string): OTelRole {
+function toOTelRole(role?: string): OTelRole {
   switch (role?.toLowerCase()) {
     case 'system':
       return OTelRole.SYSTEM;
@@ -216,7 +322,7 @@ export enum OTelFinishReason {
   ERROR = 'error',
 }
 
-export function toOTelFinishReason(finishReason?: string): OTelFinishReason {
+function toOTelFinishReason(finishReason?: string): OTelFinishReason {
   switch (finishReason) {
     // we have significantly more finish reasons than the spec
     case FinishReason.FINISH_REASON_UNSPECIFIED:
@@ -270,7 +376,7 @@ export interface ChatMessage {
   parts: AnyPart[];
 }
 
-export class TextPart {
+class TextPart {
   readonly type = 'text';
   content: string;
 
@@ -279,7 +385,7 @@ export class TextPart {
   }
 }
 
-export class ToolCallRequestPart {
+class ToolCallRequestPart {
   readonly type = 'tool_call';
   name?: string;
   id?: string;
@@ -292,7 +398,7 @@ export class ToolCallRequestPart {
   }
 }
 
-export class ToolCallResponsePart {
+class ToolCallResponsePart {
   readonly type = 'tool_call_response';
   response?: string;
   id?: string;
@@ -303,7 +409,7 @@ export class ToolCallResponsePart {
   }
 }
 
-export class ReasoningPart {
+class ReasoningPart {
   readonly type = 'reasoning';
   content: string;
 
@@ -312,7 +418,7 @@ export class ReasoningPart {
   }
 }
 
-export class GenericPart {
+class GenericPart {
   type: string;
   [key: string]: unknown;
 

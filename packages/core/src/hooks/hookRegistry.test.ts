@@ -8,9 +8,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import { HookRegistry } from './hookRegistry.js';
 import type { Storage } from '../config/storage.js';
-import { ConfigSource, HookEventName, HookType } from './types.js';
+import {
+  ConfigSource,
+  HookEventName,
+  HookType,
+  HOOKS_CONFIG_FIELDS,
+  type CommandHookConfig,
+  type HookDefinition,
+} from './types.js';
 import type { Config } from '../config/config.js';
-import type { HookDefinition } from './types.js';
 
 // Mock fs
 vi.mock('fs', () => ({
@@ -85,7 +91,7 @@ describe('HookRegistry', () => {
       await hookRegistry.initialize();
 
       expect(hookRegistry.getAllHooks()).toHaveLength(0);
-      expect(mockDebugLogger.log).toHaveBeenCalledWith(
+      expect(mockDebugLogger.debug).toHaveBeenCalledWith(
         'Hook registry initialized with 0 hook entries',
       );
     });
@@ -148,7 +154,9 @@ describe('HookRegistry', () => {
       expect(hooks).toHaveLength(1);
       expect(hooks[0].eventName).toBe(HookEventName.BeforeTool);
       expect(hooks[0].config.type).toBe(HookType.Command);
-      expect(hooks[0].config.command).toBe('./hooks/check_style.sh');
+      expect((hooks[0].config as CommandHookConfig).command).toBe(
+        './hooks/check_style.sh',
+      );
       expect(hooks[0].matcher).toBe('EditTool');
       expect(hooks[0].source).toBe(ConfigSource.Project);
     });
@@ -181,7 +189,9 @@ describe('HookRegistry', () => {
       expect(hooks).toHaveLength(1);
       expect(hooks[0].eventName).toBe(HookEventName.AfterTool);
       expect(hooks[0].config.type).toBe(HookType.Command);
-      expect(hooks[0].config.command).toBe('./hooks/after-tool.sh');
+      expect((hooks[0].config as CommandHookConfig).command).toBe(
+        './hooks/after-tool.sh',
+      );
     });
 
     it('should handle invalid configuration gracefully', async () => {
@@ -627,7 +637,9 @@ describe('HookRegistry', () => {
       // Should only load the valid hook
       const hooks = hookRegistry.getAllHooks();
       expect(hooks).toHaveLength(1);
-      expect(hooks[0].config.command).toBe('./valid-hook.sh');
+      expect((hooks[0].config as CommandHookConfig).command).toBe(
+        './valid-hook.sh',
+      );
 
       // Verify the warnings for invalid configurations
       // 1st warning: non-object hookConfig ('invalid-string')
@@ -643,6 +655,51 @@ describe('HookRegistry', () => {
       expect(mockDebugLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining('Discarding invalid hook configuration'),
         expect.objectContaining({ type: 'invalid-type' }),
+      );
+    });
+
+    it('should skip known config fields and warn on invalid event names', async () => {
+      const configWithExtras: Record<string, unknown> = {
+        InvalidEvent: [],
+        BeforeTool: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: './test.sh',
+              },
+            ],
+          },
+        ],
+      };
+
+      // Add all known config fields dynamically
+      for (const field of HOOKS_CONFIG_FIELDS) {
+        configWithExtras[field] = field === 'disabled' ? [] : true;
+      }
+
+      vi.mocked(mockConfig.getHooks).mockReturnValue(
+        configWithExtras as unknown as {
+          [K in HookEventName]?: HookDefinition[];
+        },
+      );
+
+      await hookRegistry.initialize();
+
+      // Should only load the valid hook
+      expect(hookRegistry.getAllHooks()).toHaveLength(1);
+
+      // Should skip all known config fields without warnings
+      for (const field of HOOKS_CONFIG_FIELDS) {
+        expect(mockDebugLogger.warn).not.toHaveBeenCalledWith(
+          expect.stringContaining(`Invalid hook event name: ${field}`),
+        );
+      }
+
+      // Should warn on truly invalid event name
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('Invalid hook event name: "InvalidEvent"'),
       );
     });
   });

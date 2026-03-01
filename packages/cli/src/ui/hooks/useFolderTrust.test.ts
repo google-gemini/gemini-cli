@@ -23,10 +23,24 @@ import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
 import { TrustLevel } from '../../config/trustedFolders.js';
 import * as trustedFolders from '../../config/trustedFolders.js';
-import { coreEvents, ExitCodes } from '@google/gemini-cli-core';
+import { coreEvents, ExitCodes, isHeadlessMode } from '@google/gemini-cli-core';
+import { MessageType } from '../types.js';
 
 const mockedCwd = vi.hoisted(() => vi.fn());
 const mockedExit = vi.hoisted(() => vi.fn());
+
+vi.mock('@google/gemini-cli-core', async () => {
+  const actual = await vi.importActual<
+    typeof import('@google/gemini-cli-core')
+  >('@google/gemini-cli-core');
+  return {
+    ...actual,
+    isHeadlessMode: vi.fn().mockReturnValue(false),
+    FolderTrustDiscoveryService: {
+      discover: vi.fn(() => new Promise(() => {})),
+    },
+  };
+});
 
 vi.mock('node:process', async () => {
   const actual =
@@ -46,8 +60,24 @@ describe('useFolderTrust', () => {
   let onTrustChange: (isTrusted: boolean | undefined) => void;
   let addItem: Mock;
 
+  const originalStdoutIsTTY = process.stdout.isTTY;
+  const originalStdinIsTTY = process.stdin.isTTY;
+
   beforeEach(() => {
     vi.useFakeTimers();
+
+    // Default to interactive mode for tests
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
+
     mockSettings = {
       merged: {
         security: {
@@ -75,6 +105,16 @@ describe('useFolderTrust', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: originalStdoutIsTTY,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalStdinIsTTY,
+      configurable: true,
+      writable: true,
+    });
   });
 
   it('should not open dialog when folder is already trusted', () => {
@@ -114,7 +154,7 @@ describe('useFolderTrust', () => {
     renderHook(() => useFolderTrust(mockSettings, onTrustChange, addItem));
     expect(addItem).toHaveBeenCalledWith(
       {
-        text: 'This folder is not trusted. Some features may be disabled. Use the `/permissions` command to change the trust level.',
+        text: 'This folder is untrusted, project settings, hooks, MCPs, and GEMINI.md files will not be applied for this folder.\nUse the `/permissions` command to change the trust level.',
         type: 'info',
       },
       expect.any(Number),
@@ -149,7 +189,9 @@ describe('useFolderTrust', () => {
     });
 
     await act(async () => {
-      result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
+      await result.current.handleFolderTrustSelect(
+        FolderTrustChoice.TRUST_FOLDER,
+      );
     });
 
     await waitFor(() => {
@@ -173,7 +215,9 @@ describe('useFolderTrust', () => {
     );
 
     await act(async () => {
-      result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_PARENT);
+      await result.current.handleFolderTrustSelect(
+        FolderTrustChoice.TRUST_PARENT,
+      );
     });
 
     await waitFor(() => {
@@ -197,7 +241,9 @@ describe('useFolderTrust', () => {
     );
 
     await act(async () => {
-      result.current.handleFolderTrustSelect(FolderTrustChoice.DO_NOT_TRUST);
+      await result.current.handleFolderTrustSelect(
+        FolderTrustChoice.DO_NOT_TRUST,
+      );
     });
 
     await waitFor(() => {
@@ -221,7 +267,7 @@ describe('useFolderTrust', () => {
     );
 
     await act(async () => {
-      result.current.handleFolderTrustSelect(
+      await result.current.handleFolderTrustSelect(
         'invalid_choice' as FolderTrustChoice,
       );
     });
@@ -253,7 +299,9 @@ describe('useFolderTrust', () => {
     });
 
     await act(async () => {
-      result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
+      await result.current.handleFolderTrustSelect(
+        FolderTrustChoice.TRUST_FOLDER,
+      );
     });
 
     await waitFor(() => {
@@ -272,7 +320,9 @@ describe('useFolderTrust', () => {
     );
 
     await act(async () => {
-      result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
+      await result.current.handleFolderTrustSelect(
+        FolderTrustChoice.TRUST_FOLDER,
+      );
     });
 
     await waitFor(() => {
@@ -294,8 +344,10 @@ describe('useFolderTrust', () => {
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
-    act(() => {
-      result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
+    await act(async () => {
+      await result.current.handleFolderTrustSelect(
+        FolderTrustChoice.TRUST_FOLDER,
+      );
     });
 
     await vi.runAllTimersAsync();
@@ -305,5 +357,29 @@ describe('useFolderTrust', () => {
       'Failed to save trust settings. Exiting Gemini CLI.',
     );
     expect(mockedExit).toHaveBeenCalledWith(ExitCodes.FATAL_CONFIG_ERROR);
+  });
+
+  describe('headless mode', () => {
+    it('should force trust and hide dialog in headless mode', () => {
+      vi.mocked(isHeadlessMode).mockReturnValue(true);
+      isWorkspaceTrustedSpy.mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
+
+      const { result } = renderHook(() =>
+        useFolderTrust(mockSettings, onTrustChange, addItem),
+      );
+
+      expect(result.current.isFolderTrustDialogOpen).toBe(false);
+      expect(onTrustChange).toHaveBeenCalledWith(true);
+      expect(addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('This folder is untrusted'),
+        }),
+        expect.any(Number),
+      );
+    });
   });
 });

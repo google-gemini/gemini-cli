@@ -4,19 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Transformation } from '../components/shared/text-buffer.js';
+import {
+  type Transformation,
+  PASTED_TEXT_PLACEHOLDER_REGEX,
+} from '../components/shared/text-buffer.js';
+import { LRUCache } from 'mnemonist';
 import { cpLen, cpSlice } from './textUtils.js';
+import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../constants.js';
+import { AT_COMMAND_PATH_REGEX_SOURCE } from '../hooks/atCommandProcessor.js';
 
 export type HighlightToken = {
   text: string;
-  type: 'default' | 'command' | 'file';
+  type: 'default' | 'command' | 'file' | 'paste';
 };
 
-// Matches slash commands (e.g., /help) and @ references (files or MCP resource URIs).
-// The @ pattern uses a negated character class to support URIs like `@file:///example.txt`
-// which contain colons. It matches any character except delimiters: comma, whitespace,
-// semicolon, common punctuation, and brackets.
-const HIGHLIGHT_REGEX = /(^\/[a-zA-Z0-9_-]+|@(?:\\ |[^,\s;!?()[\]{}])+)/g;
+// Matches slash commands (e.g., /help), @ references (files or MCP resource URIs),
+// and large paste placeholders (e.g., [Pasted Text: 6 lines]).
+//
+// The @ pattern uses the same source as the command processor to ensure consistency.
+// It matches any character except strict delimiters (ASCII whitespace, comma, etc.).
+// This supports URIs like `@file:///example.txt` and filenames with Unicode spaces (like NNBSP).
+const HIGHLIGHT_REGEX = new RegExp(
+  `(^/[a-zA-Z0-9_-]+|@${AT_COMMAND_PATH_REGEX_SOURCE}|${PASTED_TEXT_PLACEHOLDER_REGEX.source})`,
+  'g',
+);
+
+const highlightCache = new LRUCache<string, readonly HighlightToken[]>(
+  LRU_BUFFER_PERF_CACHE_LIMIT,
+);
 
 export function parseInputForHighlighting(
   text: string,
@@ -24,6 +39,20 @@ export function parseInputForHighlighting(
   transformations: Transformation[] = [],
   cursorCol?: number,
 ): readonly HighlightToken[] {
+  let isCursorInsideTransform = false;
+  if (cursorCol !== undefined) {
+    for (const transform of transformations) {
+      if (cursorCol >= transform.logStart && cursorCol <= transform.logEnd) {
+        isCursorInsideTransform = true;
+        break;
+      }
+    }
+  }
+
+  const cacheKey = `${index === 0 ? 'F' : 'N'}:${isCursorInsideTransform ? cursorCol : 'NC'}:${text}`;
+  const cached = highlightCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   HIGHLIGHT_REGEX.lastIndex = 0;
 
   if (!text) {
@@ -46,7 +75,11 @@ export function parseInputForHighlighting(
         tokens.push({ text: text.slice(last, matchIndex), type: 'default' });
       }
 
-      const type = fullMatch.startsWith('/') ? 'command' : 'file';
+      const type = fullMatch.startsWith('/')
+        ? 'command'
+        : fullMatch.startsWith('@')
+          ? 'file'
+          : 'paste';
       if (type === 'command' && index !== 0) {
         tokens.push({ text: fullMatch, type: 'default' });
       } else {
@@ -79,7 +112,7 @@ export function parseInputForHighlighting(
     tokens.push(...parseUntransformedInput(textBeforeTransformation));
 
     const isCursorInside =
-      typeof cursorCol === 'number' &&
+      cursorCol !== undefined &&
       cursorCol >= transformation.logStart &&
       cursorCol <= transformation.logEnd;
     const transformationText = isCursorInside
@@ -92,6 +125,9 @@ export function parseInputForHighlighting(
 
   const textAfterFinalTransformation = cpSlice(text, column);
   tokens.push(...parseUntransformedInput(textAfterFinalTransformation));
+
+  highlightCache.set(cacheKey, tokens);
+
   return tokens;
 }
 

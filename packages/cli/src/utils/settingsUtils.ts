@@ -16,6 +16,8 @@ import type {
   SettingsValue,
 } from '../config/settingsSchema.js';
 import { getSettingsSchema } from '../config/settingsSchema.js';
+import type { Config } from '@google/gemini-cli-core';
+import { ExperimentFlags } from '@google/gemini-cli-core';
 
 // The schema is now nested, but many parts of the UI and logic work better
 // with a flattened structure and dot-notation keys. This section flattens the
@@ -97,6 +99,28 @@ export function getDefaultValue(key: string): SettingsValue {
 }
 
 /**
+ * Get the effective default value for a setting, checking experiment values when available.
+ * For settings like compressionThreshold, this will return the experiment value if set,
+ * otherwise falls back to the schema default.
+ */
+export function getEffectiveDefaultValue(
+  key: string,
+  config?: Config,
+): SettingsValue {
+  if (key === 'model.compressionThreshold' && config) {
+    const experiments = config.getExperiments();
+    const experimentValue =
+      experiments?.flags[ExperimentFlags.CONTEXT_COMPRESSION_THRESHOLD]
+        ?.floatValue;
+    if (experimentValue !== undefined && experimentValue !== 0) {
+      return experimentValue;
+    }
+  }
+
+  return getDefaultValue(key);
+}
+
+/**
  * Get all setting keys that require restart
  */
 export function getRestartRequiredSettings(): string[] {
@@ -121,6 +145,7 @@ export function getNestedValue(
     return value;
   }
   if (value && typeof value === 'object' && value !== null) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return getNestedValue(value as Record<string, unknown>, rest);
   }
   return undefined;
@@ -145,12 +170,14 @@ export function getEffectiveValue(
   // Check the current scope's settings first
   let value = getNestedValue(settings as Record<string, unknown>, path);
   if (value !== undefined) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return value as SettingsValue;
   }
 
   // Check the merged settings for an inherited value
   value = getNestedValue(mergedSettings as Record<string, unknown>, path);
   if (value !== undefined) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return value as SettingsValue;
   }
 
@@ -330,6 +357,7 @@ function setNestedValue(
     obj[first] = {};
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   setNestedValue(obj[first] as Record<string, unknown>, rest, value);
   return obj;
 }
@@ -343,8 +371,10 @@ export function setPendingSettingValue(
   pendingSettings: Settings,
 ): Settings {
   const path = key.split('.');
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const newSettings = JSON.parse(JSON.stringify(pendingSettings));
   setNestedValue(newSettings, path, value);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return newSettings;
 }
 

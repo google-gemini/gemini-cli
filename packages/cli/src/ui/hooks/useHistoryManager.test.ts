@@ -219,4 +219,40 @@ describe('useHistoryManager', () => {
     expect(result.current.history[0].id).toBeGreaterThanOrEqual(before + 1);
     expect(result.current.history[0].id).toBeLessThanOrEqual(after + 1);
   });
+
+  describe('initialItems with auth information', () => {
+    it('should initialize with auth information', () => {
+      const email = 'user@example.com';
+      const tier = 'Pro';
+      const authMessage = `Authenticated as: ${email} (Plan: ${tier})`;
+      const initialItems: HistoryItem[] = [
+        {
+          id: 1,
+          type: 'info',
+          text: authMessage,
+        },
+      ];
+      const { result } = renderHook(() => useHistory({ initialItems }));
+      expect(result.current.history).toHaveLength(1);
+      expect(result.current.history[0].text).toBe(authMessage);
+    });
+
+    it('should add items with auth information via addItem', () => {
+      const { result } = renderHook(() => useHistory());
+      const email = 'user@example.com';
+      const tier = 'Pro';
+      const authMessage = `Authenticated as: ${email} (Plan: ${tier})`;
+
+      act(() => {
+        result.current.addItem({
+          type: 'info',
+          text: authMessage,
+        });
+      });
+
+      expect(result.current.history).toHaveLength(1);
+      expect(result.current.history[0].text).toBe(authMessage);
+      expect(result.current.history[0].type).toBe('info');
+    });
+  });
 });

@@ -1,0 +1,72 @@
+# Priority system for policy rules:
+# - Higher priority numbers win over lower priority numbers
+# - When multiple rules match, the highest priority rule is applied
+# - Rules are evaluated in order of priority (highest first)
+#
+# Priority bands (tiers):
+# - Default policies (TOML): 1 + priority/1000 (e.g., priority 100 → 1.100)
+# - Workspace policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
+# - User policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
+# - Admin policies (TOML): 4 + priority/1000 (e.g., priority 100 → 4.100)
+#
+# This ensures Admin > User > Workspace > Default hierarchy is always preserved,
+# while allowing user-specified priorities to work within each tier.
+#
+# Settings-based and dynamic rules (all in user tier 3.x):
+#   3.95: Tools that the user has selected as "Always Allow" in the interactive UI
+#   3.9:  MCP servers excluded list (security: persistent server blocks)
+#   3.4:  Command line flag --exclude-tools (explicit temporary blocks)
+#   3.3:  Command line flag --allowed-tools (explicit temporary allows)
+#   3.2:  MCP servers with trust=true (persistent trusted servers)
+#   3.1:  MCP servers allowed list (persistent general server allows)
+#
+# TOML policy priorities (before transformation):
+#   10: Write tools default to ASK_USER (becomes 1.010 in default tier)
+#   60: Plan mode catch-all DENY override (becomes 1.060 in default tier)
+#   70: Plan mode explicit ALLOW override (becomes 1.070 in default tier)
+#   999: YOLO mode allow-all (becomes 1.999 in default tier)
+
+# Catch-All: Deny everything by default in Plan mode.
+
+[[rule]]
+decision = "deny"
+priority = 60
+modes = ["plan"]
+deny_message = "You are in Plan Mode with access to read-only tools. Execution of scripts (including those from skills) is blocked."
+
+# Explicitly Allow Read-Only Tools in Plan mode.
+
+[[rule]]
+mcpName = "*"
+toolAnnotations = { readOnlyHint = true }
+decision = "ask_user"
+priority = 70
+modes = ["plan"]
+
+[[rule]]
+toolName = ["glob", "grep_search", "list_directory", "read_file", "google_web_search", "activate_skill"]
+decision = "allow"
+priority = 70
+modes = ["plan"]
+
+[[rule]]
+toolName = ["ask_user", "exit_plan_mode", "save_memory"]
+decision = "ask_user"
+priority = 70
+modes = ["plan"]
+
+# Allow write_file and replace for .md files in the plans directory (cross-platform)
+[[rule]]
+toolName = ["write_file", "replace"]
+decision = "allow"
+priority = 70
+modes = ["plan"]
+argsPattern = "\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\""
+
+# Explicitly Deny other write operations in Plan mode with a clear message.
+[[rule]]
+toolName = ["write_file", "replace"]
+decision = "deny"
+priority = 65
+modes = ["plan"]
+deny_message = "You are in Plan Mode and cannot modify source code. You may ONLY use write_file or replace to save plans to the designated plans directory as .md files."

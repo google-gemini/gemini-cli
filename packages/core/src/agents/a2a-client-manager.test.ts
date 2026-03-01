@@ -8,16 +8,16 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   A2AClientManager,
   type SendMessageResult,
-  createAdapterFetch,
 } from './a2a-client-manager.js';
 import type { AgentCard, Task } from '@a2a-js/sdk';
 import type { AuthenticationHandler, Client } from '@a2a-js/sdk/client';
-import { ClientFactory, DefaultAgentCardResolver } from '@a2a-js/sdk/client';
-import { debugLogger } from '../utils/debugLogger.js';
 import {
+  ClientFactory,
+  DefaultAgentCardResolver,
   createAuthenticatingFetchWithRetry,
   ClientFactoryOptions,
 } from '@a2a-js/sdk/client';
+import { debugLogger } from '../utils/debugLogger.js';
 
 vi.mock('../utils/debugLogger.js', () => ({
   debugLogger: {
@@ -53,14 +53,14 @@ describe('A2AClientManager', () => {
   let manager: A2AClientManager;
 
   // Stable mocks initialized once
-  const sendMessageMock = vi.fn();
+  const sendMessageStreamMock = vi.fn();
   const getTaskMock = vi.fn();
   const cancelTaskMock = vi.fn();
   const getAgentCardMock = vi.fn();
   const authFetchMock = vi.fn();
 
   const mockClient = {
-    sendMessage: sendMessageMock,
+    sendMessageStream: sendMessageStreamMock,
     getTask: getTaskMock,
     cancelTask: cancelTaskMock,
     getAgentCard: getAgentCardMock,
@@ -178,75 +178,91 @@ describe('A2AClientManager', () => {
     });
   });
 
-  describe('sendMessage', () => {
+  describe('sendMessageStream', () => {
     beforeEach(async () => {
       await manager.loadAgent('TestAgent', 'http://test.agent');
     });
 
-    it('should send a message to the correct agent', async () => {
-      sendMessageMock.mockResolvedValue({
+    it('should send a message and return a stream', async () => {
+      const mockResult = {
         kind: 'message',
         messageId: 'a',
         parts: [],
         role: 'agent',
-      } as SendMessageResult);
+      } as SendMessageResult;
 
-      await manager.sendMessage('TestAgent', 'Hello');
-      expect(sendMessageMock).toHaveBeenCalledWith(
+      sendMessageStreamMock.mockReturnValue(
+        (async function* () {
+          yield mockResult;
+        })(),
+      );
+
+      const stream = manager.sendMessageStream('TestAgent', 'Hello');
+      const results = [];
+      for await (const res of stream) {
+        results.push(res);
+      }
+
+      expect(results).toEqual([mockResult]);
+      expect(sendMessageStreamMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: expect.anything(),
         }),
+        expect.any(Object),
       );
     });
 
     it('should use contextId and taskId when provided', async () => {
-      sendMessageMock.mockResolvedValue({
-        kind: 'message',
-        messageId: 'a',
-        parts: [],
-        role: 'agent',
-      } as SendMessageResult);
+      sendMessageStreamMock.mockReturnValue(
+        (async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'a',
+            parts: [],
+            role: 'agent',
+          } as SendMessageResult;
+        })(),
+      );
 
       const expectedContextId = 'user-context-id';
       const expectedTaskId = 'user-task-id';
 
-      await manager.sendMessage('TestAgent', 'Hello', {
+      const stream = manager.sendMessageStream('TestAgent', 'Hello', {
         contextId: expectedContextId,
         taskId: expectedTaskId,
       });
 
-      const call = sendMessageMock.mock.calls[0][0];
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      const call = sendMessageStreamMock.mock.calls[0][0];
       expect(call.message.contextId).toBe(expectedContextId);
       expect(call.message.taskId).toBe(expectedTaskId);
     });
 
-    it('should return result from client', async () => {
-      const mockResult = {
-        contextId: 'server-context-id',
-        id: 'ctx-1',
-        kind: 'task',
-        status: { state: 'working' },
-      };
-
-      sendMessageMock.mockResolvedValueOnce(mockResult as SendMessageResult);
-
-      const response = await manager.sendMessage('TestAgent', 'Hello');
-
-      expect(response).toEqual(mockResult);
-    });
-
     it('should throw prefixed error on failure', async () => {
-      sendMessageMock.mockRejectedValueOnce(new Error('Network error'));
+      sendMessageStreamMock.mockImplementationOnce(() => {
+        throw new Error('Network error');
+      });
 
-      await expect(manager.sendMessage('TestAgent', 'Hello')).rejects.toThrow(
-        'A2AClient SendMessage Error [TestAgent]: Network error',
+      const stream = manager.sendMessageStream('TestAgent', 'Hello');
+      await expect(async () => {
+        for await (const _ of stream) {
+          // consume
+        }
+      }).rejects.toThrow(
+        '[A2AClientManager] sendMessageStream Error [TestAgent]: Network error',
       );
     });
 
     it('should throw an error if the agent is not found', async () => {
-      await expect(
-        manager.sendMessage('NonExistentAgent', 'Hello'),
-      ).rejects.toThrow("Agent 'NonExistentAgent' not found.");
+      const stream = manager.sendMessageStream('NonExistentAgent', 'Hello');
+      await expect(async () => {
+        for await (const _ of stream) {
+          // consume
+        }
+      }).rejects.toThrow("Agent 'NonExistentAgent' not found.");
     });
   });
 
@@ -315,92 +331,6 @@ describe('A2AClientManager', () => {
       await expect(
         manager.cancelTask('NonExistentAgent', 'task123'),
       ).rejects.toThrow("Agent 'NonExistentAgent' not found.");
-    });
-  });
-
-  describe('createAdapterFetch', () => {
-    it('normalizes TASK_STATE_ enums to lower-case', async () => {
-      const baseFetch = vi
-        .fn()
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({ status: { state: 'TASK_STATE_WORKING' } }),
-          ),
-        );
-
-      const adapter = createAdapterFetch(baseFetch as typeof fetch);
-      const response = await adapter('http://example.com', {
-        method: 'POST',
-        body: '{}',
-      });
-      const data = await response.json();
-
-      expect(data.status.state).toBe('working');
-    });
-
-    it('lowercases non-prefixed task states', async () => {
-      const baseFetch = vi
-        .fn()
-        .mockResolvedValue(
-          new Response(JSON.stringify({ status: { state: 'WORKING' } })),
-        );
-
-      const adapter = createAdapterFetch(baseFetch as typeof fetch);
-      const response = await adapter('http://example.com', {
-        method: 'POST',
-        body: '{}',
-      });
-      const data = await response.json();
-
-      expect(data.status.state).toBe('working');
-    });
-
-    it('bypasses adapter for JSON-RPC requests', async () => {
-      const baseFetch = vi.fn().mockResolvedValue(new Response('{}'));
-      const adapter = createAdapterFetch(baseFetch as typeof fetch);
-      const rpcBody = JSON.stringify({ jsonrpc: '2.0', method: 'foo' });
-
-      await adapter('http://example.com', {
-        method: 'POST',
-        body: rpcBody,
-      });
-
-      // Verify baseFetch was called with original body, not modified
-      expect(baseFetch).toHaveBeenCalledWith(
-        'http://example.com',
-        expect.objectContaining({ body: rpcBody }),
-      );
-    });
-
-    it('applies dialect translation for remote REST requests', async () => {
-      const baseFetch = vi.fn().mockResolvedValue(new Response('{}'));
-      const adapter = createAdapterFetch(baseFetch as typeof fetch);
-      const originalBody = JSON.stringify({
-        message: {
-          role: 'user',
-          parts: [{ kind: 'text', text: 'hi' }],
-        },
-      });
-
-      await adapter('https://remote-agent.com/v1/message:send', {
-        method: 'POST',
-        body: originalBody,
-      });
-
-      // Verify body WAS modified:
-      // 1. role: 'user' -> 'ROLE_USER'
-      // 2. parts mapped to content, kind stripped
-      const expectedBody = JSON.stringify({
-        message: {
-          role: 'ROLE_USER',
-          content: [{ text: 'hi' }],
-        },
-      });
-
-      expect(baseFetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({ body: expectedBody }),
-      );
     });
   });
 });

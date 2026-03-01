@@ -18,6 +18,7 @@ Learn how to enable and setup OpenTelemetry for Gemini CLI.
   - [Logs and metrics](#logs-and-metrics)
     - [Logs](#logs)
       - [Sessions](#sessions)
+      - [Approval Mode](#approval-mode)
       - [Tools](#tools)
       - [Files](#files)
       - [API](#api)
@@ -92,7 +93,7 @@ Environment variables can be used to override the settings in the file.
 `true` or `1` will enable the feature. Any other value will disable it.
 
 For detailed information about all configuration options, see the
-[Configuration guide](../get-started/configuration.md).
+[Configuration guide](../reference/configuration.md).
 
 ## Google Cloud telemetry
 
@@ -102,12 +103,31 @@ Before using either method below, complete these steps:
 
 1. Set your Google Cloud project ID:
    - For telemetry in a separate project from inference:
+
+     **macOS/Linux**
+
      ```bash
      export OTLP_GOOGLE_CLOUD_PROJECT="your-telemetry-project-id"
      ```
+
+     **Windows (PowerShell)**
+
+     ```powershell
+     $env:OTLP_GOOGLE_CLOUD_PROJECT="your-telemetry-project-id"
+     ```
+
    - For telemetry in the same project as inference:
+
+     **macOS/Linux**
+
      ```bash
      export GOOGLE_CLOUD_PROJECT="your-project-id"
+     ```
+
+     **Windows (PowerShell)**
+
+     ```powershell
+     $env:GOOGLE_CLOUD_PROJECT="your-project-id"
      ```
 
 2. Authenticate with Google Cloud:
@@ -116,9 +136,19 @@ Before using either method below, complete these steps:
      gcloud auth application-default login
      ```
    - If using a service account:
+
+     **macOS/Linux**
+
      ```bash
      export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/service-account.json"
      ```
+
+     **Windows (PowerShell)**
+
+     ```powershell
+     $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\your\service-account.json"
+     ```
+
 3. Make sure your account or service account has these IAM roles:
    - Cloud Trace Agent
    - Monitoring Metric Writer
@@ -175,11 +205,12 @@ Sends telemetry directly to Google Cloud services. No collector needed.
    }
    ```
 2. Run Gemini CLI and send prompts.
-3. View logs and metrics:
+3. View logs, metrics, and traces:
    - Open the Google Cloud Console in your browser after sending prompts:
-     - Logs: https://console.cloud.google.com/logs/
-     - Metrics: https://console.cloud.google.com/monitoring/metrics-explorer
-     - Traces: https://console.cloud.google.com/traces/list
+     - Logs (Logs Explorer): https://console.cloud.google.com/logs/
+     - Metrics (Metrics Explorer):
+       https://console.cloud.google.com/monitoring/metrics-explorer
+     - Traces (Trace Explorer): https://console.cloud.google.com/traces/list
 
 ### Collector-based export (advanced)
 
@@ -207,11 +238,12 @@ forward data to Google Cloud.
    - Save collector logs to `~/.gemini/tmp/<projectHash>/otel/collector-gcp.log`
    - Stop collector on exit (e.g. `Ctrl+C`)
 3. Run Gemini CLI and send prompts.
-4. View logs and metrics:
+4. View logs, metrics, and traces:
    - Open the Google Cloud Console in your browser after sending prompts:
-     - Logs: https://console.cloud.google.com/logs/
-     - Metrics: https://console.cloud.google.com/monitoring/metrics-explorer
-     - Traces: https://console.cloud.google.com/traces/list
+     - Logs (Logs Explorer): https://console.cloud.google.com/logs/
+     - Metrics (Metrics Explorer):
+       https://console.cloud.google.com/monitoring/metrics-explorer
+     - Traces (Trace Explorer): https://console.cloud.google.com/traces/list
    - Open `~/.gemini/tmp/<projectHash>/otel/collector-gcp.log` to view local
      collector logs.
 
@@ -224,11 +256,11 @@ visualize your telemetry.
 This dashboard can be found under **Google Cloud Monitoring Dashboard
 Templates** as "**Gemini CLI Monitoring**".
 
-![Gemini CLI Monitoring Dashboard Overview](../assets/monitoring-dashboard-overview.png)
+![Gemini CLI Monitoring Dashboard Overview](/docs/assets/monitoring-dashboard-overview.png)
 
-![Gemini CLI Monitoring Dashboard Metrics](../assets/monitoring-dashboard-metrics.png)
+![Gemini CLI Monitoring Dashboard Metrics](/docs/assets/monitoring-dashboard-metrics.png)
 
-![Gemini CLI Monitoring Dashboard Logs](../assets/monitoring-dashboard-logs.png)
+![Gemini CLI Monitoring Dashboard Logs](/docs/assets/monitoring-dashboard-logs.png)
 
 To learn more, check out this blog post:
 [Instant insights: Gemini CLI’s new pre-configured monitoring dashboards](https://cloud.google.com/blog/topics/developers-practitioners/instant-insights-gemini-clis-new-pre-configured-monitoring-dashboards/).
@@ -269,14 +301,14 @@ For local development and debugging, you can capture telemetry data locally:
 3. View traces at http://localhost:16686 and logs/metrics in the collector log
    file.
 
-## Logs and metrics
+## Logs, metrics, and traces
 
-The following section describes the structure of logs and metrics generated for
-Gemini CLI.
+The following section describes the structure of logs, metrics, and traces
+generated for Gemini CLI.
 
-The `session.id`, `installation.id`, and `user.email` (available only when
-authenticated with a Google account) are included as common attributes on all
-logs and metrics.
+The `session.id`, `installation.id`, `active_approval_mode`, and `user.email`
+(available only when authenticated with a Google account) are included as common
+attributes on all logs and metrics.
 
 ### Logs
 
@@ -315,6 +347,31 @@ Captures startup configuration and user prompt submissions.
     - `prompt` (string; excluded if `telemetry.logPrompts` is `false`)
     - `auth_type` (string)
 
+#### Approval Mode
+
+Tracks changes and duration of approval modes.
+
+##### Lifecycle
+
+- `approval_mode_switch`: Approval mode was changed.
+  - **Attributes**:
+    - `from_mode` (string)
+    - `to_mode` (string)
+
+- `approval_mode_duration`: Duration spent in an approval mode.
+  - **Attributes**:
+    - `mode` (string)
+    - `duration_ms` (int)
+
+##### Execution
+
+These events track the execution of an approval mode, such as Plan Mode.
+
+- `plan_execution`: A plan was executed and the session switched from plan mode
+  to active execution.
+  - **Attributes**:
+    - `approval_mode` (string)
+
 #### Tools
 
 Captures tool executions, output truncation, and Edit behavior.
@@ -334,7 +391,21 @@ Captures tool executions, output truncation, and Edit behavior.
     - `extension_name` (string, if applicable)
     - `extension_id` (string, if applicable)
     - `content_length` (int, if applicable)
-    - `metadata` (if applicable)
+    - `metadata` (if applicable), which includes for the `AskUser` tool:
+      - `ask_user` (object):
+        - `question_types` (array of strings)
+        - `ask_user_dismissed` (boolean)
+        - `ask_user_empty_submission` (boolean)
+        - `ask_user_answer_count` (number)
+      - `diffStat` (if applicable), which includes:
+        - `model_added_lines` (number)
+        - `model_removed_lines` (number)
+        - `model_added_chars` (number)
+        - `model_removed_chars` (number)
+        - `user_added_lines` (number)
+        - `user_removed_lines` (number)
+        - `user_added_chars` (number)
+        - `user_removed_chars` (number)
 
 - `gemini_cli.tool_output_truncated`: Output of a tool call was truncated.
   - **Attributes**:
@@ -447,6 +518,7 @@ Captures Gemini API requests, responses, and errors.
     - `reasoning` (string, optional)
     - `failed` (boolean)
     - `error_message` (string, optional)
+    - `approval_mode` (string)
 
 #### Chat and streaming
 
@@ -671,12 +743,14 @@ Routing latency/failures and slash-command selections.
   - **Attributes**:
     - `routing.decision_model` (string)
     - `routing.decision_source` (string)
+    - `routing.approval_mode` (string)
 
 - `gemini_cli.model_routing.failure.count` (Counter, Int): Counts model routing
   failures.
   - **Attributes**:
     - `routing.decision_source` (string)
     - `routing.error_message` (string)
+    - `routing.approval_mode` (string)
 
 ##### Agent runs
 
@@ -694,6 +768,17 @@ Agent lifecycle metrics: runs, durations, and turns.
 - `gemini_cli.agent.turns` (Histogram, turns): Turns taken per agent run.
   - **Attributes**:
     - `agent_name` (string)
+
+##### Approval Mode
+
+###### Execution
+
+These metrics track the adoption and usage of specific approval workflows, such
+as Plan Mode.
+
+- `gemini_cli.plan.execution.count` (Counter, Int): Counts plan executions.
+  - **Attributes**:
+    - `approval_mode` (string)
 
 ##### UI
 
@@ -769,6 +854,32 @@ Optional performance monitoring for startup, CPU/memory, and phase timing.
     - `category` (string)
     - `current_value` (number)
     - `baseline_value` (number)
+
+### Traces
+
+Traces offer a granular, "under-the-hood" view of every agent and backend
+operation. By providing a high-fidelity execution map, they enable precise
+debugging of complex tool interactions and deep performance optimization. Each
+trace captures rich, consistent metadata via custom span attributes:
+
+- `gen_ai.operation.name` (string): The high-level operation kind (e.g.
+  "tool_call", "llm_call").
+- `gen_ai.agent.name` (string): The service agent identifier ("gemini-cli").
+- `gen_ai.agent.description` (string): The service agent description.
+- `gen_ai.input.messages` (string): Input messages or metadata specific to the
+  operation.
+- `gen_ai.output.messages` (string): Output messages or metadata generated from
+  the operation.
+- `gen_ai.request.model` (string): The request model name.
+- `gen_ai.response.model` (string): The response model name.
+- `gen_ai.system_instructions` (json string): The system instructions.
+- `gen_ai.prompt.name` (string): The prompt name.
+- `gen_ai.tool.name` (string): The executed tool's name.
+- `gen_ai.tool.call_id` (string): The generated specific ID of the tool call.
+- `gen_ai.tool.description` (string): The executed tool's description.
+- `gen_ai.tool.definitions` (json string): The executed tool's description.
+- `gen_ai.conversation.id` (string): The current CLI session ID.
+- Additional user-defined Custom Attributes passed via the span's configuration.
 
 #### GenAI semantic convention
 

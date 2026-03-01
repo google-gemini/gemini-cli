@@ -28,21 +28,8 @@ describe('OAuthUtils', () => {
   });
 
   describe('buildWellKnownUrls', () => {
-    it('should build standard root-based URLs by default', () => {
+    it('should build RFC 9728 compliant path-based URLs by default', () => {
       const urls = OAuthUtils.buildWellKnownUrls('https://example.com/mcp');
-      expect(urls.protectedResource).toBe(
-        'https://example.com/.well-known/oauth-protected-resource',
-      );
-      expect(urls.authorizationServer).toBe(
-        'https://example.com/.well-known/oauth-authorization-server',
-      );
-    });
-
-    it('should build path-based URLs when includePathSuffix is true', () => {
-      const urls = OAuthUtils.buildWellKnownUrls(
-        'https://example.com/mcp',
-        true,
-      );
       expect(urls.protectedResource).toBe(
         'https://example.com/.well-known/oauth-protected-resource/mcp',
       );
@@ -51,8 +38,21 @@ describe('OAuthUtils', () => {
       );
     });
 
+    it('should build root-based URLs when useRootDiscovery is true', () => {
+      const urls = OAuthUtils.buildWellKnownUrls(
+        'https://example.com/mcp',
+        true,
+      );
+      expect(urls.protectedResource).toBe(
+        'https://example.com/.well-known/oauth-protected-resource',
+      );
+      expect(urls.authorizationServer).toBe(
+        'https://example.com/.well-known/oauth-authorization-server',
+      );
+    });
+
     it('should handle root path correctly', () => {
-      const urls = OAuthUtils.buildWellKnownUrls('https://example.com', true);
+      const urls = OAuthUtils.buildWellKnownUrls('https://example.com');
       expect(urls.protectedResource).toBe(
         'https://example.com/.well-known/oauth-protected-resource',
       );
@@ -62,15 +62,24 @@ describe('OAuthUtils', () => {
     });
 
     it('should handle trailing slash in path', () => {
-      const urls = OAuthUtils.buildWellKnownUrls(
-        'https://example.com/mcp/',
-        true,
-      );
+      const urls = OAuthUtils.buildWellKnownUrls('https://example.com/mcp/');
       expect(urls.protectedResource).toBe(
         'https://example.com/.well-known/oauth-protected-resource/mcp',
       );
       expect(urls.authorizationServer).toBe(
         'https://example.com/.well-known/oauth-authorization-server/mcp',
+      );
+    });
+
+    it('should handle deep paths per RFC 9728', () => {
+      const urls = OAuthUtils.buildWellKnownUrls(
+        'https://app.mintmcp.com/s/g_2lj2CNDoJdf3xnbFeeF6vx/mcp',
+      );
+      expect(urls.protectedResource).toBe(
+        'https://app.mintmcp.com/.well-known/oauth-protected-resource/s/g_2lj2CNDoJdf3xnbFeeF6vx/mcp',
+      );
+      expect(urls.authorizationServer).toBe(
+        'https://app.mintmcp.com/.well-known/oauth-authorization-server/s/g_2lj2CNDoJdf3xnbFeeF6vx/mcp',
       );
     });
   });
@@ -243,6 +252,7 @@ describe('OAuthUtils', () => {
 
       expect(config).toEqual({
         authorizationUrl: 'https://auth.example.com/authorize',
+        issuer: 'https://auth.example.com',
         tokenUrl: 'https://auth.example.com/token',
         scopes: ['read', 'write'],
       });
@@ -277,6 +287,7 @@ describe('OAuthUtils', () => {
 
       expect(config).toEqual({
         authorizationUrl: 'https://auth.example.com/authorize',
+        issuer: 'https://auth.example.com',
         tokenUrl: 'https://auth.example.com/token',
         scopes: ['read', 'write'],
       });
@@ -292,6 +303,19 @@ describe('OAuthUtils', () => {
       const config = OAuthUtils.metadataToOAuthConfig(metadata);
 
       expect(config.scopes).toEqual([]);
+    });
+
+    it('should use issuer from metadata', () => {
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/oauth/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+        scopes_supported: ['read', 'write'],
+      };
+
+      const config = OAuthUtils.metadataToOAuthConfig(metadata);
+
+      expect(config.issuer).toBe('https://auth.example.com');
     });
   });
 

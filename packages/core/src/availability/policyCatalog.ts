@@ -11,10 +11,12 @@ import type {
   ModelPolicyStateMap,
 } from './modelPolicy.js';
 import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
+  resolveModel,
 } from '../config/models.js';
 import type { UserTierId } from '../code_assist/types.js';
 
@@ -27,6 +29,8 @@ type PolicyConfig = Omit<ModelPolicy, 'actions' | 'stateTransitions'> & {
 export interface ModelPolicyOptions {
   previewEnabled: boolean;
   userTier?: UserTierId;
+  useGemini31?: boolean;
+  useCustomToolModel?: boolean;
 }
 
 const DEFAULT_ACTIONS: ModelPolicyActionMap = {
@@ -34,6 +38,13 @@ const DEFAULT_ACTIONS: ModelPolicyActionMap = {
   transient: 'prompt',
   not_found: 'prompt',
   unknown: 'prompt',
+};
+
+const SILENT_ACTIONS: ModelPolicyActionMap = {
+  terminal: 'silent',
+  transient: 'silent',
+  not_found: 'silent',
+  unknown: 'silent',
 };
 
 const DEFAULT_STATE: ModelPolicyStateMap = {
@@ -48,9 +59,20 @@ const DEFAULT_CHAIN: ModelPolicyChain = [
   definePolicy({ model: DEFAULT_GEMINI_FLASH_MODEL, isLastResort: true }),
 ];
 
-const PREVIEW_CHAIN: ModelPolicyChain = [
-  definePolicy({ model: PREVIEW_GEMINI_MODEL }),
-  definePolicy({ model: PREVIEW_GEMINI_FLASH_MODEL, isLastResort: true }),
+const FLASH_LITE_CHAIN: ModelPolicyChain = [
+  definePolicy({
+    model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+    actions: SILENT_ACTIONS,
+  }),
+  definePolicy({
+    model: DEFAULT_GEMINI_FLASH_MODEL,
+    actions: SILENT_ACTIONS,
+  }),
+  definePolicy({
+    model: DEFAULT_GEMINI_MODEL,
+    isLastResort: true,
+    actions: SILENT_ACTIONS,
+  }),
 ];
 
 /**
@@ -60,7 +82,15 @@ export function getModelPolicyChain(
   options: ModelPolicyOptions,
 ): ModelPolicyChain {
   if (options.previewEnabled) {
-    return cloneChain(PREVIEW_CHAIN);
+    const previewModel = resolveModel(
+      PREVIEW_GEMINI_MODEL,
+      options.useGemini31,
+      options.useCustomToolModel,
+    );
+    return [
+      definePolicy({ model: previewModel }),
+      definePolicy({ model: PREVIEW_GEMINI_FLASH_MODEL, isLastResort: true }),
+    ];
   }
 
   return cloneChain(DEFAULT_CHAIN);
@@ -68,6 +98,10 @@ export function getModelPolicyChain(
 
 export function createSingleModelChain(model: string): ModelPolicyChain {
   return [definePolicy({ model, isLastResort: true })];
+}
+
+export function getFlashLitePolicyChain(): ModelPolicyChain {
+  return cloneChain(FLASH_LITE_CHAIN);
 }
 
 /**

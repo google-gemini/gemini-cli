@@ -124,7 +124,6 @@ describe('settings-validation', () => {
         },
         tools: {
           sandbox: 'inherit',
-          autoAccept: false,
         },
       };
 
@@ -325,7 +324,7 @@ describe('settings-validation', () => {
         expect(formatted).toContain('Expected: string, but received: object');
         expect(formatted).toContain('Please fix the configuration.');
         expect(formatted).toContain(
-          'https://github.com/google-gemini/gemini-cli',
+          'https://geminicli.com/docs/reference/configuration/',
         );
       }
     });
@@ -365,9 +364,8 @@ describe('settings-validation', () => {
         const formatted = formatValidationError(result.error, 'test.json');
 
         expect(formatted).toContain(
-          'https://github.com/google-gemini/gemini-cli',
+          'https://geminicli.com/docs/reference/configuration/',
         );
-        expect(formatted).toContain('configuration.md');
       }
     });
 

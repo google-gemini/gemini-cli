@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { ExtensionManager } from './extension-manager.js';
-import type { Settings } from './settings.js';
+import { createTestMergedSettings } from './settings.js';
 import {
   loadAgentsFromDirectory,
   loadSkillsFromDir,
@@ -105,14 +105,11 @@ describe('ExtensionManager Settings Scope', () => {
       workspaceDir: tempWorkspace,
       requestConsent: async () => true,
       requestSetting: async () => '',
-      settings: {
-        telemetry: {
-          enabled: false,
-        },
-        experimental: {
-          extensionConfig: true,
-        },
-      } as Settings,
+      settings: createTestMergedSettings({
+        telemetry: { enabled: false },
+        experimental: { extensionConfig: true },
+        security: { folderTrust: { enabled: false } },
+      }),
     });
 
     const extensions = await extensionManager.loadExtensions();
@@ -147,14 +144,11 @@ describe('ExtensionManager Settings Scope', () => {
       workspaceDir: tempWorkspace,
       requestConsent: async () => true,
       requestSetting: async () => '',
-      settings: {
-        telemetry: {
-          enabled: false,
-        },
-        experimental: {
-          extensionConfig: true,
-        },
-      } as Settings,
+      settings: createTestMergedSettings({
+        telemetry: { enabled: false },
+        experimental: { extensionConfig: true },
+        security: { folderTrust: { enabled: false } },
+      }),
     });
 
     const extensions = await extensionManager.loadExtensions();
@@ -187,14 +181,11 @@ describe('ExtensionManager Settings Scope', () => {
       workspaceDir: tempWorkspace,
       requestConsent: async () => true,
       requestSetting: async () => '',
-      settings: {
-        telemetry: {
-          enabled: false,
-        },
-        experimental: {
-          extensionConfig: true,
-        },
-      } as Settings,
+      settings: createTestMergedSettings({
+        telemetry: { enabled: false },
+        experimental: { extensionConfig: true },
+        security: { folderTrust: { enabled: false } },
+      }),
     });
 
     const extensions = await extensionManager.loadExtensions();
@@ -207,7 +198,7 @@ describe('ExtensionManager Settings Scope', () => {
       (s) => s.envVar === 'TEST_SETTING',
     );
     expect(setting).toBeDefined();
-    expect(setting?.value).toBe('[not set]');
+    expect(setting?.value).toBeUndefined();
     expect(setting?.scope).toBeUndefined();
 
     // Verify output string does not contain scope

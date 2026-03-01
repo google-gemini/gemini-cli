@@ -4,23 +4,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import {
+  renderWithProviders,
+  persistentStateMock,
+} from '../../test-utils/render.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AlternateBufferQuittingDisplay } from './AlternateBufferQuittingDisplay.js';
-import { ToolCallStatus } from '../types.js';
 import type { HistoryItem, HistoryItemWithoutId } from '../types.js';
 import { Text } from 'ink';
-import { renderWithProviders } from '../../test-utils/render.js';
-import type { Config } from '@google/gemini-cli-core';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 
 vi.mock('../utils/terminalSetup.js', () => ({
   getTerminalProgram: () => null,
 }));
 
-vi.mock('../contexts/AppContext.js', () => ({
-  useAppContext: () => ({
-    version: '0.10.0',
-  }),
-}));
+vi.mock('../contexts/AppContext.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../contexts/AppContext.js')>();
+  return {
+    ...actual,
+    useAppContext: () => ({
+      version: '0.10.0',
+    }),
+  };
+});
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -44,7 +51,7 @@ const mockHistory: HistoryItem[] = [
         callId: 'call1',
         name: 'tool1',
         description: 'Description for tool 1',
-        status: ToolCallStatus.Success,
+        status: CoreToolCallStatus.Success,
         resultDisplay: undefined,
         confirmationDetails: undefined,
       },
@@ -58,7 +65,7 @@ const mockHistory: HistoryItem[] = [
         callId: 'call2',
         name: 'tool2',
         description: 'Description for tool 2',
-        status: ToolCallStatus.Success,
+        status: CoreToolCallStatus.Success,
         resultDisplay: undefined,
         confirmationDetails: undefined,
       },
@@ -74,7 +81,7 @@ const mockPendingHistoryItems: HistoryItemWithoutId[] = [
         callId: 'call3',
         name: 'tool3',
         description: 'Description for tool 3',
-        status: ToolCallStatus.Pending,
+        status: CoreToolCallStatus.Scheduled,
         resultDisplay: undefined,
         confirmationDetails: undefined,
       },
@@ -82,21 +89,10 @@ const mockPendingHistoryItems: HistoryItemWithoutId[] = [
   },
 ];
 
-const mockConfig = {
-  getScreenReader: () => false,
-  getEnableInteractiveShell: () => false,
-  getModel: () => 'gemini-pro',
-  getTargetDir: () => '/tmp',
-  getDebugMode: () => false,
-  getGeminiMdFileCount: () => 0,
-  getExperiments: () => ({
-    flags: {},
-    experimentIds: [],
-  }),
-  getPreviewFeatures: () => false,
-} as unknown as Config;
-
 describe('AlternateBufferQuittingDisplay', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
   const baseUIState = {
     terminalWidth: 80,
     mainAreaWidth: 80,
@@ -110,8 +106,9 @@ describe('AlternateBufferQuittingDisplay', () => {
     },
   };
 
-  it('renders with active and pending tool messages', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders with active and pending tool messages', async () => {
+    persistentStateMock.setData({ tipsShown: 0 });
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -119,14 +116,16 @@ describe('AlternateBufferQuittingDisplay', () => {
           history: mockHistory,
           pendingHistoryItems: mockPendingHistoryItems,
         },
-        config: mockConfig,
       },
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot('with_history_and_pending');
+    unmount();
   });
 
-  it('renders with empty history and no pending items', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders with empty history and no pending items', async () => {
+    persistentStateMock.setData({ tipsShown: 0 });
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -134,14 +133,16 @@ describe('AlternateBufferQuittingDisplay', () => {
           history: [],
           pendingHistoryItems: [],
         },
-        config: mockConfig,
       },
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot('empty');
+    unmount();
   });
 
-  it('renders with history but no pending items', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders with history but no pending items', async () => {
+    persistentStateMock.setData({ tipsShown: 0 });
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -149,14 +150,16 @@ describe('AlternateBufferQuittingDisplay', () => {
           history: mockHistory,
           pendingHistoryItems: [],
         },
-        config: mockConfig,
       },
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot('with_history_no_pending');
+    unmount();
   });
 
-  it('renders with pending items but no history', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders with pending items but no history', async () => {
+    persistentStateMock.setData({ tipsShown: 0 });
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -164,18 +167,60 @@ describe('AlternateBufferQuittingDisplay', () => {
           history: [],
           pendingHistoryItems: mockPendingHistoryItems,
         },
-        config: mockConfig,
       },
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot('with_pending_no_history');
+    unmount();
   });
 
-  it('renders with user and gemini messages', () => {
+  it('renders with a tool awaiting confirmation', async () => {
+    persistentStateMock.setData({ tipsShown: 0 });
+    const pendingHistoryItems: HistoryItemWithoutId[] = [
+      {
+        type: 'tool_group',
+        tools: [
+          {
+            callId: 'call4',
+            name: 'confirming_tool',
+            description: 'Confirming tool description',
+            status: CoreToolCallStatus.AwaitingApproval,
+            resultDisplay: undefined,
+            confirmationDetails: {
+              type: 'info',
+              title: 'Confirm Tool',
+              prompt: 'Confirm this action?',
+            },
+          },
+        ],
+      },
+    ];
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <AlternateBufferQuittingDisplay />,
+      {
+        uiState: {
+          ...baseUIState,
+          history: [],
+          pendingHistoryItems,
+        },
+      },
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('Action Required (was prompted):');
+    expect(output).toContain('confirming_tool');
+    expect(output).toContain('Confirming tool description');
+    expect(output).toMatchSnapshot('with_confirming_tool');
+    unmount();
+  });
+
+  it('renders with user and gemini messages', async () => {
+    persistentStateMock.setData({ tipsShown: 0 });
     const history: HistoryItem[] = [
       { id: 1, type: 'user', text: 'Hello Gemini' },
       { id: 2, type: 'gemini', text: 'Hello User!' },
     ];
-    const { lastFrame } = renderWithProviders(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <AlternateBufferQuittingDisplay />,
       {
         uiState: {
@@ -183,9 +228,10 @@ describe('AlternateBufferQuittingDisplay', () => {
           history,
           pendingHistoryItems: [],
         },
-        config: mockConfig,
       },
     );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot('with_user_gemini_messages');
+    unmount();
   });
 });

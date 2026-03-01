@@ -8,16 +8,14 @@ import * as http from 'node:http';
 import * as crypto from 'node:crypto';
 import type * as net from 'node:net';
 import { URL } from 'node:url';
-import type { EventEmitter } from 'node:events';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage, FatalCancellationError } from '../utils/errors.js';
 import { OAuthUtils, ResourceMismatchError } from './oauth-utils.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
-
-export const OAUTH_DISPLAY_MESSAGE_EVENT = 'oauth-display-message' as const;
+import { getConsentForOauth } from '../utils/authConsent.js';
 
 /**
  * OAuth configuration for an MCP server.
@@ -27,6 +25,7 @@ export interface MCPOAuthConfig {
   clientId?: string;
   clientSecret?: string;
   authorizationUrl?: string;
+  issuer?: string;
   tokenUrl?: string;
   scopes?: string[];
   audiences?: string[];
@@ -143,6 +142,7 @@ export class MCPOAuthProvider {
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return (await response.json()) as OAuthClientRegistrationResponse;
   }
 
@@ -160,14 +160,14 @@ export class MCPOAuthProvider {
   }
 
   private async discoverAuthServerMetadataForRegistration(
-    authorizationUrl: string,
+    issuer: string,
   ): Promise<{
     issuerUrl: string;
     metadata: NonNullable<
       Awaited<ReturnType<typeof OAuthUtils.discoverAuthorizationServerMetadata>>
     >;
   }> {
-    const authUrl = new URL(authorizationUrl);
+    const authUrl = new URL(issuer);
 
     // Preserve path components for issuers with path-based discovery (e.g., Keycloak)
     // Extract issuer by removing the OIDC protocol-specific path suffix
@@ -245,7 +245,8 @@ export class MCPOAuthProvider {
    */
   private generatePKCEParams(): PKCEParams {
     // Generate code verifier (43-128 characters)
-    const codeVerifier = crypto.randomBytes(32).toString('base64url');
+    // using 64 bytes results in ~86 characters, safely above the minimum of 43
+    const codeVerifier = crypto.randomBytes(64).toString('base64url');
 
     // Generate code challenge using SHA256
     const codeChallenge = crypto
@@ -266,7 +267,10 @@ export class MCPOAuthProvider {
    * @param expectedState The state parameter to validate
    * @returns Object containing the port (available immediately) and a promise for the auth response
    */
-  private startCallbackServer(expectedState: string): {
+  private startCallbackServer(
+    expectedState: string,
+    port?: number,
+  ): {
     port: Promise<number>;
     response: Promise<OAuthAuthorizationResponse>;
   } {
@@ -353,9 +357,10 @@ export class MCPOAuthProvider {
           reject(error);
         });
 
-        // Determine which port to use (env var or OS-assigned)
-        const portStr = process.env['OAUTH_CALLBACK_PORT'];
+        // Determine which port to use (env var, argument, or OS-assigned)
         let listenPort = 0; // Default to OS-assigned port
+
+        const portStr = process.env['OAUTH_CALLBACK_PORT'];
         if (portStr) {
           const envPort = parseInt(portStr, 10);
           if (isNaN(envPort) || envPort <= 0 || envPort > 65535) {
@@ -367,9 +372,12 @@ export class MCPOAuthProvider {
             return;
           }
           listenPort = envPort;
+        } else if (port !== undefined) {
+          listenPort = port;
         }
 
         server.listen(listenPort, () => {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const address = server.address() as net.AddressInfo;
           serverPort = address.port;
           debugLogger.log(
@@ -393,7 +401,34 @@ export class MCPOAuthProvider {
   }
 
   /**
-   * Build the authorization URL with PKCE parameters.
+   * Extract the port number from a URL string if available and valid.
+   *
+   * @param urlString The URL string to parse
+   * @returns The port number or undefined if not found or invalid
+   */
+  private getPortFromUrl(urlString?: string): number | undefined {
+    if (!urlString) {
+      return undefined;
+    }
+
+    try {
+      const url = new URL(urlString);
+      if (url.port) {
+        const parsedPort = parseInt(url.port, 10);
+        if (!isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
+          return parsedPort;
+        }
+      }
+    } catch {
+      // Ignore invalid URL
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Build the authorization URL for the OAuth flow.
+
    *
    * @param config OAuth configuration
    * @param pkceParams PKCE parameters
@@ -546,6 +581,7 @@ export class MCPOAuthProvider {
 
     // Try to parse as JSON first, fall back to form-urlencoded
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(responseText) as OAuthTokenResponse;
     } catch {
       // Parse form-urlencoded response
@@ -668,6 +704,7 @@ export class MCPOAuthProvider {
 
     // Try to parse as JSON first, fall back to form-urlencoded
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(responseText) as OAuthTokenResponse;
     } catch {
       // Parse form-urlencoded response
@@ -710,15 +747,10 @@ export class MCPOAuthProvider {
     serverName: string,
     config: MCPOAuthConfig,
     mcpServerUrl?: string,
-    events?: EventEmitter,
   ): Promise<OAuthToken> {
     // Helper function to display messages through handler or fallback to console.log
     const displayMessage = (message: string) => {
-      if (events) {
-        events.emit(OAUTH_DISPLAY_MESSAGE_EVENT, message);
-      } else {
-        debugLogger.log(message);
-      }
+      coreEvents.emitFeedback('info', message);
     };
 
     // If no authorization URL is provided, try to discover OAuth configuration
@@ -751,6 +783,7 @@ export class MCPOAuthProvider {
               config = {
                 ...config,
                 authorizationUrl: discoveredConfig.authorizationUrl,
+                issuer: discoveredConfig.issuer,
                 tokenUrl: discoveredConfig.tokenUrl,
                 scopes: config.scopes || discoveredConfig.scopes || [],
                 // Preserve existing client credentials
@@ -781,6 +814,7 @@ export class MCPOAuthProvider {
             ...config,
             authorizationUrl: discoveredConfig.authorizationUrl,
             tokenUrl: discoveredConfig.tokenUrl,
+            issuer: discoveredConfig.issuer,
             scopes: config.scopes || discoveredConfig.scopes || [],
             registrationUrl: discoveredConfig.registrationUrl,
             // Preserve existing client credentials
@@ -798,9 +832,15 @@ export class MCPOAuthProvider {
     // Generate PKCE parameters
     const pkceParams = this.generatePKCEParams();
 
+    // Determine preferred port from redirectUri if available
+    const preferredPort = this.getPortFromUrl(config.redirectUri);
+
     // Start callback server first to allocate port
     // This ensures we only create one server and eliminates race conditions
-    const callbackServer = this.startCallbackServer(pkceParams.state);
+    const callbackServer = this.startCallbackServer(
+      pkceParams.state,
+      preferredPort,
+    );
 
     // Wait for server to start and get the allocated port
     // We need this port for client registration and auth URL building
@@ -813,18 +853,14 @@ export class MCPOAuthProvider {
 
       // If no registration URL was previously discovered, try to discover it
       if (!registrationUrl) {
-        // Extract server URL from authorization URL
-        if (!config.authorizationUrl) {
-          throw new Error(
-            'Cannot perform dynamic registration without authorization URL',
-          );
+        // Use the issuer to discover registration endpoint
+        if (!config.issuer) {
+          throw new Error('Cannot perform dynamic registration without issuer');
         }
 
         debugLogger.debug('→ Attempting dynamic client registration...');
         const { metadata: authServerMetadata } =
-          await this.discoverAuthServerMetadataForRegistration(
-            config.authorizationUrl,
-          );
+          await this.discoverAuthServerMetadataForRegistration(config.issuer);
         registrationUrl = authServerMetadata.registration_endpoint;
       }
 
@@ -863,6 +899,13 @@ export class MCPOAuthProvider {
       redirectPort,
       mcpServerUrl,
     );
+
+    const userConsent = await getConsentForOauth(
+      `Authentication required for MCP Server: '${serverName}.'`,
+    );
+    if (!userConsent) {
+      throw new FatalCancellationError('Authentication cancelled by user.');
+    }
 
     displayMessage(`→ Opening your browser for OAuth sign-in...
 

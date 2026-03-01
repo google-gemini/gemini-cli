@@ -5,10 +5,13 @@
  */
 
 import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
-import type { LocalAgentDefinition } from './types.js';
+import type {
+  LocalAgentDefinition,
+  SubagentActivityEvent,
+  AgentInputs,
+} from './types.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { LocalAgentExecutor } from './local-executor.js';
-import type { SubagentActivityEvent, AgentInputs } from './types.js';
 import { AgentTerminateMode } from './types.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolErrorType } from '../tools/tool-error.js';
@@ -28,9 +31,13 @@ const testDefinition: LocalAgentDefinition<z.ZodUnknown> = {
   name: 'MockAgent',
   description: 'A mock agent.',
   inputConfig: {
-    inputs: {
-      task: { type: 'string', required: true, description: 'task' },
-      priority: { type: 'number', required: false, description: 'prio' },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        task: { type: 'string', description: 'task' },
+        priority: { type: 'number', description: 'prio' },
+      },
+      required: ['task'],
     },
   },
   modelConfig: {

@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 137
+  // Next ID: 172
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -136,6 +136,21 @@ export enum EventMetadataKey {
 
   // Logs the tool use token count of the API call.
   GEMINI_CLI_API_RESPONSE_TOOL_TOKEN_COUNT = 29,
+
+  // Logs the token count for system instructions.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_SYSTEM_INSTRUCTIONS = 167,
+
+  // Logs the token count for tool definitions.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_DEFINITIONS = 168,
+
+  // Logs the token count for conversation history.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_HISTORY = 169,
+
+  // Logs the token count for tool calls (JSON map of tool name to tokens).
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_CALLS = 170,
+
+  // Logs the token count from MCP servers (tool definitions + tool inputs/outputs).
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_MCP_SERVERS = 171,
 
   // ==========================================================================
   // GenAI API Error Event Keys
@@ -529,4 +544,106 @@ export enum EventMetadataKey {
 
   // Logs total RAM in GB of user machine.
   GEMINI_CLI_RAM_TOTAL_GB = 140,
+
+  // ==========================================================================
+  // Approval Mode Event Keys
+  // ==========================================================================
+
+  // Logs the active approval mode in the session.
+  GEMINI_CLI_ACTIVE_APPROVAL_MODE = 141,
+
+  // Logs the new approval mode.
+  GEMINI_CLI_APPROVAL_MODE_TO = 142,
+
+  // Logs the duration spent in an approval mode in milliseconds.
+  GEMINI_CLI_APPROVAL_MODE_DURATION_MS = 143,
+
+  // ==========================================================================
+  // Rewind Event Keys
+  // ==========================================================================
+
+  // Logs the outcome of a rewind operation.
+  GEMINI_CLI_REWIND_OUTCOME = 144,
+
+  // Model Routing Event Keys (Cont.)
+  // ==========================================================================
+
+  // Logs the reasoning for the routing decision.
+  GEMINI_CLI_ROUTING_REASONING = 145,
+
+  // Logs whether numerical routing was enabled.
+  GEMINI_CLI_ROUTING_NUMERICAL_ENABLED = 146,
+
+  // Logs the classifier threshold used.
+  GEMINI_CLI_ROUTING_CLASSIFIER_THRESHOLD = 147,
+
+  // ==========================================================================
+  // Tool Output Masking Event Keys
+  // ==========================================================================
+
+  // Logs the total tokens in the prunable block before masking.
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_BEFORE = 148,
+
+  // Logs the total tokens in the masked remnants after masking.
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_AFTER = 149,
+
+  // Logs the number of tool outputs masked in this operation.
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_MASKED_COUNT = 150,
+
+  // Logs the total prunable tokens identified at the trigger point.
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_TOTAL_PRUNABLE_TOKENS = 151,
+
+  // Ask User Stats Event Keys
+  // ==========================================================================
+
+  // Logs the types of questions asked in the ask_user tool.
+  GEMINI_CLI_ASK_USER_QUESTION_TYPES = 152,
+
+  // Logs whether the ask_user dialog was dismissed.
+  GEMINI_CLI_ASK_USER_DISMISSED = 153,
+
+  // Logs whether the ask_user dialog was submitted empty.
+  GEMINI_CLI_ASK_USER_EMPTY_SUBMISSION = 154,
+
+  // Logs the number of questions answered in the ask_user tool.
+  GEMINI_CLI_ASK_USER_ANSWER_COUNT = 155,
+
+  // ==========================================================================
+  // Keychain & Token Storage Event Keys
+  // ==========================================================================
+
+  // Logs whether the keychain is available.
+  GEMINI_CLI_KEYCHAIN_AVAILABLE = 156,
+
+  // Logs the type of token storage initialized.
+  GEMINI_CLI_TOKEN_STORAGE_TYPE = 157,
+
+  // Logs whether the token storage type was forced by an environment variable.
+  GEMINI_CLI_TOKEN_STORAGE_FORCED = 158,
+  // Conseca Event Keys
+  // ==========================================================================
+
+  // Logs the policy generation event.
+  CONSECA_POLICY_GENERATION = 159,
+
+  // Logs the verdict event.
+  CONSECA_VERDICT = 160,
+
+  // Logs the generated policy content.
+  CONSECA_GENERATED_POLICY = 161,
+
+  // Logs the verdict result (e.g. ALLOW/BLOCK).
+  CONSECA_VERDICT_RESULT = 162,
+
+  // Logs the verdict rationale.
+  CONSECA_VERDICT_RATIONALE = 163,
+
+  // Logs the trusted content used.
+  CONSECA_TRUSTED_CONTENT = 164,
+
+  // Logs the user prompt for Conseca events.
+  CONSECA_USER_PROMPT = 165,
+
+  // Logs the error message for Conseca events.
+  CONSECA_ERROR = 166,
 }

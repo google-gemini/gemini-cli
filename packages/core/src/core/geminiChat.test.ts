@@ -22,24 +22,13 @@ import { AuthType } from './contentGenerator.js';
 import { TerminalQuotaError } from '../utils/googleQuotaErrors.js';
 import { type RetryOptions } from '../utils/retry.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
-import { HookSystem } from '../hooks/hookSystem.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import * as policyHelpers from '../availability/policyHelpers.js';
 import { makeResolvedModelConfig } from '../services/modelConfigServiceTestUtils.js';
-import {
-  fireBeforeModelHook,
-  fireAfterModelHook,
-  fireBeforeToolSelectionHook,
-} from './geminiChatHookTriggers.js';
-
-// Mock hook triggers
-vi.mock('./geminiChatHookTriggers.js', () => ({
-  fireBeforeModelHook: vi.fn(),
-  fireAfterModelHook: vi.fn(),
-  fireBeforeToolSelectionHook: vi.fn().mockResolvedValue({}),
-}));
+import type { HookSystem } from '../hooks/hookSystem.js';
+import { LlmRole } from '../telemetry/types.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -142,7 +131,6 @@ describe('GeminiChat', () => {
       getTelemetryLogPromptsEnabled: () => true,
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
-      getPreviewFeatures: () => false,
       getContentGeneratorConfig: vi.fn().mockImplementation(() => ({
         authType: 'oauth-personal',
         model: currentModel,
@@ -165,6 +153,7 @@ describe('GeminiChat', () => {
       }),
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
+      getMaxAttempts: vi.fn().mockReturnValue(10),
       getUserTier: vi.fn().mockReturnValue(undefined),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => {
@@ -204,9 +193,7 @@ describe('GeminiChat', () => {
     setSimulate429(false);
     // Reset history for each test by creating a new instance
     chat = new GeminiChat(mockConfig);
-    mockConfig.getHookSystem = vi
-      .fn()
-      .mockReturnValue(new HookSystem(mockConfig));
+    mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
   });
 
   afterEach(() => {
@@ -230,6 +217,37 @@ describe('GeminiChat', () => {
     it('should initialize lastPromptTokenCount for empty history', () => {
       const chatEmpty = new GeminiChat(mockConfig);
       expect(chatEmpty.getLastPromptTokenCount()).toBe(0);
+    });
+  });
+
+  describe('setHistory', () => {
+    it('should recalculate lastPromptTokenCount when history is updated', () => {
+      const initialHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+      ];
+      const chatWithHistory = new GeminiChat(
+        mockConfig,
+        '',
+        [],
+        initialHistory,
+      );
+      const initialCount = chatWithHistory.getLastPromptTokenCount();
+
+      const newHistory: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: 'This is a much longer history item that should result in more tokens than just hello.',
+            },
+          ],
+        },
+      ];
+      chatWithHistory.setHistory(newHistory);
+
+      expect(chatWithHistory.getLastPromptTokenCount()).toBeGreaterThan(
+        initialCount,
+      );
     });
   });
 
@@ -271,6 +289,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-tool-call-empty-end',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       await expect(
         (async () => {
@@ -324,6 +343,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-no-finish-empty-end',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       await expect(
         (async () => {
@@ -371,6 +391,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-valid-then-invalid-end',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       await expect(
         (async () => {
@@ -419,6 +440,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-empty-chunk-consolidation',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // Consume the stream
@@ -478,6 +500,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-multi-chunk',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // Consume the stream to trigger history recording.
@@ -527,6 +550,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-mixed-chunk',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // This loop consumes the stream.
@@ -596,6 +620,7 @@ describe('GeminiChat', () => {
         },
         'prompt-id-stream-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       // 4. Assert: The stream processing should throw an InvalidStreamError.
@@ -640,6 +665,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       // Should not throw an error
@@ -677,6 +703,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       await expect(
@@ -713,6 +740,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       await expect(
@@ -749,6 +777,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       // Should not throw an error
@@ -786,6 +815,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id-malformed',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       // Should throw an error
@@ -833,6 +863,7 @@ describe('GeminiChat', () => {
         'test retry',
         'prompt-id-retry-malformed',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       const events: StreamEvent[] = [];
       for await (const event of stream) {
@@ -890,6 +921,7 @@ describe('GeminiChat', () => {
         'hello',
         'prompt-id-1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // consume stream
@@ -915,6 +947,7 @@ describe('GeminiChat', () => {
           },
         },
         'prompt-id-1',
+        LlmRole.MAIN,
       );
     });
 
@@ -938,6 +971,7 @@ describe('GeminiChat', () => {
         'hello',
         'prompt-id-thinking-level',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // consume stream
@@ -954,6 +988,7 @@ describe('GeminiChat', () => {
           }),
         }),
         'prompt-id-thinking-level',
+        LlmRole.MAIN,
       );
     });
 
@@ -977,6 +1012,7 @@ describe('GeminiChat', () => {
         'hello',
         'prompt-id-thinking-budget',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // consume stream
@@ -987,13 +1023,67 @@ describe('GeminiChat', () => {
           model: 'gemini-2.0-flash',
           config: expect.objectContaining({
             thinkingConfig: {
-              thinkingBudget: DEFAULT_THINKING_MODE,
+              thinkingBudget: 8192,
               thinkingLevel: undefined,
             },
           }),
         }),
         'prompt-id-thinking-budget',
+        LlmRole.MAIN,
       );
+    });
+
+    it('should flush transcript before tool dispatch for pure tool call with no text or thoughts', async () => {
+      const pureToolCallStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  {
+                    functionCall: {
+                      name: 'read_file',
+                      args: { path: 'test.py' },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        pureToolCallStream,
+      );
+
+      const { default: fs } = await import('node:fs');
+      const writeFileSync = vi.mocked(fs.writeFileSync);
+      const writeCountBefore = writeFileSync.mock.calls.length;
+
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'analyze test.py',
+        'prompt-id-pure-tool-flush',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      const newWrites = writeFileSync.mock.calls.slice(writeCountBefore);
+      expect(newWrites.length).toBeGreaterThan(0);
+
+      const lastWriteData = JSON.parse(
+        newWrites[newWrites.length - 1][1] as string,
+      ) as { messages: Array<{ type: string }> };
+
+      const geminiMessages = lastWriteData.messages.filter(
+        (m) => m.type === 'gemini',
+      );
+      expect(geminiMessages.length).toBeGreaterThan(0);
     });
   });
 
@@ -1044,6 +1134,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id-no-retry',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       await expect(
@@ -1092,6 +1183,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-yield-retry',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       const events: StreamEvent[] = [];
       for await (const event of stream) {
@@ -1134,6 +1226,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id-retry-success',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       const chunks: StreamEvent[] = [];
       for await (const chunk of stream) {
@@ -1206,6 +1299,7 @@ describe('GeminiChat', () => {
         'test message',
         'prompt-id-retry-temperature',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       for await (const _ of stream) {
@@ -1227,6 +1321,7 @@ describe('GeminiChat', () => {
           }),
         }),
         'prompt-id-retry-temperature',
+        LlmRole.MAIN,
       );
 
       // Second call (retry) should have temperature 1
@@ -1240,6 +1335,7 @@ describe('GeminiChat', () => {
           }),
         }),
         'prompt-id-retry-temperature',
+        LlmRole.MAIN,
       );
     });
 
@@ -1265,6 +1361,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id-retry-fail',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       await expect(async () => {
         for await (const _ of stream) {
@@ -1331,6 +1428,7 @@ describe('GeminiChat', () => {
           'test message',
           'prompt-id-400',
           new AbortController().signal,
+          LlmRole.MAIN,
         );
 
         await expect(
@@ -1370,9 +1468,11 @@ describe('GeminiChat', () => {
           'test message',
           'prompt-id-429-retry',
           new AbortController().signal,
+          LlmRole.MAIN,
         );
 
         const events: StreamEvent[] = [];
+
         for await (const event of stream) {
           events.push(event);
         }
@@ -1419,9 +1519,11 @@ describe('GeminiChat', () => {
           'test message',
           'prompt-id-500-retry',
           new AbortController().signal,
+          LlmRole.MAIN,
         );
 
         const events: StreamEvent[] = [];
+
         for await (const event of stream) {
           events.push(event);
         }
@@ -1476,9 +1578,11 @@ describe('GeminiChat', () => {
           'test message',
           'prompt-id-fetch-error-retry',
           new AbortController().signal,
+          LlmRole.MAIN,
         );
 
         const events: StreamEvent[] = [];
+
         for await (const event of stream) {
           events.push(event);
         }
@@ -1540,6 +1644,7 @@ describe('GeminiChat', () => {
       'Second question',
       'prompt-id-retry-existing',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
     for await (const _ of stream) {
       // consume stream
@@ -1612,6 +1717,7 @@ describe('GeminiChat', () => {
       'test empty stream',
       'prompt-id-empty-stream',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
     const chunks: StreamEvent[] = [];
     for await (const chunk of stream) {
@@ -1693,6 +1799,7 @@ describe('GeminiChat', () => {
       'first',
       'prompt-1',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
     const firstStreamIterator = firstStream[Symbol.asyncIterator]();
     await firstStreamIterator.next();
@@ -1703,6 +1810,7 @@ describe('GeminiChat', () => {
       'second',
       'prompt-2',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
 
     // 5. Assert that only one API call has been made so far.
@@ -1808,6 +1916,7 @@ describe('GeminiChat', () => {
         'trigger 429',
         'prompt-id-fb1',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       // Consume stream to trigger logic
@@ -1874,6 +1983,7 @@ describe('GeminiChat', () => {
       'test message',
       'prompt-id-discard-test',
       new AbortController().signal,
+      LlmRole.MAIN,
     );
     const events: StreamEvent[] = [];
     for await (const event of stream) {
@@ -2090,6 +2200,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-healthy',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // consume
@@ -2125,6 +2236,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-sticky-once',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       for await (const _ of stream) {
         // consume
@@ -2175,6 +2287,7 @@ describe('GeminiChat', () => {
           'test',
           'prompt-fallback-arg',
           new AbortController().signal,
+          LlmRole.MAIN,
         );
         for await (const _ of stream) {
           // consume
@@ -2253,6 +2366,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-config-refresh',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
       // Consume to drive both attempts
       for await (const _ of stream) {
@@ -2265,9 +2379,12 @@ describe('GeminiChat', () => {
         1,
         expect.objectContaining({
           model: 'model-a',
-          config: expect.objectContaining({ temperature: 0.1 }),
+          config: expect.objectContaining({
+            temperature: 0.1,
+          }),
         }),
         expect.any(String),
+        LlmRole.MAIN,
       );
       expect(
         mockContentGenerator.generateContentStream,
@@ -2275,26 +2392,31 @@ describe('GeminiChat', () => {
         2,
         expect.objectContaining({
           model: 'model-b',
-          config: expect.objectContaining({ temperature: 0.9 }),
+          config: expect.objectContaining({
+            temperature: 0.9,
+          }),
         }),
         expect.any(String),
+        LlmRole.MAIN,
       );
     });
   });
 
   describe('Hook execution control', () => {
+    let mockHookSystem: HookSystem;
     beforeEach(() => {
       vi.mocked(mockConfig.getEnableHooks).mockReturnValue(true);
-      // Default to allowing execution
-      vi.mocked(fireBeforeModelHook).mockResolvedValue({ blocked: false });
-      vi.mocked(fireAfterModelHook).mockResolvedValue({
-        response: {} as GenerateContentResponse,
-      });
-      vi.mocked(fireBeforeToolSelectionHook).mockResolvedValue({});
+
+      mockHookSystem = {
+        fireBeforeModelEvent: vi.fn().mockResolvedValue({ blocked: false }),
+        fireAfterModelEvent: vi.fn().mockResolvedValue({ response: {} }),
+        fireBeforeToolSelectionEvent: vi.fn().mockResolvedValue({}),
+      } as unknown as HookSystem;
+      mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
     });
 
     it('should yield AGENT_EXECUTION_STOPPED when BeforeModel hook stops execution', async () => {
-      vi.mocked(fireBeforeModelHook).mockResolvedValue({
+      vi.mocked(mockHookSystem.fireBeforeModelEvent).mockResolvedValue({
         blocked: true,
         stopped: true,
         reason: 'stopped by hook',
@@ -2305,6 +2427,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       const events: StreamEvent[] = [];
@@ -2324,7 +2447,7 @@ describe('GeminiChat', () => {
         candidates: [{ content: { parts: [{ text: 'blocked' }] } }],
       } as GenerateContentResponse;
 
-      vi.mocked(fireBeforeModelHook).mockResolvedValue({
+      vi.mocked(mockHookSystem.fireBeforeModelEvent).mockResolvedValue({
         blocked: true,
         reason: 'blocked by hook',
         syntheticResponse,
@@ -2335,6 +2458,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       const events: StreamEvent[] = [];
@@ -2363,7 +2487,7 @@ describe('GeminiChat', () => {
         })(),
       );
 
-      vi.mocked(fireAfterModelHook).mockResolvedValue({
+      vi.mocked(mockHookSystem.fireAfterModelEvent).mockResolvedValue({
         response: {} as GenerateContentResponse,
         stopped: true,
         reason: 'stopped by after hook',
@@ -2374,6 +2498,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       const events: StreamEvent[] = [];
@@ -2399,7 +2524,7 @@ describe('GeminiChat', () => {
         })(),
       );
 
-      vi.mocked(fireAfterModelHook).mockResolvedValue({
+      vi.mocked(mockHookSystem.fireAfterModelEvent).mockResolvedValue({
         response,
         blocked: true,
         reason: 'blocked by after hook',
@@ -2410,6 +2535,7 @@ describe('GeminiChat', () => {
         'test',
         'prompt-id',
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       const events: StreamEvent[] = [];

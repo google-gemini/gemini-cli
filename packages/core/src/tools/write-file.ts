@@ -5,9 +5,11 @@
  */
 
 import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import * as Diff from 'diff';
-import { WRITE_FILE_TOOL_NAME } from './tool-names.js';
+import { WRITE_FILE_TOOL_NAME, WRITE_FILE_DISPLAY_NAME } from './tool-names.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 
@@ -18,21 +20,16 @@ import type {
   ToolInvocation,
   ToolLocation,
   ToolResult,
-} from './tools.js';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
   ToolConfirmationOutcome,
 } from './tools.js';
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
-import {
-  ensureCorrectEdit,
-  ensureCorrectFileContent,
-} from '../utils/editCorrector.js';
+import { ensureCorrectFileContent } from '../utils/editCorrector.js';
+import { detectLineEnding } from '../utils/textUtils.js';
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
+import { getDiffContextSnippet } from './diff-utils.js';
 import type {
   ModifiableDeclarativeTool,
   ModifyContext,
@@ -45,6 +42,10 @@ import { getSpecificMimeType } from '../utils/fileUtils.js';
 import { getLanguageFromFilePath } from '../utils/language-detection.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { WRITE_FILE_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
+import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
+import { isGemini3Model } from '../config/models.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -110,35 +111,16 @@ export async function getCorrectedFileContent(
     }
   }
 
-  // If readError is set, we have returned.
-  // So, file was either read successfully (fileExists=true, originalContent set)
-  // or it was ENOENT (fileExists=false, originalContent='').
+  const aggressiveUnescape = !isGemini3Model(config.getActiveModel());
 
-  if (fileExists) {
-    // This implies originalContent is available
-    const { params: correctedParams } = await ensureCorrectEdit(
-      filePath,
-      originalContent,
-      {
-        old_string: originalContent, // Treat entire current content as old_string
-        new_string: proposedContent,
-        file_path: filePath,
-      },
-      config.getGeminiClient(),
-      config.getBaseLlmClient(),
-      abortSignal,
-      config.getDisableLLMCorrection(),
-    );
-    correctedContent = correctedParams.new_string;
-  } else {
-    // This implies new file (ENOENT)
-    correctedContent = await ensureCorrectFileContent(
-      proposedContent,
-      config.getBaseLlmClient(),
-      abortSignal,
-      config.getDisableLLMCorrection(),
-    );
-  }
+  correctedContent = await ensureCorrectFileContent(
+    proposedContent,
+    config.getBaseLlmClient(),
+    abortSignal,
+    config.getDisableLLMCorrection(),
+    aggressiveUnescape,
+  );
+
   return { originalContent, correctedContent, fileExists };
 }
 
@@ -223,14 +205,9 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       fileDiff,
       originalContent,
       newContent: correctedContent,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          // No need to publish a policy update as the default policy for
-          // AUTO_EDIT already reflects always approving write-file.
-          this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
-        } else {
-          await this.publishPolicyUpdate(outcome);
-        }
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Mode transitions (e.g. AUTO_EDIT) and policy updates are now
+        // handled centrally by the scheduler.
 
         if (ideConfirmation) {
           const result = await ideConfirmation;
@@ -245,6 +222,18 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(abortSignal: AbortSignal): Promise<ToolResult> {
+    const validationError = this.config.validatePathAccess(this.resolvedPath);
+    if (validationError) {
+      return {
+        llmContent: validationError,
+        returnDisplay: 'Error: Path not in workspace.',
+        error: {
+          message: validationError,
+          type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+        },
+      };
+    }
+
     const { content, ai_proposed_content, modified_by_user } = this.params;
     const correctedContentResult = await getCorrectedFileContent(
       this.config,
@@ -282,13 +271,25 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
     try {
       const dirName = path.dirname(this.resolvedPath);
-      if (!fs.existsSync(dirName)) {
-        fs.mkdirSync(dirName, { recursive: true });
+      try {
+        await fsPromises.access(dirName);
+      } catch {
+        await fsPromises.mkdir(dirName, { recursive: true });
+      }
+
+      let finalContent = fileContent;
+      const useCRLF =
+        !isNewFile && originalContent
+          ? detectLineEnding(originalContent) === '\r\n'
+          : os.EOL === '\r\n';
+
+      if (useCRLF) {
+        finalContent = finalContent.replace(/\r?\n/g, '\r\n');
       }
 
       await this.config
         .getFileSystemService()
-        .writeTextFile(this.resolvedPath, fileContent);
+        .writeTextFile(this.resolvedPath, finalContent);
 
       // Generate diff for display result
       const fileName = path.basename(this.resolvedPath);
@@ -326,6 +327,15 @@ class WriteFileToolInvocation extends BaseToolInvocation<
           `User modified the \`content\` to be: ${content}`,
         );
       }
+
+      // Return a diff of the file before and after the write so that the agent
+      // can avoid the need to spend a turn doing a verification read.
+      const snippet = getDiffContextSnippet(
+        isNewFile ? '' : originalContent,
+        finalContent,
+        5,
+      );
+      llmSuccessMessageParts.push(`Here is the updated code:\n${snippet}`);
 
       // Log file operation for telemetry (without diff_stat to avoid double-counting)
       const mimetype = getSpecificMimeType(this.resolvedPath);
@@ -417,25 +427,10 @@ export class WriteFileTool
   ) {
     super(
       WriteFileTool.Name,
-      'WriteFile',
-      `Writes content to a specified file in the local filesystem.
-
-      The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
+      WRITE_FILE_DISPLAY_NAME,
+      WRITE_FILE_DEFINITION.base.description!,
       Kind.Edit,
-      {
-        properties: {
-          file_path: {
-            description: 'The path to the file to write to.',
-            type: 'string',
-          },
-          content: {
-            description: 'The content to write to the file.',
-            type: 'string',
-          },
-        },
-        required: ['file_path', 'content'],
-        type: 'object',
-      },
+      WRITE_FILE_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true,
       false,
@@ -453,12 +448,9 @@ export class WriteFileTool
 
     const resolvedPath = path.resolve(this.config.getTargetDir(), filePath);
 
-    const workspaceContext = this.config.getWorkspaceContext();
-    if (!workspaceContext.isPathWithinWorkspace(resolvedPath)) {
-      const directories = workspaceContext.getDirectories();
-      return `File path must be within one of the workspace directories: ${directories.join(
-        ', ',
-      )}`;
+    const validationError = this.config.validatePathAccess(resolvedPath);
+    if (validationError) {
+      return validationError;
     }
 
     try {
@@ -472,6 +464,11 @@ export class WriteFileTool
       return `Error accessing path properties for validation: ${resolvedPath}. Reason: ${
         statError instanceof Error ? statError.message : String(statError)
       }`;
+    }
+
+    const omissionPlaceholders = detectOmissionPlaceholders(params.content);
+    if (omissionPlaceholders.length > 0) {
+      return "`content` contains an omission placeholder (for example 'rest of methods ...'). Provide complete file content.";
     }
 
     return null;
@@ -488,6 +485,10 @@ export class WriteFileTool
       this.name,
       this.displayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(WRITE_FILE_DEFINITION, modelId);
   }
 
   getModifyContext(

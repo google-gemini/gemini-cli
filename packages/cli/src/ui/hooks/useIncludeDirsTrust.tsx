@@ -5,9 +5,9 @@
  */
 
 import { useEffect } from 'react';
-import type { Config } from '@google/gemini-cli-core';
+import { type Config } from '@google/gemini-cli-core';
 import { loadTrustedFolders } from '../../config/trustedFolders.js';
-import { expandHomeDir } from '../utils/directoryUtils.js';
+import { expandHomeDir, batchAddDirectories } from '../utils/directoryUtils.js';
 import {
   debugLogger,
   refreshServerHierarchicalMemory,
@@ -38,6 +38,7 @@ async function finishAddingDirectories(
       await refreshServerHierarchicalMemory(config);
     }
   } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     errors.push(`Error refreshing memory: ${(error as Error).message}`);
   }
 
@@ -79,15 +80,10 @@ export function useIncludeDirsTrust(
       const added: string[] = [];
       const errors: string[] = [];
       const workspaceContext = config.getWorkspaceContext();
-      for (const pathToAdd of pendingDirs) {
-        try {
-          workspaceContext.addDirectory(expandHomeDir(pathToAdd.trim()));
-          added.push(pathToAdd.trim());
-        } catch (e) {
-          const error = e as Error;
-          errors.push(`Error adding '${pathToAdd.trim()}': ${error.message}`);
-        }
-      }
+
+      const result = batchAddDirectories(workspaceContext, pendingDirs);
+      added.push(...result.added);
+      errors.push(...result.errors);
 
       if (added.length > 0 || errors.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -125,14 +121,10 @@ export function useIncludeDirsTrust(
     }
 
     const workspaceContext = config.getWorkspaceContext();
-    for (const pathToAdd of trustedDirs) {
-      try {
-        workspaceContext.addDirectory(expandHomeDir(pathToAdd));
-        added.push(pathToAdd);
-      } catch (e) {
-        const error = e as Error;
-        errors.push(`Error adding '${pathToAdd}': ${error.message}`);
-      }
+    if (trustedDirs.length > 0) {
+      const result = batchAddDirectories(workspaceContext, trustedDirs);
+      added.push(...result.added);
+      errors.push(...result.errors);
     }
 
     if (undefinedTrustDirs.length > 0) {

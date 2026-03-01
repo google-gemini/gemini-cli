@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
-/* eslint-env node */
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 /**
  * Skill Packager - Creates a distributable .skill file of a skill folder
@@ -64,17 +68,32 @@ async function main() {
     // -r: recursive
     // -x: exclude patterns
     // Run the zip command from within the directory to avoid parent folder nesting
-    const zipProcess = spawnSync('zip', ['-r', outputFilename, '.'], {
+    let zipProcess = spawnSync('zip', ['-r', outputFilename, '.'], {
       cwd: skillPath,
       stdio: 'inherit',
     });
+
+    if (zipProcess.error || zipProcess.status !== 0) {
+      // Fallback to tar --format=zip if zip is not available (common on Windows)
+      console.log('zip command not found, falling back to tar...');
+      zipProcess = spawnSync(
+        'tar',
+        ['-a', '-c', '--format=zip', '-f', outputFilename, '.'],
+        {
+          cwd: skillPath,
+          stdio: 'inherit',
+        },
+      );
+    }
 
     if (zipProcess.error) {
       throw zipProcess.error;
     }
 
     if (zipProcess.status !== 0) {
-      throw new Error(`zip command failed with exit code ${zipProcess.status}`);
+      throw new Error(
+        `Packaging command failed with exit code ${zipProcess.status}`,
+      );
     }
 
     console.log(`✅ Successfully packaged skill to: ${outputFilename}`);

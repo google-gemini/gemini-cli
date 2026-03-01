@@ -28,7 +28,9 @@ export const LogoutConfirmationDialog: React.FC<
     (key) => {
       if (key.name === 'escape') {
         onSelect(LogoutChoice.EXIT);
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );

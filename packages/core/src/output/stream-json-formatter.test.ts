@@ -289,6 +289,7 @@ describe('StreamJsonFormatter', () => {
           thoughts: 0,
           tool: 0,
         },
+        roles: {},
       };
       metrics.tools.totalCalls = 2;
       metrics.tools.totalDecisions[ToolCallDecision.AUTO_ACCEPT] = 2;
@@ -319,6 +320,7 @@ describe('StreamJsonFormatter', () => {
           thoughts: 0,
           tool: 0,
         },
+        roles: {},
       };
       metrics.models['gemini-ultra'] = {
         api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 2000 },
@@ -331,6 +333,7 @@ describe('StreamJsonFormatter', () => {
           thoughts: 0,
           tool: 0,
         },
+        roles: {},
       };
       metrics.tools.totalCalls = 5;
 
@@ -360,6 +363,7 @@ describe('StreamJsonFormatter', () => {
           thoughts: 0,
           tool: 0,
         },
+        roles: {},
       };
 
       const result = formatter.convertToStreamStats(metrics, 1200);

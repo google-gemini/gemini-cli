@@ -6,7 +6,7 @@
 
 import type { Config } from '../config/config.js';
 import type { HookDefinition, HookConfig } from './types.js';
-import { HookEventName, ConfigSource } from './types.js';
+import { HookEventName, ConfigSource, HOOKS_CONFIG_FIELDS } from './types.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { TrustedHooksManager } from './trustedHooks.js';
 import { coreEvents } from '../utils/events.js';
@@ -35,13 +35,42 @@ export class HookRegistry {
   }
 
   /**
+   * Register a new hook programmatically
+   */
+  registerHook(
+    config: HookConfig,
+    eventName: HookEventName,
+    options?: { matcher?: string; sequential?: boolean; source?: ConfigSource },
+  ): void {
+    const source = options?.source ?? ConfigSource.Runtime;
+
+    if (!this.validateHookConfig(config, eventName, source)) {
+      throw new Error(
+        `Invalid hook configuration for ${eventName} from ${source}`,
+      );
+    }
+
+    this.entries.push({
+      config,
+      source,
+      eventName,
+      matcher: options?.matcher,
+      sequential: options?.sequential,
+      enabled: true,
+    });
+  }
+
+  /**
    * Initialize the registry by processing hooks from config
    */
   async initialize(): Promise<void> {
-    this.entries = [];
+    const runtimeHooks = this.entries.filter(
+      (entry) => entry.source === ConfigSource.Runtime,
+    );
+    this.entries = [...runtimeHooks];
     this.processHooksFromConfig();
 
-    debugLogger.log(
+    debugLogger.debug(
       `Hook registry initialized with ${this.entries.length} hook entries`,
     );
   }
@@ -93,7 +122,10 @@ export class HookRegistry {
   private getHookName(
     entry: HookRegistryEntry | { config: HookConfig },
   ): string {
-    return entry.config.name || entry.config.command || 'unknown-command';
+    if (entry.config.type === 'command') {
+      return entry.config.name || entry.config.command || 'unknown-command';
+    }
+    return entry.config.name || 'unknown-hook';
   }
 
   /**
@@ -169,8 +201,15 @@ please review the project settings (.gemini/settings.json) and remove them.`;
     source: ConfigSource,
   ): void {
     for (const [eventName, definitions] of Object.entries(hooksConfig)) {
+      if (HOOKS_CONFIG_FIELDS.includes(eventName)) {
+        continue;
+      }
+
       if (!this.isValidEventName(eventName)) {
-        debugLogger.warn(`Invalid hook event name: ${eventName}`);
+        coreEvents.emitFeedback(
+          'warning',
+          `Invalid hook event name: "${eventName}" from ${source} config. Skipping.`,
+        );
         continue;
       }
 
@@ -219,6 +258,7 @@ please review the project settings (.gemini/settings.json) and remove them.`;
         this.validateHookConfig(hookConfig, eventName, source)
       ) {
         // Check if this hook is in the disabled list
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const hookName = this.getHookName({
           config: hookConfig,
         } as HookRegistryEntry);
@@ -253,7 +293,10 @@ please review the project settings (.gemini/settings.json) and remove them.`;
     eventName: HookEventName,
     source: ConfigSource,
   ): boolean {
-    if (!config.type || !['command', 'plugin'].includes(config.type)) {
+    if (
+      !config.type ||
+      !['command', 'plugin', 'runtime'].includes(config.type)
+    ) {
       debugLogger.warn(
         `Invalid hook ${eventName} from ${source} type: ${config.type}`,
       );
@@ -267,6 +310,13 @@ please review the project settings (.gemini/settings.json) and remove them.`;
       return false;
     }
 
+    if (config.type === 'runtime' && !config.name) {
+      debugLogger.warn(
+        `Runtime hook ${eventName} from ${source} missing name field`,
+      );
+      return false;
+    }
+
     return true;
   }
 
@@ -275,6 +325,7 @@ please review the project settings (.gemini/settings.json) and remove them.`;
    */
   private isValidEventName(eventName: string): eventName is HookEventName {
     const validEventNames = Object.values(HookEventName);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return validEventNames.includes(eventName as HookEventName);
   }
 
@@ -283,6 +334,8 @@ please review the project settings (.gemini/settings.json) and remove them.`;
    */
   private getSourcePriority(source: ConfigSource): number {
     switch (source) {
+      case ConfigSource.Runtime:
+        return 0; // Highest
       case ConfigSource.Project:
         return 1;
       case ConfigSource.User:

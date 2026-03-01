@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -11,7 +11,6 @@ import { Text } from 'ink';
 import { type UIState } from '../contexts/UIStateContext.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import { type IdeInfo } from '@google/gemini-cli-core';
-import { type ShellConfirmationRequest } from '../types.js';
 
 // Mock child components
 vi.mock('../IdeIntegrationNudge.js', () => ({
@@ -22,9 +21,6 @@ vi.mock('./LoopDetectionConfirmation.js', () => ({
 }));
 vi.mock('./FolderTrustDialog.js', () => ({
   FolderTrustDialog: () => <Text>FolderTrustDialog</Text>,
-}));
-vi.mock('./ShellConfirmationDialog.js', () => ({
-  ShellConfirmationDialog: () => <Text>ShellConfirmationDialog</Text>,
 }));
 vi.mock('./ConsentPrompt.js', () => ({
   ConsentPrompt: () => <Text>ConsentPrompt</Text>,
@@ -62,6 +58,9 @@ vi.mock('./ModelDialog.js', () => ({
 vi.mock('./IdeTrustChangeDialog.js', () => ({
   IdeTrustChangeDialog: () => <Text>IdeTrustChangeDialog</Text>,
 }));
+vi.mock('./AgentConfigDialog.js', () => ({
+  AgentConfigDialog: () => <Text>AgentConfigDialog</Text>,
+}));
 
 describe('DialogManager', () => {
   const defaultProps = {
@@ -73,15 +72,22 @@ describe('DialogManager', () => {
     constrainHeight: false,
     terminalHeight: 24,
     staticExtraHeight: 0,
-    mainAreaWidth: 80,
+    terminalWidth: 80,
     confirmUpdateExtensionRequests: [],
     showIdeRestartPrompt: false,
-    proQuotaRequest: null,
+    quota: {
+      userTier: undefined,
+      stats: undefined,
+      proQuotaRequest: null,
+      validationRequest: null,
+      overageMenuRequest: null,
+      emptyWalletRequest: null,
+    },
     shouldShowIdePrompt: false,
     isFolderTrustDialogOpen: false,
-    shellConfirmationRequest: null,
     loopDetectionConfirmationRequest: null,
     confirmationRequest: null,
+    consentRequest: null,
     isThemeDialogOpen: false,
     isSettingsDialogOpen: false,
     isModelDialogOpen: false,
@@ -91,15 +97,20 @@ describe('DialogManager', () => {
     isEditorDialogOpen: false,
     showPrivacyNotice: false,
     isPermissionsDialogOpen: false,
+    isAgentConfigDialogOpen: false,
+    selectedAgentName: undefined,
+    selectedAgentDisplayName: undefined,
+    selectedAgentDefinition: undefined,
   };
 
-  it('renders nothing by default', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders nothing by default', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <DialogManager {...defaultProps} />,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { uiState: baseUiState as any },
+      { uiState: baseUiState as Partial<UIState> as UIState },
     );
-    expect(lastFrame()).toBe('');
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 
   const testCases: Array<[Partial<UIState>, string]> = [
@@ -112,12 +123,19 @@ describe('DialogManager', () => {
     ],
     [
       {
-        proQuotaRequest: {
-          failedModel: 'a',
-          fallbackModel: 'b',
-          message: 'c',
-          isTerminalQuotaError: false,
-          resolve: vi.fn(),
+        quota: {
+          userTier: undefined,
+          stats: undefined,
+          proQuotaRequest: {
+            failedModel: 'a',
+            fallbackModel: 'b',
+            message: 'c',
+            isTerminalQuotaError: false,
+            resolve: vi.fn(),
+          },
+          validationRequest: null,
+          overageMenuRequest: null,
+          emptyWalletRequest: null,
         },
       },
       'ProQuotaDialog',
@@ -131,20 +149,15 @@ describe('DialogManager', () => {
     ],
     [{ isFolderTrustDialogOpen: true }, 'FolderTrustDialog'],
     [
-      {
-        shellConfirmationRequest: {
-          commands: [],
-          onConfirm: vi.fn(),
-        } as unknown as ShellConfirmationRequest,
-      },
-      'ShellConfirmationDialog',
-    ],
-    [
       { loopDetectionConfirmationRequest: { onComplete: vi.fn() } },
       'LoopDetectionConfirmation',
     ],
     [
-      { confirmationRequest: { prompt: 'foo', onConfirm: vi.fn() } },
+      { commandConfirmationRequest: { prompt: 'foo', onConfirm: vi.fn() } },
+      'ConsentPrompt',
+    ],
+    [
+      { authConsentRequest: { prompt: 'bar', onConfirm: vi.fn() } },
       'ConsentPrompt',
     ],
     [
@@ -162,19 +175,40 @@ describe('DialogManager', () => {
     [{ isEditorDialogOpen: true }, 'EditorSettingsDialog'],
     [{ showPrivacyNotice: true }, 'PrivacyNotice'],
     [{ isPermissionsDialogOpen: true }, 'PermissionsModifyTrustDialog'],
+    [
+      {
+        isAgentConfigDialogOpen: true,
+        selectedAgentName: 'test-agent',
+        selectedAgentDisplayName: 'Test Agent',
+        selectedAgentDefinition: {
+          name: 'test-agent',
+          kind: 'local',
+          description: 'Test agent',
+          inputConfig: { inputSchema: {} },
+          promptConfig: { systemPrompt: 'test' },
+          modelConfig: { model: 'inherit' },
+          runConfig: { maxTimeMinutes: 5 },
+        },
+      },
+      'AgentConfigDialog',
+    ],
   ];
 
   it.each(testCases)(
     'renders %s when state is %o',
-    (uiStateOverride, expectedComponent) => {
-      const { lastFrame } = renderWithProviders(
+    async (uiStateOverride, expectedComponent) => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <DialogManager {...defaultProps} />,
         {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          uiState: { ...baseUiState, ...uiStateOverride } as any,
+          uiState: {
+            ...baseUiState,
+            ...uiStateOverride,
+          } as Partial<UIState> as UIState,
         },
       );
+      await waitUntilReady();
       expect(lastFrame()).toContain(expectedComponent);
+      unmount();
     },
   );
 });

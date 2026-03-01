@@ -22,6 +22,32 @@ export const SKILLS_WARNING_MESSAGE = chalk.yellow(
 );
 
 /**
+ * Builds a consent string for installing agent skills.
+ */
+export async function skillsConsentString(
+  skills: SkillDefinition[],
+  source: string,
+  targetDir?: string,
+  isLink = false,
+): Promise<string> {
+  const action = isLink ? 'Linking' : 'Installing';
+  const output: string[] = [];
+  output.push(`${action} agent skill(s) from "${source}".`);
+  output.push(
+    `\nThe following agent skill(s) will be ${action.toLowerCase()}:\n`,
+  );
+  output.push(...(await renderSkillsList(skills)));
+
+  if (targetDir) {
+    const destLabel = isLink ? 'Link' : 'Install';
+    output.push(`${destLabel} Destination: ${targetDir}`);
+  }
+  output.push('\n' + SKILLS_WARNING_MESSAGE);
+
+  return output.join('\n');
+}
+
+/**
  * Requests consent from the user to perform an action, by reading a Y/n
  * character from stdin.
  *
@@ -65,10 +91,12 @@ export async function requestConsentInteractive(
  * This should not be called from interactive mode as it will break the CLI.
  *
  * @param prompt A yes/no prompt to ask the user
- * @returns Whether or not the user answers 'y' (yes). Defaults to 'yes' on enter.
+ * @param defaultValue Whether to resolve as true or false on enter.
+ * @returns Whether or not the user answers 'y' (yes).
  */
-async function promptForConsentNonInteractive(
+export async function promptForConsentNonInteractive(
   prompt: string,
+  defaultValue = true,
 ): Promise<boolean> {
   const readline = await import('node:readline');
   const rl = readline.createInterface({
@@ -79,7 +107,12 @@ async function promptForConsentNonInteractive(
   return new Promise((resolve) => {
     rl.question(prompt, (answer) => {
       rl.close();
-      resolve(['y', ''].includes(answer.trim().toLowerCase()));
+      const trimmedAnswer = answer.trim().toLowerCase();
+      if (trimmedAnswer === '') {
+        resolve(defaultValue);
+      } else {
+        resolve(['y', 'yes'].includes(trimmedAnswer));
+      }
     });
   });
 }
@@ -120,7 +153,6 @@ async function extensionConsentString(
   const output: string[] = [];
   const mcpServerEntries = Object.entries(sanitizedConfig.mcpServers || {});
   output.push(`Installing extension "${sanitizedConfig.name}".`);
-  output.push(INSTALL_WARNING_MESSAGE);
 
   if (mcpServerEntries.length) {
     output.push('This extension will run the following MCP servers:');
@@ -149,23 +181,37 @@ async function extensionConsentString(
   }
   if (skills.length > 0) {
     output.push(`\n${chalk.bold('Agent Skills:')}`);
-    output.push(SKILLS_WARNING_MESSAGE);
-    output.push('This extension will install the following agent skills:');
-    for (const skill of skills) {
-      output.push(`  * ${chalk.bold(skill.name)}: ${skill.description}`);
-      const skillDir = path.dirname(skill.location);
-      let fileCountStr = '';
-      try {
-        const skillDirItems = await fs.readdir(skillDir);
-        fileCountStr = ` (${skillDirItems.length} items in directory)`;
-      } catch {
-        fileCountStr = ` ${chalk.red('⚠️ (Could not count items in directory)')}`;
-      }
-      output.push(`    (Location: ${skill.location})${fileCountStr}`);
+    output.push('\nThis extension will install the following agent skills:\n');
+    output.push(...(await renderSkillsList(skills)));
+  }
+
+  output.push('\n' + INSTALL_WARNING_MESSAGE);
+  if (skills.length > 0) {
+    output.push('\n' + SKILLS_WARNING_MESSAGE);
+  }
+
+  return output.join('\n');
+}
+
+/**
+ * Shared logic for formatting a list of agent skills for a consent prompt.
+ */
+async function renderSkillsList(skills: SkillDefinition[]): Promise<string[]> {
+  const output: string[] = [];
+  for (const skill of skills) {
+    output.push(`  * ${chalk.bold(skill.name)}: ${skill.description}`);
+    const skillDir = path.dirname(skill.location);
+    let fileCountStr = '';
+    try {
+      const skillDirItems = await fs.readdir(skillDir);
+      fileCountStr = ` (${skillDirItems.length} items in directory)`;
+    } catch {
+      fileCountStr = ` ${chalk.red('⚠️ (Could not count items in directory)')}`;
     }
+    output.push(chalk.dim(`    (Source: ${skill.location})${fileCountStr}`));
     output.push('');
   }
-  return output.join('\n');
+  return output;
 }
 
 /**

@@ -11,6 +11,7 @@ import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
+import { createHash } from 'node:crypto';
 import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
@@ -31,8 +32,16 @@ import {
   registerSyncCleanup,
   runExitCleanup,
   registerTelemetryConfig,
+  setupSignalHandlers,
+  setupTtyCheck,
 } from './utils/cleanup.js';
 import {
+  cleanupToolOutputFiles,
+  cleanupExpiredSessions,
+} from './utils/sessionCleanup.js';
+import {
+  type StartupWarning,
+  WarningPriority,
   type Config,
   type ResumedSessionData,
   type OutputPayload,
@@ -53,14 +62,17 @@ import {
   writeToStderr,
   disableMouseEvents,
   enableMouseEvents,
-  enterAlternateScreen,
   disableLineWrapping,
+  enableLineWrapping,
   shouldEnterAlternateScreen,
   startupProfiler,
   ExitCodes,
   SessionStartSource,
   SessionEndReason,
   getVersion,
+  ValidationCancelledError,
+  ValidationRequiredError,
+  type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -68,7 +80,6 @@ import {
 } from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
-import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
@@ -91,10 +102,14 @@ import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
+import { TerminalProvider } from './ui/contexts/TerminalContext.js';
 import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
+import { OverflowProvider } from './ui/contexts/OverflowContext.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
+import { runDeferredCommand } from './deferred.js';
+import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -171,7 +186,7 @@ ${reason.stack}`
 export async function startInteractiveUI(
   config: Config,
   settings: LoadedSettings,
-  startupWarnings: string[],
+  startupWarnings: StartupWarning[],
   workspaceRoot: string = process.cwd(),
   resumedSessionData: ResumedSessionData | undefined,
   initializationResult: InitializationResult,
@@ -181,7 +196,7 @@ export async function startInteractiveUI(
   // and the Ink alternate buffer mode requires line wrapping harmful to
   // screen readers.
   const useAlternateBuffer = shouldEnterAlternateScreen(
-    isAlternateBufferEnabled(settings),
+    isAlternateBufferEnabled(config),
     config.getScreenReader(),
   );
   const mouseEventsEnabled = useAlternateBuffer;
@@ -206,39 +221,57 @@ export async function startInteractiveUI(
 
   const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio();
 
+  const isShpool = !!process.env['SHPOOL_SESSION_NAME'];
+
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
     useKittyKeyboardProtocol();
+
     return (
       <SettingsContext.Provider value={settings}>
         <KeypressProvider
           config={config}
-          debugKeystrokeLogging={settings.merged.general?.debugKeystrokeLogging}
+          debugKeystrokeLogging={settings.merged.general.debugKeystrokeLogging}
         >
           <MouseProvider
             mouseEventsEnabled={mouseEventsEnabled}
             debugKeystrokeLogging={
-              settings.merged.general?.debugKeystrokeLogging
+              settings.merged.general.debugKeystrokeLogging
             }
           >
-            <ScrollProvider>
-              <SessionStatsProvider>
-                <VimModeProvider settings={settings}>
-                  <AppContainer
-                    config={config}
-                    startupWarnings={startupWarnings}
-                    version={version}
-                    resumedSessionData={resumedSessionData}
-                    initializationResult={initializationResult}
-                  />
-                </VimModeProvider>
-              </SessionStatsProvider>
-            </ScrollProvider>
+            <TerminalProvider>
+              <ScrollProvider>
+                <OverflowProvider>
+                  <SessionStatsProvider>
+                    <VimModeProvider settings={settings}>
+                      <AppContainer
+                        config={config}
+                        startupWarnings={startupWarnings}
+                        version={version}
+                        resumedSessionData={resumedSessionData}
+                        initializationResult={initializationResult}
+                      />
+                    </VimModeProvider>
+                  </SessionStatsProvider>
+                </OverflowProvider>
+              </ScrollProvider>
+            </TerminalProvider>
           </MouseProvider>
         </KeypressProvider>
       </SettingsContext.Provider>
     );
   };
+
+  if (isShpool) {
+    // Wait a moment for shpool to stabilize terminal size and state.
+    // shpool is a persistence tool that restores terminal state by replaying it.
+    // This delay gives shpool time to finish its restoration replay and send
+    // the actual terminal size (often via an immediate SIGWINCH) before we
+    // render the first TUI frame. Without this, the first frame may be
+    // garbled or rendered at an incorrect size, which disabling incremental
+    // rendering alone cannot fix for the initial frame.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
 
   const instance = render(
     process.env['DEBUG'] ? (
@@ -263,10 +296,18 @@ export async function startInteractiveUI(
       patchConsole: false,
       alternateBuffer: useAlternateBuffer,
       incrementalRendering:
-        settings.merged.ui?.incrementalRendering !== false &&
-        useAlternateBuffer,
+        settings.merged.ui.incrementalRendering !== false &&
+        useAlternateBuffer &&
+        !isShpool,
     },
   );
+
+  if (useAlternateBuffer) {
+    disableLineWrapping();
+    registerCleanup(() => {
+      enableLineWrapping();
+    });
+  }
 
   checkForUpdates(settings)
     .then((info) => {
@@ -280,10 +321,20 @@ export async function startInteractiveUI(
     });
 
   registerCleanup(() => instance.unmount());
+
+  registerCleanup(setupTtyCheck());
 }
 
 export async function main() {
   const cliStartupHandle = startupProfiler.start('cli_startup');
+
+  // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
+  // sandbox mode, we re-fetch the admin controls from the server once we enter
+  // the sandbox.
+  // TODO: Cache settings in sandbox mode as well.
+  const adminControlsListner = setupAdminControlsListener();
+  registerCleanup(adminControlsListner.cleanup);
+
   const cleanupStdio = patchStdio();
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
@@ -292,6 +343,13 @@ export async function main() {
   });
 
   setupUnhandledRejectionHandler();
+
+  setupSignalHandlers();
+
+  const slashCommandConflictHandler = new SlashCommandConflictHandler();
+  slashCommandConflictHandler.start();
+  registerCleanup(() => slashCommandConflictHandler.stop());
+
   const loadSettingsHandle = startupProfiler.start('load_settings');
   const settings = loadSettings();
   loadSettingsHandle?.end();
@@ -309,11 +367,40 @@ export async function main() {
     );
   });
 
-  await cleanupCheckpoints();
+  await Promise.all([
+    cleanupCheckpoints(),
+    cleanupToolOutputFiles(settings.merged),
+  ]);
 
   const parseArgsHandle = startupProfiler.start('parse_arguments');
   const argv = await parseArguments(settings.merged);
   parseArgsHandle?.end();
+
+  if (
+    (argv.allowedTools && argv.allowedTools.length > 0) ||
+    (settings.merged.tools?.allowed && settings.merged.tools.allowed.length > 0)
+  ) {
+    coreEvents.emitFeedback(
+      'warning',
+      'Warning: --allowed-tools cli argument and tools.allowed in settings.json are deprecated and will be removed in 1.0: Migrate to Policy Engine: https://geminicli.com/docs/core/policy-engine/',
+    );
+  }
+
+  if (
+    settings.merged.tools?.exclude &&
+    settings.merged.tools.exclude.length > 0
+  ) {
+    coreEvents.emitFeedback(
+      'warning',
+      'Warning: tools.exclude in settings.json is deprecated and will be removed in 1.0. Migrate to Policy Engine: https://geminicli.com/docs/core/policy-engine/',
+    );
+  }
+
+  if (argv.startupMessages) {
+    argv.startupMessages.forEach((msg) => {
+      coreEvents.emitFeedback('info', msg);
+    });
+  }
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
@@ -336,13 +423,13 @@ export async function main() {
   registerCleanup(consolePatcher.cleanup);
 
   dns.setDefaultResultOrder(
-    validateDnsResolutionOrder(settings.merged.advanced?.dnsResolutionOrder),
+    validateDnsResolutionOrder(settings.merged.advanced.dnsResolutionOrder),
   );
 
   // Set a default auth type if one isn't set or is set to a legacy type
   if (
-    !settings.merged.security?.auth?.selectedType ||
-    settings.merged.security?.auth?.selectedType === AuthType.LEGACY_CLOUD_SHELL
+    !settings.merged.security.auth.selectedType ||
+    settings.merged.security.auth.selectedType === AuthType.LEGACY_CLOUD_SHELL
   ) {
     if (
       process.env['CLOUD_SHELL'] === 'true' ||
@@ -350,7 +437,7 @@ export async function main() {
     ) {
       settings.setValue(
         SettingScope.User,
-        'selectedAuthType',
+        'security.auth.selectedType',
         AuthType.COMPUTE_ADC,
       );
     }
@@ -359,16 +446,18 @@ export async function main() {
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
     projectHooks: settings.workspace.settings.hooks,
   });
+  adminControlsListner.setConfig(partialConfig);
 
   // Refresh auth to fetch remote admin settings from CCPA and before entering
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
-  if (
-    settings.merged.security?.auth?.selectedType &&
-    !settings.merged.security?.auth?.useExternal
-  ) {
+  let initialAuthFailed = false;
+  if (!settings.merged.security.auth.useExternal) {
     try {
-      if (partialConfig.isInteractive()) {
+      if (
+        partialConfig.isInteractive() &&
+        settings.merged.security.auth.selectedType
+      ) {
         const err = validateAuthMethod(
           settings.merged.security.auth.selectedType,
         );
@@ -379,19 +468,29 @@ export async function main() {
         await partialConfig.refreshAuth(
           settings.merged.security.auth.selectedType,
         );
-      } else {
+      } else if (!partialConfig.isInteractive()) {
         const authType = await validateNonInteractiveAuth(
-          settings.merged.security?.auth?.selectedType,
-          settings.merged.security?.auth?.useExternal,
+          settings.merged.security.auth.selectedType,
+          settings.merged.security.auth.useExternal,
           partialConfig,
           settings,
         );
         await partialConfig.refreshAuth(authType);
       }
     } catch (err) {
-      debugLogger.error('Error authenticating:', err);
-      await runExitCleanup();
-      process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
+      if (err instanceof ValidationCancelledError) {
+        // User cancelled verification, exit immediately.
+        await runExitCleanup();
+        process.exit(ExitCodes.SUCCESS);
+      }
+
+      // If validation is required, we don't treat it as a fatal failure.
+      // We allow the app to start, and the React-based ValidationDialog
+      // will handle it.
+      if (!(err instanceof ValidationRequiredError)) {
+        debugLogger.error('Error authenticating:', err);
+        initialAuthFailed = true;
+      }
     }
   }
 
@@ -401,9 +500,12 @@ export async function main() {
     settings.setRemoteAdminSettings(remoteAdminSettings);
   }
 
+  // Run deferred command now that we have admin settings.
+  await runDeferredCommand(settings.merged);
+
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX']) {
-    const memoryArgs = settings.merged.advanced?.autoConfigureMemory
+    const memoryArgs = settings.merged.advanced.autoConfigureMemory
       ? getNodeMemoryArgs(isDebugMode)
       : [];
     const sandboxConfig = await loadSandboxConfig(settings.merged, argv);
@@ -414,6 +516,10 @@ export async function main() {
     // another way to decouple refreshAuth from requiring a config.
 
     if (sandboxConfig) {
+      if (initialAuthFailed) {
+        await runExitCleanup();
+        process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
+      }
       let stdinData = '';
       if (!process.stdin.isTTY) {
         stdinData = await readStdin();
@@ -452,7 +558,7 @@ export async function main() {
     } else {
       // Relaunch app so we always have a child process that can be internally
       // restarted if needed.
-      await relaunchAppInChildProcess(memoryArgs, []);
+      await relaunchAppInChildProcess(memoryArgs, [], remoteAdminSettings);
     }
   }
 
@@ -466,11 +572,18 @@ export async function main() {
     });
     loadConfigHandle?.end();
 
-    if (config.isInteractive() && config.storage && config.getDebugMode()) {
-      const { registerActivityLogger } = await import(
-        './utils/activityLogger.js'
+    // Initialize storage immediately after loading config to ensure that
+    // storage-related operations (like listing or resuming sessions) have
+    // access to the project identifier.
+    await config.storage.initialize();
+
+    adminControlsListner.setConfig(config);
+
+    if (config.isInteractive() && settings.merged.general.devtools) {
+      const { setupInitialActivityLogger } = await import(
+        './utils/devtoolsService.js'
       );
-      registerActivityLogger(config);
+      await setupInitialActivityLogger(config);
     }
 
     // Register config for telemetry shutdown
@@ -479,7 +592,7 @@ export async function main() {
 
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, config.storage);
 
     // Register SessionEnd hook to fire on graceful exit
     // This runs before telemetry shutdown in runExitCleanup()
@@ -506,7 +619,7 @@ export async function main() {
     // Handle --list-sessions flag
     if (config.getListSessions()) {
       // Attempt auth for summary generation (gracefully skips if not configured)
-      const authType = settings.merged.security?.auth?.selectedType;
+      const authType = settings.merged.security.auth.selectedType;
       if (authType) {
         try {
           await config.refreshAuth(authType);
@@ -538,23 +651,8 @@ export async function main() {
       // input showing up in the output.
       process.stdin.setRawMode(true);
 
-      if (
-        shouldEnterAlternateScreen(
-          isAlternateBufferEnabled(settings),
-          config.getScreenReader(),
-        )
-      ) {
-        enterAlternateScreen();
-        disableLineWrapping();
-
-        // Ink will cleanup so there is no need for us to manually cleanup.
-      }
-
       // This cleanup isn't strictly needed but may help in certain situations.
-      process.on('SIGTERM', () => {
-        process.stdin.setRawMode(wasRaw);
-      });
-      process.on('SIGINT', () => {
+      registerSyncCleanup(() => {
         process.stdin.setRawMode(wasRaw);
       });
     }
@@ -566,7 +664,7 @@ export async function main() {
     initAppHandle?.end();
 
     if (
-      settings.merged.security?.auth?.selectedType ===
+      settings.merged.security.auth.selectedType ===
         AuthType.LOGIN_WITH_GOOGLE &&
       config.isBrowserLaunchSuppressed()
     ) {
@@ -579,9 +677,20 @@ export async function main() {
     }
 
     let input = config.getQuestion();
-    const startupWarnings = [
-      ...(await getStartupWarnings()),
-      ...(await getUserStartupWarnings(settings.merged)),
+    const useAlternateBuffer = shouldEnterAlternateScreen(
+      isAlternateBufferEnabled(config),
+      config.getScreenReader(),
+    );
+    const rawStartupWarnings = await getStartupWarnings();
+    const startupWarnings: StartupWarning[] = [
+      ...rawStartupWarnings.map((message) => ({
+        id: `startup-${createHash('sha256').update(message).digest('hex').substring(0, 16)}`,
+        message,
+        priority: WarningPriority.High,
+      })),
+      ...(await getUserStartupWarnings(settings.merged, undefined, {
+        isAlternateBuffer: useAlternateBuffer,
+      })),
     ];
 
     // Handle --resume flag
@@ -638,18 +747,21 @@ export async function main() {
     const sessionStartSource = resumedSessionData
       ? SessionStartSource.Resume
       : SessionStartSource.Startup;
-    const result = await config
-      .getHookSystem()
-      ?.fireSessionStartEvent(sessionStartSource);
 
-    if (result?.finalOutput) {
-      if (result.finalOutput.systemMessage) {
-        writeToStderr(result.finalOutput.systemMessage + '\n');
-      }
-      const additionalContext = result.finalOutput.getAdditionalContext();
-      if (additionalContext) {
-        // Prepend context to input (System Context -> Stdin -> Question)
-        input = input ? `${additionalContext}\n\n${input}` : additionalContext;
+    const hookSystem = config?.getHookSystem();
+    if (hookSystem) {
+      const result = await hookSystem.fireSessionStartEvent(sessionStartSource);
+
+      if (result) {
+        if (result.systemMessage) {
+          writeToStderr(result.systemMessage + '\n');
+        }
+        const additionalContext = result.getAdditionalContext();
+        if (additionalContext) {
+          // Prepend context to input (System Context -> Stdin -> Question)
+          const wrappedContext = `<hook_context>${additionalContext}</hook_context>`;
+          input = input ? `${wrappedContext}\n\n${input}` : wrappedContext;
+        }
       }
     }
 
@@ -678,8 +790,8 @@ export async function main() {
     );
 
     const authType = await validateNonInteractiveAuth(
-      settings.merged.security?.auth?.selectedType,
-      settings.merged.security?.auth?.useExternal,
+      settings.merged.security.auth.selectedType,
+      settings.merged.security.auth.useExternal,
       config,
       settings,
     );
@@ -689,9 +801,6 @@ export async function main() {
       debugLogger.log('Session ID: %s', sessionId);
     }
 
-    const hasDeprecatedPromptArg = process.argv.some((arg) =>
-      arg.startsWith('--prompt'),
-    );
     initializeOutputListenersAndFlush();
 
     await runNonInteractive({
@@ -699,7 +808,6 @@ export async function main() {
       settings,
       input,
       prompt_id,
-      hasDeprecatedPromptArg,
       resumedSessionData,
     });
     // Call cleanup before process.exit, which causes cleanup to not run
@@ -709,14 +817,15 @@ export async function main() {
 }
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
-  if (!settings.merged.ui?.hideWindowTitle) {
+  if (!settings.merged.ui.hideWindowTitle) {
     // Initial state before React loop starts
     const windowTitle = computeTerminalTitle({
       streamingState: StreamingState.Idle,
       isConfirming: false,
+      isSilentWorking: false,
       folderName: title,
-      showThoughts: !!settings.merged.ui?.showStatusInTitle,
-      useDynamicTitle: settings.merged.ui?.dynamicWindowTitle ?? true,
+      showThoughts: !!settings.merged.ui.showStatusInTitle,
+      useDynamicTitle: settings.merged.ui.dynamicWindowTitle,
     });
     writeToStdout(`\x1b]0;${windowTitle}\x07`);
 
@@ -760,4 +869,38 @@ export function initializeOutputListenersAndFlush() {
     }
   }
   coreEvents.drainBacklogs();
+}
+
+function setupAdminControlsListener() {
+  let pendingSettings: AdminControlsSettings | undefined;
+  let config: Config | undefined;
+
+  const messageHandler = (msg: unknown) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const message = msg as {
+      type?: string;
+      settings?: AdminControlsSettings;
+    };
+    if (message?.type === 'admin-settings' && message.settings) {
+      if (config) {
+        config.setRemoteAdminSettings(message.settings);
+      } else {
+        pendingSettings = message.settings;
+      }
+    }
+  };
+
+  process.on('message', messageHandler);
+
+  return {
+    setConfig: (newConfig: Config) => {
+      config = newConfig;
+      if (pendingSettings) {
+        config.setRemoteAdminSettings(pendingSettings);
+      }
+    },
+    cleanup: () => {
+      process.off('message', messageHandler);
+    },
+  };
 }

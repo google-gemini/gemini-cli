@@ -4,25 +4,40 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 const mockInstallSkill = vi.hoisted(() => vi.fn());
+const mockRequestConsentNonInteractive = vi.hoisted(() => vi.fn());
+const mockSkillsConsentString = vi.hoisted(() => vi.fn());
 
 vi.mock('../../utils/skillUtils.js', () => ({
   installSkill: mockInstallSkill,
 }));
 
-vi.mock('@google/gemini-cli-core', () => ({
-  debugLogger: { log: vi.fn(), error: vi.fn() },
+vi.mock('../../config/extensions/consent.js', () => ({
+  requestConsentNonInteractive: mockRequestConsentNonInteractive,
+  skillsConsentString: mockSkillsConsentString,
 }));
 
-import { debugLogger } from '@google/gemini-cli-core';
+const { debugLogger, emitConsoleLog } = await vi.hoisted(async () => {
+  const { createMockDebugLogger } = await import(
+    '../../test-utils/mockDebugLogger.js'
+  );
+  return createMockDebugLogger({ stripAnsi: true });
+});
+
+vi.mock('@google/gemini-cli-core', () => ({
+  debugLogger,
+}));
+
 import { handleInstall, installCommand } from './install.js';
 
 describe('skill install command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+    mockSkillsConsentString.mockResolvedValue('Mock Consent String');
+    mockRequestConsentNonInteractive.mockResolvedValue(true);
   });
 
   describe('installCommand', () => {
@@ -37,9 +52,10 @@ describe('skill install command', () => {
   });
 
   it('should call installSkill with correct arguments for user scope', async () => {
-    mockInstallSkill.mockResolvedValue([
-      { name: 'test-skill', location: '/mock/user/skills/test-skill' },
-    ]);
+    mockInstallSkill.mockImplementation(async (_s, _sc, _p, _ol, rc) => {
+      await rc([]);
+      return [{ name: 'test-skill', location: '/mock/user/skills/test-skill' }];
+    });
 
     await handleInstall({
       source: 'https://example.com/repo.git',
@@ -51,13 +67,59 @@ describe('skill install command', () => {
       'user',
       undefined,
       expect.any(Function),
+      expect.any(Function),
     );
-    expect(debugLogger.log).toHaveBeenCalledWith(
+    expect(emitConsoleLog).toHaveBeenCalledWith(
+      'log',
       expect.stringContaining('Successfully installed skill: test-skill'),
     );
-    expect(debugLogger.log).toHaveBeenCalledWith(
+    expect(emitConsoleLog).toHaveBeenCalledWith(
+      'log',
       expect.stringContaining('location: /mock/user/skills/test-skill'),
     );
+    expect(mockRequestConsentNonInteractive).toHaveBeenCalledWith(
+      'Mock Consent String',
+    );
+  });
+
+  it('should skip prompt and log consent when --consent is provided', async () => {
+    mockInstallSkill.mockImplementation(async (_s, _sc, _p, _ol, rc) => {
+      await rc([]);
+      return [{ name: 'test-skill', location: '/mock/user/skills/test-skill' }];
+    });
+
+    await handleInstall({
+      source: 'https://example.com/repo.git',
+      consent: true,
+    });
+
+    expect(mockRequestConsentNonInteractive).not.toHaveBeenCalled();
+    expect(emitConsoleLog).toHaveBeenCalledWith(
+      'log',
+      'You have consented to the following:',
+    );
+    expect(emitConsoleLog).toHaveBeenCalledWith('log', 'Mock Consent String');
+    expect(mockInstallSkill).toHaveBeenCalled();
+  });
+
+  it('should abort installation if consent is denied', async () => {
+    mockRequestConsentNonInteractive.mockResolvedValue(false);
+    mockInstallSkill.mockImplementation(async (_s, _sc, _p, _ol, rc) => {
+      if (!(await rc([]))) {
+        throw new Error('Skill installation cancelled by user.');
+      }
+      return [];
+    });
+
+    await handleInstall({
+      source: 'https://example.com/repo.git',
+    });
+
+    expect(emitConsoleLog).toHaveBeenCalledWith(
+      'error',
+      'Skill installation cancelled by user.',
+    );
+    expect(process.exit).toHaveBeenCalledWith(1);
   });
 
   it('should call installSkill with correct arguments for workspace scope and subpath', async () => {
@@ -76,6 +138,7 @@ describe('skill install command', () => {
       'workspace',
       'my-skills-dir',
       expect.any(Function),
+      expect.any(Function),
     );
   });
 
@@ -84,7 +147,7 @@ describe('skill install command', () => {
 
     await handleInstall({ source: '/local/path' });
 
-    expect(debugLogger.error).toHaveBeenCalledWith('Install failed');
+    expect(emitConsoleLog).toHaveBeenCalledWith('error', 'Install failed');
     expect(process.exit).toHaveBeenCalledWith(1);
   });
 });

@@ -6,36 +6,40 @@
 
 // File for 'gemini mcp list' command
 import type { CommandModule } from 'yargs';
-import { loadSettings } from '../../config/settings.js';
+import { type MergedSettings, loadSettings } from '../../config/settings.js';
 import type { MCPServerConfig } from '@google/gemini-cli-core';
 import {
   MCPServerStatus,
   createTransport,
   debugLogger,
+  applyAdminAllowlist,
+  getAdminBlockedMcpServersMessage,
 } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
+import chalk from 'chalk';
 
-const COLOR_GREEN = '\u001b[32m';
-const COLOR_YELLOW = '\u001b[33m';
-const COLOR_RED = '\u001b[31m';
-const RESET_COLOR = '\u001b[0m';
+export async function getMcpServersFromConfig(
+  settings?: MergedSettings,
+): Promise<{
+  mcpServers: Record<string, MCPServerConfig>;
+  blockedServerNames: string[];
+}> {
+  if (!settings) {
+    settings = loadSettings().merged;
+  }
 
-async function getMcpServersFromConfig(): Promise<
-  Record<string, MCPServerConfig>
-> {
-  const settings = loadSettings();
   const extensionManager = new ExtensionManager({
-    settings: settings.merged,
+    settings,
     workspaceDir: process.cwd(),
     requestConsent: requestConsentNonInteractive,
     requestSetting: promptForSetting,
   });
   const extensions = await extensionManager.loadExtensions();
-  const mcpServers = { ...(settings.merged.mcpServers || {}) };
+  const mcpServers = { ...settings.mcpServers };
   for (const extension of extensions) {
     Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
       if (mcpServers[key]) {
@@ -47,35 +51,67 @@ async function getMcpServersFromConfig(): Promise<
       };
     });
   }
-  return mcpServers;
+
+  const adminAllowlist = settings.admin?.mcp?.config;
+  const filteredResult = applyAdminAllowlist(mcpServers, adminAllowlist);
+
+  return filteredResult;
 }
 
 async function testMCPConnection(
   serverName: string,
   config: MCPServerConfig,
 ): Promise<MCPServerStatus> {
+  const settings = loadSettings();
+
+  // SECURITY: Only test connection if workspace is trusted or if it's a remote server.
+  // stdio servers execute local commands and must never run in untrusted workspaces.
+  const isStdio = !!config.command;
+  if (isStdio && !settings.isTrusted) {
+    return MCPServerStatus.DISCONNECTED;
+  }
+
   const client = new Client({
     name: 'mcp-test-client',
     version: '0.0.1',
   });
 
-  const settings = loadSettings();
-  const sanitizationConfig = {
-    enableEnvironmentVariableRedaction: true,
-    allowedEnvironmentVariables: [],
-    blockedEnvironmentVariables:
-      settings.merged.advanced?.excludedEnvVars || [],
+  const mcpContext = {
+    sanitizationConfig: {
+      enableEnvironmentVariableRedaction: true,
+      allowedEnvironmentVariables: [],
+      blockedEnvironmentVariables: settings.merged.advanced.excludedEnvVars,
+    },
+    emitMcpDiagnostic: (
+      severity: 'info' | 'warning' | 'error',
+      message: string,
+      error?: unknown,
+      serverName?: string,
+    ) => {
+      // In non-interactive list, we log everything through debugLogger for consistency
+      if (severity === 'error') {
+        debugLogger.error(
+          chalk.red(`Error${serverName ? ` (${serverName})` : ''}: ${message}`),
+          error,
+        );
+      } else if (severity === 'warning') {
+        debugLogger.warn(
+          chalk.yellow(
+            `Warning${serverName ? ` (${serverName})` : ''}: ${message}`,
+          ),
+          error,
+        );
+      } else {
+        debugLogger.log(message, error);
+      }
+    },
+    isTrustedFolder: () => settings.isTrusted,
   };
 
   let transport;
   try {
     // Use the same transport creation logic as core
-    transport = await createTransport(
-      serverName,
-      config,
-      false,
-      sanitizationConfig,
-    );
+    transport = await createTransport(serverName, config, false, mcpContext);
   } catch (_error) {
     await client.close();
     return MCPServerStatus.DISCONNECTED;
@@ -104,12 +140,23 @@ async function getServerStatus(
   return testMCPConnection(serverName, server);
 }
 
-export async function listMcpServers(): Promise<void> {
-  const mcpServers = await getMcpServersFromConfig();
+export async function listMcpServers(settings?: MergedSettings): Promise<void> {
+  const { mcpServers, blockedServerNames } =
+    await getMcpServersFromConfig(settings);
   const serverNames = Object.keys(mcpServers);
 
+  if (blockedServerNames.length > 0) {
+    const message = getAdminBlockedMcpServersMessage(
+      blockedServerNames,
+      undefined,
+    );
+    debugLogger.log(chalk.yellow(message + '\n'));
+  }
+
   if (serverNames.length === 0) {
-    debugLogger.log('No MCP servers configured.');
+    if (blockedServerNames.length === 0) {
+      debugLogger.log('No MCP servers configured.');
+    }
     return;
   }
 
@@ -124,16 +171,16 @@ export async function listMcpServers(): Promise<void> {
     let statusText = '';
     switch (status) {
       case MCPServerStatus.CONNECTED:
-        statusIndicator = COLOR_GREEN + '✓' + RESET_COLOR;
+        statusIndicator = chalk.green('✓');
         statusText = 'Connected';
         break;
       case MCPServerStatus.CONNECTING:
-        statusIndicator = COLOR_YELLOW + '…' + RESET_COLOR;
+        statusIndicator = chalk.yellow('…');
         statusText = 'Connecting';
         break;
       case MCPServerStatus.DISCONNECTED:
       default:
-        statusIndicator = COLOR_RED + '✗' + RESET_COLOR;
+        statusIndicator = chalk.red('✗');
         statusText = 'Disconnected';
         break;
     }
@@ -145,7 +192,8 @@ export async function listMcpServers(): Promise<void> {
     if (server.httpUrl) {
       serverInfo += `${server.httpUrl} (http)`;
     } else if (server.url) {
-      serverInfo += `${server.url} (sse)`;
+      const type = server.type || 'http';
+      serverInfo += `${server.url} (${type})`;
     } else if (server.command) {
       serverInfo += `${server.command} ${server.args?.join(' ') || ''} (stdio)`;
     }
@@ -154,11 +202,15 @@ export async function listMcpServers(): Promise<void> {
   }
 }
 
-export const listCommand: CommandModule = {
+interface ListArgs {
+  settings?: MergedSettings;
+}
+
+export const listCommand: CommandModule<object, ListArgs> = {
   command: 'list',
   describe: 'List all configured MCP servers',
-  handler: async () => {
-    await listMcpServers();
+  handler: async (argv) => {
+    await listMcpServers(argv.settings);
     await exitCli();
   },
 };

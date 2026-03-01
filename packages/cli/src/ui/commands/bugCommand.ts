@@ -13,7 +13,7 @@ import {
 } from './types.js';
 import { MessageType } from '../types.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
-import { formatMemoryUsage } from '../utils/formatters.js';
+import { formatBytes } from '../utils/formatters.js';
 import {
   IdeClient,
   sessionId,
@@ -45,7 +45,7 @@ export const bugCommand: SlashCommand = {
     }
     const modelVersion = config?.getModel() || 'Unknown';
     const cliVersion = await getVersion();
-    const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
+    const memoryUsage = formatBytes(process.memoryUsage().rss);
     const ideClient = await getIdeClientName(context);
     const terminalName =
       terminalCapabilityManager.getTerminalName() || 'Unknown';
@@ -54,6 +54,7 @@ export const bugCommand: SlashCommand = {
     const kittyProtocol = terminalCapabilityManager.isKittyProtocolEnabled()
       ? 'Supported'
       : 'Unsupported';
+    const authType = config?.getContentGeneratorConfig()?.authType || 'Unknown';
 
     let info = `
 * **CLI Version:** ${cliVersion}
@@ -62,6 +63,7 @@ export const bugCommand: SlashCommand = {
 * **Operating System:** ${osVersion}
 * **Sandbox Environment:** ${sandboxEnv}
 * **Model Version:** ${modelVersion}
+* **Auth Type:** ${authType}
 * **Memory Usage:** ${memoryUsage}
 * **Terminal Name:** ${terminalName}
 * **Terminal Background:** ${terminalBgColor}

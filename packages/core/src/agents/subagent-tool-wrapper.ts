@@ -12,9 +12,10 @@ import {
 } from '../tools/tools.js';
 import type { Config } from '../config/config.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
-import { convertInputConfigToJsonSchema } from './schema-utils.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { RemoteAgentInvocation } from './remote-invocation.js';
+import { BrowserAgentInvocation } from './browser/browserAgentInvocation.js';
+import { BROWSER_AGENT_NAME } from './browser/browserAgentDefinition.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 /**
@@ -40,16 +41,12 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
     private readonly config: Config,
     messageBus: MessageBus,
   ) {
-    const parameterSchema = convertInputConfigToJsonSchema(
-      definition.inputConfig,
-    );
-
     super(
       definition.name,
       definition.displayName ?? definition.name,
       definition.description,
-      Kind.Think,
-      parameterSchema,
+      Kind.Agent,
+      definition.inputConfig.inputSchema,
       messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
@@ -77,6 +74,17 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
     if (definition.kind === 'remote') {
       return new RemoteAgentInvocation(
         definition,
+        params,
+        effectiveMessageBus,
+        _toolName,
+        _toolDisplayName,
+      );
+    }
+
+    // Special handling for browser agent - needs async MCP setup
+    if (definition.name === BROWSER_AGENT_NAME) {
+      return new BrowserAgentInvocation(
+        this.config,
         params,
         effectiveMessageBus,
         _toolName,

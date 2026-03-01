@@ -95,7 +95,8 @@ jobs:
         id: 'generate_token'
         env:
           APP_ID: '${{ secrets.APP_ID }}'
-        if: "${{ env.APP_ID != '' }}"
+        if: |-
+          ${{ env.APP_ID != '' }}
         uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
         with:
           app-id: '${{ secrets.APP_ID }}'
@@ -154,7 +155,10 @@ jobs:
               "telemetry": {
                 "enabled": true,
                 "target": "gcp"
-              }
+              },
+              "coreTools": [
+                "run_shell_command(echo)"
+              ]
             }
           prompt: |-
             ## Role
@@ -283,8 +287,21 @@ jobs:
                   return;
                 }
               } else {
-                core.setFailed(`Output is not valid JSON and does not contain a JSON markdown block.\nRaw output: ${rawOutput}`);
-                return;
+                // If no markdown block, try to find a raw JSON object in the output.
+                // The CLI may include debug/log lines (e.g. telemetry init, YOLO mode)
+                // before the actual JSON response.
+                const jsonObjectMatch = rawOutput.match(/(\{[\s\S]*"labels_to_set"[\s\S]*\})/);
+                if (jsonObjectMatch) {
+                  try {
+                    parsedLabels = JSON.parse(jsonObjectMatch[0]);
+                  } catch (extractError) {
+                    core.setFailed(`Found JSON-like content but failed to parse: ${extractError.message}\nRaw output: ${rawOutput}`);
+                    return;
+                  }
+                } else {
+                  core.setFailed(`Output is not valid JSON and does not contain extractable JSON.\nRaw output: ${rawOutput}`);
+                  return;
+                }
               }
             }
 
@@ -304,22 +321,6 @@ jobs:
               labels: labelsToAdd
             });
             core.info(`Successfully added labels for #${issueNumber}: ${labelsToAdd.join(', ')}`);
-
-            // Remove the 'status/need-triage' label
-            try {
-                await github.rest.issues.removeLabel({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issueNumber,
-                    name: 'status/need-triage'
-                });
-                core.info(`Successfully removed 'status/need-triage' label.`);
-            } catch (error) {
-                // If the label doesn't exist, the API call will throw a 404. We can ignore this.
-                if (error.status !== 404) {
-                    core.warning(`Failed to remove 'status/need-triage': ${error.message}`);
-                }
-            }
 
       - name: 'Post Issue Analysis Failure Comment'
         if: |-

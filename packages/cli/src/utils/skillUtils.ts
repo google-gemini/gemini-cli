@@ -6,7 +6,11 @@
 
 import { SettingScope } from '../config/settings.js';
 import type { SkillActionResult } from './skillSettings.js';
-import { Storage, loadSkillsFromDir } from '@google/gemini-cli-core';
+import {
+  Storage,
+  loadSkillsFromDir,
+  type SkillDefinition,
+} from '@google/gemini-cli-core';
 import { cloneFromGit } from '../config/extensions/github.js';
 import extract from 'extract-zip';
 import * as fs from 'node:fs/promises';
@@ -79,6 +83,10 @@ export async function installSkill(
   scope: 'user' | 'workspace',
   subpath: string | undefined,
   onLog: (msg: string) => void,
+  requestConsent: (
+    skills: SkillDefinition[],
+    targetDir: string,
+  ) => Promise<boolean> = () => Promise.resolve(true),
 ): Promise<Array<{ name: string; location: string }>> {
   let sourcePath = source;
   let tempDirToClean: string | undefined = undefined;
@@ -90,52 +98,126 @@ export async function installSkill(
 
   const isSkillFile = source.toLowerCase().endsWith('.skill');
 
-  if (isGitUrl) {
-    tempDirToClean = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-skill-'));
-    sourcePath = tempDirToClean;
+  try {
+    if (isGitUrl) {
+      tempDirToClean = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'gemini-skill-'),
+      );
+      sourcePath = tempDirToClean;
 
-    onLog(`Cloning skill from ${source}...`);
-    // Reuse existing robust git cloning utility from extension manager.
-    await cloneFromGit(
-      {
-        source,
-        type: 'git',
-      },
-      tempDirToClean,
-    );
-  } else if (isSkillFile) {
-    tempDirToClean = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-skill-'));
-    sourcePath = tempDirToClean;
+      onLog(`Cloning skill from ${source}...`);
+      // Reuse existing robust git cloning utility from extension manager.
+      await cloneFromGit(
+        {
+          source,
+          type: 'git',
+        },
+        tempDirToClean,
+      );
+    } else if (isSkillFile) {
+      tempDirToClean = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'gemini-skill-'),
+      );
+      sourcePath = tempDirToClean;
 
-    onLog(`Extracting skill from ${source}...`);
-    await extract(path.resolve(source), { dir: tempDirToClean });
-  }
+      onLog(`Extracting skill from ${source}...`);
+      await extract(path.resolve(source), { dir: tempDirToClean });
+    }
 
-  // If a subpath is provided, resolve it against the cloned/local root.
-  if (subpath) {
-    sourcePath = path.join(sourcePath, subpath);
-  }
+    // If a subpath is provided, resolve it against the cloned/local root.
+    if (subpath) {
+      sourcePath = path.join(sourcePath, subpath);
+    }
 
-  sourcePath = path.resolve(sourcePath);
+    sourcePath = path.resolve(sourcePath);
 
-  // Quick security check to prevent directory traversal out of temp dir when cloning
-  if (tempDirToClean && !sourcePath.startsWith(path.resolve(tempDirToClean))) {
+    // Quick security check to prevent directory traversal out of temp dir when cloning
+    if (
+      tempDirToClean &&
+      !sourcePath.startsWith(path.resolve(tempDirToClean))
+    ) {
+      throw new Error('Invalid path: Directory traversal not allowed.');
+    }
+
+    onLog(`Searching for skills in ${sourcePath}...`);
+    const skills = await loadSkillsFromDir(sourcePath);
+
+    if (skills.length === 0) {
+      throw new Error(
+        `No valid skills found in ${source}${subpath ? ` at path "${subpath}"` : ''}. Ensure a SKILL.md file exists with valid frontmatter.`,
+      );
+    }
+
+    const workspaceDir = process.cwd();
+    const storage = new Storage(workspaceDir);
+    const targetDir =
+      scope === 'workspace'
+        ? storage.getProjectSkillsDir()
+        : Storage.getUserSkillsDir();
+
+    if (!(await requestConsent(skills, targetDir))) {
+      throw new Error('Skill installation cancelled by user.');
+    }
+
+    await fs.mkdir(targetDir, { recursive: true });
+
+    const installedSkills: Array<{ name: string; location: string }> = [];
+
+    for (const skill of skills) {
+      const skillName = skill.name;
+      const skillDir = path.dirname(skill.location);
+      const destPath = path.join(targetDir, skillName);
+
+      const exists = await fs.stat(destPath).catch(() => null);
+      if (exists) {
+        onLog(`Skill "${skillName}" already exists. Overwriting...`);
+        await fs.rm(destPath, { recursive: true, force: true });
+      }
+
+      await fs.cp(skillDir, destPath, { recursive: true });
+      installedSkills.push({ name: skillName, location: destPath });
+    }
+
+    return installedSkills;
+  } finally {
     if (tempDirToClean) {
       await fs.rm(tempDirToClean, { recursive: true, force: true });
     }
-    throw new Error('Invalid path: Directory traversal not allowed.');
   }
+}
+
+/**
+ * Central logic for linking a skill from a local path via symlink.
+ */
+export async function linkSkill(
+  source: string,
+  scope: 'user' | 'workspace',
+  onLog: (msg: string) => void,
+  requestConsent: (
+    skills: SkillDefinition[],
+    targetDir: string,
+  ) => Promise<boolean> = () => Promise.resolve(true),
+): Promise<Array<{ name: string; location: string }>> {
+  const sourcePath = path.resolve(source);
 
   onLog(`Searching for skills in ${sourcePath}...`);
   const skills = await loadSkillsFromDir(sourcePath);
 
   if (skills.length === 0) {
-    if (tempDirToClean) {
-      await fs.rm(tempDirToClean, { recursive: true, force: true });
-    }
     throw new Error(
-      `No valid skills found in ${source}${subpath ? ` at path "${subpath}"` : ''}. Ensure a SKILL.md file exists with valid frontmatter.`,
+      `No valid skills found in "${sourcePath}". Ensure a SKILL.md file exists with valid frontmatter.`,
     );
+  }
+
+  // Check for internal name collisions
+  const seenNames = new Map<string, string>();
+  for (const skill of skills) {
+    if (seenNames.has(skill.name)) {
+      throw new Error(
+        `Duplicate skill name "${skill.name}" found at multiple locations:\n  - ${seenNames.get(skill.name)}\n  - ${skill.location}`,
+      );
+    }
+    seenNames.set(skill.name, skill.location);
   }
 
   const workspaceDir = process.cwd();
@@ -145,30 +227,32 @@ export async function installSkill(
       ? storage.getProjectSkillsDir()
       : Storage.getUserSkillsDir();
 
+  if (!(await requestConsent(skills, targetDir))) {
+    throw new Error('Skill linking cancelled by user.');
+  }
+
   await fs.mkdir(targetDir, { recursive: true });
 
-  const installedSkills: Array<{ name: string; location: string }> = [];
+  const linkedSkills: Array<{ name: string; location: string }> = [];
 
   for (const skill of skills) {
     const skillName = skill.name;
-    const skillDir = path.dirname(skill.location);
+    const skillSourceDir = path.dirname(skill.location);
     const destPath = path.join(targetDir, skillName);
 
-    const exists = await fs.stat(destPath).catch(() => null);
+    const exists = await fs.lstat(destPath).catch(() => null);
     if (exists) {
-      onLog(`Skill "${skillName}" already exists. Overwriting...`);
+      onLog(
+        `Skill "${skillName}" already exists at destination. Overwriting...`,
+      );
       await fs.rm(destPath, { recursive: true, force: true });
     }
 
-    await fs.cp(skillDir, destPath, { recursive: true });
-    installedSkills.push({ name: skillName, location: destPath });
+    await fs.symlink(skillSourceDir, destPath, 'dir');
+    linkedSkills.push({ name: skillName, location: destPath });
   }
 
-  if (tempDirToClean) {
-    await fs.rm(tempDirToClean, { recursive: true, force: true });
-  }
-
-  return installedSkills;
+  return linkedSkills;
 }
 
 /**

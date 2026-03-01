@@ -11,7 +11,7 @@ Before using sandboxing, you need to install and set up the Gemini CLI:
 npm install -g @google/gemini-cli
 ```
 
-To verify the installation
+To verify the installation:
 
 ```bash
 gemini --version
@@ -55,12 +55,27 @@ from your organization's registry.
 ```bash
 # Enable sandboxing with command flag
 gemini -s -p "analyze the code structure"
+```
 
-# Use environment variable
+**Use environment variable**
+
+**macOS/Linux**
+
+```bash
 export GEMINI_SANDBOX=true
 gemini -p "run the test suite"
+```
 
-# Configure in settings.json
+**Windows (PowerShell)**
+
+```powershell
+$env:GEMINI_SANDBOX="true"
+gemini -p "run the test suite"
+```
+
+**Configure in settings.json**
+
+```json
 {
   "tools": {
     "sandbox": "docker"
@@ -82,10 +97,11 @@ gemini -p "run the test suite"
 Built-in profiles (set via `SEATBELT_PROFILE` env var):
 
 - `permissive-open` (default): Write restrictions, network allowed
-- `permissive-closed`: Write restrictions, no network
 - `permissive-proxied`: Write restrictions, network via proxy
 - `restrictive-open`: Strict restrictions, network allowed
-- `restrictive-closed`: Maximum restrictions
+- `restrictive-proxied`: Strict restrictions, network via proxy
+- `strict-open`: Read and write restrictions, network allowed
+- `strict-proxied`: Read and write restrictions, network via proxy
 
 ### Custom sandbox flags
 
@@ -98,14 +114,30 @@ use cases.
 
 To disable SELinux labeling for volume mounts, you can set the following:
 
+**macOS/Linux**
+
 ```bash
 export SANDBOX_FLAGS="--security-opt label=disable"
 ```
 
+**Windows (PowerShell)**
+
+```powershell
+$env:SANDBOX_FLAGS="--security-opt label=disable"
+```
+
 Multiple flags can be provided as a space-separated string:
+
+**macOS/Linux**
 
 ```bash
 export SANDBOX_FLAGS="--flag1 --flag2=value"
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:SANDBOX_FLAGS="--flag1 --flag2=value"
 ```
 
 ## Linux UID/GID handling
@@ -113,9 +145,18 @@ export SANDBOX_FLAGS="--flag1 --flag2=value"
 The sandbox automatically handles user permissions on Linux. Override these
 permissions with:
 
+**macOS/Linux**
+
 ```bash
 export SANDBOX_SET_UID_GID=true   # Force host UID/GID
 export SANDBOX_SET_UID_GID=false  # Disable UID/GID mapping
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:SANDBOX_SET_UID_GID="true"   # Force host UID/GID
+$env:SANDBOX_SET_UID_GID="false"  # Disable UID/GID mapping
 ```
 
 ## Troubleshooting
@@ -166,6 +207,6 @@ gemini -s -p "run shell command: mount | grep workspace"
 
 ## Related documentation
 
-- [Configuration](../get-started/configuration.md): Full configuration options.
-- [Commands](./commands.md): Available commands.
-- [Troubleshooting](../troubleshooting.md): General troubleshooting.
+- [Configuration](../reference/configuration.md): Full configuration options.
+- [Commands](../reference/commands.md): Available commands.
+- [Troubleshooting](../resources/troubleshooting.md): General troubleshooting.

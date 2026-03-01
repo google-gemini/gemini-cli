@@ -32,14 +32,14 @@ export async function setupTerminalAndTheme(
   }
 
   // Load custom themes from settings
-  themeManager.loadCustomThemes(settings.merged.ui?.customThemes);
+  themeManager.loadCustomThemes(settings.merged.ui.customThemes);
 
-  if (settings.merged.ui?.theme) {
-    if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {
+  if (settings.merged.ui.theme) {
+    if (!themeManager.setActiveTheme(settings.merged.ui.theme)) {
       // If the theme is not found during initial load, log a warning and continue.
       // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
       debugLogger.warn(
-        `Warning: Theme "${settings.merged.ui?.theme}" not found.`,
+        `Warning: Theme "${settings.merged.ui.theme}" not found.`,
       );
     }
   } else {
@@ -54,18 +54,17 @@ export async function setupTerminalAndTheme(
   }
 
   config.setTerminalBackground(terminalBackground);
+  themeManager.setTerminalBackground(terminalBackground);
 
   if (terminalBackground !== undefined) {
     const currentTheme = themeManager.getActiveTheme();
-    if (currentTheme.type !== 'ansi' && currentTheme.type !== 'custom') {
+    if (!themeManager.isThemeCompatible(currentTheme, terminalBackground)) {
       const backgroundType =
         getThemeTypeFromBackgroundColor(terminalBackground);
-      if (backgroundType && currentTheme.type !== backgroundType) {
-        coreEvents.emitFeedback(
-          'warning',
-          `Theme '${currentTheme.name}' (${currentTheme.type}) might look incorrect on your ${backgroundType} terminal background. Type /theme to change theme.`,
-        );
-      }
+      coreEvents.emitFeedback(
+        'warning',
+        `Theme '${currentTheme.name}' (${currentTheme.type}) might look incorrect on your ${backgroundType} terminal background. Type /theme to change theme.`,
+      );
     }
   }
 

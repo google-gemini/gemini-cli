@@ -4,8 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useEffect, useRef } from 'react';
-import type { Config, ResumedSessionData } from '@google/gemini-cli-core';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  coreEvents,
+  type Config,
+  type ResumedSessionData,
+  convertSessionToClientHistory,
+} from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import type { HistoryItemWithoutId } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -35,6 +40,8 @@ export function useSessionResume({
   resumedSessionData,
   isAuthenticating,
 }: UseSessionResumeParams) {
+  const [isResuming, setIsResuming] = useState(false);
+
   // Use refs to avoid dependency chain that causes infinite loop
   const historyManagerRef = useRef(historyManager);
   const refreshStaticRef = useRef(refreshStatic);
@@ -45,7 +52,7 @@ export function useSessionResume({
   });
 
   const loadHistoryForResume = useCallback(
-    (
+    async (
       uiHistory: HistoryItemWithoutId[],
       clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
       resumedData: ResumedSessionData,
@@ -55,17 +62,38 @@ export function useSessionResume({
         return;
       }
 
-      // Now that we have the client, load the history into the UI and the client.
-      setQuittingMessages(null);
-      historyManagerRef.current.clearItems();
-      uiHistory.forEach((item, index) => {
-        historyManagerRef.current.addItem(item, index, true);
-      });
-      refreshStaticRef.current(); // Force Static component to re-render with the updated history.
+      setIsResuming(true);
+      try {
+        // Now that we have the client, load the history into the UI and the client.
+        setQuittingMessages(null);
+        historyManagerRef.current.clearItems();
+        uiHistory.forEach((item, index) => {
+          historyManagerRef.current.addItem(item, index, true);
+        });
+        refreshStaticRef.current(); // Force Static component to re-render with the updated history.
 
-      // Give the history to the Gemini client.
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
+        // Restore directories from the resumed session
+        if (
+          resumedData.conversation.directories &&
+          resumedData.conversation.directories.length > 0
+        ) {
+          const workspaceContext = config.getWorkspaceContext();
+          // Add back any directories that were saved in the session
+          // but filter out ones that no longer exist
+          workspaceContext.addDirectories(resumedData.conversation.directories);
+        }
+
+        // Give the history to the Gemini client.
+        await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
+      } catch (error) {
+        coreEvents.emitFeedback(
+          'error',
+          'Failed to resume session. Please try again.',
+          error,
+        );
+      } finally {
+        setIsResuming(false);
+      }
     },
     [config, isGeminiClientInitialized, setQuittingMessages],
   );
@@ -84,9 +112,9 @@ export function useSessionResume({
       const historyData = convertSessionToHistoryFormats(
         resumedSessionData.conversation.messages,
       );
-      loadHistoryForResume(
+      void loadHistoryForResume(
         historyData.uiHistory,
-        historyData.clientHistory,
+        convertSessionToClientHistory(resumedSessionData.conversation.messages),
         resumedSessionData,
       );
     }
@@ -97,5 +125,5 @@ export function useSessionResume({
     loadHistoryForResume,
   ]);
 
-  return { loadHistoryForResume };
+  return { loadHistoryForResume, isResuming };
 }

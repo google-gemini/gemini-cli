@@ -1,0 +1,19 @@
+{
+  "/docs/architecture": "/docs/cli/index",
+  "/docs/cli/commands": "/docs/reference/commands",
+  "/docs/cli": "/docs",
+  "/docs/cli/index": "/docs",
+  "/docs/cli/keyboard-shortcuts": "/docs/reference/keyboard-shortcuts",
+  "/docs/cli/uninstall": "/docs/resources/uninstall",
+  "/docs/core/concepts": "/docs",
+  "/docs/core/memport": "/docs/reference/memport",
+  "/docs/core/policy-engine": "/docs/reference/policy-engine",
+  "/docs/core/tools-api": "/docs/reference/tools-api",
+  "/docs/faq": "/docs/resources/faq",
+  "/docs/get-started/configuration": "/docs/reference/configuration",
+  "/docs/get-started/configuration-v1": "/docs/reference/configuration",
+  "/docs/index": "/docs",
+  "/docs/quota-and-pricing": "/docs/resources/quota-and-pricing",
+  "/docs/tos-privacy": "/docs/resources/tos-privacy",
+  "/docs/troubleshooting": "/docs/resources/troubleshooting"
+}

@@ -9,12 +9,13 @@ import * as path from 'node:path';
 import {
   type MCPServerConfig,
   type ExtensionInstallMetadata,
+  type ExtensionSetting,
+  type CustomTheme,
 } from '@google/gemini-cli-core';
 import {
   EXTENSIONS_CONFIG_FILENAME,
   INSTALL_METADATA_FILENAME,
 } from '../config/extensions/variables.js';
-import type { ExtensionSetting } from '../config/extensions/extensionSettings.js';
 
 export function createExtension({
   extensionsDir = 'extensions-dir',
@@ -25,12 +26,20 @@ export function createExtension({
   mcpServers = {} as Record<string, MCPServerConfig>,
   installMetadata = undefined as ExtensionInstallMetadata | undefined,
   settings = undefined as ExtensionSetting[] | undefined,
+  themes = undefined as CustomTheme[] | undefined,
 } = {}): string {
   const extDir = path.join(extensionsDir, name);
   fs.mkdirSync(extDir, { recursive: true });
   fs.writeFileSync(
     path.join(extDir, EXTENSIONS_CONFIG_FILENAME),
-    JSON.stringify({ name, version, contextFileName, mcpServers, settings }),
+    JSON.stringify({
+      name,
+      version,
+      contextFileName,
+      mcpServers,
+      settings,
+      themes,
+    }),
   );
 
   if (addContextFile) {

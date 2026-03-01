@@ -374,6 +374,53 @@ describe('sandbox', () => {
       );
     });
 
+    it('should pass through GOOGLE_GEMINI_BASE_URL and GOOGLE_VERTEX_BASE_URL', async () => {
+      const config: SandboxConfig = {
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      };
+      process.env['GOOGLE_GEMINI_BASE_URL'] = 'http://gemini.proxy';
+      process.env['GOOGLE_VERTEX_BASE_URL'] = 'http://vertex.proxy';
+
+      // Mock image check to return true
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      expect(spawn).toHaveBeenCalledWith(
+        'docker',
+        expect.arrayContaining([
+          '--env',
+          'GOOGLE_GEMINI_BASE_URL=http://gemini.proxy',
+          '--env',
+          'GOOGLE_VERTEX_BASE_URL=http://vertex.proxy',
+        ]),
+        expect.any(Object),
+      );
+    });
+
     it('should handle user creation on Linux if needed', async () => {
       const config: SandboxConfig = {
         command: 'docker',

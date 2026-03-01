@@ -101,9 +101,9 @@ describe('KeypressContext', () => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'return',
-          ctrl: false,
-          meta: false,
           shift: false,
+          ctrl: false,
+          cmd: false,
         }),
       );
     });
@@ -116,9 +116,9 @@ describe('KeypressContext', () => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'return',
-          ctrl: false,
-          meta: false,
           shift: true,
+          ctrl: false,
+          cmd: false,
         }),
       );
     });
@@ -127,17 +127,17 @@ describe('KeypressContext', () => {
       {
         modifier: 'Shift',
         sequence: '\x1b[57414;2u',
-        expected: { ctrl: false, meta: false, shift: true },
+        expected: { shift: true, ctrl: false, cmd: false },
       },
       {
         modifier: 'Ctrl',
         sequence: '\x1b[57414;5u',
-        expected: { ctrl: true, meta: false, shift: false },
+        expected: { shift: false, ctrl: true, cmd: false },
       },
       {
         modifier: 'Alt',
         sequence: '\x1b[57414;3u',
-        expected: { ctrl: false, meta: true, shift: false },
+        expected: { shift: false, alt: true, ctrl: false, cmd: false },
       },
     ])(
       'should handle numpad enter with $modifier modifier',
@@ -154,6 +154,37 @@ describe('KeypressContext', () => {
         );
       },
     );
+
+    it('should recognize \n (LF) as ctrl+j', async () => {
+      const { keyHandler } = setupKeypressTest();
+
+      act(() => stdin.write('\n'));
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'j',
+          shift: false,
+          ctrl: true,
+          cmd: false,
+        }),
+      );
+    });
+
+    it('should recognize \\x1b\\n as Alt+Enter (return with meta)', async () => {
+      const { keyHandler } = setupKeypressTest();
+
+      act(() => stdin.write('\x1b\n'));
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'return',
+          shift: false,
+          alt: true,
+          ctrl: false,
+          cmd: false,
+        }),
+      );
+    });
   });
 
   describe('Fast return buffering', () => {
@@ -172,16 +203,26 @@ describe('KeypressContext', () => {
 
       act(() => stdin.write('a'));
       expect(keyHandler).toHaveBeenLastCalledWith(
-        expect.objectContaining({ name: 'a' }),
+        expect.objectContaining({
+          name: 'a',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        }),
       );
 
       act(() => stdin.write('\r'));
 
       expect(keyHandler).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          name: '',
+          name: 'return',
           sequence: '\r',
           insertable: true,
+          shift: true,
+          alt: false,
+          ctrl: false,
+          cmd: false,
         }),
       );
     });
@@ -198,6 +239,10 @@ describe('KeypressContext', () => {
       expect(keyHandler).toHaveBeenLastCalledWith(
         expect.objectContaining({
           name: 'return',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
         }),
       );
     });
@@ -215,6 +260,10 @@ describe('KeypressContext', () => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'escape',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
         }),
       );
     });
@@ -236,11 +285,21 @@ describe('KeypressContext', () => {
 
         expect(keyHandler).toHaveBeenNthCalledWith(
           1,
-          expect.objectContaining({ name: 'escape', meta: true }),
+          expect.objectContaining({
+            name: 'escape',
+            shift: false,
+            alt: true,
+            cmd: false,
+          }),
         );
         expect(keyHandler).toHaveBeenNthCalledWith(
           2,
-          expect.objectContaining({ name: 'escape', meta: true }),
+          expect.objectContaining({
+            name: 'escape',
+            shift: false,
+            alt: true,
+            cmd: false,
+          }),
         );
       });
     });
@@ -266,7 +325,9 @@ describe('KeypressContext', () => {
         expect(keyHandler).toHaveBeenCalledWith(
           expect.objectContaining({
             name: 'escape',
-            meta: true,
+            shift: false,
+            alt: true,
+            cmd: false,
           }),
         );
       });
@@ -288,17 +349,17 @@ describe('KeypressContext', () => {
       {
         name: 'Backspace',
         inputSequence: '\x1b[127u',
-        expected: { name: 'backspace', meta: false },
+        expected: { name: 'backspace', alt: false, cmd: false },
       },
       {
-        name: 'Option+Backspace',
+        name: 'Alt+Backspace',
         inputSequence: '\x1b[127;3u',
-        expected: { name: 'backspace', meta: true },
+        expected: { name: 'backspace', alt: true, cmd: false },
       },
       {
         name: 'Ctrl+Backspace',
         inputSequence: '\x1b[127;5u',
-        expected: { name: 'backspace', ctrl: true },
+        expected: { name: 'backspace', alt: false, ctrl: true, cmd: false },
       },
       {
         name: 'Shift+Space',
@@ -582,14 +643,17 @@ describe('KeypressContext', () => {
       { sequence: `\x1b[27;5;9~`, expected: { name: 'tab', ctrl: true } },
       {
         sequence: `\x1b[27;6;9~`,
-        expected: { name: 'tab', ctrl: true, shift: true },
+        expected: { name: 'tab', shift: true, ctrl: true },
       },
       // XTerm Function Key
       { sequence: `\x1b[1;129A`, expected: { name: 'up' } },
       { sequence: `\x1b[1;2H`, expected: { name: 'home', shift: true } },
       { sequence: `\x1b[1;5F`, expected: { name: 'end', ctrl: true } },
       { sequence: `\x1b[1;1P`, expected: { name: 'f1' } },
-      { sequence: `\x1b[1;3Q`, expected: { name: 'f2', meta: true } },
+      {
+        sequence: `\x1b[1;3Q`,
+        expected: { name: 'f2', alt: true, cmd: false },
+      },
       // Tilde Function Keys
       { sequence: `\x1b[3~`, expected: { name: 'delete' } },
       { sequence: `\x1b[5~`, expected: { name: 'pageup' } },
@@ -604,36 +668,79 @@ describe('KeypressContext', () => {
       // Reverse tabs
       { sequence: `\x1b[Z`, expected: { name: 'tab', shift: true } },
       { sequence: `\x1b[1;2Z`, expected: { name: 'tab', shift: true } },
+      { sequence: `\x1bOZ`, expected: { name: 'tab', shift: true } },
       // Legacy Arrows
       {
         sequence: `\x1b[A`,
-        expected: { name: 'up', ctrl: false, meta: false, shift: false },
+        expected: {
+          name: 'up',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        },
       },
       {
         sequence: `\x1b[B`,
-        expected: { name: 'down', ctrl: false, meta: false, shift: false },
+        expected: {
+          name: 'down',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        },
       },
       {
         sequence: `\x1b[C`,
-        expected: { name: 'right', ctrl: false, meta: false, shift: false },
+        expected: {
+          name: 'right',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        },
       },
       {
         sequence: `\x1b[D`,
-        expected: { name: 'left', ctrl: false, meta: false, shift: false },
+        expected: {
+          name: 'left',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        },
       },
 
       // Legacy Home/End
       {
         sequence: `\x1b[H`,
-        expected: { name: 'home', ctrl: false, meta: false, shift: false },
+        expected: {
+          name: 'home',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        },
       },
       {
         sequence: `\x1b[F`,
-        expected: { name: 'end', ctrl: false, meta: false, shift: false },
+        expected: {
+          name: 'end',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        },
       },
       {
         sequence: `\x1b[5H`,
-        expected: { name: 'home', ctrl: true, meta: false, shift: false },
+        expected: {
+          name: 'home',
+          shift: false,
+          alt: false,
+          ctrl: true,
+          cmd: false,
+        },
       },
     ])(
       'should recognize sequence "$sequence" as $expected.name',
@@ -651,6 +758,80 @@ describe('KeypressContext', () => {
     );
   });
 
+  describe('Numpad support', () => {
+    it.each([
+      {
+        sequence: '\x1bOj',
+        expected: { name: '*', sequence: '*', insertable: true },
+      },
+      {
+        sequence: '\x1bOk',
+        expected: { name: '+', sequence: '+', insertable: true },
+      },
+      {
+        sequence: '\x1bOm',
+        expected: { name: '-', sequence: '-', insertable: true },
+      },
+      {
+        sequence: '\x1bOo',
+        expected: { name: '/', sequence: '/', insertable: true },
+      },
+      {
+        sequence: '\x1bOp',
+        expected: { name: '0', sequence: '0', insertable: true },
+      },
+      {
+        sequence: '\x1bOq',
+        expected: { name: '1', sequence: '1', insertable: true },
+      },
+      {
+        sequence: '\x1bOr',
+        expected: { name: '2', sequence: '2', insertable: true },
+      },
+      {
+        sequence: '\x1bOs',
+        expected: { name: '3', sequence: '3', insertable: true },
+      },
+      {
+        sequence: '\x1bOt',
+        expected: { name: '4', sequence: '4', insertable: true },
+      },
+      {
+        sequence: '\x1bOu',
+        expected: { name: '5', sequence: '5', insertable: true },
+      },
+      {
+        sequence: '\x1bOv',
+        expected: { name: '6', sequence: '6', insertable: true },
+      },
+      {
+        sequence: '\x1bOw',
+        expected: { name: '7', sequence: '7', insertable: true },
+      },
+      {
+        sequence: '\x1bOx',
+        expected: { name: '8', sequence: '8', insertable: true },
+      },
+      {
+        sequence: '\x1bOy',
+        expected: { name: '9', sequence: '9', insertable: true },
+      },
+      {
+        sequence: '\x1bOn',
+        expected: { name: '.', sequence: '.', insertable: true },
+      },
+    ])(
+      'should recognize numpad sequence "$sequence" as $expected.name',
+      ({ sequence, expected }) => {
+        const { keyHandler } = setupKeypressTest();
+        act(() => stdin.write(sequence));
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining(expected),
+        );
+      },
+    );
+  });
+
   describe('Double-tap and batching', () => {
     it('should emit two delete events for double-tap CSI[3~', async () => {
       const { keyHandler } = setupKeypressTest();
@@ -660,11 +841,23 @@ describe('KeypressContext', () => {
 
       expect(keyHandler).toHaveBeenNthCalledWith(
         1,
-        expect.objectContaining({ name: 'delete' }),
+        expect.objectContaining({
+          name: 'delete',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        }),
       );
       expect(keyHandler).toHaveBeenNthCalledWith(
         2,
-        expect.objectContaining({ name: 'delete' }),
+        expect.objectContaining({
+          name: 'delete',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        }),
       );
     });
 
@@ -703,62 +896,72 @@ describe('KeypressContext', () => {
     // Terminals to test
     const terminals = ['iTerm2', 'Ghostty', 'MacTerminal', 'VSCodeTerminal'];
 
-    // Key mappings: letter -> [keycode, accented character]
-    const keys: Record<string, [number, string]> = {
-      b: [98, '\u222B'],
-      f: [102, '\u0192'],
-      m: [109, '\u00B5'],
+    // Key mappings: letter -> [keycode, accented character, shift]
+    const keys: Record<string, [number, string, boolean]> = {
+      b: [98, '\u222B', false],
+      f: [102, '\u0192', false],
+      m: [109, '\u00B5', false],
+      z: [122, '\u03A9', false],
+      Z: [122, '\u00B8', true],
     };
 
     it.each(
       terminals.flatMap((terminal) =>
-        Object.entries(keys).map(([key, [keycode, accentedChar]]) => {
-          if (terminal === 'Ghostty') {
-            // Ghostty uses kitty protocol sequences
-            return {
-              terminal,
-              key,
-              chunk: `\x1b[${keycode};3u`,
-              expected: {
-                name: key,
-                ctrl: false,
-                meta: true,
-                shift: false,
-              },
-            };
-          } else if (terminal === 'MacTerminal') {
-            // Mac Terminal sends ESC + letter
-            return {
-              terminal,
-              key,
-              kitty: false,
-              chunk: `\x1b${key}`,
-              expected: {
-                sequence: `\x1b${key}`,
-                name: key,
-                ctrl: false,
-                meta: true,
-                shift: false,
-              },
-            };
-          } else {
-            // iTerm2 and VSCode send accented characters (å, ø, µ)
-            // Note: µ (mu) is sent with meta:false on iTerm2/VSCode but
-            // gets converted to m with meta:true
-            return {
-              terminal,
-              key,
-              chunk: accentedChar,
-              expected: {
-                name: key,
-                ctrl: false,
-                meta: true, // Always expect meta:true after conversion
-                shift: false,
-                sequence: accentedChar,
-              },
-            };
-          }
-        }),
+        Object.entries(keys).map(
+          ([key, [keycode, accentedChar, shiftValue]]) => {
+            if (terminal === 'Ghostty') {
+              // Ghostty uses kitty protocol sequences
+              // Modifier 3 is Alt, 4 is Shift+Alt
+              const modifier = shiftValue ? 4 : 3;
+              return {
+                terminal,
+                key,
+                chunk: `\x1b[${keycode};${modifier}u`,
+                expected: {
+                  name: key.toLowerCase(),
+                  shift: shiftValue,
+                  alt: true,
+                  ctrl: false,
+                  cmd: false,
+                },
+              };
+            } else if (terminal === 'MacTerminal') {
+              // Mac Terminal sends ESC + letter
+              const chunk = shiftValue
+                ? `\x1b${key.toUpperCase()}`
+                : `\x1b${key.toLowerCase()}`;
+              return {
+                terminal,
+                key,
+                kitty: false,
+                chunk,
+                expected: {
+                  sequence: chunk,
+                  name: key.toLowerCase(),
+                  shift: shiftValue,
+                  alt: true,
+                  ctrl: false,
+                  cmd: false,
+                },
+              };
+            } else {
+              // iTerm2 and VSCode send accented characters (å, ø, µ, Ω, ¸)
+              return {
+                terminal,
+                key,
+                chunk: accentedChar,
+                expected: {
+                  name: key.toLowerCase(),
+                  shift: shiftValue,
+                  alt: true, // Always expect alt:true after conversion
+                  ctrl: false,
+                  cmd: false,
+                  sequence: accentedChar,
+                },
+              };
+            }
+          },
+        ),
       ),
     )(
       'should handle Alt+$key in $terminal',
@@ -795,7 +998,10 @@ describe('KeypressContext', () => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           sequence: '\\',
-          meta: false,
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
         }),
       );
     });
@@ -828,6 +1034,10 @@ describe('KeypressContext', () => {
       expect.objectContaining({
         name: 'undefined',
         sequence: INCOMPLETE_KITTY_SEQUENCE,
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
       }),
     );
   });
@@ -846,6 +1056,10 @@ describe('KeypressContext', () => {
     expect(keyHandler).toHaveBeenCalledWith(
       expect.objectContaining({
         sequence: '\x1b[m',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
       }),
     );
   });
@@ -1018,6 +1232,10 @@ describe('KeypressContext', () => {
         expect.objectContaining({
           name: 'a',
           sequence: 'a',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
         }),
       );
     });
@@ -1132,7 +1350,14 @@ describe('KeypressContext', () => {
       });
 
       expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'f12', sequence: '\u001b[24~' }),
+        expect.objectContaining({
+          name: 'f12',
+          sequence: '\u001b[24~',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        }),
       );
     });
   });
@@ -1158,5 +1383,58 @@ describe('KeypressContext', () => {
         );
       }
     });
+  });
+
+  describe('Greek support', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it.each([
+      {
+        lang: 'en_US.UTF-8',
+        expected: { name: 'z', alt: true, insertable: false },
+        desc: 'non-Greek locale (Option+z)',
+      },
+      {
+        lang: 'el_GR.UTF-8',
+        expected: { name: '', insertable: true },
+        desc: 'Greek LANG',
+      },
+      {
+        lcAll: 'el_GR.UTF-8',
+        expected: { name: '', insertable: true },
+        desc: 'Greek LC_ALL',
+      },
+      {
+        lang: 'en_US.UTF-8',
+        lcAll: 'el_GR.UTF-8',
+        expected: { name: '', insertable: true },
+        desc: 'LC_ALL overriding non-Greek LANG',
+      },
+      {
+        lang: 'el_GR.UTF-8',
+        char: '\u00B8',
+        expected: { name: 'z', alt: true, shift: true },
+        desc: 'Cedilla (\u00B8) in Greek locale (should be Option+Shift+z)',
+      },
+    ])(
+      'should handle $char correctly in $desc',
+      async ({ lang, lcAll, char = '\u03A9', expected }) => {
+        if (lang) vi.stubEnv('LANG', lang);
+        if (lcAll) vi.stubEnv('LC_ALL', lcAll);
+
+        const { keyHandler } = setupKeypressTest();
+
+        act(() => stdin.write(char));
+
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            ...expected,
+            sequence: char,
+          }),
+        );
+      },
+    );
   });
 });

@@ -131,13 +131,16 @@ async function processIntent(
     case 'retry_always':
       // TODO(telemetry): Implement generic fallback event logging. Existing
       // logFlashFallback is specific to a single Model.
-      config.setActiveModel(fallbackModel);
+      config.activateFallbackMode(fallbackModel);
       return true;
 
     case 'retry_once':
       // For distinct retry (retry_once), we do NOT set the active model permanently.
       // The FallbackStrategy will handle routing to the available model for this turn
       // based on the availability service state (which is updated before this).
+      return true;
+
+    case 'retry_with_credits':
       return true;
 
     case 'stop':

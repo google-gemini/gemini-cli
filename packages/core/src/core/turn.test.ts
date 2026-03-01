@@ -14,6 +14,7 @@ import type { GenerateContentResponse, Part, Content } from '@google/genai';
 import { reportError } from '../utils/errorReporting.js';
 import type { GeminiChat } from './geminiChat.js';
 import { InvalidStreamError, StreamEventType } from './geminiChat.js';
+import { LlmRole } from '../telemetry/types.js';
 
 const mockSendMessageStream = vi.fn();
 const mockGetHistory = vi.fn();
@@ -102,6 +103,8 @@ describe('Turn', () => {
         reqParts,
         'prompt-id-1',
         expect.any(AbortSignal),
+        LlmRole.MAIN,
+        undefined,
       );
 
       expect(events).toEqual([
@@ -167,7 +170,7 @@ describe('Turn', () => {
         }),
       );
       expect(event2.value.callId).toEqual(
-        expect.stringMatching(/^tool2-\d{13}-\w{10,}$/),
+        expect.stringMatching(/^tool2_\d{13}_\d+$/),
       );
       expect(turn.pendingToolCalls[1]).toEqual(event2.value);
       expect(turn.getDebugResponses().length).toBe(1);
@@ -258,7 +261,10 @@ describe('Turn', () => {
       const errorEvent = events[0] as ServerGeminiErrorEvent;
       expect(errorEvent.type).toBe(GeminiEventType.Error);
       expect(errorEvent.value).toEqual({
-        error: { message: 'API Error', status: undefined },
+        error: {
+          message: 'API Error',
+          status: undefined,
+        },
       });
       expect(turn.getDebugResponses().length).toBe(0);
       expect(reportError).toHaveBeenCalledWith(
@@ -753,6 +759,108 @@ describe('Turn', () => {
       }
 
       expect(events).toEqual([expectedEvent]);
+    });
+
+    it('should process all parts when thought is first part in chunk', async () => {
+      const mockResponseStream = (async function* () {
+        yield {
+          type: StreamEventType.CHUNK,
+          value: {
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    { text: '**Planning** the solution', thought: 'planning' },
+                    { text: 'I will help you with that.' },
+                  ],
+                },
+                citationMetadata: {
+                  citations: [{ uri: 'https://example.com', title: 'Source' }],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+            functionCalls: [
+              {
+                id: 'fc1',
+                name: 'ReadFile',
+                args: { path: 'file.txt' },
+              },
+            ],
+            responseId: 'trace-789',
+          } as unknown as GenerateContentResponse,
+        };
+      })();
+      mockSendMessageStream.mockResolvedValue(mockResponseStream);
+
+      const events = [];
+      for await (const event of turn.run(
+        { model: 'gemini' },
+        [{ text: 'Test mixed content' }],
+        new AbortController().signal,
+      )) {
+        events.push(event);
+      }
+
+      // Should yield:
+      // 1. Thought event (from first part)
+      // 2. Content event (from second part)
+      // 3. ToolCallRequest event (from functionCalls)
+      // 4. Citation event (from citationMetadata, emitted with finishReason)
+      // 5. Finished event (from finishReason)
+
+      expect(events.length).toBe(5);
+
+      const thoughtEvent = events.find(
+        (e) => e.type === GeminiEventType.Thought,
+      );
+      expect(thoughtEvent).toBeDefined();
+      expect(thoughtEvent).toMatchObject({
+        type: GeminiEventType.Thought,
+        value: { subject: 'Planning', description: 'the solution' },
+        traceId: 'trace-789',
+      });
+
+      const contentEvent = events.find(
+        (e) => e.type === GeminiEventType.Content,
+      );
+      expect(contentEvent).toBeDefined();
+      expect(contentEvent).toMatchObject({
+        type: GeminiEventType.Content,
+        value: 'I will help you with that.',
+        traceId: 'trace-789',
+      });
+
+      const toolCallEvent = events.find(
+        (e) => e.type === GeminiEventType.ToolCallRequest,
+      );
+      expect(toolCallEvent).toBeDefined();
+      expect(toolCallEvent).toMatchObject({
+        type: GeminiEventType.ToolCallRequest,
+        value: expect.objectContaining({
+          callId: 'fc1',
+          name: 'ReadFile',
+          args: { path: 'file.txt' },
+        }),
+      });
+
+      const citationEvent = events.find(
+        (e) => e.type === GeminiEventType.Citation,
+      );
+      expect(citationEvent).toBeDefined();
+      expect(citationEvent).toMatchObject({
+        type: GeminiEventType.Citation,
+        value: expect.stringContaining('https://example.com'),
+      });
+
+      const finishedEvent = events.find(
+        (e) => e.type === GeminiEventType.Finished,
+      );
+      expect(finishedEvent).toBeDefined();
+      expect(finishedEvent).toMatchObject({
+        type: GeminiEventType.Finished,
+        value: { reason: 'STOP' },
+      });
     });
   });
 

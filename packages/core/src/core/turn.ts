@@ -29,6 +29,7 @@ import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { createUserContent } from '@google/genai';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { getCitations } from '../utils/generateContentResponseUtilities.js';
+import { LlmRole } from '../telemetry/types.js';
 
 import {
   type ToolCallRequestInfo,
@@ -79,6 +80,7 @@ export type ServerGeminiAgentExecutionStoppedEvent = {
   value: {
     reason: string;
     systemMessage?: string;
+    contextCleared?: boolean;
   };
 };
 
@@ -87,6 +89,7 @@ export type ServerGeminiAgentExecutionBlockedEvent = {
   value: {
     reason: string;
     systemMessage?: string;
+    contextCleared?: boolean;
   };
 };
 
@@ -113,7 +116,7 @@ export interface StructuredError {
 }
 
 export interface GeminiErrorEventValue {
-  error: StructuredError;
+  error: unknown;
 }
 
 export interface GeminiFinishedEventValue {
@@ -172,8 +175,14 @@ export enum CompressionStatus {
   /** The compression failed due to an error counting tokens */
   COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
 
+  /** The compression failed because the summary was empty */
+  COMPRESSION_FAILED_EMPTY_SUMMARY,
+
   /** The compression was not necessary and no action was taken */
   NOOP,
+
+  /** The compression was skipped due to previous failure, but content was truncated to budget */
+  CONTENT_TRUNCATED,
 }
 
 export interface ChatCompressionInfo {
@@ -228,6 +237,8 @@ export type ServerGeminiStreamEvent =
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
+  private callCounter = 0;
+
   readonly pendingToolCalls: ToolCallRequestInfo[] = [];
   private debugResponses: GenerateContentResponse[] = [];
   private pendingCitations = new Set<string>();
@@ -243,6 +254,8 @@ export class Turn {
     modelConfigKey: ModelConfigKey,
     req: PartListUnion,
     signal: AbortSignal,
+    displayContent?: PartListUnion,
+    role: LlmRole = LlmRole.MAIN,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     try {
       // Note: This assumes `sendMessageStream` yields events like
@@ -252,6 +265,8 @@ export class Turn {
         req,
         this.prompt_id,
         signal,
+        role,
+        displayContent,
       );
 
       for await (const streamEvent of responseStream) {
@@ -290,15 +305,16 @@ export class Turn {
 
         const traceId = resp.responseId;
 
-        const thoughtPart = resp.candidates?.[0]?.content?.parts?.[0];
-        if (thoughtPart?.thought) {
-          const thought = parseThought(thoughtPart.text ?? '');
-          yield {
-            type: GeminiEventType.Thought,
-            value: thought,
-            traceId,
-          };
-          continue;
+        const parts = resp.candidates?.[0]?.content?.parts ?? [];
+        for (const part of parts) {
+          if (part.thought) {
+            const thought = parseThought(part.text ?? '');
+            yield {
+              type: GeminiEventType.Thought,
+              value: thought,
+              traceId,
+            };
+          }
         }
 
         const text = getResponseText(resp);
@@ -374,7 +390,8 @@ export class Turn {
         error !== null &&
         'status' in error &&
         typeof (error as { status: unknown }).status === 'number'
-          ? (error as { status: number }).status
+          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (error as { status: number }).status
           : undefined;
       const structuredError: StructuredError = {
         message: getErrorMessage(error),
@@ -390,11 +407,9 @@ export class Turn {
     fnCall: FunctionCall,
     traceId?: string,
   ): ServerGeminiStreamEvent | null {
-    const callId =
-      fnCall.id ??
-      `${fnCall.name}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const name = fnCall.name || 'undefined_tool_name';
     const args = fnCall.args || {};
+    const callId = fnCall.id ?? `${name}_${Date.now()}_${this.callCounter++}`;
 
     const toolCallRequest: ToolCallRequestInfo = {
       callId,

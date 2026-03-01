@@ -11,13 +11,23 @@ import {
   CommandKind,
 } from './types.js';
 import {
-  MessageType,
-  type HistoryItemSkillsList,
   type HistoryItemInfo,
+  type HistoryItemSkillsList,
+  MessageType,
 } from '../types.js';
+import { disableSkill, enableSkill } from '../../utils/skillSettings.js';
+import { getErrorMessage } from '../../utils/errors.js';
+
+import { getAdminErrorMessage } from '@google/gemini-cli-core';
+import {
+  linkSkill,
+  renderSkillActionFeedback,
+} from '../../utils/skillUtils.js';
 import { SettingScope } from '../../config/settings.js';
-import { enableSkill, disableSkill } from '../../utils/skillSettings.js';
-import { renderSkillActionFeedback } from '../../utils/skillUtils.js';
+import {
+  requestConsentInteractive,
+  skillsConsentString,
+} from '../../config/extensions/consent.js';
 
 async function listAction(
   context: CommandContext,
@@ -66,6 +76,69 @@ async function listAction(
   context.ui.addItem(skillsListItem);
 }
 
+async function linkAction(
+  context: CommandContext,
+  args: string,
+): Promise<void | SlashCommandActionReturn> {
+  const parts = args.trim().split(/\s+/);
+  const sourcePath = parts[0];
+
+  if (!sourcePath) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Usage: /skills link <path> [--scope user|workspace]',
+    });
+    return;
+  }
+
+  let scopeArg = 'user';
+  if (parts.length >= 3 && parts[1] === '--scope') {
+    scopeArg = parts[2];
+  } else if (parts.length >= 2 && parts[1].startsWith('--scope=')) {
+    scopeArg = parts[1].split('=')[1];
+  }
+
+  const scope = scopeArg === 'workspace' ? 'workspace' : 'user';
+
+  try {
+    await linkSkill(
+      sourcePath,
+      scope,
+      (msg) =>
+        context.ui.addItem({
+          type: MessageType.INFO,
+          text: msg,
+        }),
+      async (skills, targetDir) => {
+        const consentString = await skillsConsentString(
+          skills,
+          sourcePath,
+          targetDir,
+          true,
+        );
+        return requestConsentInteractive(
+          consentString,
+          context.ui.setConfirmationRequest.bind(context.ui),
+        );
+      },
+    );
+
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: `Successfully linked skills from "${sourcePath}" (${scope}).`,
+    });
+
+    if (context.services.config) {
+      await context.services.config.reloadSkills();
+    }
+  } catch (error) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Failed to link skills: ${getErrorMessage(error)}`,
+    });
+  }
+}
+
 async function disableAction(
   context: CommandContext,
   args: string,
@@ -83,7 +156,10 @@ async function disableAction(
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: 'Agent skills are disabled by your admin.',
+        text: getAdminErrorMessage(
+          'Agent skills',
+          context.services.config ?? undefined,
+        ),
       },
       Date.now(),
     );
@@ -112,8 +188,9 @@ async function disableAction(
     result,
     (label, path) => `${label} (${path})`,
   );
-  if (result.status === 'success') {
-    feedback += ' Use "/skills reload" for it to take effect.';
+  if (result.status === 'success' || result.status === 'no-op') {
+    feedback +=
+      ' You can run "/skills reload" to refresh your current instance.';
   }
 
   context.ui.addItem({
@@ -140,7 +217,10 @@ async function enableAction(
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: 'Agent skills are disabled by your admin.',
+        text: getAdminErrorMessage(
+          'Agent skills',
+          context.services.config ?? undefined,
+        ),
       },
       Date.now(),
     );
@@ -153,8 +233,9 @@ async function enableAction(
     result,
     (label, path) => `${label} (${path})`,
   );
-  if (result.status === 'success') {
-    feedback += ' Use "/skills reload" for it to take effect.';
+  if (result.status === 'success' || result.status === 'no-op') {
+    feedback +=
+      ' You can run "/skills reload" to refresh your current instance.';
   }
 
   context.ui.addItem({
@@ -292,6 +373,13 @@ export const skillsCommand: SlashCommand = {
       action: listAction,
     },
     {
+      name: 'link',
+      description:
+        'Link an agent skill from a local path. Usage: /skills link <path> [--scope user|workspace]',
+      kind: CommandKind.BUILT_IN,
+      action: linkAction,
+    },
+    {
       name: 'disable',
       description: 'Disable a skill by name. Usage: /skills disable <name>',
       kind: CommandKind.BUILT_IN,
@@ -308,6 +396,7 @@ export const skillsCommand: SlashCommand = {
     },
     {
       name: 'reload',
+      altNames: ['refresh'],
       description:
         'Reload the list of discovered skills. Usage: /skills reload',
       kind: CommandKind.BUILT_IN,
