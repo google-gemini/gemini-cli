@@ -120,10 +120,14 @@ export const calculatePromptWidths = (mainContentWidth: number) => {
   const PROMPT_PREFIX_WIDTH = 2; // '> ' or '! '
 
   const FRAME_OVERHEAD = FRAME_PADDING_AND_BORDER + PROMPT_PREFIX_WIDTH;
+  const SCROLLBAR_WIDTH = 1;
   const suggestionsWidth = Math.max(20, mainContentWidth);
 
   return {
-    inputWidth: Math.max(mainContentWidth - FRAME_OVERHEAD, 1),
+    inputWidth: Math.max(
+      mainContentWidth - FRAME_OVERHEAD - SCROLLBAR_WIDTH,
+      1,
+    ),
     containerWidth: mainContentWidth,
     suggestionsWidth,
     frameOverhead: FRAME_OVERHEAD,
