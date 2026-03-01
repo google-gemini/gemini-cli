@@ -2694,6 +2694,18 @@ describe('loadCliConfig approval mode', () => {
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
     });
 
+    it('should pass yolo flag to isWorkspaceTrusted', async () => {
+      process.argv = ['node', 'script.js', '--yolo'];
+      const argv = await parseArguments(createTestMergedSettings());
+      await loadCliConfig(createTestMergedSettings(), 'test-session', argv);
+      expect(isWorkspaceTrusted).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        undefined,
+        expect.objectContaining({ yolo: true }),
+      );
+    });
+
     it('should remain DEFAULT when --approval-mode=default', async () => {
       process.argv = ['node', 'script.js', '--approval-mode', 'default'];
       const argv = await parseArguments(createTestMergedSettings());
@@ -2703,6 +2715,25 @@ describe('loadCliConfig approval mode', () => {
         argv,
       );
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+    });
+  });
+
+  describe('when yolo flag auto-trusts folder', () => {
+    it('should keep YOLO approval mode when --yolo auto-trusts the folder', async () => {
+      vi.mocked(isWorkspaceTrusted).mockImplementation(
+        (_settings, _dir, _config, headlessOptions) => ({
+          isTrusted: !!headlessOptions?.yolo,
+          source: undefined,
+        }),
+      );
+      process.argv = ['node', 'script.js', '--yolo'];
+      const argv = await parseArguments(createTestMergedSettings());
+      const config = await loadCliConfig(
+        createTestMergedSettings(),
+        'test-session',
+        argv,
+      );
+      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
     });
   });
 
