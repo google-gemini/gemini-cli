@@ -4,7 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec, execSync, spawn, type ChildProcess } from 'node:child_process';
+import {
+  exec,
+  execFile,
+  execFileSync,
+  execSync,
+  spawn,
+  type ChildProcess,
+} from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -34,6 +41,7 @@ import {
 } from './sandboxUtils.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export async function start_sandbox(
   config: SandboxConfig,
@@ -201,6 +209,10 @@ export async function start_sandbox(
           resolve(code ?? 1);
         });
       });
+    }
+
+    if (config.command === 'lxc') {
+      return await start_lxc_sandbox(config, nodeArgs, cliArgs);
     }
 
     debugLogger.log(`hopping into sandbox (command: ${config.command}) ...`);
@@ -720,6 +732,212 @@ export async function start_sandbox(
   } finally {
     patcher.cleanup();
   }
+}
+
+// Helper function to start a sandbox using LXC/LXD.
+// Unlike Docker/Podman, LXC does not launch a transient container from an
+// image. The user creates and manages their own LXC container; Gemini runs
+// inside it via `lxc exec`. The container name is stored in config.image
+// (default: "gemini-sandbox"). The workspace is bind-mounted into the
+// container at the same absolute path.
+async function start_lxc_sandbox(
+  config: SandboxConfig,
+  nodeArgs: string[] = [],
+  cliArgs: string[] = [],
+): Promise<number> {
+  const containerName = config.image || 'gemini-sandbox';
+  const workdir = path.resolve(process.cwd());
+
+  debugLogger.log(
+    `starting lxc sandbox (container: ${containerName}, workdir: ${workdir}) ...`,
+  );
+
+  // Verify the container exists and is running.
+  let listOutput: string;
+  try {
+    const { stdout } = await execFileAsync('lxc', [
+      'list',
+      containerName,
+      '--format=json',
+    ]);
+    listOutput = stdout.trim();
+  } catch (err) {
+    throw new FatalSandboxError(
+      `Failed to query LXC container '${containerName}': ${err instanceof Error ? err.message : String(err)}. ` +
+        `Make sure LXC/LXD is installed and '${containerName}' container exists. ` +
+        `Create one with: lxc launch ubuntu:24.04 ${containerName}`,
+    );
+  }
+
+  let containers: Array<{ name: string; status: string }> = [];
+  try {
+    const parsed: unknown = JSON.parse(listOutput);
+    if (Array.isArray(parsed)) {
+      containers = parsed
+        .filter(
+          (item): item is Record<string, unknown> =>
+            item !== null &&
+            typeof item === 'object' &&
+            'name' in item &&
+            'status' in item,
+        )
+        .map((item) => ({
+          name: String(item['name']),
+          status: String(item['status']),
+        }));
+    }
+  } catch {
+    containers = [];
+  }
+
+  const container = containers.find((c) => c.name === containerName);
+  if (!container) {
+    throw new FatalSandboxError(
+      `LXC container '${containerName}' not found. ` +
+        `Create one with: lxc launch ubuntu:24.04 ${containerName}`,
+    );
+  }
+  if (container.status.toLowerCase() !== 'running') {
+    throw new FatalSandboxError(
+      `LXC container '${containerName}' is not running (current status: ${container.status}). ` +
+        `Start it with: lxc start ${containerName}`,
+    );
+  }
+
+  // Bind-mount the working directory into the container at the same path.
+  // Using "lxc config device add" is idempotent when the device name matches.
+  const deviceName = `gemini-workspace-${randomBytes(4).toString('hex')}`;
+  try {
+    await execFileAsync('lxc', [
+      'config',
+      'device',
+      'add',
+      containerName,
+      deviceName,
+      'disk',
+      `source=${workdir}`,
+      `path=${workdir}`,
+    ]);
+    debugLogger.log(
+      `mounted workspace '${workdir}' into container as device '${deviceName}'`,
+    );
+  } catch (err) {
+    throw new FatalSandboxError(
+      `Failed to mount workspace into LXC container '${containerName}': ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  // Remove the workspace device from the container when the process exits.
+  const removeDevice = () => {
+    try {
+      execFileSync('lxc', [
+        'config',
+        'device',
+        'remove',
+        containerName,
+        deviceName,
+      ]);
+    } catch {
+      // Best-effort cleanup; ignore errors on exit.
+    }
+  };
+  process.off('exit', removeDevice);
+  process.on('exit', removeDevice);
+  process.off('SIGINT', removeDevice);
+  process.on('SIGINT', removeDevice);
+  process.off('SIGTERM', removeDevice);
+  process.on('SIGTERM', removeDevice);
+
+  // Build the environment variable arguments for `lxc exec`.
+  const envArgs: string[] = [];
+  const envVarsToForward: Record<string, string | undefined> = {
+    GEMINI_API_KEY: process.env['GEMINI_API_KEY'],
+    GOOGLE_API_KEY: process.env['GOOGLE_API_KEY'],
+    GOOGLE_GEMINI_BASE_URL: process.env['GOOGLE_GEMINI_BASE_URL'],
+    GOOGLE_VERTEX_BASE_URL: process.env['GOOGLE_VERTEX_BASE_URL'],
+    GOOGLE_GENAI_USE_VERTEXAI: process.env['GOOGLE_GENAI_USE_VERTEXAI'],
+    GOOGLE_GENAI_USE_GCA: process.env['GOOGLE_GENAI_USE_GCA'],
+    GOOGLE_CLOUD_PROJECT: process.env['GOOGLE_CLOUD_PROJECT'],
+    GOOGLE_CLOUD_LOCATION: process.env['GOOGLE_CLOUD_LOCATION'],
+    GEMINI_MODEL: process.env['GEMINI_MODEL'],
+    TERM: process.env['TERM'],
+    COLORTERM: process.env['COLORTERM'],
+    GEMINI_CLI_IDE_SERVER_PORT: process.env['GEMINI_CLI_IDE_SERVER_PORT'],
+    GEMINI_CLI_IDE_WORKSPACE_PATH: process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'],
+    TERM_PROGRAM: process.env['TERM_PROGRAM'],
+  };
+  for (const [key, value] of Object.entries(envVarsToForward)) {
+    if (value) {
+      envArgs.push('--env', `${key}=${value}`);
+    }
+  }
+
+  // Forward SANDBOX_ENV key=value pairs
+  if (process.env['SANDBOX_ENV']) {
+    for (let env of process.env['SANDBOX_ENV'].split(',')) {
+      if ((env = env.trim())) {
+        if (env.includes('=')) {
+          envArgs.push('--env', env);
+        } else {
+          throw new FatalSandboxError(
+            'SANDBOX_ENV must be a comma-separated list of key=value pairs',
+          );
+        }
+      }
+    }
+  }
+
+  // Forward NODE_OPTIONS (e.g. from --inspect flags)
+  const existingNodeOptions = process.env['NODE_OPTIONS'] || '';
+  const allNodeOptions = [
+    ...(existingNodeOptions ? [existingNodeOptions] : []),
+    ...nodeArgs,
+  ].join(' ');
+  if (allNodeOptions.length > 0) {
+    envArgs.push('--env', `NODE_OPTIONS=${allNodeOptions}`);
+  }
+
+  // Mark that we're running inside an LXC sandbox.
+  envArgs.push('--env', `SANDBOX=${containerName}`);
+
+  // Build the command entrypoint (same logic as Docker path).
+  const finalEntrypoint = entrypoint(workdir, cliArgs);
+
+  // Build the full lxc exec command args.
+  const args = [
+    'exec',
+    containerName,
+    '--cwd',
+    workdir,
+    ...envArgs,
+    '--',
+    ...finalEntrypoint,
+  ];
+
+  debugLogger.log(`lxc exec args: ${args.join(' ')}`);
+
+  process.stdin.pause();
+  const sandboxProcess = spawn('lxc', args, {
+    stdio: 'inherit',
+  });
+
+  return new Promise<number>((resolve, reject) => {
+    sandboxProcess.on('error', (err) => {
+      coreEvents.emitFeedback('error', 'LXC sandbox process error', err);
+      reject(err);
+    });
+
+    sandboxProcess.on('close', (code, signal) => {
+      process.stdin.resume();
+      removeDevice();
+      if (code !== 0 && code !== null) {
+        debugLogger.log(
+          `LXC sandbox process exited with code: ${code}, signal: ${signal}`,
+        );
+      }
+      resolve(code ?? 1);
+    });
+  });
 }
 
 // Helper functions to ensure sandbox image is present
