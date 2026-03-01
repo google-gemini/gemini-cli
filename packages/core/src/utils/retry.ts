@@ -130,13 +130,17 @@ export function isRetryableError(
   if (error instanceof ApiError) {
     // Explicitly do not retry 400 (Bad Request)
     if (error.status === 400) return false;
-    return error.status === 429 || (error.status >= 500 && error.status < 600);
+    return (
+      error.status === 429 ||
+      error.status === 499 ||
+      (error.status >= 500 && error.status < 600)
+    );
   }
 
   // Check for status using helper (handles other error shapes)
   const status = getErrorStatus(error);
   if (status !== undefined) {
-    return status === 429 || (status >= 500 && status < 600);
+    return status === 429 || status === 499 || (status >= 500 && status < 600);
   }
 
   return false;

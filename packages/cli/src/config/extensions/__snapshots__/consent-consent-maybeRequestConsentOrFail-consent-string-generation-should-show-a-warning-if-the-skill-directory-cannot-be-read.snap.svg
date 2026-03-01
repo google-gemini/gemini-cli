@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="343" viewBox="0 0 920 343">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="343" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Installing extension &quot;test-ext&quot;.                                                                    </text>
+    <text x="0" y="36" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Agent Skills:                                                                                       </text>
+    <text x="0" y="70" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">This extension will install the following agent skills:                                             </text>
+    <text x="0" y="104" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">  * locked-skill: A skill in a locked dir                                                           </text>
+    <text x="0" y="121" fill="#ffffff" textLength="405" lengthAdjust="spacingAndGlyphs">    (Source: /mock/temp/dir/locked/SKILL.md) </text>
+    <text x="405" y="121" fill="#cd0000" textLength="342" lengthAdjust="spacingAndGlyphs">⚠️ (Could not count items in directory)</text>
+    <text x="0" y="172" fill="#cdcd00" textLength="891" lengthAdjust="spacingAndGlyphs">The extension you are about to install may have been created by a third-party developer and sourced</text>
+    <text x="0" y="189" fill="#cdcd00" textLength="882" lengthAdjust="spacingAndGlyphs">from a public repository. Google does not vet, endorse, or guarantee the functionality or security</text>
+    <text x="0" y="206" fill="#cdcd00" textLength="846" lengthAdjust="spacingAndGlyphs">of extensions. Please carefully inspect any extension and its source code before installing to</text>
+    <text x="0" y="223" fill="#cdcd00" textLength="630" lengthAdjust="spacingAndGlyphs">understand the permissions it requires and the actions it may perform.</text>
+    <text x="0" y="257" fill="#cdcd00" textLength="882" lengthAdjust="spacingAndGlyphs">Agent skills inject specialized instructions and domain-specific knowledge into the agent&apos;s system</text>
+    <text x="0" y="274" fill="#cdcd00" textLength="891" lengthAdjust="spacingAndGlyphs">prompt. This can change how the agent interprets your requests and interacts with your environment.</text>
+    <text x="0" y="291" fill="#cdcd00" textLength="864" lengthAdjust="spacingAndGlyphs">Review the skill definitions at the location(s) provided below to ensure they meet your security</text>
+    <text x="0" y="308" fill="#cdcd00" textLength="90" lengthAdjust="spacingAndGlyphs">standards.</text>
+  </g>
+</svg>

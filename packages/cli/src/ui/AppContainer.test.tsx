@@ -2544,6 +2544,136 @@ describe('AppContainer State Management', () => {
     });
   });
 
+  describe('Expansion Persistence', () => {
+    let rerender: () => void;
+    let unmount: () => void;
+    let stdin: ReturnType<typeof render>['stdin'];
+
+    const setupExpansionPersistenceTest = async (
+      HighPriorityChild?: React.FC,
+    ) => {
+      const getTree = () => (
+        <SettingsContext.Provider value={mockSettings}>
+          <KeypressProvider config={mockConfig}>
+            <OverflowProvider>
+              <AppContainer
+                config={mockConfig}
+                version="1.0.0"
+                initializationResult={mockInitResult}
+              />
+              {HighPriorityChild && <HighPriorityChild />}
+            </OverflowProvider>
+          </KeypressProvider>
+        </SettingsContext.Provider>
+      );
+
+      const renderResult = render(getTree());
+      stdin = renderResult.stdin;
+      await act(async () => {
+        vi.advanceTimersByTime(100);
+      });
+      rerender = () => renderResult.rerender(getTree());
+      unmount = () => renderResult.unmount();
+    };
+
+    const writeStdin = async (sequence: string) => {
+      await act(async () => {
+        stdin.write(sequence);
+        // Advance timers to allow escape sequence parsing and broadcasting
+        vi.advanceTimersByTime(100);
+      });
+      rerender();
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('should reset expansion when a key is NOT handled by anyone', async () => {
+      await setupExpansionPersistenceTest();
+
+      // Expand first
+      act(() => capturedUIActions.setConstrainHeight(false));
+      rerender();
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      // Press a random key that no one handles (hits Low priority fallback)
+      await writeStdin('x');
+
+      // Should be reset to true (collapsed)
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      unmount();
+    });
+
+    it('should toggle expansion when Ctrl+O is pressed', async () => {
+      await setupExpansionPersistenceTest();
+
+      // Initial state is collapsed
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      // Press Ctrl+O to expand (Ctrl+O is sequence \x0f)
+      await writeStdin('\x0f');
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      // Press Ctrl+O again to collapse
+      await writeStdin('\x0f');
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      unmount();
+    });
+
+    it('should NOT collapse when a high-priority component handles the key (e.g., up/down arrows)', async () => {
+      const NavigationHandler = () => {
+        // use real useKeypress
+        useKeypress(
+          (key: Key) => {
+            if (key.name === 'up' || key.name === 'down') {
+              return true; // Handle navigation
+            }
+            return false;
+          },
+          { isActive: true, priority: true }, // High priority
+        );
+        return null;
+      };
+
+      await setupExpansionPersistenceTest(NavigationHandler);
+
+      // Expand first
+      act(() => capturedUIActions.setConstrainHeight(false));
+      rerender();
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      // 1. Simulate Up arrow (handled by high priority child)
+      // CSI A is Up arrow
+      await writeStdin('\u001b[A');
+
+      // Should STILL be expanded
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      // 2. Simulate Down arrow (handled by high priority child)
+      // CSI B is Down arrow
+      await writeStdin('\u001b[B');
+
+      // Should STILL be expanded
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      // 3. Sanity check: press an unhandled key
+      await writeStdin('x');
+
+      // Should finally collapse
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      unmount();
+    });
+  });
+
   describe('Shortcuts Help Visibility', () => {
     let handleGlobalKeypress: (key: Key) => boolean;
     let mockedUseKeypress: Mock;
@@ -2675,6 +2805,10 @@ describe('AppContainer State Management', () => {
       isAlternateMode = false,
       childHandler?: Mock,
     ) => {
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(
+        isAlternateMode,
+      );
+
       // Update settings for this test run
       const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const testSettings = {
@@ -3364,6 +3498,8 @@ describe('AppContainer State Management', () => {
       );
       vi.mocked(checkPermissions).mockResolvedValue([]);
 
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
+
       let unmount: () => void;
       await act(async () => {
         unmount = renderAppContainer({
@@ -3595,6 +3731,8 @@ describe('AppContainer State Management', () => {
           },
         },
       } as unknown as LoadedSettings;
+
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
 
       let unmount: () => void;
       await act(async () => {
