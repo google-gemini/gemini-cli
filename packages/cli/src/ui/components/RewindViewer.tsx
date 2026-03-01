@@ -187,14 +187,34 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
     return (
       <Box flexDirection="column" width={terminalWidth}>
         <Text bold>Rewind - Select a conversation point:</Text>
-        {items.map((item, idx) => (
-          <Text key={item.key}>
-            {idx + 1}.{' '}
-            {item.value.id === 'current-position'
-              ? 'Stay at current position'
-              : getCleanedRewindText(item.value)}
-          </Text>
-        ))}
+        <BaseSelectionList
+          items={items}
+          initialIndex={items.length - 1}
+          isFocused={true}
+          showNumbers={false}
+          wrapAround={false}
+          onSelect={(item: MessageRecord) => {
+            if (item?.id) {
+              if (item.id === 'current-position') {
+                onExit();
+              } else {
+                selectMessage(item.id);
+              }
+            }
+          }}
+          renderItem={(itemWrapper) => {
+            const item = itemWrapper.value;
+            const text =
+              item.id === 'current-position'
+                ? 'Stay at current position'
+                : getCleanedRewindText(item);
+            return (
+              <Text>
+                {itemWrapper.index + 1}. {text}
+              </Text>
+            );
+          }}
+        />
         <Text>Press Esc to exit, Enter to select, arrow keys to navigate.</Text>
       </Box>
     );
