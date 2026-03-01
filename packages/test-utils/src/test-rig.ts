@@ -6,7 +6,7 @@
 
 import { expect } from 'vitest';
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import fs, { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
