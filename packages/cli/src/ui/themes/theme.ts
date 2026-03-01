@@ -8,12 +8,6 @@ import type { CSSProperties } from 'react';
 
 import type { SemanticColors } from './semantic-tokens.js';
 
-import {
-  resolveColor,
-  interpolateColor,
-  getThemeTypeFromBackgroundColor,
-} from './color-utils.js';
-
 import type { CustomTheme } from '@google/gemini-cli-core';
 import {
   DEFAULT_BACKGROUND_OPACITY,
@@ -186,6 +180,7 @@ export interface ColorsTheme {
   InputBackground?: string;
   MessageBackground?: string;
   FocusBackground?: string;
+  FocusColor?: string;
   GradientColors?: string[];
 }
 
@@ -331,7 +326,7 @@ export class Theme {
           this.colors.FocusBackground ??
           interpolateColor(
             this.colors.Background,
-            this.colors.AccentGreen,
+            this.colors.FocusColor ?? this.colors.AccentGreen,
             DEFAULT_SELECTION_OPACITY,
           ),
         diff: {
@@ -347,7 +342,7 @@ export class Theme {
         comment: this.colors.Gray,
         symbol: this.colors.AccentCyan,
         dark: this.colors.DarkGray,
-        focus: this.colors.AccentGreen,
+        focus: this.colors.FocusColor ?? this.colors.AccentGreen,
         gradient: this.colors.GradientColors,
       },
       status: {
@@ -461,6 +456,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       customTheme.status?.success ?? customTheme.AccentGreen ?? '#3CA84B', // Fallback to a default green if not found
       DEFAULT_SELECTION_OPACITY,
     ),
+    FocusColor: customTheme.ui?.focus ?? customTheme.AccentGreen,
     GradientColors: customTheme.ui?.gradient ?? customTheme.GradientColors,
   };
 
@@ -631,7 +627,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       comment: customTheme.ui?.comment ?? colors.Comment,
       symbol: customTheme.ui?.symbol ?? colors.Gray,
       dark: colors.DarkGray,
-      focus: customTheme.ui?.focus ?? colors.AccentGreen,
+      focus: colors.FocusColor ?? colors.AccentGreen,
       gradient: customTheme.ui?.gradient ?? colors.GradientColors,
     },
     status: {

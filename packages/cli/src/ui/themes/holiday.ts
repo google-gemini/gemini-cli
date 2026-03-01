@@ -23,6 +23,7 @@ const holidayColors: ColorsTheme = {
   Comment: '#8FBC8F',
   Gray: '#D7F5D3',
   DarkGray: interpolateColor('#D7F5D3', '#151B18', 0.5),
+  FocusColor: '#33F9FF', // AccentCyan for neon pop
   GradientColors: ['#FF0000', '#FFFFFF', '#008000'],
 };
 

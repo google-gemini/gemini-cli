@@ -12,8 +12,8 @@ exports[`InputPrompt > command search (Ctrl+R when not in shell) > expands and c
  (r:)    Type your message or @path/to/file                                                         
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
  lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll → 
- lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll
- ...
+ lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll   
+ ...                                                                           
 "
 `;
 
@@ -22,8 +22,8 @@ exports[`InputPrompt > command search (Ctrl+R when not in shell) > expands and c
  (r:)    Type your message or @path/to/file                                                         
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
  lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll ← 
- lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll
- llllllllllllllllllllllllllllllllllllllllllllllllll
+ lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll   
+ llllllllllllllllllllllllllllllllllllllllllllllllll                            
 "
 `;
 
@@ -31,7 +31,7 @@ exports[`InputPrompt > command search (Ctrl+R when not in shell) > renders match
 "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
  (r:)  commit                                                                                       
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
- git commit -m "feat: add search" in src/app
+ git commit -m "feat: add search" in src/app                                   
 "
 `;
 
@@ -39,7 +39,7 @@ exports[`InputPrompt > command search (Ctrl+R when not in shell) > renders match
 "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
  (r:)  commit                                                                                       
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
- git commit -m "feat: add search" in src/app
+ git commit -m "feat: add search" in src/app                                   
 "
 `;
 

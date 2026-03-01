@@ -20,12 +20,16 @@ vi.mock('../../hooks/useSelectionList.js');
 const mockTheme = {
   text: { primary: 'COLOR_PRIMARY', secondary: 'COLOR_SECONDARY' },
   status: { success: 'COLOR_SUCCESS' },
+  ui: { focus: 'COLOR_FOCUS' },
+  background: { focus: 'COLOR_FOCUS_BG' },
 } as typeof theme;
 
 vi.mock('../../semantic-colors.js', () => ({
   theme: {
     text: { primary: 'COLOR_PRIMARY', secondary: 'COLOR_SECONDARY' },
     status: { success: 'COLOR_SUCCESS' },
+    ui: { focus: 'COLOR_FOCUS' },
+    background: { focus: 'COLOR_FOCUS_BG' },
   },
 }));
 
@@ -161,8 +165,8 @@ describe('BaseSelectionList', () => {
       expect(mockRenderItem).toHaveBeenCalledWith(
         items[0],
         expect.objectContaining({
-          titleColor: mockTheme.status.success,
-          numberColor: mockTheme.status.success,
+          titleColor: mockTheme.ui.focus,
+          numberColor: mockTheme.ui.focus,
           isSelected: true,
         }),
       );
@@ -207,8 +211,8 @@ describe('BaseSelectionList', () => {
       expect(mockRenderItem).toHaveBeenCalledWith(
         items[1],
         expect.objectContaining({
-          titleColor: mockTheme.status.success,
-          numberColor: mockTheme.status.success,
+          titleColor: mockTheme.ui.focus,
+          numberColor: mockTheme.ui.focus,
           isSelected: true,
         }),
       );
@@ -267,7 +271,7 @@ describe('BaseSelectionList', () => {
         items[0],
         expect.objectContaining({
           isSelected: true,
-          titleColor: mockTheme.status.success,
+          titleColor: mockTheme.ui.focus,
           numberColor: mockTheme.text.secondary,
         }),
       );

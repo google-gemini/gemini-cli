@@ -5,7 +5,7 @@ exports[`AskUserDialog > Choice question placeholder > uses default placeholder 
 
   1.  TypeScript
   2.  JavaScript
-● 3.  Enter a custom value
+● 3.  Enter a custom value                                                      
 
 Enter to submit · Esc to cancel
 "
@@ -16,7 +16,7 @@ exports[`AskUserDialog > Choice question placeholder > uses placeholder for "Oth
 
   1.  TypeScript
   2.  JavaScript
-● 3.  Type another language...
+● 3.  Type another language...                                                  
 
 Enter to submit · Esc to cancel
 "
@@ -26,8 +26,8 @@ exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: false) > shows scrol
 "Choose an option
 
 ▲
-●  1.  Option 1
-       Description 1
+●  1.  Option 1                                                                 
+       Description 1                                                            
    2.  Option 2
        Description 2
 ▼
@@ -39,8 +39,8 @@ Enter to select · ↑/↓ to navigate · Esc to cancel
 exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: true) > shows scroll arrows correctly when useAlternateBuffer is true 1`] = `
 "Choose an option
 
-●  1.  Option 1
-       Description 1
+●  1.  Option 1                                                                 
+       Description 1                                                            
    2.  Option 2
        Description 2
    3.  Option 3
@@ -122,8 +122,8 @@ Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel
 exports[`AskUserDialog > hides progress header for single question 1`] = `
 "Which authentication method should we use?
 
-● 1.  OAuth 2.0
-      Industry standard, supports SSO
+● 1.  OAuth 2.0                                                                                                         
+      Industry standard, supports SSO                                                                                   
   2.  JWT tokens
       Stateless, good for APIs
   3.  Enter a custom value
@@ -135,8 +135,8 @@ Enter to select · ↑/↓ to navigate · Esc to cancel
 exports[`AskUserDialog > renders question and options 1`] = `
 "Which authentication method should we use?
 
-● 1.  OAuth 2.0
-      Industry standard, supports SSO
+● 1.  OAuth 2.0                                                                                                         
+      Industry standard, supports SSO                                                                                   
   2.  JWT tokens
       Stateless, good for APIs
   3.  Enter a custom value
@@ -150,8 +150,8 @@ exports[`AskUserDialog > shows Review tab in progress header for multiple questi
 
 Which framework?
 
-● 1.  React
-      Component library
+● 1.  React                                                                                                             
+      Component library                                                                                                 
   2.  Vue
       Progressive framework
   3.  Enter a custom value
@@ -163,8 +163,8 @@ Enter to select · ←/→ to switch questions · Esc to cancel
 exports[`AskUserDialog > shows keyboard hints 1`] = `
 "Which authentication method should we use?
 
-● 1.  OAuth 2.0
-      Industry standard, supports SSO
+● 1.  OAuth 2.0                                                                                                         
+      Industry standard, supports SSO                                                                                   
   2.  JWT tokens
       Stateless, good for APIs
   3.  Enter a custom value
@@ -178,8 +178,8 @@ exports[`AskUserDialog > shows progress header for multiple questions 1`] = `
 
 Which database should we use?
 
-● 1.  PostgreSQL
-      Relational database
+● 1.  PostgreSQL                                                                                                        
+      Relational database                                                                                               
   2.  MongoDB
       Document database
   3.  Enter a custom value

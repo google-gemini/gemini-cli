@@ -1,21 +1,83 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`DescriptiveRadioButtonSelect > should render correctly with custom props 1`] = `
-"  1. Foo Title
-     This is Foo.
-● 2. Bar Title
-     This is Bar.
-  3. Baz Title
-     This is Baz.
+"
+  ERROR  Cannot read properties of undefined (reading 'focus')
+
+ src/ui/components/shared/BaseSelectionList.tsx:120:33
+
+ 117:         let numberColor = theme.text.primary;
+ 118:
+ 119:         if (isSelected) {
+ 120:           titleColor = theme.ui.focus;
+ 121:           numberColor = theme.ui.focus;
+ 122:         } else if (item.disabled) {
+ 123:           titleColor = theme.text.secondary;
+
+ -  (src/ui/components/shared/BaseSelectionList.tsx:120:33)
+ -     at Array.map (<anonymous>)\\t 
+ - BaseSelectionList (src/ui/components/shared/BaseSelectionList.tsx:111:21)
+ -Object.react-stack-bott 
+  m-frame                (/Users/keithguerin/Documents/gemini-cli_colors/node_modules/react-reconci
+                         ler/cjs/react-reconciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/Users/keithguerin/Documents/gemini-cli_colors/node_modules/react-reconciler/cjs/re
+               act-reconciler.development.js:3221:22)
+ -updateFunctionComp 
+  nent              (/Users/keithguerin/Documents/gemini-cli_colors/node_modules/react-reconciler/c
+                    js/react-reconciler.development.js:6475:19)
+ -beginWor 
+          (/Users/keithguerin/Documents/gemini-cli_colors/node_modules/react-reconciler/cjs/react-r
+          econciler.development.js:8009:18)
+ -runWithFiberIn 
+  EV            (/Users/keithguerin/Documents/gemini-cli_colors/node_modules/react-reconciler/cjs/r
+                eact-reconciler.development.js:1738:13)
+ -performUnitOfW 
+  rk            (/Users/keithguerin/Documents/gemini-cli_colors/node_modules/react-reconciler/cjs/r
+                eact-reconciler.development.js:12834:22)
+ -workLoopSyn 
+             (/Users/keithguerin/Documents/gemini-cli_colors/node_modules/react-reconciler/cjs/reac
+             t-reconciler.development.js:12644:41)
 "
 `;
 
 exports[`DescriptiveRadioButtonSelect > should render correctly with default props 1`] = `
-"● Foo Title
-  This is Foo.
-  Bar Title
-  This is Bar.
-  Baz Title
-  This is Baz.
+"
+  ERROR  Cannot read properties of undefined (reading 'focus')
+
+ src/ui/components/shared/BaseSelectionList.tsx:120:33
+
+ 117:         let numberColor = theme.text.primary;
+ 118:
+ 119:         if (isSelected) {
+ 120:           titleColor = theme.ui.focus;
+ 121:           numberColor = theme.ui.focus;
+ 122:         } else if (item.disabled) {
+ 123:           titleColor = theme.text.secondary;
+
+ -  (src/ui/components/shared/BaseSelectionList.tsx:120:33)
+ -     at Array.map (<anonymous>)\\t 
+ - BaseSelectionList (src/ui/components/shared/BaseSelectionList.tsx:111:21)
+ -Object.react-stack-bott 
+  m-frame                (/Users/keithguerin/Documents/gemini-cli_colors/node_modules/react-reconci
+                         ler/cjs/react-reconciler.development.js:15859:20)
+ -renderWithHoo 
+  s            (/Users/keithguerin/Documents/gemini-cli_colors/node_modules/react-reconciler/cjs/re
+               act-reconciler.development.js:3221:22)
+ -updateFunctionComp 
+  nent              (/Users/keithguerin/Documents/gemini-cli_colors/node_modules/react-reconciler/c
+                    js/react-reconciler.development.js:6475:19)
+ -beginWor 
+          (/Users/keithguerin/Documents/gemini-cli_colors/node_modules/react-reconciler/cjs/react-r
+          econciler.development.js:8009:18)
+ -runWithFiberIn 
+  EV            (/Users/keithguerin/Documents/gemini-cli_colors/node_modules/react-reconciler/cjs/r
+                eact-reconciler.development.js:1738:13)
+ -performUnitOfW 
+  rk            (/Users/keithguerin/Documents/gemini-cli_colors/node_modules/react-reconciler/cjs/r
+                eact-reconciler.development.js:12834:22)
+ -workLoopSyn 
+             (/Users/keithguerin/Documents/gemini-cli_colors/node_modules/react-reconciler/cjs/reac
+             t-reconciler.development.js:12644:41)
 "
 `;

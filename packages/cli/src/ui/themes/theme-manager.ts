@@ -373,7 +373,7 @@ class ThemeManager {
         ),
         FocusBackground: interpolateColor(
           this.terminalBackground,
-          colors.AccentGreen,
+          activeTheme.colors.FocusColor ?? activeTheme.colors.AccentGreen,
           DEFAULT_SELECTION_OPACITY,
         ),
       };
@@ -418,7 +418,7 @@ class ThemeManager {
         ui: {
           ...semanticColors.ui,
           dark: colors.DarkGray,
-          focus: colors.AccentGreen,
+          focus: colors.FocusColor ?? colors.AccentGreen,
         },
       };
     } else {
