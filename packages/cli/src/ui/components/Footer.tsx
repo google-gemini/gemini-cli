@@ -115,7 +115,7 @@ export const FooterRow: React.FC<{
   items.forEach((item, idx) => {
     if (idx > 0 && !showLabels) {
       elements.push(
-        <Box key={`sep-${item.key}`} height={1}>
+        <Box key={`sep-${item.key}`}>
           <Text color={theme.ui.comment}> · </Text>
         </Box>,
       );
@@ -124,11 +124,11 @@ export const FooterRow: React.FC<{
     elements.push(
       <Box key={item.key} flexDirection="column">
         {showLabels && (
-          <Box height={1}>
+          <Box>
             <Text color={theme.ui.comment}>{item.header}</Text>
           </Box>
         )}
-        <Box height={1}>{item.element}</Box>
+        <Box>{item.element}</Box>
       </Box>,
     );
   });
@@ -136,7 +136,7 @@ export const FooterRow: React.FC<{
   return (
     <Box
       flexDirection="row"
-      flexWrap="nowrap"
+      flexWrap="wrap"
       columnGap={showLabels ? COLUMN_GAP : 0}
     >
       {elements}
@@ -403,37 +403,14 @@ export const Footer: React.FC = () => {
   }
 
   // --- Width Fitting Logic ---
-  let currentWidth = 2; // Initial padding
-  const columnsToRender: FooterColumn[] = [];
-  let droppedAny = false;
+  // Sum up fixed widths to see how much is left for CWD
+  const nonCwdWidth = potentialColumns
+    .filter((c) => c.id !== 'cwd')
+    .reduce((sum, c) => sum + c.width + (showLabels ? COLUMN_GAP : 3), 0);
+  const cwdBudget = Math.max(20, terminalWidth - nonCwdWidth - 4);
 
-  for (let i = 0; i < potentialColumns.length; i++) {
-    const col = potentialColumns[i];
-    const gap = columnsToRender.length > 0 ? (showLabels ? COLUMN_GAP : 3) : 0; // Use 3 for dot separator width
-    const budgetWidth = col.id === 'cwd' ? 20 : col.width;
-
-    if (
-      col.isHighPriority ||
-      currentWidth + gap + budgetWidth <= terminalWidth - 2
-    ) {
-      columnsToRender.push(col);
-      currentWidth += gap + budgetWidth;
-    } else {
-      droppedAny = true;
-    }
-  }
-
-  const totalBudgeted = columnsToRender.reduce(
-    (sum, c, idx) =>
-      sum +
-      (c.id === 'cwd' ? 20 : c.width) +
-      (idx > 0 ? (showLabels ? COLUMN_GAP : 3) : 0),
-    2,
-  );
-  const excessSpace = Math.max(0, terminalWidth - totalBudgeted);
-
-  const rowItems: FooterRowItem[] = columnsToRender.map((col) => {
-    const maxWidth = col.id === 'cwd' ? 20 + excessSpace : col.width;
+  const rowItems: FooterRowItem[] = potentialColumns.map((col) => {
+    const maxWidth = col.id === 'cwd' ? cwdBudget : col.width;
     return {
       key: col.id,
       header: col.header,
@@ -441,16 +418,8 @@ export const Footer: React.FC = () => {
     };
   });
 
-  if (droppedAny) {
-    rowItems.push({
-      key: 'ellipsis',
-      header: '',
-      element: <Text color={theme.ui.comment}>…</Text>,
-    });
-  }
-
   return (
-    <Box width={terminalWidth} paddingX={1} overflow="hidden" flexWrap="nowrap">
+    <Box width={terminalWidth} paddingX={1} overflow="hidden" flexWrap="wrap">
       <FooterRow items={rowItems} showLabels={showLabels} />
     </Box>
   );
