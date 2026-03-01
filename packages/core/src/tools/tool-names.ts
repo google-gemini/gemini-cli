@@ -158,6 +158,12 @@ export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 export const WRITE_FILE_DISPLAY_NAME = 'WriteFile';
 export const EDIT_DISPLAY_NAME = 'Edit';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
+export const TRACKER_CREATE_TASK_TOOL_NAME = 'tracker_create_task';
+export const TRACKER_UPDATE_TASK_TOOL_NAME = 'tracker_update_task';
+export const TRACKER_GET_TASK_TOOL_NAME = 'tracker_get_task';
+export const TRACKER_LIST_TASKS_TOOL_NAME = 'tracker_list_tasks';
+export const TRACKER_ADD_DEPENDENCY_TOOL_NAME = 'tracker_add_dependency';
+export const TRACKER_VISUALIZE_TOOL_NAME = 'tracker_visualize';
 export const READ_FILE_DISPLAY_NAME = 'ReadFile';
 export const GLOB_DISPLAY_NAME = 'FindFiles';
 
@@ -213,9 +219,30 @@ export const ALL_BUILTIN_TOOL_NAMES = [
   MEMORY_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
+  TRACKER_CREATE_TASK_TOOL_NAME,
+  TRACKER_UPDATE_TASK_TOOL_NAME,
+  TRACKER_GET_TASK_TOOL_NAME,
+  TRACKER_LIST_TASKS_TOOL_NAME,
+  TRACKER_ADD_DEPENDENCY_TOOL_NAME,
+  TRACKER_VISUALIZE_TOOL_NAME,
   GET_INTERNAL_DOCS_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
+] as const;
+
+/**
+ * Read-only tools available in Plan Mode.
+ * This list is used to dynamically generate the Plan Mode prompt,
+ * filtered by what tools are actually enabled in the current configuration.
+ */
+export const PLAN_MODE_TOOLS = [
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  LS_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+  ASK_USER_TOOL_NAME,
+  ACTIVATE_SKILL_TOOL_NAME,
 ] as const;
 
 /**

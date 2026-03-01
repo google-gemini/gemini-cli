@@ -826,6 +826,7 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
+    tracker: settings.experimental?.taskTracker,
     directWebFetch: settings.experimental?.directWebFetch,
     planSettings: settings.general?.plan,
     enableEventDrivenScheduler: true,
