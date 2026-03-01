@@ -658,8 +658,10 @@ export class PolicyEngine {
     let globalVerdict: PolicyDecision | undefined;
 
     for (const rule of this.rules) {
+      const normalizedDecision = this.applyNonInteractiveMode(rule.decision);
+
       if (rule.argsPattern) {
-        if (rule.toolName && rule.decision !== PolicyDecision.DENY) {
+        if (rule.toolName && normalizedDecision !== PolicyDecision.DENY) {
           processedTools.add(rule.toolName);
         }
         continue;
@@ -718,7 +720,7 @@ export class PolicyEngine {
           if (globalVerdict !== undefined) {
             decision = globalVerdict;
           } else {
-            decision = rule.decision;
+            decision = normalizedDecision;
           }
           if (decision === PolicyDecision.DENY) {
             excludedTools.add(toolName);
@@ -731,7 +733,7 @@ export class PolicyEngine {
       // Handle Global Rules
       if (!rule.toolName) {
         if (globalVerdict === undefined) {
-          globalVerdict = rule.decision;
+          globalVerdict = normalizedDecision;
           if (globalVerdict !== PolicyDecision.DENY) {
             // Global ALLOW/ASK found.
             // Since rules are sorted by priority, this overrides any lower-priority rules.
@@ -777,7 +779,7 @@ export class PolicyEngine {
       if (globalVerdict !== undefined) {
         decision = globalVerdict;
       } else {
-        decision = rule.decision;
+        decision = normalizedDecision;
       }
 
       if (decision === PolicyDecision.DENY) {

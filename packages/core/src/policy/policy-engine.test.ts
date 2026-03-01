@@ -2223,7 +2223,7 @@ describe('PolicyEngine', () => {
         expected: [],
       },
       {
-        name: 'should NOT include ASK_USER tools even in non-interactive mode',
+        name: 'should include ASK_USER tools in non-interactive mode',
         rules: [
           {
             toolName: 'tool1',
@@ -2232,6 +2232,18 @@ describe('PolicyEngine', () => {
           },
         ],
         nonInteractive: true,
+        expected: ['tool1'],
+      },
+      {
+        name: 'should NOT exclude ASK_USER tools in interactive mode',
+        rules: [
+          {
+            toolName: 'tool1',
+            decision: PolicyDecision.ASK_USER,
+            modes: [ApprovalMode.DEFAULT],
+          },
+        ],
+        nonInteractive: false,
         expected: [],
       },
       {

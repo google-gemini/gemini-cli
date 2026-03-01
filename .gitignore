@@ -62,3 +62,9 @@ gemini-debug.log
 .gemini-clipboard/
 .eslintcache
 evals/logs/
+
+# Generated output and declaration files
+*.txt
+!NOTICES.txt
+!LICENSE.txt
+packages/*/src/**/*.d.ts

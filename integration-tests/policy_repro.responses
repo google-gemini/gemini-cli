@@ -1,0 +1,2 @@
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"functionCall":{"name":"run_shell_command","args":{"command":"echo policy-test-passed"}}}]},"finishReason":"STOP","index":0}]}]}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"I was unable to run the command because it was blocked by policy."}]},"finishReason":"STOP","index":0}]}]}
