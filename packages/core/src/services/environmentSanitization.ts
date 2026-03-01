@@ -71,6 +71,10 @@ export const ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES: ReadonlySet<string> =
     'TMPDIR',
     'USER',
     'LOGNAME',
+    // Terminal capability variables (needed by editors like vim/emacs and
+    // interactive commands like top)
+    'TERM',
+    'COLORTERM',
     // GitHub Action-related variables
     'ADDITIONAL_CONTEXT',
     'AVAILABLE_LABELS',
