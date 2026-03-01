@@ -11,25 +11,28 @@ import type { LoadingPhrasesMode } from '../../config/settings.js';
 
 export const PHRASE_CHANGE_INTERVAL_MS = 15000;
 export const INTERACTIVE_SHELL_WAITING_PHRASE =
-  'Interactive shell awaiting input... press tab to focus shell';
+  '! Shell awaiting input (Tab to focus)';
 
 /**
  * Custom hook to manage cycling through loading phrases.
  * @param isActive Whether the phrase cycling should be active.
  * @param isWaiting Whether to show a specific waiting phrase.
  * @param shouldShowFocusHint Whether to show the shell focus hint.
- * @param loadingPhrasesMode Which phrases to show: tips, witty, all, or off.
+ * @param loadingPhraseLayout Which phrases to show and where.
  * @param customPhrases Optional list of custom phrases to use instead of built-in witty phrases.
- * @returns The current loading phrase.
+ * @param maxLength Optional maximum length for the selected phrase.
+ * @returns The current tip and witty phrase.
  */
 export const usePhraseCycler = (
   isActive: boolean,
   isWaiting: boolean,
   shouldShowFocusHint: boolean,
-  loadingPhrasesMode: LoadingPhrasesMode = 'tips',
+  loadingPhraseLayout: LoadingPhrasesMode = 'all_inline',
   customPhrases?: string[],
+  maxLength?: number,
 ) => {
-  const [currentLoadingPhrase, setCurrentLoadingPhrase] = useState<
+  const [currentTip, setCurrentTip] = useState<string | undefined>(undefined);
+  const [currentWittyPhrase, setCurrentWittyPhrase] = useState<
     string | undefined
   >(undefined);
 
@@ -44,17 +47,20 @@ export const usePhraseCycler = (
     }
 
     if (shouldShowFocusHint) {
-      setCurrentLoadingPhrase(INTERACTIVE_SHELL_WAITING_PHRASE);
+      setCurrentTip(INTERACTIVE_SHELL_WAITING_PHRASE);
+      setCurrentWittyPhrase(undefined);
       return;
     }
 
     if (isWaiting) {
-      setCurrentLoadingPhrase('Waiting for user confirmation...');
+      setCurrentTip('Waiting for user confirmation...');
+      setCurrentWittyPhrase(undefined);
       return;
     }
 
-    if (!isActive || loadingPhrasesMode === 'off') {
-      setCurrentLoadingPhrase(undefined);
+    if (!isActive || loadingPhraseLayout === 'none') {
+      setCurrentTip(undefined);
+      setCurrentWittyPhrase(undefined);
       return;
     }
 
@@ -64,32 +70,54 @@ export const usePhraseCycler = (
         : WITTY_LOADING_PHRASES;
 
     const setRandomPhrase = () => {
-      let phraseList: readonly string[];
+      let currentMode: 'tips' | 'witty' | 'all' = 'all';
 
-      switch (loadingPhrasesMode) {
-        case 'tips':
-          phraseList = INFORMATIVE_TIPS;
-          break;
-        case 'witty':
-          phraseList = wittyPhrases;
-          break;
-        case 'all':
-          // Show a tip on the first request after startup, then continue with 1/6 chance
-          if (!hasShownFirstRequestTipRef.current) {
-            phraseList = INFORMATIVE_TIPS;
-            hasShownFirstRequestTipRef.current = true;
-          } else {
-            const showTip = Math.random() < 1 / 6;
-            phraseList = showTip ? INFORMATIVE_TIPS : wittyPhrases;
-          }
-          break;
-        default:
-          phraseList = INFORMATIVE_TIPS;
-          break;
+      if (loadingPhraseLayout === 'tips') {
+        currentMode = 'tips';
+      } else if (
+        loadingPhraseLayout === 'wit_status' ||
+        loadingPhraseLayout === 'wit_inline' ||
+        loadingPhraseLayout === 'wit_ambient'
+      ) {
+        currentMode = 'witty';
       }
 
-      const randomIndex = Math.floor(Math.random() * phraseList.length);
-      setCurrentLoadingPhrase(phraseList[randomIndex]);
+      // In 'all' modes, we decide once per phrase cycle what to show
+      if (
+        loadingPhraseLayout === 'all_inline' ||
+        loadingPhraseLayout === 'all_ambient'
+      ) {
+        if (!hasShownFirstRequestTipRef.current) {
+          currentMode = 'tips';
+          hasShownFirstRequestTipRef.current = true;
+        } else {
+          currentMode = Math.random() < 1 / 2 ? 'tips' : 'witty';
+        }
+      }
+
+      const phraseList =
+        currentMode === 'witty' ? wittyPhrases : INFORMATIVE_TIPS;
+
+      const filteredList =
+        maxLength !== undefined
+          ? phraseList.filter((p) => p.length <= maxLength)
+          : phraseList;
+
+      if (filteredList.length > 0) {
+        const randomIndex = Math.floor(Math.random() * filteredList.length);
+        const selected = filteredList[randomIndex];
+        if (currentMode === 'witty') {
+          setCurrentWittyPhrase(selected);
+          setCurrentTip(undefined);
+        } else {
+          setCurrentTip(selected);
+          setCurrentWittyPhrase(undefined);
+        }
+      } else {
+        // If no phrases fit, try to fallback
+        setCurrentTip(undefined);
+        setCurrentWittyPhrase(undefined);
+      }
     };
 
     // Select an initial random phrase
@@ -110,9 +138,10 @@ export const usePhraseCycler = (
     isActive,
     isWaiting,
     shouldShowFocusHint,
-    loadingPhrasesMode,
+    loadingPhraseLayout,
     customPhrases,
+    maxLength,
   ]);
 
-  return currentLoadingPhrase;
+  return { currentTip, currentWittyPhrase };
 };

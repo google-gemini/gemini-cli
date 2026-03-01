@@ -18,22 +18,28 @@ import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
 
 interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
+  wittyPhrase?: string;
+  wittyPosition?: 'status' | 'inline' | 'ambient';
   elapsedTime: number;
   inline?: boolean;
   rightContent?: React.ReactNode;
   thought?: ThoughtSummary | null;
   thoughtLabel?: string;
   showCancelAndTimer?: boolean;
+  forceRealStatusOnly?: boolean;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   currentLoadingPhrase,
+  wittyPhrase,
+  wittyPosition = 'inline',
   elapsedTime,
   inline = false,
   rightContent,
   thought,
   thoughtLabel,
   showCancelAndTimer = true,
+  forceRealStatusOnly = false,
 }) => {
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
@@ -54,17 +60,30 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       ? currentLoadingPhrase
       : thought?.subject
         ? (thoughtLabel ?? thought.subject)
-        : currentLoadingPhrase;
-  const hasThoughtIndicator =
-    currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
-    Boolean(thought?.subject?.trim());
-  const thinkingIndicator = hasThoughtIndicator ? '💬 ' : '';
+        : forceRealStatusOnly
+          ? wittyPosition === 'status' && wittyPhrase
+            ? wittyPhrase
+            : streamingState === StreamingState.Responding
+              ? 'Waiting for model...'
+              : undefined
+          : currentLoadingPhrase;
+  const thinkingIndicator = '';
 
   const cancelAndTimerContent =
     showCancelAndTimer &&
     streamingState !== StreamingState.WaitingForConfirmation
-      ? `(esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)})`
+      ? `esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)}`
       : null;
+
+  const wittyPhraseNode =
+    forceRealStatusOnly &&
+    wittyPosition === 'inline' &&
+    wittyPhrase &&
+    primaryText ? (
+      <Box marginLeft={1}>
+        <Text color={theme.text.secondary}>{wittyPhrase}</Text>
+      </Box>
+    ) : null;
 
   if (inline) {
     return (
@@ -79,11 +98,16 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
           />
         </Box>
         {primaryText && (
-          <Text color={theme.text.primary} italic wrap="truncate-end">
+          <Text
+            color={theme.text.primary}
+            italic
+            wrap={isNarrow ? 'wrap' : 'truncate-end'}
+          >
             {thinkingIndicator}
             {primaryText}
           </Text>
         )}
+        {wittyPhraseNode}
         {cancelAndTimerContent && (
           <>
             <Box flexShrink={0} width={1} />
@@ -113,11 +137,16 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
             />
           </Box>
           {primaryText && (
-            <Text color={theme.text.primary} italic wrap="truncate-end">
+            <Text
+              color={theme.text.primary}
+              italic
+              wrap={isNarrow ? 'wrap' : 'truncate-end'}
+            >
               {thinkingIndicator}
               {primaryText}
             </Text>
           )}
+          {wittyPhraseNode}
           {!isNarrow && cancelAndTimerContent && (
             <>
               <Box flexShrink={0} width={1} />

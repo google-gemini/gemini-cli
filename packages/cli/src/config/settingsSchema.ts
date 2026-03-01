@@ -619,6 +619,39 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the footer from the UI',
         showInDialog: true,
       },
+      newFooterLayout: {
+        type: 'enum',
+        label: 'New Footer Layout',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'legacy',
+        description: 'Use the new 2-row layout with inline tips.',
+        showInDialog: true,
+        options: [
+          { value: 'legacy', label: 'Legacy' },
+          { value: 'new', label: 'New Layout' },
+          { value: 'new_divider_down', label: 'New Layout (Divider Down)' },
+        ],
+      },
+      loadingPhraseLayout: {
+        type: 'enum',
+        label: 'Loading Phrase Layout',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'all_inline',
+        description:
+          'Control which loading phrases are shown and where they appear.',
+        showInDialog: true,
+        options: [
+          { value: 'none', label: 'None' },
+          { value: 'tips', label: 'Tips Only (at right)' },
+          { value: 'wit_status', label: 'Wit Only (in status slot)' },
+          { value: 'wit_inline', label: 'Wit Only (after status)' },
+          { value: 'wit_ambient', label: 'Wit Only (at right)' },
+          { value: 'all_inline', label: 'Tips at right, Wit inline' },
+          { value: 'all_ambient', label: 'Tips and Wit at right' },
+        ],
+      },
       showMemoryUsage: {
         type: 'boolean',
         label: 'Show Memory Usage',
@@ -702,22 +735,6 @@ const SETTINGS_SCHEMA = {
         default: true,
         description: 'Show the spinner during operations.',
         showInDialog: true,
-      },
-      loadingPhrases: {
-        type: 'enum',
-        label: 'Loading Phrases',
-        category: 'UI',
-        requiresRestart: false,
-        default: 'tips',
-        description:
-          'What to show while the model is working: tips, witty comments, both, or nothing.',
-        showInDialog: true,
-        options: [
-          { value: 'tips', label: 'Tips' },
-          { value: 'witty', label: 'Witty' },
-          { value: 'all', label: 'All' },
-          { value: 'off', label: 'Off' },
-        ],
       },
       errorVerbosity: {
         type: 'enum',

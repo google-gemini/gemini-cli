@@ -20,18 +20,20 @@ export interface UseLoadingIndicatorProps {
   streamingState: StreamingState;
   shouldShowFocusHint: boolean;
   retryStatus: RetryAttemptPayload | null;
-  loadingPhrasesMode?: LoadingPhrasesMode;
+  loadingPhraseLayout?: LoadingPhrasesMode;
   customWittyPhrases?: string[];
   errorVerbosity?: 'low' | 'full';
+  maxLength?: number;
 }
 
 export const useLoadingIndicator = ({
   streamingState,
   shouldShowFocusHint,
   retryStatus,
-  loadingPhrasesMode,
+  loadingPhraseLayout,
   customWittyPhrases,
   errorVerbosity = 'full',
+  maxLength,
 }: UseLoadingIndicatorProps) => {
   const [timerResetKey, setTimerResetKey] = useState(0);
   const isTimerActive = streamingState === StreamingState.Responding;
@@ -40,12 +42,13 @@ export const useLoadingIndicator = ({
 
   const isPhraseCyclingActive = streamingState === StreamingState.Responding;
   const isWaiting = streamingState === StreamingState.WaitingForConfirmation;
-  const currentLoadingPhrase = usePhraseCycler(
+  const { currentTip, currentWittyPhrase } = usePhraseCycler(
     isPhraseCyclingActive,
     isWaiting,
     shouldShowFocusHint,
-    loadingPhrasesMode,
+    loadingPhraseLayout,
     customWittyPhrases,
+    maxLength,
   );
 
   const [retainedElapsedTime, setRetainedElapsedTime] = useState(0);
@@ -86,6 +89,8 @@ export const useLoadingIndicator = ({
       streamingState === StreamingState.WaitingForConfirmation
         ? retainedElapsedTime
         : elapsedTimeFromTimer,
-    currentLoadingPhrase: retryPhrase || currentLoadingPhrase,
+    currentLoadingPhrase: retryPhrase || currentTip || currentWittyPhrase,
+    currentTip,
+    currentWittyPhrase,
   };
 };

@@ -123,7 +123,7 @@ export const FocusHint: React.FC<{
 
   return (
     <Box marginLeft={1} flexShrink={0}>
-      <Text color={theme.text.accent}>
+      <Text color={theme.status.warning}>
         {isThisShellFocused
           ? `(${formatCommand(Command.UNFOCUS_SHELL_INPUT)} to unfocus)`
           : `(${formatCommand(Command.FOCUS_SHELL_INPUT)} to focus)`}

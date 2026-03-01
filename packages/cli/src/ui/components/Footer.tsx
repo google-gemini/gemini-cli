@@ -83,6 +83,8 @@ export const Footer: React.FC = () => {
       flexDirection="row"
       alignItems="center"
       paddingX={1}
+      paddingBottom={0}
+      marginBottom={0}
     >
       {(showDebugProfiler || displayVimMode || !hideCWD) && (
         <Box>
