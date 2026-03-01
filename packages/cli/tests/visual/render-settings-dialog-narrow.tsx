@@ -1,17 +1,15 @@
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { render } from 'ink';
 import { SettingsDialog } from '../../src/ui/components/SettingsDialog';
 import { VimModeProvider } from '../../src/ui/contexts/VimModeContext';
 import { KeypressProvider } from '../../src/ui/contexts/KeypressContext';
 import { UIStateContext } from '../../src/ui/contexts/UIStateContext';
 
-// Slightly different data for the narrow view to ensure it's a unique snapshot
 const mockData = {
   general: { vimMode: false, disableAutoUpdate: true },
   ui: { showMemoryUsage: false, theme: 'dark' }
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const robustMockSettings = {
   merged: mockData,
   forScope: (scope: string) => ({
@@ -25,11 +23,11 @@ const robustMockSettings = {
 } as any;
 
 const mockUIState = {
-  searchBuffer: 'narrow-test',
+  searchBuffer: 'narrow-test-active',
   setSearchBuffer: () => {},
-  isSearching: true,
+  isSearching: true, // Forces the Search Bar to appear
   setIsSearching: () => {},
-  activeTab: 'general',
+  activeTab: 'ui',   // Switches to the UI tab instead of General
   setActiveTab: () => {},
 };
 
@@ -43,10 +41,7 @@ const FixtureWrapper = () => {
     <UIStateContext.Provider value={mockUIState as any}>
       <VimModeProvider settings={robustMockSettings}>
         <KeypressProvider kittyProtocolEnabled={false}>
-          <SettingsDialog
-            settings={robustMockSettings}
-            onSelect={() => {}}
-          />
+          <SettingsDialog settings={robustMockSettings} onSelect={() => {}} />
         </KeypressProvider>
       </VimModeProvider>
     </UIStateContext.Provider>

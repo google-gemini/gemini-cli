@@ -3,12 +3,13 @@ import { createSnapshotFromPty, getCIOptimizedConfig } from 'ink-visual-testing'
 import path from 'node:path';
 
 describe('SettingsDialog Visual Regression', () => {
-  const renderScript = path.resolve(__dirname, 'render-settings-dialog.tsx');
+  const standardScript = path.resolve(__dirname, 'render-settings-dialog.tsx');
+  const narrowScript = path.resolve(__dirname, 'render-settings-dialog-narrow.tsx');
 
   it('renders standard layout (80x24)', async () => {
     await createSnapshotFromPty({
       command: 'npx',
-      args: ['tsx', renderScript],
+      args: ['tsx', standardScript],
       outputPath: 'tests/__baselines__/settings-standard.png',
       ...getCIOptimizedConfig({
         baseFont: 'bundled',
@@ -23,7 +24,7 @@ describe('SettingsDialog Visual Regression', () => {
   it('renders wide layout (120x40)', async () => {
     await createSnapshotFromPty({
       command: 'npx',
-      args: ['tsx', renderScript],
+      args: ['tsx', standardScript],
       outputPath: 'tests/__baselines__/settings-wide.png',
       ...getCIOptimizedConfig({
         baseFont: 'bundled',
@@ -38,8 +39,8 @@ describe('SettingsDialog Visual Regression', () => {
   it('renders narrow layout (60x20)', async () => {
     await createSnapshotFromPty({
       command: 'npx',
-      args: ['tsx', path.resolve(__dirname, 'render-settings-dialog-narrow.tsx')],
-      outputPath: 'tests/__baselines__/render-settings-dialog-narrow.png',
+      args: ['tsx', narrowScript],
+      outputPath: 'tests/__baselines__/settings-narrow.png',
       ...getCIOptimizedConfig({
         baseFont: 'bundled',
         emojiFontKey: 'system'

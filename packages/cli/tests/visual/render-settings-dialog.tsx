@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { render } from 'ink';
 import { SettingsDialog } from '../../src/ui/components/SettingsDialog';
 import { VimModeProvider } from '../../src/ui/contexts/VimModeContext';
@@ -10,7 +10,6 @@ const mockData = {
   ui: { showMemoryUsage: true, theme: 'system' }
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const robustMockSettings = {
   merged: mockData,
   forScope: (scope: string) => ({
@@ -42,10 +41,7 @@ const FixtureWrapper = () => {
     <UIStateContext.Provider value={mockUIState as any}>
       <VimModeProvider settings={robustMockSettings}>
         <KeypressProvider kittyProtocolEnabled={false}>
-          <SettingsDialog
-            settings={robustMockSettings}
-            onSelect={() => {}}
-          />
+          <SettingsDialog settings={robustMockSettings} onSelect={() => {}} />
         </KeypressProvider>
       </VimModeProvider>
     </UIStateContext.Provider>
