@@ -381,6 +381,61 @@ describe('<Footer />', () => {
       unmount();
     });
 
+    it('shows the context percentage even when hideModelInfo is true', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: { sessionStats: mockSessionStats },
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                hideModelInfo: true,
+                hideContextPercentage: false,
+              },
+            },
+          }),
+        },
+      );
+      await waitUntilReady();
+
+      expect(lastFrame()).not.toContain(defaultProps.model);
+      expect(lastFrame()).toMatch(/\d+% context left/);
+      unmount();
+    });
+
+    it('shows quota stats even when hideModelInfo is true', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            quota: {
+              userTier: undefined,
+              stats: { remaining: 15, limit: 100, resetTime: undefined },
+              proQuotaRequest: null,
+              validationRequest: null,
+              overageMenuRequest: null,
+              emptyWalletRequest: null,
+            },
+          },
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                hideModelInfo: true,
+              },
+            },
+          }),
+        },
+      );
+      await waitUntilReady();
+
+      expect(lastFrame()).not.toContain(defaultProps.model);
+      expect(lastFrame()).toContain('15%');
+      unmount();
+    });
+
     it('renders footer with all optional sections hidden (minimal footer)', async () => {
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <Footer />,

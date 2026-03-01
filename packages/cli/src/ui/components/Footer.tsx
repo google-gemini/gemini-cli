@@ -71,7 +71,10 @@ export const Footer: React.FC = () => {
   const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
   const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
 
-  const justifyContent = hideCWD && hideModelInfo ? 'center' : 'space-between';
+  const justifyContent =
+    hideCWD && hideModelInfo && hideContextPercentage
+      ? 'center'
+      : 'space-between';
   const displayVimMode = vimEnabled ? vimMode : undefined;
 
   const showDebugProfiler = debugMode || isDevelopment;
@@ -140,15 +143,25 @@ export const Footer: React.FC = () => {
       )}
 
       {/* Right Section: Gemini Label and Console Summary */}
-      {!hideModelInfo && (
+      {(!hideModelInfo ||
+        !hideContextPercentage ||
+        !!quotaStats ||
+        showMemoryUsage ||
+        corgiMode ||
+        showErrorSummary) && (
         <Box alignItems="center" justifyContent="flex-end">
           <Box alignItems="center">
             <Text color={theme.text.primary}>
-              <Text color={theme.text.secondary}>/model </Text>
-              {getDisplayString(model)}
+              {!hideModelInfo && (
+                <>
+                  <Text color={theme.text.secondary}>/model </Text>
+                  {getDisplayString(model)}
+                </>
+              )}
               {!hideContextPercentage && (
                 <>
-                  {' '}
+                  {/* Adds a space between Model Info and Context if BOTH are shown */}
+                  {!hideModelInfo && ' '}
                   <ContextUsageDisplay
                     promptTokenCount={promptTokenCount}
                     model={model}
@@ -158,7 +171,8 @@ export const Footer: React.FC = () => {
               )}
               {quotaStats && (
                 <>
-                  {' '}
+                  {/* Adds a space if either of the previous items are shown */}
+                  {(!hideModelInfo || !hideContextPercentage) && ' '}
                   <QuotaDisplay
                     remaining={quotaStats.remaining}
                     limit={quotaStats.limit}
