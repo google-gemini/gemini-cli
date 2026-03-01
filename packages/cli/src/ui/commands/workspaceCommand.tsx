@@ -77,9 +77,9 @@ async function finishAddingDirectories(
   }
 }
 
-export const directoryCommand: SlashCommand = {
-  name: 'directory',
-  altNames: ['dir'],
+export const workspaceCommand: SlashCommand = {
+  name: 'workspace',
+  altNames: ['directory', 'dir'],
   description: 'Manage workspace directories',
   kind: CommandKind.BUILT_IN,
   subCommands: [
@@ -156,7 +156,7 @@ export const directoryCommand: SlashCommand = {
             type: 'message' as const,
             messageType: 'error' as const,
             content:
-              'The /directory add command is not supported in restrictive sandbox profiles. Please use --include-directories when starting the session instead.',
+              'The /workspace add command is not supported in restrictive sandbox profiles. Please use --include-directories when starting the session instead.',
           };
         }
 
