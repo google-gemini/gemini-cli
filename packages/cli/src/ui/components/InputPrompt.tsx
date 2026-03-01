@@ -7,7 +7,7 @@
 import type React from 'react';
 import clipboardy from 'clipboardy';
 import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import { Box, Text, useStdout, type DOMElement } from 'ink';
+import { Box, Text, useStdout, type DOMElement, getBoundingBox } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
@@ -226,6 +226,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     shortcutsHelpVisible,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
+  const [isPromptMouseFocused, setIsPromptMouseFocused] = useState(false);
   const { handlePress: registerPlainTabPress, resetCount: resetPlainTabPress } =
     useRepeatedKeyPress({
       windowMs: DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS,
@@ -608,12 +609,37 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         handleClipboardPaste();
       }
 
-      // Scroll input viewport on trackpad/mouse wheel without moving cursor
-      // guard with focus so only the active input box scrolls
+      if (event.name === 'left-press' && innerBoxRef.current) {
+        const { x, y, width, height } = getBoundingBox(innerBoxRef.current);
+        const mouseX = event.col - 1;
+        const mouseY = event.row - 1;
+        const relativeX = mouseX - x;
+        const relativeY = mouseY - y;
+
+        const isInside =
+          relativeX >= 0 &&
+          relativeX < width &&
+          relativeY >= 0 &&
+          relativeY < height;
+
+        setIsPromptMouseFocused(isInside);
+      }
+
       if (
         focus &&
-        (event.name === 'scroll-up' || event.name === 'scroll-down')
+        (event.name === 'scroll-up' || event.name === 'scroll-down') &&
+        innerBoxRef.current
       ) {
+        // Obey user's "tapped" logic: only scroll if the prompt was tapped (focused via click)
+        if (!isPromptMouseFocused) {
+          return;
+        }
+
+        // If there's no actual content to scroll inside the prompt, we can skip handling entirely.
+        const viewportRows = buffer.viewportVisualLines.length;
+        const totalRows = buffer.allVisualLines.length;
+        if (totalRows <= viewportRows) return;
+
         enqueueWheelSteps(event.name === 'scroll-down' ? 1 : -1);
       }
     },
@@ -1559,184 +1585,187 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             )}{' '}
           </Text>
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
-            {buffer.text.length === 0 && placeholder ? (
-              showCursor ? (
-                <Text
-                  terminalCursorFocus={showCursor}
-                  terminalCursorPosition={0}
-                >
-                  {chalk.inverse(placeholder.slice(0, 1))}
-                  <Text color={theme.text.secondary}>
-                    {placeholder.slice(1)}
+            <Box flexDirection="column">
+              {buffer.text.length === 0 && placeholder ? (
+                showCursor ? (
+                  <Text
+                    terminalCursorFocus={showCursor}
+                    terminalCursorPosition={0}
+                  >
+                    {chalk.inverse(placeholder.slice(0, 1))}
+                    <Text color={theme.text.secondary}>
+                      {placeholder.slice(1)}
+                    </Text>
                   </Text>
-                </Text>
+                ) : (
+                  <Text color={theme.text.secondary}>{placeholder}</Text>
+                )
               ) : (
-                <Text color={theme.text.secondary}>{placeholder}</Text>
-              )
-            ) : (
-              linesToRender
-                .map((lineText: string, visualIdxInRenderedSet: number) => {
-                  const absoluteVisualIdx =
-                    scrollVisualRow + visualIdxInRenderedSet;
-                  const mapEntry = buffer.visualToLogicalMap[absoluteVisualIdx];
-                  if (!mapEntry) return null;
+                linesToRender
+                  .map((lineText: string, visualIdxInRenderedSet: number) => {
+                    const absoluteVisualIdx =
+                      scrollVisualRow + visualIdxInRenderedSet;
+                    const mapEntry =
+                      buffer.visualToLogicalMap[absoluteVisualIdx];
+                    if (!mapEntry) return null;
 
-                  const cursorVisualRow =
-                    cursorVisualRowAbsolute - scrollVisualRow;
-                  const isOnCursorLine =
-                    focus && visualIdxInRenderedSet === cursorVisualRow;
+                    const cursorVisualRow =
+                      cursorVisualRowAbsolute - scrollVisualRow;
+                    const isOnCursorLine =
+                      focus && visualIdxInRenderedSet === cursorVisualRow;
 
-                  const renderedLine: React.ReactNode[] = [];
+                    const renderedLine: React.ReactNode[] = [];
 
-                  const [logicalLineIdx] = mapEntry;
-                  const logicalLine = buffer.lines[logicalLineIdx] || '';
-                  const transformations =
-                    buffer.transformationsByLine[logicalLineIdx] ?? [];
-                  const tokens = parseInputForHighlighting(
-                    logicalLine,
-                    logicalLineIdx,
-                    transformations,
-                    ...(focus && buffer.cursor[0] === logicalLineIdx
-                      ? [buffer.cursor[1]]
-                      : []),
-                  );
-                  const startColInTransformed =
-                    buffer.visualToTransformedMap[absoluteVisualIdx] ?? 0;
-                  const visualStartCol = startColInTransformed;
-                  const visualEndCol = visualStartCol + cpLen(lineText);
-                  const segments = parseSegmentsFromTokens(
-                    tokens,
-                    visualStartCol,
-                    visualEndCol,
-                  );
-                  let charCount = 0;
-                  segments.forEach((seg, segIdx) => {
-                    const segLen = cpLen(seg.text);
-                    let display = seg.text;
+                    const [logicalLineIdx] = mapEntry;
+                    const logicalLine = buffer.lines[logicalLineIdx] || '';
+                    const transformations =
+                      buffer.transformationsByLine[logicalLineIdx] ?? [];
+                    const tokens = parseInputForHighlighting(
+                      logicalLine,
+                      logicalLineIdx,
+                      transformations,
+                      ...(focus && buffer.cursor[0] === logicalLineIdx
+                        ? [buffer.cursor[1]]
+                        : []),
+                    );
+                    const startColInTransformed =
+                      buffer.visualToTransformedMap[absoluteVisualIdx] ?? 0;
+                    const visualStartCol = startColInTransformed;
+                    const visualEndCol = visualStartCol + cpLen(lineText);
+                    const segments = parseSegmentsFromTokens(
+                      tokens,
+                      visualStartCol,
+                      visualEndCol,
+                    );
+                    let charCount = 0;
+                    segments.forEach((seg, segIdx) => {
+                      const segLen = cpLen(seg.text);
+                      let display = seg.text;
 
-                    if (isOnCursorLine) {
-                      const relativeVisualColForHighlight =
-                        cursorVisualColAbsolute;
-                      const segStart = charCount;
-                      const segEnd = segStart + segLen;
-                      if (
-                        relativeVisualColForHighlight >= segStart &&
-                        relativeVisualColForHighlight < segEnd
-                      ) {
-                        const charToHighlight = cpSlice(
-                          display,
-                          relativeVisualColForHighlight - segStart,
-                          relativeVisualColForHighlight - segStart + 1,
-                        );
-                        const highlighted = showCursor
-                          ? chalk.inverse(charToHighlight)
-                          : charToHighlight;
-                        display =
-                          cpSlice(
+                      if (isOnCursorLine) {
+                        const relativeVisualColForHighlight =
+                          cursorVisualColAbsolute;
+                        const segStart = charCount;
+                        const segEnd = segStart + segLen;
+                        if (
+                          relativeVisualColForHighlight >= segStart &&
+                          relativeVisualColForHighlight < segEnd
+                        ) {
+                          const charToHighlight = cpSlice(
                             display,
-                            0,
                             relativeVisualColForHighlight - segStart,
-                          ) +
-                          highlighted +
-                          cpSlice(
-                            display,
                             relativeVisualColForHighlight - segStart + 1,
                           );
+                          const highlighted = showCursor
+                            ? chalk.inverse(charToHighlight)
+                            : charToHighlight;
+                          display =
+                            cpSlice(
+                              display,
+                              0,
+                              relativeVisualColForHighlight - segStart,
+                            ) +
+                            highlighted +
+                            cpSlice(
+                              display,
+                              relativeVisualColForHighlight - segStart + 1,
+                            );
+                        }
+                        charCount = segEnd;
+                      } else {
+                        // Advance the running counter even when not on cursor line
+                        charCount += segLen;
                       }
-                      charCount = segEnd;
-                    } else {
-                      // Advance the running counter even when not on cursor line
-                      charCount += segLen;
-                    }
 
-                    const color =
-                      seg.type === 'command' ||
-                      seg.type === 'file' ||
-                      seg.type === 'paste'
-                        ? theme.text.accent
-                        : theme.text.primary;
+                      const color =
+                        seg.type === 'command' ||
+                        seg.type === 'file' ||
+                        seg.type === 'paste'
+                          ? theme.text.accent
+                          : theme.text.primary;
 
-                    renderedLine.push(
-                      <Text key={`token-${segIdx}`} color={color}>
-                        {display}
-                      </Text>,
-                    );
-                  });
-
-                  const currentLineGhost = isOnCursorLine ? inlineGhost : '';
-                  if (
-                    isOnCursorLine &&
-                    cursorVisualColAbsolute === cpLen(lineText)
-                  ) {
-                    if (!currentLineGhost) {
                       renderedLine.push(
-                        <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
-                          {showCursor ? chalk.inverse(' ') : ' '}
+                        <Text key={`token-${segIdx}`} color={color}>
+                          {display}
                         </Text>,
                       );
+                    });
+
+                    const currentLineGhost = isOnCursorLine ? inlineGhost : '';
+                    if (
+                      isOnCursorLine &&
+                      cursorVisualColAbsolute === cpLen(lineText)
+                    ) {
+                      if (!currentLineGhost) {
+                        renderedLine.push(
+                          <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
+                            {showCursor ? chalk.inverse(' ') : ' '}
+                          </Text>,
+                        );
+                      }
                     }
-                  }
 
-                  const showCursorBeforeGhost =
-                    focus &&
-                    isOnCursorLine &&
-                    cursorVisualColAbsolute === cpLen(lineText) &&
-                    currentLineGhost;
+                    const showCursorBeforeGhost =
+                      focus &&
+                      isOnCursorLine &&
+                      cursorVisualColAbsolute === cpLen(lineText) &&
+                      currentLineGhost;
 
-                  const isThumbRow =
-                    showInputScrollbar &&
-                    visualIdxInRenderedSet >= scrollbarThumbTop &&
-                    visualIdxInRenderedSet <
-                      scrollbarThumbTop + scrollbarThumbSize;
-                  const scrollbarChar = isThumbRow ? '█' : '│';
-                  const scrollbarColor = isThumbRow
-                    ? theme.text.secondary
-                    : theme.ui.dark;
+                    const isThumbRow =
+                      showInputScrollbar &&
+                      visualIdxInRenderedSet >= scrollbarThumbTop &&
+                      visualIdxInRenderedSet <
+                        scrollbarThumbTop + scrollbarThumbSize;
+                    const scrollbarChar = isThumbRow ? '█' : '│';
+                    const scrollbarColor = isThumbRow
+                      ? theme.text.secondary
+                      : theme.ui.dark;
 
-                  return (
-                    <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
-                      <Box flexGrow={1}>
-                        <Text
-                          terminalCursorFocus={showCursor && isOnCursorLine}
-                          terminalCursorPosition={cpIndexToOffset(
-                            lineText,
-                            cursorVisualColAbsolute,
-                          )}
-                        >
-                          {renderedLine}
-                          {showCursorBeforeGhost &&
-                            (showCursor ? chalk.inverse(' ') : ' ')}
-                          {currentLineGhost && (
-                            <Text color={theme.text.secondary}>
-                              {currentLineGhost}
-                            </Text>
-                          )}
-                        </Text>
-                      </Box>
-                      {showInputScrollbar && (
-                        <Text color={scrollbarColor}>{scrollbarChar}</Text>
-                      )}
-                    </Box>
-                  );
-                })
-                .concat(
-                  additionalLines.map((ghostLine, index) => {
-                    const padding = Math.max(
-                      0,
-                      inputWidth - stringWidth(ghostLine),
-                    );
                     return (
-                      <Text
-                        key={`ghost-line-${index}`}
-                        color={theme.text.secondary}
-                      >
-                        {ghostLine}
-                        {' '.repeat(padding)}
-                      </Text>
+                      <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
+                        <Box flexGrow={1}>
+                          <Text
+                            terminalCursorFocus={showCursor && isOnCursorLine}
+                            terminalCursorPosition={cpIndexToOffset(
+                              lineText,
+                              cursorVisualColAbsolute,
+                            )}
+                          >
+                            {renderedLine}
+                            {showCursorBeforeGhost &&
+                              (showCursor ? chalk.inverse(' ') : ' ')}
+                            {currentLineGhost && (
+                              <Text color={theme.text.secondary}>
+                                {currentLineGhost}
+                              </Text>
+                            )}
+                          </Text>
+                        </Box>
+                        {showInputScrollbar && (
+                          <Text color={scrollbarColor}>{scrollbarChar}</Text>
+                        )}
+                      </Box>
                     );
-                  }),
-                )
-            )}
+                  })
+                  .concat(
+                    additionalLines.map((ghostLine, index) => {
+                      const padding = Math.max(
+                        0,
+                        inputWidth - stringWidth(ghostLine),
+                      );
+                      return (
+                        <Text
+                          key={`ghost-line-${index}`}
+                          color={theme.text.secondary}
+                        >
+                          {ghostLine}
+                          {' '.repeat(padding)}
+                        </Text>
+                      );
+                    }),
+                  )
+              )}
+            </Box>
           </Box>
         </Box>
       </HalfLinePaddedBox>
