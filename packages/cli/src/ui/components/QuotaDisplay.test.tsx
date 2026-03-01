@@ -5,10 +5,23 @@
  */
 
 import { render } from '../../test-utils/render.js';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { QuotaDisplay } from './QuotaDisplay.js';
 
 describe('QuotaDisplay', () => {
+  const MOCK_NOW = new Date('2026-02-27T10:00:00Z').getTime();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(MOCK_NOW);
+    vi.stubEnv('TZ', 'UTC');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
   it('should not render when remaining is undefined', async () => {
     const { lastFrame, waitUntilReady, unmount } = render(
       <QuotaDisplay remaining={undefined} limit={100} />,
@@ -36,7 +49,7 @@ describe('QuotaDisplay', () => {
     unmount();
   });
 
-  it('should not render when usage > 20%', async () => {
+  it('should not render when usage < 80%', async () => {
     const { lastFrame, waitUntilReady, unmount } = render(
       <QuotaDisplay remaining={85} limit={100} />,
     );
@@ -45,7 +58,7 @@ describe('QuotaDisplay', () => {
     unmount();
   });
 
-  it('should render yellow when usage < 20%', async () => {
+  it('should render warning when used >= 80%', async () => {
     const { lastFrame, waitUntilReady, unmount } = render(
       <QuotaDisplay remaining={15} limit={100} />,
     );
@@ -54,7 +67,7 @@ describe('QuotaDisplay', () => {
     unmount();
   });
 
-  it('should render red when usage < 5%', async () => {
+  it('should render critical when used >= 95%', async () => {
     const { lastFrame, waitUntilReady, unmount } = render(
       <QuotaDisplay remaining={4} limit={100} />,
     );

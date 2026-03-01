@@ -7,9 +7,9 @@
 import type React from 'react';
 import { Text } from 'ink';
 import {
-  getStatusColor,
-  QUOTA_THRESHOLD_HIGH,
-  QUOTA_THRESHOLD_MEDIUM,
+  getUsedStatusColor,
+  QUOTA_USED_WARNING_THRESHOLD,
+  QUOTA_USED_CRITICAL_THRESHOLD,
 } from '../utils/displayUtils.js';
 import { formatResetTime } from '../utils/formatters.js';
 
@@ -30,26 +30,24 @@ export const QuotaDisplay: React.FC<QuotaDisplayProps> = ({
     return null;
   }
 
-  const percentage = (remaining / limit) * 100;
+  const usedPercentage = 100 - (remaining / limit) * 100;
 
-  if (percentage > QUOTA_THRESHOLD_HIGH) {
+  if (usedPercentage < QUOTA_USED_WARNING_THRESHOLD) {
     return null;
   }
 
-  const color = getStatusColor(percentage, {
-    green: QUOTA_THRESHOLD_HIGH,
-    yellow: QUOTA_THRESHOLD_MEDIUM,
+  const color = getUsedStatusColor(usedPercentage, {
+    warning: QUOTA_USED_WARNING_THRESHOLD,
+    critical: QUOTA_USED_CRITICAL_THRESHOLD,
   });
 
-  const resetInfo =
-    !terse && resetTime ? `, ${formatResetTime(resetTime)}` : '';
-
   if (remaining === 0) {
+    const resetMsg = resetTime
+      ? `, resets in ${formatResetTime(resetTime, true)}`
+      : '';
     return (
       <Text color={color}>
-        {terse
-          ? 'Limit reached'
-          : `/stats Limit reached${resetInfo}${!terse && '. /auth to continue.'}`}
+        {terse ? 'Limit reached' : `Limit reached${resetMsg}`}
       </Text>
     );
   }
@@ -57,8 +55,10 @@ export const QuotaDisplay: React.FC<QuotaDisplayProps> = ({
   return (
     <Text color={color}>
       {terse
-        ? `${percentage.toFixed(0)}%`
-        : `/stats ${percentage.toFixed(0)}% usage remaining${resetInfo}`}
+        ? `${usedPercentage.toFixed(0)}%`
+        : `${usedPercentage.toFixed(0)}% used${
+            resetTime ? ` (resets in ${formatResetTime(resetTime, true)})` : ''
+          }`}
     </Text>
   );
 };

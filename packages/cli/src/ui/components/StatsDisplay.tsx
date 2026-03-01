@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useStdout } from 'ink';
 import { ThemedGradient } from './ThemedGradient.js';
 import { theme } from '../semantic-colors.js';
 import { formatDuration, formatResetTime } from '../utils/formatters.js';
@@ -19,6 +19,9 @@ import {
   USER_AGREEMENT_RATE_MEDIUM,
   CACHE_EFFICIENCY_HIGH,
   CACHE_EFFICIENCY_MEDIUM,
+  getUsedStatusColor,
+  QUOTA_USED_WARNING_THRESHOLD,
+  QUOTA_USED_CRITICAL_THRESHOLD,
 } from '../utils/displayUtils.js';
 import { computeSessionStats } from '../utils/computeStats.js';
 import {
@@ -155,6 +158,7 @@ const ModelUsageTable: React.FC<{
   useGemini3_1,
   useCustomToolModel,
 }) => {
+  const { stdout } = useStdout();
   const rows = buildModelRows(models, quotas, useGemini3_1, useCustomToolModel);
 
   if (rows.length === 0) {
@@ -163,12 +167,37 @@ const ModelUsageTable: React.FC<{
 
   const showQuotaColumn = !!quotas && rows.some((row) => !!row.bucket);
 
+  const terminalWidth = stdout?.columns ?? 100;
+
   const nameWidth = 25;
   const requestsWidth = 7;
   const uncachedWidth = 15;
   const cachedWidth = 14;
   const outputTokensWidth = 15;
-  const usageLimitWidth = showQuotaColumn ? 28 : 0;
+
+  const isNarrow = terminalWidth < 100;
+  const usageLimitWidth = showQuotaColumn
+    ? Math.max(30, terminalWidth - nameWidth - requestsWidth - 10)
+    : 0;
+
+  const renderProgressBar = (usedFraction: number, color: string) => {
+    const totalSteps = isNarrow ? 10 : 20;
+    let filledSteps = Math.round(usedFraction * totalSteps);
+
+    // If something is used (fraction > 0) but rounds to 0, show 1 tick.
+    // If < 100% (fraction < 1) but rounds to totalSteps, show totalSteps - 1 ticks.
+    if (usedFraction > 0 && usedFraction < 1) {
+      filledSteps = Math.min(Math.max(filledSteps, 1), totalSteps - 1);
+    }
+
+    const emptySteps = totalSteps - filledSteps;
+    return (
+      <Box flexDirection="row">
+        <Text color={color}>{'▇'.repeat(filledSteps)}</Text>
+        <Text color={theme.ui.comment}>{'▇'.repeat(emptySteps)}</Text>
+      </Box>
+    );
+  };
 
   const cacheEfficiencyColor = getStatusColor(cacheEfficiency, {
     green: CACHE_EFFICIENCY_HIGH,
@@ -183,19 +212,21 @@ const ModelUsageTable: React.FC<{
       : uncachedWidth + cachedWidth + outputTokensWidth);
 
   const isAuto = currentModel && isAutoModel(currentModel);
-  const modelUsageTitle = isAuto
-    ? `${getDisplayString(currentModel)} Usage`
-    : `Model Usage`;
+  const modelUsageTitle = isAuto ? (
+    <Text color={theme.text.primary} wrap="truncate-end">
+      <Text bold>Model Usage:</Text> {getDisplayString(currentModel)}
+    </Text>
+  ) : (
+    <Text bold color={theme.text.primary} wrap="truncate-end">
+      Model Usage
+    </Text>
+  );
 
   return (
     <Box flexDirection="column" marginBottom={1}>
       {/* Header */}
       <Box alignItems="flex-end">
-        <Box width={nameWidth}>
-          <Text bold color={theme.text.primary} wrap="truncate-end">
-            {modelUsageTitle}
-          </Text>
-        </Box>
+        <Box width={totalWidth}>{modelUsageTitle}</Box>
       </Box>
 
       {isAuto &&
@@ -270,10 +301,11 @@ const ModelUsageTable: React.FC<{
           <Box
             width={usageLimitWidth}
             flexDirection="column"
-            alignItems="flex-end"
+            alignItems="flex-start"
+            paddingLeft={4}
           >
             <Text bold color={theme.text.primary}>
-              Usage remaining
+              Model usage
             </Text>
           </Box>
         )}
@@ -355,16 +387,62 @@ const ModelUsageTable: React.FC<{
           <Box
             width={usageLimitWidth}
             flexDirection="column"
-            alignItems="flex-end"
+            alignItems="flex-start"
+            paddingLeft={4}
           >
-            {row.bucket &&
-              row.bucket.remainingFraction != null &&
-              row.bucket.resetTime && (
-                <Text color={theme.text.secondary} wrap="truncate-end">
-                  {(row.bucket.remainingFraction * 100).toFixed(1)}%{' '}
-                  {formatResetTime(row.bucket.resetTime)}
-                </Text>
-              )}
+            {row.bucket && row.bucket.remainingFraction != null && (
+              <Box flexDirection="row">
+                {(() => {
+                  const actualUsedFraction = 1 - row.bucket.remainingFraction;
+                  // If we have session activity but 0% server usage, show 0.1% as a hint.
+                  const effectiveUsedFraction =
+                    actualUsedFraction === 0 && row.isActive
+                      ? 0.001
+                      : actualUsedFraction;
+
+                  const usedPercentage = effectiveUsedFraction * 100;
+
+                  const statusColor =
+                    getUsedStatusColor(usedPercentage, {
+                      warning: QUOTA_USED_WARNING_THRESHOLD,
+                      critical: QUOTA_USED_CRITICAL_THRESHOLD,
+                    }) ??
+                    (row.isActive ? theme.text.primary : theme.ui.comment);
+
+                  const percentageText =
+                    usedPercentage > 0 && usedPercentage < 1
+                      ? `${usedPercentage.toFixed(1)}% used`
+                      : `${usedPercentage.toFixed(0)}% used`;
+
+                  return (
+                    <>
+                      {renderProgressBar(effectiveUsedFraction, statusColor)}
+                      <Box marginLeft={1}>
+                        <Text wrap="truncate-end">
+                          {row.bucket.remainingFraction === 0 ? (
+                            <Text color={theme.status.error}>
+                              Limit reached
+                              {row.bucket.resetTime &&
+                                `, resets in ${formatResetTime(row.bucket.resetTime, true)}`}
+                            </Text>
+                          ) : (
+                            <>
+                              <Text color={statusColor}>{percentageText}</Text>
+                              <Text color={theme.text.secondary}>
+                                {row.bucket.resetTime &&
+                                formatResetTime(row.bucket.resetTime, true)
+                                  ? ` (resets in ${formatResetTime(row.bucket.resetTime, true)})`
+                                  : ''}
+                              </Text>
+                            </>
+                          )}
+                        </Text>
+                      </Box>
+                    </>
+                  );
+                })()}
+              </Box>
+            )}
           </Box>
         </Box>
       ))}

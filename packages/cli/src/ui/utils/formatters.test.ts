@@ -10,6 +10,7 @@ import {
   formatBytes,
   formatTimeAgo,
   stripReferenceContent,
+  formatResetTime,
 } from './formatters.js';
 
 describe('formatters', () => {
@@ -119,6 +120,56 @@ describe('formatters', () => {
     it('should handle invalid timestamps', () => {
       const past = 'hello';
       expect(formatTimeAgo(past)).toBe('invalid date');
+    });
+  });
+
+  describe('formatResetTime', () => {
+    const NOW = new Date('2025-01-01T12:00:00Z');
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should return empty string for missing reset time', () => {
+      expect(formatResetTime(undefined)).toBe('');
+    });
+
+    it('should return empty string for invalid dates', () => {
+      expect(formatResetTime('invalid')).toBe('');
+    });
+
+    it('should return empty string for dates in the past', () => {
+      const past = new Date(NOW.getTime() - 1000).toISOString();
+      expect(formatResetTime(past)).toBe('');
+    });
+
+    it('should format minutes only when less than an hour', () => {
+      const future = new Date(NOW.getTime() + 15 * 60 * 1000).toISOString();
+      expect(formatResetTime(future)).toContain('15 minutes at');
+    });
+
+    it('should format hours and minutes', () => {
+      const future = new Date(
+        NOW.getTime() + 2 * 60 * 60 * 1000 + 30 * 60 * 1000,
+      ).toISOString();
+      expect(formatResetTime(future)).toContain('2 hours 30 minutes at');
+    });
+
+    it('should format terse version correctly', () => {
+      const future = new Date(
+        NOW.getTime() + 1 * 60 * 60 * 1000 + 5 * 60 * 1000,
+      ).toISOString();
+      expect(formatResetTime(future, true)).toBe('1hr 5m');
+    });
+
+    it('should format terse version with minutes only', () => {
+      const future = new Date(NOW.getTime() + 45 * 60 * 1000).toISOString();
+      expect(formatResetTime(future, true)).toBe('45m');
     });
   });
 

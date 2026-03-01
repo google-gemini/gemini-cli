@@ -6,7 +6,7 @@ exports[`<Footer /> > displays "Limit reached" message when remaining is 0 1`] =
 `;
 
 exports[`<Footer /> > displays the usage indicator when usage is low 1`] = `
-" ...directories/to/make/it/long                      no sandbox (see /docs)                       /model gemini-pro 15%
+" ...directories/to/make/it/long                      no sandbox (see /docs)                       /model gemini-pro 85%
 "
 `;
 
