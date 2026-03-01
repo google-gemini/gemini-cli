@@ -59,6 +59,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const isAlternateBuffer = useAlternateBuffer();
   const { showApprovalModeIndicator } = uiState;
   const newLayoutSetting = settings.merged.ui.newFooterLayout;
+  const wittyPosition = settings.merged.ui.wittyPhrasePosition;
   const isExperimentalLayout = newLayoutSetting !== 'legacy';
   const showUiDetails = uiState.cleanUiDetailsVisible;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
@@ -197,15 +198,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
   const ambientText = isInteractiveShellWaiting
     ? undefined
-    : uiState.currentLoadingPhrase;
-
-  // Wit often ends with an ellipsis or similar, tips usually don't.
-  const isAmbientTip =
-    ambientText &&
-    !ambientText.includes('…') &&
-    !ambientText.includes('...') &&
-    !ambientText.includes('feeling lucky');
-  const ambientPrefix = isAmbientTip ? 'Tip: ' : '';
+    : uiState.currentTip ||
+      (wittyPosition === 'ambient' ? uiState.currentWittyPhrase : undefined);
 
   let estimatedStatusLength = 0;
   if (
@@ -225,13 +219,16 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     estimatedStatusLength = hookLabel.length + hookNames.length + 10; // +10 for spinner and spacing
   } else if (showLoadingIndicator) {
     const thoughtText = uiState.thought?.subject || 'Waiting for model...';
-    estimatedStatusLength = thoughtText.length + 25; // Spinner(3) + timer(15) + padding
+    const inlineWittyLength =
+      wittyPosition === 'inline' && uiState.currentWittyPhrase
+        ? uiState.currentWittyPhrase.length + 1
+        : 0;
+    estimatedStatusLength = thoughtText.length + 25 + inlineWittyLength; // Spinner(3) + timer(15) + padding + witty
   } else if (hasPendingActionRequired) {
-    estimatedStatusLength = 35; // "⏸ Awaiting user approval..."
+    estimatedStatusLength = 25; // "↑ Awaiting approval"
   }
 
-  const estimatedAmbientLength =
-    ambientPrefix.length + (ambientText?.length || 0);
+  const estimatedAmbientLength = ambientText?.length || 0;
   const willCollideAmbient =
     estimatedStatusLength + estimatedAmbientLength + 5 > terminalWidth;
   const willCollideShortcuts = estimatedStatusLength + 45 > terminalWidth; // Assume worst-case shortcut hint is 45 chars
@@ -263,7 +260,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     return (
       <Box flexDirection="row" justifyContent="flex-end" marginLeft={1}>
         <Text color={theme.text.secondary} wrap="truncate-end">
-          {ambientPrefix}
           {ambientText}
         </Text>
       </Box>
@@ -322,13 +318,13 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           elapsedTime={uiState.elapsedTime}
           forceRealStatusOnly={isExperimentalLayout}
           showCancelAndTimer={!isExperimentalLayout}
+          wittyPhrase={uiState.currentWittyPhrase}
+          wittyPosition={wittyPosition}
         />
       );
     }
     if (hasPendingActionRequired) {
-      return (
-        <Text color={theme.status.warning}>⏸ Awaiting user approval...</Text>
-      );
+      return <Text color={theme.status.warning}>↑ Awaiting approval</Text>;
     }
     return null;
   };

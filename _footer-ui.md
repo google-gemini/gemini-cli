@@ -730,6 +730,18 @@ better discoverability of features:
   wit based on the available terminal width, ensuring that only phrases that fit
   without colliding with the system status are selected.
 
+### 4. Witty Phrase Positioning
+
+A new setting `ui.wittyPhrasePosition` allows controlling where entertainment
+phrases are displayed:
+
+- **`status`**: Replaces the status text when the model is thinking but hasn't
+  emitted a specific thought yet.
+- **`inline` (Default)**: Appends the witty phrase in gray immediately following
+  the real system status (e.g., `⠏ Searching... Loading wit.exe`).
+- **`ambient`**: Displays witty phrases on the far right, interspersed with
+  tips.
+
 ---
 
 ## 12. Testing Summary & Final Feedback
@@ -748,6 +760,7 @@ review against the updated specification.
 - **Toasts:** Claims 100% width, left-aligned, prominent warning color.
   Overrides ambient tips.
 - **Hooks:** Uses `↪` (Before) / `↩` (After) icons. Text is white and italic.
+- **Witty Phrases:** Default to `inline` position (gray text after status).
 - **Responsive:**
   - Tips/Wit disappear on narrow windows or if they collide with long statuses.
   - Status text wraps onto multiple lines only when the window is narrow.

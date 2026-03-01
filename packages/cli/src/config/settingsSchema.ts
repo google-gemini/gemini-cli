@@ -633,6 +633,20 @@ const SETTINGS_SCHEMA = {
           { value: 'new_divider_down', label: 'New Layout (Divider Down)' },
         ],
       },
+      wittyPhrasePosition: {
+        type: 'enum',
+        label: 'Witty Phrase Position',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'inline',
+        description: 'Where to show witty phrases while waiting.',
+        showInDialog: true,
+        options: [
+          { value: 'status', label: 'Status' },
+          { value: 'inline', label: 'Inline (after status)' },
+          { value: 'ambient', label: 'Ambient (at right)' },
+        ],
+      },
       showMemoryUsage: {
         type: 'boolean',
         label: 'Show Memory Usage',

@@ -30,14 +30,14 @@ const TestComponent = ({
   loadingPhrasesMode?: LoadingPhrasesMode;
   customPhrases?: string[];
 }) => {
-  const phrase = usePhraseCycler(
+  const { currentTip, currentWittyPhrase } = usePhraseCycler(
     isActive,
     isWaiting,
     isInteractiveShellWaiting,
     loadingPhrasesMode,
     customPhrases,
   );
-  return <Text>{phrase}</Text>;
+  return <Text>{currentTip || currentWittyPhrase}</Text>;
 };
 
 describe('usePhraseCycler', () => {
