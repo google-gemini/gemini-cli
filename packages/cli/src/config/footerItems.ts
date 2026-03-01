@@ -33,7 +33,7 @@ export const ALL_ITEMS = [
     description: 'Percentage of context window remaining',
   },
   {
-    id: 'usage-limit',
+    id: 'quota',
     header: '/stats',
     description: 'Remaining usage on daily limit (not shown when unavailable)',
   },
@@ -67,7 +67,7 @@ export const DEFAULT_ORDER = [
   'sandbox-status',
   'model-name',
   'context-remaining',
-  'usage-limit',
+  'quota',
   'memory-usage',
   'session-id',
   'code-changes',
@@ -82,7 +82,7 @@ export function deriveItemsFromLegacySettings(
     'git-branch',
     'sandbox-status',
     'model-name',
-    'usage-limit',
+    'quota',
   ];
   const items = [...defaults];
 
@@ -96,7 +96,7 @@ export function deriveItemsFromLegacySettings(
   if (settings.ui.footer.hideModelInfo) {
     remove(items, 'model-name');
     remove(items, 'context-remaining');
-    remove(items, 'usage-limit');
+    remove(items, 'quota');
   }
   if (
     !settings.ui.footer.hideContextPercentage &&

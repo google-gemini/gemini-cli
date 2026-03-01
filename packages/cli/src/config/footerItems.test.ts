@@ -19,7 +19,7 @@ describe('deriveItemsFromLegacySettings', () => {
       'git-branch',
       'sandbox-status',
       'model-name',
-      'usage-limit',
+      'quota',
     ]);
   });
 
@@ -39,14 +39,14 @@ describe('deriveItemsFromLegacySettings', () => {
     expect(items).not.toContain('sandbox-status');
   });
 
-  it('removes model-name, context-remaining, and usage-limit when hideModelInfo is true', () => {
+  it('removes model-name, context-remaining, and quota when hideModelInfo is true', () => {
     const settings = createMockSettings({
       ui: { footer: { hideModelInfo: true, hideContextPercentage: true } },
     }).merged;
     const items = deriveItemsFromLegacySettings(settings);
     expect(items).not.toContain('model-name');
     expect(items).not.toContain('context-remaining');
-    expect(items).not.toContain('usage-limit');
+    expect(items).not.toContain('quota');
   });
 
   it('includes context-remaining when hideContextPercentage is false', () => {

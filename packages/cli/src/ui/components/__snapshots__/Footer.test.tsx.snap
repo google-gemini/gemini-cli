@@ -8,7 +8,7 @@ exports[`<Footer /> > displays "Limit reached" message when remaining is 0 1`] =
 
 exports[`<Footer /> > displays the usage indicator when usage is low 1`] = `
 " workspace (/directory)                                        sandbox      /model       /stats
- ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   daily 15%
+ ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   15%
 "
 `;
 
@@ -40,6 +40,6 @@ exports[`<Footer /> > footer configuration filtering (golden snapshots) > render
 
 exports[`<Footer /> > hides the usage indicator when usage is not near limit 1`] = `
 " workspace (/directory)                                        sandbox      /model       /stats
- ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   daily 85%
+ ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   85%
 "
 `;

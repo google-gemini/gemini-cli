@@ -285,9 +285,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       'context-remaining': (
         <Text color={getColor('context-remaining', itemColor)}>85% left</Text>
       ),
-      'usage-limit': (
-        <Text color={getColor('usage-limit', itemColor)}>daily 97%</Text>
-      ),
+      quota: <Text color={getColor('quota', itemColor)}>97%</Text>,
       'memory-usage': (
         <Text color={getColor('memory-usage', itemColor)}>260 MB</Text>
       ),

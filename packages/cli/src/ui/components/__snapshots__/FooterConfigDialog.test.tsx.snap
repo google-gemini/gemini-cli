@@ -26,7 +26,7 @@ exports[`<FooterConfigDialog /> > renders correctly with default settings 1`] = 
 │  ┌────────────────────────────────────────────────────────────────────────────────────────────┐  │
 │  │ Preview:                                                                                   │  │
 │  │ workspace (/directory)   branch   sandbox   /model           /stats                        │  │
-│  │ ~/project/path           main     docker    gemini-2.5-pro   daily 97%                     │  │
+│  │ ~/project/path           main     docker    gemini-2.5-pro   97%                           │  │
 │  └────────────────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

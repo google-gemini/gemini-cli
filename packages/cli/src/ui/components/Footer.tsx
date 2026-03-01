@@ -17,10 +17,7 @@ import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
-import {
-  QUOTA_THRESHOLD_HIGH,
-  QUOTA_THRESHOLD_MEDIUM,
-} from '../utils/displayUtils.js';
+import { QuotaDisplay } from './QuotaDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -312,24 +309,22 @@ export const Footer: React.FC = () => {
         );
         break;
       }
-      case 'usage-limit': {
+      case 'quota': {
         if (quotaStats?.remaining !== undefined && quotaStats.limit) {
-          const percentage = (quotaStats.remaining / quotaStats.limit) * 100;
-          let color = itemColor;
-          if (percentage < QUOTA_THRESHOLD_MEDIUM) {
-            color = theme.status.error;
-          } else if (percentage < QUOTA_THRESHOLD_HIGH) {
-            color = theme.status.warning;
-          }
-          const text =
-            quotaStats.remaining === 0
-              ? 'limit reached'
-              : `daily ${percentage.toFixed(0)}%`;
           addCol(
             id,
             header,
-            () => <Text color={color}>{text}</Text>,
-            text.length,
+            () => (
+              <QuotaDisplay
+                remaining={quotaStats.remaining}
+                limit={quotaStats.limit}
+                resetTime={quotaStats.resetTime}
+                terse={true}
+                forceShow={true}
+                lowercase={true}
+              />
+            ),
+            10, // "daily 100%" is 10 chars, but terse is "100%" (4 chars)
           );
         }
         break;
@@ -375,18 +370,16 @@ export const Footer: React.FC = () => {
         for (const m of Object.values(uiState.sessionStats.metrics.models))
           total += m.tokens.total;
         if (total > 0) {
-          const formatted =
-            new Intl.NumberFormat('en-US', {
-              notation: 'compact',
-              maximumFractionDigits: 1,
-            })
-              .format(total)
-              .toLowerCase() + ' tokens';
+          const formatter = new Intl.NumberFormat('en-US', {
+            notation: 'compact',
+            maximumFractionDigits: 1,
+          });
+          const formatted = formatter.format(total).toLowerCase();
           addCol(
             id,
             header,
-            () => <Text color={itemColor}>{formatted}</Text>,
-            formatted.length,
+            () => <Text color={itemColor}>{formatted} tokens</Text>,
+            formatted.length + 7,
           );
         }
         break;
