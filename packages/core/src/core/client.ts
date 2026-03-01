@@ -186,7 +186,7 @@ export class GeminiClient {
     stopHookActive: boolean = false,
   ): Promise<DefaultHookOutput | undefined> {
     const hookState = this.hookStateMap.get(prompt_id);
-    // Fire on the outermost call (when activeCalls is 1) OR if it's a retry (stopHookActive)
+    // Only fire on the outermost call (when activeCalls is 1)
     if (!hookState || (hookState.activeCalls !== 1 && !stopHookActive)) {
       return undefined;
     }
