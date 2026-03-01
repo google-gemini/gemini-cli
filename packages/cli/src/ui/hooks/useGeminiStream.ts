@@ -38,6 +38,7 @@ import {
   generateSteeringAckMessage,
   GeminiCliOperation,
   getPlanModeExitMessage,
+  uiTelemetryService,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -1412,6 +1413,7 @@ export const useGeminiStream = (
             lastQueryRef.current = queryToSend;
             lastPromptIdRef.current = prompt_id!;
 
+            const promptStartTime = Date.now();
             try {
               const stream = geminiClient.sendMessageStream(
                 queryToSend,
@@ -1499,6 +1501,9 @@ export const useGeminiStream = (
                 maybeAddLowVerbosityFailureNote(userMessageTimestamp);
               }
             } finally {
+              uiTelemetryService.recordPromptDuration(
+                Date.now() - promptStartTime,
+              );
               if (activeQueryIdRef.current === queryId) {
                 setIsResponding(false);
               }

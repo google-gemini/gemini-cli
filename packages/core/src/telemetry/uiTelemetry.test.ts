@@ -117,6 +117,13 @@ describe('UiTelemetryService', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     });
     expect(service.getLastPromptTokenCount()).toBe(0);
   });
@@ -732,6 +739,77 @@ describe('UiTelemetryService', () => {
       const metrics = service.getMetrics();
       expect(metrics.files.totalLinesAdded).toBe(0);
       expect(metrics.files.totalLinesRemoved).toBe(0);
+    });
+  });
+
+  describe('recordPromptDuration', () => {
+    it('should update prompts metrics after a single call', () => {
+      service.recordPromptDuration(500);
+
+      const { prompts } = service.getMetrics();
+      expect(prompts.count).toBe(1);
+      expect(prompts.totalWallClockMs).toBe(500);
+      expect(prompts.minMs).toBe(500);
+      expect(prompts.maxMs).toBe(500);
+      expect(prompts.lastMs).toBe(500);
+    });
+
+    it('should accumulate totals and track min/max across multiple calls', () => {
+      service.recordPromptDuration(300);
+      service.recordPromptDuration(100);
+      service.recordPromptDuration(500);
+      service.recordPromptDuration(200);
+
+      const { prompts } = service.getMetrics();
+      expect(prompts.count).toBe(4);
+      expect(prompts.totalWallClockMs).toBe(1100);
+      expect(prompts.minMs).toBe(100);
+      expect(prompts.maxMs).toBe(500);
+      expect(prompts.lastMs).toBe(200);
+    });
+
+    it('should update lastMs to the most recent call each time', () => {
+      service.recordPromptDuration(400);
+      expect(service.getMetrics().prompts.lastMs).toBe(400);
+
+      service.recordPromptDuration(150);
+      expect(service.getMetrics().prompts.lastMs).toBe(150);
+
+      service.recordPromptDuration(800);
+      expect(service.getMetrics().prompts.lastMs).toBe(800);
+    });
+
+    it('should treat identical durations correctly', () => {
+      service.recordPromptDuration(250);
+      service.recordPromptDuration(250);
+
+      const { prompts } = service.getMetrics();
+      expect(prompts.count).toBe(2);
+      expect(prompts.totalWallClockMs).toBe(500);
+      expect(prompts.minMs).toBe(250);
+      expect(prompts.maxMs).toBe(250);
+    });
+
+    it('should emit an update event on each call', () => {
+      const spy = vi.fn();
+      service.on('update', spy);
+
+      service.recordPromptDuration(300);
+      service.recordPromptDuration(600);
+
+      expect(spy).toHaveBeenCalledTimes(2);
+    });
+
+    it('should include updated prompts in the emitted event payload', () => {
+      const spy = vi.fn();
+      service.on('update', spy);
+
+      service.recordPromptDuration(750);
+
+      const { metrics } = spy.mock.calls[0][0];
+      expect(metrics.prompts.count).toBe(1);
+      expect(metrics.prompts.totalWallClockMs).toBe(750);
+      expect(metrics.prompts.lastMs).toBe(750);
     });
   });
 });
