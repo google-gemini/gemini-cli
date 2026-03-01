@@ -18,7 +18,7 @@ export interface SemanticColors {
     primary: string;
     message: string;
     input: string;
-    selection: string;
+    focus: string;
     diff: {
       added: string;
       removed: string;
@@ -54,6 +54,7 @@ export const lightSemanticColors: SemanticColors = {
     primary: lightTheme.Background,
     message: lightTheme.MessageBackground!,
     input: lightTheme.InputBackground!,
+    focus: lightTheme.FocusBackground!,
     diff: {
       added: lightTheme.DiffAdded,
       removed: lightTheme.DiffRemoved,
@@ -67,7 +68,7 @@ export const lightSemanticColors: SemanticColors = {
     comment: lightTheme.Comment,
     symbol: lightTheme.Gray,
     dark: lightTheme.DarkGray,
-    focus: lightTheme.AccentBlue,
+    focus: lightTheme.AccentGreen,
     gradient: lightTheme.GradientColors,
   },
   status: {
@@ -89,6 +90,7 @@ export const darkSemanticColors: SemanticColors = {
     primary: darkTheme.Background,
     message: darkTheme.MessageBackground!,
     input: darkTheme.InputBackground!,
+    focus: darkTheme.FocusBackground!,
     diff: {
       added: darkTheme.DiffAdded,
       removed: darkTheme.DiffRemoved,
@@ -102,7 +104,7 @@ export const darkSemanticColors: SemanticColors = {
     comment: darkTheme.Comment,
     symbol: darkTheme.Gray,
     dark: darkTheme.DarkGray,
-    focus: darkTheme.AccentBlue,
+    focus: darkTheme.AccentGreen,
     gradient: darkTheme.GradientColors,
   },
   status: {

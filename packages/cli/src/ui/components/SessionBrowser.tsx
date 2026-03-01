@@ -486,7 +486,7 @@ const SessionItem = ({
   return (
     <Box
       flexDirection="row"
-      backgroundColor={isActive ? theme.background.selection : undefined}
+      backgroundColor={isActive ? theme.background.focus : undefined}
     >
       <Text color={textColor()} dimColor={isDisabled}>
         {prefix}

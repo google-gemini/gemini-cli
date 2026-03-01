@@ -185,7 +185,7 @@ export interface ColorsTheme {
   DarkGray: string;
   InputBackground?: string;
   MessageBackground?: string;
-  SelectionBackground?: string;
+  FocusBackground?: string;
   GradientColors?: string[];
 }
 
@@ -215,7 +215,7 @@ export const lightTheme: ColorsTheme = {
     '#97a0b0',
     DEFAULT_BACKGROUND_OPACITY,
   ),
-  SelectionBackground: interpolateColor(
+  FocusBackground: interpolateColor(
     '#FAFAFA',
     '#3CA84B',
     DEFAULT_SELECTION_OPACITY,
@@ -249,7 +249,7 @@ export const darkTheme: ColorsTheme = {
     '#6C7086',
     DEFAULT_BACKGROUND_OPACITY,
   ),
-  SelectionBackground: interpolateColor(
+  FocusBackground: interpolateColor(
     '#1E1E2E',
     '#A6E3A1',
     DEFAULT_SELECTION_OPACITY,
@@ -275,7 +275,7 @@ export const ansiTheme: ColorsTheme = {
   DarkGray: 'gray',
   InputBackground: 'black',
   MessageBackground: 'black',
-  SelectionBackground: 'black',
+  FocusBackground: 'black',
 };
 
 export class Theme {
@@ -327,8 +327,8 @@ export class Theme {
             this.colors.Gray,
             DEFAULT_INPUT_BACKGROUND_OPACITY,
           ),
-        selection:
-          this.colors.SelectionBackground ??
+        focus:
+          this.colors.FocusBackground ??
           interpolateColor(
             this.colors.Background,
             this.colors.AccentGreen,
@@ -347,7 +347,7 @@ export class Theme {
         comment: this.colors.Gray,
         symbol: this.colors.AccentCyan,
         dark: this.colors.DarkGray,
-        focus: this.colors.AccentBlue,
+        focus: this.colors.AccentGreen,
         gradient: this.colors.GradientColors,
       },
       status: {
@@ -456,7 +456,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       customTheme.text?.secondary ?? customTheme.Gray ?? '',
       DEFAULT_BACKGROUND_OPACITY,
     ),
-    SelectionBackground: interpolateColor(
+    FocusBackground: interpolateColor(
       customTheme.background?.primary ?? customTheme.Background ?? '',
       customTheme.status?.success ?? customTheme.AccentGreen ?? '#3CA84B', // Fallback to a default green if not found
       DEFAULT_SELECTION_OPACITY,
@@ -617,7 +617,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       primary: customTheme.background?.primary ?? colors.Background,
       message: colors.MessageBackground!,
       input: colors.InputBackground!,
-      selection: colors.SelectionBackground!,
+      focus: colors.FocusBackground!,
       diff: {
         added: customTheme.background?.diff?.added ?? colors.DiffAdded,
         removed: customTheme.background?.diff?.removed ?? colors.DiffRemoved,
@@ -631,7 +631,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       comment: customTheme.ui?.comment ?? colors.Comment,
       symbol: customTheme.ui?.symbol ?? colors.Gray,
       dark: colors.DarkGray,
-      focus: customTheme.ui?.focus ?? colors.AccentBlue,
+      focus: customTheme.ui?.focus ?? colors.AccentGreen,
       gradient: customTheme.ui?.gradient ?? colors.GradientColors,
     },
     status: {

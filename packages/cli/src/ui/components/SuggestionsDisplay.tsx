@@ -100,7 +100,7 @@ export function SuggestionsDisplay({
           <Box
             key={`${suggestion.value}-${originalIndex}`}
             flexDirection="row"
-            backgroundColor={isActive ? theme.background.selection : undefined}
+            backgroundColor={isActive ? theme.background.focus : undefined}
           >
             <Box
               {...(mode === 'slash'

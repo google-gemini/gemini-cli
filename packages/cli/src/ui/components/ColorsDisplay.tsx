@@ -42,7 +42,7 @@ const COLOR_DESCRIPTIONS: Record<string, string> = {
   'background.primary': 'Main terminal background color',
   'background.message': 'Subtle background for message blocks',
   'background.input': 'Background for the input prompt',
-  'background.selection': 'Background highlight for selected/focused items',
+  'background.focus': 'Background highlight for selected/focused items',
   'background.diff.added': 'Background for added lines in diffs',
   'background.diff.removed': 'Background for removed lines in diffs',
   'border.default': 'Standard border color',

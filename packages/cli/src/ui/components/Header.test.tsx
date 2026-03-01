@@ -98,7 +98,7 @@ describe('<Header />', () => {
         primary: '',
         message: '',
         input: '',
-        selection: '',
+        focus: '',
         diff: { added: '', removed: '' },
       },
       border: {

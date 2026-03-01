@@ -26,7 +26,7 @@ const noColorColorsTheme: ColorsTheme = {
   DarkGray: '',
   InputBackground: '',
   MessageBackground: '',
-  SelectionBackground: '',
+  FocusBackground: '',
 };
 
 const noColorSemanticColors: SemanticColors = {
@@ -41,7 +41,7 @@ const noColorSemanticColors: SemanticColors = {
     primary: '',
     message: '',
     input: '',
-    selection: '',
+    focus: '',
     diff: {
       added: '',
       removed: '',

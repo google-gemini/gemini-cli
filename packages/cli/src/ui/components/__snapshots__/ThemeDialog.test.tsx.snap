@@ -39,7 +39,7 @@ exports[`Initial Theme Selection > should default to a dark theme when terminal 
 │                                              │   #313…   backgroun Background for the input    │ │
 │                                              │           d.input   prompt                      │ │
 │                                              │   #39…   background. Background highlight for   │ │
-│                                              │          selection   selected/focused items     │ │
+│                                              │          focus       selected/focused items     │ │
 │                                              │   #283…  backgrou Background for added lines    │ │
 │                                              │          nd.diff. in diffs                      │ │
 │                                              │          added                                  │ │
@@ -67,8 +67,8 @@ exports[`Initial Theme Selection > should default to a dark theme when terminal 
 │                                              │  B                and UI icons                  │ │
 │                                              │  #3d3f5 ui.dark    Deeply dimmed color for      │ │
 │                                              │  1                 subtle UI elements           │ │
-│                                              │  #89B4F ui.focus   Color for focused or         │ │
-│                                              │  A                 selected UI elements (e.g.   │ │
+│                                              │  #A6E3A ui.focus   Color for focused or         │ │
+│                                              │  1                 selected UI elements (e.g.   │ │
 │                                              │                    menu items)                  │ │
 │                                              │  #F38BA8status.err Color for error messages     │ │
 │                                              │         or         and critical status          │ │
@@ -126,7 +126,7 @@ exports[`Initial Theme Selection > should default to a light theme when terminal
 │                                              │   #e2e…   backgroun Background for the input    │ │
 │                                              │           d.input   prompt                      │ │
 │                                              │   #d4…   background. Background highlight for   │ │
-│                                              │          selection   selected/focused items     │ │
+│                                              │          focus       selected/focused items     │ │
 │                                              │   #C6E…  backgrou Background for added lines    │ │
 │                                              │          nd.diff. in diffs                      │ │
 │                                              │          added                                  │ │
@@ -154,8 +154,8 @@ exports[`Initial Theme Selection > should default to a light theme when terminal
 │                                              │  4                and UI icons                  │ │
 │                                              │  #d2d6d ui.dark    Deeply dimmed color for      │ │
 │                                              │  c                 subtle UI elements           │ │
-│                                              │  #3B82F ui.focus   Color for focused or         │ │
-│                                              │  6                 selected UI elements (e.g.   │ │
+│                                              │  #3CA84 ui.focus   Color for focused or         │ │
+│                                              │  B                 selected UI elements (e.g.   │ │
 │                                              │                    menu items)                  │ │
 │                                              │  #DD4C4Cstatus.err Color for error messages     │ │
 │                                              │         or         and critical status          │ │
@@ -213,7 +213,7 @@ exports[`Initial Theme Selection > should use the theme from settings even if te
 │                                              │   #313…   backgroun Background for the input    │ │
 │                                              │           d.input   prompt                      │ │
 │                                              │   #39…   background. Background highlight for   │ │
-│                                              │          selection   selected/focused items     │ │
+│                                              │          focus       selected/focused items     │ │
 │                                              │   #283…  backgrou Background for added lines    │ │
 │                                              │          nd.diff. in diffs                      │ │
 │                                              │          added                                  │ │
@@ -241,8 +241,8 @@ exports[`Initial Theme Selection > should use the theme from settings even if te
 │                                              │  B                and UI icons                  │ │
 │                                              │  #3d3f5 ui.dark    Deeply dimmed color for      │ │
 │                                              │  1                 subtle UI elements           │ │
-│                                              │  #89B4F ui.focus   Color for focused or         │ │
-│                                              │  A                 selected UI elements (e.g.   │ │
+│                                              │  #A6E3A ui.focus   Color for focused or         │ │
+│                                              │  1                 selected UI elements (e.g.   │ │
 │                                              │                    menu items)                  │ │
 │                                              │  #F38BA8status.err Color for error messages     │ │
 │                                              │         or         and critical status          │ │
@@ -313,6 +313,8 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │                                              │          d.message  message blocks              │ │
 │                                              │   #313…   backgroun Background for the input    │ │
 │                                              │           d.input   prompt                      │ │
+│                                              │   #39…   background. Background highlight for   │ │
+│                                              │          focus       selected/focused items     │ │
 │                                              │   #283…  backgrou Background for added lines    │ │
 │                                              │          nd.diff. in diffs                      │ │
 │                                              │          added                                  │ │
@@ -340,8 +342,8 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │                                              │  6                and UI icons                  │ │
 │                                              │  #3d3f5 ui.dark    Deeply dimmed color for      │ │
 │                                              │  1                 subtle UI elements           │ │
-│                                              │  #89B4F ui.focus   Color for focused or         │ │
-│                                              │  A                 selected UI elements (e.g.   │ │
+│                                              │  #A6E3A ui.focus   Color for focused or         │ │
+│                                              │  1                 selected UI elements (e.g.   │ │
 │                                              │                    menu items)                  │ │
 │                                              │  #F38BA8status.err Color for error messages     │ │
 │                                              │         or         and critical status          │ │

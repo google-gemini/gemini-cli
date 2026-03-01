@@ -39,11 +39,7 @@ const semanticColors: SemanticColors = {
     primary: '#002b36',
     message: '#073642',
     input: '#073642',
-    selection: interpolateColor(
-      '#002b36',
-      '#859900',
-      DEFAULT_SELECTION_OPACITY,
-    ),
+    focus: interpolateColor('#002b36', '#859900', DEFAULT_SELECTION_OPACITY),
     diff: {
       added: '#00382f',
       removed: '#3d0115',
@@ -57,7 +53,7 @@ const semanticColors: SemanticColors = {
     comment: '#586e75',
     symbol: '#93a1a1',
     dark: '#073642',
-    focus: '#268bd2',
+    focus: '#859900',
     gradient: ['#268bd2', '#2aa198', '#859900'],
   },
   status: {

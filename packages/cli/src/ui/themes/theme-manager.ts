@@ -22,7 +22,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Theme, ThemeType, ColorsTheme } from './theme.js';
 import type { CustomTheme } from '@google/gemini-cli-core';
-import { createCustomTheme, validateCustomTheme ,
+import {
+  createCustomTheme,
+  validateCustomTheme,
   interpolateColor,
   getThemeTypeFromBackgroundColor,
   resolveColor,
@@ -369,7 +371,7 @@ class ThemeManager {
           colors.Gray,
           DEFAULT_BACKGROUND_OPACITY,
         ),
-        SelectionBackground: interpolateColor(
+        FocusBackground: interpolateColor(
           this.terminalBackground,
           colors.AccentGreen,
           DEFAULT_SELECTION_OPACITY,
@@ -407,7 +409,7 @@ class ThemeManager {
           primary: this.terminalBackground,
           message: colors.MessageBackground!,
           input: colors.InputBackground!,
-          selection: colors.SelectionBackground!,
+          focus: colors.FocusBackground!,
         },
         border: {
           ...semanticColors.border,
@@ -416,6 +418,7 @@ class ThemeManager {
         ui: {
           ...semanticColors.ui,
           dark: colors.DarkGray,
+          focus: colors.AccentGreen,
         },
       };
     } else {

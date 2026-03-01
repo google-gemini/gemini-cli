@@ -32,7 +32,7 @@ describe('createCustomTheme', () => {
     DiffRemoved: '#FF0000',
     Comment: '#808080',
     Gray: '#cccccc',
-    SelectionBackground: '#004000',
+    FocusBackground: '#004000',
     // DarkGray intentionally omitted to test fallback
   };
 
@@ -104,7 +104,7 @@ describe('validateCustomTheme', () => {
     DiffRemoved: '#FF0000',
     Comment: '#808080',
     Gray: '#808080',
-    SelectionBackground: '#004000',
+    FocusBackground: '#004000',
   };
 
   it('should return isValid: true for a valid theme', () => {
@@ -155,7 +155,7 @@ describe('themeManager.loadCustomThemes', () => {
     AccentRed: '#F00',
     Comment: '#888',
     Gray: '#888',
-    SelectionBackground: '#040',
+    FocusBackground: '#040',
   };
 
   it('should use values from DEFAULT_THEME when DiffAdded and DiffRemoved are not provided', () => {

@@ -25,7 +25,7 @@ describe('ColorsDisplay', () => {
         primary: '#000000',
         message: '#111111',
         input: '#222222',
-        selection: '#333333',
+        focus: '#333333',
         diff: {
           added: '#003300',
           removed: '#330000',

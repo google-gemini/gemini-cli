@@ -519,7 +519,7 @@ export function BaseSettingsDialog({
                     flexDirection="row"
                     alignItems="flex-start"
                     backgroundColor={
-                      isActive ? theme.background.selection : undefined
+                      isActive ? theme.background.focus : undefined
                     }
                   >
                     <Box minWidth={2} flexShrink={0}>
