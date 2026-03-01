@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { z } from 'zod';
+
 /**
  * Interface for OAuth tokens.
  */
@@ -47,3 +49,20 @@ export enum TokenStorageType {
   KEYCHAIN = 'keychain',
   ENCRYPTED_FILE = 'encrypted_file',
 }
+
+export const OAuthTokenSchema = z.object({
+  accessToken: z.string(),
+  refreshToken: z.string().optional(),
+  expiresAt: z.number().optional(),
+  tokenType: z.string(),
+  scope: z.string().optional(),
+});
+
+export const OAuthCredentialsSchema = z.object({
+  serverName: z.string(),
+  token: OAuthTokenSchema,
+  clientId: z.string().optional(),
+  tokenUrl: z.string().optional(),
+  mcpServerUrl: z.string().optional(),
+  updatedAt: z.number(),
+});

@@ -4,21 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { z } from 'zod';
 import { coreEvents } from '../utils/events.js';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
-import { getErrorMessage } from '../utils/errors.js';
-import type {
-  OAuthToken,
-  OAuthCredentials,
-  TokenStorage,
+import { getErrorMessage, isErrnoException } from '../utils/errors.js';
+import {
+  type OAuthToken,
+  type OAuthCredentials,
+  type TokenStorage,
+  OAuthCredentialsSchema,
 } from './token-storage/types.js';
 import { HybridTokenStorage } from './token-storage/hybrid-token-storage.js';
 import {
   DEFAULT_SERVICE_NAME,
   FORCE_ENCRYPTED_FILE_ENV_VAR,
 } from './token-storage/index.js';
+
+export const OAuthCredentialsArraySchema = z.array(OAuthCredentialsSchema);
 
 /**
  * Class for managing MCP OAuth token storage and retrieval.
@@ -61,16 +65,16 @@ export class MCPOAuthTokenStorage implements TokenStorage {
     try {
       const tokenFile = this.getTokenFilePath();
       const data = await fs.readFile(tokenFile, 'utf-8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const tokens = JSON.parse(data) as OAuthCredentials[];
+      const parsedData: unknown = JSON.parse(data);
+      const tokens = OAuthCredentialsArraySchema.parse(parsedData);
 
       for (const credential of tokens) {
         tokenMap.set(credential.serverName, credential);
       }
     } catch (error) {
       // File doesn't exist or is invalid, return empty map
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+
+      if (!isErrnoException(error) || error.code !== 'ENOENT') {
         coreEvents.emitFeedback(
           'error',
           `Failed to load MCP OAuth tokens: ${getErrorMessage(error)}`,
@@ -224,8 +228,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
       const tokenFile = this.getTokenFilePath();
       await fs.unlink(tokenFile);
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      if (!isErrnoException(error) || error.code !== 'ENOENT') {
         coreEvents.emitFeedback(
           'error',
           `Failed to clear MCP OAuth tokens: ${getErrorMessage(error)}`,

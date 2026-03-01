@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isAuthenticationError,
+  isErrnoException,
   UnauthorizedError,
   toFriendlyError,
   BadRequestError,
@@ -329,5 +330,41 @@ describe('getErrorType', () => {
     expect(getErrorType({})).toBe('unknown');
     expect(getErrorType(null)).toBe('unknown');
     expect(getErrorType(undefined)).toBe('unknown');
+  });
+});
+
+describe('isErrnoException', () => {
+  it('should return true for Error with string code', () => {
+    const err = Object.assign(new Error('msg'), { code: 'ENOENT' });
+    expect(isErrnoException(err)).toBe(true);
+  });
+
+  it('should return true for plain object with string code', () => {
+    expect(isErrnoException({ code: 'ENOENT' })).toBe(true);
+    expect(isErrnoException({ code: 'EACCES' })).toBe(true);
+  });
+
+  it('should return false for null and undefined', () => {
+    expect(isErrnoException(null)).toBe(false);
+    expect(isErrnoException(undefined)).toBe(false);
+  });
+
+  it('should return false for non-objects', () => {
+    expect(isErrnoException('error')).toBe(false);
+    expect(isErrnoException(123)).toBe(false);
+  });
+
+  it('should return false for Error without code', () => {
+    expect(isErrnoException(new Error('no code'))).toBe(false);
+  });
+
+  it('should return false for object with non-string code', () => {
+    expect(isErrnoException({ code: 404 })).toBe(false);
+    expect(isErrnoException({ code: null })).toBe(false);
+  });
+
+  it('should return false for object without code', () => {
+    expect(isErrnoException({})).toBe(false);
+    expect(isErrnoException({ message: 'x' })).toBe(false);
   });
 });
