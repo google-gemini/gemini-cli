@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="122" viewBox="0 0 920 122">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="122" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="19" fill="#333333" textLength="414" lengthAdjust="spacingAndGlyphs">┌─────────────┬───────────────┬──────────────┐</text>
+    <text x="0" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="36" fill="#89b4fa" textLength="99" lengthAdjust="spacingAndGlyphs">Bold Header</text>
+    <text x="126" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="144" y="36" fill="#89b4fa" textLength="117" lengthAdjust="spacingAndGlyphs">Normal Header</text>
+    <text x="270" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="288" y="36" fill="#89b4fa" textLength="108" lengthAdjust="spacingAndGlyphs">Another Bold</text>
+    <text x="405" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="53" fill="#333333" textLength="414" lengthAdjust="spacingAndGlyphs">├─────────────┼───────────────┼──────────────┤</text>
+    <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="70" fill="#ffffff" textLength="117" lengthAdjust="spacingAndGlyphs"> Data 1      </text>
+    <text x="126" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="135" y="70" fill="#ffffff" textLength="135" lengthAdjust="spacingAndGlyphs"> Data 2        </text>
+    <text x="270" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="279" y="70" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs"> Data 3       </text>
+    <text x="405" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="87" fill="#333333" textLength="414" lengthAdjust="spacingAndGlyphs">└─────────────┴───────────────┴──────────────┘</text>
+  </g>
+</svg>
