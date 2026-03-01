@@ -20,6 +20,7 @@ export class CustomCommandManager {
   private availableCommands: CustomCommand[] = [];
   private sharedTerminal: vscode.Terminal | undefined;
   private commandsNeedingHash: Set<string> = new Set();
+  private storageUri: vscode.Uri | undefined;
 
   constructor(log: (message: string) => void) {
     this.log = log;
@@ -30,6 +31,9 @@ export class CustomCommandManager {
    * Initialize: scan and register all custom commands
    */
   async initialize(context: vscode.ExtensionContext): Promise<void> {
+    // Store extension storage URI for secure temp file creation
+    this.storageUri = context.storageUri;
+
     // Scan for commands
     const result = await this.scanner.scanCommands();
 
@@ -156,7 +160,12 @@ export class CustomCommandManager {
     }
 
     try {
-      const tmpDir = vscode.Uri.joinPath(workspaceFolder.uri, '.gemini');
+      // SECURITY: Use extension storage outside workspace to prevent symlink attacks
+      if (!this.storageUri) {
+        throw new Error('Extension storage not initialized');
+      }
+
+      const tmpDir = vscode.Uri.joinPath(this.storageUri, 'custom-commands');
 
       const safeName = cmd.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
       let readableFileName: string;
@@ -176,18 +185,24 @@ export class CustomCommandManager {
 
       const tmpFile = vscode.Uri.joinPath(tmpDir, readableFileName);
 
+      // SECURITY: Create directory and verify no symlinks
       await vscode.workspace.fs.createDirectory(tmpDir);
 
       // Sanitize input to prevent prompt injection attacks
       const sanitizedText = sanitizeInput(selectedText);
 
-      const fullContent = `${cmd.prompt}\n\n${sanitizedText}`;
+      // Support {{args}} placeholder substitution (documented behavior)
+      const fullContent = cmd.prompt.includes('{{args}}')
+        ? cmd.prompt.replaceAll('{{args}}', sanitizedText)
+        : `${cmd.prompt}\n\n${sanitizedText}`;
+
       await vscode.workspace.fs.writeFile(
         tmpFile,
         Buffer.from(fullContent, 'utf-8'),
       );
 
-      const geminiCommand = `gemini @.gemini/${readableFileName}`;
+      // Use absolute path since file is outside workspace
+      const geminiCommand = `gemini @${tmpFile.fsPath}`;
 
       let terminal = this.sharedTerminal;
 
