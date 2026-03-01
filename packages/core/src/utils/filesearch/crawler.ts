@@ -29,7 +29,10 @@ function toPosixPath(p: string) {
   return p.split(path.sep).join(path.posix.sep);
 }
 
-export async function crawl(options: CrawlOptions): Promise<string[]> {
+export async function crawl(options: CrawlOptions): Promise<{
+  files: string[];
+  truncated: boolean;
+}> {
   if (options.cache) {
     const cacheKey = cache.getCacheKey(
       options.crawlDirectory,
@@ -39,7 +42,8 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
     const cachedResults = cache.read(cacheKey);
 
     if (cachedResults) {
-      return cachedResults;
+      // The cache does not store the truncated flag, but we didn't cache it if it was truncated.
+      return { files: cachedResults, truncated: false };
     }
   }
 
@@ -82,7 +86,7 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
     results = await api.crawl(options.crawlDirectory).withPromise();
   } catch (_e) {
     // The directory probably doesn't exist.
-    return [];
+    return { files: [], truncated: false };
   }
 
   const relativeToCrawlDir = path.posix.relative(posixCwd, posixCrawlDirectory);
@@ -100,5 +104,5 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
     cache.write(cacheKey, relativeToCwdResults, options.cacheTtl * 1000);
   }
 
-  return relativeToCwdResults;
+  return { files: relativeToCwdResults, truncated };
 }

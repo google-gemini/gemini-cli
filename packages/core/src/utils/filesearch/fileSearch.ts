@@ -12,8 +12,22 @@ import { ResultCache } from './result-cache.js';
 import { crawl } from './crawler.js';
 import type { FzfResultItem } from 'fzf';
 import { AsyncFzf } from 'fzf';
+import { coreEvents } from '../events.js';
 import { unescapePath } from '../paths.js';
 import type { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
+import { DEFAULT_FILE_FILTERING_OPTIONS } from '../../config/constants.js';
+
+let hasWarnedTruncation = false;
+
+function emitTruncationWarning(limit: number | undefined) {
+  if (!hasWarnedTruncation) {
+    hasWarnedTruncation = true;
+    coreEvents.emitFeedback(
+      'warning',
+      `Indexed ${limit} files (limit reached). Add ignore rules or increase context.fileFiltering.maxFileCount in settings.`,
+    );
+  }
+}
 
 export interface FileSearchOptions {
   projectRoot: string;
@@ -106,15 +120,24 @@ class RecursiveFileSearch implements FileSearch {
       this.options.ignoreDirs,
     );
 
-    this.allFiles = await crawl({
+    const { files: allFiles, truncated } = await crawl({
       crawlDirectory: this.options.projectRoot,
       cwd: this.options.projectRoot,
       ignore: this.ignore,
       cache: this.options.cache,
       cacheTtl: this.options.cacheTtl,
       maxDepth: this.options.maxDepth,
-      maxFiles: this.options.maxFiles ?? 20000,
+      maxFiles:
+        this.options.maxFiles ?? DEFAULT_FILE_FILTERING_OPTIONS.maxFileCount,
     });
+
+    this.allFiles = allFiles;
+
+    if (truncated) {
+      emitTruncationWarning(
+        this.options.maxFiles ?? DEFAULT_FILE_FILTERING_OPTIONS.maxFileCount,
+      );
+    }
 
     this.buildResultCache();
   }
@@ -221,14 +244,22 @@ class DirectoryFileSearch implements FileSearch {
     pattern = pattern || '*';
 
     const dir = pattern.endsWith('/') ? pattern : path.dirname(pattern);
-    const results = await crawl({
+    const { files: results, truncated } = await crawl({
       crawlDirectory: path.join(this.options.projectRoot, dir),
       cwd: this.options.projectRoot,
       maxDepth: 0,
       ignore: this.ignore,
       cache: this.options.cache,
       cacheTtl: this.options.cacheTtl,
+      maxFiles:
+        this.options.maxFiles ?? DEFAULT_FILE_FILTERING_OPTIONS.maxFileCount,
     });
+
+    if (truncated) {
+      emitTruncationWarning(
+        this.options.maxFiles ?? DEFAULT_FILE_FILTERING_OPTIONS.maxFileCount,
+      );
+    }
 
     const filteredResults = await filter(results, pattern, options.signal);
 
