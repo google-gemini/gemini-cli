@@ -334,7 +334,7 @@ describe('run_shell_command', () => {
       approvalMode: 'default',
     });
 
-    for (const expected in ['ls', tool]) {
+    for (const expected of ['ls', tool]) {
       const foundToolCall = await rig.waitForToolCall(
         'run_shell_command',
         15000,
