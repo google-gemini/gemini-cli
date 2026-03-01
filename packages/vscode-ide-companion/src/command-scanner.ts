@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -48,10 +48,15 @@ export class CommandScanner {
 
     try {
       await fs.access(this.commandsDir);
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.log(
-        `Commands directory does not exist: ${this.commandsDir}. No custom commands loaded.`,
+        `Commands directory does not exist or is inaccessible: ${this.commandsDir}. Error: ${message}. No custom commands loaded.`,
       );
+      result.errors.push({
+        filePath: this.commandsDir,
+        error: message,
+      });
       return result;
     }
 
