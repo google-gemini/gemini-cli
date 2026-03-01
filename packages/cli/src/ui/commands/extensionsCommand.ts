@@ -176,7 +176,7 @@ async function restartAction(
   if (!all && names?.length === 0) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: 'Usage: /extensions restart <extension-names>|--all',
+      text: 'Usage: /extensions reload <extension-names>|--all',
     });
     return Promise.resolve();
   }
@@ -208,12 +208,12 @@ async function restartAction(
 
   const s = extensionsToRestart.length > 1 ? 's' : '';
 
-  const restartingMessage = {
+  const reloadingMessage = {
     type: MessageType.INFO,
-    text: `Restarting ${extensionsToRestart.length} extension${s}...`,
+    text: `Reloading ${extensionsToRestart.length} extension${s}...`,
     color: theme.text.primary,
   };
-  context.ui.addItem(restartingMessage);
+  context.ui.addItem(reloadingMessage);
 
   const results = await Promise.allSettled(
     extensionsToRestart.map(async (extension) => {
@@ -254,12 +254,12 @@ async function restartAction(
       .join('\n  ');
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Failed to restart some extensions:\n  ${errorMessages}`,
+      text: `Failed to reload some extensions:\n  ${errorMessages}`,
     });
   } else {
     const infoItem: HistoryItemInfo = {
       type: MessageType.INFO,
-      text: `${extensionsToRestart.length} extension${s} restarted successfully.`,
+      text: `${extensionsToRestart.length} extension${s} reloaded successfully`,
       icon: emptyIcon,
       color: theme.text.primary,
     };
@@ -707,7 +707,8 @@ export function completeExtensions(
   }
   if (
     context.invocation?.name === 'disable' ||
-    context.invocation?.name === 'restart'
+    context.invocation?.name === 'restart' ||
+    context.invocation?.name === 'reload'
   ) {
     extensions = extensions.filter((ext) => ext.isActive);
   }
@@ -802,9 +803,10 @@ const exploreExtensionsCommand: SlashCommand = {
   action: exploreAction,
 };
 
-const restartCommand: SlashCommand = {
-  name: 'restart',
-  description: 'Restart all extensions',
+const reloadCommand: SlashCommand = {
+  name: 'reload',
+  altNames: ['restart'],
+  description: 'Reload all extensions',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: restartAction,
@@ -841,7 +843,7 @@ export function extensionsCommand(
       listExtensionsCommand,
       updateExtensionsCommand,
       exploreExtensionsCommand,
-      restartCommand,
+      reloadCommand,
       ...conditionalCommands,
     ],
     action: (context, args) =>

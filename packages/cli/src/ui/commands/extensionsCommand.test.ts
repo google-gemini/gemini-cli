@@ -830,7 +830,7 @@ describe('extensionsCommand', () => {
     });
   });
 
-  describe('restart', () => {
+  describe('reload', () => {
     let restartAction: SlashCommand['action'];
     let mockRestartExtension: MockedFunction<
       typeof ExtensionLoader.prototype.restartExtension
@@ -838,7 +838,7 @@ describe('extensionsCommand', () => {
 
     beforeEach(() => {
       restartAction = extensionsCommand().subCommands?.find(
-        (c) => c.name === 'restart',
+        (c) => c.name === 'reload',
       )?.action;
       expect(restartAction).not.toBeNull();
 
@@ -849,7 +849,7 @@ describe('extensionsCommand', () => {
           getExtensions: mockGetExtensions,
           restartExtension: mockRestartExtension,
         }));
-      mockContext.invocation!.name = 'restart';
+      mockContext.invocation!.name = 'reload';
     });
 
     it('should show a message if no extensions are installed', async () => {
@@ -868,7 +868,7 @@ describe('extensionsCommand', () => {
       });
     });
 
-    it('restarts all active extensions when --all is provided', async () => {
+    it('reloads all active extensions when --all is provided', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: true },
         { name: 'ext2', isActive: true },
@@ -884,13 +884,13 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Restarting 2 extensions...',
+          text: 'Reloading 2 extensions...',
         }),
       );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: '2 extensions restarted successfully.',
+          text: '2 extensions reloaded successfully',
         }),
       );
       expect(mockContext.ui.dispatchExtensionStateUpdate).toHaveBeenCalledWith({
@@ -924,7 +924,7 @@ describe('extensionsCommand', () => {
       );
     });
 
-    it('restarts only specified active extensions', async () => {
+    it('reloads only specified active extensions', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: false },
         { name: 'ext2', isActive: true },
@@ -962,13 +962,13 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.ERROR,
-          text: 'Usage: /extensions restart <extension-names>|--all',
+          text: 'Usage: /extensions reload <extension-names>|--all',
         }),
       );
       expect(mockRestartExtension).not.toHaveBeenCalled();
     });
 
-    it('handles errors during extension restart', async () => {
+    it('handles errors during extension reload', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: true },
       ] as GeminiCLIExtension[];
@@ -981,7 +981,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.ERROR,
-          text: 'Failed to restart some extensions:\n  ext1: Failed to restart',
+          text: 'Failed to reload some extensions:\n  ext1: Failed to restart',
         }),
       );
     });
@@ -1004,7 +1004,7 @@ describe('extensionsCommand', () => {
       );
     });
 
-    it('does not restart any extensions if none are found', async () => {
+    it('does not reload any extensions if none are found', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: true },
       ] as GeminiCLIExtension[];
@@ -1021,8 +1021,8 @@ describe('extensionsCommand', () => {
       );
     });
 
-    it('should suggest only enabled extension names for the restart command', async () => {
-      mockContext.invocation!.name = 'restart';
+    it('should suggest only enabled extension names for the reload command', async () => {
+      mockContext.invocation!.name = 'reload';
       const mockExtensions = [
         { name: 'ext1', isActive: true },
         { name: 'ext2', isActive: false },

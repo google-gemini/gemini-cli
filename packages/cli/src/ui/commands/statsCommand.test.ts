@@ -20,6 +20,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     UserAccountManager: vi.fn().mockImplementation(() => ({
       getCachedGoogleAccount: vi.fn().mockReturnValue('mock@example.com'),
     })),
+    getG1CreditBalance: vi.fn().mockReturnValue(undefined),
   };
 });
 
