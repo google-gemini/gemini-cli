@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Credentials, AuthClient, JWTInput } from 'google-auth-library';
 import {
+  type Credentials,
+  type AuthClient,
+  type JWTInput,
   OAuth2Client,
   Compute,
   CodeChallengeMethod,

@@ -8,8 +8,12 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 
 import nodePath from 'node:path';
 
-import type { PolicySettings } from './types.js';
-import { ApprovalMode, PolicyDecision, InProcessCheckerType } from './types.js';
+import {
+  type PolicySettings,
+  ApprovalMode,
+  PolicyDecision,
+  InProcessCheckerType,
+} from './types.js';
 import { isDirectorySecure } from '../utils/security.js';
 
 vi.unmock('../config/storage.js');

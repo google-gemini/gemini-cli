@@ -8,15 +8,13 @@ import type {
   ModifiableDeclarativeTool,
   ModifyContext,
 } from '../tools/modifiable-tool.js';
-import type {
-  ToolCallConfirmationDetails,
-  ToolInvocation,
-  ToolResult,
-} from '../tools/tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+  type ToolCallConfirmationDetails,
+  type ToolInvocation,
+  type ToolResult,
 } from '../tools/tools.js';
 import { createMockMessageBus } from './mock-message-bus.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';

@@ -4,8 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Attributes, Meter, Counter, Histogram } from '@opentelemetry/api';
-import { diag, metrics, ValueType } from '@opentelemetry/api';
+import {
+  type Attributes,
+  type Meter,
+  type Counter,
+  type Histogram,
+  diag,
+  metrics,
+  ValueType,
+} from '@opentelemetry/api';
 import { SERVICE_NAME } from './constants.js';
 import type { Config } from '../config/config.js';
 import type {

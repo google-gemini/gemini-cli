@@ -13,8 +13,7 @@ import {
   type InProcessCheckerConfig,
   InProcessCheckerType,
 } from '../policy/types.js';
-import type { SafetyCheckResult } from './protocol.js';
-import { SafetyCheckDecision } from './protocol.js';
+import { type SafetyCheckResult, SafetyCheckDecision } from './protocol.js';
 import type { Config } from '../config/config.js';
 
 // Mock dependencies

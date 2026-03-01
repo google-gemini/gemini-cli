@@ -14,8 +14,7 @@ import {
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
 import * as readline from 'node:readline';
-import type { Node, Tree } from 'web-tree-sitter';
-import { Language, Parser, Query } from 'web-tree-sitter';
+import { type Node, type Tree, Language, Parser, Query } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
 import { debugLogger } from './debugLogger.js';
 

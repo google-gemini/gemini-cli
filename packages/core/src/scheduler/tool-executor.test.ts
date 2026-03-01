@@ -13,8 +13,7 @@ import {
 } from '../index.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
-import type { ScheduledToolCall } from './types.js';
-import { CoreToolCallStatus } from './types.js';
+import { type ScheduledToolCall, CoreToolCallStatus } from './types.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import * as fileUtils from '../utils/fileUtils.js';
 import * as coreToolHookTriggers from '../core/coreToolHookTriggers.js';

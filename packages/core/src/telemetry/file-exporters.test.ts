@@ -13,8 +13,10 @@ import {
 import { ExportResultCode } from '@opentelemetry/core';
 import type { ReadableSpan } from '@opentelemetry/sdk-trace-base';
 import type { ReadableLogRecord } from '@opentelemetry/sdk-logs';
-import type { ResourceMetrics } from '@opentelemetry/sdk-metrics';
-import { AggregationTemporality } from '@opentelemetry/sdk-metrics';
+import {
+  type ResourceMetrics,
+  AggregationTemporality,
+} from '@opentelemetry/sdk-metrics';
 import * as fs from 'node:fs';
 
 function createMockWriteStream(): {

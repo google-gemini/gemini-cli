@@ -5,14 +5,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
-import type {
-  LocalAgentDefinition,
-  SubagentActivityEvent,
-  AgentInputs,
+import {
+  type LocalAgentDefinition,
+  type SubagentActivityEvent,
+  type AgentInputs,
+  AgentTerminateMode,
 } from './types.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { LocalAgentExecutor } from './local-executor.js';
-import { AgentTerminateMode } from './types.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import type { Config } from '../config/config.js';

@@ -31,8 +31,8 @@ import type { AgentTerminateMode } from '../agents/types.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import type { OTelFinishReason } from './semantic.js';
 import {
+  type OTelFinishReason,
   toInputMessages,
   toOutputMessages,
   toFinishReasons,

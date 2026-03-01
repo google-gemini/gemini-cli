@@ -5,8 +5,13 @@
  */
 
 import type { Config } from '../config/config.js';
-import type { HookDefinition, HookConfig } from './types.js';
-import { HookEventName, ConfigSource, HOOKS_CONFIG_FIELDS } from './types.js';
+import {
+  type HookDefinition,
+  type HookConfig,
+  HookEventName,
+  ConfigSource,
+  HOOKS_CONFIG_FIELDS,
+} from './types.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { TrustedHooksManager } from './trustedHooks.js';
 import { coreEvents } from '../utils/events.js';

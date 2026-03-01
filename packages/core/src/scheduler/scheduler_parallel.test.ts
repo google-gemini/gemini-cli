@@ -72,14 +72,14 @@ import {
   type AnyToolInvocation,
   Kind,
 } from '../tools/tools.js';
-import type {
-  ToolCallRequestInfo,
-  CompletedToolCall,
-  SuccessfulToolCall,
-  Status,
-  ToolCall,
+import {
+  type ToolCallRequestInfo,
+  type CompletedToolCall,
+  type SuccessfulToolCall,
+  type Status,
+  type ToolCall,
+  ROOT_SCHEDULER_ID,
 } from './types.js';
-import { ROOT_SCHEDULER_ID } from './types.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
 import type { EditorType } from '../utils/editor.js';
 

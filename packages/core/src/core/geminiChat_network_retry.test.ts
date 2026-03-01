@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { GenerateContentResponse } from '@google/genai';
-import { ApiError } from '@google/genai';
+import { type GenerateContentResponse, ApiError } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import { GeminiChat, StreamEventType, type StreamEvent } from './geminiChat.js';
 import type { Config } from '../config/config.js';

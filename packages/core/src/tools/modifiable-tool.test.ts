@@ -5,11 +5,9 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type {
-  ModifyContext,
-  ModifiableDeclarativeTool,
-} from './modifiable-tool.js';
 import {
+  type ModifyContext,
+  type ModifiableDeclarativeTool,
   modifyWithEditor,
   isModifiableDeclarativeTool,
 } from './modifiable-tool.js';

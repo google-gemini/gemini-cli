@@ -4,10 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { ToolModificationHandler } from './tool-modifier.js';
-import type { WaitingToolCall, ToolCallRequestInfo } from './types.js';
-import { CoreToolCallStatus } from './types.js';
+import {
+  type WaitingToolCall,
+  type ToolCallRequestInfo,
+  CoreToolCallStatus,
+} from './types.js';
 import * as modifiableToolModule from '../tools/modifiable-tool.js';
 import * as Diff from 'diff';
 import { MockModifiableTool, MockTool } from '../test-utils/mock-tool.js';
@@ -17,7 +20,6 @@ import type {
   ToolConfirmationPayload,
 } from '../tools/tools.js';
 import type { ModifyContext } from '../tools/modifiable-tool.js';
-import type { Mock } from 'vitest';
 
 // Mock the modules that export functions we need to control
 vi.mock('diff', () => ({

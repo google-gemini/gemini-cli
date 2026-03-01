@@ -49,11 +49,9 @@ import {
 } from '../billing/billing.js';
 import { logBillingEvent } from '../telemetry/loggers.js';
 import { CreditsUsedEvent } from '../telemetry/billingEvents.js';
-import type {
-  CaCountTokenResponse,
-  CaGenerateContentResponse,
-} from './converter.js';
 import {
+  type CaCountTokenResponse,
+  type CaGenerateContentResponse,
   fromCountTokenResponse,
   fromGenerateContentResponse,
   toCountTokenRequest,

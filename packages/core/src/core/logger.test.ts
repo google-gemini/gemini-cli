@@ -13,8 +13,8 @@ import {
   afterEach,
   afterAll,
 } from 'vitest';
-import type { LogEntry } from './logger.js';
 import {
+  type LogEntry,
   Logger,
   MessageSenderType,
   encodeTagName,

@@ -7,8 +7,13 @@
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { WEB_SEARCH_TOOL_NAME } from './tool-names.js';
 import type { GroundingMetadata } from '@google/genai';
-import type { ToolInvocation, ToolResult } from './tools.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import {
+  type ToolInvocation,
+  type ToolResult,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+} from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
 import { getErrorMessage } from '../utils/errors.js';

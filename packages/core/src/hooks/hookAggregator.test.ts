@@ -6,13 +6,14 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { HookAggregator } from './hookAggregator.js';
-import type {
-  HookExecutionResult,
-  BeforeToolSelectionOutput,
-  BeforeModelOutput,
-  HookOutput,
+import {
+  type HookExecutionResult,
+  type BeforeToolSelectionOutput,
+  type BeforeModelOutput,
+  type HookOutput,
+  HookType,
+  HookEventName,
 } from './types.js';
-import { HookType, HookEventName } from './types.js';
 
 // Helper function to create proper HookExecutionResult objects
 function createHookExecutionResult(

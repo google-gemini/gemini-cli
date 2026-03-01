@@ -9,15 +9,12 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { inspect } from 'node:util';
 import process from 'node:process';
-import type {
-  ContentGenerator,
-  ContentGeneratorConfig,
-} from '../core/contentGenerator.js';
-import type { OverageStrategy } from '../billing/billing.js';
 import {
   AuthType,
   createContentGenerator,
   createContentGeneratorConfig,
+  type ContentGenerator,
+  type ContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
@@ -39,16 +36,15 @@ import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
-import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
-import type { TelemetryTarget } from '../telemetry/index.js';
 import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
+  type TelemetryTarget,
 } from '../telemetry/index.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
@@ -68,8 +64,10 @@ import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
-import type { FileSystemService } from '../services/fileSystemService.js';
-import { StandardFileSystemService } from '../services/fileSystemService.js';
+import {
+  StandardFileSystemService,
+  type FileSystemService,
+} from '../services/fileSystemService.js';
 import {
   logRipgrepFallback,
   logFlashFallback,
@@ -89,11 +87,11 @@ import type {
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
-import type {
-  ModelConfig,
-  ModelConfigServiceConfig,
+import {
+  ModelConfigService,
+  type ModelConfig,
+  type ModelConfigServiceConfig,
 } from '../services/modelConfigService.js';
-import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
 import type { GenerateContentParameters } from '@google/genai';
@@ -108,27 +106,23 @@ import { FileExclusions } from '../utils/ignorePatterns.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
-import {
-  ApprovalMode,
-  type PolicyEngineConfig,
-  type PolicyRule,
-  type SafetyCheckerRule,
-} from '../policy/types.js';
+import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type {
   UserTierId,
-  GeminiUserTier,
   RetrieveUserQuotaResponse,
   AdminControlsSettings,
 } from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
-import type { Experiments } from '../code_assist/experiments/experiments.js';
+import {
+  getExperiments,
+  type Experiments,
+} from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentTool } from '../agents/subagent-tool.js';
-import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
@@ -184,14 +178,6 @@ export interface ToolOutputMaskingConfig {
   toolProtectionThreshold: number;
   minPrunableTokensThreshold: number;
   protectLatestTurn: boolean;
-}
-
-export interface GemmaModelRouterSettings {
-  enabled?: boolean;
-  classifier?: {
-    host?: string;
-    model?: string;
-  };
 }
 
 export interface ExtensionSetting {
@@ -331,14 +317,6 @@ export interface GeminiCLIExtension {
    * These themes will be registered when the extension is activated.
    */
   themes?: CustomTheme[];
-  /**
-   * Policy rules contributed by this extension.
-   */
-  rules?: PolicyRule[];
-  /**
-   * Safety checkers contributed by this extension.
-   */
-  checkers?: SafetyCheckerRule[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -351,10 +329,10 @@ export interface ExtensionInstallMetadata {
 }
 
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
-import type { FileFilteringOptions } from './constants.js';
 import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+  type FileFilteringOptions,
 } from './constants.js';
 import {
   DEFAULT_TOOL_PROTECTION_THRESHOLD,
@@ -367,7 +345,6 @@ import {
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
-import { type McpContext } from '../tools/mcp-client.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getErrorMessage } from '../utils/errors.js';
 import {
@@ -522,7 +499,6 @@ export interface ConfigParameters {
   interactive?: boolean;
   trustedFolder?: boolean;
   useBackgroundColor?: boolean;
-  useAlternateBuffer?: boolean;
   useRipgrep?: boolean;
   enableInteractiveShell?: boolean;
   skipNextSpeakerCheck?: boolean;
@@ -535,7 +511,6 @@ export interface ConfigParameters {
   directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
-  gemmaModelRouter?: GemmaModelRouterSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
@@ -576,12 +551,9 @@ export interface ConfigParameters {
     agents?: AgentSettings;
   }>;
   enableConseca?: boolean;
-  billing?: {
-    overageStrategy?: OverageStrategy;
-  };
 }
 
-export class Config implements McpContext {
+export class Config {
   private toolRegistry!: ToolRegistry;
   private mcpClientManager?: McpClientManager;
   private allowedMcpServers: string[];
@@ -629,7 +601,6 @@ export class Config implements McpContext {
   private readonly usageStatisticsEnabled: boolean;
   private geminiClient!: GeminiClient;
   private baseLlmClient!: BaseLlmClient;
-  private localLiteRtLmClient?: LocalLiteRtLmClient;
   private modelRouterService: ModelRouterService;
   private readonly modelAvailabilityService: ModelAvailabilityService;
   private readonly fileFiltering: {
@@ -709,7 +680,6 @@ export class Config implements McpContext {
   private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private readonly useBackgroundColor: boolean;
-  private readonly useAlternateBuffer: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly truncateToolOutputThreshold: number;
@@ -727,9 +697,6 @@ export class Config implements McpContext {
     | PolicyUpdateConfirmationRequest
     | undefined;
   private readonly outputSettings: OutputSettings;
-
-  private readonly gemmaModelRouter: GemmaModelRouterSettings;
-
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly maxAttempts: number;
@@ -761,10 +728,6 @@ export class Config implements McpContext {
       }>)
     | undefined;
 
-  private readonly billing: {
-    overageStrategy: OverageStrategy;
-  };
-
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
   private readonly enableEventDrivenScheduler: boolean;
@@ -781,7 +744,7 @@ export class Config implements McpContext {
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
-  private lastModeSwitchTime: number = performance.now();
+  private lastModeSwitchTime: number = Date.now();
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
 
@@ -913,7 +876,6 @@ export class Config implements McpContext {
     this.directWebFetch = params.directWebFetch ?? false;
     this.useRipgrep = params.useRipgrep ?? true;
     this.useBackgroundColor = params.useBackgroundColor ?? true;
-    this.useAlternateBuffer = params.useAlternateBuffer ?? false;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
@@ -983,15 +945,6 @@ export class Config implements McpContext {
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
-    this.gemmaModelRouter = {
-      enabled: params.gemmaModelRouter?.enabled ?? false,
-      classifier: {
-        host:
-          params.gemmaModelRouter?.classifier?.host ?? 'http://localhost:9379',
-        model:
-          params.gemmaModelRouter?.classifier?.model ?? 'gemma3-1b-gpu-custom',
-      },
-    };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.maxAttempts = Math.min(
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
@@ -1011,10 +964,6 @@ export class Config implements McpContext {
     this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
     this.onReload = params.onReload;
-
-    this.billing = {
-      overageStrategy: params.billing?.overageStrategy ?? 'ask',
-    };
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -1279,10 +1228,6 @@ export class Config implements McpContext {
     return this.contentGenerator?.userTierName;
   }
 
-  getUserPaidTier(): GeminiUserTier | undefined {
-    return this.contentGenerator?.paidTier;
-  }
-
   /**
    * Provides access to the BaseLlmClient for stateless LLM operations.
    */
@@ -1301,13 +1246,6 @@ export class Config implements McpContext {
       }
     }
     return this.baseLlmClient;
-  }
-
-  getLocalLiteRtLmClient(): LocalLiteRtLmClient {
-    if (!this.localLiteRtLmClient) {
-      this.localLiteRtLmClient = new LocalLiteRtLmClient(this);
-    }
-    return this.localLiteRtLmClient;
   }
 
   getSessionId(): string {
@@ -1597,19 +1535,6 @@ export class Config implements McpContext {
     this.hasAccessToPreviewModel = hasAccess;
   }
 
-  async refreshAvailableCredits(): Promise<void> {
-    const codeAssistServer = getCodeAssistServer(this);
-    if (!codeAssistServer) {
-      return;
-    }
-    try {
-      await codeAssistServer.refreshAvailableCredits();
-    } catch {
-      // Non-fatal: proceed even if refresh fails.
-      // The actual credit balance will be verified server-side.
-    }
-  }
-
   async refreshUserQuota(): Promise<RetrieveUserQuotaResponse | undefined> {
     const codeAssistServer = getCodeAssistServer(this);
     if (!codeAssistServer || !codeAssistServer.projectId) {
@@ -1769,33 +1694,6 @@ export class Config implements McpContext {
 
   getMcpClientManager(): McpClientManager | undefined {
     return this.mcpClientManager;
-  }
-
-  setUserInteractedWithMcp(): void {
-    this.mcpClientManager?.setUserInteractedWithMcp();
-  }
-
-  /** @deprecated Use getMcpClientManager().getLastError() directly */
-  getLastMcpError(serverName: string): string | undefined {
-    return this.mcpClientManager?.getLastError(serverName);
-  }
-
-  emitMcpDiagnostic(
-    severity: 'info' | 'warning' | 'error',
-    message: string,
-    error?: unknown,
-    serverName?: string,
-  ): void {
-    if (this.mcpClientManager) {
-      this.mcpClientManager.emitDiagnostic(
-        severity,
-        message,
-        error,
-        serverName,
-      );
-    } else {
-      coreEvents.emitFeedback(severity, message, error);
-    }
   }
 
   getAllowedMcpServers(): string[] | undefined {
@@ -2048,15 +1946,12 @@ export class Config implements McpContext {
    * Logs the duration of the current approval mode.
    */
   logCurrentModeDuration(mode: ApprovalMode): void {
-    const now = performance.now();
+    const now = Date.now();
     const duration = now - this.lastModeSwitchTime;
-    if (duration > 0) {
-      logApprovalModeDuration(
-        this,
-        new ApprovalModeDurationEvent(mode, duration),
-      );
-    }
-    this.lastModeSwitchTime = now;
+    logApprovalModeDuration(
+      this,
+      new ApprovalModeDurationEvent(mode, duration),
+    );
   }
 
   isYoloModeDisabled(): boolean {
@@ -2109,19 +2004,6 @@ export class Config implements McpContext {
 
   getTelemetryOutfile(): string | undefined {
     return this.telemetrySettings.outfile;
-  }
-
-  getBillingSettings(): { overageStrategy: OverageStrategy } {
-    return this.billing;
-  }
-
-  /**
-   * Updates the overage strategy at runtime.
-   * Used to switch from 'ask' to 'always' after the user accepts credits
-   * via the overage dialog, so subsequent API calls auto-include credits.
-   */
-  setOverageStrategy(strategy: OverageStrategy): void {
-    this.billing.overageStrategy = strategy;
   }
 
   getTelemetryUseCollector(): boolean {
@@ -2602,10 +2484,6 @@ export class Config implements McpContext {
     return this.useBackgroundColor;
   }
 
-  getUseAlternateBuffer(): boolean {
-    return this.useAlternateBuffer;
-  }
-
   getEnableInteractiveShell(): boolean {
     return this.enableInteractiveShell;
   }
@@ -2704,14 +2582,6 @@ export class Config implements McpContext {
 
   getEnableHooksUI(): boolean {
     return this.enableHooksUI;
-  }
-
-  getGemmaModelRouterEnabled(): boolean {
-    return this.gemmaModelRouter.enabled ?? false;
-  }
-
-  getGemmaModelRouterSettings(): GemmaModelRouterSettings {
-    return this.gemmaModelRouter;
   }
 
   /**

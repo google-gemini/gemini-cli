@@ -11,12 +11,13 @@ import type {
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HookEventHandler } from './hookEventHandler.js';
 import type { Config } from '../config/config.js';
-import type { HookConfig, HookExecutionResult } from './types.js';
 import {
-  NotificationType,
-  SessionStartSource,
   HookEventName,
   HookType,
+  NotificationType,
+  SessionStartSource,
+  type HookConfig,
+  type HookExecutionResult,
 } from './types.js';
 import type { HookPlanner } from './hookPlanner.js';
 import type { HookRunner } from './hookRunner.js';

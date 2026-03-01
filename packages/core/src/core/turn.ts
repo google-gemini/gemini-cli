@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  PartListUnion,
-  GenerateContentResponse,
-  FunctionCall,
-  FunctionDeclaration,
-  FinishReason,
-  GenerateContentResponseUsageMetadata,
+import {
+  type PartListUnion,
+  type GenerateContentResponse,
+  type FunctionCall,
+  type FunctionDeclaration,
+  type FinishReason,
+  type GenerateContentResponseUsageMetadata,
+  createUserContent,
 } from '@google/genai';
 import type {
   ToolCallConfirmationDetails,
@@ -23,10 +24,8 @@ import {
   UnauthorizedError,
   toFriendlyError,
 } from '../utils/errors.js';
-import type { GeminiChat } from './geminiChat.js';
-import { InvalidStreamError } from './geminiChat.js';
+import { type GeminiChat, InvalidStreamError } from './geminiChat.js';
 import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
-import { createUserContent } from '@google/genai';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { getCitations } from '../utils/generateContentResponseUtilities.js';
 import { LlmRole } from '../telemetry/types.js';

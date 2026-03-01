@@ -7,9 +7,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fsPromises from 'node:fs/promises';
 import * as os from 'node:os';
+import * as path from 'node:path';
 import { getFolderStructure } from './getFolderStructure.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import * as path from 'node:path';
 import { GEMINI_DIR } from './paths.js';
 import { GEMINI_IGNORE_FILE_NAME } from 'src/config/constants.js';
 

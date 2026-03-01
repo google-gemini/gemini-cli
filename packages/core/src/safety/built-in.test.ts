@@ -9,8 +9,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { AllowedPathChecker } from './built-in.js';
-import type { SafetyCheckInput } from './protocol.js';
-import { SafetyCheckDecision } from './protocol.js';
+import { type SafetyCheckInput, SafetyCheckDecision } from './protocol.js';
 import type { FunctionCall } from '@google/genai';
 
 describe('AllowedPathChecker', () => {

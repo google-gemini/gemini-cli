@@ -25,16 +25,16 @@ import {
   type ToolExecuteConfirmationDetails,
   type AnyToolInvocation,
 } from '../tools/tools.js';
-import type {
-  ValidatingToolCall,
-  ToolCallRequestInfo,
-  CompletedToolCall,
+import {
+  type ValidatingToolCall,
+  type ToolCallRequestInfo,
+  type CompletedToolCall,
+  ROOT_SCHEDULER_ID,
 } from './types.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { CoreToolScheduler } from '../core/coreToolScheduler.js';
 import { Scheduler } from './scheduler.js';
-import { ROOT_SCHEDULER_ID } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 

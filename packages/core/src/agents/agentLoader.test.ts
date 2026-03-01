@@ -15,8 +15,11 @@ import {
   AgentLoadError,
 } from './agentLoader.js';
 import { GEMINI_MODEL_ALIAS_PRO } from '../config/models.js';
-import type { LocalAgentDefinition } from './types.js';
-import { DEFAULT_MAX_TIME_MINUTES, DEFAULT_MAX_TURNS } from './types.js';
+import {
+  type LocalAgentDefinition,
+  DEFAULT_MAX_TIME_MINUTES,
+  DEFAULT_MAX_TURNS,
+} from './types.js';
 
 describe('loader', () => {
   let tempDir: string;

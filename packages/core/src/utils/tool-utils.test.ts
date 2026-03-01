@@ -10,8 +10,9 @@ import {
   getToolSuggestion,
   shouldHideToolCall,
 } from './tool-utils.js';
-import type { AnyToolInvocation, Config } from '../index.js';
 import {
+  type AnyToolInvocation,
+  type Config,
   ReadFileTool,
   ApprovalMode,
   CoreToolCallStatus,

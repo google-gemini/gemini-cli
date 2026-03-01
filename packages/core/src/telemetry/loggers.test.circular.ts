@@ -16,8 +16,8 @@ import type { CompletedToolCall } from '../core/coreToolScheduler.js';
 import {
   type ToolCallRequestInfo,
   type ToolCallResponseInfo,
+  CoreToolCallStatus,
 } from '../scheduler/types.js';
-import { CoreToolCallStatus } from '../scheduler/types.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 
 describe('Circular Reference Handling', () => {

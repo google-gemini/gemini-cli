@@ -5,12 +5,10 @@
  */
 
 import { FunctionCallingConfigMode } from '@google/genai';
-import type {
-  HookOutput,
-  HookExecutionResult,
-  BeforeToolSelectionOutput,
-} from './types.js';
 import {
+  type HookOutput,
+  type HookExecutionResult,
+  type BeforeToolSelectionOutput,
   DefaultHookOutput,
   BeforeToolHookOutput,
   BeforeModelHookOutput,

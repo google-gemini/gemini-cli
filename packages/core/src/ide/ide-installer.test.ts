@@ -23,7 +23,6 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
     homedir: vi.fn(),
   };
 });
-
 import { getIdeInstaller } from './ide-installer.js';
 import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';

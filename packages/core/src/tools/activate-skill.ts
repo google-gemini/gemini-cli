@@ -7,13 +7,15 @@
 import * as path from 'node:path';
 import { getFolderStructure } from '../utils/getFolderStructure.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import type {
-  ToolResult,
-  ToolCallConfirmationDetails,
-  ToolInvocation,
-  ToolConfirmationOutcome,
+import {
+  type ToolResult,
+  type ToolCallConfirmationDetails,
+  type ToolInvocation,
+  type ToolConfirmationOutcome,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
 } from './tools.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import type { Config } from '../config/config.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from './tool-names.js';
 import { ToolErrorType } from './tool-error.js';
