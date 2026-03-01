@@ -519,8 +519,7 @@ describe('Gemini Client (client.ts)', () => {
         // On failure, the chat should NOT be replaced
         expect(client['chat']).toBe(mockOriginalChat);
       });
-
-      it.skip('will not attempt to compress context after a failure', async () => {
+      it('will not attempt to compress context after a failure', async () => {
         const { client } = setup({
           originalTokenCount: 100,
           newTokenCount: 200,
