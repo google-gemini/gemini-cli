@@ -268,7 +268,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`ui.footer.hideContextPercentage`** (boolean):
-  - **Description:** Hides the context window remaining percentage.
+  - **Description:** Hides the context window usage percentage.
   - **Default:** `true`
 
 - **`ui.hideFooter`** (boolean):

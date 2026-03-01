@@ -100,6 +100,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {itemForDisplay.type === 'info' && (
         <InfoMessage
           text={itemForDisplay.text}
+          secondaryText={itemForDisplay.secondaryText}
           icon={itemForDisplay.icon}
           color={itemForDisplay.color}
           marginBottom={itemForDisplay.marginBottom}

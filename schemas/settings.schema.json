@@ -350,8 +350,8 @@
             },
             "hideContextPercentage": {
               "title": "Hide Context Window Percentage",
-              "description": "Hides the context window remaining percentage.",
-              "markdownDescription": "Hides the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "description": "Hides the context window usage percentage.",
+              "markdownDescription": "Hides the context window usage percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             }
@@ -576,7 +576,7 @@
           }
         },
         "compressionThreshold": {
-          "title": "Compression Threshold",
+          "title": "Context Compression Threshold",
           "description": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).",
           "markdownDescription": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `0.5`",
           "default": 0.5,

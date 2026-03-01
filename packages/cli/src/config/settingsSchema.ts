@@ -118,6 +118,10 @@ export interface SettingDefinition {
    */
   additionalProperties?: SettingCollectionDefinition;
   /**
+   * Optional unit to display after the value (e.g. '%').
+   */
+  unit?: string;
+  /**
    * Optional reference identifier for generators that emit a `$ref`.
    */
   ref?: string;
@@ -605,7 +609,7 @@ const SETTINGS_SCHEMA = {
             category: 'UI',
             requiresRestart: false,
             default: true,
-            description: 'Hides the context window remaining percentage.',
+            description: 'Hides the context window usage percentage.',
             showInDialog: true,
           },
         },
@@ -923,7 +927,7 @@ const SETTINGS_SCHEMA = {
       },
       compressionThreshold: {
         type: 'number',
-        label: 'Compression Threshold',
+        label: 'Context Compression Threshold',
         category: 'Model',
         requiresRestart: true,
         default: 0.5 as number,
