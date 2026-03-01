@@ -76,14 +76,14 @@ export function EditorSettingsDialog({
     editorIndex = 0;
   }
 
-  const hasEmittedUnsupportedError = useRef(false);
+  const reportedInvalidEditors = useRef(new Set<string>());
   useEffect(() => {
-    if (isUnsupportedEditor && !hasEmittedUnsupportedError.current) {
-      hasEmittedUnsupportedError.current = true;
+    if (isUnsupportedEditor && currentPreference && !reportedInvalidEditors.current.has(currentPreference)) {
       coreEvents.emitFeedback(
         'error',
         `Editor is not supported: ${currentPreference}`,
       );
+      reportedInvalidEditors.current.add(currentPreference);
     }
   }, [isUnsupportedEditor, currentPreference]);
 
