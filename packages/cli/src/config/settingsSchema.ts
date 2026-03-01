@@ -1186,6 +1186,16 @@ const SETTINGS_SCHEMA = {
             description: 'Respect .geminiignore files when searching.',
             showInDialog: true,
           },
+          maxFileCount: {
+            type: 'number',
+            label: 'Max File Count',
+            category: 'Context',
+            requiresRestart: true,
+            default: 100000,
+            description:
+              'Maximum number of files to index for autocomplete and search. Defaults to 100,000.',
+            showInDialog: true,
+          },
           enableRecursiveFileSearch: {
             type: 'boolean',
             label: 'Enable Recursive File Search',

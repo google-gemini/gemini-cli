@@ -528,7 +528,7 @@ describe('FileSearch', () => {
     expect(results).toEqual(['src/', 'src/main.js']);
   });
 
-  it('should respect default maxFiles budget of 20000 in RecursiveFileSearch', async () => {
+  it('should respect default maxFiles budget of 100000 in RecursiveFileSearch', async () => {
     const crawlSpy = vi.spyOn(crawler, 'crawl');
 
     tmpDir = await createTmpDir({
@@ -552,9 +552,61 @@ describe('FileSearch', () => {
 
     expect(crawlSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        maxFiles: 20000,
+        maxFiles: 100000,
       }),
     );
+  });
+
+  describe('truncation warning', () => {
+    it('should detect truncation and emit a warning when maxFiles is hit', async () => {
+      // Reset modules so hasWarnedTruncation starts as false regardless of test order.
+      // Both fileSearch and events must be re-imported after the reset so that
+      // the spy targets the same coreEvents instance that the fresh module uses.
+      vi.resetModules();
+      const [
+        { FileSearchFactory: FreshFileSearchFactory },
+        { coreEvents: freshCoreEvents },
+      ] = await Promise.all([
+        import('./fileSearch.js'),
+        import('../events.js'),
+      ]);
+      const emitFeedbackSpy = vi.spyOn(freshCoreEvents, 'emitFeedback');
+
+      const largeDir: Record<string, string> = {};
+      for (let i = 0; i < 10; i++) {
+        largeDir[`file${i}.js`] = '';
+      }
+      tmpDir = await createTmpDir(largeDir);
+
+      const fileSearch = FreshFileSearchFactory.create({
+        projectRoot: tmpDir,
+        fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+          respectGitIgnore: false,
+          respectGeminiIgnore: false,
+        }),
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        enableRecursiveFileSearch: true,
+        enableFuzzySearch: true,
+        maxFiles: 5,
+      });
+
+      await fileSearch.initialize();
+
+      // It should have emitted the warning once during initialization
+      expect(emitFeedbackSpy).toHaveBeenCalledTimes(1);
+      expect(emitFeedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('Indexed 5 files (limit reached)'),
+      );
+
+      // Initializing again or searching should not emit the warning again
+      await fileSearch.initialize();
+      await fileSearch.search('');
+
+      expect(emitFeedbackSpy).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('should be cancellable via AbortSignal', async () => {
@@ -741,7 +793,7 @@ describe('FileSearch', () => {
       cache: false,
       cacheTtl: 0,
       enableRecursiveFileSearch: true,
-      enableFuzzySearch: true,
+      enableFuzzySearch: false,
     });
 
     await fileSearch.initialize();
