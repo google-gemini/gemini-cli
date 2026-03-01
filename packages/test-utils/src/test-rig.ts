@@ -421,12 +421,6 @@ export class TestRig {
     const userGeminiDir = join(this.homeDir!, GEMINI_DIR);
     mkdirSync(userGeminiDir, { recursive: true });
 
-    // Disable the interactive terminal setup prompt in tests
-    writeFileSync(
-      join(userGeminiDir, 'state.json'),
-      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
-    );
-
     // In sandbox mode, use an absolute path for telemetry inside the container
     // The container mounts the test directory at the same path as the host
     const telemetryPath = join(this.homeDir!, 'telemetry.log'); // Always use home directory for telemetry
