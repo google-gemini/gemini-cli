@@ -15,13 +15,12 @@ import {
   SHELL_FOCUS_HINT_DELAY_MS,
 } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
-import type {
-  CoreToolCallStatus,
-  type Config,
+import {
   SHELL_TOOL_NAME,
-  isCompletedAskUserTool,
-  type ToolResultDisplay
+  isCompletedAskUserTool
 } from '@google/gemini-cli-core';
+import type { Config, ToolResultDisplay ,
+  CoreToolCallStatus} from '@google/gemini-cli-core';
 import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
 import { formatCommand } from '../../utils/keybindingUtils.js';
 import { Command } from '../../../config/keyBindings.js';
