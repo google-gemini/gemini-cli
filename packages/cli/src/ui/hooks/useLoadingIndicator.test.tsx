@@ -34,7 +34,7 @@ describe('useLoadingIndicator', () => {
     initialStreamingState: StreamingState,
     initialShouldShowFocusHint: boolean = false,
     initialRetryStatus: RetryAttemptPayload | null = null,
-    loadingPhrasesMode: LoadingPhrasesMode = 'all',
+    loadingPhraseLayout: LoadingPhrasesMode = 'all_inline',
     initialErrorVerbosity: 'low' | 'full' = 'full',
   ) => {
     let hookResult: ReturnType<typeof useLoadingIndicator>;
@@ -55,7 +55,7 @@ describe('useLoadingIndicator', () => {
         streamingState,
         shouldShowFocusHint: !!shouldShowFocusHint,
         retryStatus: retryStatus || null,
-        loadingPhrasesMode: mode,
+        loadingPhraseLayout: mode,
         errorVerbosity,
       });
       return null;
@@ -65,7 +65,7 @@ describe('useLoadingIndicator', () => {
         streamingState={initialStreamingState}
         shouldShowFocusHint={initialShouldShowFocusHint}
         retryStatus={initialRetryStatus}
-        mode={loadingPhrasesMode}
+        mode={loadingPhraseLayout}
         errorVerbosity={initialErrorVerbosity}
       />,
     );
@@ -84,7 +84,7 @@ describe('useLoadingIndicator', () => {
       }) =>
         rerender(
           <TestComponent
-            mode={loadingPhrasesMode}
+            mode={loadingPhraseLayout}
             errorVerbosity={initialErrorVerbosity}
             {...newProps}
           />,
@@ -253,7 +253,7 @@ describe('useLoadingIndicator', () => {
       StreamingState.Responding,
       false,
       retryStatus,
-      'all',
+      'all_inline',
       'low',
     );
 
@@ -273,7 +273,7 @@ describe('useLoadingIndicator', () => {
       StreamingState.Responding,
       false,
       retryStatus,
-      'all',
+      'all_inline',
       'low',
     );
 
@@ -282,12 +282,12 @@ describe('useLoadingIndicator', () => {
     );
   });
 
-  it('should show no phrases when loadingPhrasesMode is "off"', () => {
+  it('should show no phrases when loadingPhraseLayout is "none"', () => {
     const { result } = renderLoadingIndicatorHook(
       StreamingState.Responding,
       false,
       null,
-      'off',
+      'none',
     );
 
     expect(result.current.currentLoadingPhrase).toBeUndefined();

@@ -59,7 +59,14 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const isAlternateBuffer = useAlternateBuffer();
   const { showApprovalModeIndicator } = uiState;
   const newLayoutSetting = settings.merged.ui.newFooterLayout;
-  const wittyPosition = settings.merged.ui.wittyPhrasePosition;
+  const { loadingPhraseLayout } = settings.merged.ui;
+  const wittyPosition: 'status' | 'inline' | 'ambient' =
+    loadingPhraseLayout === 'wit_status'
+      ? 'status'
+      : loadingPhraseLayout === 'wit_inline' ||
+          loadingPhraseLayout === 'all_inline'
+        ? 'inline'
+        : 'ambient';
   const isExperimentalLayout = newLayoutSetting !== 'legacy';
   const showUiDetails = uiState.cleanUiDetailsVisible;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
@@ -198,8 +205,15 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
   const ambientText = isInteractiveShellWaiting
     ? undefined
-    : uiState.currentTip ||
-      (wittyPosition === 'ambient' ? uiState.currentWittyPhrase : undefined);
+    : (loadingPhraseLayout === 'tips' ||
+      loadingPhraseLayout === 'all_inline' ||
+      loadingPhraseLayout === 'all_ambient'
+        ? uiState.currentTip
+        : undefined) ||
+      (loadingPhraseLayout === 'wit_ambient' ||
+      loadingPhraseLayout === 'all_ambient'
+        ? uiState.currentWittyPhrase
+        : undefined);
 
   let estimatedStatusLength = 0;
   if (
@@ -239,6 +253,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     uiState.streamingState !== StreamingState.Idle &&
     !hasPendingActionRequired &&
     ambientText &&
+    loadingPhraseLayout !== 'none' &&
     !willCollideAmbient &&
     !isNarrow;
 
@@ -299,10 +314,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
               : uiState.thought
           }
           currentLoadingPhrase={
-            uiState.currentLoadingPhrase?.includes('press tab to focus shell')
+            uiState.currentLoadingPhrase?.includes('Tab to focus')
               ? uiState.currentLoadingPhrase
-              : !isExperimentalLayout &&
-                  settings.merged.ui.loadingPhrases !== 'off'
+              : !isExperimentalLayout && loadingPhraseLayout !== 'none'
                 ? uiState.currentLoadingPhrase
                 : isExperimentalLayout &&
                     uiState.streamingState === StreamingState.Responding &&
@@ -376,7 +390,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                         : uiState.thought
                     }
                     currentLoadingPhrase={
-                      settings.merged.ui.loadingPhrases === 'off'
+                      loadingPhraseLayout === 'none'
                         ? undefined
                         : uiState.currentLoadingPhrase
                     }
@@ -419,7 +433,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                           : uiState.thought
                       }
                       currentLoadingPhrase={
-                        settings.merged.ui.loadingPhrases === 'off'
+                        loadingPhraseLayout === 'none'
                           ? undefined
                           : uiState.currentLoadingPhrase
                       }

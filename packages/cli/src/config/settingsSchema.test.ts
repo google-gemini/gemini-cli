@@ -83,16 +83,21 @@ describe('SettingsSchema', () => {
       ).toBe('boolean');
     });
 
-    it('should have loadingPhrases enum property', () => {
-      const definition = getSettingsSchema().ui?.properties?.loadingPhrases;
+    it('should have loadingPhraseLayout enum property', () => {
+      const definition =
+        getSettingsSchema().ui?.properties?.loadingPhraseLayout;
       expect(definition).toBeDefined();
       expect(definition?.type).toBe('enum');
-      expect(definition?.default).toBe('tips');
-      expect(definition?.options?.map((o) => o.value)).toEqual([
+      expect(definition?.default).toBe('all_inline');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(definition?.options?.map((o: any) => o.value)).toEqual([
+        'none',
         'tips',
-        'witty',
-        'all',
-        'off',
+        'wit_status',
+        'wit_inline',
+        'wit_ambient',
+        'all_inline',
+        'all_ambient',
       ]);
     });
 

@@ -165,10 +165,17 @@ export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
 }
 
-export type LoadingPhrasesMode = 'tips' | 'witty' | 'all' | 'off';
+export type LoadingPhrasesMode =
+  | 'none'
+  | 'tips'
+  | 'wit_status'
+  | 'wit_inline'
+  | 'wit_ambient'
+  | 'all_inline'
+  | 'all_ambient';
 
 export interface AccessibilitySettings {
-  /** @deprecated Use ui.loadingPhrases instead. */
+  /** @deprecated Use ui.loadingPhraseLayout instead. */
   enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }
@@ -912,14 +919,14 @@ export function migrateDeprecatedSettings(
           }
         }
 
-        // Migrate enableLoadingPhrases: false → loadingPhrases: 'off'
+        // Migrate enableLoadingPhrases: false → loadingPhraseLayout: 'none'
         const enableLP = newAccessibility['enableLoadingPhrases'];
         if (
           typeof enableLP === 'boolean' &&
-          newUi['loadingPhrases'] === undefined
+          newUi['loadingPhraseLayout'] === undefined
         ) {
           if (!enableLP) {
-            newUi['loadingPhrases'] = 'off';
+            newUi['loadingPhraseLayout'] = 'none';
             loadedSettings.setValue(scope, 'ui', newUi);
             if (!settingsFile.readOnly) {
               anyModified = true;

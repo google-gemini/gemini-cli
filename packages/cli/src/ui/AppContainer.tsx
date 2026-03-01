@@ -2102,7 +2102,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       streamingState,
       shouldShowFocusHint,
       retryStatus,
-      loadingPhrasesMode: settings.merged.ui.loadingPhrases,
+      loadingPhraseLayout: settings.merged.ui.loadingPhraseLayout,
       customWittyPhrases: settings.merged.ui.customWittyPhrases,
       errorVerbosity: settings.merged.ui.errorVerbosity,
       maxLength,
