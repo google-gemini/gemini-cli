@@ -91,7 +91,7 @@ toolName = "write_file"
 decision = "allow"
 priority = 70
 modes = ["plan"]
-argsPattern = '.*${plansDir.replace(/\//g, '[\\\\/]+')}.*'
+argsPattern = "file_path":"[^"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+[\\\\/]+[\\w-]+[\\\\/]+plans[\\\\/]+[\\w-]+\\.md"
 `,
     );
 
