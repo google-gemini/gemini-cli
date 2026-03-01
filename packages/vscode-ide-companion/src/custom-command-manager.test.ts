@@ -6,6 +6,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { CustomCommandManager } from './custom-command-manager.js';
+import { sanitizeInput } from './sanitize-input.js';
 import type { CustomCommand } from './types.js';
 
 // Mock VS Code API
@@ -108,46 +109,39 @@ describe('CustomCommandManager - Collision Detection', () => {
   });
 });
 
-describe('CustomCommandManager - Input Sanitization', () => {
-  // These tests document the expected sanitization behavior to prevent
+describe('Input Sanitization', () => {
+  // These tests validate the production sanitization logic to prevent
   // prompt injection and backslash bypass attacks
 
-  const sanitize = (input: string): string =>
-    input
-      .replace(/\\/g, '\\\\')
-      .replace(/!{/g, '\\!{')
-      .replace(/@{/g, '\\@{')
-      .replace(/{{/g, '\\{{')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-
   it('escapes backslash to prevent bypass attacks', () => {
-    expect(sanitize('\\!{malicious}')).toBe('\\\\\\!{malicious}');
-    expect(sanitize('\\@{/etc/passwd}')).toBe('\\\\\\@{/etc/passwd}');
-    expect(sanitize('\\\\{{args}}')).toBe('\\\\\\\\\\{{args}}');
+    expect(sanitizeInput('\\!{malicious}')).toBe('\\\\\\!{malicious}');
+    expect(sanitizeInput('\\@{/etc/passwd}')).toBe('\\\\\\@{/etc/passwd}');
+    expect(sanitizeInput('\\\\{{args}}')).toBe('\\\\\\\\\\{{args}}');
   });
 
   it('escapes Gemini CLI special sequences', () => {
-    expect(sanitize('!{rm -rf /}')).toBe('\\!{rm -rf /}');
-    expect(sanitize('@{/etc/passwd}')).toBe('\\@{/etc/passwd}');
-    expect(sanitize('{{malicious_args}}')).toBe('\\{{malicious_args}}');
+    expect(sanitizeInput('!{rm -rf /}')).toBe('\\!{rm -rf /}');
+    expect(sanitizeInput('@{/etc/passwd}')).toBe('\\@{/etc/passwd}');
+    expect(sanitizeInput('{{malicious_args}}')).toBe('\\{{malicious_args}}');
   });
 
   it('escapes HTML-like tag characters', () => {
-    expect(sanitize('<script>alert("xss")</script>')).toBe(
+    expect(sanitizeInput('<script>alert("xss")</script>')).toBe(
       '&lt;script&gt;alert("xss")&lt;/script&gt;',
     );
-    expect(sanitize('a < b && c > d')).toBe('a &lt; b && c &gt; d');
+    expect(sanitizeInput('a < b && c > d')).toBe('a &lt; b && c &gt; d');
   });
 
   it('handles combined attack vectors', () => {
     const malicious = '\\!{cmd} && <tag>@{file}';
-    expect(sanitize(malicious)).toBe('\\\\\\!{cmd} && &lt;tag&gt;\\@{file}');
+    expect(sanitizeInput(malicious)).toBe(
+      '\\\\\\!{cmd} && &lt;tag&gt;\\@{file}',
+    );
   });
 
   it('preserves safe text unchanged', () => {
-    expect(sanitize('normal text')).toBe('normal text');
-    expect(sanitize('function(a, b) { return a + b; }')).toBe(
+    expect(sanitizeInput('normal text')).toBe('normal text');
+    expect(sanitizeInput('function(a, b) { return a + b; }')).toBe(
       'function(a, b) { return a + b; }',
     );
   });

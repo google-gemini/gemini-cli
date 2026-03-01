@@ -6,6 +6,7 @@
 
 import * as vscode from 'vscode';
 import { CommandScanner } from './command-scanner.js';
+import { sanitizeInput } from './sanitize-input.js';
 import type { CustomCommand } from './types.js';
 
 /**
@@ -177,15 +178,8 @@ export class CustomCommandManager {
 
       await vscode.workspace.fs.createDirectory(tmpDir);
 
-      // Escape special sequences that Gemini CLI interprets
-      // Order matters: escape backslashes first to prevent bypass attacks
-      const sanitizedText = selectedText
-        .replace(/\\/g, '\\\\')
-        .replace(/!{/g, '\\!{')
-        .replace(/@{/g, '\\@{')
-        .replace(/{{/g, '\\{{')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+      // Sanitize input to prevent prompt injection attacks
+      const sanitizedText = sanitizeInput(selectedText);
 
       const fullContent = `${cmd.prompt}\n\n${sanitizedText}`;
       await vscode.workspace.fs.writeFile(
