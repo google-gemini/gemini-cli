@@ -20,9 +20,7 @@ jobs:
       - name: 'Limit open pull requests per user'
         uses: 'Homebrew/actions/limit-pull-requests@9ceb7934560eb61d131dde205a6c2d77b2e1529d' # master
         with:
-          except-author-associations: |
-            MEMBER
-            OWNER
+          except-author-associations: 'MEMBER,OWNER,COLLABORATOR'
           comment-limit: 8
           comment: >
             You already have 7 pull requests open. Please work on getting

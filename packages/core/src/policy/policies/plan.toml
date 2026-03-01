@@ -37,13 +37,20 @@ deny_message = "You are in Plan Mode with access to read-only tools. Execution o
 # Explicitly Allow Read-Only Tools in Plan mode.
 
 [[rule]]
+mcpName = "*"
+toolAnnotations = { readOnlyHint = true }
+decision = "ask_user"
+priority = 70
+modes = ["plan"]
+
+[[rule]]
 toolName = ["glob", "grep_search", "list_directory", "read_file", "google_web_search", "activate_skill"]
 decision = "allow"
 priority = 70
 modes = ["plan"]
 
 [[rule]]
-toolName = ["ask_user", "exit_plan_mode"]
+toolName = ["ask_user", "exit_plan_mode", "save_memory"]
 decision = "ask_user"
 priority = 70
 modes = ["plan"]
@@ -58,7 +65,7 @@ argsPattern = "\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+tmp[\\\\/]+[\\w-]+
 
 # Explicitly Deny other write operations in Plan mode with a clear message.
 [[rule]]
-toolName = ["write_file", "edit"]
+toolName = ["write_file", "replace"]
 decision = "deny"
 priority = 65
 modes = ["plan"]

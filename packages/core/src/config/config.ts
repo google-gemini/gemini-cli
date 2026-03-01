@@ -13,6 +13,7 @@ import type {
   ContentGenerator,
   ContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import type { OverageStrategy } from '../billing/billing.js';
 import {
   AuthType,
   createContentGenerator,
@@ -38,6 +39,7 @@ import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
+import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
@@ -106,10 +108,16 @@ import { FileExclusions } from '../utils/ignorePatterns.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
-import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
+import {
+  ApprovalMode,
+  type PolicyEngineConfig,
+  type PolicyRule,
+  type SafetyCheckerRule,
+} from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type {
   UserTierId,
+  GeminiUserTier,
   RetrieveUserQuotaResponse,
   AdminControlsSettings,
 } from '../code_assist/types.js';
@@ -153,6 +161,7 @@ export interface SummarizeToolOutputSettings {
 
 export interface PlanSettings {
   directory?: string;
+  modelRouting?: boolean;
 }
 
 export interface TelemetrySettings {
@@ -177,6 +186,14 @@ export interface ToolOutputMaskingConfig {
   protectLatestTurn: boolean;
 }
 
+export interface GemmaModelRouterSettings {
+  enabled?: boolean;
+  classifier?: {
+    host?: string;
+    model?: string;
+  };
+}
+
 export interface ExtensionSetting {
   name: string;
   description: string;
@@ -198,6 +215,10 @@ export interface AgentRunConfig {
   maxTurns?: number;
 }
 
+/**
+ * Override configuration for a specific agent.
+ * Generic fields (modelConfig, runConfig, enabled) are standard across all agents.
+ */
 export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
@@ -206,6 +227,7 @@ export interface AgentOverride {
 
 export interface AgentSettings {
   overrides?: Record<string, AgentOverride>;
+  browser?: BrowserAgentCustomConfig;
 }
 
 export interface CustomTheme {
@@ -260,6 +282,30 @@ export interface CustomTheme {
 }
 
 /**
+ * Browser agent custom configuration.
+ * Used in agents.browser
+ *
+ * IMPORTANT: Keep in sync with the browser settings schema in
+ * packages/cli/src/config/settingsSchema.ts (agents.browser.properties).
+ */
+export interface BrowserAgentCustomConfig {
+  /**
+   * Session mode:
+   * - 'persistent': Launch Chrome with a persistent profile at ~/.cache/chrome-devtools-mcp/ (default)
+   * - 'isolated': Launch Chrome with a temporary profile, cleaned up after session
+   * - 'existing': Attach to an already-running Chrome instance (requires remote debugging
+   *   enabled at chrome://inspect/#remote-debugging)
+   */
+  sessionMode?: 'isolated' | 'persistent' | 'existing';
+  /** Run browser in headless mode. Default: false */
+  headless?: boolean;
+  /** Path to Chrome profile directory for session persistence. */
+  profilePath?: string;
+  /** Model override for the visual agent. */
+  visualModel?: string;
+}
+
+/**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
  * around on the config object though Core does not use this information
@@ -285,6 +331,14 @@ export interface GeminiCLIExtension {
    * These themes will be registered when the extension is activated.
    */
   themes?: CustomTheme[];
+  /**
+   * Policy rules contributed by this extension.
+   */
+  rules?: PolicyRule[];
+  /**
+   * Safety checkers contributed by this extension.
+   */
+  checkers?: SafetyCheckerRule[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -313,6 +367,7 @@ import {
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
+import { type McpContext } from '../tools/mcp-client.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getErrorMessage } from '../utils/errors.js';
 import {
@@ -467,6 +522,7 @@ export interface ConfigParameters {
   interactive?: boolean;
   trustedFolder?: boolean;
   useBackgroundColor?: boolean;
+  useAlternateBuffer?: boolean;
   useRipgrep?: boolean;
   enableInteractiveShell?: boolean;
   skipNextSpeakerCheck?: boolean;
@@ -479,6 +535,7 @@ export interface ConfigParameters {
   directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
   output?: OutputSettings;
+  gemmaModelRouter?: GemmaModelRouterSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
@@ -519,9 +576,12 @@ export interface ConfigParameters {
     agents?: AgentSettings;
   }>;
   enableConseca?: boolean;
+  billing?: {
+    overageStrategy?: OverageStrategy;
+  };
 }
 
-export class Config {
+export class Config implements McpContext {
   private toolRegistry!: ToolRegistry;
   private mcpClientManager?: McpClientManager;
   private allowedMcpServers: string[];
@@ -569,6 +629,7 @@ export class Config {
   private readonly usageStatisticsEnabled: boolean;
   private geminiClient!: GeminiClient;
   private baseLlmClient!: BaseLlmClient;
+  private localLiteRtLmClient?: LocalLiteRtLmClient;
   private modelRouterService: ModelRouterService;
   private readonly modelAvailabilityService: ModelAvailabilityService;
   private readonly fileFiltering: {
@@ -648,12 +709,14 @@ export class Config {
   private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private readonly useBackgroundColor: boolean;
+  private readonly useAlternateBuffer: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly truncateToolOutputThreshold: number;
   private compressionTruncationCounter = 0;
   private initialized = false;
   private initPromise: Promise<void> | undefined;
+  private mcpInitializationPromise: Promise<void> | null = null;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
@@ -664,6 +727,9 @@ export class Config {
     | PolicyUpdateConfirmationRequest
     | undefined;
   private readonly outputSettings: OutputSettings;
+
+  private readonly gemmaModelRouter: GemmaModelRouterSettings;
+
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly maxAttempts: number;
@@ -695,6 +761,10 @@ export class Config {
       }>)
     | undefined;
 
+  private readonly billing: {
+    overageStrategy: OverageStrategy;
+  };
+
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
   private readonly enableEventDrivenScheduler: boolean;
@@ -705,6 +775,7 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
@@ -794,6 +865,7 @@ export class Config {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
+    this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
@@ -841,6 +913,7 @@ export class Config {
     this.directWebFetch = params.directWebFetch ?? false;
     this.useRipgrep = params.useRipgrep ?? true;
     this.useBackgroundColor = params.useBackgroundColor ?? true;
+    this.useAlternateBuffer = params.useAlternateBuffer ?? false;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
@@ -910,6 +983,15 @@ export class Config {
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
+    this.gemmaModelRouter = {
+      enabled: params.gemmaModelRouter?.enabled ?? false,
+      classifier: {
+        host:
+          params.gemmaModelRouter?.classifier?.host ?? 'http://localhost:9379',
+        model:
+          params.gemmaModelRouter?.classifier?.model ?? 'gemma3-1b-gpu-custom',
+      },
+    };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.maxAttempts = Math.min(
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
@@ -929,6 +1011,10 @@ export class Config {
     this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
     this.onReload = params.onReload;
+
+    this.billing = {
+      overageStrategy: params.billing?.overageStrategy ?? 'ask',
+    };
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -1039,7 +1125,7 @@ export class Config {
     );
     // We do not await this promise so that the CLI can start up even if
     // MCP servers are slow to connect.
-    const mcpInitialization = Promise.allSettled([
+    this.mcpInitializationPromise = Promise.allSettled([
       this.mcpClientManager.startConfiguredMcpServers(),
       this.getExtensionLoader().start(this),
     ]).then((results) => {
@@ -1051,7 +1137,7 @@ export class Config {
     });
 
     if (!this.interactive || this.experimentalZedIntegration) {
-      await mcpInitialization;
+      await this.mcpInitializationPromise;
     }
 
     if (this.skillsSupport) {
@@ -1094,7 +1180,7 @@ export class Config {
     return this.contentGenerator;
   }
 
-  async refreshAuth(authMethod: AuthType) {
+  async refreshAuth(authMethod: AuthType, apiKey?: string) {
     // Reset availability service when switching auth
     this.modelAvailabilityService.reset();
 
@@ -1120,6 +1206,7 @@ export class Config {
     const newContentGeneratorConfig = await createContentGeneratorConfig(
       this,
       authMethod,
+      apiKey,
     );
     this.contentGenerator = await createContentGenerator(
       newContentGeneratorConfig,
@@ -1192,6 +1279,10 @@ export class Config {
     return this.contentGenerator?.userTierName;
   }
 
+  getUserPaidTier(): GeminiUserTier | undefined {
+    return this.contentGenerator?.paidTier;
+  }
+
   /**
    * Provides access to the BaseLlmClient for stateless LLM operations.
    */
@@ -1210,6 +1301,13 @@ export class Config {
       }
     }
     return this.baseLlmClient;
+  }
+
+  getLocalLiteRtLmClient(): LocalLiteRtLmClient {
+    if (!this.localLiteRtLmClient) {
+      this.localLiteRtLmClient = new LocalLiteRtLmClient(this);
+    }
+    return this.localLiteRtLmClient;
   }
 
   getSessionId(): string {
@@ -1499,6 +1597,19 @@ export class Config {
     this.hasAccessToPreviewModel = hasAccess;
   }
 
+  async refreshAvailableCredits(): Promise<void> {
+    const codeAssistServer = getCodeAssistServer(this);
+    if (!codeAssistServer) {
+      return;
+    }
+    try {
+      await codeAssistServer.refreshAvailableCredits();
+    } catch {
+      // Non-fatal: proceed even if refresh fails.
+      // The actual credit balance will be verified server-side.
+    }
+  }
+
   async refreshUserQuota(): Promise<RetrieveUserQuotaResponse | undefined> {
     const codeAssistServer = getCodeAssistServer(this);
     if (!codeAssistServer || !codeAssistServer.projectId) {
@@ -1597,7 +1708,10 @@ export class Config {
    *
    * May change over time.
    */
-  getExcludeTools(): Set<string> | undefined {
+  getExcludeTools(
+    toolMetadata?: Map<string, Record<string, unknown>>,
+    allToolNames?: Set<string>,
+  ): Set<string> | undefined {
     // Right now this is present for backward compatibility with settings.json exclude
     const excludeToolsSet = new Set([...(this.excludeTools ?? [])]);
     for (const extension of this.getExtensionLoader().getExtensions()) {
@@ -1609,7 +1723,10 @@ export class Config {
       }
     }
 
-    const policyExclusions = this.policyEngine.getExcludedTools();
+    const policyExclusions = this.policyEngine.getExcludedTools(
+      toolMetadata,
+      allToolNames,
+    );
     for (const tool of policyExclusions) {
       excludeToolsSet.add(tool);
     }
@@ -1652,6 +1769,33 @@ export class Config {
 
   getMcpClientManager(): McpClientManager | undefined {
     return this.mcpClientManager;
+  }
+
+  setUserInteractedWithMcp(): void {
+    this.mcpClientManager?.setUserInteractedWithMcp();
+  }
+
+  /** @deprecated Use getMcpClientManager().getLastError() directly */
+  getLastMcpError(serverName: string): string | undefined {
+    return this.mcpClientManager?.getLastError(serverName);
+  }
+
+  emitMcpDiagnostic(
+    severity: 'info' | 'warning' | 'error',
+    message: string,
+    error?: unknown,
+    serverName?: string,
+  ): void {
+    if (this.mcpClientManager) {
+      this.mcpClientManager.emitDiagnostic(
+        severity,
+        message,
+        error,
+        serverName,
+      );
+    } else {
+      coreEvents.emitFeedback(severity, message, error);
+    }
   }
 
   getAllowedMcpServers(): string[] | undefined {
@@ -1967,6 +2111,19 @@ export class Config {
     return this.telemetrySettings.outfile;
   }
 
+  getBillingSettings(): { overageStrategy: OverageStrategy } {
+    return this.billing;
+  }
+
+  /**
+   * Updates the overage strategy at runtime.
+   * Used to switch from 'ask' to 'always' after the user accepts credits
+   * via the overage dialog, so subsequent API calls auto-include credits.
+   */
+  setOverageStrategy(strategy: OverageStrategy): void {
+    this.billing.overageStrategy = strategy;
+  }
+
   getTelemetryUseCollector(): boolean {
     return this.telemetrySettings.useCollector ?? false;
   }
@@ -2076,6 +2233,12 @@ export class Config {
 
   getExperimentalZedIntegration(): boolean {
     return this.experimentalZedIntegration;
+  }
+
+  async waitForMcpInit(): Promise<void> {
+    if (this.mcpInitializationPromise) {
+      await this.mcpInitializationPromise;
+    }
   }
 
   getListExtensions(): boolean {
@@ -2283,6 +2446,10 @@ export class Config {
     return this.experiments?.flags[ExperimentFlags.USER_CACHING]?.boolValue;
   }
 
+  async getPlanModeRoutingEnabled(): Promise<boolean> {
+    return this.planModeRoutingEnabled;
+  }
+
   async getNumericalRoutingEnabled(): Promise<boolean> {
     await this.ensureExperimentsLoaded();
 
@@ -2435,6 +2602,10 @@ export class Config {
     return this.useBackgroundColor;
   }
 
+  getUseAlternateBuffer(): boolean {
+    return this.useAlternateBuffer;
+  }
+
   getEnableInteractiveShell(): boolean {
     return this.enableInteractiveShell;
   }
@@ -2533,6 +2704,46 @@ export class Config {
 
   getEnableHooksUI(): boolean {
     return this.enableHooksUI;
+  }
+
+  getGemmaModelRouterEnabled(): boolean {
+    return this.gemmaModelRouter.enabled ?? false;
+  }
+
+  getGemmaModelRouterSettings(): GemmaModelRouterSettings {
+    return this.gemmaModelRouter;
+  }
+
+  /**
+   * Get override settings for a specific agent.
+   * Reads from agents.overrides.<agentName>.
+   */
+  getAgentOverride(agentName: string): AgentOverride | undefined {
+    return this.getAgentsSettings()?.overrides?.[agentName];
+  }
+
+  /**
+   * Get browser agent configuration.
+   * Combines generic AgentOverride fields with browser-specific customConfig.
+   * This is the canonical way to access browser agent settings.
+   */
+  getBrowserAgentConfig(): {
+    enabled: boolean;
+    model?: string;
+    customConfig: BrowserAgentCustomConfig;
+  } {
+    const override = this.getAgentOverride('browser_agent');
+    const customConfig = this.getAgentsSettings()?.browser ?? {};
+    return {
+      enabled: override?.enabled ?? false,
+      model: override?.modelConfig?.model,
+      customConfig: {
+        sessionMode: customConfig.sessionMode ?? 'persistent',
+        headless: customConfig.headless ?? false,
+        profilePath: customConfig.profilePath,
+        visualModel: customConfig.visualModel,
+      },
+    };
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {

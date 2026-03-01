@@ -7,6 +7,8 @@
 import { spawn } from 'node:child_process';
 import type {
   HookConfig,
+  CommandHookConfig,
+  RuntimeHookConfig,
   HookInput,
   HookOutput,
   HookExecutionResult,
@@ -15,7 +17,7 @@ import type {
   BeforeModelOutput,
   BeforeToolInput,
 } from './types.js';
-import { HookEventName, ConfigSource } from './types.js';
+import { HookEventName, ConfigSource, HookType } from './types.js';
 import type { Config } from '../config/config.js';
 import type { LLMRequest } from './hookTranslator.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -75,6 +77,15 @@ export class HookRunner {
     }
 
     try {
+      if (hookConfig.type === HookType.Runtime) {
+        return await this.executeRuntimeHook(
+          hookConfig,
+          eventName,
+          input,
+          startTime,
+        );
+      }
+
       return await this.executeCommandHook(
         hookConfig,
         eventName,
@@ -83,7 +94,10 @@ export class HookRunner {
       );
     } catch (error) {
       const duration = Date.now() - startTime;
-      const hookId = hookConfig.name || hookConfig.command || 'unknown';
+      const hookId =
+        hookConfig.name ||
+        (hookConfig.type === HookType.Command ? hookConfig.command : '') ||
+        'unknown';
       const errorMessage = `Hook execution failed for event '${eventName}' (hook: ${hookId}): ${error}`;
       debugLogger.warn(`Hook execution error (non-fatal): ${errorMessage}`);
 
@@ -231,10 +245,65 @@ export class HookRunner {
   }
 
   /**
+   * Execute a runtime hook
+   */
+  private async executeRuntimeHook(
+    hookConfig: RuntimeHookConfig,
+    eventName: HookEventName,
+    input: HookInput,
+    startTime: number,
+  ): Promise<HookExecutionResult> {
+    const timeout = hookConfig.timeout ?? DEFAULT_HOOK_TIMEOUT;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const controller = new AbortController();
+
+    try {
+      // Create a promise that rejects after timeout
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(
+          () => reject(new Error(`Hook timed out after ${timeout}ms`)),
+          timeout,
+        );
+      });
+
+      // Execute action with timeout race
+      const result = await Promise.race([
+        hookConfig.action(input, { signal: controller.signal }),
+        timeoutPromise,
+      ]);
+
+      const output =
+        result === null || result === undefined ? undefined : result;
+
+      return {
+        hookConfig,
+        eventName,
+        success: true,
+        output,
+        duration: Date.now() - startTime,
+      };
+    } catch (error) {
+      // Abort the ongoing hook action if it timed out or errored
+      controller.abort();
+      return {
+        hookConfig,
+        eventName,
+        success: false,
+        error: error instanceof Error ? error : new Error(String(error)),
+        duration: Date.now() - startTime,
+      };
+    } finally {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
+    }
+  }
+
+  /**
    * Execute a command hook
    */
   private async executeCommandHook(
-    hookConfig: HookConfig,
+    hookConfig: CommandHookConfig,
     eventName: HookEventName,
     input: HookInput,
     startTime: number,
