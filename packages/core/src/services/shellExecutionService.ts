@@ -28,6 +28,7 @@ import {
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
 import { killProcessGroup } from '../utils/process-utils.js';
+import path from 'node:path';
 const { Terminal } = pkg;
 
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
@@ -929,10 +930,10 @@ export class ShellExecutionService {
   ): string {
     // Force PowerShell on Windows to use UTF-8 encoding.
     // Without this, multibyte characters (e.g., Japanese, Chinese) appear garbled.
+    const exeName = path.basename(executable).toLowerCase();
     const isPowerShell =
       isWindows &&
-      (executable.toLowerCase().includes('powershell') ||
-        executable.toLowerCase().includes('pwsh'));
+      (exeName.startsWith('powershell') || exeName.startsWith('pwsh'));
 
     if (isPowerShell) {
       return `$OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${command}`;
