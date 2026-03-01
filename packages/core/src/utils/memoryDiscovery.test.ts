@@ -97,9 +97,6 @@ describe('memoryDiscovery', () => {
     vi.mocked(pathsHomedir).mockReturnValue(homedir);
   });
 
-  const normMarker = (p: string) =>
-    process.platform === 'win32' ? p.toLowerCase() : p;
-
   afterEach(async () => {
     vi.unstubAllEnvs();
     // Some tests set this to a different value.
@@ -1429,12 +1426,18 @@ included directory memory
         .mockReturnValue(new SimpleExtensionLoader([])),
       isTrustedFolder: vi.fn().mockReturnValue(true),
       getImportFormat: vi.fn().mockReturnValue('tree'),
-      getFileFilteringOptions: vi.fn().mockReturnValue(undefined),
+      getMemoryFileFilteringOptions: vi.fn().mockReturnValue(undefined),
       getDiscoveryMaxDirs: vi.fn().mockReturnValue(200),
       getMemoryBoundaryMarkers: vi.fn().mockReturnValue(['.git']),
       setUserMemory: vi.fn(),
       setGeminiMdFileCount: vi.fn(),
       setGeminiMdFilePaths: vi.fn(),
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        getDirectories: vi.fn().mockReturnValue([]),
+      }),
+      getFileDiscoveryService: vi.fn().mockReturnValue(new FileDiscoveryService(projectRoot)),
+      isFolderTrusted: vi.fn().mockReturnValue(true),
+      getMaxGeminiMdDiscoveryDirs: vi.fn().mockReturnValue(200),
       getMcpClientManager: vi.fn().mockReturnValue({
         getMcpInstructions: vi
           .fn()
