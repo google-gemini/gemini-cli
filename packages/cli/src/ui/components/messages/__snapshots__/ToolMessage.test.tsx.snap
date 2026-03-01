@@ -1,94 +1,83 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`<ToolMessage /> > JSON rendering > renders pretty JSON in ink frame 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                              │
-│                                                                              │
-│ {                                                                            │
-│   "a": 1,                                                                    │
-│   "b": 2                                                                     │
-│ }                                                                            │
+" ✓  test-tool A tool for testing
+
+ {
+   "a": 1,
+   "b": 2
+ }
 "
 `;
 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows ? for Confirming status 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ?  test-tool A tool for testing                                              │
-│                                                                              │
-│ Test result                                                                  │
+" ?  test-tool A tool for testing
+
+ Test result
 "
 `;
 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows - for Canceled status 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ -  test-tool A tool for testing                                              │
-│                                                                              │
-│ Test result                                                                  │
+" -  test-tool A tool for testing
+
+ Test result
 "
 `;
 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows MockRespondingSpinner for Executing status when streamingState is Responding 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ MockRespondingSpinnertest-tool A tool for testing                            │
-│                                                                              │
-│ Test result                                                                  │
+" MockRespondingSpinnertest-tool A tool for testing
+
+ Test result
 "
 `;
 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows o for Pending status 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ o  test-tool A tool for testing                                              │
-│                                                                              │
-│ Test result                                                                  │
+" o  test-tool A tool for testing
+
+ Test result
 "
 `;
 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows paused spinner for Executing status when streamingState is Idle 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ MockRespondingSpinnertest-tool A tool for testing                            │
-│                                                                              │
-│ Test result                                                                  │
+" MockRespondingSpinnertest-tool A tool for testing
+
+ Test result
 "
 `;
 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows paused spinner for Executing status when streamingState is WaitingForConfirmation 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ MockRespondingSpinnertest-tool A tool for testing                            │
-│                                                                              │
-│ Test result                                                                  │
+" MockRespondingSpinnertest-tool A tool for testing
+
+ Test result
 "
 `;
 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows x for Error status 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ x  test-tool A tool for testing                                              │
-│                                                                              │
-│ Test result                                                                  │
+" x  test-tool A tool for testing
+
+ Test result
 "
 `;
 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows ✓ for Success status 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                              │
-│                                                                              │
-│ Test result                                                                  │
+" ✓  test-tool A tool for testing
+
+ Test result
 "
 `;
 
 exports[`<ToolMessage /> > renders AnsiOutputText for AnsiOutput results 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                              │
-│                                                                              │
-│ hello                                                                        │
+" ✓  test-tool A tool for testing
+
+ hello
 "
 `;
 
 exports[`<ToolMessage /> > renders DiffRenderer for diff results 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                              │
-│                                                                              │
-│ 1 - old                                                                      │
-│ 1 + new                                                                      │
+" ✓  test-tool A tool for testing
+
+ 1 - old
+ 1 + new
 "
 `;
 
@@ -103,26 +92,23 @@ exports[`<ToolMessage /> > renders McpProgressIndicator with percentage and mess
 `;
 
 exports[`<ToolMessage /> > renders basic tool information 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                              │
-│                                                                              │
-│ Test result                                                                  │
+" ✓  test-tool A tool for testing
+
+ Test result
 "
 `;
 
 exports[`<ToolMessage /> > renders emphasis correctly 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                            ← │
-│                                                                              │
-│ Test result                                                                  │
+" ✓  test-tool A tool for testing                                              ←
+
+ Test result
 "
 `;
 
 exports[`<ToolMessage /> > renders emphasis correctly 2`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                              │
-│                                                                              │
-│ Test result                                                                  │
+" ✓  test-tool A tool for testing
+
+ Test result
 "
 `;
 

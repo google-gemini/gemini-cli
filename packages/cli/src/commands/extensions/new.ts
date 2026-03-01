@@ -10,6 +10,12 @@ import type { CommandModule } from 'yargs';
 import { fileURLToPath } from 'node:url';
 import { debugLogger } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
+import { z } from 'zod';
+
+const newArgsSchema = z.object({
+  path: z.string(),
+  template: z.string().optional(),
+});
 
 interface NewArgs {
   path: string;
@@ -96,12 +102,11 @@ export const newCommand: CommandModule = {
         choices,
       });
   },
-  handler: async (args) => {
+  handler: async (argv) => {
+    const parsedArgs = newArgsSchema.parse(argv);
     await handleNew({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      path: args['path'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      template: args['template'] as string | undefined,
+      path: parsedArgs.path,
+      template: parsedArgs.template,
     });
     await exitCli();
   },

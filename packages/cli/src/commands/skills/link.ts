@@ -15,6 +15,13 @@ import {
   skillsConsentString,
 } from '../../config/extensions/consent.js';
 import { linkSkill } from '../../utils/skillUtils.js';
+import { z } from 'zod';
+
+const linkArgsSchema = z.object({
+  path: z.string(),
+  scope: z.enum(['user', 'workspace']).default('user'),
+  consent: z.boolean().optional(),
+});
 
 interface LinkArgs {
   path: string;
@@ -83,13 +90,11 @@ export const linkCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const parsedArgs = linkArgsSchema.parse(argv);
     await handleLink({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      path: argv['path'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      scope: argv['scope'] as 'user' | 'workspace',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      consent: argv['consent'] as boolean | undefined,
+      path: parsedArgs.path,
+      scope: parsedArgs.scope,
+      consent: parsedArgs.consent,
     });
     await exitCli();
   },

@@ -12,6 +12,12 @@ import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
+import { z } from 'zod';
+
+const disableArgsSchema = z.object({
+  name: z.string(),
+  scope: z.enum(['user', 'workspace']).default('user'),
+});
 
 interface DisableArgs {
   name: string;
@@ -78,11 +84,10 @@ export const disableCommand: CommandModule = {
         return true;
       }),
   handler: async (argv) => {
+    const parsedArgs = disableArgsSchema.parse(argv);
     await handleDisable({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      name: argv['name'] as string,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      scope: argv['scope'] as string,
+      name: parsedArgs.name,
+      scope: parsedArgs.scope,
     });
     await exitCli();
   },

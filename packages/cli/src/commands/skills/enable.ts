@@ -11,6 +11,11 @@ import { exitCli } from '../utils.js';
 import { enableSkill } from '../../utils/skillSettings.js';
 import { renderSkillActionFeedback } from '../../utils/skillUtils.js';
 import chalk from 'chalk';
+import { z } from 'zod';
+
+const enableArgsSchema = z.object({
+  name: z.string(),
+});
 
 interface EnableArgs {
   name: string;
@@ -39,9 +44,9 @@ export const enableCommand: CommandModule = {
       demandOption: true,
     }),
   handler: async (argv) => {
+    const parsedArgs = enableArgsSchema.parse(argv);
     await handleEnable({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      name: argv['name'] as string,
+      name: parsedArgs.name,
     });
     await exitCli();
   },

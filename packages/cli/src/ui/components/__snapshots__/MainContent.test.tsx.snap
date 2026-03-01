@@ -3,21 +3,19 @@
 exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Focused shell should expand' 1`] = `
 "ScrollableList
 AppHeader(full)
-╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command Running a long command...                                                   │
-│                                                                                              │
-│ Line 10                                                                                      │
-│ Line 11                                                                                      │
-│ Line 12                                                                                      │
-│ Line 13                                                                                      │
-│ Line 14                                                                                      │
-│ Line 15                                                                                    █ │
-│ Line 16                                                                                    █ │
-│ Line 17                                                                                    █ │
-│ Line 18                                                                                    █ │
-│ Line 19                                                                                    █ │
-│ Line 20                                                                                    █ │
-╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+ ⊷  Shell Command Running a long command...
+
+ Line 10
+ Line 11
+ Line 12
+ Line 13
+ Line 14
+ Line 15                                                                                    █
+ Line 16                                                                                    █
+ Line 17                                                                                    █
+ Line 18                                                                                    █
+ Line 19                                                                                    █
+ Line 20                                                                                    █
 ShowMoreLines
 "
 `;
@@ -25,21 +23,19 @@ ShowMoreLines
 exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Unfocused shell' 1`] = `
 "ScrollableList
 AppHeader(full)
-╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command Running a long command...                                                   │
-│                                                                                              │
-│ Line 10                                                                                      │
-│ Line 11                                                                                      │
-│ Line 12                                                                                      │
-│ Line 13                                                                                      │
-│ Line 14                                                                                      │
-│ Line 15                                                                                    █ │
-│ Line 16                                                                                    █ │
-│ Line 17                                                                                    █ │
-│ Line 18                                                                                    █ │
-│ Line 19                                                                                    █ │
-│ Line 20                                                                                    █ │
-╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+ ⊷  Shell Command Running a long command...
+
+ Line 10
+ Line 11
+ Line 12
+ Line 13
+ Line 14
+ Line 15                                                                                    █
+ Line 16                                                                                    █
+ Line 17                                                                                    █
+ Line 18                                                                                    █
+ Line 19                                                                                    █
+ Line 20                                                                                    █
 ShowMoreLines
 "
 `;

@@ -12,6 +12,11 @@ import { requestConsentNonInteractive } from '../../config/extensions/consent.js
 import { loadSettings } from '../../config/settings.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
+import { z } from 'zod';
+
+const listArgsSchema = z.object({
+  'output-format': z.enum(['text', 'json']).default('text'),
+});
 
 export async function handleList(options?: { outputFormat?: 'text' | 'json' }) {
   try {
@@ -61,9 +66,9 @@ export const listCommand: CommandModule = {
       default: 'text',
     }),
   handler: async (argv) => {
+    const parsedArgs = listArgsSchema.parse(argv);
     await handleList({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      outputFormat: argv['output-format'] as 'text' | 'json',
+      outputFormat: parsedArgs['output-format'],
     });
     await exitCli();
   },
