@@ -32,6 +32,30 @@ type ColorRow = StandardColorRow | GradientColorRow | BackgroundColorRow;
 
 const VALUE_COLUMN_WIDTH = 10;
 
+const COLOR_DESCRIPTIONS: Record<string, string> = {
+  'text.primary': 'Primary text color (uses terminal default if blank)',
+  'text.secondary': 'Secondary/dimmed text color',
+  'text.link': 'Hyperlink and highlighting color',
+  'text.accent': 'Accent color for emphasis',
+  'text.response':
+    'Color for model response text (uses terminal default if blank)',
+  'background.primary': 'Main terminal background color',
+  'background.message': 'Subtle background for message blocks',
+  'background.input': 'Background for the input prompt',
+  'background.selection': 'Background highlight for selected/focused items',
+  'background.diff.added': 'Background for added lines in diffs',
+  'background.diff.removed': 'Background for removed lines in diffs',
+  'border.default': 'Standard border color',
+  'border.focused': 'Border color when an element is focused',
+  'ui.comment': 'Color for code comments and metadata',
+  'ui.symbol': 'Color for technical symbols and UI icons',
+  'ui.dark': 'Deeply dimmed color for subtle UI elements',
+  'ui.focus': 'Color for focused or selected UI elements (e.g. menu items)',
+  'status.error': 'Color for error messages and critical status',
+  'status.success': 'Color for success messages and positive status',
+  'status.warning': 'Color for warnings and cautionary status',
+};
+
 interface ColorsDisplayProps {
   activeTheme: Theme;
 }
@@ -179,20 +203,28 @@ export const ColorsDisplay: React.FC<ColorsDisplayProps> = ({
 function renderStandardRow({ name, value }: StandardColorRow) {
   const isHex = value.startsWith('#');
   const displayColor = isHex ? value : theme.text.primary;
+  const description = COLOR_DESCRIPTIONS[name] || '';
 
   return (
     <Box key={name} flexDirection="row" paddingX={1}>
       <Box width={VALUE_COLUMN_WIDTH}>
         <Text color={displayColor}>{value || '(blank)'}</Text>
       </Box>
-      <Box flexGrow={1}>
-        <Text color={displayColor}>{name}</Text>
+      <Box flexGrow={1} flexDirection="row">
+        <Box width="30%">
+          <Text color={displayColor}>{name}</Text>
+        </Box>
+        <Box flexGrow={1} paddingLeft={1}>
+          <Text color={theme.text.secondary}>{description}</Text>
+        </Box>
       </Box>
     </Box>
   );
 }
 
 function renderGradientRow({ name, value }: GradientColorRow) {
+  const description = COLOR_DESCRIPTIONS[name] || '';
+
   return (
     <Box key={name} flexDirection="row" paddingX={1}>
       <Box width={VALUE_COLUMN_WIDTH} flexDirection="column">
@@ -202,16 +234,23 @@ function renderGradientRow({ name, value }: GradientColorRow) {
           </Text>
         ))}
       </Box>
-      <Box flexGrow={1}>
-        <Gradient colors={value}>
-          <Text>{name}</Text>
-        </Gradient>
+      <Box flexGrow={1} flexDirection="row">
+        <Box width="30%">
+          <Gradient colors={value}>
+            <Text>{name}</Text>
+          </Gradient>
+        </Box>
+        <Box flexGrow={1} paddingLeft={1}>
+          <Text color={theme.text.secondary}>{description}</Text>
+        </Box>
       </Box>
     </Box>
   );
 }
 
 function renderBackgroundRow({ name, value }: BackgroundColorRow) {
+  const description = COLOR_DESCRIPTIONS[name] || '';
+
   return (
     <Box key={name} flexDirection="row" paddingX={1}>
       <Box
@@ -224,8 +263,13 @@ function renderBackgroundRow({ name, value }: BackgroundColorRow) {
           {value || 'default'}
         </Text>
       </Box>
-      <Box flexGrow={1} paddingLeft={1}>
-        <Text color={theme.text.primary}>{name}</Text>
+      <Box flexGrow={1} flexDirection="row" paddingLeft={1}>
+        <Box width="30%">
+          <Text color={theme.text.primary}>{name}</Text>
+        </Box>
+        <Box flexGrow={1} paddingLeft={1}>
+          <Text color={theme.text.secondary}>{description}</Text>
+        </Box>
       </Box>
     </Box>
   );

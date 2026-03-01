@@ -97,7 +97,11 @@ export function SuggestionsDisplay({
         );
 
         return (
-          <Box key={`${suggestion.value}-${originalIndex}`} flexDirection="row">
+          <Box
+            key={`${suggestion.value}-${originalIndex}`}
+            flexDirection="row"
+            backgroundColor={isActive ? theme.background.selection : undefined}
+          >
             <Box
               {...(mode === 'slash'
                 ? { width: commandColumnWidth, flexShrink: 0 as const }

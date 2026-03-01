@@ -23,6 +23,7 @@ const ansiColors: ColorsTheme = {
   Comment: 'gray',
   Gray: 'gray',
   DarkGray: 'gray',
+  SelectionBackground: 'black',
   GradientColors: ['cyan', 'green'],
 };
 

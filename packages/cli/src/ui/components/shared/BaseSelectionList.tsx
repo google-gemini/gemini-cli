@@ -137,7 +137,13 @@ export function BaseSelectionList<
         )}.`;
 
         return (
-          <Box key={item.key} alignItems="flex-start">
+          <Box
+            key={item.key}
+            alignItems="flex-start"
+            backgroundColor={
+              isSelected ? theme.background.selection : undefined
+            }
+          >
             {/* Radio button indicator */}
             <Box minWidth={2} flexShrink={0}>
               <Text

@@ -514,7 +514,14 @@ export function BaseSettingsDialog({
 
               return (
                 <React.Fragment key={item.key}>
-                  <Box marginX={1} flexDirection="row" alignItems="flex-start">
+                  <Box
+                    marginX={1}
+                    flexDirection="row"
+                    alignItems="flex-start"
+                    backgroundColor={
+                      isActive ? theme.background.selection : undefined
+                    }
+                  >
                     <Box minWidth={2} flexShrink={0}>
                       <Text
                         color={isActive ? theme.ui.focus : theme.text.secondary}

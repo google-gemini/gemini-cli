@@ -22,16 +22,16 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Theme, ThemeType, ColorsTheme } from './theme.js';
 import type { CustomTheme } from '@google/gemini-cli-core';
-import { createCustomTheme, validateCustomTheme } from './theme.js';
-import type { SemanticColors } from './semantic-tokens.js';
-import {
+import { createCustomTheme, validateCustomTheme ,
   interpolateColor,
   getThemeTypeFromBackgroundColor,
   resolveColor,
-} from './color-utils.js';
+} from './theme.js';
+import type { SemanticColors } from './semantic-tokens.js';
 import {
   DEFAULT_BACKGROUND_OPACITY,
   DEFAULT_INPUT_BACKGROUND_OPACITY,
+  DEFAULT_SELECTION_OPACITY,
   DEFAULT_BORDER_OPACITY,
 } from '../constants.js';
 import { ANSI } from './ansi.js';
@@ -369,6 +369,11 @@ class ThemeManager {
           colors.Gray,
           DEFAULT_BACKGROUND_OPACITY,
         ),
+        SelectionBackground: interpolateColor(
+          this.terminalBackground,
+          colors.AccentGreen,
+          DEFAULT_SELECTION_OPACITY,
+        ),
       };
     } else {
       this.cachedColors = colors;
@@ -402,6 +407,7 @@ class ThemeManager {
           primary: this.terminalBackground,
           message: colors.MessageBackground!,
           input: colors.InputBackground!,
+          selection: colors.SelectionBackground!,
         },
         border: {
           ...semanticColors.border,

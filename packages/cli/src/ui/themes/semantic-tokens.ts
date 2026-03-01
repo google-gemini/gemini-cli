@@ -18,6 +18,7 @@ export interface SemanticColors {
     primary: string;
     message: string;
     input: string;
+    selection: string;
     diff: {
       added: string;
       removed: string;
