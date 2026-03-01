@@ -1,4 +1,4 @@
-import { evaluate } from 'mathjs';
+import { create, all } from 'mathjs';
 import { CALCULATOR_TOOL_NAME } from './definitions/base-declarations.js';
 import {
   BaseDeclarativeTool,
@@ -7,6 +7,15 @@ import {
   type ToolResult,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+
+// Create a sandboxed mathjs instance for safer evaluation.
+const math = create(all);
+// Disable unsafe functions that could be exploited with untrusted input.
+// We cast to any because we're purposefully removing core functions for security.
+/* eslint-disable @typescript-eslint/no-explicit-any */
+delete (math as any).import;
+delete (math as any).createUnit;
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 export interface CalculatorParams extends Record<string, unknown> {
   expression: string;
@@ -78,7 +87,7 @@ export function calculator(expression: string): string {
       return 'Expression too long.';
     }
 
-    const result = evaluate(expression);
+    const result = math.evaluate(expression);
     return String(result);
   } catch {
     return 'Invalid mathematical expression.';
