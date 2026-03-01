@@ -28,6 +28,7 @@ import type { UseAtCompletionProps } from './useAtCompletion.js';
 import { useAtCompletion } from './useAtCompletion.js';
 import type { UseSlashCompletionProps } from './useSlashCompletion.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
+import { useShellCompletion } from './useShellCompletion.js';
 
 vi.mock('./useAtCompletion', () => ({
   useAtCompletion: vi.fn(),
@@ -40,19 +41,35 @@ vi.mock('./useSlashCompletion', () => ({
   })),
 }));
 
+vi.mock('./useShellCompletion', () => ({
+  useShellCompletion: vi.fn(() => ({
+    completionStart: 0,
+    completionEnd: 0,
+    query: '',
+  })),
+}));
+
 // Helper to set up mocks in a consistent way for both child hooks
 const setupMocks = ({
   atSuggestions = [],
   slashSuggestions = [],
+  shellSuggestions = [],
   isLoading = false,
   isPerfectMatch = false,
   slashCompletionRange = { completionStart: 0, completionEnd: 0 },
+  shellCompletionRange = { completionStart: 0, completionEnd: 0, query: '' },
 }: {
   atSuggestions?: Suggestion[];
   slashSuggestions?: Suggestion[];
+  shellSuggestions?: Suggestion[];
   isLoading?: boolean;
   isPerfectMatch?: boolean;
   slashCompletionRange?: { completionStart: number; completionEnd: number };
+  shellCompletionRange?: {
+    completionStart: number;
+    completionEnd: number;
+    query: string;
+  };
 }) => {
   // Mock for @-completions
   (useAtCompletion as Mock).mockImplementation(
@@ -89,11 +106,25 @@ const setupMocks = ({
       return slashCompletionRange;
     },
   );
+
+  // Mock for shell completions
+  (useShellCompletion as Mock).mockImplementation(
+    ({ enabled, setSuggestions, setIsLoadingSuggestions }) => {
+      useEffect(() => {
+        if (enabled) {
+          setIsLoadingSuggestions(isLoading);
+          setSuggestions(shellSuggestions);
+        }
+      }, [enabled, setSuggestions, setIsLoadingSuggestions]);
+      return shellCompletionRange;
+    },
+  );
 };
 
 describe('useCommandCompletion', () => {
   const mockCommandContext = {} as CommandContext;
   const mockConfig = {
+    getEnablePromptCompletion: () => false,
     getGeminiClient: vi.fn(),
   } as unknown as Config;
   const testRootDir = '/';
@@ -498,6 +529,7 @@ describe('useCommandCompletion', () => {
   describe('prompt completion filtering', () => {
     it('should not trigger prompt completion for line comments', async () => {
       const mockConfig = {
+        getEnablePromptCompletion: () => true,
         getGeminiClient: vi.fn(),
       } as unknown as Config;
 
@@ -530,6 +562,7 @@ describe('useCommandCompletion', () => {
 
     it('should not trigger prompt completion for block comments', async () => {
       const mockConfig = {
+        getEnablePromptCompletion: () => true,
         getGeminiClient: vi.fn(),
       } as unknown as Config;
 
@@ -564,6 +597,7 @@ describe('useCommandCompletion', () => {
 
     it('should trigger prompt completion for regular text when enabled', async () => {
       const mockConfig = {
+        getEnablePromptCompletion: () => true,
         getGeminiClient: vi.fn(),
       } as unknown as Config;
 

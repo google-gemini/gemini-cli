@@ -263,6 +263,41 @@ describe('toolMapping', () => {
       expect(result.borderBottom).toBe(false);
     });
 
+    it('maps raw progress and progressTotal from Executing calls', () => {
+      const toolCall: ExecutingToolCall = {
+        status: CoreToolCallStatus.Executing,
+        request: mockRequest,
+        tool: mockTool,
+        invocation: mockInvocation,
+        progressMessage: 'Downloading...',
+        progress: 5,
+        progressTotal: 10,
+      };
+
+      const result = mapToDisplay(toolCall);
+      const displayTool = result.tools[0];
+
+      expect(displayTool.progress).toBe(5);
+      expect(displayTool.progressTotal).toBe(10);
+      expect(displayTool.progressMessage).toBe('Downloading...');
+    });
+
+    it('leaves progress fields undefined for non-Executing calls', () => {
+      const toolCall: SuccessfulToolCall = {
+        status: CoreToolCallStatus.Success,
+        request: mockRequest,
+        tool: mockTool,
+        invocation: mockInvocation,
+        response: mockResponse,
+      };
+
+      const result = mapToDisplay(toolCall);
+      const displayTool = result.tools[0];
+
+      expect(displayTool.progress).toBeUndefined();
+      expect(displayTool.progressTotal).toBeUndefined();
+    });
+
     it('sets resultDisplay to undefined for pre-execution statuses', () => {
       const toolCall: ScheduledToolCall = {
         status: CoreToolCallStatus.Scheduled,
@@ -274,6 +309,49 @@ describe('toolMapping', () => {
       const result = mapToDisplay(toolCall);
       expect(result.tools[0].resultDisplay).toBeUndefined();
       expect(result.tools[0].status).toBe(CoreToolCallStatus.Scheduled);
+    });
+
+    it('propagates originalRequestName correctly', () => {
+      const toolCall: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: {
+          ...mockRequest,
+          originalRequestName: 'original_tool',
+        },
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+
+      const result = mapToDisplay(toolCall);
+      expect(result.tools[0].originalRequestName).toBe('original_tool');
+    });
+
+    it('propagates isClientInitiated from tool request', () => {
+      const clientInitiatedTool: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: {
+          ...mockRequest,
+          callId: 'call-client',
+          isClientInitiated: true,
+        },
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+
+      const modelInitiatedTool: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: {
+          ...mockRequest,
+          callId: 'call-model',
+          isClientInitiated: false,
+        },
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+
+      const result = mapToDisplay([clientInitiatedTool, modelInitiatedTool]);
+      expect(result.tools[0].isClientInitiated).toBe(true);
+      expect(result.tools[1].isClientInitiated).toBe(false);
     });
   });
 });

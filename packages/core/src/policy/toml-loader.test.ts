@@ -89,6 +89,52 @@ priority = 100
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should parse toolAnnotations from TOML', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "annotated-tool"
+toolAnnotations = { readOnlyHint = true, custom = "value" }
+decision = "allow"
+priority = 70
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('annotated-tool');
+      expect(result.rules[0].toolAnnotations).toEqual({
+        readOnlyHint: true,
+        custom: 'value',
+      });
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should transform mcpName = "*" to wildcard toolName', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+mcpName = "*"
+decision = "ask_user"
+priority = 10
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('*__*');
+      expect(result.rules[0].decision).toBe(PolicyDecision.ASK_USER);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should transform mcpName = "*" and specific toolName to wildcard prefix', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+mcpName = "*"
+toolName = "search"
+decision = "allow"
+priority = 10
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('*__search');
+      expect(result.errors).toHaveLength(0);
+    });
+
     it('should transform commandRegex to argsPattern', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
@@ -216,30 +262,34 @@ deny_message = "Deletion is permanent"
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should support modes property for Tier 2 and Tier 3 policies', async () => {
+    it('should support modes property for Tier 4 and Tier 5 policies', async () => {
       await fs.writeFile(
-        path.join(tempDir, 'tier2.toml'),
+        path.join(tempDir, 'tier4.toml'),
         `
 [[rule]]
-toolName = "tier2-tool"
+toolName = "tier4-tool"
 decision = "allow"
 priority = 100
 modes = ["autoEdit"]
 `,
       );
 
-      const getPolicyTier2 = (_dir: string) => 2; // Tier 2
+      const getPolicyTier4 = (_dir: string) => 4; // Tier 4 (User)
+      const result4 = await loadPoliciesFromToml([tempDir], getPolicyTier4);
+
+      expect(result4.rules).toHaveLength(1);
+      expect(result4.rules[0].toolName).toBe('tier4-tool');
+      expect(result4.rules[0].modes).toEqual(['autoEdit']);
+      expect(result4.rules[0].source).toBe('User: tier4.toml');
+
+      const getPolicyTier2 = (_dir: string) => 2; // Tier 2 (Extension)
       const result2 = await loadPoliciesFromToml([tempDir], getPolicyTier2);
+      expect(result2.rules[0].source).toBe('Extension: tier4.toml');
 
-      expect(result2.rules).toHaveLength(1);
-      expect(result2.rules[0].toolName).toBe('tier2-tool');
-      expect(result2.rules[0].modes).toEqual(['autoEdit']);
-      expect(result2.rules[0].source).toBe('Workspace: tier2.toml');
-
-      const getPolicyTier3 = (_dir: string) => 3; // Tier 3
-      const result3 = await loadPoliciesFromToml([tempDir], getPolicyTier3);
-      expect(result3.rules[0].source).toBe('User: tier2.toml');
-      expect(result3.errors).toHaveLength(0);
+      const getPolicyTier5 = (_dir: string) => 5; // Tier 5 (Admin)
+      const result5 = await loadPoliciesFromToml([tempDir], getPolicyTier5);
+      expect(result5.rules[0].source).toBe('Admin: tier4.toml');
+      expect(result5.errors).toHaveLength(0);
     });
 
     it('should handle TOML parse errors', async () => {
@@ -563,6 +613,118 @@ priority = 100
   });
 
   describe('Built-in Plan Mode Policy', () => {
+    it('should allow MCP tools with readOnlyHint annotation in Plan Mode (ASK_USER, not DENY)', async () => {
+      const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
+      const fileContent = await fs.readFile(planTomlPath, 'utf-8');
+      const tempPolicyDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'plan-annotation-test-'),
+      );
+      try {
+        await fs.writeFile(path.join(tempPolicyDir, 'plan.toml'), fileContent);
+        const getPolicyTier = () => 1; // Default tier
+
+        // 1. Load the actual Plan Mode policies
+        const result = await loadPoliciesFromToml(
+          [tempPolicyDir],
+          getPolicyTier,
+        );
+        expect(result.errors).toHaveLength(0);
+
+        // Verify annotation rule was loaded correctly
+        const annotationRule = result.rules.find(
+          (r) => r.toolAnnotations !== undefined,
+        );
+        expect(
+          annotationRule,
+          'Should have loaded a rule with toolAnnotations',
+        ).toBeDefined();
+        expect(annotationRule!.toolName).toBe('*__*');
+        expect(annotationRule!.toolAnnotations).toEqual({
+          readOnlyHint: true,
+        });
+        expect(annotationRule!.decision).toBe(PolicyDecision.ASK_USER);
+        // Priority 70 in tier 1 => 1.070
+        expect(annotationRule!.priority).toBe(1.07);
+
+        // Verify deny rule was loaded correctly
+        const denyRule = result.rules.find(
+          (r) =>
+            r.decision === PolicyDecision.DENY &&
+            r.toolName === undefined &&
+            r.denyMessage?.includes('Plan Mode'),
+        );
+        expect(
+          denyRule,
+          'Should have loaded the catch-all deny rule',
+        ).toBeDefined();
+        // Priority 60 in tier 1 => 1.060
+        expect(denyRule!.priority).toBe(1.06);
+
+        // 2. Initialize Policy Engine in Plan Mode
+        const engine = new PolicyEngine({
+          rules: result.rules,
+          approvalMode: ApprovalMode.PLAN,
+        });
+
+        // 3. MCP tool with readOnlyHint=true and serverName should get ASK_USER
+        const askResult = await engine.check(
+          { name: 'github__list_issues' },
+          'github',
+          { readOnlyHint: true },
+        );
+        expect(
+          askResult.decision,
+          'MCP tool with readOnlyHint=true should be ASK_USER, not DENY',
+        ).toBe(PolicyDecision.ASK_USER);
+
+        // 4. MCP tool WITHOUT annotations should be DENIED
+        const denyResult = await engine.check(
+          { name: 'github__create_issue' },
+          'github',
+          undefined,
+        );
+        expect(
+          denyResult.decision,
+          'MCP tool without annotations should be DENIED in Plan Mode',
+        ).toBe(PolicyDecision.DENY);
+
+        // 5. MCP tool with readOnlyHint=false should also be DENIED
+        const denyResult2 = await engine.check(
+          { name: 'github__delete_issue' },
+          'github',
+          { readOnlyHint: false },
+        );
+        expect(
+          denyResult2.decision,
+          'MCP tool with readOnlyHint=false should be DENIED in Plan Mode',
+        ).toBe(PolicyDecision.DENY);
+
+        // 6. Test with qualified tool name format (server__tool) but no separate serverName
+        const qualifiedResult = await engine.check(
+          { name: 'github__list_repos' },
+          undefined,
+          { readOnlyHint: true },
+        );
+        expect(
+          qualifiedResult.decision,
+          'Qualified MCP tool name with readOnlyHint=true should be ASK_USER even without separate serverName',
+        ).toBe(PolicyDecision.ASK_USER);
+
+        // 7. Non-MCP tool (no server context) should be DENIED despite having annotations
+        const builtinResult = await engine.check(
+          { name: 'some_random_tool' },
+          undefined,
+          { readOnlyHint: true },
+        );
+        expect(
+          builtinResult.decision,
+          'Non-MCP tool should be DENIED even with readOnlyHint (no server context for *__* match)',
+        ).toBe(PolicyDecision.DENY);
+      } finally {
+        await fs.rm(tempPolicyDir, { recursive: true, force: true });
+      }
+    });
+
     it('should override default subagent rules when in Plan Mode', async () => {
       const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
       const fileContent = await fs.readFile(planTomlPath, 'utf-8');
