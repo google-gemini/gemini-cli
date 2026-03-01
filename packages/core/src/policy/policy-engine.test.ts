@@ -193,12 +193,10 @@ describe('PolicyEngine', () => {
         (await engine.check({ name: 'my-server__tool' }, 'my-server')).decision,
       ).toBe(PolicyDecision.ALLOW);
 
-      // Should NOT match with qualified call but NO serverName
       expect(
         (await engine.check({ name: 'my-server__tool' }, undefined)).decision,
       ).toBe(PolicyDecision.ASK_USER);
 
-      // Should NOT match with qualified call but WRONG serverName
       expect(
         (await engine.check({ name: 'my-server__tool' }, 'wrong-server'))
           .decision,
@@ -225,7 +223,6 @@ describe('PolicyEngine', () => {
           .decision,
       ).toBe(PolicyDecision.ALLOW);
 
-      // Unmatched tools should still be DENY in non-interactive mode
       expect(
         (await engine.check({ name: 'craftMCP__other_tool' }, 'craftMCP'))
           .decision,
