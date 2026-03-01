@@ -971,7 +971,7 @@ export class Session {
           resolvedSuccessfully = true;
         } else {
           this.debug(
-            `Path ${pathName} is outside the project directory. Skipping.`,
+            `Path ${pathName} is outside the workspace directory. Skipping.`,
           );
         }
       } catch (error) {

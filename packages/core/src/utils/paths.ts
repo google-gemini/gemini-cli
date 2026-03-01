@@ -310,13 +310,16 @@ export function unescapePath(filePath: string): string {
 }
 
 /**
- * Generates a unique hash for a project based on its root path.
- * @param projectRoot The absolute path to the project's root directory.
- * @returns A SHA256 hash of the project root path.
+ * Generates a unique hash for a workspace based on its root path.
+ * @param workspaceRoot The absolute path to the workspace's root directory.
+ * @returns A SHA256 hash of the workspace root path.
  */
-export function getProjectHash(projectRoot: string): string {
-  return crypto.createHash('sha256').update(projectRoot).digest('hex');
+export function getWorkspaceHash(workspaceRoot: string): string {
+  return crypto.createHash('sha256').update(workspaceRoot).digest('hex');
 }
+
+/** @deprecated Use getWorkspaceHash instead */
+export const getProjectHash = getWorkspaceHash;
 
 /**
  * Normalizes a path for reliable comparison across platforms.

@@ -80,10 +80,10 @@ export class AgentRegistry {
    */
   async acknowledgeAgent(agent: AgentDefinition): Promise<void> {
     const ackService = this.config.getAcknowledgedAgentsService();
-    const projectRoot = this.config.getProjectRoot();
+    const workspaceRoot = this.config.getWorkspaceRoot();
     if (agent.metadata?.hash) {
       await ackService.acknowledge(
-        projectRoot,
+        workspaceRoot,
         agent.name,
         agent.metadata.hash,
       );
@@ -121,14 +121,14 @@ export class AgentRegistry {
       userAgents.agents.map((agent) => this.registerAgent(agent)),
     );
 
-    // Load project-level agents: .gemini/agents/ (relative to Project Root)
+    // Load workspace-level agents: .gemini/agents/ (relative to Workspace Root)
     const folderTrustEnabled = this.config.getFolderTrust();
     const isTrustedFolder = this.config.isTrustedFolder();
 
     if (!folderTrustEnabled || isTrustedFolder) {
-      const projectAgentsDir = this.config.storage.getProjectAgentsDir();
-      const projectAgents = await loadAgentsFromDirectory(projectAgentsDir);
-      for (const error of projectAgents.errors) {
+      const workspaceAgentsDir = this.config.storage.getWorkspaceAgentsDir();
+      const workspaceAgents = await loadAgentsFromDirectory(workspaceAgentsDir);
+      for (const error of workspaceAgents.errors) {
         coreEvents.emitFeedback(
           'error',
           `Agent loading error: ${error.message}`,
@@ -136,11 +136,11 @@ export class AgentRegistry {
       }
 
       const ackService = this.config.getAcknowledgedAgentsService();
-      const projectRoot = this.config.getProjectRoot();
+      const workspaceRoot = this.config.getWorkspaceRoot();
       const unacknowledgedAgents: AgentDefinition[] = [];
       const agentsToRegister: AgentDefinition[] = [];
 
-      for (const agent of projectAgents.agents) {
+      for (const agent of workspaceAgents.agents) {
         // If it's a remote agent, use the agentCardUrl as the hash.
         // This allows multiple remote agents in a single file to be tracked independently.
         if (agent.kind === 'remote') {
@@ -156,7 +156,7 @@ export class AgentRegistry {
         }
 
         const isAcknowledged = await ackService.isAcknowledged(
-          projectRoot,
+          workspaceRoot,
           agent.name,
           agent.metadata.hash,
         );
@@ -178,7 +178,7 @@ export class AgentRegistry {
     } else {
       coreEvents.emitFeedback(
         'info',
-        'Skipping project agents due to untrusted folder. To enable, ensure that the project root is trusted.',
+        'Skipping workspace agents due to untrusted folder. To enable, ensure that the workspace root is trusted.',
       );
     }
 

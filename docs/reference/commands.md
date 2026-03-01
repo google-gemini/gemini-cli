@@ -79,8 +79,8 @@ Slash commands provide meta-level control over the CLI itself.
 - **Sub-commands:**
   - **`reload`**:
     - **Description:** Reload custom command definitions from all sources
-      (user-level `~/.gemini/commands/`, project-level
-      `<project>/.gemini/commands/`, MCP prompts, and extensions). Use this to
+      (user-level `~/.gemini/commands/`, workspace-level
+      `<workspace>/.gemini/commands/`, MCP prompts, and extensions). Use this to
       pick up new or modified `.toml` files without restarting the CLI.
     - **Usage:** `/commands reload`
 
@@ -104,7 +104,7 @@ Slash commands provide meta-level control over the CLI itself.
   - On macOS, it requires `pbcopy`, and on Windows, it requires `clip`. These
     tools are typically pre-installed on their respective systems.
 
-### `/directory` (or `/dir`)
+### `/workspace` (or `/dir`, `/directory`)
 
 - **Description:** Manage workspace directories for multi-directory support.
 - **Sub-commands:**
@@ -112,13 +112,13 @@ Slash commands provide meta-level control over the CLI itself.
     - **Description:** Add a directory to the workspace. The path can be
       absolute or relative to the current working directory. Moreover, the
       reference from home directory is supported as well.
-    - **Usage:** `/directory add <path1>,<path2>`
+    - **Usage:** `/workspace add <path1>,<path2>`
     - **Note:** Disabled in restrictive sandbox profiles. If you're using that,
       use `--include-directories` when starting the session instead.
   - **`show`**:
-    - **Description:** Display all directories added by `/directory add` and
+    - **Description:** Display all directories added by `/workspace add` and
       `--include-directories`.
-    - **Usage:** `/directory show`
+    - **Usage:** `/workspace show`
 
 ### `/docs`
 
@@ -289,7 +289,7 @@ Slash commands provide meta-level control over the CLI itself.
 
 ### `/restore`
 
-- **Description:** Restores the project files to the state they were in just
+- **Description:** Restores the workspace files to the state they were in just
   before a tool was executed. This is particularly useful for undoing file edits
   made by a tool. If run without a tool call ID, it will list available
   checkpoints to restore from.

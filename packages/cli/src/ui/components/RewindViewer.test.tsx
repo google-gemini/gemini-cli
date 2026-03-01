@@ -55,7 +55,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 
 const createConversation = (messages: MessageRecord[]): ConversationRecord => ({
   sessionId: 'test-session',
-  projectHash: 'hash',
+  workspaceHash: 'hash',
   startTime: new Date().toISOString(),
   lastUpdated: new Date().toISOString(),
   messages,

@@ -150,9 +150,9 @@ export class DiscoveredTool extends BaseDeclarativeTool<
       description +
       `
 
-This tool was discovered from the project by executing the command \`${discoveryCmd}\` on project root.
-When called, this tool will execute the command \`${callCommand} ${originalName}\` on project root.
-Tool discovery and call commands can be configured in project or user settings.
+This tool was discovered from the workspace by executing the command \`${discoveryCmd}\` on workspace root.
+When called, this tool will execute the command \`${callCommand} ${originalName}\` on workspace root.
+Tool discovery and call commands can be configured in workspace or user settings.
 
 When called, the tool call command is executed as a subprocess.
 On success, tool output is returned as a json string.
@@ -301,7 +301,7 @@ export class ToolRegistry {
   }
 
   /**
-   * Discovers tools from project (if available and configured).
+   * Discovers tools from workspace (if available and configured).
    * Can be called multiple times to update discovered tools.
    * This will discover tools from the command line and from MCP servers.
    */

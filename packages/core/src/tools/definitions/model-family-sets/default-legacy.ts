@@ -561,7 +561,7 @@ DO NOT use this tool for simple tasks that can be completed in less than 2 steps
 User request: Create a website with a React for creating fancy logos using gemini-2.5-flash-image
 
 ToDo list created by the agent:
-1. Initialize a new React project environment (e.g., using Vite).
+1. Initialize a new React workspace environment (e.g., using Vite).
 2. Design and build the core UI components: a text input (prompt field) for the logo description, selection controls for style parameters (if the API supports them), and an image preview area.
 3. Implement state management (e.g., React Context or Zustand) to manage the user's input prompt, the API loading status (pending, success, error), and the resulting image data.
 4. Create an API service module within the React app (using "fetch" or "axios") to securely format and send the prompt data via an HTTP POST request to the specified "gemini-2.5-flash-image" (Gemini model) endpoint.

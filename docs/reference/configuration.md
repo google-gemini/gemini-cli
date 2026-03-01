@@ -13,7 +13,7 @@ overridden by higher numbers):
 2.  **System defaults file:** System-wide default settings that can be
     overridden by other settings files.
 3.  **User settings file:** Global settings for the current user.
-4.  **Project settings file:** Project-specific settings.
+4.  **Workspace settings file:** Workspace-specific settings.
 5.  **System settings file:** System-wide settings that override all other
     settings files.
 6.  **Environment variables:** System-wide or session-specific variables,
@@ -43,10 +43,11 @@ locations for these files:
   - **Location:** `~/.gemini/settings.json` (where `~` is your home directory).
   - **Scope:** Applies to all Gemini CLI sessions for the current user. User
     settings override system defaults.
-- **Project settings file:**
-  - **Location:** `.gemini/settings.json` within your project's root directory.
-  - **Scope:** Applies only when running Gemini CLI from that specific project.
-    Project settings override user settings and system defaults.
+- **Workspace settings file:**
+  - **Location:** `.gemini/settings.json` within your workspace's root
+    directory.
+  - **Scope:** Applies only when running Gemini CLI from that specific
+    workspace. Workspace settings override user settings and system defaults.
 - **System settings file:**
   - **Location:** `/etc/gemini-cli/settings.json` (Linux),
     `C:\ProgramData\gemini-cli\settings.json` (Windows) or
@@ -70,10 +71,11 @@ this: `"apiKey": "$MY_API_TOKEN"`. Additionally, each extension can have its own
 > CLI in a corporate environment, please see the
 > [Enterprise Configuration](../cli/enterprise.md) documentation.
 
-### The `.gemini` directory in your project
+### The `.gemini` directory in your workspace
 
-In addition to a project settings file, a project's `.gemini` directory can
-contain other project-specific files related to Gemini CLI's operation, such as:
+In addition to a workspace settings file, a workspace's `.gemini` directory can
+contain other workspace-specific files related to Gemini CLI's operation, such
+as:
 
 - [Custom sandbox profiles](#sandboxing) (e.g.,
   `.gemini/sandbox-macos-custom.sb`, `.gemini/sandbox.Dockerfile`).
@@ -1292,12 +1294,12 @@ of v0.3.0:
 ## Shell history
 
 The CLI keeps a history of shell commands you run. To avoid conflicts between
-different projects, this history is stored in a project-specific directory
+different workspaces, this history is stored in a workspace-specific directory
 within your user's home folder.
 
-- **Location:** `~/.gemini/tmp/<project_hash>/shell_history`
-  - `<project_hash>` is a unique identifier generated from your project's root
-    path.
+- **Location:** `~/.gemini/tmp/<workspace_hash>/shell_history`
+  - `<workspace_hash>` is a unique identifier generated from your workspace's
+    root path.
   - The history is stored in a file named `shell_history`.
 
 ## Environment variables and `.env` files

@@ -481,14 +481,14 @@ Use this tool when the user's query implies needing the content of several files
 
   save_memory: {
     name: MEMORY_TOOL_NAME,
-    description: `Persists global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike '${WRITE_FILE_TOOL_NAME}', which is for project-specific files, this appends to a global memory file loaded in every workspace. If you are unsure whether a fact should be remembered globally, ask the user first. CRITICAL: Do not use for session-specific context or temporary data.`,
+    description: `Persists global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike '${WRITE_FILE_TOOL_NAME}', which is for workspace-specific files, this appends to a global memory file loaded in every workspace. If you are unsure whether a fact should be remembered globally, ask the user first. CRITICAL: Do not use for session-specific context or temporary data.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
         [MEMORY_PARAM_FACT]: {
           type: 'string',
           description:
-            "A concise, global fact or preference (e.g., 'I prefer using tabs'). Do not include local paths or project-specific names.",
+            "A concise, global fact or preference (e.g., 'I prefer using tabs'). Do not include local paths or workspace-specific names.",
         },
       },
       required: [MEMORY_PARAM_FACT],
@@ -531,7 +531,7 @@ DO NOT use this tool for simple tasks that can be completed in less than 2 steps
 User request: Create a website with a React for creating fancy logos using gemini-2.5-flash-image
 
 ToDo list created by the agent:
-1. Initialize a new React project environment (e.g., using Vite).
+1. Initialize a new React workspace environment (e.g., using Vite).
 2. Design and build the core UI components: a text input (prompt field) for the logo description, selection controls for style parameters (if the API supports them), and an image preview area.
 3. Implement state management (e.g., React Context or Zustand) to manage the user's input prompt, the API loading status (pending, success, error), and the resulting image data.
 4. Create an API service module within the React app (using "fetch" or "axios") to securely format and send the prompt data via an HTTP POST request to the specified "gemini-2.5-flash-image" (Gemini model) endpoint.

@@ -38,7 +38,7 @@ describe('useRewindLogic', () => {
 
   const mockConversation: ConversationRecord = {
     sessionId: 'conv-1',
-    projectHash: 'hash-1',
+    workspaceHash: 'hash-1',
     startTime: new Date(1000).toISOString(),
     lastUpdated: new Date(1001).toISOString(),
     messages: [mockUserMessage, mockModelMessage],

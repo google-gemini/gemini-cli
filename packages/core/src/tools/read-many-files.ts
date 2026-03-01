@@ -241,7 +241,7 @@ ${finalExclusionPatternsForDescription
       if (ignoredCount > 0) {
         skippedFiles.push({
           path: `${ignoredCount} file(s)`,
-          reason: 'ignored by project ignore files',
+          reason: 'ignored by workspace ignore files',
         });
       }
     } catch (error) {

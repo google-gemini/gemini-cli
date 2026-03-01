@@ -5,7 +5,7 @@ exports[`AuthDialog > Snapshots > renders correctly with auth error 1`] = `
 │                                                                                                  │
 │ ? Get started                                                                                    │
 │                                                                                                  │
-│   How would you like to authenticate for this project?                                           │
+│   How would you like to authenticate for this workspace?                                         │
 │                                                                                                  │
 │   (selected) Login with Google(not selected) Use Gemini API Key(not selected) Vertex AI          │
 │                                                                                                  │
@@ -26,7 +26,7 @@ exports[`AuthDialog > Snapshots > renders correctly with default props 1`] = `
 │                                                                                                  │
 │ ? Get started                                                                                    │
 │                                                                                                  │
-│   How would you like to authenticate for this project?                                           │
+│   How would you like to authenticate for this workspace?                                         │
 │                                                                                                  │
 │   (selected) Login with Google(not selected) Use Gemini API Key(not selected) Vertex AI          │
 │                                                                                                  │
@@ -45,7 +45,7 @@ exports[`AuthDialog > Snapshots > renders correctly with enforced auth type 1`] 
 │                                                                                                  │
 │ ? Get started                                                                                    │
 │                                                                                                  │
-│   How would you like to authenticate for this project?                                           │
+│   How would you like to authenticate for this workspace?                                         │
 │                                                                                                  │
 │   (selected) Use Gemini API Key                                                                  │
 │                                                                                                  │

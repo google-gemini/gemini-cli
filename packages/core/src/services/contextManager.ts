@@ -22,7 +22,7 @@ export class ContextManager {
   private readonly config: Config;
   private globalMemory: string = '';
   private extensionMemory: string = '';
-  private projectMemory: string = '';
+  private workspaceMemory: string = '';
 
   constructor(config: Config) {
     this.config = config;
@@ -43,7 +43,7 @@ export class ContextManager {
   }
 
   private async discoverMemoryPaths(debugMode: boolean) {
-    const [global, extension, project] = await Promise.all([
+    const [global, extension, workspace] = await Promise.all([
       getGlobalMemoryPaths(debugMode),
       Promise.resolve(
         getExtensionMemoryPaths(this.config.getExtensionLoader()),
@@ -56,15 +56,15 @@ export class ContextManager {
         : Promise.resolve([]),
     ]);
 
-    return { global, extension, project };
+    return { global, extension, workspace };
   }
 
   private async loadMemoryContents(
-    paths: { global: string[]; extension: string[]; project: string[] },
+    paths: { global: string[]; extension: string[]; workspace: string[] },
     debugMode: boolean,
   ) {
     const allPaths = Array.from(
-      new Set([...paths.global, ...paths.extension, ...paths.project]),
+      new Set([...paths.global, ...paths.extension, ...paths.workspace]),
     );
 
     const allContents = await readGeminiMdFiles(
@@ -81,7 +81,7 @@ export class ContextManager {
   }
 
   private categorizeMemoryContents(
-    paths: { global: string[]; extension: string[]; project: string[] },
+    paths: { global: string[]; extension: string[]; workspace: string[] },
     contentsMap: Map<string, GeminiFileContent>,
   ) {
     const workingDir = this.config.getWorkingDir();
@@ -96,15 +96,15 @@ export class ContextManager {
 
     const mcpInstructions =
       this.config.getMcpClientManager()?.getMcpInstructions() || '';
-    const projectMemoryWithMcp = [
-      hierarchicalMemory.project,
+    const workspaceMemoryWithMcp = [
+      hierarchicalMemory.workspace || hierarchicalMemory.project,
       mcpInstructions.trimStart(),
     ]
       .filter(Boolean)
       .join('\n\n');
 
-    this.projectMemory = this.config.isTrustedFolder()
-      ? projectMemoryWithMcp
+    this.workspaceMemory = this.config.isTrustedFolder()
+      ? workspaceMemoryWithMcp
       : '';
   }
 
@@ -152,7 +152,7 @@ export class ContextManager {
   }
 
   getEnvironmentMemory(): string {
-    return this.projectMemory;
+    return this.workspaceMemory;
   }
 
   private markAsLoaded(paths: string[]): void {

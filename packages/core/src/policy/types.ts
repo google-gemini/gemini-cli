@@ -15,12 +15,18 @@ export enum PolicyDecision {
 /**
  * Valid sources for hook execution
  */
-export type HookSource = 'project' | 'user' | 'system' | 'extension';
+export type HookSource =
+  | 'workspace'
+  | 'project'
+  | 'user'
+  | 'system'
+  | 'extension';
 
 /**
  * Array of valid hook source values for runtime validation
  */
 const VALID_HOOK_SOURCES: HookSource[] = [
+  'workspace',
   'project',
   'user',
   'system',
@@ -29,7 +35,7 @@ const VALID_HOOK_SOURCES: HookSource[] = [
 
 /**
  * Safely extract and validate hook source from input
- * Returns 'project' as default if the value is invalid or missing
+ * Returns 'workspace' as default if the value is invalid or missing
  */
 export function getHookSource(input: Record<string, unknown>): HookSource {
   const source = input['hook_source'];
@@ -38,10 +44,14 @@ export function getHookSource(input: Record<string, unknown>): HookSource {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     VALID_HOOK_SOURCES.includes(source as HookSource)
   ) {
+    // Treat 'project' as 'workspace' for backward compatibility
+    if (source === 'project') {
+      return 'workspace';
+    }
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return source as HookSource;
   }
-  return 'project';
+  return 'workspace';
 }
 
 export enum ApprovalMode {
@@ -198,7 +208,7 @@ export interface SafetyCheckerRule {
 
   /**
    * Source of the rule.
-   * e.g. "my-policies.toml", "Workspace: project.toml", etc.
+   * e.g. "my-policies.toml", "Workspace: workspace.toml", etc.
    */
   source?: string;
 }

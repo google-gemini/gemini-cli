@@ -129,35 +129,35 @@ export class HookRegistry {
   }
 
   /**
-   * Check for untrusted project hooks and warn the user
+   * Check for untrusted workspace hooks and warn the user
    */
-  private checkProjectHooksTrust(): void {
-    const projectHooks = this.config.getProjectHooks();
-    if (!projectHooks) return;
+  private checkWorkspaceHooksTrust(): void {
+    const workspaceHooks = this.config.getProjectHooks();
+    if (!workspaceHooks) return;
 
     try {
       const trustedHooksManager = new TrustedHooksManager();
       const untrusted = trustedHooksManager.getUntrustedHooks(
-        this.config.getProjectRoot(),
-        projectHooks,
+        this.config.getWorkspaceRoot(),
+        workspaceHooks,
       );
 
       if (untrusted.length > 0) {
-        const message = `WARNING: The following project-level hooks have been detected in this workspace:
+        const message = `WARNING: The following workspace-level hooks have been detected in this workspace:
 ${untrusted.map((h) => `  - ${h}`).join('\n')}
 
-These hooks will be executed. If you did not configure these hooks or do not trust this project,
-please review the project settings (.gemini/settings.json) and remove them.`;
+These hooks will be executed. If you did not configure these hooks or do not trust this workspace,
+please review the workspace settings (.gemini/settings.json) and remove them.`;
         coreEvents.emitFeedback('warning', message);
 
         // Trust them so we don't warn again
         trustedHooksManager.trustHooks(
-          this.config.getProjectRoot(),
-          projectHooks,
+          this.config.getWorkspaceRoot(),
+          workspaceHooks,
         );
       }
     } catch (error) {
-      debugLogger.warn('Failed to check project hooks trust', error);
+      debugLogger.warn('Failed to check workspace hooks trust', error);
     }
   }
 
@@ -166,7 +166,7 @@ please review the project settings (.gemini/settings.json) and remove them.`;
    */
   private processHooksFromConfig(): void {
     if (this.config.isTrustedFolder()) {
-      this.checkProjectHooksTrust();
+      this.checkWorkspaceHooksTrust();
     }
 
     // Get hooks from the main config (this comes from the merged settings)
@@ -176,7 +176,7 @@ please review the project settings (.gemini/settings.json) and remove them.`;
         this.processHooksConfiguration(configHooks, ConfigSource.Project);
       } else {
         debugLogger.warn(
-          'Project hooks disabled because the folder is not trusted.',
+          'Workspace hooks disabled because the folder is not trusted.',
         );
       }
     }

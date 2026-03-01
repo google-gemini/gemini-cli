@@ -72,7 +72,8 @@ export const NewAgentsNotification = ({
             New Agents Discovered
           </Text>
           <Text color={theme.text.primary}>
-            The following agents were found in this project. Please review them:
+            The following agents were found in this workspace. Please review
+            them:
           </Text>
           <Box
             flexDirection="column"

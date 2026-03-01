@@ -111,7 +111,7 @@ export class PromptProvider {
         userMemory !== null &&
         (!!userMemory.global?.trim() ||
           !!userMemory.extension?.trim() ||
-          !!userMemory.project?.trim());
+          !!(userMemory.workspace || userMemory.project)?.trim());
 
       const options: snippets.SystemPromptOptions = {
         preamble: this.withSection('preamble', () => ({

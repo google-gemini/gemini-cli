@@ -102,7 +102,7 @@ export function getShellDeclaration(
         [PARAM_DIR_PATH]: {
           type: 'string',
           description:
-            '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
+            '(OPTIONAL) The path of the directory to run the command in. If not provided, the workspace root directory is used. Must be a directory within the workspace and must already exist.',
         },
         [SHELL_PARAM_IS_BACKGROUND]: {
           type: 'boolean',

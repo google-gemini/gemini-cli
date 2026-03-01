@@ -55,7 +55,7 @@ const TomlCommandDefSchema = z.object({
 
 /**
  * Discovers and loads custom slash commands from .toml files in both the
- * user's global config directory and the current project's directory.
+ * user's global config directory and the current workspace's directory.
  *
  * This loader is responsible for:
  * - Recursively scanning command directories.
@@ -64,22 +64,22 @@ const TomlCommandDefSchema = z.object({
  * - Handling file system errors and malformed files gracefully.
  */
 export class FileCommandLoader implements ICommandLoader {
-  private readonly projectRoot: string;
+  private readonly workspaceRoot: string;
   private readonly folderTrustEnabled: boolean;
   private readonly isTrustedFolder: boolean;
 
   constructor(private readonly config: Config | null) {
     this.folderTrustEnabled = !!config?.getFolderTrust();
     this.isTrustedFolder = !!config?.isTrustedFolder();
-    this.projectRoot = config?.getProjectRoot() || process.cwd();
+    this.workspaceRoot = config?.getWorkspaceRoot() || process.cwd();
   }
 
   /**
-   * Loads all commands from user, project, and extension directories.
-   * Returns commands in order: user → project → extensions (alphabetically).
+   * Loads all commands from user, workspace, and extension directories.
+   * Returns commands in order: user → workspace → extensions (alphabetically).
    *
    * Order is important for conflict resolution in CommandService:
-   * - User/project commands (without extensionName) use "last wins" strategy
+   * - User/workspace commands (without extensionName) use "last wins" strategy
    * - Extension commands (with extensionName) get renamed if conflicts exist
    *
    * @param signal An AbortSignal to cancel the loading process.
@@ -148,13 +148,13 @@ export class FileCommandLoader implements ICommandLoader {
   private getCommandDirectories(): CommandDirectory[] {
     const dirs: CommandDirectory[] = [];
 
-    const storage = this.config?.storage ?? new Storage(this.projectRoot);
+    const storage = this.config?.storage ?? new Storage(this.workspaceRoot);
 
     // 1. User commands
     dirs.push({ path: Storage.getUserCommandsDir() });
 
-    // 2. Project commands (override user commands)
-    dirs.push({ path: storage.getProjectCommandsDir() });
+    // 2. Workspace commands (override user commands)
+    dirs.push({ path: storage.getWorkspaceCommandsDir() });
 
     // 3. Extension commands (processed last to detect all conflicts)
     if (this.config) {

@@ -1094,7 +1094,7 @@ describe('AppContainer State Management', () => {
       const mockResumedSessionData = {
         conversation: {
           sessionId: 'test-session-123',
-          projectHash: 'test-project-hash',
+          workspaceHash: 'test-workspace-hash',
           startTime: '2024-01-01T00:00:00Z',
           lastUpdated: '2024-01-01T00:00:01Z',
           messages: [
@@ -1283,7 +1283,7 @@ describe('AppContainer State Management', () => {
       const resumedData = {
         conversation: {
           sessionId: 'resumed-session-456',
-          projectHash: 'project-hash',
+          workspaceHash: 'workspace-hash',
           startTime: '2024-01-01T00:00:00Z',
           lastUpdated: '2024-01-01T00:01:00Z',
           messages: [
@@ -1339,7 +1339,7 @@ describe('AppContainer State Management', () => {
       const resumedData = {
         conversation: {
           sessionId: 'test-session',
-          projectHash: 'project-hash',
+          workspaceHash: 'workspace-hash',
           startTime: '2024-01-01T00:00:00Z',
           lastUpdated: '2024-01-01T00:01:00Z',
           messages: [],

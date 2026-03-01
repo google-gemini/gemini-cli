@@ -16,7 +16,7 @@ import { performInit } from '@google/gemini-cli-core';
 
 export const initCommand: SlashCommand = {
   name: 'init',
-  description: 'Analyzes the project and creates a tailored GEMINI.md file',
+  description: 'Analyzes the workspace and creates a tailored GEMINI.md file',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (
@@ -42,7 +42,7 @@ export const initCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: 'info',
-          text: 'Empty GEMINI.md created. Now analyzing the project to populate it.',
+          text: 'Empty GEMINI.md created. Now analyzing the workspace to populate it.',
         },
         Date.now(),
       );
