@@ -123,8 +123,23 @@ export class McpPromptLoader implements ICommandLoader {
                 };
               }
 
-              const maybeContent = result.messages?.[0]?.content;
-              if (maybeContent.type !== 'text') {
+              if (!result.messages || result.messages.length === 0) {
+                return {
+                  type: 'message',
+                  messageType: 'error',
+                  content: 'Received an empty prompt response from the server.',
+                };
+              }
+
+              const textParts: string[] = [];
+              for (const message of result.messages) {
+                const content = message?.content;
+                if (content?.type === 'text' && content.text) {
+                  textParts.push(content.text);
+                }
+              }
+
+              if (textParts.length === 0) {
                 return {
                   type: 'message',
                   messageType: 'error',
@@ -135,7 +150,7 @@ export class McpPromptLoader implements ICommandLoader {
 
               return {
                 type: 'submit_prompt',
-                content: JSON.stringify(maybeContent.text),
+                content: JSON.stringify(textParts.join('\n\n')),
               };
             } catch (error) {
               return {
