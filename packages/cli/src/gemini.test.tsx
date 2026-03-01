@@ -821,6 +821,7 @@ describe('gemini.tsx main function kitty protocol', () => {
     expect(processExitSpy).toHaveBeenCalledWith(0);
     processExitSpy.mockRestore();
     debugLoggerErrorSpy.mockRestore();
+    vi.unstubAllEnvs();
   });
 
   it('should read from stdin in non-interactive mode', async () => {
