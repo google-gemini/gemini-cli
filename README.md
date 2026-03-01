@@ -284,7 +284,7 @@ gemini
   auth configuration.
 - [**Configuration Guide**](./docs/get-started/configuration.md) - Settings and
   customization.
-- [**Keyboard Shortcuts**](./docs/cli/keyboard-shortcuts.md) - Productivity
+- [**Keyboard Shortcuts**](https://github.com/google-gemini/gemini-cli/blob/main/docs/reference/keyboard-shortcuts.md) - Productivity
   tips.
 
 ### Core Features
