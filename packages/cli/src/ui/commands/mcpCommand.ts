@@ -432,10 +432,10 @@ const removeCommand: SlashCommand = {
     }
 
     const settings = loadSettings();
-    const existingSettings = settings.forScope(scope).settings;
-    const mcpServers = existingSettings.mcpServers || {};
+    const settingsFile = settings.forScope(scope);
+    const resolvedMcpServers = settingsFile.settings.mcpServers || {};
 
-    if (!mcpServers[serverName]) {
+    if (!resolvedMcpServers[serverName]) {
       const scopeStr = scope === SettingScope.User ? 'user' : 'project';
       return {
         type: 'message',
@@ -444,8 +444,9 @@ const removeCommand: SlashCommand = {
       };
     }
 
-    delete mcpServers[serverName];
-    settings.setValue(scope, 'mcpServers', mcpServers);
+    const mcpServersToSave = { ...(settingsFile.originalSettings.mcpServers || {}) };
+    delete mcpServersToSave[serverName];
+    settings.setValue(scope, 'mcpServers', mcpServersToSave);
 
     const scopeStr = scope === SettingScope.User ? 'user' : 'project';
     context.ui.addItem({
