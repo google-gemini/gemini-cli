@@ -5,6 +5,7 @@
  */
 
 import { spawn } from 'node:child_process';
+import { MAX_SUBPROCESS_OUTPUT_SIZE } from '../utils/constants.js';
 import type { FunctionCall } from '@google/genai';
 import type {
   SafetyCheckerConfig,
@@ -173,6 +174,8 @@ export class CheckerRunner {
       let killed = false;
 
       let exited = false;
+      let stdoutByteLength = 0;
+      let stderrByteLength = 0;
 
       // Set up timeout
       timeoutHandle = setTimeout(() => {
@@ -194,12 +197,40 @@ export class CheckerRunner {
       // Collect output
       if (child.stdout) {
         child.stdout.on('data', (data: Buffer) => {
+          if (killed) return;
+          stdoutByteLength += data.length;
+          if (stdoutByteLength > MAX_SUBPROCESS_OUTPUT_SIZE) {
+            killed = true;
+            if (timeoutHandle) {
+              clearTimeout(timeoutHandle);
+            }
+            child.kill('SIGTERM');
+            resolve({
+              decision: SafetyCheckDecision.DENY,
+              reason: `Safety checker "${checkerName}" output exceeded maximum size of ${MAX_SUBPROCESS_OUTPUT_SIZE} bytes`,
+            });
+            return;
+          }
           stdout += data.toString();
         });
       }
 
       if (child.stderr) {
         child.stderr.on('data', (data: Buffer) => {
+          if (killed) return;
+          stderrByteLength += data.length;
+          if (stderrByteLength > MAX_SUBPROCESS_OUTPUT_SIZE) {
+            killed = true;
+            if (timeoutHandle) {
+              clearTimeout(timeoutHandle);
+            }
+            child.kill('SIGTERM');
+            resolve({
+              decision: SafetyCheckDecision.DENY,
+              reason: `Safety checker "${checkerName}" stderr exceeded maximum size of ${MAX_SUBPROCESS_OUTPUT_SIZE} bytes`,
+            });
+            return;
+          }
           stderr += data.toString();
         });
       }
@@ -211,7 +242,7 @@ export class CheckerRunner {
           clearTimeout(timeoutHandle);
         }
 
-        // If we already killed it due to timeout, don't process the result
+        // If we already killed it due to timeout or overflow, don't process the result
         if (killed) {
           return;
         }
