@@ -273,10 +273,18 @@ export const getAllSessionFiles = async (
             return { fileName: file, sessionInfo: null };
           }
 
-          // Skip sessions that only contain system messages (info, error, warning)
-          if (!hasUserOrAssistantMessage(content.messages)) {
+          // // Skip sessions that contain messages but none are user or assistant (only system messages)
+          if (
+            content.messages.length > 0 &&
+            !hasUserOrAssistantMessage(content.messages)
+          ) {
             return { fileName: file, sessionInfo: null };
           }
+
+          // Skip sessions that only contain system messages (info, error, warning)
+          // if (!hasUserOrAssistantMessage(content.messages)) {
+          //   return { fileName: file, sessionInfo: null };
+          // }
 
           const firstUserMessage = extractFirstUserMessage(content.messages);
           const isCurrentSession = currentSessionId

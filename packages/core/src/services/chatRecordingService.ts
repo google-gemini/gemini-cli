@@ -171,13 +171,16 @@ export class ChatRecordingService {
         )}.json`;
         this.conversationFile = path.join(chatsDir, filename);
 
-        this.writeConversation({
-          sessionId: this.sessionId,
-          projectHash: this.projectHash,
-          startTime: new Date().toISOString(),
-          lastUpdated: new Date().toISOString(),
-          messages: [],
-        });
+        this.writeConversation(
+          {
+            sessionId: this.sessionId,
+            projectHash: this.projectHash,
+            startTime: new Date().toISOString(),
+            lastUpdated: new Date().toISOString(),
+            messages: [],
+          },
+          { allowEmpty: true },
+        );
       }
 
       // Clear any queued data since this is a fresh start

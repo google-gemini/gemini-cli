@@ -83,7 +83,17 @@ describe('ChatRecordingService', () => {
         '/test/project/root/.gemini/tmp/chats',
         { recursive: true },
       );
-      expect(writeFileSyncSpy).not.toHaveBeenCalled();
+      expect(writeFileSyncSpy).toHaveBeenCalledOnce();
+      const [filePath, content] = writeFileSyncSpy.mock.calls[0];
+      expect(filePath).toMatch(
+        /\/test\/project\/root\/.gemini\/tmp\/chats\/session-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-test-ses.json/,
+      );
+      const conversation = JSON.parse(content as string);
+      expect(conversation).toMatchObject({
+        sessionId: 'test-session-id',
+        projectHash: 'test-project-hash',
+        messages: [],
+      });
     });
 
     it('should resume from an existing session if provided', () => {
