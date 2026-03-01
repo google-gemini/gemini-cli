@@ -36,6 +36,9 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 /** Padding for dialog content to prevent text from touching edges. */
 const DIALOG_PADDING = 4;
 
+/** Fraction of available height allocated to the question text. */
+const QUESTION_HEIGHT_RATIO = 0.4;
+
 /**
  * Checks if text is a single line without markdown identifiers.
  */
@@ -791,7 +794,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     : undefined;
   const questionHeight =
     listHeight && !isAlternateBuffer
-      ? Math.min(15, Math.max(1, listHeight - DIALOG_PADDING))
+      ? Math.max(1, Math.floor(listHeight * QUESTION_HEIGHT_RATIO))
       : undefined;
   const maxItemsToShow =
     listHeight && questionHeight
