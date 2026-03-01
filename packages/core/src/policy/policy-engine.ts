@@ -789,7 +789,12 @@ export class PolicyEngine {
 
     // If there's a global DENY and we know all tool names, exclude any tool
     // that wasn't explicitly allowed by a higher-priority rule.
-    if (globalVerdict === PolicyDecision.DENY && allToolNames) {
+    let finalGlobalVerdict: PolicyDecision | undefined = globalVerdict;
+    if (finalGlobalVerdict === undefined) {
+      finalGlobalVerdict = this.applyNonInteractiveMode(this.defaultDecision);
+    }
+
+    if (finalGlobalVerdict === PolicyDecision.DENY && allToolNames) {
       for (const name of allToolNames) {
         if (!processedTools.has(name)) {
           excludedTools.add(name);
