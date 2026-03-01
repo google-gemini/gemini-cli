@@ -53,6 +53,7 @@ const noColorSemanticColors: SemanticColors = {
     comment: '',
     symbol: '',
     dark: '',
+    focus: '',
     gradient: [],
   },
   status: {

@@ -38,6 +38,7 @@ describe('ColorsDisplay', () => {
         comment: '#666666',
         symbol: '#cccccc',
         dark: '#333333',
+        focus: '#0000ff',
         gradient: undefined,
       },
       status: {

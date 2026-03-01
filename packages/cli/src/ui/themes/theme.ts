@@ -186,6 +186,7 @@ export class Theme {
         comment: this.colors.Gray,
         symbol: this.colors.AccentCyan,
         dark: this.colors.DarkGray,
+        focus: this.colors.AccentBlue,
         gradient: this.colors.GradientColors,
       },
       status: {
@@ -463,6 +464,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       comment: customTheme.ui?.comment ?? colors.Comment,
       symbol: customTheme.ui?.symbol ?? colors.Gray,
       dark: colors.DarkGray,
+      focus: customTheme.ui?.focus ?? colors.AccentBlue,
       gradient: customTheme.ui?.gradient ?? colors.GradientColors,
     },
     status: {
