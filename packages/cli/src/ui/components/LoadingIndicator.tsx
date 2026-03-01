@@ -28,6 +28,7 @@ interface LoadingIndicatorProps {
   thought?: ThoughtSummary | null;
   thoughtLabel?: string;
   showCancelAndTimer?: boolean;
+  forceRealStatusOnly?: boolean;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
@@ -41,6 +42,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   thought,
   thoughtLabel,
   showCancelAndTimer = true,
+  forceRealStatusOnly = false,
 }) => {
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
@@ -74,7 +76,10 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       : null;
 
   const wittyPhraseNode =
-    showWit && wittyPhrase && primaryText === GENERIC_WORKING_LABEL ? (
+    !forceRealStatusOnly &&
+    showWit &&
+    wittyPhrase &&
+    primaryText === GENERIC_WORKING_LABEL ? (
       <Box marginLeft={1}>
         <Text color={theme.text.secondary} italic>
           {wittyPhrase}
