@@ -36,16 +36,10 @@ export class MCPOAuthClientProvider implements OAuthClientProvider {
     private readonly _redirectUrl: string | URL,
     private readonly _clientMetadata: OAuthClientMetadata,
     private readonly _state?: string | undefined,
-    onRedirect?: (url: URL) => void,
-  ) {
-    this._onRedirect =
-      onRedirect ||
-      ((url) => {
-        debugLogger.log(`Redirect to: ${url.toString()}`);
-      });
-  }
-
-  private _onRedirect: (url: URL) => void;
+    private readonly _onRedirect: (url: URL) => void = (url) => {
+      debugLogger.log(`Redirect to: ${url.toString()}`);
+    },
+  ) {}
 
   get redirectUrl(): string | URL {
     return this._redirectUrl;
