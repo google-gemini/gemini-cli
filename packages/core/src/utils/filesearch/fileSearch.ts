@@ -9,11 +9,38 @@ import picomatch from 'picomatch';
 import { loadIgnoreRules, type Ignore } from './ignore.js';
 import { ResultCache } from './result-cache.js';
 import { crawl } from './crawler.js';
-import { AsyncFzf, type FzfResultItem } from 'fzf';
-import { unescapePath } from '../paths.js';
+import type { FzfResultItem } from 'fzf';
+import { AsyncFzf } from 'fzf';
+import { coreEvents } from '../events.js';
+import {
+  isSubpath,
+  normalizePath,
+  resolveToRealPath,
+  unescapePath,
+} from '../paths.js';
 import type { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
 import { FileWatcher, type FileWatcherEvent } from './fileWatcher.js';
 import { debugLogger } from '../debugLogger.js';
+import { DEFAULT_FILE_FILTERING_OPTIONS } from '../../config/constants.js';
+
+const DEFAULT_MAX_FILE_COUNT =
+  DEFAULT_FILE_FILTERING_OPTIONS.maxFileCount ?? 20000;
+
+function getMaxFilesLimit(maxFiles: number | undefined): number {
+  return maxFiles ?? DEFAULT_MAX_FILE_COUNT;
+}
+
+let hasWarnedTruncation = false;
+
+function emitTruncationWarning(limit: number | undefined) {
+  if (!hasWarnedTruncation) {
+    hasWarnedTruncation = true;
+    coreEvents.emitFeedback(
+      'warning',
+      `Indexed ${limit} files (limit reached). Add ignore rules or increase context.fileFiltering.maxFileCount in settings.`,
+    );
+  }
+}
 
 // Tiebreaker: Prefers shorter paths.
 const byLengthAsc = (a: { item: string }, b: { item: string }) =>
@@ -140,7 +167,7 @@ class RecursiveFileSearch implements FileSearch {
   private fileWatcher: FileWatcher | undefined;
   private rebuildTimer: NodeJS.Timeout | undefined;
 
-  constructor(private readonly options: FileSearchOptions) {}
+  constructor(private readonly options: FileSearchOptions) { }
 
   async initialize(): Promise<void> {
     this.ignore = loadIgnoreRules(
@@ -148,17 +175,21 @@ class RecursiveFileSearch implements FileSearch {
       this.options.ignoreDirs,
     );
 
-    this.allFiles = new Set(
-      await crawl({
-        crawlDirectory: this.options.projectRoot,
-        cwd: this.options.projectRoot,
-        ignore: this.ignore,
-        cache: this.options.cache,
-        cacheTtl: this.options.cacheTtl,
-        maxDepth: this.options.maxDepth,
-        maxFiles: this.options.maxFiles ?? 20000,
-      }),
-    );
+    const { files: allFiles, truncated } = await crawl({
+      crawlDirectory: this.options.projectRoot,
+      cwd: this.options.projectRoot,
+      ignore: this.ignore,
+      cache: this.options.cache,
+      cacheTtl: this.options.cacheTtl,
+      maxDepth: this.options.maxDepth,
+      maxFiles: getMaxFilesLimit(this.options.maxFiles),
+    });
+
+    this.allFiles = new Set(allFiles);
+
+    if (truncated) {
+      emitTruncationWarning(getMaxFilesLimit(this.options.maxFiles));
+    }
 
     this.buildResultCache();
 
@@ -203,7 +234,7 @@ class RecursiveFileSearch implements FileSearch {
       case 'add': {
         if (
           fileFilter?.(normalizedPath) ||
-          this.allFiles.size >= (this.options.maxFiles ?? 20000)
+          this.allFiles.size >= getMaxFilesLimit(this.options.maxFiles)
         ) {
           return;
         }
@@ -222,7 +253,7 @@ class RecursiveFileSearch implements FileSearch {
           : `${normalizedPath}/`;
         if (
           directoryFilter?.(directoryPath) ||
-          this.allFiles.size >= (this.options.maxFiles ?? 20000)
+          this.allFiles.size >= getMaxFilesLimit(this.options.maxFiles)
         ) {
           return;
         }
@@ -351,7 +382,7 @@ class RecursiveFileSearch implements FileSearch {
 class DirectoryFileSearch implements FileSearch {
   private ignore: Ignore | undefined;
 
-  constructor(private readonly options: FileSearchOptions) {}
+  constructor(private readonly options: FileSearchOptions) { }
 
   async initialize(): Promise<void> {
     this.ignore = loadIgnoreRules(
@@ -370,14 +401,41 @@ class DirectoryFileSearch implements FileSearch {
     pattern = pattern || '*';
 
     const dir = pattern.endsWith('/') ? pattern : path.dirname(pattern);
-    const results = await crawl({
-      crawlDirectory: path.join(this.options.projectRoot, dir),
+    // Unescape before joining so POSIX-escaped special chars (e.g. `file\ name`)
+    // resolve to the actual filesystem path before the realpathSync call below.
+    let crawlDirectory = path.join(
+      this.options.projectRoot,
+      unescapePath(dir),
+    );
+
+    // Resolve symlinks to real paths on both sides before the boundary check.
+    // Without this, a symlink inside the project pointing outside (e.g. ~/.ssh)
+    // would bypass the isSubpath string comparison.
+    const realProjectRoot = resolveToRealPath(this.options.projectRoot);
+    const realCrawlDirectory = resolveToRealPath(crawlDirectory);
+    if (
+      !isSubpath(realProjectRoot, realCrawlDirectory) &&
+      normalizePath(realProjectRoot) !== normalizePath(realCrawlDirectory)
+    ) {
+      // The resolved path escapes the project root; reset to project root.
+      crawlDirectory = this.options.projectRoot;
+    }
+    // When within bounds, keep the original crawlDirectory so cwd-relative
+    // path computation in fdir remains consistent.
+
+    const { files: results, truncated } = await crawl({
+      crawlDirectory,
       cwd: this.options.projectRoot,
       maxDepth: 0,
       ignore: this.ignore,
       cache: this.options.cache,
       cacheTtl: this.options.cacheTtl,
+      maxFiles: getMaxFilesLimit(this.options.maxFiles),
     });
+
+    if (truncated) {
+      emitTruncationWarning(getMaxFilesLimit(this.options.maxFiles));
+    }
 
     const filteredResults = await filter(results, pattern, options.signal);
 
