@@ -80,6 +80,7 @@ export interface UIActions {
   revealCleanUiDetailsTemporarily: (durationMs?: number) => void;
   handleWarning: (message: string) => void;
   setEmbeddedShellFocused: (value: boolean) => void;
+  setActivePtyId: (pid: number | null) => void;
   dismissBackgroundShell: (pid: number) => void;
   setActiveBackgroundShellPid: (pid: number) => void;
   setIsBackgroundShellListOpen: (isOpen: boolean) => void;

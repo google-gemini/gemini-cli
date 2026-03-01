@@ -1109,6 +1109,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     backgroundShells,
     dismissBackgroundShell,
     retryStatus,
+    setActivePtyId,
   } = useGeminiStream(
     config.getGeminiClient(),
     historyManager.history,
@@ -2509,6 +2510,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       revealCleanUiDetailsTemporarily,
       handleWarning,
       setEmbeddedShellFocused,
+      setActivePtyId,
       dismissBackgroundShell,
       setActiveBackgroundShellPid,
       setIsBackgroundShellListOpen,
@@ -2601,6 +2603,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       revealCleanUiDetailsTemporarily,
       handleWarning,
       setEmbeddedShellFocused,
+      setActivePtyId,
       dismissBackgroundShell,
       setActiveBackgroundShellPid,
       setIsBackgroundShellListOpen,

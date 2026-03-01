@@ -204,9 +204,8 @@ export const useGeminiStream = (
   consumeUserHint?: () => string | null,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
-  const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
-    null,
-  );
+  const [modelRetryStatus, setModelRetryStatus] =
+    useState<RetryAttemptPayload | null>(null);
   const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
   const suppressedToolErrorCountRef = useRef(0);
   const suppressedToolErrorNoteShownRef = useRef(false);
@@ -242,7 +241,7 @@ export const useGeminiStream = (
 
   useEffect(() => {
     const handleRetryAttempt = (payload: RetryAttemptPayload) => {
-      setRetryStatus(payload);
+      setModelRetryStatus(payload);
     };
     coreEvents.on(CoreEvent.RetryAttempt, handleRetryAttempt);
     return () => {
@@ -338,6 +337,7 @@ export const useGeminiStream = (
     registerBackgroundShell,
     dismissBackgroundShell,
     backgroundShells,
+    setActivePtyId,
   } = useShellCommandProcessor(
     addItem,
     setPendingHistoryItem,
@@ -564,7 +564,7 @@ export const useGeminiStream = (
 
   useEffect(() => {
     if (!isResponding) {
-      setRetryStatus(null);
+      setModelRetryStatus(null);
     }
   }, [isResponding]);
 
@@ -844,7 +844,7 @@ export const useGeminiStream = (
       currentGeminiMessageBuffer: string,
       userMessageTimestamp: number,
     ): string => {
-      setRetryStatus(null);
+      setModelRetryStatus(null);
       if (turnCancelledRef.current) {
         // Prevents additional output after a user initiated cancel.
         return '';
@@ -1897,6 +1897,7 @@ export const useGeminiStream = (
     backgroundCurrentShell,
     backgroundShells,
     dismissBackgroundShell,
-    retryStatus,
+    retryStatus: modelRetryStatus,
+    setActivePtyId,
   };
 };

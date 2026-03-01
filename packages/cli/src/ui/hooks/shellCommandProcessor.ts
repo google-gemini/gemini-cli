@@ -152,6 +152,13 @@ export const useShellCommandProcessor = (
     [m],
   );
 
+  const setActivePtyId = useCallback(
+    (pid: number | null) => {
+      dispatch({ type: 'SET_ACTIVE_PTY', pid });
+    },
+    [dispatch],
+  );
+
   const toggleBackgroundShell = useCallback(() => {
     if (state.backgroundShells.size > 0) {
       const willBeVisible = !state.isBackgroundShellVisible;
@@ -550,5 +557,6 @@ export const useShellCommandProcessor = (
     registerBackgroundShell,
     dismissBackgroundShell,
     backgroundShells: state.backgroundShells,
+    setActivePtyId,
   };
 };
