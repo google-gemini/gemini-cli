@@ -1182,7 +1182,6 @@ export const useGeminiStream = (
       pendingHistoryItemRef,
       setPendingHistoryItem,
       setRespondingState,
-      setIsResponding,
       maybeAddLowVerbosityFailureNote,
     ],
   );
@@ -1374,6 +1373,7 @@ export const useGeminiStream = (
           const queryId = `${Date.now()}-${Math.random()}`;
           activeQueryIdRef.current = queryId;
           isRespondingRef.current = true;
+          setIsResponding(true);
 
           const userMessageTimestamp = Date.now();
 
@@ -1425,7 +1425,6 @@ export const useGeminiStream = (
                 setThought(null); // Reset thought when starting a new prompt
               }
 
-              setRespondingState(true);
               setInitError(null);
 
               // Store query and prompt_id for potential retry on loop detection
@@ -1714,7 +1713,6 @@ export const useGeminiStream = (
         });
         setRespondingState(false);
         maybeAddLowVerbosityFailureNote();
-        setIsResponding(false);
 
         const callIdsToMarkAsSubmitted = geminiTools.map(
           (toolCall) => toolCall.request.callId,
