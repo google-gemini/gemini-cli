@@ -71,13 +71,21 @@ export const Footer: React.FC = () => {
   const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
   const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
 
-  const justifyContent =
-    hideCWD && hideModelInfo && hideContextPercentage
-      ? 'center'
-      : 'space-between';
   const displayVimMode = vimEnabled ? vimMode : undefined;
-
   const showDebugProfiler = debugMode || isDevelopment;
+
+  // Determine if anything is visible on the left or right to set layout
+  const showLeftSection = showDebugProfiler || !!displayVimMode || !hideCWD;
+  const showRightSection =
+    !hideModelInfo ||
+    !hideContextPercentage ||
+    !!quotaStats ||
+    showMemoryUsage ||
+    corgiMode ||
+    showErrorSummary;
+
+  const justifyContent =
+    !showLeftSection && !showRightSection ? 'center' : 'space-between';
 
   return (
     <Box
