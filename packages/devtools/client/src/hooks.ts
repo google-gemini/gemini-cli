@@ -20,7 +20,14 @@ export function useDevToolsData() {
   const [connectedSessions, setConnectedSessions] = useState<string[]>([]);
 
   useEffect(() => {
-    const evtSource = new EventSource('/events');
+    const token =
+      (typeof window !== 'undefined' &&
+        (window as { __DEVTOOLS_TOKEN__?: string }).__DEVTOOLS_TOKEN__) ||
+      '';
+    const eventsUrl = token
+      ? `/events?token=${encodeURIComponent(token)}`
+      : '/events';
+    const evtSource = new EventSource(eventsUrl);
 
     evtSource.onopen = () => setIsConnected(true);
     evtSource.onerror = () => setIsConnected(false);

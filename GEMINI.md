@@ -58,12 +58,16 @@ powerful tool for developers.
 
 ## Development Conventions
 
-- **Legacy Snippets:** `packages/core/src/prompts/snippets.legacy.ts` is a
-  snapshot of an older system prompt. Avoid changing the prompting verbiage to
-  preserve its historical behavior; however, structural changes to ensure
-  compilation or simplify the code are permitted.
+- **Code organization (feature-first hybrid):** Prefer a feature-first hybrid
+  structure. Within each package, group code by feature/capability first (e.g. a
+  feature’s types, logic, UI, and tests together), while keeping the existing
+  package and layer boundaries (`packages/cli`, `packages/core`, etc.). Use
+  shared `utils/` or `config/` only for cross-feature code. When adding or
+  refactoring code, favor feature-scoped modules over scattering a feature
+  across many layer-only folders.
 - **Contributions:** Follow the process outlined in `CONTRIBUTING.md`. Requires
-  signing the Google CLA.
+  signing the Google CLA. Before coding: link work to an issue; keep PRs small
+  and focused; run `npm run preflight` before submitting.
 - **Pull Requests:** Keep PRs small, focused, and linked to an existing issue.
   Always activate the `pr-creator` skill for PR generation, even when using the
   `gh` CLI.
