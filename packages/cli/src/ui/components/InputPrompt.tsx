@@ -117,7 +117,7 @@ export interface InputPromptProps {
 
 // The input content, input container, and input suggestions list may have different widths
 export const calculatePromptWidths = (mainContentWidth: number) => {
-  const FRAME_PADDING_AND_BORDER = 6; // Border (2) + padding (4)
+  const FRAME_PADDING_AND_BORDER = 4; // Border (2) + padding (2)
   const PROMPT_PREFIX_WIDTH = 2; // '> ' or '! '
 
   const FRAME_OVERHEAD = FRAME_PADDING_AND_BORDER + PROMPT_PREFIX_WIDTH;
