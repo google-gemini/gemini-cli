@@ -97,7 +97,6 @@ describe('Plan Mode', () => {
     await run.type('Create a file called plan.md in the plans directory.');
     await run.type('\r');
 
-    // In plan mode, write_file to the plans directory is allowed by the default plan policy.
     await rig.expectToolCallSuccess(['write_file'], 30000, (args) =>
       args.includes('plan.md'),
     );
