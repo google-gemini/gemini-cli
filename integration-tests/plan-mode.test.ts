@@ -63,29 +63,41 @@ describe('Plan Mode', () => {
   });
 
   it('should allow write_file only in the plans directory in plan mode', async () => {
-    await rig.setup(
-      'should allow write_file only in the plans directory in plan mode',
-      {
-        settings: {
-          experimental: { plan: true },
-          tools: {
-            core: ['write_file', 'read_file', 'list_directory'],
-            allowed: ['write_file'],
-          },
-          general: {
-            defaultApprovalMode: 'plan',
-            plan: {
-              directory: '.gemini/tmp/v1/session/plans',
-            },
+    const plansDir = '.gemini/tmp/v1/session/plans';
+    const testName =
+      'should allow write_file only in the plans directory in plan mode';
+
+    await rig.setup(testName, {
+      settings: {
+        experimental: { plan: true },
+        tools: {
+          core: ['write_file', 'read_file', 'list_directory'],
+          allowed: ['write_file'],
+        },
+        general: {
+          defaultApprovalMode: 'plan',
+          plan: {
+            directory: plansDir,
           },
         },
       },
+    });
+
+    const policyPath = rig.createFile(
+      'plan-overrides.toml',
+      `
+[[rule]]
+toolName = "write_file"
+decision = "allow"
+priority = 70
+modes = ["plan"]
+argsPattern = '.*${plansDir.replace(/\//g, '[\\\\/]+')}.*'
+`,
     );
 
-    // We ask the agent to create a plan for a feature, which should trigger a write_file in the plans directory.
-    // Verify that write_file outside of plan directory fails
     await rig.run({
       approvalMode: 'plan',
+      args: ['--policy', policyPath],
       stdin:
         'Create a file called plan.md in the plans directory. Then create a file called hello.txt in the current directory',
     });
