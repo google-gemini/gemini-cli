@@ -26,7 +26,6 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
   containerRef,
 }) => (
   <Box
-    ref={containerRef}
     sticky
     minHeight={1}
     flexShrink={0}
@@ -58,6 +57,7 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
     }
   >
     <Box
+      ref={containerRef}
       borderStyle="round"
       width={width}
       borderColor={borderColor}

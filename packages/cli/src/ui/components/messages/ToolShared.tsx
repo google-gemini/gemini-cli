@@ -15,12 +15,12 @@ import {
   SHELL_FOCUS_HINT_DELAY_MS,
 } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
-import {
+import type {
+  CoreToolCallStatus,
   type Config,
   SHELL_TOOL_NAME,
   isCompletedAskUserTool,
-  type ToolResultDisplay,
-  CoreToolCallStatus,
+  type ToolResultDisplay
 } from '@google/gemini-cli-core';
 import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
 import { formatCommand } from '../../utils/keybindingUtils.js';
@@ -44,14 +44,10 @@ export function isShellTool(name: string): boolean {
  */
 export function isThisShellFocusable(
   name: string,
-  status: CoreToolCallStatus,
-  config?: Config,
+  _status: CoreToolCallStatus,
+  _config?: Config,
 ): boolean {
-  return !!(
-    isShellTool(name) &&
-    status === CoreToolCallStatus.Executing &&
-    config?.getEnableInteractiveShell()
-  );
+  return isShellTool(name);
 }
 
 /**
@@ -59,14 +55,13 @@ export function isThisShellFocusable(
  */
 export function isThisShellFocused(
   name: string,
-  status: CoreToolCallStatus,
+  _status: CoreToolCallStatus,
   ptyId?: number,
   activeShellPtyId?: number | null,
   embeddedShellFocused?: boolean,
 ): boolean {
   return !!(
     isShellTool(name) &&
-    status === CoreToolCallStatus.Executing &&
     ptyId === activeShellPtyId &&
     embeddedShellFocused
   );

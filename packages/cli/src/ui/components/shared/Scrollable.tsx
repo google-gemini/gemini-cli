@@ -5,12 +5,20 @@
  */
 
 import type React from 'react';
-import { useState, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
-import { Box, ResizeObserver, type DOMElement } from 'ink';
+import {
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+  useLayoutEffect,
+  useEffect,
+} from 'react';
+import { Box, ResizeObserver, getBoundingBox, type DOMElement } from 'ink';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { useScrollable } from '../../contexts/ScrollProvider.js';
 import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
+import { useMouse, type MouseEvent } from '../../hooks/useMouse.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
 
 interface ScrollableProps {
@@ -115,13 +123,34 @@ export const Scrollable: React.FC<ScrollableProps> = ({
     [scrollToBottom],
   );
 
+  const [isHovered, setIsHovered] = useState(false);
+
+  useMouse(
+    (event: MouseEvent) => {
+      if (event.name === 'move' && viewportRef.current) {
+        const boundingBox = getBoundingBox(viewportRef.current);
+        if (boundingBox) {
+          const { x, y, width, height } = boundingBox;
+          const inside =
+            event.col >= x &&
+            event.col < x + width + 1 &&
+            event.row >= y &&
+            event.row < y + height;
+
+          if (inside !== isHovered) {
+            setIsHovered(inside);
+          }
+        }
+      }
+      return false;
+    },
+    { isActive: true },
+  );
+
   const { getScrollTop, setPendingScrollTop } = useBatchedScroll(scrollTop);
 
   const scrollBy = useCallback(
     (delta: number) => {
-      if (!hasFocus) {
-        return;
-      }
       const { scrollHeight, innerHeight } = sizeRef.current;
       const maxScroll = Math.max(0, scrollHeight - innerHeight);
       const current = Math.min(getScrollTop(), maxScroll);
@@ -132,14 +161,26 @@ export const Scrollable: React.FC<ScrollableProps> = ({
       setPendingScrollTop(next);
       setScrollTop(next);
     },
-    [getScrollTop, setPendingScrollTop, hasFocus],
+    [getScrollTop, setPendingScrollTop],
   );
 
   const { scrollbarColor, flashScrollbar, scrollByWithAnimation } =
     useAnimatedScrollbar(hasFocus, scrollBy);
 
+  // Flash scrollbar on hover for discoverability.
+  const wasHovered = useRef(isHovered);
+  useEffect(() => {
+    if (isHovered && !wasHovered.current && !hasFocus) {
+      flashScrollbar();
+    }
+    wasHovered.current = isHovered;
+  }, [isHovered, hasFocus, flashScrollbar]);
+
   useKeypress(
     (key: Key) => {
+      if (!hasFocus) {
+        return false;
+      }
       const { scrollHeight, innerHeight } = sizeRef.current;
       const scrollTop = getScrollTop();
       const maxScroll = Math.max(0, scrollHeight - innerHeight);
@@ -178,13 +219,20 @@ export const Scrollable: React.FC<ScrollableProps> = ({
   );
 
   const getScrollState = useCallback(() => {
+    if (!hasFocus && !isHovered) {
+      return {
+        scrollTop: 0,
+        scrollHeight: 0,
+        innerHeight: 0,
+      };
+    }
     const maxScroll = Math.max(0, size.scrollHeight - size.innerHeight);
     return {
       scrollTop: Math.min(getScrollTop(), maxScroll),
       scrollHeight: size.scrollHeight,
       innerHeight: size.innerHeight,
     };
-  }, [getScrollTop, size.scrollHeight, size.innerHeight]);
+  }, [hasFocus, isHovered, getScrollTop, size.scrollHeight, size.innerHeight]);
 
   const hasFocusCallback = useCallback(() => hasFocus, [hasFocus]);
 
@@ -209,11 +257,11 @@ export const Scrollable: React.FC<ScrollableProps> = ({
       width={width ?? maxWidth}
       height={height}
       flexDirection="column"
-      overflowY={hasFocus ? 'scroll' : 'hidden'}
+      overflowY={hasFocus || isHovered ? 'scroll' : 'hidden'}
       overflowX="hidden"
       scrollTop={scrollTop}
       flexGrow={flexGrow}
-      scrollbarThumbColor={hasFocus ? scrollbarColor : undefined}
+      scrollbarThumbColor={hasFocus || isHovered ? scrollbarColor : undefined}
     >
       {/*
         This inner box is necessary to prevent the parent from shrinking

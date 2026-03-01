@@ -107,9 +107,9 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     }
   };
 
-  useMouseClick(headerRef, handleFocus, { isActive: !!isThisShellFocusable });
+  useMouseClick(headerRef, handleFocus, { isActive: true });
 
-  useMouseClick(contentRef, handleFocus, { isActive: !!isThisShellFocusable });
+  useMouseClick(contentRef, handleFocus, { isActive: true });
 
   const { shouldShowFocusHint } = useFocusHint(
     isThisShellFocusable,
