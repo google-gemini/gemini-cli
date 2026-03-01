@@ -183,8 +183,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
         ? strippedCommand
         : (() => {
             // wrap command to append subprocess pids (via pgrep) to temporary file
-            let command = strippedCommand.trim();
-            if (!command.endsWith('&')) command += ';';
+            // Use trimStart() only — trimEnd() would strip trailing newlines
+            // needed by heredocs and other multi-line shell constructs.
+            let command = strippedCommand.trimStart();
+            if (!command.trimEnd().endsWith('&')) command += '\n;';
             return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
           })();
 
