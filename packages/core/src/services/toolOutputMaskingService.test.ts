@@ -41,7 +41,7 @@ describe('ToolOutputMaskingService', () => {
     mockConfig = {
       storage: {
         getHistoryDir: () => path.join(testTempDir, 'history'),
-        getProjectTempDir: () => testTempDir,
+        getWorkspaceTempDir: () => testTempDir,
       },
       getSessionId: () => 'mock-session',
       getUsageStatisticsEnabled: () => false,

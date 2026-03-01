@@ -153,7 +153,7 @@ describe('restoreCommand', () => {
       });
     });
 
-    it('should restore a tool call and project state', async () => {
+    it('should restore a tool call and workspace state', async () => {
       const toolCallData = {
         history: [{ type: 'user', text: 'do a thing', id: 123 }],
         clientHistory: [{ role: 'user', parts: [{ text: 'do a thing' }] }],
@@ -181,7 +181,7 @@ describe('restoreCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: 'info',
-          text: 'Restored project to the state before the tool call.',
+          text: 'Restored workspace to the state before the tool call.',
         },
         expect.any(Number),
       );

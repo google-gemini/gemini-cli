@@ -95,10 +95,10 @@ export function loadSettings(workspaceDir: string): Settings {
   // Load workspace settings
   try {
     if (fs.existsSync(workspaceSettingsPath)) {
-      const projectContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
+      const workspaceContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const parsedWorkspaceSettings = JSON.parse(
-        stripJsonComments(projectContent),
+        stripJsonComments(workspaceContent),
       ) as Settings;
       workspaceSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
     }

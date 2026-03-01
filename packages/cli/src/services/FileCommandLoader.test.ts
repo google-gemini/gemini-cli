@@ -230,7 +230,7 @@ describe('FileCommandLoader', () => {
       },
     });
     const mockConfig = {
-      getProjectRoot: vi.fn(() => '/path/to/project'),
+      getWorkspaceRoot: vi.fn(() => '/path/to/workspace'),
       getExtensions: vi.fn(() => []),
       getFolderTrust: vi.fn(() => false),
       isTrustedFolder: vi.fn(() => false),
@@ -260,22 +260,22 @@ describe('FileCommandLoader', () => {
     expect(command.name).toBe('git:commit');
   });
 
-  it('returns both user and project commands in order', async () => {
+  it('returns both user and workspace commands in order', async () => {
     const userCommandsDir = Storage.getUserCommandsDir();
-    const projectCommandsDir = new Storage(
+    const workspaceCommandsDir = new Storage(
       process.cwd(),
     ).getProjectCommandsDir();
     mock({
       [userCommandsDir]: {
         'test.toml': 'prompt = "User prompt"',
       },
-      [projectCommandsDir]: {
+      [workspaceCommandsDir]: {
         'test.toml': 'prompt = "Project prompt"',
       },
     });
 
     const mockConfig = {
-      getProjectRoot: vi.fn(() => process.cwd()),
+      getWorkspaceRoot: vi.fn(() => process.cwd()),
       getExtensions: vi.fn(() => []),
       getFolderTrust: vi.fn(() => false),
       isTrustedFolder: vi.fn(() => false),
@@ -299,7 +299,7 @@ describe('FileCommandLoader', () => {
     } else {
       assert.fail('Incorrect action type for user command');
     }
-    const projectResult = await commands[1].action?.(
+    const workspaceResult = await commands[1].action?.(
       createMockCommandContext({
         invocation: {
           raw: '/test',
@@ -309,10 +309,10 @@ describe('FileCommandLoader', () => {
       }),
       '',
     );
-    if (projectResult?.type === 'submit_prompt') {
-      expect(projectResult.content).toEqual([{ text: 'Project prompt' }]);
+    if (workspaceResult?.type === 'submit_prompt') {
+      expect(workspaceResult.content).toEqual([{ text: 'Project prompt' }]);
     } else {
-      assert.fail('Incorrect action type for project command');
+      assert.fail('Incorrect action type for workspace command');
     }
   });
 
@@ -532,7 +532,7 @@ describe('FileCommandLoader', () => {
   describe('Extension Command Loading', () => {
     it('loads commands from active extensions', async () => {
       const userCommandsDir = Storage.getUserCommandsDir();
-      const projectCommandsDir = new Storage(
+      const workspaceCommandsDir = new Storage(
         process.cwd(),
       ).getProjectCommandsDir();
       const extensionDir = path.join(
@@ -546,8 +546,8 @@ describe('FileCommandLoader', () => {
         [userCommandsDir]: {
           'user.toml': 'prompt = "User command"',
         },
-        [projectCommandsDir]: {
-          'project.toml': 'prompt = "Project command"',
+        [workspaceCommandsDir]: {
+          'workspace.toml': 'prompt = "Project command"',
         },
         [extensionDir]: {
           'gemini-extension.json': JSON.stringify({
@@ -561,7 +561,7 @@ describe('FileCommandLoader', () => {
       });
 
       const mockConfig = {
-        getProjectRoot: vi.fn(() => process.cwd()),
+        getWorkspaceRoot: vi.fn(() => process.cwd()),
         getExtensions: vi.fn(() => [
           {
             name: 'test-ext',
@@ -578,7 +578,7 @@ describe('FileCommandLoader', () => {
 
       expect(commands).toHaveLength(3);
       const commandNames = commands.map((cmd) => cmd.name);
-      expect(commandNames).toEqual(['user', 'project', 'ext']);
+      expect(commandNames).toEqual(['user', 'workspace', 'ext']);
 
       const extCommand = commands.find((cmd) => cmd.name === 'ext');
       expect(extCommand?.extensionName).toBe('test-ext');
@@ -587,7 +587,7 @@ describe('FileCommandLoader', () => {
 
     it('extension commands have extensionName metadata for conflict resolution', async () => {
       const userCommandsDir = Storage.getUserCommandsDir();
-      const projectCommandsDir = new Storage(
+      const workspaceCommandsDir = new Storage(
         process.cwd(),
       ).getProjectCommandsDir();
       const extensionDir = path.join(
@@ -610,13 +610,13 @@ describe('FileCommandLoader', () => {
         [userCommandsDir]: {
           'deploy.toml': 'prompt = "User deploy command"',
         },
-        [projectCommandsDir]: {
+        [workspaceCommandsDir]: {
           'deploy.toml': 'prompt = "Project deploy command"',
         },
       });
 
       const mockConfig = {
-        getProjectRoot: vi.fn(() => process.cwd()),
+        getWorkspaceRoot: vi.fn(() => process.cwd()),
         getExtensions: vi.fn(() => [
           {
             name: 'test-ext',
@@ -723,7 +723,7 @@ describe('FileCommandLoader', () => {
       });
 
       const mockConfig = {
-        getProjectRoot: vi.fn(() => process.cwd()),
+        getWorkspaceRoot: vi.fn(() => process.cwd()),
         getExtensions: vi.fn(() => [
           {
             name: 'active-ext',
@@ -769,7 +769,7 @@ describe('FileCommandLoader', () => {
       });
 
       const mockConfig = {
-        getProjectRoot: vi.fn(() => process.cwd()),
+        getWorkspaceRoot: vi.fn(() => process.cwd()),
         getExtensions: vi.fn(() => [
           {
             name: 'no-commands',
@@ -813,7 +813,7 @@ describe('FileCommandLoader', () => {
       });
 
       const mockConfig = {
-        getProjectRoot: vi.fn(() => process.cwd()),
+        getWorkspaceRoot: vi.fn(() => process.cwd()),
         getExtensions: vi.fn(() => [
           { name: 'a', version: '1.0.0', isActive: true, path: extensionDir },
         ]),
@@ -874,7 +874,7 @@ describe('FileCommandLoader', () => {
       });
 
       const mockConfig = {
-        getProjectRoot: vi.fn(() => process.cwd()),
+        getWorkspaceRoot: vi.fn(() => process.cwd()),
         getExtensions: vi.fn(() => [
           {
             name: 'my-test-ext',
@@ -1256,7 +1256,7 @@ describe('FileCommandLoader', () => {
   describe('with folder trust enabled', () => {
     it('loads multiple commands', async () => {
       const mockConfig = {
-        getProjectRoot: vi.fn(() => '/path/to/project'),
+        getWorkspaceRoot: vi.fn(() => '/path/to/workspace'),
         getExtensions: vi.fn(() => []),
         getFolderTrust: vi.fn(() => true),
         isTrustedFolder: vi.fn(() => true),
@@ -1277,7 +1277,7 @@ describe('FileCommandLoader', () => {
 
     it('does not load when folder is not trusted', async () => {
       const mockConfig = {
-        getProjectRoot: vi.fn(() => '/path/to/project'),
+        getWorkspaceRoot: vi.fn(() => '/path/to/workspace'),
         getExtensions: vi.fn(() => []),
         getFolderTrust: vi.fn(() => true),
         isTrustedFolder: vi.fn(() => false),
@@ -1307,7 +1307,7 @@ describe('FileCommandLoader', () => {
         .mockImplementation(() => {});
 
       const mockConfig = {
-        getProjectRoot: vi.fn(() => '/path/to/project'),
+        getWorkspaceRoot: vi.fn(() => '/path/to/workspace'),
         getExtensions: vi.fn(() => []),
         getFolderTrust: vi.fn(() => false),
         isTrustedFolder: vi.fn(() => false),

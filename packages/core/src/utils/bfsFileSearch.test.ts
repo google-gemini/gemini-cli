@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { bfsFileSearch, bfsFileSearchSync } from './bfsFileSearch.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { GEMINI_IGNORE_FILE_NAME } from 'src/config/constants.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 
 describe('bfsFileSearch', () => {
   let testRootDir: string;
@@ -108,10 +108,10 @@ describe('bfsFileSearch', () => {
   });
 
   describe('with FileDiscoveryService', () => {
-    let projectRoot: string;
+    let workspaceRoot: string;
 
     beforeEach(async () => {
-      projectRoot = await createEmptyDir('project');
+      workspaceRoot = await createEmptyDir('project');
     });
 
     it('should ignore gitignored files', async () => {
@@ -125,8 +125,8 @@ describe('bfsFileSearch', () => {
         'target.txt',
       );
 
-      const fileService = new FileDiscoveryService(projectRoot);
-      const result = await bfsFileSearch(projectRoot, {
+      const fileService = new FileDiscoveryService(workspaceRoot);
+      const result = await bfsFileSearch(workspaceRoot, {
         fileName: 'target.txt',
         fileService,
         fileFilteringOptions: {
@@ -149,8 +149,8 @@ describe('bfsFileSearch', () => {
         'target.txt',
       );
 
-      const fileService = new FileDiscoveryService(projectRoot);
-      const result = await bfsFileSearch(projectRoot, {
+      const fileService = new FileDiscoveryService(workspaceRoot);
+      const result = await bfsFileSearch(workspaceRoot, {
         fileName: 'target.txt',
         fileService,
         fileFilteringOptions: {
@@ -179,8 +179,8 @@ describe('bfsFileSearch', () => {
         'target.txt',
       );
 
-      const fileService = new FileDiscoveryService(projectRoot);
-      const result = await bfsFileSearch(projectRoot, {
+      const fileService = new FileDiscoveryService(workspaceRoot);
+      const result = await bfsFileSearch(workspaceRoot, {
         fileName: 'target.txt',
         fileService,
         fileFilteringOptions: {
@@ -302,7 +302,7 @@ describe('bfsFileSearchSync', () => {
   });
 
   it('should work with FileDiscoveryService synchronously', async () => {
-    const projectRoot = await createEmptyDir('project');
+    const workspaceRoot = await createEmptyDir('project');
     await createEmptyDir('project', '.git');
     await createTestFile('node_modules/', 'project', '.gitignore');
     await createTestFile('content', 'project', 'node_modules', 'target.txt');
@@ -313,8 +313,8 @@ describe('bfsFileSearchSync', () => {
       'target.txt',
     );
 
-    const fileService = new FileDiscoveryService(projectRoot);
-    const result = bfsFileSearchSync(projectRoot, {
+    const fileService = new FileDiscoveryService(workspaceRoot);
+    const result = bfsFileSearchSync(workspaceRoot, {
       fileName: 'target.txt',
       fileService,
       fileFilteringOptions: {

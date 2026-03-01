@@ -66,7 +66,7 @@ describe('memoryDiscovery', () => {
   const DEFAULT_FOLDER_TRUST = true;
   let testRootDir: string;
   let cwd: string;
-  let projectRoot: string;
+  let workspaceRoot: string;
   let homedir: string;
 
   async function createEmptyDir(fullPath: string) {
@@ -92,8 +92,8 @@ describe('memoryDiscovery', () => {
     vi.stubEnv('NODE_ENV', 'test');
     vi.stubEnv('VITEST', 'true');
 
-    projectRoot = await createEmptyDir(path.join(testRootDir, 'project'));
-    cwd = await createEmptyDir(path.join(projectRoot, 'src'));
+    workspaceRoot = await createEmptyDir(path.join(testRootDir, 'project'));
+    cwd = await createEmptyDir(path.join(workspaceRoot, 'src'));
     homedir = await createEmptyDir(path.join(testRootDir, 'userhome'));
     vi.mocked(os.homedir).mockReturnValue(homedir);
     vi.mocked(pathsHomedir).mockReturnValue(homedir);
@@ -119,8 +119,8 @@ describe('memoryDiscovery', () => {
   describe('when untrusted', () => {
     it('does not load context files from untrusted workspaces', async () => {
       await createTestFile(
-        path.join(projectRoot, DEFAULT_CONTEXT_FILENAME),
-        'Project root memory',
+        path.join(workspaceRoot, DEFAULT_CONTEXT_FILENAME),
+        'Workspace root memory',
       );
       await createTestFile(
         path.join(cwd, DEFAULT_CONTEXT_FILENAME),
@@ -131,7 +131,7 @@ describe('memoryDiscovery', () => {
           cwd,
           [],
           false,
-          new FileDiscoveryService(projectRoot),
+          new FileDiscoveryService(workspaceRoot),
           new SimpleExtensionLoader([]),
           false, // untrusted
         ),
@@ -146,8 +146,8 @@ describe('memoryDiscovery', () => {
 
     it('loads context from outside the untrusted workspace', async () => {
       await createTestFile(
-        path.join(projectRoot, DEFAULT_CONTEXT_FILENAME),
-        'Project root memory', // Untrusted
+        path.join(workspaceRoot, DEFAULT_CONTEXT_FILENAME),
+        'Workspace root memory', // Untrusted
       );
       await createTestFile(
         path.join(cwd, DEFAULT_CONTEXT_FILENAME),
@@ -168,7 +168,7 @@ describe('memoryDiscovery', () => {
           cwd,
           [],
           false,
-          new FileDiscoveryService(projectRoot),
+          new FileDiscoveryService(workspaceRoot),
           new SimpleExtensionLoader([]),
           false, // untrusted
         ),
@@ -186,7 +186,7 @@ describe('memoryDiscovery', () => {
         cwd,
         [],
         false,
-        new FileDiscoveryService(projectRoot),
+        new FileDiscoveryService(workspaceRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
       ),
@@ -210,7 +210,7 @@ describe('memoryDiscovery', () => {
         cwd,
         [],
         false,
-        new FileDiscoveryService(projectRoot),
+        new FileDiscoveryService(workspaceRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
       ),
@@ -243,7 +243,7 @@ default context content
         cwd,
         [],
         false,
-        new FileDiscoveryService(projectRoot),
+        new FileDiscoveryService(workspaceRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
       ),
@@ -264,8 +264,8 @@ custom context content
     setGeminiMdFilename(customFilename);
 
     const projectContextFile = await createTestFile(
-      path.join(projectRoot, customFilename),
-      'project context content',
+      path.join(workspaceRoot, customFilename),
+      'workspace context content',
     );
     const cwdContextFile = await createTestFile(
       path.join(cwd, customFilename),
@@ -277,16 +277,16 @@ custom context content
         cwd,
         [],
         false,
-        new FileDiscoveryService(projectRoot),
+        new FileDiscoveryService(workspaceRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
       ),
     );
 
     expect(result).toEqual({
-      memoryContent: `--- Project ---
+      memoryContent: `--- Workspace ---
 --- Context from: ${normMarker(path.relative(cwd, projectContextFile))} ---
-project context content
+workspace context content
 --- End of Context from: ${normMarker(path.relative(cwd, projectContextFile))} ---
 
 --- Context from: ${normMarker(path.relative(cwd, cwdContextFile))} ---
@@ -315,14 +315,14 @@ cwd context content
         cwd,
         [],
         false,
-        new FileDiscoveryService(projectRoot),
+        new FileDiscoveryService(workspaceRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
       ),
     );
 
     expect(result).toEqual({
-      memoryContent: `--- Project ---
+      memoryContent: `--- Workspace ---
 --- Context from: ${normMarker(customFilename)} ---
 CWD custom memory
 --- End of Context from: ${normMarker(customFilename)} ---
@@ -336,9 +336,9 @@ Subdir custom memory
   });
 
   it('should load ORIGINAL_GEMINI_MD_FILENAME files by upward traversal from CWD to project root', async () => {
-    const projectRootGeminiFile = await createTestFile(
-      path.join(projectRoot, DEFAULT_CONTEXT_FILENAME),
-      'Project root memory',
+    const workspaceRootGeminiFile = await createTestFile(
+      path.join(workspaceRoot, DEFAULT_CONTEXT_FILENAME),
+      'Workspace root memory',
     );
     const srcGeminiFile = await createTestFile(
       path.join(cwd, DEFAULT_CONTEXT_FILENAME),
@@ -350,23 +350,23 @@ Subdir custom memory
         cwd,
         [],
         false,
-        new FileDiscoveryService(projectRoot),
+        new FileDiscoveryService(workspaceRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
       ),
     );
 
     expect(result).toEqual({
-      memoryContent: `--- Project ---
---- Context from: ${normMarker(path.relative(cwd, projectRootGeminiFile))} ---
-Project root memory
---- End of Context from: ${normMarker(path.relative(cwd, projectRootGeminiFile))} ---
+      memoryContent: `--- Workspace ---
+--- Context from: ${normMarker(path.relative(cwd, workspaceRootGeminiFile))} ---
+Workspace root memory
+--- End of Context from: ${normMarker(path.relative(cwd, workspaceRootGeminiFile))} ---
 
 --- Context from: ${normMarker(path.relative(cwd, srcGeminiFile))} ---
 Src directory memory
 --- End of Context from: ${normMarker(path.relative(cwd, srcGeminiFile))} ---`,
       fileCount: 2,
-      filePaths: [projectRootGeminiFile, srcGeminiFile],
+      filePaths: [workspaceRootGeminiFile, srcGeminiFile],
     });
   });
 
@@ -385,14 +385,14 @@ Src directory memory
         cwd,
         [],
         false,
-        new FileDiscoveryService(projectRoot),
+        new FileDiscoveryService(workspaceRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
       ),
     );
 
     expect(result).toEqual({
-      memoryContent: `--- Project ---
+      memoryContent: `--- Workspace ---
 --- Context from: ${normMarker(DEFAULT_CONTEXT_FILENAME)} ---
 CWD memory
 --- End of Context from: ${normMarker(DEFAULT_CONTEXT_FILENAME)} ---
@@ -412,11 +412,11 @@ Subdir memory
     );
     const rootGeminiFile = await createTestFile(
       path.join(testRootDir, DEFAULT_CONTEXT_FILENAME),
-      'Project parent memory',
+      'Workspace parent memory',
     );
-    const projectRootGeminiFile = await createTestFile(
-      path.join(projectRoot, DEFAULT_CONTEXT_FILENAME),
-      'Project root memory',
+    const workspaceRootGeminiFile = await createTestFile(
+      path.join(workspaceRoot, DEFAULT_CONTEXT_FILENAME),
+      'Workspace root memory',
     );
     const cwdGeminiFile = await createTestFile(
       path.join(cwd, DEFAULT_CONTEXT_FILENAME),
@@ -432,7 +432,7 @@ Subdir memory
         cwd,
         [],
         false,
-        new FileDiscoveryService(projectRoot),
+        new FileDiscoveryService(workspaceRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
       ),
@@ -444,14 +444,14 @@ Subdir memory
 default context content
 --- End of Context from: ${normMarker(path.relative(cwd, defaultContextFile))} ---
 
---- Project ---
+--- Workspace ---
 --- Context from: ${normMarker(path.relative(cwd, rootGeminiFile))} ---
-Project parent memory
+Workspace parent memory
 --- End of Context from: ${normMarker(path.relative(cwd, rootGeminiFile))} ---
 
---- Context from: ${normMarker(path.relative(cwd, projectRootGeminiFile))} ---
-Project root memory
---- End of Context from: ${normMarker(path.relative(cwd, projectRootGeminiFile))} ---
+--- Context from: ${normMarker(path.relative(cwd, workspaceRootGeminiFile))} ---
+Workspace root memory
+--- End of Context from: ${normMarker(path.relative(cwd, workspaceRootGeminiFile))} ---
 
 --- Context from: ${normMarker(path.relative(cwd, cwdGeminiFile))} ---
 CWD memory
@@ -464,7 +464,7 @@ Subdir memory
       filePaths: [
         defaultContextFile,
         rootGeminiFile,
-        projectRootGeminiFile,
+        workspaceRootGeminiFile,
         cwdGeminiFile,
         subDirGeminiFile,
       ],
@@ -472,8 +472,11 @@ Subdir memory
   });
 
   it('should ignore specified directories during downward scan', async () => {
-    await createEmptyDir(path.join(projectRoot, '.git'));
-    await createTestFile(path.join(projectRoot, '.gitignore'), 'node_modules');
+    await createEmptyDir(path.join(workspaceRoot, '.git'));
+    await createTestFile(
+      path.join(workspaceRoot, '.gitignore'),
+      'node_modules',
+    );
 
     await createTestFile(
       path.join(cwd, 'node_modules', DEFAULT_CONTEXT_FILENAME),
@@ -489,7 +492,7 @@ Subdir memory
         cwd,
         [],
         false,
-        new FileDiscoveryService(projectRoot),
+        new FileDiscoveryService(workspaceRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
         'tree',
@@ -503,7 +506,7 @@ Subdir memory
     );
 
     expect(result).toEqual({
-      memoryContent: `--- Project ---
+      memoryContent: `--- Workspace ---
 --- Context from: ${normMarker(path.relative(cwd, regularSubDirGeminiFile))} ---
 My code memory
 --- End of Context from: ${normMarker(path.relative(cwd, regularSubDirGeminiFile))} ---`,
@@ -528,7 +531,7 @@ My code memory
       cwd,
       [],
       true,
-      new FileDiscoveryService(projectRoot),
+      new FileDiscoveryService(workspaceRoot),
       new SimpleExtensionLoader([]),
       DEFAULT_FOLDER_TRUST,
       'tree', // importFormat
@@ -552,7 +555,7 @@ My code memory
         cwd,
         [],
         false,
-        new FileDiscoveryService(projectRoot),
+        new FileDiscoveryService(workspaceRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
       ),
@@ -576,7 +579,7 @@ My code memory
         cwd,
         [],
         false,
-        new FileDiscoveryService(projectRoot),
+        new FileDiscoveryService(workspaceRoot),
         new SimpleExtensionLoader([
           {
             contextFiles: [extensionFilePath],
@@ -611,14 +614,14 @@ Extension memory content
         cwd,
         [includedDir],
         false,
-        new FileDiscoveryService(projectRoot),
+        new FileDiscoveryService(workspaceRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
       ),
     );
 
     expect(result).toEqual({
-      memoryContent: `--- Project ---
+      memoryContent: `--- Workspace ---
 --- Context from: ${normMarker(path.relative(cwd, includedFile))} ---
 included directory memory
 --- End of Context from: ${normMarker(path.relative(cwd, includedFile))} ---`,
@@ -649,7 +652,7 @@ included directory memory
         cwd,
         createdFiles.map((f) => path.dirname(f)),
         false,
-        new FileDiscoveryService(projectRoot),
+        new FileDiscoveryService(workspaceRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
       ),
@@ -687,7 +690,7 @@ included directory memory
         parentDir,
         [childDir, parentDir], // Deliberately include duplicates
         false,
-        new FileDiscoveryService(projectRoot),
+        new FileDiscoveryService(workspaceRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
       ),
@@ -1030,7 +1033,7 @@ included directory memory
       getDebugMode: vi.fn().mockReturnValue(false),
       getFileService: vi
         .fn()
-        .mockReturnValue(new FileDiscoveryService(projectRoot)),
+        .mockReturnValue(new FileDiscoveryService(workspaceRoot)),
       getExtensionLoader: vi
         .fn()
         .mockReturnValue(new SimpleExtensionLoader([])),
@@ -1054,14 +1057,14 @@ included directory memory
 
     expect(mockConfig.setUserMemory).toHaveBeenCalledWith(
       expect.objectContaining({
-        project: expect.stringContaining(
+        workspace: expect.stringContaining(
           "# Instructions for MCP Server 'extension-server'",
         ),
       }),
     );
     expect(mockConfig.setUserMemory).toHaveBeenCalledWith(
       expect.objectContaining({
-        project: expect.stringContaining('Always be polite.'),
+        workspace: expect.stringContaining('Always be polite.'),
       }),
     );
   });

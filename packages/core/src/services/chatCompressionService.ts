@@ -183,7 +183,7 @@ async function truncateHistoryToBudget(
                 contentStr,
                 part.functionResponse.name ?? 'unknown_tool',
                 config.getNextCompressionTruncationId(),
-                config.storage.getProjectTempDir(),
+                config.storage.getWorkspaceTempDir(),
               );
 
               const truncatedMessage = formatTruncatedToolOutput(

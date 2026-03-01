@@ -59,7 +59,7 @@ export async function cleanupExpiredSessions(
     }
 
     const retentionConfig = settings.general.sessionRetention;
-    const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
+    const chatsDir = path.join(config.storage.getWorkspaceTempDir(), 'chats');
 
     // Validate retention configuration
     const validationErrorMessage = validateRetentionConfig(
@@ -95,7 +95,10 @@ export async function cleanupExpiredSessions(
         // ALSO cleanup Activity logs in the project logs directory
         const sessionId = sessionToDelete.sessionInfo?.id;
         if (sessionId) {
-          const logsDir = path.join(config.storage.getProjectTempDir(), 'logs');
+          const logsDir = path.join(
+            config.storage.getWorkspaceTempDir(),
+            'logs',
+          );
           const logPath = path.join(logsDir, `session-${sessionId}.jsonl`);
           try {
             await fs.unlink(logPath);
@@ -106,7 +109,7 @@ export async function cleanupExpiredSessions(
           // ALSO cleanup tool outputs for this session
           const safeSessionId = sanitizeFilenamePart(sessionId);
           const toolOutputDir = path.join(
-            config.storage.getProjectTempDir(),
+            config.storage.getWorkspaceTempDir(),
             TOOL_OUTPUTS_DIR,
             `session-${safeSessionId}`,
           );
@@ -371,7 +374,7 @@ export async function cleanupToolOutputFiles(
     if (!tempDir) {
       const storage = new Storage(process.cwd());
       await storage.initialize();
-      tempDir = storage.getProjectTempDir();
+      tempDir = storage.getWorkspaceTempDir();
     }
     const toolOutputDir = path.join(tempDir, TOOL_OUTPUTS_DIR);
 

@@ -47,6 +47,24 @@ import { ToolRegistry } from '../tools/tool-registry.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from '../tools/tool-names.js';
 import type { SkillDefinition } from '../skills/skillLoader.js';
 import type { McpClientManager } from '../tools/mcp-client-manager.js';
+vi.mock('./storage.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./storage.js')>();
+  actual.Storage.prototype.initialize = vi.fn().mockResolvedValue(undefined);
+  actual.Storage.prototype.getWorkspaceTempDir = vi
+    .fn()
+    .mockReturnValue('/tmp/workspace');
+  actual.Storage.prototype.getWorkspaceTempPlansDir = vi
+    .fn()
+    .mockReturnValue('/tmp/workspace/plans');
+  actual.Storage.prototype.getPlansDir = vi
+    .fn()
+    .mockReturnValue('/tmp/workspace/plans');
+  actual.Storage.prototype.getProjectIdentifier = vi
+    .fn()
+    .mockReturnValue('test-project');
+  return actual;
+});
+
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import {
   DEFAULT_GEMINI_MODEL,
@@ -2763,7 +2781,7 @@ describe('Config JIT Initialization', () => {
     expect(config.getUserMemory()).toEqual({
       global: 'Global Memory',
       extension: 'Extension Memory',
-      project: 'Environment Memory\n\nMCP Instructions',
+      workspace: 'Environment Memory\n\nMCP Instructions',
     });
 
     // Verify state update (delegated to ContextManager)

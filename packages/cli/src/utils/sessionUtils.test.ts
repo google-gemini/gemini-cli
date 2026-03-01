@@ -30,7 +30,7 @@ describe('SessionSelector', () => {
     // Mock config
     config = {
       storage: {
-        getProjectTempDir: () => tmpDir,
+        getWorkspaceTempDir: () => tmpDir,
       },
       getSessionId: () => 'current-session-id',
     } as Partial<Config> as Config;
@@ -55,7 +55,7 @@ describe('SessionSelector', () => {
 
     const session1 = {
       sessionId: sessionId1,
-      projectHash: 'test-hash',
+      workspaceHash: 'test-hash',
       startTime: '2024-01-01T10:00:00.000Z',
       lastUpdated: '2024-01-01T10:30:00.000Z',
       messages: [
@@ -70,7 +70,7 @@ describe('SessionSelector', () => {
 
     const session2 = {
       sessionId: sessionId2,
-      projectHash: 'test-hash',
+      workspaceHash: 'test-hash',
       startTime: '2024-01-01T11:00:00.000Z',
       lastUpdated: '2024-01-01T11:30:00.000Z',
       messages: [
@@ -121,7 +121,7 @@ describe('SessionSelector', () => {
 
     const session1 = {
       sessionId: sessionId1,
-      projectHash: 'test-hash',
+      workspaceHash: 'test-hash',
       startTime: '2024-01-01T10:00:00.000Z',
       lastUpdated: '2024-01-01T10:30:00.000Z',
       messages: [
@@ -136,7 +136,7 @@ describe('SessionSelector', () => {
 
     const session2 = {
       sessionId: sessionId2,
-      projectHash: 'test-hash',
+      workspaceHash: 'test-hash',
       startTime: '2024-01-01T11:00:00.000Z',
       lastUpdated: '2024-01-01T11:30:00.000Z',
       messages: [
@@ -185,7 +185,7 @@ describe('SessionSelector', () => {
 
     const session1 = {
       sessionId: sessionId1,
-      projectHash: 'test-hash',
+      workspaceHash: 'test-hash',
       startTime: '2024-01-01T10:00:00.000Z',
       lastUpdated: '2024-01-01T10:30:00.000Z',
       messages: [
@@ -200,7 +200,7 @@ describe('SessionSelector', () => {
 
     const session2 = {
       sessionId: sessionId2,
-      projectHash: 'test-hash',
+      workspaceHash: 'test-hash',
       startTime: '2024-01-01T11:00:00.000Z',
       lastUpdated: '2024-01-01T11:30:00.000Z',
       messages: [
@@ -245,7 +245,7 @@ describe('SessionSelector', () => {
 
     const sessionOriginal = {
       sessionId,
-      projectHash: 'test-hash',
+      workspaceHash: 'test-hash',
       startTime: '2024-01-01T10:00:00.000Z',
       lastUpdated: '2024-01-01T10:30:00.000Z',
       messages: [
@@ -260,7 +260,7 @@ describe('SessionSelector', () => {
 
     const sessionDuplicate = {
       sessionId,
-      projectHash: 'test-hash',
+      workspaceHash: 'test-hash',
       startTime: '2024-01-01T10:00:00.000Z',
       lastUpdated: '2024-01-01T11:00:00.000Z', // Newer
       messages: [
@@ -309,7 +309,7 @@ describe('SessionSelector', () => {
 
     const session1 = {
       sessionId: sessionId1,
-      projectHash: 'test-hash',
+      workspaceHash: 'test-hash',
       startTime: '2024-01-01T10:00:00.000Z',
       lastUpdated: '2024-01-01T10:30:00.000Z',
       messages: [
@@ -352,7 +352,7 @@ describe('SessionSelector', () => {
     // Session with user message - should be listed
     const sessionWithUser = {
       sessionId: sessionIdWithUser,
-      projectHash: 'test-hash',
+      workspaceHash: 'test-hash',
       startTime: '2024-01-01T10:00:00.000Z',
       lastUpdated: '2024-01-01T10:30:00.000Z',
       messages: [
@@ -368,7 +368,7 @@ describe('SessionSelector', () => {
     // Session with only system messages - should NOT be listed
     const sessionSystemOnly = {
       sessionId: sessionIdSystemOnly,
-      projectHash: 'test-hash',
+      workspaceHash: 'test-hash',
       startTime: '2024-01-01T11:00:00.000Z',
       lastUpdated: '2024-01-01T11:30:00.000Z',
       messages: [
@@ -421,7 +421,7 @@ describe('SessionSelector', () => {
     // Session with only gemini message - should be listed
     const sessionGeminiOnly = {
       sessionId: sessionIdGeminiOnly,
-      projectHash: 'test-hash',
+      workspaceHash: 'test-hash',
       startTime: '2024-01-01T10:00:00.000Z',
       lastUpdated: '2024-01-01T10:30:00.000Z',
       messages: [
@@ -461,7 +461,7 @@ describe('SessionSelector', () => {
     // Main session - should be listed
     const mainSession = {
       sessionId: mainSessionId,
-      projectHash: 'test-hash',
+      workspaceHash: 'test-hash',
       startTime: '2024-01-01T10:00:00.000Z',
       lastUpdated: '2024-01-01T10:30:00.000Z',
       messages: [
@@ -478,7 +478,7 @@ describe('SessionSelector', () => {
     // Subagent session - should NOT be listed
     const subagentSession = {
       sessionId: subagentSessionId,
-      projectHash: 'test-hash',
+      workspaceHash: 'test-hash',
       startTime: '2024-01-01T11:00:00.000Z',
       lastUpdated: '2024-01-01T11:30:00.000Z',
       messages: [

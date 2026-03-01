@@ -108,7 +108,7 @@ describe('agentUtils', () => {
         ],
       };
       expect(renderAgentActionFeedback(result, mockFormatScope)).toBe(
-        'Agent "my-agent" enabled by setting it to enabled in [user:/path/to/user/settings] and [project:/path/to/workspace/settings] settings.',
+        'Agent "my-agent" enabled by setting it to enabled in [user:/path/to/user/settings] and [workspace:/path/to/workspace/settings] settings.',
       );
     });
 
@@ -143,7 +143,7 @@ describe('agentUtils', () => {
         ],
       };
       expect(renderAgentActionFeedback(result, mockFormatScope)).toBe(
-        'Agent "my-agent" is now disabled in both [user:/path/to/user/settings] and [project:/path/to/workspace/settings] settings.',
+        'Agent "my-agent" is now disabled in both [user:/path/to/user/settings] and [workspace:/path/to/workspace/settings] settings.',
       );
     });
   });

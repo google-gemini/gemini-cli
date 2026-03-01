@@ -16,7 +16,7 @@ import type { spawn } from 'node:child_process';
 export function handleAutoUpdate(
   info: UpdateObject | null,
   settings: LoadedSettings,
-  projectRoot: string,
+  workspaceRoot: string,
   spawnFn: typeof spawn = spawnWrapper,
 ) {
   if (!info) {
@@ -35,7 +35,7 @@ export function handleAutoUpdate(
   }
 
   const installationInfo = getInstallationInfo(
-    projectRoot,
+    workspaceRoot,
     settings.merged.general.enableAutoUpdate,
   );
 

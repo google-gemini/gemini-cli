@@ -11,6 +11,24 @@ import type { ConfigParameters } from '../config/config.js';
 import { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 
+vi.mock('../config/storage.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../config/storage.js')>();
+  actual.Storage.prototype.initialize = vi.fn().mockResolvedValue(undefined);
+  actual.Storage.prototype.getWorkspaceTempDir = vi
+    .fn()
+    .mockReturnValue('/tmp/workspace');
+  actual.Storage.prototype.getWorkspaceTempPlansDir = vi
+    .fn()
+    .mockReturnValue('/tmp/workspace/plans');
+  actual.Storage.prototype.getPlansDir = vi
+    .fn()
+    .mockReturnValue('/tmp/workspace/plans');
+  actual.Storage.prototype.getProjectIdentifier = vi
+    .fn()
+    .mockReturnValue('test-project');
+  return actual;
+});
+
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
 import { DiscoveredMCPTool, MCP_QUALIFIED_NAME_SEPARATOR } from './mcp-tool.js';

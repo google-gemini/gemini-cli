@@ -165,7 +165,7 @@ export function setupTtyCheck(): () => void {
 export async function cleanupCheckpoints() {
   const storage = new Storage(process.cwd());
   await storage.initialize();
-  const tempDir = storage.getProjectTempDir();
+  const tempDir = storage.getWorkspaceTempDir();
   const checkpointsDir = join(tempDir, 'checkpoints');
   try {
     await fs.rm(checkpointsDir, { recursive: true, force: true });

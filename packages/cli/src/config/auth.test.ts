@@ -60,7 +60,7 @@ describe('validateAuthMethod', () => {
         'should return null for USE_VERTEX_AI if GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION are set',
       authType: AuthType.USE_VERTEX_AI,
       envs: {
-        GOOGLE_CLOUD_PROJECT: 'test-project',
+        GOOGLE_CLOUD_PROJECT: 'test-workspace',
         GOOGLE_CLOUD_LOCATION: 'test-location',
       },
       expected: null,

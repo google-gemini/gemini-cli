@@ -2392,7 +2392,7 @@ export class Config implements McpContext {
       return true;
     }
 
-    const projectTempDir = this.storage.getProjectTempDir();
+    const projectTempDir = this.storage.getWorkspaceTempDir();
     const resolvedTempDir = realpath(projectTempDir);
 
     return isSubpath(resolvedTempDir, resolvedPath);

@@ -41,7 +41,7 @@ describe('GlobTool', () => {
     const fileDiscovery = new FileDiscoveryService(rootDir);
 
     const mockStorage = {
-      getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/project'),
     };
 
     mockConfig = {
@@ -57,8 +57,8 @@ describe('GlobTool', () => {
           return true;
         }
 
-        const projectTempDir = this.storage.getProjectTempDir();
-        return isSubpath(path.resolve(projectTempDir), absolutePath);
+        const workspaceTempDir = this.storage.getWorkspaceTempDir();
+        return isSubpath(path.resolve(workspaceTempDir), absolutePath);
       },
       validatePathAccess(this: Config, absolutePath: string): string | null {
         if (this.isPathAllowed(absolutePath)) {
@@ -66,8 +66,8 @@ describe('GlobTool', () => {
         }
 
         const workspaceDirs = this.getWorkspaceContext().getDirectories();
-        const projectTempDir = this.storage.getProjectTempDir();
-        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        const workspaceTempDir = this.storage.getWorkspaceTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${workspaceTempDir}`;
       },
     } as unknown as Config;
 

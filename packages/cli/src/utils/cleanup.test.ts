@@ -10,7 +10,7 @@ import * as path from 'node:path';
 
 vi.mock('@google/gemini-cli-core', () => ({
   Storage: vi.fn().mockImplementation(() => ({
-    getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+    getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/workspace'),
     initialize: vi.fn().mockResolvedValue(undefined),
   })),
   shutdownTelemetry: vi.fn(),
@@ -112,7 +112,7 @@ describe('cleanup', () => {
     it('should remove checkpoints directory', async () => {
       await cleanupCheckpoints();
       expect(fs.rm).toHaveBeenCalledWith(
-        path.join('/tmp/project', 'checkpoints'),
+        path.join('/tmp/workspace', 'checkpoints'),
         {
           recursive: true,
           force: true,

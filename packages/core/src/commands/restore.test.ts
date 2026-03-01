@@ -63,7 +63,7 @@ describe('performRestore', () => {
     expect(result.value).toEqual({
       type: 'message',
       messageType: 'info',
-      content: 'Restored project to the state before the tool call.',
+      content: 'Restored workspace to the state before the tool call.',
     });
     expect(result.done).toBe(false);
 
@@ -138,7 +138,7 @@ describe('performRestore', () => {
     expect(messageResult.value).toEqual({
       type: 'message',
       messageType: 'info',
-      content: 'Restored project to the state before the tool call.',
+      content: 'Restored workspace to the state before the tool call.',
     });
     expect(messageResult.done).toBe(false);
 

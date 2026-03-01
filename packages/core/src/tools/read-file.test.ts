@@ -45,7 +45,7 @@ describe('ReadFileTool', () => {
         respectGeminiIgnore: true,
       }),
       storage: {
-        getProjectTempDir: () => path.join(tempRootDir, '.temp'),
+        getWorkspaceTempDir: () => path.join(tempRootDir, '.temp'),
       },
       isInteractive: () => false,
       isPathAllowed(this: Config, absolutePath: string): boolean {
@@ -54,8 +54,8 @@ describe('ReadFileTool', () => {
           return true;
         }
 
-        const projectTempDir = this.storage.getProjectTempDir();
-        return isSubpath(path.resolve(projectTempDir), absolutePath);
+        const workspaceTempDir = this.storage.getWorkspaceTempDir();
+        return isSubpath(path.resolve(workspaceTempDir), absolutePath);
       },
       validatePathAccess(this: Config, absolutePath: string): string | null {
         if (this.isPathAllowed(absolutePath)) {
@@ -63,8 +63,8 @@ describe('ReadFileTool', () => {
         }
 
         const workspaceDirs = this.getWorkspaceContext().getDirectories();
-        const projectTempDir = this.storage.getProjectTempDir();
-        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        const workspaceTempDir = this.storage.getWorkspaceTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${workspaceTempDir}`;
       },
     } as unknown as Config;
     tool = new ReadFileTool(mockConfigInstance, createMockMessageBus());
@@ -459,7 +459,7 @@ describe('ReadFileTool', () => {
             respectGeminiIgnore: true,
           }),
           storage: {
-            getProjectTempDir: () => path.join(tempRootDir, '.temp'),
+            getWorkspaceTempDir: () => path.join(tempRootDir, '.temp'),
           },
           isPathAllowed(this: Config, absolutePath: string): boolean {
             const workspaceContext = this.getWorkspaceContext();
@@ -467,8 +467,8 @@ describe('ReadFileTool', () => {
               return true;
             }
 
-            const projectTempDir = this.storage.getProjectTempDir();
-            return isSubpath(path.resolve(projectTempDir), absolutePath);
+            const workspaceTempDir = this.storage.getWorkspaceTempDir();
+            return isSubpath(path.resolve(workspaceTempDir), absolutePath);
           },
           validatePathAccess(
             this: Config,
@@ -479,8 +479,8 @@ describe('ReadFileTool', () => {
             }
 
             const workspaceDirs = this.getWorkspaceContext().getDirectories();
-            const projectTempDir = this.storage.getProjectTempDir();
-            return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+            const workspaceTempDir = this.storage.getWorkspaceTempDir();
+            return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${workspaceTempDir}`;
           },
         } as unknown as Config;
         tool = new ReadFileTool(mockConfigInstance, createMockMessageBus());
@@ -532,7 +532,7 @@ describe('ReadFileTool', () => {
             respectGeminiIgnore: false,
           }),
           storage: {
-            getProjectTempDir: () => path.join(tempRootDir, '.temp'),
+            getWorkspaceTempDir: () => path.join(tempRootDir, '.temp'),
           },
           isInteractive: () => false,
           isPathAllowed(this: Config, absolutePath: string): boolean {
@@ -541,8 +541,8 @@ describe('ReadFileTool', () => {
               return true;
             }
 
-            const projectTempDir = this.storage.getProjectTempDir();
-            return isSubpath(path.resolve(projectTempDir), absolutePath);
+            const workspaceTempDir = this.storage.getWorkspaceTempDir();
+            return isSubpath(path.resolve(workspaceTempDir), absolutePath);
           },
           validatePathAccess(
             this: Config,
@@ -553,8 +553,8 @@ describe('ReadFileTool', () => {
             }
 
             const workspaceDirs = this.getWorkspaceContext().getDirectories();
-            const projectTempDir = this.storage.getProjectTempDir();
-            return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+            const workspaceTempDir = this.storage.getWorkspaceTempDir();
+            return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${workspaceTempDir}`;
           },
         } as unknown as Config;
 

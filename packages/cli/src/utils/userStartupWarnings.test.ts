@@ -82,10 +82,10 @@ describe('getUserStartupWarnings', () => {
       );
     });
 
-    it('should not return a warning when running in a project directory', async () => {
-      const projectDir = path.join(testRootDir, 'project');
-      await fs.mkdir(projectDir);
-      const warnings = await getUserStartupWarnings({}, projectDir);
+    it('should not return a warning when running in a workspace directory', async () => {
+      const workspaceDir = path.join(testRootDir, 'workspace');
+      await fs.mkdir(workspaceDir);
+      const warnings = await getUserStartupWarnings({}, workspaceDir);
       expect(warnings.find((w) => w.id === 'home-directory')).toBeUndefined();
     });
 
@@ -123,9 +123,9 @@ describe('getUserStartupWarnings', () => {
     });
 
     it('should not return a warning when running in a non-root directory', async () => {
-      const projectDir = path.join(testRootDir, 'project');
-      await fs.mkdir(projectDir);
-      const warnings = await getUserStartupWarnings({}, projectDir);
+      const workspaceDir = path.join(testRootDir, 'workspace');
+      await fs.mkdir(workspaceDir);
+      const warnings = await getUserStartupWarnings({}, workspaceDir);
       expect(warnings.find((w) => w.id === 'root-directory')).toBeUndefined();
     });
   });
@@ -151,10 +151,10 @@ describe('getUserStartupWarnings', () => {
         priority: WarningPriority.High,
       };
       vi.mocked(getCompatibilityWarnings).mockReturnValue([compWarning]);
-      const projectDir = path.join(testRootDir, 'project');
-      await fs.mkdir(projectDir);
+      const workspaceDir = path.join(testRootDir, 'workspace');
+      await fs.mkdir(workspaceDir);
 
-      const warnings = await getUserStartupWarnings({}, projectDir);
+      const warnings = await getUserStartupWarnings({}, workspaceDir);
       expect(warnings).toContainEqual(compWarning);
     });
 
@@ -165,12 +165,12 @@ describe('getUserStartupWarnings', () => {
         priority: WarningPriority.High,
       };
       vi.mocked(getCompatibilityWarnings).mockReturnValue([compWarning]);
-      const projectDir = path.join(testRootDir, 'project');
-      await fs.mkdir(projectDir);
+      const workspaceDir = path.join(testRootDir, 'workspace');
+      await fs.mkdir(workspaceDir);
 
       const warnings = await getUserStartupWarnings(
         { ui: { showCompatibilityWarnings: false } },
-        projectDir,
+        workspaceDir,
       );
       expect(warnings).not.toContainEqual(compWarning);
     });

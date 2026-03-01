@@ -402,7 +402,7 @@ export class SessionSelector {
    */
   async listSessions(): Promise<SessionInfo[]> {
     const chatsDir = path.join(
-      this.config.storage.getProjectTempDir(),
+      this.config.storage.getWorkspaceTempDir(),
       'chats',
     );
     return getSessionFiles(chatsDir, this.config.getSessionId());
@@ -498,7 +498,7 @@ export class SessionSelector {
     sessionInfo: SessionInfo,
   ): Promise<SessionSelectionResult> {
     const chatsDir = path.join(
-      this.config.storage.getProjectTempDir(),
+      this.config.storage.getWorkspaceTempDir(),
       'chats',
     );
     const sessionPath = path.join(chatsDir, sessionInfo.fileName);

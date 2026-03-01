@@ -1554,7 +1554,7 @@ describe('Settings Loading and Merging', () => {
       process.env = originalEnv;
     });
 
-    it('should exclude DEBUG and DEBUG_MODE from project .env files by default', () => {
+    it('should exclude DEBUG and DEBUG_MODE from workspace .env files by default', () => {
       // Create a workspace settings file with excludedProjectEnvVars
       const workspaceSettingsContent = {
         general: {},
@@ -1573,18 +1573,18 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      // Mock findEnvFile to return a project .env file
+      // Mock findEnvFile to return a workspace .env file
       const originalFindEnvFile = (
         loadSettings as unknown as { findEnvFile: () => string }
       ).findEnvFile;
       (loadSettings as unknown as { findEnvFile: () => string }).findEnvFile =
-        () => '/mock/project/.env';
+        () => '/mock/workspace/.env';
 
       // Mock fs.readFileSync for .env file content
       const originalReadFileSync = fs.readFileSync;
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
-          if (p === '/mock/project/.env') {
+          if (p === '/mock/workspace/.env') {
             return 'DEBUG=true\nDEBUG_MODE=1\nGEMINI_API_KEY=test-key';
           }
           if (p === MOCK_WORKSPACE_SETTINGS_PATH) {
@@ -2940,7 +2940,9 @@ MALICIOUS_VAR=allowed-because-trusted
       it('should sanitize value in sanitizeEnvVar helper', () => {
         expect(sanitizeEnvVar('$(calc)')).toBe('calc');
         expect(sanitizeEnvVar('`rm -rf /`')).toBe('rm-rf/');
-        expect(sanitizeEnvVar('normal-project-123')).toBe('normal-project-123');
+        expect(sanitizeEnvVar('normal-workspace-123')).toBe(
+          'normal-workspace-123',
+        );
         expect(sanitizeEnvVar('us-central1')).toBe('us-central1');
       });
     });
@@ -2974,7 +2976,7 @@ MALICIOUS_VAR=allowed-because-trusted
         });
         vi.mocked(fs.existsSync).mockReturnValue(true);
         vi.mocked(fs.readFileSync).mockReturnValue(
-          'GOOGLE_CLOUD_PROJECT=attacker-project;inject',
+          'GOOGLE_CLOUD_PROJECT=attacker-workspace;inject',
         );
 
         loadEnvironment(
@@ -2983,7 +2985,7 @@ MALICIOUS_VAR=allowed-because-trusted
         );
 
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe(
-          'attacker-projectinject',
+          'attacker-workspaceinject',
         );
       });
     });

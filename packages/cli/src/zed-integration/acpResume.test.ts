@@ -89,7 +89,7 @@ describe('GeminiAgent Session Resume', () => {
         getChat: vi.fn().mockReturnValue({}),
       }),
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/workspace'),
       },
       getApprovalMode: vi.fn().mockReturnValue('default'),
       isPlanEnabled: vi.fn().mockReturnValue(false),

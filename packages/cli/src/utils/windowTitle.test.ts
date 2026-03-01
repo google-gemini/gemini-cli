@@ -23,11 +23,11 @@ describe('computeTerminalTitle', () => {
         streamingState: StreamingState.Idle,
         isConfirming: false,
         isSilentWorking: false,
-        folderName: 'my-project',
+        folderName: 'my-workspace',
         showThoughts: false,
         useDynamicTitle: true,
       } as TerminalTitleOptions,
-      expected: '◇  Ready (my-project)',
+      expected: '◇  Ready (my-workspace)',
     },
     {
       description: 'legacy title when useDynamicTitle is false',
@@ -35,11 +35,11 @@ describe('computeTerminalTitle', () => {
         streamingState: StreamingState.Responding,
         isConfirming: false,
         isSilentWorking: false,
-        folderName: 'my-project',
+        folderName: 'my-workspace',
         showThoughts: true,
         useDynamicTitle: false,
       } as TerminalTitleOptions,
-      expected: 'Gemini CLI (my-project)'.padEnd(80, ' '),
+      expected: 'Gemini CLI (my-workspace)'.padEnd(80, ' '),
       exact: true,
     },
     {
@@ -50,11 +50,11 @@ describe('computeTerminalTitle', () => {
         thoughtSubject: 'Reading files',
         isConfirming: false,
         isSilentWorking: false,
-        folderName: 'my-project',
+        folderName: 'my-workspace',
         showThoughts: false,
         useDynamicTitle: true,
       } as TerminalTitleOptions,
-      expected: '✦  Working… (my-project)',
+      expected: '✦  Working… (my-workspace)',
     },
     {
       description:
@@ -64,11 +64,11 @@ describe('computeTerminalTitle', () => {
         thoughtSubject: 'Short thought',
         isConfirming: false,
         isSilentWorking: false,
-        folderName: 'my-project',
+        folderName: 'my-workspace',
         showThoughts: true,
         useDynamicTitle: true,
       } as TerminalTitleOptions,
-      expected: '✦  Short thought (my-project)',
+      expected: '✦  Short thought (my-workspace)',
     },
     {
       description:
@@ -78,11 +78,11 @@ describe('computeTerminalTitle', () => {
         thoughtSubject: undefined,
         isConfirming: false,
         isSilentWorking: false,
-        folderName: 'my-project',
+        folderName: 'my-workspace',
         showThoughts: true,
         useDynamicTitle: true,
       } as TerminalTitleOptions,
-      expected: '✦  Working… (my-project)'.padEnd(80, ' '),
+      expected: '✦  Working… (my-workspace)'.padEnd(80, ' '),
       exact: true,
     },
     {
@@ -91,11 +91,11 @@ describe('computeTerminalTitle', () => {
         streamingState: StreamingState.Idle,
         isConfirming: true,
         isSilentWorking: false,
-        folderName: 'my-project',
+        folderName: 'my-workspace',
         showThoughts: false,
         useDynamicTitle: true,
       } as TerminalTitleOptions,
-      expected: '✋  Action Required (my-project)',
+      expected: '✋  Action Required (my-workspace)',
     },
     {
       description: 'silent working state',
@@ -103,11 +103,11 @@ describe('computeTerminalTitle', () => {
         streamingState: StreamingState.Responding,
         isConfirming: false,
         isSilentWorking: true,
-        folderName: 'my-project',
+        folderName: 'my-workspace',
         showThoughts: false,
         useDynamicTitle: true,
       } as TerminalTitleOptions,
-      expected: '⏲  Working… (my-project)',
+      expected: '⏲  Working… (my-workspace)',
     },
   ])('should return $description', ({ args, expected, exact }) => {
     const title = computeTerminalTitle(args);
@@ -126,12 +126,12 @@ describe('computeTerminalTitle', () => {
       thoughtSubject: longThought,
       isConfirming: false,
       isSilentWorking: false,
-      folderName: 'my-project',
+      folderName: 'my-workspace',
       showThoughts: true,
       useDynamicTitle: true,
     });
 
-    expect(title).not.toContain('(my-project)');
+    expect(title).not.toContain('(my-workspace)');
     expect(title).toContain('✦  AAAAAAAAAAAAAAAA');
     expect(title.length).toBe(80);
   });
@@ -143,7 +143,7 @@ describe('computeTerminalTitle', () => {
       thoughtSubject: longThought,
       isConfirming: false,
       isSilentWorking: false,
-      folderName: 'my-project',
+      folderName: 'my-workspace',
       showThoughts: true,
       useDynamicTitle: true,
     });
@@ -159,7 +159,7 @@ describe('computeTerminalTitle', () => {
       thoughtSubject: 'BadTitle\x00 With\x07Control\x1BChars',
       isConfirming: false,
       isSilentWorking: false,
-      folderName: 'my-project',
+      folderName: 'my-workspace',
       showThoughts: true,
       useDynamicTitle: true,
     });
@@ -178,13 +178,13 @@ describe('computeTerminalTitle', () => {
       streamingState: StreamingState.Idle,
       isConfirming: false,
       isSilentWorking: false,
-      folderName: 'my-project',
+      folderName: 'my-workspace',
       showThoughts: false,
       useDynamicTitle: true,
     });
 
     expect(title).toContain('◇  Ready (EnvOverride)');
-    expect(title).not.toContain('my-project');
+    expect(title).not.toContain('my-workspace');
     expect(title.length).toBe(80);
   });
 
@@ -196,7 +196,7 @@ describe('computeTerminalTitle', () => {
     },
     {
       name: 'CLI_TITLE',
-      folderName: 'my-project',
+      folderName: 'my-workspace',
       envTitle: 'B'.repeat(100),
       expected: '◇  Ready (BBBBB',
     },

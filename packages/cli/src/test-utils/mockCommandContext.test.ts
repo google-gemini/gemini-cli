@@ -40,7 +40,7 @@ describe('createMockCommandContext', () => {
   it('should apply deeply nested overrides correctly', () => {
     // This is the most important test for factory's logic.
     const mockConfig = {
-      getProjectRoot: () => '/test/project',
+      getWorkspaceRoot: () => '/test/workspace',
       getModel: () => 'gemini-pro',
     };
 
@@ -54,7 +54,7 @@ describe('createMockCommandContext', () => {
 
     expect(context.services.config).toBeDefined();
     expect(context.services.config?.getModel()).toBe('gemini-pro');
-    expect(context.services.config?.getProjectRoot()).toBe('/test/project');
+    expect(context.services.config?.getWorkspaceRoot()).toBe('/test/workspace');
 
     // Verify a default property on the same nested object is still there
     expect(context.services.logger).toBeDefined();

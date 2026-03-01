@@ -74,7 +74,7 @@ describe('Tool Confirmation Policy Updates', () => {
       }),
       getDirectWebFetch: () => false,
       storage: {
-        getProjectTempDir: () => path.join(os.tmpdir(), 'gemini-cli-temp'),
+        getWorkspaceTempDir: () => path.join(os.tmpdir(), 'gemini-cli-temp'),
       },
       isPathAllowed(this: Config, absolutePath: string): boolean {
         const workspaceContext = this.getWorkspaceContext();
@@ -82,8 +82,8 @@ describe('Tool Confirmation Policy Updates', () => {
           return true;
         }
 
-        const projectTempDir = this.storage.getProjectTempDir();
-        return isSubpath(path.resolve(projectTempDir), absolutePath);
+        const workspaceTempDir = this.storage.getWorkspaceTempDir();
+        return isSubpath(path.resolve(workspaceTempDir), absolutePath);
       },
       validatePathAccess(this: Config, absolutePath: string): string | null {
         if (this.isPathAllowed(absolutePath)) {
@@ -91,8 +91,8 @@ describe('Tool Confirmation Policy Updates', () => {
         }
 
         const workspaceDirs = this.getWorkspaceContext().getDirectories();
-        const projectTempDir = this.storage.getProjectTempDir();
-        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        const workspaceTempDir = this.storage.getWorkspaceTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${workspaceTempDir}`;
       },
     };
   });

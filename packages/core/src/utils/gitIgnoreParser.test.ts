@@ -12,25 +12,25 @@ import * as os from 'node:os';
 
 describe('GitIgnoreParser', () => {
   let parser: GitIgnoreParser;
-  let projectRoot: string;
+  let workspaceRoot: string;
 
   async function createTestFile(filePath: string, content = '') {
-    const fullPath = path.join(projectRoot, filePath);
+    const fullPath = path.join(workspaceRoot, filePath);
     await fs.mkdir(path.dirname(fullPath), { recursive: true });
     await fs.writeFile(fullPath, content);
   }
 
   async function setupGitRepo() {
-    await fs.mkdir(path.join(projectRoot, '.git'), { recursive: true });
+    await fs.mkdir(path.join(workspaceRoot, '.git'), { recursive: true });
   }
 
   beforeEach(async () => {
-    projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'gitignore-test-'));
-    parser = new GitIgnoreParser(projectRoot);
+    workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'gitignore-test-'));
+    parser = new GitIgnoreParser(workspaceRoot);
   });
 
   afterEach(async () => {
-    await fs.rm(projectRoot, { recursive: true, force: true });
+    await fs.rm(workspaceRoot, { recursive: true, force: true });
   });
 
   describe('Basic ignore behaviors', () => {
@@ -90,7 +90,7 @@ src/*.tmp
     it('should always ignore .git directory', () => {
       expect(parser.isIgnored('.git')).toBe(true);
       expect(parser.isIgnored(path.join('.git', 'config'))).toBe(true);
-      expect(parser.isIgnored(path.join(projectRoot, '.git', 'HEAD'))).toBe(
+      expect(parser.isIgnored(path.join(workspaceRoot, '.git', 'HEAD'))).toBe(
         true,
       );
     });
@@ -121,12 +121,17 @@ src/*.tmp
     });
 
     it('should handle absolute paths correctly', () => {
-      const absolutePath = path.join(projectRoot, 'node_modules', 'lib');
+      const absolutePath = path.join(workspaceRoot, 'node_modules', 'lib');
       expect(parser.isIgnored(absolutePath)).toBe(true);
     });
 
     it('should handle paths outside project root by not ignoring them', () => {
-      const outsidePath = path.resolve(projectRoot, '..', 'other', 'file.txt');
+      const outsidePath = path.resolve(
+        workspaceRoot,
+        '..',
+        'other',
+        'file.txt',
+      );
       expect(parser.isIgnored(outsidePath)).toBe(false);
     });
 
@@ -280,7 +285,7 @@ src/*.tmp
       await createTestFile('.gitignore', '*.txt');
 
       const extraPatterns = ['!important.txt', 'temp/'];
-      parser = new GitIgnoreParser(projectRoot, extraPatterns);
+      parser = new GitIgnoreParser(workspaceRoot, extraPatterns);
 
       expect(parser.isIgnored('file.txt')).toBe(true);
       expect(parser.isIgnored('important.txt')).toBe(false); // Un-ignored by extraPatterns
@@ -291,7 +296,7 @@ src/*.tmp
       await createTestFile('.gitignore', '/foo/\n/a/*/c/');
 
       const extraPatterns = ['!foo/', '!a/*/c/'];
-      parser = new GitIgnoreParser(projectRoot, extraPatterns);
+      parser = new GitIgnoreParser(workspaceRoot, extraPatterns);
 
       expect(parser.isIgnored('foo/bar/file.txt')).toBe(false);
       expect(parser.isIgnored('a/b/c/file.txt')).toBe(false);
@@ -302,7 +307,7 @@ src/*.tmp
       await createTestFile('foo/bar/.gitignore', 'file.txt');
 
       const extraPatterns = ['!foo/'];
-      parser = new GitIgnoreParser(projectRoot, extraPatterns);
+      parser = new GitIgnoreParser(workspaceRoot, extraPatterns);
 
       expect(parser.isIgnored('foo/bar/file.txt')).toBe(true);
       expect(parser.isIgnored('foo/bar/file2.txt')).toBe(false);

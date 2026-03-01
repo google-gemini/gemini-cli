@@ -28,8 +28,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     Storage: class MockStorage {
-      getProjectTempDir() {
-        return '/tmp/test-project';
+      getWorkspaceTempDir() {
+        return '/tmp/test-workspace';
       }
     },
   };
@@ -42,7 +42,7 @@ const mockGetAllSessionFiles = vi.mocked(getAllSessionFiles);
 function createMockConfig(overrides: Partial<Config> = {}): Config {
   return {
     storage: {
-      getProjectTempDir: vi.fn().mockReturnValue('/tmp/test-project'),
+      getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/test-workspace'),
     },
     getSessionId: vi.fn().mockReturnValue('current123'),
     getDebugMode: vi.fn().mockReturnValue(false),
@@ -245,7 +245,7 @@ describe('Session Cleanup', () => {
       // Verify that unlink was never called with the current session file
       const unlinkCalls = mockFs.unlink.mock.calls;
       const currentSessionPath = path.join(
-        '/tmp/test-project',
+        '/tmp/test-workspace',
         'chats',
         `${SESSION_FILE_PREFIX}2025-01-20T10-30-00-current12.json`,
       );
@@ -525,21 +525,21 @@ describe('Session Cleanup', () => {
       const unlinkCalls = mockFs.unlink.mock.calls.map((call) => call[0]);
       expect(unlinkCalls).toContain(
         path.join(
-          '/tmp/test-project',
+          '/tmp/test-workspace',
           'chats',
           `${SESSION_FILE_PREFIX}8d.json`,
         ),
       );
       expect(unlinkCalls).toContain(
         path.join(
-          '/tmp/test-project',
+          '/tmp/test-workspace',
           'chats',
           `${SESSION_FILE_PREFIX}15d.json`,
         ),
       );
       expect(unlinkCalls).not.toContain(
         path.join(
-          '/tmp/test-project',
+          '/tmp/test-workspace',
           'chats',
           `${SESSION_FILE_PREFIX}5d.json`,
         ),
@@ -724,21 +724,21 @@ describe('Session Cleanup', () => {
       const unlinkCalls = mockFs.unlink.mock.calls.map((call) => call[0]);
       expect(unlinkCalls).toContain(
         path.join(
-          '/tmp/test-project',
+          '/tmp/test-workspace',
           'chats',
           `${SESSION_FILE_PREFIX}3d.json`,
         ),
       );
       expect(unlinkCalls).toContain(
         path.join(
-          '/tmp/test-project',
+          '/tmp/test-workspace',
           'chats',
           `${SESSION_FILE_PREFIX}4d.json`,
         ),
       );
       expect(unlinkCalls).toContain(
         path.join(
-          '/tmp/test-project',
+          '/tmp/test-workspace',
           'chats',
           `${SESSION_FILE_PREFIX}5d.json`,
         ),
@@ -747,21 +747,21 @@ describe('Session Cleanup', () => {
       // Verify which files were NOT deleted
       expect(unlinkCalls).not.toContain(
         path.join(
-          '/tmp/test-project',
+          '/tmp/test-workspace',
           'chats',
           `${SESSION_FILE_PREFIX}current.json`,
         ),
       );
       expect(unlinkCalls).not.toContain(
         path.join(
-          '/tmp/test-project',
+          '/tmp/test-workspace',
           'chats',
           `${SESSION_FILE_PREFIX}1d.json`,
         ),
       );
       expect(unlinkCalls).not.toContain(
         path.join(
-          '/tmp/test-project',
+          '/tmp/test-workspace',
           'chats',
           `${SESSION_FILE_PREFIX}2d.json`,
         ),
@@ -883,21 +883,21 @@ describe('Session Cleanup', () => {
       const unlinkCalls = mockFs.unlink.mock.calls.map((call) => call[0]);
       expect(unlinkCalls).toContain(
         path.join(
-          '/tmp/test-project',
+          '/tmp/test-workspace',
           'chats',
           `${SESSION_FILE_PREFIX}5d.json`,
         ),
       );
       expect(unlinkCalls).toContain(
         path.join(
-          '/tmp/test-project',
+          '/tmp/test-workspace',
           'chats',
           `${SESSION_FILE_PREFIX}7d.json`,
         ),
       );
       expect(unlinkCalls).toContain(
         path.join(
-          '/tmp/test-project',
+          '/tmp/test-workspace',
           'chats',
           `${SESSION_FILE_PREFIX}12d.json`,
         ),
@@ -906,14 +906,14 @@ describe('Session Cleanup', () => {
       // Verify which files were NOT deleted
       expect(unlinkCalls).not.toContain(
         path.join(
-          '/tmp/test-project',
+          '/tmp/test-workspace',
           'chats',
           `${SESSION_FILE_PREFIX}current.json`,
         ),
       );
       expect(unlinkCalls).not.toContain(
         path.join(
-          '/tmp/test-project',
+          '/tmp/test-workspace',
           'chats',
           `${SESSION_FILE_PREFIX}3d.json`,
         ),

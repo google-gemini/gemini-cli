@@ -277,7 +277,7 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
       },
     }),
     storage: {
-      getProjectTempDir: () => '/tmp',
+      getWorkspaceTempDir: () => '/tmp',
     },
     getTruncateToolOutputThreshold: () =>
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,

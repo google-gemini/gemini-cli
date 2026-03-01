@@ -40,7 +40,7 @@ describe('listSessions', () => {
     // Create mock config
     mockConfig = {
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/test-project'),
+        getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/test-workspace'),
       },
       getSessionId: vi.fn().mockReturnValue('current-session-id'),
     } as unknown as Config;
@@ -340,7 +340,7 @@ describe('deleteSession', () => {
     // Create mock config
     mockConfig = {
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/test-project'),
+        getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/test-workspace'),
       },
       getSessionId: vi.fn().mockReturnValue('current-session-id'),
     } as unknown as Config;

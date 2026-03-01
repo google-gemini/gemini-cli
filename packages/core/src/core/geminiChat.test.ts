@@ -144,9 +144,12 @@ describe('GeminiChat', () => {
       getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
       setQuotaErrorOccurred: vi.fn(),
       flashFallbackHandler: undefined,
-      getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
+      getWorkspaceRoot: vi.fn().mockReturnValue('/test/project/root'),
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        targetDir: '/test/project/root',
+      }),
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
+        getWorkspaceTempDir: vi.fn().mockReturnValue('/test/temp'),
       },
       getToolRegistry: vi.fn().mockReturnValue({
         getTool: vi.fn(),

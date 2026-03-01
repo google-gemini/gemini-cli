@@ -12,7 +12,7 @@ import { installSkill, linkSkill } from './skillUtils.js';
 
 describe('skillUtils', () => {
   let tempDir: string;
-  const projectRoot = path.resolve(__dirname, '../../../../../');
+  const workspaceRoot = path.resolve(__dirname, '../../../../../');
 
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'skill-utils-test-'));
@@ -130,7 +130,7 @@ describe('skillUtils', () => {
   });
 
   it('should successfully install from a .skill file', async () => {
-    const skillPath = path.join(projectRoot, 'weather-skill.skill');
+    const skillPath = path.join(workspaceRoot, 'weather-skill.skill');
 
     // Ensure the file exists
     const exists = await fs.stat(skillPath).catch(() => null);

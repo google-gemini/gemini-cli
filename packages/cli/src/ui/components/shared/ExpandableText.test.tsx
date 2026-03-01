@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import '../../../../test-utils/customMatchers.js';
 import { render } from '../../../test-utils/render.js';
 import { ExpandableText, MAX_WIDTH } from './ExpandableText.js';
 

@@ -42,7 +42,7 @@ describe('PromptProvider', () => {
       }),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+        getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         getPlansDir: vi.fn().mockReturnValue('/tmp/project-temp/plans'),
       },
       isInteractive: vi.fn().mockReturnValue(true),

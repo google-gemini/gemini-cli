@@ -96,16 +96,16 @@ describe('FolderTrustDiscoveryService', () => {
     const results = await FolderTrustDiscoveryService.discover(tempDir);
 
     expect(results.securityWarnings).toContain(
-      'This project auto-approves certain tools (tools.allowed).',
+      'This workspace auto-approves certain tools (tools.allowed).',
     );
     expect(results.securityWarnings).toContain(
-      'This project enables autonomous agents (enableAgents).',
+      'This workspace enables autonomous agents (enableAgents).',
     );
     expect(results.securityWarnings).toContain(
-      'This project attempts to disable folder trust (security.folderTrust.enabled).',
+      'This workspace attempts to disable folder trust (security.folderTrust.enabled).',
     );
     expect(results.securityWarnings).toContain(
-      'This project disables the security sandbox (tools.sandbox).',
+      'This workspace disables the security sandbox (tools.sandbox).',
     );
   });
 

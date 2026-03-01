@@ -38,7 +38,7 @@ extension content`,
 
     it('should return content with headers even if only project memory is present', () => {
       expect(flattenMemory({ project: 'project content' })).toBe(
-        `--- Project ---
+        `--- Workspace ---
 project content`,
       );
     });
@@ -50,7 +50,7 @@ project content`,
       });
       expect(result).toContain('--- Global ---');
       expect(result).toContain('global content');
-      expect(result).toContain('--- Project ---');
+      expect(result).toContain('--- Workspace ---');
       expect(result).toContain('project content');
       expect(result).not.toContain('--- Extension ---');
     });
@@ -63,7 +63,7 @@ project content`,
       });
       expect(result).toContain('--- Global ---');
       expect(result).toContain('--- Extension ---');
-      expect(result).toContain('--- Project ---');
+      expect(result).toContain('--- Workspace ---');
       expect(result).toBe(
         `--- Global ---
 global content
@@ -71,7 +71,7 @@ global content
 --- Extension ---
 extension content
 
---- Project ---
+--- Workspace ---
 project content`,
       );
     });
@@ -86,7 +86,7 @@ project content`,
         `--- Global ---
 trimmed global
 
---- Project ---
+--- Workspace ---
 project`,
       );
     });

@@ -231,6 +231,7 @@ describe('Gemini Client (client.ts)', () => {
       getDebugMode: vi.fn().mockReturnValue(false),
       getWorkspaceContext: vi.fn().mockReturnValue({
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
+        targetDir: '/test/project/root',
       }),
       getGeminiClient: vi.fn(),
       getModelRouterService: vi
@@ -243,10 +244,10 @@ describe('Gemini Client (client.ts)', () => {
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
       getShowModelInfoInChat: vi.fn().mockReturnValue(false),
       getContinueOnFailedApiCall: vi.fn(),
-      getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
+      getWorkspaceRoot: vi.fn().mockReturnValue('/test/project/root'),
       getIncludeDirectoryTree: vi.fn().mockReturnValue(true),
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
+        getWorkspaceTempDir: vi.fn().mockReturnValue('/test/temp'),
       },
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getBaseLlmClient: vi.fn().mockReturnValue({
@@ -371,7 +372,7 @@ describe('Gemini Client (client.ts)', () => {
       expect(history[0].role).toBe('user');
       expect(history[0].parts?.[0]?.text).toContain('This is the Gemini CLI');
       expect(history[0].parts?.[0]?.text).toContain(
-        "The project's temporary directory is:",
+        "The workspace's temporary directory is:",
       );
 
       // The subsequent messages should be the extra history

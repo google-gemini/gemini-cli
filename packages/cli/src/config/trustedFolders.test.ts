@@ -272,30 +272,30 @@ describe('Trusted Folders', () => {
     };
 
     it('should return true for a directly trusted folder', () => {
-      const config = { '/projectA': TrustLevel.TRUST_FOLDER };
+      const config = { '/workspaceA': TrustLevel.TRUST_FOLDER };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
-      expect(isWorkspaceTrusted(mockSettings, '/projectA')).toEqual({
+      expect(isWorkspaceTrusted(mockSettings, '/workspaceA')).toEqual({
         isTrusted: true,
         source: 'file',
       });
     });
 
     it('should return true for a child of a trusted folder', () => {
-      const config = { '/projectA': TrustLevel.TRUST_FOLDER };
+      const config = { '/workspaceA': TrustLevel.TRUST_FOLDER };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
-      expect(isWorkspaceTrusted(mockSettings, '/projectA/src')).toEqual({
+      expect(isWorkspaceTrusted(mockSettings, '/workspaceA/src')).toEqual({
         isTrusted: true,
         source: 'file',
       });
     });
 
     it('should return true for a child of a trusted parent folder', () => {
-      const config = { '/projectB/somefile.txt': TrustLevel.TRUST_PARENT };
+      const config = { '/workspaceB/somefile.txt': TrustLevel.TRUST_PARENT };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
-      expect(isWorkspaceTrusted(mockSettings, '/projectB')).toEqual({
+      expect(isWorkspaceTrusted(mockSettings, '/workspaceB')).toEqual({
         isTrusted: true,
         source: 'file',
       });
@@ -329,20 +329,22 @@ describe('Trusted Folders', () => {
 
     it('should prioritize specific distrust over parent trust', () => {
       const config = {
-        '/projectA': TrustLevel.TRUST_FOLDER,
-        '/projectA/untrusted': TrustLevel.DO_NOT_TRUST,
+        '/workspaceA': TrustLevel.TRUST_FOLDER,
+        '/workspaceA/untrusted': TrustLevel.DO_NOT_TRUST,
       };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
-      expect(isWorkspaceTrusted(mockSettings, '/projectA/untrusted')).toEqual({
-        isTrusted: false,
-        source: 'file',
-      });
+      expect(isWorkspaceTrusted(mockSettings, '/workspaceA/untrusted')).toEqual(
+        {
+          isTrusted: false,
+          source: 'file',
+        },
+      );
     });
 
     it('should use workspaceDir instead of process.cwd() when provided', () => {
       const config = {
-        '/projectA': TrustLevel.TRUST_FOLDER,
+        '/workspaceA': TrustLevel.TRUST_FOLDER,
         '/untrusted': TrustLevel.DO_NOT_TRUST,
       };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
@@ -350,18 +352,18 @@ describe('Trusted Folders', () => {
       vi.spyOn(process, 'cwd').mockImplementation(() => '/untrusted');
 
       // process.cwd() is untrusted, but workspaceDir is trusted
-      expect(isWorkspaceTrusted(mockSettings, '/projectA')).toEqual({
+      expect(isWorkspaceTrusted(mockSettings, '/workspaceA')).toEqual({
         isTrusted: true,
         source: 'file',
       });
     });
 
     it('should handle path normalization', () => {
-      const config = { '/home/user/projectA': TrustLevel.TRUST_FOLDER };
+      const config = { '/home/user/workspaceA': TrustLevel.TRUST_FOLDER };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
       expect(
-        isWorkspaceTrusted(mockSettings, '/home/user/../user/projectA'),
+        isWorkspaceTrusted(mockSettings, '/home/user/../user/workspaceA'),
       ).toEqual({
         isTrusted: true,
         source: 'file',
@@ -369,13 +371,13 @@ describe('Trusted Folders', () => {
     });
 
     it('should prioritize IDE override over file config', () => {
-      const config = { '/projectA': TrustLevel.DO_NOT_TRUST };
+      const config = { '/workspaceA': TrustLevel.DO_NOT_TRUST };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
       ideContextStore.set({ workspaceState: { isTrusted: true } });
 
       try {
-        expect(isWorkspaceTrusted(mockSettings, '/projectA')).toEqual({
+        expect(isWorkspaceTrusted(mockSettings, '/workspaceA')).toEqual({
           isTrusted: true,
           source: 'ide',
         });
@@ -385,13 +387,13 @@ describe('Trusted Folders', () => {
     });
 
     it('should return false when IDE override is false', () => {
-      const config = { '/projectA': TrustLevel.TRUST_FOLDER };
+      const config = { '/workspaceA': TrustLevel.TRUST_FOLDER };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
       ideContextStore.set({ workspaceState: { isTrusted: false } });
 
       try {
-        expect(isWorkspaceTrusted(mockSettings, '/projectA')).toEqual({
+        expect(isWorkspaceTrusted(mockSettings, '/workspaceA')).toEqual({
           isTrusted: false,
           source: 'ide',
         });
@@ -442,10 +444,10 @@ describe('Trusted Folders', () => {
       const geminiCore = await import('@google/gemini-cli-core');
       vi.spyOn(geminiCore, 'isHeadlessMode').mockReturnValue(false);
 
-      const config = { '/projectA': TrustLevel.DO_NOT_TRUST };
+      const config = { '/workspaceA': TrustLevel.DO_NOT_TRUST };
       fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
 
-      expect(isWorkspaceTrusted(mockSettings, '/projectA').isTrusted).toBe(
+      expect(isWorkspaceTrusted(mockSettings, '/workspaceA').isTrusted).toBe(
         false,
       );
     });

@@ -74,7 +74,10 @@ describe('HookRegistry', () => {
       getProjectHooks: vi.fn().mockReturnValue({}),
       getDisabledHooks: vi.fn().mockReturnValue([]),
       isTrustedFolder: vi.fn().mockReturnValue(true),
-      getProjectRoot: vi.fn().mockReturnValue('/project'),
+      getWorkspaceRoot: vi.fn().mockReturnValue('/project'),
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        targetDir: '/project',
+      }),
     } as unknown as Config;
 
     hookRegistry = new HookRegistry(mockConfig);
@@ -121,7 +124,7 @@ describe('HookRegistry', () => {
 
       expect(hookRegistry.getAllHooks()).toHaveLength(0);
       expect(mockDebugLogger.warn).toHaveBeenCalledWith(
-        'Project hooks disabled because the folder is not trusted.',
+        'Workspace hooks disabled because the folder is not trusted.',
       );
     });
 
@@ -740,7 +743,7 @@ describe('HookRegistry', () => {
       expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
         'warning',
         expect.stringContaining(
-          'WARNING: The following project-level hooks have been detected',
+          'WARNING: The following workspace-level hooks have been detected',
         ),
       );
       expect(mockTrustedHooksManager.trustHooks).toHaveBeenCalledWith(

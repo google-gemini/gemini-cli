@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import '../../../test-utils/customMatchers.js';
 import stripAnsi from 'strip-ansi';
 import { act } from 'react';
 import * as fs from 'node:fs';

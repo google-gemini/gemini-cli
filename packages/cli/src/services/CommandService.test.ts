@@ -237,17 +237,17 @@ describe('CommandService', () => {
     expect(syncExtension?.extensionName).toBe('git-helper');
   });
 
-  it('should handle user/project command override correctly', async () => {
+  it('should handle user/workspace command override correctly', async () => {
     const builtinCommand = createMockCommand('help', CommandKind.BUILT_IN);
     const userCommand = createMockCommand('help', CommandKind.FILE);
-    const projectCommand = createMockCommand('deploy', CommandKind.FILE);
+    const workspaceCommand = createMockCommand('deploy', CommandKind.FILE);
     const userDeployCommand = createMockCommand('deploy', CommandKind.FILE);
 
     const mockLoader1 = new MockCommandLoader([builtinCommand]);
     const mockLoader2 = new MockCommandLoader([
       userCommand,
       userDeployCommand,
-      projectCommand,
+      workspaceCommand,
     ]);
 
     const service = await CommandService.create(

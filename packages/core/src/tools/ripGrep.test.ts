@@ -286,7 +286,7 @@ describe('RipGrepTool', () => {
         respectGeminiIgnore: true,
       }),
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },
       isPathAllowed(this: Config, absolutePath: string): boolean {
         const workspaceContext = this.getWorkspaceContext();
@@ -294,8 +294,8 @@ describe('RipGrepTool', () => {
           return true;
         }
 
-        const projectTempDir = this.storage.getProjectTempDir();
-        return isSubpath(path.resolve(projectTempDir), absolutePath);
+        const workspaceTempDir = this.storage.getWorkspaceTempDir();
+        return isSubpath(path.resolve(workspaceTempDir), absolutePath);
       },
       validatePathAccess(this: Config, absolutePath: string): string | null {
         if (this.isPathAllowed(absolutePath)) {
@@ -303,8 +303,8 @@ describe('RipGrepTool', () => {
         }
 
         const workspaceDirs = this.getWorkspaceContext().getDirectories();
-        const projectTempDir = this.storage.getProjectTempDir();
-        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        const workspaceTempDir = this.storage.getWorkspaceTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${workspaceTempDir}`;
       },
     } as unknown as Config;
 
@@ -857,7 +857,7 @@ describe('RipGrepTool', () => {
           respectGeminiIgnore: true,
         }),
         storage: {
-          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+          getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
         isPathAllowed(this: Config, absolutePath: string): boolean {
           const workspaceContext = this.getWorkspaceContext();
@@ -865,8 +865,8 @@ describe('RipGrepTool', () => {
             return true;
           }
 
-          const projectTempDir = this.storage.getProjectTempDir();
-          return isSubpath(path.resolve(projectTempDir), absolutePath);
+          const workspaceTempDir = this.storage.getWorkspaceTempDir();
+          return isSubpath(path.resolve(workspaceTempDir), absolutePath);
         },
         validatePathAccess(this: Config, absolutePath: string): string | null {
           if (this.isPathAllowed(absolutePath)) {
@@ -874,8 +874,8 @@ describe('RipGrepTool', () => {
           }
 
           const workspaceDirs = this.getWorkspaceContext().getDirectories();
-          const projectTempDir = this.storage.getProjectTempDir();
-          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+          const workspaceTempDir = this.storage.getWorkspaceTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${workspaceTempDir}`;
         },
       } as unknown as Config;
 
@@ -970,7 +970,7 @@ describe('RipGrepTool', () => {
           respectGeminiIgnore: true,
         }),
         storage: {
-          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+          getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
         isPathAllowed(this: Config, absolutePath: string): boolean {
           const workspaceContext = this.getWorkspaceContext();
@@ -978,8 +978,8 @@ describe('RipGrepTool', () => {
             return true;
           }
 
-          const projectTempDir = this.storage.getProjectTempDir();
-          return isSubpath(path.resolve(projectTempDir), absolutePath);
+          const workspaceTempDir = this.storage.getWorkspaceTempDir();
+          return isSubpath(path.resolve(workspaceTempDir), absolutePath);
         },
         validatePathAccess(this: Config, absolutePath: string): string | null {
           if (this.isPathAllowed(absolutePath)) {
@@ -987,8 +987,8 @@ describe('RipGrepTool', () => {
           }
 
           const workspaceDirs = this.getWorkspaceContext().getDirectories();
-          const projectTempDir = this.storage.getProjectTempDir();
-          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+          const workspaceTempDir = this.storage.getWorkspaceTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${workspaceTempDir}`;
         },
       } as unknown as Config;
 
@@ -1510,7 +1510,7 @@ describe('RipGrepTool', () => {
           respectGeminiIgnore: true,
         }),
         storage: {
-          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+          getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
         isPathAllowed(this: Config, absolutePath: string): boolean {
           const workspaceContext = this.getWorkspaceContext();
@@ -1518,8 +1518,8 @@ describe('RipGrepTool', () => {
             return true;
           }
 
-          const projectTempDir = this.storage.getProjectTempDir();
-          return isSubpath(path.resolve(projectTempDir), absolutePath);
+          const workspaceTempDir = this.storage.getWorkspaceTempDir();
+          return isSubpath(path.resolve(workspaceTempDir), absolutePath);
         },
         validatePathAccess(this: Config, absolutePath: string): string | null {
           if (this.isPathAllowed(absolutePath)) {
@@ -1527,8 +1527,8 @@ describe('RipGrepTool', () => {
           }
 
           const workspaceDirs = this.getWorkspaceContext().getDirectories();
-          const projectTempDir = this.storage.getProjectTempDir();
-          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+          const workspaceTempDir = this.storage.getWorkspaceTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${workspaceTempDir}`;
         },
       } as unknown as Config;
       const gitIgnoreDisabledTool = new RipGrepTool(
@@ -1576,7 +1576,7 @@ describe('RipGrepTool', () => {
           respectGeminiIgnore: true,
         }),
         storage: {
-          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+          getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
         isPathAllowed(this: Config, absolutePath: string): boolean {
           const workspaceContext = this.getWorkspaceContext();
@@ -1584,8 +1584,8 @@ describe('RipGrepTool', () => {
             return true;
           }
 
-          const projectTempDir = this.storage.getProjectTempDir();
-          return isSubpath(path.resolve(projectTempDir), absolutePath);
+          const workspaceTempDir = this.storage.getWorkspaceTempDir();
+          return isSubpath(path.resolve(workspaceTempDir), absolutePath);
         },
         validatePathAccess(this: Config, absolutePath: string): string | null {
           if (this.isPathAllowed(absolutePath)) {
@@ -1593,8 +1593,8 @@ describe('RipGrepTool', () => {
           }
 
           const workspaceDirs = this.getWorkspaceContext().getDirectories();
-          const projectTempDir = this.storage.getProjectTempDir();
-          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+          const workspaceTempDir = this.storage.getWorkspaceTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${workspaceTempDir}`;
         },
       } as unknown as Config;
       const geminiIgnoreTool = new RipGrepTool(
@@ -1642,7 +1642,7 @@ describe('RipGrepTool', () => {
           respectGeminiIgnore: false,
         }),
         storage: {
-          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+          getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
         isPathAllowed(this: Config, absolutePath: string): boolean {
           const workspaceContext = this.getWorkspaceContext();
@@ -1650,8 +1650,8 @@ describe('RipGrepTool', () => {
             return true;
           }
 
-          const projectTempDir = this.storage.getProjectTempDir();
-          return isSubpath(path.resolve(projectTempDir), absolutePath);
+          const workspaceTempDir = this.storage.getWorkspaceTempDir();
+          return isSubpath(path.resolve(workspaceTempDir), absolutePath);
         },
         validatePathAccess(this: Config, absolutePath: string): string | null {
           if (this.isPathAllowed(absolutePath)) {
@@ -1659,8 +1659,8 @@ describe('RipGrepTool', () => {
           }
 
           const workspaceDirs = this.getWorkspaceContext().getDirectories();
-          const projectTempDir = this.storage.getProjectTempDir();
-          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+          const workspaceTempDir = this.storage.getWorkspaceTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${workspaceTempDir}`;
         },
       } as unknown as Config;
       const geminiIgnoreTool = new RipGrepTool(
@@ -1816,7 +1816,7 @@ describe('RipGrepTool', () => {
           respectGeminiIgnore: true,
         }),
         storage: {
-          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+          getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
         isPathAllowed(this: Config, absolutePath: string): boolean {
           const workspaceContext = this.getWorkspaceContext();
@@ -1824,8 +1824,8 @@ describe('RipGrepTool', () => {
             return true;
           }
 
-          const projectTempDir = this.storage.getProjectTempDir();
-          return isSubpath(path.resolve(projectTempDir), absolutePath);
+          const workspaceTempDir = this.storage.getWorkspaceTempDir();
+          return isSubpath(path.resolve(workspaceTempDir), absolutePath);
         },
         validatePathAccess(this: Config, absolutePath: string): string | null {
           if (this.isPathAllowed(absolutePath)) {
@@ -1833,8 +1833,8 @@ describe('RipGrepTool', () => {
           }
 
           const workspaceDirs = this.getWorkspaceContext().getDirectories();
-          const projectTempDir = this.storage.getProjectTempDir();
-          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+          const workspaceTempDir = this.storage.getWorkspaceTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${workspaceTempDir}`;
         },
       } as unknown as Config;
 

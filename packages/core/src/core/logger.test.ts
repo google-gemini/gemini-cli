@@ -28,6 +28,9 @@ import type { Content } from '@google/genai';
 import os from 'node:os';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { ProjectRegistry } from '../config/projectRegistry.js';
+
+vi.mock('../config/projectRegistry.js');
 
 const PROJECT_SLUG = 'project-slug';
 const TMP_DIR_NAME = 'tmp';
@@ -83,6 +86,12 @@ describe('Logger', () => {
     await cleanupLogAndCheckpointFiles();
     // Ensure the directory exists for the test
     await fs.mkdir(TEST_GEMINI_DIR, { recursive: true });
+
+    ProjectRegistry.prototype.initialize = vi.fn().mockResolvedValue(undefined);
+    ProjectRegistry.prototype.getShortId = vi
+      .fn()
+      .mockReturnValue(PROJECT_SLUG);
+
     logger = new Logger(testSessionId, new Storage(process.cwd()));
     await logger.initialize();
   });

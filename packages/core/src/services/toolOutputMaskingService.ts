@@ -160,7 +160,7 @@ export class ToolOutputMaskingService {
     const newHistory = [...history]; // Shallow copy of history
     let actualTokensSaved = 0;
     let toolOutputsDir = path.join(
-      config.storage.getProjectTempDir(),
+      config.storage.getWorkspaceTempDir(),
       TOOL_OUTPUTS_DIR,
     );
     const sessionId = config.getSessionId();

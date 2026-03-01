@@ -297,7 +297,7 @@ describe('FolderTrustDialog', () => {
         <FolderTrustDialog onSelect={vi.fn()} />,
       );
       await waitUntilReady();
-      expect(lastFrame()).toContain('Trust folder (project)');
+      expect(lastFrame()).toContain('Trust folder (workspace)');
       unmount();
     });
 

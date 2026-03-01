@@ -237,7 +237,7 @@ export class ToolExecutor {
           content,
           toolName,
           callId,
-          this.config.storage.getProjectTempDir(),
+          this.config.storage.getWorkspaceTempDir(),
           this.config.getSessionId(),
         );
         outputFile = savedPath;

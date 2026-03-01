@@ -15,6 +15,7 @@ import {
 } from 'vitest';
 import { GitService } from './gitService.js';
 import { Storage } from '../config/storage.js';
+import { ProjectRegistry } from '../config/projectRegistry.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
@@ -70,6 +71,8 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../config/projectRegistry.js');
+
 const hoistedMockDebugLogger = vi.hoisted(() => ({
   debug: vi.fn(),
   warn: vi.fn(),
@@ -81,15 +84,15 @@ vi.mock('../utils/debugLogger.js', () => ({
 
 describe('GitService', () => {
   let testRootDir: string;
-  let projectRoot: string;
+  let workspaceRoot: string;
   let homedir: string;
   let storage: Storage;
 
   beforeEach(async () => {
     testRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'git-service-test-'));
-    projectRoot = path.join(testRootDir, 'project');
+    workspaceRoot = path.join(testRootDir, 'project');
     homedir = path.join(testRootDir, 'home');
-    await fs.mkdir(projectRoot, { recursive: true });
+    await fs.mkdir(workspaceRoot, { recursive: true });
     await fs.mkdir(homedir, { recursive: true });
 
     vi.clearAllMocks();
@@ -126,7 +129,12 @@ describe('GitService', () => {
     hoistedMockCommit.mockResolvedValue({
       commit: 'initial',
     });
-    storage = new Storage(projectRoot);
+    ProjectRegistry.prototype.initialize = vi.fn().mockResolvedValue(undefined);
+    ProjectRegistry.prototype.getShortId = vi
+      .fn()
+      .mockReturnValue('project-slug');
+    storage = new Storage(workspaceRoot);
+    await storage.initialize();
   });
 
   afterEach(async () => {
@@ -136,7 +144,7 @@ describe('GitService', () => {
 
   describe('constructor', () => {
     it('should successfully create an instance', () => {
-      expect(() => new GitService(projectRoot, storage)).not.toThrow();
+      expect(() => new GitService(workspaceRoot, storage)).not.toThrow();
     });
   });
 
@@ -155,14 +163,14 @@ describe('GitService', () => {
   describe('initialize', () => {
     it('should throw an error if Git is not available', async () => {
       (spawnAsync as Mock).mockRejectedValue(new Error('git not found'));
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       await expect(service.initialize()).rejects.toThrow(
         'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.',
       );
     });
 
     it('should call setupShadowGitRepository if Git is available', async () => {
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       const setupSpy = vi
         .spyOn(service, 'setupShadowGitRepository')
         .mockResolvedValue(undefined);
@@ -182,14 +190,14 @@ describe('GitService', () => {
     });
 
     it('should create history and repository directories', async () => {
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       await service.setupShadowGitRepository();
       const stats = await fs.stat(repoDir);
       expect(stats.isDirectory()).toBe(true);
     });
 
     it('should create a .gitconfig file with the correct content', async () => {
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       await service.setupShadowGitRepository();
 
       const expectedConfigContent =
@@ -200,7 +208,7 @@ describe('GitService', () => {
 
     it('should initialize git repo in historyDir if not already initialized', async () => {
       hoistedMockCheckIsRepo.mockResolvedValue(false);
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       await service.setupShadowGitRepository();
       expect(hoistedMockSimpleGit).toHaveBeenCalledWith(repoDir);
       expect(hoistedMockInit).toHaveBeenCalled();
@@ -208,17 +216,17 @@ describe('GitService', () => {
 
     it('should not initialize git repo if already initialized', async () => {
       hoistedMockCheckIsRepo.mockResolvedValue(true);
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       await service.setupShadowGitRepository();
       expect(hoistedMockInit).not.toHaveBeenCalled();
     });
 
-    it('should copy .gitignore from projectRoot if it exists', async () => {
+    it('should copy .gitignore from workspaceRoot if it exists', async () => {
       const gitignoreContent = 'node_modules/\n.env';
-      const visibleGitIgnorePath = path.join(projectRoot, '.gitignore');
+      const visibleGitIgnorePath = path.join(workspaceRoot, '.gitignore');
       await fs.writeFile(visibleGitIgnorePath, gitignoreContent);
 
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       await service.setupShadowGitRepository();
 
       const hiddenGitIgnorePath = path.join(repoDir, '.gitignore');
@@ -227,7 +235,7 @@ describe('GitService', () => {
     });
 
     it('should not create a .gitignore in shadow repo if project .gitignore does not exist', async () => {
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       await service.setupShadowGitRepository();
 
       const hiddenGitIgnorePath = path.join(repoDir, '.gitignore');
@@ -236,12 +244,12 @@ describe('GitService', () => {
       expect(content).toBe('');
     });
 
-    it('should throw an error if reading projectRoot .gitignore fails with other errors', async () => {
-      const visibleGitIgnorePath = path.join(projectRoot, '.gitignore');
+    it('should throw an error if reading workspaceRoot .gitignore fails with other errors', async () => {
+      const visibleGitIgnorePath = path.join(workspaceRoot, '.gitignore');
       // Create a directory instead of a file to cause a read error
       await fs.mkdir(visibleGitIgnorePath);
 
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       // EISDIR is the expected error code on Unix-like systems
       await expect(service.setupShadowGitRepository()).rejects.toThrow(
         /EISDIR: illegal operation on a directory, read|EBUSY: resource busy or locked, read/,
@@ -250,7 +258,7 @@ describe('GitService', () => {
 
     it('should make an initial commit if no commits exist in history repo', async () => {
       hoistedMockCheckIsRepo.mockResolvedValue(false);
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       await service.setupShadowGitRepository();
       expect(hoistedMockCommit).toHaveBeenCalledWith('Initial commit', {
         '--allow-empty': null,
@@ -259,7 +267,7 @@ describe('GitService', () => {
 
     it('should not make an initial commit if commits already exist', async () => {
       hoistedMockCheckIsRepo.mockResolvedValue(true);
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       await service.setupShadowGitRepository();
       expect(hoistedMockCommit).not.toHaveBeenCalled();
     });
@@ -269,7 +277,7 @@ describe('GitService', () => {
       hoistedMockCheckIsRepo.mockRejectedValue(
         new Error('git rev-parse --is-inside-work-tree failed'),
       );
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       await service.setupShadowGitRepository();
       // Should proceed to initialize the repo since checkIsRepo failed
       expect(hoistedMockInit).toHaveBeenCalled();
@@ -281,7 +289,7 @@ describe('GitService', () => {
 
     it('should configure git environment to use local gitconfig', async () => {
       hoistedMockCheckIsRepo.mockResolvedValue(false);
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       await service.setupShadowGitRepository();
 
       expect(hoistedMockEnv).toHaveBeenCalledWith(
@@ -302,7 +310,7 @@ describe('GitService', () => {
   describe('createFileSnapshot', () => {
     it('should commit with --no-verify flag', async () => {
       hoistedMockStatus.mockResolvedValue({ isClean: () => false });
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       await service.initialize();
       await service.createFileSnapshot('test commit');
       expect(hoistedMockCommit).toHaveBeenCalledWith('test commit', {
@@ -313,7 +321,7 @@ describe('GitService', () => {
     it('should create a new commit if there are staged changes', async () => {
       hoistedMockStatus.mockResolvedValue({ isClean: () => false });
       hoistedMockCommit.mockResolvedValue({ commit: 'new-commit-hash' });
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       const commitHash = await service.createFileSnapshot('test message');
       expect(hoistedMockAdd).toHaveBeenCalledWith('.');
       expect(hoistedMockStatus).toHaveBeenCalled();
@@ -326,7 +334,7 @@ describe('GitService', () => {
     it('should return the current HEAD commit hash if there are no staged changes', async () => {
       hoistedMockStatus.mockResolvedValue({ isClean: () => true });
       hoistedMockRaw.mockResolvedValue('current-head-hash');
-      const service = new GitService(projectRoot, storage);
+      const service = new GitService(workspaceRoot, storage);
       const commitHash = await service.createFileSnapshot('test message');
       expect(hoistedMockAdd).toHaveBeenCalledWith('.');
       expect(hoistedMockStatus).toHaveBeenCalled();

@@ -17,7 +17,7 @@ import {
 function createTestConfig(): Config {
   return {
     storage: {
-      getProjectTempDir: () => '/tmp/nonexistent-test-dir',
+      getWorkspaceTempDir: () => '/tmp/nonexistent-test-dir',
     },
     getSessionId: () => 'test-session-id',
     getDebugMode: () => false,
@@ -93,7 +93,7 @@ describe('Session Cleanup Integration', () => {
     );
 
     const config = createTestConfig();
-    config.storage.getProjectTempDir = vi.fn().mockReturnValue(tempDir);
+    config.storage.getWorkspaceTempDir = vi.fn().mockReturnValue(tempDir);
 
     const settings: Settings = {};
 
@@ -209,7 +209,7 @@ describe('Session Cleanup Integration', () => {
     // Configure test with real temp directory
     const config: Config = {
       storage: {
-        getProjectTempDir: () => tempDir,
+        getWorkspaceTempDir: () => tempDir,
       },
       getSessionId: () => 'current123',
       getDebugMode: () => false,

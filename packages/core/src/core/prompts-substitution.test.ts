@@ -32,7 +32,7 @@ describe('Core System Prompt Substitution', () => {
       }),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+        getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),

@@ -87,9 +87,12 @@ describe('GeminiChat Network Retries', () => {
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       setActiveModel: vi.fn(),
       getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
-      getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
+      getWorkspaceRoot: vi.fn().mockReturnValue('/test/project/root'),
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        targetDir: '/test/project/root',
+      }),
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
+        getWorkspaceTempDir: vi.fn().mockReturnValue('/test/temp'),
       },
       getToolRegistry: vi.fn().mockReturnValue({ getTool: vi.fn() }),
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),

@@ -32,7 +32,7 @@ export interface InstallationInfo {
 }
 
 export function getInstallationInfo(
-  projectRoot: string,
+  workspaceRoot: string,
   isAutoUpdateEnabled: boolean,
 ): InstallationInfo {
   const cliPath = process.argv[1];
@@ -43,7 +43,7 @@ export function getInstallationInfo(
   try {
     // Normalize path separators to forward slashes for consistent matching.
     const realPath = fs.realpathSync(cliPath).replace(/\\/g, '/');
-    const normalizedProjectRoot = projectRoot?.replace(/\\/g, '/');
+    const normalizedProjectRoot = workspaceRoot?.replace(/\\/g, '/');
     const isGit = isGitRepository(process.cwd());
 
     // Check for local git clone first
@@ -160,11 +160,11 @@ export function getInstallationInfo(
       realPath.startsWith(`${normalizedProjectRoot}/node_modules`)
     ) {
       let pm = PackageManager.NPM;
-      if (fs.existsSync(path.join(projectRoot, 'yarn.lock'))) {
+      if (fs.existsSync(path.join(workspaceRoot, 'yarn.lock'))) {
         pm = PackageManager.YARN;
-      } else if (fs.existsSync(path.join(projectRoot, 'pnpm-lock.yaml'))) {
+      } else if (fs.existsSync(path.join(workspaceRoot, 'pnpm-lock.yaml'))) {
         pm = PackageManager.PNPM;
-      } else if (fs.existsSync(path.join(projectRoot, 'bun.lockb'))) {
+      } else if (fs.existsSync(path.join(workspaceRoot, 'bun.lockb'))) {
         pm = PackageManager.BUN;
       }
       return {

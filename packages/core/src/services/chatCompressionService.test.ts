@@ -186,7 +186,7 @@ describe('ChatCompressionService', () => {
       getNextCompressionTruncationId: vi.fn().mockReturnValue(1),
       getTruncateToolOutputThreshold: vi.fn().mockReturnValue(40000),
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue(testTempDir),
+        getWorkspaceTempDir: vi.fn().mockReturnValue(testTempDir),
       },
     } as unknown as Config;
 

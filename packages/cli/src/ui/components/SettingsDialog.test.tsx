@@ -23,7 +23,8 @@
 
 import { render } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import '../../../test-utils/customMatchers.js';
 import { SettingsDialog } from './SettingsDialog.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { createMockSettings } from '../../test-utils/settings.js';

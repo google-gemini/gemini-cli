@@ -69,7 +69,7 @@ describe('sandboxUtils', () => {
     });
 
     it('should handle registry path', () => {
-      expect(parseImageName('gcr.io/my-project/my-image:v1')).toBe(
+      expect(parseImageName('gcr.io/my-workspace/my-image:v1')).toBe(
         'my-image-v1',
       );
     });

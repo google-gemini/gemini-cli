@@ -17,7 +17,7 @@ import { CoreToolCallStatus } from '../scheduler/types.js';
 import type { Content, Part } from '@google/genai';
 import { ChatRecordingService } from './chatRecordingService.js';
 import type { Config } from '../config/config.js';
-import { getProjectHash } from '../utils/paths.js';
+import { getWorkspaceHash } from '../utils/paths.js';
 
 vi.mock('../utils/paths.js');
 vi.mock('node:crypto', () => {
@@ -44,9 +44,12 @@ describe('ChatRecordingService', () => {
 
     mockConfig = {
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
-      getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
+      getWorkspaceRoot: vi.fn().mockReturnValue('/test/project/root'),
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        targetDir: '/test/project/root',
+      }),
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue(testTempDir),
+        getWorkspaceTempDir: vi.fn().mockReturnValue(testTempDir),
       },
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getDebugMode: vi.fn().mockReturnValue(false),
@@ -59,7 +62,7 @@ describe('ChatRecordingService', () => {
       }),
     } as unknown as Config;
 
-    vi.mocked(getProjectHash).mockReturnValue('test-project-hash');
+    vi.mocked(getWorkspaceHash).mockReturnValue('test-workspace-hash');
     chatRecordingService = new ChatRecordingService(mockConfig);
   });
 

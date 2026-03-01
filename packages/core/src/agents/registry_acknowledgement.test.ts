@@ -62,14 +62,16 @@ describe('AgentRegistry Acknowledgement', () => {
     // Ensure we are in trusted folder mode for project agents to load
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
     vi.spyOn(config, 'getFolderTrust').mockReturnValue(true);
-    vi.spyOn(config, 'getProjectRoot').mockReturnValue('/project');
+    vi.spyOn(config, 'getWorkspaceRoot').mockReturnValue('/project');
+    vi.spyOn(config, 'getWorkspaceContext').mockReturnValue({
+      targetDir: '/project',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
     vi.spyOn(config, 'getAcknowledgedAgentsService').mockReturnValue(
       ackService,
     );
 
-    // We cannot easily spy on storage.getProjectAgentsDir if it's a property/getter unless we cast to any or it's a method
-    // Assuming it's a method on Storage class
-    vi.spyOn(config.storage, 'getProjectAgentsDir').mockReturnValue(
+    vi.spyOn(config.storage, 'getWorkspaceAgentsDir').mockReturnValue(
       '/project/.gemini/agents',
     );
     vi.spyOn(config, 'isAgentsEnabled').mockReturnValue(true);

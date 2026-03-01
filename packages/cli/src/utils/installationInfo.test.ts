@@ -43,14 +43,14 @@ const mockedExistsSync = vi.mocked(fs.existsSync);
 const mockedExecSync = vi.mocked(childProcess.execSync);
 
 describe('getInstallationInfo', () => {
-  const projectRoot = '/path/to/project';
+  const workspaceRoot = '/path/to/workspace';
   let originalArgv: string[];
 
   beforeEach(() => {
     vi.resetAllMocks();
     originalArgv = [...process.argv];
     // Mock process.cwd() for isGitRepository
-    vi.spyOn(process, 'cwd').mockReturnValue(projectRoot);
+    vi.spyOn(process, 'cwd').mockReturnValue(workspaceRoot);
     vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
   });
 
@@ -60,7 +60,7 @@ describe('getInstallationInfo', () => {
 
   it('should return UNKNOWN when cliPath is not available', () => {
     process.argv[1] = '';
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
     expect(info.packageManager).toBe(PackageManager.UNKNOWN);
   });
 
@@ -71,20 +71,20 @@ describe('getInstallationInfo', () => {
       throw error;
     });
 
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
 
     expect(info.packageManager).toBe(PackageManager.UNKNOWN);
     expect(debugLogger.log).toHaveBeenCalledWith(error);
   });
 
   it('should detect running from a local git clone', () => {
-    process.argv[1] = `${projectRoot}/packages/cli/dist/index.js`;
+    process.argv[1] = `${workspaceRoot}/packages/cli/dist/index.js`;
     mockedRealPathSync.mockReturnValue(
-      `${projectRoot}/packages/cli/dist/index.js`,
+      `${workspaceRoot}/packages/cli/dist/index.js`,
     );
     mockedIsGitRepository.mockReturnValue(true);
 
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
 
     expect(info.packageManager).toBe(PackageManager.UNKNOWN);
     expect(info.isGlobal).toBe(false);
@@ -98,7 +98,7 @@ describe('getInstallationInfo', () => {
     process.argv[1] = npxPath;
     mockedRealPathSync.mockReturnValue(npxPath);
 
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
 
     expect(info.packageManager).toBe(PackageManager.NPX);
     expect(info.isGlobal).toBe(false);
@@ -110,7 +110,7 @@ describe('getInstallationInfo', () => {
     process.argv[1] = pnpxPath;
     mockedRealPathSync.mockReturnValue(pnpxPath);
 
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
 
     expect(info.packageManager).toBe(PackageManager.PNPX);
     expect(info.isGlobal).toBe(false);
@@ -125,7 +125,7 @@ describe('getInstallationInfo', () => {
       throw new Error('Command failed');
     });
 
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
 
     expect(info.packageManager).toBe(PackageManager.BUNX);
     expect(info.isGlobal).toBe(false);
@@ -155,7 +155,7 @@ describe('getInstallationInfo', () => {
       return String(p);
     });
 
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
 
     expect(mockedExecSync).toHaveBeenCalledWith(
       expect.stringContaining('brew --prefix gemini-cli'),
@@ -179,7 +179,7 @@ describe('getInstallationInfo', () => {
       throw new Error('Command failed');
     });
 
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
 
     expect(mockedExecSync).toHaveBeenCalledWith(
       expect.stringContaining('brew --prefix gemini-cli'),
@@ -199,14 +199,14 @@ describe('getInstallationInfo', () => {
     });
 
     // isAutoUpdateEnabled = true -> "Attempting to automatically update"
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
     expect(info.packageManager).toBe(PackageManager.PNPM);
     expect(info.isGlobal).toBe(true);
     expect(info.updateCommand).toBe('pnpm add -g @google/gemini-cli@latest');
     expect(info.updateMessage).toContain('Attempting to automatically update');
 
     // isAutoUpdateEnabled = false -> "Please run..."
-    const infoDisabled = getInstallationInfo(projectRoot, false);
+    const infoDisabled = getInstallationInfo(workspaceRoot, false);
     expect(infoDisabled.updateMessage).toContain('Please run pnpm add');
   });
 
@@ -219,7 +219,7 @@ describe('getInstallationInfo', () => {
     });
 
     // isAutoUpdateEnabled = true -> "Attempting to automatically update"
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
     expect(info.packageManager).toBe(PackageManager.YARN);
     expect(info.isGlobal).toBe(true);
     expect(info.updateCommand).toBe(
@@ -228,7 +228,7 @@ describe('getInstallationInfo', () => {
     expect(info.updateMessage).toContain('Attempting to automatically update');
 
     // isAutoUpdateEnabled = false -> "Please run..."
-    const infoDisabled = getInstallationInfo(projectRoot, false);
+    const infoDisabled = getInstallationInfo(workspaceRoot, false);
     expect(infoDisabled.updateMessage).toContain('Please run yarn global add');
   });
 
@@ -241,29 +241,29 @@ describe('getInstallationInfo', () => {
     });
 
     // isAutoUpdateEnabled = true -> "Attempting to automatically update"
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
     expect(info.packageManager).toBe(PackageManager.BUN);
     expect(info.isGlobal).toBe(true);
     expect(info.updateCommand).toBe('bun add -g @google/gemini-cli@latest');
     expect(info.updateMessage).toContain('Attempting to automatically update');
 
     // isAutoUpdateEnabled = false -> "Please run..."
-    const infoDisabled = getInstallationInfo(projectRoot, false);
+    const infoDisabled = getInstallationInfo(workspaceRoot, false);
     expect(infoDisabled.updateMessage).toContain('Please run bun add');
   });
 
   it('should detect local installation and identify yarn from lockfile', () => {
-    const localPath = `${projectRoot}/node_modules/.bin/gemini`;
+    const localPath = `${workspaceRoot}/node_modules/.bin/gemini`;
     process.argv[1] = localPath;
     mockedRealPathSync.mockReturnValue(localPath);
     mockedExecSync.mockImplementation(() => {
       throw new Error('Command failed');
     });
     mockedExistsSync.mockImplementation(
-      (p) => p === path.join(projectRoot, 'yarn.lock'),
+      (p) => p === path.join(workspaceRoot, 'yarn.lock'),
     );
 
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
 
     expect(info.packageManager).toBe(PackageManager.YARN);
     expect(info.isGlobal).toBe(false);
@@ -271,41 +271,41 @@ describe('getInstallationInfo', () => {
   });
 
   it('should detect local installation and identify pnpm from lockfile', () => {
-    const localPath = `${projectRoot}/node_modules/.bin/gemini`;
+    const localPath = `${workspaceRoot}/node_modules/.bin/gemini`;
     process.argv[1] = localPath;
     mockedRealPathSync.mockReturnValue(localPath);
     mockedExecSync.mockImplementation(() => {
       throw new Error('Command failed');
     });
     mockedExistsSync.mockImplementation(
-      (p) => p === path.join(projectRoot, 'pnpm-lock.yaml'),
+      (p) => p === path.join(workspaceRoot, 'pnpm-lock.yaml'),
     );
 
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
 
     expect(info.packageManager).toBe(PackageManager.PNPM);
     expect(info.isGlobal).toBe(false);
   });
 
   it('should detect local installation and identify bun from lockfile', () => {
-    const localPath = `${projectRoot}/node_modules/.bin/gemini`;
+    const localPath = `${workspaceRoot}/node_modules/.bin/gemini`;
     process.argv[1] = localPath;
     mockedRealPathSync.mockReturnValue(localPath);
     mockedExecSync.mockImplementation(() => {
       throw new Error('Command failed');
     });
     mockedExistsSync.mockImplementation(
-      (p) => p === path.join(projectRoot, 'bun.lockb'),
+      (p) => p === path.join(workspaceRoot, 'bun.lockb'),
     );
 
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
 
     expect(info.packageManager).toBe(PackageManager.BUN);
     expect(info.isGlobal).toBe(false);
   });
 
   it('should default to local npm installation if no lockfile is found', () => {
-    const localPath = `${projectRoot}/node_modules/.bin/gemini`;
+    const localPath = `${workspaceRoot}/node_modules/.bin/gemini`;
     process.argv[1] = localPath;
     mockedRealPathSync.mockReturnValue(localPath);
     mockedExecSync.mockImplementation(() => {
@@ -313,7 +313,7 @@ describe('getInstallationInfo', () => {
     });
     mockedExistsSync.mockReturnValue(false); // No lockfiles
 
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
 
     expect(info.packageManager).toBe(PackageManager.NPM);
     expect(info.isGlobal).toBe(false);
@@ -328,14 +328,14 @@ describe('getInstallationInfo', () => {
     });
 
     // isAutoUpdateEnabled = true -> "Attempting to automatically update"
-    const info = getInstallationInfo(projectRoot, true);
+    const info = getInstallationInfo(workspaceRoot, true);
     expect(info.packageManager).toBe(PackageManager.NPM);
     expect(info.isGlobal).toBe(true);
     expect(info.updateCommand).toBe('npm install -g @google/gemini-cli@latest');
     expect(info.updateMessage).toContain('Attempting to automatically update');
 
     // isAutoUpdateEnabled = false -> "Please run..."
-    const infoDisabled = getInstallationInfo(projectRoot, false);
+    const infoDisabled = getInstallationInfo(workspaceRoot, false);
     expect(infoDisabled.updateMessage).toContain('Please run npm install');
   });
 
@@ -368,7 +368,7 @@ describe('getInstallationInfo', () => {
       return String(p);
     });
 
-    const info = getInstallationInfo(projectRoot, false);
+    const info = getInstallationInfo(workspaceRoot, false);
 
     expect(info.packageManager).not.toBe(PackageManager.HOMEBREW);
     expect(info.packageManager).toBe(PackageManager.NPM);

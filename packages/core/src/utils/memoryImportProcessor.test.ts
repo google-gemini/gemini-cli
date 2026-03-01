@@ -297,8 +297,8 @@ describe('memoryImportProcessor', () => {
         '```',
         'More content @./should-import2.md',
       ].join('\n');
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
+      const workspaceRoot = testPath('test', 'project');
+      const basePath = testPath(workspaceRoot, 'src');
       const importedContent1 = 'Imported 1';
       const importedContent2 = 'Imported 2';
       // Only the imports outside code blocks should be processed
@@ -311,7 +311,7 @@ describe('memoryImportProcessor', () => {
         basePath,
         true,
         undefined,
-        projectRoot,
+        workspaceRoot,
       );
 
       // Use marked to verify imported content is present
@@ -338,8 +338,8 @@ describe('memoryImportProcessor', () => {
         '`code with import @./should-not-import.md`',
         'More content @./should-import2.md',
       ].join('\n');
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
+      const workspaceRoot = testPath('test', 'project');
+      const basePath = testPath(workspaceRoot, 'src');
       const importedContent1 = 'Imported 1';
       const importedContent2 = 'Imported 2';
       mockedFs.access.mockResolvedValue(undefined);
@@ -351,7 +351,7 @@ describe('memoryImportProcessor', () => {
         basePath,
         true,
         undefined,
-        projectRoot,
+        workspaceRoot,
       );
 
       // Verify imported content is present
@@ -387,8 +387,8 @@ describe('memoryImportProcessor', () => {
         'Another paragraph with the same `inline code @./should-not-import.md` text.',
         'More content @./should-import2.md',
       ].join('\n');
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
+      const workspaceRoot = testPath('test', 'project');
+      const basePath = testPath(workspaceRoot, 'src');
       const importedContent1 = 'Imported 1';
       const importedContent2 = 'Imported 2';
       mockedFs.access.mockResolvedValue(undefined);
@@ -400,7 +400,7 @@ describe('memoryImportProcessor', () => {
         basePath,
         true,
         undefined,
-        projectRoot,
+        workspaceRoot,
       );
 
       // Should process imports outside code regions
@@ -418,15 +418,15 @@ describe('memoryImportProcessor', () => {
 
     it('should not process imports in repeated inline code blocks', async () => {
       const content = '`@noimport` and `@noimport`';
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
+      const workspaceRoot = testPath('test', 'project');
+      const basePath = testPath(workspaceRoot, 'src');
 
       const result = await processImports(
         content,
         basePath,
         true,
         undefined,
-        projectRoot,
+        workspaceRoot,
       );
 
       expect(result.content).toBe(content);
@@ -444,8 +444,8 @@ describe('memoryImportProcessor', () => {
     it('should allow imports from parent and subdirectories within project root', async () => {
       const content =
         'Parent import: @../parent.md Subdir import: @./components/sub.md';
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
+      const workspaceRoot = testPath('test', 'project');
+      const basePath = testPath(workspaceRoot, 'src');
       const importedParent = 'Parent file content';
       const importedSub = 'Subdir file content';
       mockedFs.access.mockResolvedValue(undefined);
@@ -457,7 +457,7 @@ describe('memoryImportProcessor', () => {
         basePath,
         true,
         undefined,
-        projectRoot,
+        workspaceRoot,
       );
       expect(result.content).toContain(importedParent);
       expect(result.content).toContain(importedSub);
@@ -465,14 +465,14 @@ describe('memoryImportProcessor', () => {
 
     it('should reject imports outside project root', async () => {
       const content = 'Outside import: @../../../etc/passwd';
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
+      const workspaceRoot = testPath('test', 'project');
+      const basePath = testPath(workspaceRoot, 'src');
       const result = await processImports(
         content,
         basePath,
         true,
         undefined,
-        projectRoot,
+        workspaceRoot,
       );
       expect(result.content).toContain(
         '<!-- Import failed: ../../../etc/passwd - Path traversal attempt -->',
@@ -481,8 +481,8 @@ describe('memoryImportProcessor', () => {
 
     it('should build import tree structure', async () => {
       const content = 'Main content @./nested.md @./simple.md';
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
+      const workspaceRoot = testPath('test', 'project');
+      const basePath = testPath(workspaceRoot, 'src');
       const nestedContent = 'Nested @./inner.md content';
       const simpleContent = 'Simple content';
       const innerContent = 'Inner content';
@@ -527,27 +527,27 @@ describe('memoryImportProcessor', () => {
 
       // First import: nested.md
       // Check that the paths match using includes to handle potential absolute/relative differences
-      const expectedNestedPath = testPath(projectRoot, 'src', 'nested.md');
+      const expectedNestedPath = testPath(workspaceRoot, 'src', 'nested.md');
 
       expect(result.importTree.imports![0].path).toContain(expectedNestedPath);
       expect(result.importTree.imports![0].imports).toHaveLength(1);
 
-      const expectedInnerPath = testPath(projectRoot, 'src', 'inner.md');
+      const expectedInnerPath = testPath(workspaceRoot, 'src', 'inner.md');
       expect(result.importTree.imports![0].imports![0].path).toContain(
         expectedInnerPath,
       );
       expect(result.importTree.imports![0].imports![0].imports).toBeUndefined();
 
       // Second import: simple.md
-      const expectedSimplePath = testPath(projectRoot, 'src', 'simple.md');
+      const expectedSimplePath = testPath(workspaceRoot, 'src', 'simple.md');
       expect(result.importTree.imports![1].path).toContain(expectedSimplePath);
       expect(result.importTree.imports![1].imports).toBeUndefined();
     });
 
     it('should produce flat output in Claude-style with unique files in order', async () => {
       const content = 'Main @./nested.md content @./simple.md';
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
+      const workspaceRoot = testPath('test', 'project');
+      const basePath = testPath(workspaceRoot, 'src');
       const nestedContent = 'Nested @./inner.md content';
       const simpleContent = 'Simple content';
       const innerContent = 'Inner content';
@@ -563,7 +563,7 @@ describe('memoryImportProcessor', () => {
         basePath,
         true,
         undefined,
-        projectRoot,
+        workspaceRoot,
         'flat',
       );
 
@@ -622,8 +622,8 @@ describe('memoryImportProcessor', () => {
 
     it('should not duplicate files in flat output if imported multiple times', async () => {
       const content = 'Main @./dup.md again @./dup.md';
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
+      const workspaceRoot = testPath('test', 'project');
+      const basePath = testPath(workspaceRoot, 'src');
       const dupContent = 'Duplicated content';
 
       // Reset mocks
@@ -639,7 +639,7 @@ describe('memoryImportProcessor', () => {
         basePath,
         true, // followImports
         undefined, // allowedPaths
-        projectRoot,
+        workspaceRoot,
         'flat', // outputFormat
       );
 
@@ -656,8 +656,8 @@ describe('memoryImportProcessor', () => {
 
     it('should handle nested imports in flat output', async () => {
       const content = 'Root @./a.md';
-      const projectRoot = testPath('test', 'project');
-      const basePath = testPath(projectRoot, 'src');
+      const workspaceRoot = testPath('test', 'project');
+      const basePath = testPath(workspaceRoot, 'src');
       const aContent = 'A @./b.md';
       const bContent = 'B content';
 
@@ -671,7 +671,7 @@ describe('memoryImportProcessor', () => {
         basePath,
         true,
         undefined,
-        projectRoot,
+        workspaceRoot,
         'flat',
       );
 

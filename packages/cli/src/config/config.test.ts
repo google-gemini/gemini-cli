@@ -49,7 +49,7 @@ vi.mock('fs', async (importOriginal) => {
   const pathMod = await import('node:path');
   const mockHome = pathMod.resolve(pathMod.sep, 'mock', 'home', 'user');
   const MOCK_CWD1 = process.cwd();
-  const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'project');
+  const MOCK_CWD2 = pathMod.resolve(pathMod.sep, 'home', 'user', 'workspace');
 
   const mockPaths = new Set([
     MOCK_CWD1,
@@ -1896,7 +1896,7 @@ describe('loadCliConfig with includeDirectories', () => {
     );
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     vi.spyOn(process, 'cwd').mockReturnValue(
-      path.resolve(path.sep, 'home', 'user', 'project'),
+      path.resolve(path.sep, 'home', 'user', 'workspace'),
     );
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
   });
@@ -1906,7 +1906,7 @@ describe('loadCliConfig with includeDirectories', () => {
   });
 
   it.skip('should combine and resolve paths from settings and CLI arguments', async () => {
-    const mockCwd = path.resolve(path.sep, 'home', 'user', 'project');
+    const mockCwd = path.resolve(path.sep, 'home', 'user', 'workspace');
     process.argv = [
       'node',
 

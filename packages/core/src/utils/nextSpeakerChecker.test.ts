@@ -62,11 +62,14 @@ describe('checkNextSpeaker', () => {
       generateContentConfig: {},
     };
     mockConfig = {
-      getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
+      getWorkspaceRoot: vi.fn().mockReturnValue('/test/project/root'),
+      getWorkspaceContext: vi.fn().mockReturnValue({
+        targetDir: '/test/project/root',
+      }),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getModel: () => 'test-model',
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
+        getWorkspaceTempDir: vi.fn().mockReturnValue('/test/temp'),
       },
       modelConfigService: {
         getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),

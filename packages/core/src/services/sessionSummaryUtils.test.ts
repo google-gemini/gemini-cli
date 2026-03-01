@@ -58,7 +58,7 @@ describe('sessionSummaryUtils', () => {
     mockConfig = {
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       storage: {
-        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        getWorkspaceTempDir: vi.fn().mockReturnValue('/tmp/workspace'),
       },
     } as unknown as Config;
 
@@ -133,7 +133,7 @@ describe('sessionSummaryUtils', () => {
 
       expect(result).toBe(
         path.join(
-          '/tmp/project',
+          '/tmp/workspace',
           'chats',
           'session-2024-01-01T10-00-abc12345.json',
         ),
@@ -154,7 +154,7 @@ describe('sessionSummaryUtils', () => {
 
       expect(result).toBe(
         path.join(
-          '/tmp/project',
+          '/tmp/workspace',
           'chats',
           'session-2024-01-02T10-00-newer000.json',
         ),
@@ -181,7 +181,7 @@ describe('sessionSummaryUtils', () => {
 
     it('should generate and save summary for session needing one', async () => {
       const sessionPath = path.join(
-        '/tmp/project',
+        '/tmp/workspace',
         'chats',
         'session-2024-01-01T10-00-abc12345.json',
       );

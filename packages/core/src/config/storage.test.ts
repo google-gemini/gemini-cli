@@ -34,7 +34,7 @@ vi.mock('./projectRegistry.js');
 vi.mock('./storageMigration.js');
 
 describe('Storage – initialize', () => {
-  const projectRoot = '/tmp/project';
+  const workspaceRoot = '/tmp/project';
   let storage: Storage;
 
   beforeEach(() => {
@@ -42,16 +42,16 @@ describe('Storage – initialize', () => {
     ProjectRegistry.prototype.getShortId = vi
       .fn()
       .mockReturnValue(PROJECT_SLUG);
-    storage = new Storage(projectRoot);
+    storage = new Storage(workspaceRoot);
     vi.clearAllMocks();
 
     // Mock StorageMigration.migrateDirectory
     vi.mocked(StorageMigration.migrateDirectory).mockResolvedValue(undefined);
   });
 
-  it('sets up the registry and performs migration if `getProjectTempDir` is called', async () => {
+  it('sets up the registry and performs migration if `getWorkspaceTempDir` is called', async () => {
     await storage.initialize();
-    expect(storage.getProjectTempDir()).toBe(
+    expect(storage.getWorkspaceTempDir()).toBe(
       path.join(os.homedir(), GEMINI_DIR, 'tmp', PROJECT_SLUG),
     );
 
@@ -60,14 +60,14 @@ describe('Storage – initialize', () => {
     expect(vi.mocked(ProjectRegistry).prototype.initialize).toHaveBeenCalled();
     expect(
       vi.mocked(ProjectRegistry).prototype.getShortId,
-    ).toHaveBeenCalledWith(projectRoot);
+    ).toHaveBeenCalledWith(workspaceRoot);
 
     // Verify migration calls
     // We can't easily get the hash here without repeating logic, but we can verify it's called twice
     expect(StorageMigration.migrateDirectory).toHaveBeenCalledTimes(2);
 
     // Verify identifier is set by checking a path
-    expect(storage.getProjectTempDir()).toContain(PROJECT_SLUG);
+    expect(storage.getWorkspaceTempDir()).toContain(PROJECT_SLUG);
   });
 });
 
@@ -103,8 +103,8 @@ describe('Storage - Security', () => {
 });
 
 describe('Storage – additional helpers', () => {
-  const projectRoot = '/tmp/project';
-  const storage = new Storage(projectRoot);
+  const workspaceRoot = '/tmp/project';
+  const storage = new Storage(workspaceRoot);
 
   beforeEach(() => {
     ProjectRegistry.prototype.getShortId = vi
@@ -113,7 +113,7 @@ describe('Storage – additional helpers', () => {
   });
 
   it('getWorkspaceSettingsPath returns project/.gemini/settings.json', () => {
-    const expected = path.join(projectRoot, GEMINI_DIR, 'settings.json');
+    const expected = path.join(workspaceRoot, GEMINI_DIR, 'settings.json');
     expect(storage.getWorkspaceSettingsPath()).toBe(expected);
   });
 
@@ -123,7 +123,7 @@ describe('Storage – additional helpers', () => {
   });
 
   it('getProjectCommandsDir returns project/.gemini/commands', () => {
-    const expected = path.join(projectRoot, GEMINI_DIR, 'commands');
+    const expected = path.join(workspaceRoot, GEMINI_DIR, 'commands');
     expect(storage.getProjectCommandsDir()).toBe(expected);
   });
 
@@ -133,7 +133,7 @@ describe('Storage – additional helpers', () => {
   });
 
   it('getProjectSkillsDir returns project/.gemini/skills', () => {
-    const expected = path.join(projectRoot, GEMINI_DIR, 'skills');
+    const expected = path.join(workspaceRoot, GEMINI_DIR, 'skills');
     expect(storage.getProjectSkillsDir()).toBe(expected);
   });
 
@@ -143,7 +143,7 @@ describe('Storage – additional helpers', () => {
   });
 
   it('getProjectAgentsDir returns project/.gemini/agents', () => {
-    const expected = path.join(projectRoot, GEMINI_DIR, 'agents');
+    const expected = path.join(workspaceRoot, GEMINI_DIR, 'agents');
     expect(storage.getProjectAgentsDir()).toBe(expected);
   });
 
@@ -163,19 +163,19 @@ describe('Storage – additional helpers', () => {
 
   it('getProjectTempPlansDir returns ~/.gemini/tmp/<identifier>/plans when no sessionId is provided', async () => {
     await storage.initialize();
-    const tempDir = storage.getProjectTempDir();
+    const tempDir = storage.getWorkspaceTempDir();
     const expected = path.join(tempDir, 'plans');
     expect(storage.getProjectTempPlansDir()).toBe(expected);
   });
 
   it('getProjectTempPlansDir returns ~/.gemini/tmp/<identifier>/<sessionId>/plans when sessionId is provided', async () => {
     const sessionId = 'test-session-id';
-    const storageWithSession = new Storage(projectRoot, sessionId);
+    const storageWithSession = new Storage(workspaceRoot, sessionId);
     ProjectRegistry.prototype.getShortId = vi
       .fn()
       .mockReturnValue(PROJECT_SLUG);
     await storageWithSession.initialize();
-    const tempDir = storageWithSession.getProjectTempDir();
+    const tempDir = storageWithSession.getWorkspaceTempDir();
     const expected = path.join(tempDir, sessionId, 'plans');
     expect(storageWithSession.getProjectTempPlansDir()).toBe(expected);
   });
@@ -273,29 +273,29 @@ describe('Storage – additional helpers', () => {
       {
         name: 'custom relative path',
         customDir: '.my-plans',
-        expected: path.resolve(projectRoot, '.my-plans'),
+        expected: path.resolve(workspaceRoot, '.my-plans'),
       },
       {
         name: 'custom absolute path outside throws',
         customDir: '/absolute/path/to/plans',
         expected: '',
         expectedError:
-          "Custom plans directory '/absolute/path/to/plans' resolves to '/absolute/path/to/plans', which is outside the project root '/tmp/project'.",
+          "Custom plans directory '/absolute/path/to/plans' resolves to '/absolute/path/to/plans', which is outside the workspace root '/tmp/project'.",
       },
       {
         name: 'absolute path that happens to be inside project root',
-        customDir: path.join(projectRoot, 'internal-plans'),
-        expected: path.join(projectRoot, 'internal-plans'),
+        customDir: path.join(workspaceRoot, 'internal-plans'),
+        expected: path.join(workspaceRoot, 'internal-plans'),
       },
       {
         name: 'relative path that stays within project root',
         customDir: 'subdir/../plans',
-        expected: path.resolve(projectRoot, 'plans'),
+        expected: path.resolve(workspaceRoot, 'plans'),
       },
       {
         name: 'dot path',
         customDir: '.',
-        expected: projectRoot,
+        expected: workspaceRoot,
       },
       {
         name: 'default behavior when customDir is undefined',
@@ -307,12 +307,12 @@ describe('Storage – additional helpers', () => {
         customDir: '../escaped-plans',
         expected: '',
         expectedError:
-          "Custom plans directory '../escaped-plans' resolves to '/tmp/escaped-plans', which is outside the project root '/tmp/project'.",
+          "Custom plans directory '../escaped-plans' resolves to '/tmp/escaped-plans', which is outside the workspace root '/tmp/project'.",
       },
       {
         name: 'hidden directory starting with ..',
         customDir: '..plans',
-        expected: path.resolve(projectRoot, '..plans'),
+        expected: path.resolve(workspaceRoot, '..plans'),
       },
       {
         name: 'security escape via symbolic link throws',
@@ -328,7 +328,7 @@ describe('Storage – additional helpers', () => {
         },
         expected: '',
         expectedError:
-          "Custom plans directory 'symlink-to-outside' resolves to '/outside/project/root', which is outside the project root '/tmp/project'.",
+          "Custom plans directory 'symlink-to-outside' resolves to '/outside/project/root', which is outside the workspace root '/tmp/project'.",
       },
     ];
 
