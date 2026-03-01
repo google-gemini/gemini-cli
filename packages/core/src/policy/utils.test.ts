@@ -13,7 +13,7 @@ describe('policy/utils', () => {
       const input = '.-*+?^${}()|[]\\ "';
       const escaped = escapeRegex(input);
       expect(escaped).toBe(
-        '\\.\\-\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\\\ \\"',
+        '\\.-\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\\\ \\"',
       );
     });
 
@@ -97,15 +97,13 @@ describe('policy/utils', () => {
 
     it('should escape characters in commandPrefix', () => {
       const result = buildArgsPatterns(undefined, 'git checkout -b', undefined);
-      expect(result).toEqual([
-        '"command":"git\\ checkout\\ \\-b(?:[\\s"]|\\\\")',
-      ]);
+      expect(result).toEqual(['"command":"git checkout -b(?:[\\s"]|\\\\")']);
     });
 
     it('should correctly escape quotes in commandPrefix', () => {
       const result = buildArgsPatterns(undefined, 'git "fix"', undefined);
       expect(result).toEqual([
-        '"command":"git\\ \\\\\\"fix\\\\\\"(?:[\\s"]|\\\\")',
+        '"command":"git \\\\\\"fix\\\\\\"(?:[\\s"]|\\\\")',
       ]);
     });
 

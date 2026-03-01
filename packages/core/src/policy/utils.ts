@@ -8,7 +8,7 @@
  * Escapes a string for use in a regular expression.
  */
 export function escapeRegex(text: string): string {
-  return text.replace(/[-[\]{}()*+?.,\\^$|#\s"]/g, '\\$&');
+  return text.replace(/[[\]{}()*+?.,\\^$|#\s"]/g, '\\$&');
 }
 
 /**
@@ -69,10 +69,20 @@ export function buildArgsPatterns(
     // always followed by a space or a closing quote.
     return prefixes.map((prefix) => {
       const jsonPrefix = JSON.stringify(prefix).slice(1, -1);
+      // Escape regex special characters but preserve spaces since JSON
+      // contains literal spaces (not escaped) in command strings.
+      const escapedPrefix = escapeRegex(jsonPrefix).replace(/\\ /g, ' ');
+      // If prefix already ends with a space, the next character can be
+      // anything (branch name, filename, etc.) so no boundary check needed.
+      // Otherwise, append boundary to prevent partial word matches
+      // (e.g. "git" matching "github").
+      if (escapedPrefix.endsWith(' ')) {
+        return `"command":"${escapedPrefix}`;
+      }
       // We allow [\s], ["], or the specific sequence [\"] (for escaped quotes
       // in JSON). We do NOT allow generic [\\], which would match "git\status"
       // -> "gitstatus".
-      return `"command":"${escapeRegex(jsonPrefix)}(?:[\\s"]|\\\\")`;
+      return `"command":"${escapedPrefix}(?:[\\s"]|\\\\")`;
     });
   }
 
