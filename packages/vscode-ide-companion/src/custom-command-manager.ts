@@ -177,11 +177,15 @@ export class CustomCommandManager {
 
       await vscode.workspace.fs.createDirectory(tmpDir);
 
-      // Escape special sequences that Gemini CLI interprets: !{...}, @{...}, {{...}}
+      // Escape special sequences that Gemini CLI interprets
+      // Order matters: escape backslashes first to prevent bypass attacks
       const sanitizedText = selectedText
+        .replace(/\\/g, '\\\\')
         .replace(/!{/g, '\\!{')
         .replace(/@{/g, '\\@{')
-        .replace(/{{/g, '\\{{');
+        .replace(/{{/g, '\\{{')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 
       const fullContent = `${cmd.prompt}\n\n${sanitizedText}`;
       await vscode.workspace.fs.writeFile(
