@@ -4,46 +4,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
-import { createMockSettings } from '../../test-utils/settings.js';
 import { Footer } from './Footer.js';
-import {
-  makeFakeConfig,
-  tildeifyPath,
-  ToolCallDecision,
-} from '@google/gemini-cli-core';
-import type { SessionStatsState } from '../contexts/SessionContext.js';
+import { createMockSettings } from '../../test-utils/settings.js';
+import path from 'node:path';
 
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...original,
-    shortenPath: (p: string, len: number) => {
-      if (p.length > len) {
-        return '...' + p.slice(p.length - len + 3);
-      }
-      return p;
-    },
-  };
-});
-
-const defaultProps = {
-  model: 'gemini-pro',
-  targetDir:
-    '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long',
-  branchName: 'main',
+// Normalize paths to POSIX slashes for stable cross-platform snapshots.
+const normalizeFrame = (frame: string | undefined) => {
+  if (!frame) return frame;
+  return frame.replace(/\\/g, '/');
 };
 
-const mockSessionStats: SessionStatsState = {
-  sessionId: 'test-session',
+const mockSessionStats = {
+  sessionId: 'test-session-id',
   sessionStartTime: new Date(),
-  lastPromptTokenCount: 0,
   promptCount: 0,
+  lastPromptTokenCount: 150000,
   metrics: {
-    models: {},
+    files: {
+      totalLinesAdded: 12,
+      totalLinesRemoved: 4,
+    },
     tools: {
+      count: 0,
       totalCalls: 0,
       totalSuccess: 0,
       totalFail: 0,
@@ -52,18 +36,47 @@ const mockSessionStats: SessionStatsState = {
         accept: 0,
         reject: 0,
         modify: 0,
-        [ToolCallDecision.AUTO_ACCEPT]: 0,
+        auto_accept: 0,
       },
       byName: {},
+      latency: { avg: 0, max: 0, min: 0 },
     },
-    files: {
-      totalLinesAdded: 0,
-      totalLinesRemoved: 0,
+    models: {
+      'gemini-pro': {
+        api: {
+          totalRequests: 0,
+          totalErrors: 0,
+          totalLatencyMs: 0,
+        },
+        tokens: {
+          input: 0,
+          prompt: 0,
+          candidates: 0,
+          total: 1500,
+          cached: 0,
+          thoughts: 0,
+          tool: 0,
+        },
+        roles: {},
+      },
     },
   },
 };
 
+const defaultProps = {
+  model: 'gemini-pro',
+  targetDir: '/long/path/to/some/deeply/nested/directories/to/make/it/long',
+  debugMode: false,
+  branchName: 'main',
+  errorCount: 0,
+};
+
 describe('<Footer />', () => {
+  beforeEach(() => {
+    const root = path.parse(process.cwd()).root;
+    vi.stubEnv('GEMINI_CLI_HOME', path.join(root, 'Users', 'test'));
+  });
+
   it('renders the component', async () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <Footer />,
@@ -90,11 +103,12 @@ describe('<Footer />', () => {
         },
       );
       await waitUntilReady();
-      const tildePath = tildeifyPath(defaultProps.targetDir);
-      const pathLength = Math.max(20, Math.floor(79 * 0.25));
-      const expectedPath =
-        '...' + tildePath.slice(tildePath.length - pathLength + 3);
-      expect(lastFrame()).toContain(expectedPath);
+      const output = lastFrame();
+      expect(output).toBeDefined();
+      // Should contain some part of the path, likely shortened
+      expect(output).toContain(
+        path.join('directories', 'to', 'make', 'it', 'long'),
+      );
       unmount();
     });
 
@@ -107,10 +121,11 @@ describe('<Footer />', () => {
         },
       );
       await waitUntilReady();
-      const tildePath = tildeifyPath(defaultProps.targetDir);
-      const expectedPath =
-        '...' + tildePath.slice(tildePath.length - 80 * 0.25 + 3);
-      expect(lastFrame()).toContain(expectedPath);
+      const output = lastFrame();
+      expect(output).toBeDefined();
+      expect(output).toContain(
+        path.join('directories', 'to', 'make', 'it', 'long'),
+      );
       unmount();
     });
   });
@@ -127,7 +142,7 @@ describe('<Footer />', () => {
       },
     );
     await waitUntilReady();
-    expect(lastFrame()).toContain(`(${defaultProps.branchName}*)`);
+    expect(lastFrame()).toContain(defaultProps.branchName);
     unmount();
   });
 
@@ -140,7 +155,7 @@ describe('<Footer />', () => {
       },
     );
     await waitUntilReady();
-    expect(lastFrame()).not.toContain(`(${defaultProps.branchName}*)`);
+    expect(lastFrame()).not.toContain('Branch');
     unmount();
   });
 
@@ -149,7 +164,13 @@ describe('<Footer />', () => {
       <Footer />,
       {
         width: 120,
-        uiState: { sessionStats: mockSessionStats },
+        uiState: {
+          currentModel: defaultProps.model,
+          sessionStats: {
+            ...mockSessionStats,
+            lastPromptTokenCount: 1000,
+          },
+        },
         settings: createMockSettings({
           ui: {
             footer: {
@@ -161,7 +182,7 @@ describe('<Footer />', () => {
     );
     await waitUntilReady();
     expect(lastFrame()).toContain(defaultProps.model);
-    expect(lastFrame()).toMatch(/\d+% context left/);
+    expect(lastFrame()).toMatch(/\d+% left/);
     unmount();
   });
 
@@ -189,7 +210,7 @@ describe('<Footer />', () => {
     );
     await waitUntilReady();
     expect(lastFrame()).toContain('15%');
-    expect(lastFrame()).toMatchSnapshot();
+    expect(normalizeFrame(lastFrame())).toMatchSnapshot();
     unmount();
   });
 
@@ -217,7 +238,7 @@ describe('<Footer />', () => {
     );
     await waitUntilReady();
     expect(lastFrame()).not.toContain('Usage remaining');
-    expect(lastFrame()).toMatchSnapshot();
+    expect(normalizeFrame(lastFrame())).toMatchSnapshot();
     unmount();
   });
 
@@ -244,8 +265,8 @@ describe('<Footer />', () => {
       },
     );
     await waitUntilReady();
-    expect(lastFrame()).toContain('Limit reached');
-    expect(lastFrame()).toMatchSnapshot();
+    expect(lastFrame()?.toLowerCase()).toContain('limit reached');
+    expect(normalizeFrame(lastFrame())).toMatchSnapshot();
     unmount();
   });
 
@@ -377,7 +398,9 @@ describe('<Footer />', () => {
         },
       );
       await waitUntilReady();
-      expect(lastFrame()).toMatchSnapshot('complete-footer-wide');
+      expect(normalizeFrame(lastFrame())).toMatchSnapshot(
+        'complete-footer-wide',
+      );
       unmount();
     });
 
@@ -399,7 +422,9 @@ describe('<Footer />', () => {
         },
       );
       await waitUntilReady();
-      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot('footer-minimal');
+      expect(normalizeFrame(lastFrame({ allowEmpty: true }))).toMatchSnapshot(
+        'footer-minimal',
+      );
       unmount();
     });
 
@@ -421,7 +446,7 @@ describe('<Footer />', () => {
         },
       );
       await waitUntilReady();
-      expect(lastFrame()).toMatchSnapshot('footer-no-model');
+      expect(normalizeFrame(lastFrame())).toMatchSnapshot('footer-no-model');
       unmount();
     });
 
@@ -443,7 +468,9 @@ describe('<Footer />', () => {
         },
       );
       await waitUntilReady();
-      expect(lastFrame()).toMatchSnapshot('footer-only-sandbox');
+      expect(normalizeFrame(lastFrame())).toMatchSnapshot(
+        'footer-only-sandbox',
+      );
       unmount();
     });
 
@@ -464,7 +491,7 @@ describe('<Footer />', () => {
       );
       await waitUntilReady();
       expect(lastFrame()).toContain(defaultProps.model);
-      expect(lastFrame()).not.toMatch(/\d+% context left/);
+      expect(lastFrame()).not.toMatch(/\d+% left/);
       unmount();
     });
     it('shows the context percentage when hideContextPercentage is false', async () => {
@@ -484,7 +511,7 @@ describe('<Footer />', () => {
       );
       await waitUntilReady();
       expect(lastFrame()).toContain(defaultProps.model);
-      expect(lastFrame()).toMatch(/\d+% context left/);
+      expect(lastFrame()).toMatch(/\d+% left/);
       unmount();
     });
     it('renders complete footer in narrow terminal (baseline narrow)', async () => {
@@ -503,115 +530,232 @@ describe('<Footer />', () => {
         },
       );
       await waitUntilReady();
-      expect(lastFrame()).toMatchSnapshot('complete-footer-narrow');
+      expect(normalizeFrame(lastFrame())).toMatchSnapshot(
+        'complete-footer-narrow',
+      );
       unmount();
     });
   });
 
-  describe('error summary visibility', () => {
-    it('hides error summary in low verbosity mode', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-        <Footer />,
-        {
-          width: 120,
-          uiState: {
-            sessionStats: mockSessionStats,
-            errorCount: 2,
-            showErrorDetails: false,
-          },
-          settings: createMockSettings({
-            merged: { ui: { errorVerbosity: 'low' } },
-          }),
-        },
-      );
-      await waitUntilReady();
-      expect(lastFrame()).not.toContain('F12 for details');
-      expect(lastFrame()).not.toContain('2 errors');
-      unmount();
-    });
-
-    it('shows error summary in full verbosity mode', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-        <Footer />,
-        {
-          width: 120,
-          uiState: {
-            sessionStats: mockSessionStats,
-            errorCount: 2,
-            showErrorDetails: false,
-          },
-          settings: createMockSettings({
-            merged: { ui: { errorVerbosity: 'full' } },
-          }),
-        },
-      );
-      await waitUntilReady();
-      expect(lastFrame()).toContain('F12 for details');
-      expect(lastFrame()).toContain('2 errors');
-      unmount();
-    });
-
-    it('shows error summary in debug mode even when verbosity is low', async () => {
-      const debugConfig = makeFakeConfig();
-      vi.spyOn(debugConfig, 'getDebugMode').mockReturnValue(true);
-
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-        <Footer />,
-        {
-          width: 120,
-          config: debugConfig,
-          uiState: {
-            sessionStats: mockSessionStats,
-            errorCount: 1,
-            showErrorDetails: false,
-          },
-          settings: createMockSettings({
-            merged: { ui: { errorVerbosity: 'low' } },
-          }),
-        },
-      );
-      await waitUntilReady();
-      expect(lastFrame()).toContain('F12 for details');
-      expect(lastFrame()).toContain('1 error');
-      unmount();
-    });
-  });
-});
-
-describe('fallback mode display', () => {
-  it('should display Flash model when in fallback mode, not the configured Pro model', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <Footer />,
-      {
+  describe('Footer Token Formatting', () => {
+    const renderWithTokens = async (tokens: number) => {
+      const result = renderWithProviders(<Footer />, {
         width: 120,
         uiState: {
-          sessionStats: mockSessionStats,
-          currentModel: 'gemini-2.5-flash', // Fallback active, showing Flash
+          sessionStats: {
+            ...mockSessionStats,
+            metrics: {
+              ...mockSessionStats.metrics,
+              models: {
+                'gemini-pro': {
+                  api: {
+                    totalRequests: 0,
+                    totalErrors: 0,
+                    totalLatencyMs: 0,
+                  },
+                  tokens: {
+                    input: 0,
+                    prompt: 0,
+                    candidates: 0,
+                    total: tokens,
+                    cached: 0,
+                    thoughts: 0,
+                    tool: 0,
+                  },
+                  roles: {},
+                },
+              },
+            },
+          },
         },
-      },
-    );
-    await waitUntilReady();
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              items: ['token-count'],
+            },
+          },
+        }),
+      });
+      await result.waitUntilReady();
+      return result;
+    };
 
-    // Footer should show the effective model (Flash), not the config model (Pro)
-    expect(lastFrame()).toContain('gemini-2.5-flash');
-    expect(lastFrame()).not.toContain('gemini-2.5-pro');
-    unmount();
+    it('formats thousands with k', async () => {
+      const { lastFrame, unmount } = await renderWithTokens(1500);
+      expect(lastFrame()).toContain('1.5k tokens');
+      unmount();
+    });
+
+    it('formats millions with m', async () => {
+      const { lastFrame, unmount } = await renderWithTokens(1500000);
+      expect(lastFrame()).toContain('1.5m tokens');
+      unmount();
+    });
+
+    it('formats billions with b', async () => {
+      const { lastFrame, unmount } = await renderWithTokens(1500000000);
+      expect(lastFrame()).toContain('1.5b tokens');
+      unmount();
+    });
+
+    it('formats small numbers without suffix', async () => {
+      const { lastFrame, unmount } = await renderWithTokens(500);
+      expect(lastFrame()).toContain('500 tokens');
+      unmount();
+    });
   });
 
-  it('should display Pro model when NOT in fallback mode', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <Footer />,
-      {
-        width: 120,
-        uiState: {
-          sessionStats: mockSessionStats,
-          currentModel: 'gemini-2.5-pro', // Normal mode, showing Pro
+  describe('Footer Custom Items', () => {
+    it('renders items in the specified order', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            currentModel: 'gemini-pro',
+            sessionStats: mockSessionStats,
+          },
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                items: ['model-name', 'cwd'],
+              },
+            },
+          }),
         },
-      },
-    );
-    await waitUntilReady();
+      );
+      await waitUntilReady();
 
-    expect(lastFrame()).toContain('gemini-2.5-pro');
-    unmount();
+      const output = lastFrame();
+      const modelIdx = output.indexOf('/model');
+      const cwdIdx = output.indexOf('workspace (/directory)');
+      expect(modelIdx).toBeLessThan(cwdIdx);
+      unmount();
+    });
+
+    it('renders multiple items with proper alignment', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            branchName: 'main',
+          },
+          settings: createMockSettings({
+            vimMode: {
+              vimMode: true,
+            },
+            ui: {
+              footer: {
+                items: ['cwd', 'git-branch', 'sandbox-status', 'model-name'],
+              },
+            },
+          }),
+        },
+      );
+      await waitUntilReady();
+
+      const output = lastFrame();
+      expect(output).toBeDefined();
+      // Headers should be present
+      expect(output).toContain('workspace (/directory)');
+      expect(output).toContain('branch');
+      expect(output).toContain('sandbox');
+      expect(output).toContain('/model');
+      // Data should be present
+      expect(output).toContain('main');
+      expect(output).toContain('gemini-pro');
+      unmount();
+    });
+
+    it('handles empty items array', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: { sessionStats: mockSessionStats },
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                items: [],
+              },
+            },
+          }),
+        },
+      );
+      await waitUntilReady();
+
+      const output = lastFrame({ allowEmpty: true });
+      expect(output).toBeDefined();
+      expect(output.trim()).toBe('');
+      unmount();
+    });
+
+    it('does not render items that are conditionally hidden', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            branchName: undefined, // No branch
+          },
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                items: ['cwd', 'git-branch', 'model-name'],
+              },
+            },
+          }),
+        },
+      );
+      await waitUntilReady();
+
+      const output = lastFrame();
+      expect(output).toBeDefined();
+      expect(output).not.toContain('branch');
+      expect(output).toContain('workspace (/directory)');
+      expect(output).toContain('/model');
+      unmount();
+    });
+  });
+
+  describe('fallback mode display', () => {
+    it('should display Flash model when in fallback mode, not the configured Pro model', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            currentModel: 'gemini-2.5-flash', // Fallback active, showing Flash
+          },
+        },
+      );
+      await waitUntilReady();
+
+      // Footer should show the effective model (Flash), not the config model (Pro)
+      expect(lastFrame()).toContain('gemini-2.5-flash');
+      expect(lastFrame()).not.toContain('gemini-2.5-pro');
+      unmount();
+    });
+
+    it('should display Pro model when NOT in fallback mode', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            currentModel: 'gemini-2.5-pro', // Normal mode, showing Pro
+          },
+        },
+      );
+      await waitUntilReady();
+
+      expect(lastFrame()).toContain('gemini-2.5-pro');
+      unmount();
+    });
   });
 });

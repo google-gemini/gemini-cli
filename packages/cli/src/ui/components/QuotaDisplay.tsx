@@ -18,6 +18,8 @@ interface QuotaDisplayProps {
   limit: number | undefined;
   resetTime?: string;
   terse?: boolean;
+  forceShow?: boolean;
+  lowercase?: boolean;
 }
 
 export const QuotaDisplay: React.FC<QuotaDisplayProps> = ({
@@ -25,6 +27,8 @@ export const QuotaDisplay: React.FC<QuotaDisplayProps> = ({
   limit,
   resetTime,
   terse = false,
+  forceShow = false,
+  lowercase = false,
 }) => {
   if (remaining === undefined || limit === undefined || limit === 0) {
     return null;
@@ -32,7 +36,7 @@ export const QuotaDisplay: React.FC<QuotaDisplayProps> = ({
 
   const percentage = (remaining / limit) * 100;
 
-  if (percentage > QUOTA_THRESHOLD_HIGH) {
+  if (!forceShow && percentage > QUOTA_THRESHOLD_HIGH) {
     return null;
   }
 
@@ -45,20 +49,17 @@ export const QuotaDisplay: React.FC<QuotaDisplayProps> = ({
     !terse && resetTime ? `, ${formatResetTime(resetTime)}` : '';
 
   if (remaining === 0) {
-    return (
-      <Text color={color}>
-        {terse
-          ? 'Limit reached'
-          : `/stats Limit reached${resetInfo}${!terse && '. /auth to continue.'}`}
-      </Text>
-    );
+    let text = terse
+      ? 'Limit reached'
+      : `/stats Limit reached${resetInfo}${!terse && '. /auth to continue.'}`;
+    if (lowercase) text = text.toLowerCase();
+    return <Text color={color}>{text}</Text>;
   }
 
-  return (
-    <Text color={color}>
-      {terse
-        ? `${percentage.toFixed(0)}%`
-        : `/stats ${percentage.toFixed(0)}% usage remaining${resetInfo}`}
-    </Text>
-  );
+  let text = terse
+    ? `${percentage.toFixed(0)}%`
+    : `/stats ${percentage.toFixed(0)}% usage remaining${resetInfo}`;
+  if (lowercase) text = text.toLowerCase();
+
+  return <Text color={color}>{text}</Text>;
 };

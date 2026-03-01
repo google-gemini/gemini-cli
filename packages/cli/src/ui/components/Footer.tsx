@@ -11,6 +11,7 @@ import {
   shortenPath,
   tildeifyPath,
   getDisplayString,
+  checkExhaustive,
 } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
@@ -18,11 +19,142 @@ import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { QuotaDisplay } from './QuotaDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
-import { isDevelopment } from '../../utils/installationInfo.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
+import {
+  ALL_ITEMS,
+  type FooterItemId,
+  deriveItemsFromLegacySettings,
+} from '../../config/footerItems.js';
+
+interface CwdIndicatorProps {
+  targetDir: string;
+  maxWidth: number;
+  debugMode?: boolean;
+  debugMessage?: string;
+  color?: string;
+}
+
+const CwdIndicator: React.FC<CwdIndicatorProps> = ({
+  targetDir,
+  maxWidth,
+  debugMode,
+  debugMessage,
+  color = theme.text.primary,
+}) => {
+  const debugSuffix = debugMode ? ' ' + (debugMessage || '--debug') : '';
+  const availableForPath = Math.max(10, maxWidth - debugSuffix.length);
+  const displayPath = shortenPath(tildeifyPath(targetDir), availableForPath);
+
+  return (
+    <Text color={color}>
+      {displayPath}
+      {debugMode && <Text color={theme.status.error}>{debugSuffix}</Text>}
+    </Text>
+  );
+};
+
+interface SandboxIndicatorProps {
+  isTrustedFolder: boolean | undefined;
+}
+
+const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
+  isTrustedFolder,
+}) => {
+  if (isTrustedFolder === false) {
+    return <Text color={theme.status.warning}>untrusted</Text>;
+  }
+
+  const sandbox = process.env['SANDBOX'];
+  if (sandbox && sandbox !== 'sandbox-exec') {
+    return (
+      <Text color="green">{sandbox.replace(/^gemini-(?:cli-)?/, '')}</Text>
+    );
+  }
+
+  if (sandbox === 'sandbox-exec') {
+    return (
+      <Text color={theme.status.warning}>
+        macOS Seatbelt{' '}
+        <Text color={theme.ui.comment}>
+          ({process.env['SEATBELT_PROFILE']})
+        </Text>
+      </Text>
+    );
+  }
+
+  return <Text color={theme.status.error}>no sandbox</Text>;
+};
+
+const CorgiIndicator: React.FC = () => (
+  <Text>
+    <Text color={theme.status.error}>▼</Text>
+    <Text color={theme.text.primary}>(´</Text>
+    <Text color={theme.status.error}>ᴥ</Text>
+    <Text color={theme.text.primary}>`)</Text>
+    <Text color={theme.status.error}>▼</Text>
+  </Text>
+);
+
+export interface FooterRowItem {
+  key: string;
+  header: string;
+  element: React.ReactNode;
+}
+
+const COLUMN_GAP = 3;
+
+export const FooterRow: React.FC<{
+  items: FooterRowItem[];
+  showLabels: boolean;
+}> = ({ items, showLabels }) => {
+  const elements: React.ReactNode[] = [];
+
+  items.forEach((item, idx) => {
+    if (idx > 0 && !showLabels) {
+      elements.push(
+        <Box key={`sep-${item.key}`}>
+          <Text color={theme.ui.comment}> · </Text>
+        </Box>,
+      );
+    }
+
+    elements.push(
+      <Box key={item.key} flexDirection="column">
+        {showLabels && (
+          <Box>
+            <Text color={theme.ui.comment}>{item.header}</Text>
+          </Box>
+        )}
+        <Box>{item.element}</Box>
+      </Box>,
+    );
+  });
+
+  return (
+    <Box
+      flexDirection="row"
+      flexWrap="wrap"
+      columnGap={showLabels ? COLUMN_GAP : 0}
+    >
+      {elements}
+    </Box>
+  );
+};
+
+function isFooterItemId(id: string): id is FooterItemId {
+  return ALL_ITEMS.some((i) => i.id === id);
+}
+
+interface FooterColumn {
+  id: string;
+  header: string;
+  element: (maxWidth: number) => React.ReactNode;
+  width: number;
+  isHighPriority: boolean;
+}
 
 export const Footer: React.FC = () => {
   const uiState = useUIState();
@@ -58,140 +190,237 @@ export const Footer: React.FC = () => {
     quotaStats: uiState.quota.stats,
   };
 
-  const showMemoryUsage =
-    config.getDebugMode() || settings.merged.ui.showMemoryUsage;
-  const isFullErrorVerbosity = settings.merged.ui.errorVerbosity === 'full';
-  const showErrorSummary =
-    !showErrorDetails && errorCount > 0 && (isFullErrorVerbosity || debugMode);
-  const hideCWD = settings.merged.ui.footer.hideCWD;
-  const hideSandboxStatus = settings.merged.ui.footer.hideSandboxStatus;
-  const hideModelInfo = settings.merged.ui.footer.hideModelInfo;
-  const hideContextPercentage = settings.merged.ui.footer.hideContextPercentage;
-
-  const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
-  const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
-
-  const justifyContent = hideCWD && hideModelInfo ? 'center' : 'space-between';
   const displayVimMode = vimEnabled ? vimMode : undefined;
+  const items =
+    settings.merged.ui.footer.items ??
+    deriveItemsFromLegacySettings(settings.merged);
+  const showLabels = settings.merged.ui.footer.showLabels !== false;
+  const itemColor = showLabels ? theme.text.primary : theme.ui.comment;
 
-  const showDebugProfiler = debugMode || isDevelopment;
+  const potentialColumns: FooterColumn[] = [];
+
+  const addCol = (
+    id: string,
+    header: string,
+    element: (maxWidth: number) => React.ReactNode,
+    dataWidth: number,
+    isHighPriority = false,
+  ) => {
+    potentialColumns.push({
+      id,
+      header: showLabels ? header : '',
+      element,
+      width: Math.max(dataWidth, showLabels ? header.length : 0),
+      isHighPriority,
+    });
+  };
+
+  // 1. System Indicators (Far Left, high priority)
+  if (uiState.showDebugProfiler) {
+    addCol('debug', '', () => <DebugProfiler />, 45, true);
+  }
+  if (displayVimMode) {
+    const vimStr = `[${displayVimMode}]`;
+    addCol(
+      'vim',
+      '',
+      () => <Text color={theme.text.accent}>{vimStr}</Text>,
+      vimStr.length,
+      true,
+    );
+  }
+
+  // 2. Main Configurable Items
+  for (const id of items) {
+    if (!isFooterItemId(id)) continue;
+    const itemConfig = ALL_ITEMS.find((i) => i.id === id);
+    const header = itemConfig?.header ?? id;
+
+    switch (id) {
+      case 'cwd': {
+        const fullPath = tildeifyPath(targetDir);
+        const debugSuffix = debugMode ? ' ' + (debugMessage || '--debug') : '';
+        addCol(
+          id,
+          header,
+          (maxWidth) => (
+            <CwdIndicator
+              targetDir={targetDir}
+              maxWidth={maxWidth}
+              debugMode={debugMode}
+              debugMessage={debugMessage}
+              color={itemColor}
+            />
+          ),
+          fullPath.length + debugSuffix.length,
+        );
+        break;
+      }
+      case 'git-branch': {
+        if (branchName) {
+          addCol(
+            id,
+            header,
+            () => <Text color={itemColor}>{branchName}</Text>,
+            branchName.length,
+          );
+        }
+        break;
+      }
+      case 'sandbox-status': {
+        let str = 'no sandbox';
+        const sandbox = process.env['SANDBOX'];
+        if (isTrustedFolder === false) str = 'untrusted';
+        else if (sandbox === 'sandbox-exec')
+          str = `macOS Seatbelt (${process.env['SEATBELT_PROFILE']})`;
+        else if (sandbox) str = sandbox.replace(/^gemini-(?:cli-)?/, '');
+
+        addCol(
+          id,
+          header,
+          () => <SandboxIndicator isTrustedFolder={isTrustedFolder} />,
+          str.length,
+        );
+        break;
+      }
+      case 'model-name': {
+        const str = getDisplayString(model);
+        addCol(
+          id,
+          header,
+          () => <Text color={itemColor}>{str}</Text>,
+          str.length,
+        );
+        break;
+      }
+      case 'context-remaining': {
+        addCol(
+          id,
+          header,
+          () => (
+            <ContextUsageDisplay
+              promptTokenCount={promptTokenCount}
+              model={model}
+              terminalWidth={terminalWidth}
+              color={itemColor}
+            />
+          ),
+          10, // "100% left" is 9 chars
+        );
+        break;
+      }
+      case 'quota': {
+        if (quotaStats?.remaining !== undefined && quotaStats.limit) {
+          addCol(
+            id,
+            header,
+            () => (
+              <QuotaDisplay
+                remaining={quotaStats.remaining}
+                limit={quotaStats.limit}
+                resetTime={quotaStats.resetTime}
+                terse={true}
+                forceShow={true}
+                lowercase={true}
+              />
+            ),
+            10, // "daily 100%" is 10 chars, but terse is "100%" (4 chars)
+          );
+        }
+        break;
+      }
+      case 'memory-usage': {
+        addCol(id, header, () => <MemoryUsageDisplay color={itemColor} />, 10);
+        break;
+      }
+      case 'session-id': {
+        addCol(
+          id,
+          header,
+          () => (
+            <Text color={itemColor}>
+              {uiState.sessionStats.sessionId.slice(0, 8)}
+            </Text>
+          ),
+          8,
+        );
+        break;
+      }
+      case 'code-changes': {
+        const added = uiState.sessionStats.metrics.files.totalLinesAdded;
+        const removed = uiState.sessionStats.metrics.files.totalLinesRemoved;
+        if (added > 0 || removed > 0) {
+          const str = `+${added} -${removed}`;
+          addCol(
+            id,
+            header,
+            () => (
+              <Text>
+                <Text color={theme.status.success}>+{added}</Text>{' '}
+                <Text color={theme.status.error}>-{removed}</Text>
+              </Text>
+            ),
+            str.length,
+          );
+        }
+        break;
+      }
+      case 'token-count': {
+        let total = 0;
+        for (const m of Object.values(uiState.sessionStats.metrics.models))
+          total += m.tokens.total;
+        if (total > 0) {
+          const formatter = new Intl.NumberFormat('en-US', {
+            notation: 'compact',
+            maximumFractionDigits: 1,
+          });
+          const formatted = formatter.format(total).toLowerCase();
+          addCol(
+            id,
+            header,
+            () => <Text color={itemColor}>{formatted} tokens</Text>,
+            formatted.length + 7,
+          );
+        }
+        break;
+      }
+      default:
+        checkExhaustive(id);
+        break;
+    }
+  }
+
+  // 3. Transients
+  if (corgiMode) addCol('corgi', '', () => <CorgiIndicator />, 5);
+  if (!showErrorDetails && errorCount > 0) {
+    addCol(
+      'error-count',
+      '',
+      () => <ConsoleSummaryDisplay errorCount={errorCount} />,
+      12,
+      true,
+    );
+  }
+
+  // --- Width Fitting Logic ---
+  // Sum up fixed widths to see how much is left for CWD
+  const nonCwdWidth = potentialColumns
+    .filter((c) => c.id !== 'cwd')
+    .reduce((sum, c) => sum + c.width + (showLabels ? COLUMN_GAP : 3), 0);
+  const cwdBudget = Math.max(20, terminalWidth - nonCwdWidth - 4);
+
+  const rowItems: FooterRowItem[] = potentialColumns.map((col) => {
+    const maxWidth = col.id === 'cwd' ? cwdBudget : col.width;
+    return {
+      key: col.id,
+      header: col.header,
+      element: col.element(maxWidth),
+    };
+  });
 
   return (
-    <Box
-      justifyContent={justifyContent}
-      width={terminalWidth}
-      flexDirection="row"
-      alignItems="center"
-      paddingX={1}
-    >
-      {(showDebugProfiler || displayVimMode || !hideCWD) && (
-        <Box>
-          {showDebugProfiler && <DebugProfiler />}
-          {displayVimMode && (
-            <Text color={theme.text.secondary}>[{displayVimMode}] </Text>
-          )}
-          {!hideCWD && (
-            <Text color={theme.text.primary}>
-              {displayPath}
-              {branchName && (
-                <Text color={theme.text.secondary}> ({branchName}*)</Text>
-              )}
-            </Text>
-          )}
-          {debugMode && (
-            <Text color={theme.status.error}>
-              {' ' + (debugMessage || '--debug')}
-            </Text>
-          )}
-        </Box>
-      )}
-
-      {/* Middle Section: Centered Trust/Sandbox Info */}
-      {!hideSandboxStatus && (
-        <Box
-          flexGrow={1}
-          alignItems="center"
-          justifyContent="center"
-          display="flex"
-        >
-          {isTrustedFolder === false ? (
-            <Text color={theme.status.warning}>untrusted</Text>
-          ) : process.env['SANDBOX'] &&
-            process.env['SANDBOX'] !== 'sandbox-exec' ? (
-            <Text color="green">
-              {process.env['SANDBOX'].replace(/^gemini-(?:cli-)?/, '')}
-            </Text>
-          ) : process.env['SANDBOX'] === 'sandbox-exec' ? (
-            <Text color={theme.status.warning}>
-              macOS Seatbelt{' '}
-              <Text color={theme.text.secondary}>
-                ({process.env['SEATBELT_PROFILE']})
-              </Text>
-            </Text>
-          ) : (
-            <Text color={theme.status.error}>
-              no sandbox
-              {terminalWidth >= 100 && (
-                <Text color={theme.text.secondary}> (see /docs)</Text>
-              )}
-            </Text>
-          )}
-        </Box>
-      )}
-
-      {/* Right Section: Gemini Label and Console Summary */}
-      {!hideModelInfo && (
-        <Box alignItems="center" justifyContent="flex-end">
-          <Box alignItems="center">
-            <Text color={theme.text.primary}>
-              <Text color={theme.text.secondary}>/model </Text>
-              {getDisplayString(model)}
-              {!hideContextPercentage && (
-                <>
-                  {' '}
-                  <ContextUsageDisplay
-                    promptTokenCount={promptTokenCount}
-                    model={model}
-                    terminalWidth={terminalWidth}
-                  />
-                </>
-              )}
-              {quotaStats && (
-                <>
-                  {' '}
-                  <QuotaDisplay
-                    remaining={quotaStats.remaining}
-                    limit={quotaStats.limit}
-                    resetTime={quotaStats.resetTime}
-                    terse={true}
-                  />
-                </>
-              )}
-            </Text>
-            {showMemoryUsage && <MemoryUsageDisplay />}
-          </Box>
-          <Box alignItems="center">
-            {corgiMode && (
-              <Box paddingLeft={1} flexDirection="row">
-                <Text>
-                  <Text color={theme.ui.symbol}>| </Text>
-                  <Text color={theme.status.error}>▼</Text>
-                  <Text color={theme.text.primary}>(´</Text>
-                  <Text color={theme.status.error}>ᴥ</Text>
-                  <Text color={theme.text.primary}>`)</Text>
-                  <Text color={theme.status.error}>▼</Text>
-                </Text>
-              </Box>
-            )}
-            {showErrorSummary && (
-              <Box paddingLeft={1} flexDirection="row">
-                <Text color={theme.ui.comment}>| </Text>
-                <ConsoleSummaryDisplay errorCount={errorCount} />
-              </Box>
-            )}
-          </Box>
-        </Box>
-      )}
+    <Box width={terminalWidth} paddingX={1} overflow="hidden" flexWrap="wrap">
+      <FooterRow items={rowItems} showLabels={showLabels} />
     </Box>
   );
 };
