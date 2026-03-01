@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { FileSearchFactory, AbortError, filter } from './fileSearch.js';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import * as crawler from './crawler.js';
-import { coreEvents } from '../events.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../../config/constants.js';
 import { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
 
@@ -559,12 +558,19 @@ describe('FileSearch', () => {
   });
 
   describe('truncation warning', () => {
-    beforeEach(() => {
-      vi.resetModules();
-    });
-
     it('should detect truncation and emit a warning when maxFiles is hit', async () => {
-      const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+      // Reset modules so hasWarnedTruncation starts as false regardless of test order.
+      // Both fileSearch and events must be re-imported after the reset so that
+      // the spy targets the same coreEvents instance that the fresh module uses.
+      vi.resetModules();
+      const [
+        { FileSearchFactory: FreshFileSearchFactory },
+        { coreEvents: freshCoreEvents },
+      ] = await Promise.all([
+        import('./fileSearch.js'),
+        import('../events.js'),
+      ]);
+      const emitFeedbackSpy = vi.spyOn(freshCoreEvents, 'emitFeedback');
 
       const largeDir: Record<string, string> = {};
       for (let i = 0; i < 10; i++) {
@@ -572,7 +578,7 @@ describe('FileSearch', () => {
       }
       tmpDir = await createTmpDir(largeDir);
 
-      const fileSearch = FileSearchFactory.create({
+      const fileSearch = FreshFileSearchFactory.create({
         projectRoot: tmpDir,
         fileDiscoveryService: new FileDiscoveryService(tmpDir, {
           respectGitIgnore: false,
