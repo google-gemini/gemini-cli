@@ -304,7 +304,18 @@ export class ShellExecutionService {
       const isWindows = os.platform() === 'win32';
       const { executable, argsPrefix, shell } = getShellConfiguration();
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const spawnArgs = [...argsPrefix, guardedCommand];
+
+      // Force PowerShell on Windows to use UTF-8 encoding.
+      // Without this, multibyte characters (e.g., Japanese, Chinese) appear garbled.
+      const isPowerShell =
+        isWindows &&
+        (executable.toLowerCase().includes('powershell') ||
+          executable.toLowerCase().includes('pwsh'));
+      const finalCommand = isPowerShell
+        ? `$OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${guardedCommand}`
+        : guardedCommand;
+
+      const spawnArgs = [...argsPrefix, finalCommand];
 
       const child = cpSpawn(executable, spawnArgs, {
         cwd,
@@ -566,7 +577,20 @@ export class ShellExecutionService {
       }
 
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const args = [...argsPrefix, guardedCommand];
+
+      // Force PowerShell on Windows to use UTF-8 encoding.
+      // Without this, multibyte characters (e.g., Japanese, Chinese) appear garbled.
+      const isWindows = process.platform === 'win32';
+      const isPowerShell =
+        isWindows &&
+        (executable.toLowerCase().includes('powershell') ||
+          executable.toLowerCase().includes('pwsh'));
+
+      const finalCommand = isPowerShell
+        ? `$OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${guardedCommand}`
+        : guardedCommand;
+
+      const args = [...argsPrefix, finalCommand];
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(executable, args, {
