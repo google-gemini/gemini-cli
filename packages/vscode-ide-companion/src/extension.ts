@@ -14,6 +14,7 @@ import {
   IDE_DEFINITIONS,
   type IdeInfo,
 } from '@google/gemini-cli-core/src/ide/detect-ide.js';
+import { CustomCommandManager } from './custom-command-manager.js';
 
 const CLI_IDE_COMPANION_IDENTIFIER = 'Google.gemini-cli-vscode-ide-companion';
 const INFO_MESSAGE_SHOWN_KEY = 'geminiCliInfoMessageShown';
@@ -29,6 +30,7 @@ const MANAGED_EXTENSION_SURFACES: ReadonlySet<IdeInfo['name']> = new Set([
 
 let ideServer: IDEServer;
 let logger: vscode.OutputChannel;
+let customCommandManager: CustomCommandManager;
 
 let log: (message: string) => void = () => {};
 
@@ -163,6 +165,15 @@ export async function activate(context: vscode.ExtensionContext) {
     log(`Failed to start IDE server: ${message}`);
   }
 
+  // Initialize custom command manager
+  customCommandManager = new CustomCommandManager(log);
+  try {
+    await customCommandManager.initialize(context);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log(`Failed to initialize custom commands: ${message}`);
+  }
+
   if (
     !context.globalState.get(INFO_MESSAGE_SHOWN_KEY) &&
     !isManagedExtensionSurface
@@ -223,6 +234,9 @@ export async function activate(context: vscode.ExtensionContext) {
 export async function deactivate(): Promise<void> {
   log('Extension deactivated');
   try {
+    if (customCommandManager) {
+      customCommandManager.dispose();
+    }
     if (ideServer) {
       await ideServer.stop();
     }
