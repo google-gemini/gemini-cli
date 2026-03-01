@@ -166,6 +166,8 @@ export async function loadConfig(
 
   // Needed to initialize ToolRegistry, and git checkpointing if enabled
   await config.initialize();
+
+  await config.waitForMcpInit();
   startupProfiler.flush(config);
 
   await refreshAuthentication(config, adcFilePath, 'Config');
