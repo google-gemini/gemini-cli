@@ -140,6 +140,13 @@ describe('computeSessionStats', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     };
 
     const result = computeSessionStats(metrics);
@@ -191,6 +198,13 @@ describe('computeSessionStats', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     };
 
     const result = computeSessionStats(metrics);
@@ -231,6 +245,13 @@ describe('computeSessionStats', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     };
 
     const result = computeSessionStats(metrics);
@@ -252,6 +273,13 @@ describe('computeSessionStats', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+      },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
       },
     };
 
@@ -275,6 +303,13 @@ describe('computeSessionStats', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+      },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
       },
     };
 
@@ -301,6 +336,13 @@ describe('computeSessionStats', () => {
       files: {
         totalLinesAdded: 42,
         totalLinesRemoved: 18,
+      },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
       },
     };
 

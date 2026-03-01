@@ -270,6 +270,13 @@ describe('StreamJsonFormatter', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     });
 
     it('should aggregate token counts from single model', () => {
@@ -440,6 +447,13 @@ describe('StreamJsonFormatter', () => {
           totalLinesAdded: 0,
           totalLinesRemoved: 0,
         },
+        prompts: {
+          count: 0,
+          totalWallClockMs: 0,
+          minMs: Infinity,
+          maxMs: 0,
+          lastMs: 0,
+        },
       };
 
       const result = formatter.convertToStreamStats(metrics, 1000);
@@ -466,6 +480,13 @@ describe('StreamJsonFormatter', () => {
         files: {
           totalLinesAdded: 0,
           totalLinesRemoved: 0,
+        },
+        prompts: {
+          count: 0,
+          totalWallClockMs: 0,
+          minMs: Infinity,
+          maxMs: 0,
+          lastMs: 0,
         },
       };
 

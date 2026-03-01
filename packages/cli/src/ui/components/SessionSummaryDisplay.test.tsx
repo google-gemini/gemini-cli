@@ -80,6 +80,13 @@ describe('<SessionSummaryDisplay />', () => {
         totalLinesAdded: 42,
         totalLinesRemoved: 15,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     };
 
     const { lastFrame, unmount } = await renderWithMockedStats(metrics);
