@@ -99,7 +99,7 @@ describe('mcp remove command', () => {
 
       expect(mockSetValue).not.toHaveBeenCalled();
       expect(debugLogSpy).toHaveBeenCalledWith(
-        'Server "non-existent-server" not found in project settings.',
+        'Server "non-existent-server" not found in workspace settings.',
       );
       debugLogSpy.mockRestore();
     });
@@ -159,7 +159,7 @@ describe('mcp remove command', () => {
       expect(updatedContent).not.toContain('"server-to-remove"');
 
       expect(debugLogSpy).toHaveBeenCalledWith(
-        'Server "server-to-remove" removed from project settings.',
+        'Server "server-to-remove" removed from workspace settings.',
       );
 
       debugLogSpy.mockRestore();

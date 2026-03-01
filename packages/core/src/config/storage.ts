@@ -158,10 +158,15 @@ export class Storage {
     return path.join(this.targetDir, AGENTS_DIR_NAME);
   }
 
-  getProjectTempDir(): string {
+  getWorkspaceTempDir(): string {
     const identifier = this.getProjectIdentifier();
     const tempDir = Storage.getGlobalTempDir();
     return path.join(tempDir, identifier);
+  }
+
+  /** @deprecated Use getWorkspaceTempDir instead */
+  getProjectTempDir(): string {
+    return this.getWorkspaceTempDir();
   }
 
   getWorkspacePoliciesDir(): string {
@@ -172,16 +177,26 @@ export class Storage {
     return path.join(Storage.getUserPoliciesDir(), AUTO_SAVED_POLICY_FILENAME);
   }
 
+  ensureWorkspaceTempDirExists(): void {
+    fs.mkdirSync(this.getWorkspaceTempDir(), { recursive: true });
+  }
+
+  /** @deprecated Use ensureWorkspaceTempDirExists instead */
   ensureProjectTempDirExists(): void {
-    fs.mkdirSync(this.getProjectTempDir(), { recursive: true });
+    this.ensureWorkspaceTempDirExists();
   }
 
   static getOAuthCredsPath(): string {
     return path.join(Storage.getGlobalGeminiDir(), OAUTH_FILE);
   }
 
-  getProjectRoot(): string {
+  getWorkspaceRoot(): string {
     return this.targetDir;
+  }
+
+  /** @deprecated Use getWorkspaceRoot instead */
+  getProjectRoot(): string {
+    return this.getWorkspaceRoot();
   }
 
   private getFilePathHash(filePath: string): string {
@@ -255,72 +270,117 @@ export class Storage {
     return path.join(this.getGeminiDir(), 'settings.json');
   }
 
-  getProjectCommandsDir(): string {
+  getWorkspaceCommandsDir(): string {
     return path.join(this.getGeminiDir(), 'commands');
   }
 
-  getProjectSkillsDir(): string {
+  /** @deprecated Use getWorkspaceCommandsDir instead */
+  getProjectCommandsDir(): string {
+    return this.getWorkspaceCommandsDir();
+  }
+
+  getWorkspaceSkillsDir(): string {
     return path.join(this.getGeminiDir(), 'skills');
   }
 
-  getProjectAgentSkillsDir(): string {
+  /** @deprecated Use getWorkspaceSkillsDir instead */
+  getProjectSkillsDir(): string {
+    return this.getWorkspaceSkillsDir();
+  }
+
+  getWorkspaceAgentSkillsDir(): string {
     return path.join(this.getAgentsDir(), 'skills');
   }
 
-  getProjectAgentsDir(): string {
+  /** @deprecated Use getWorkspaceAgentSkillsDir instead */
+  getProjectAgentSkillsDir(): string {
+    return this.getWorkspaceAgentSkillsDir();
+  }
+
+  getWorkspaceAgentsDir(): string {
     return path.join(this.getGeminiDir(), 'agents');
   }
 
+  /** @deprecated Use getWorkspaceAgentsDir instead */
+  getProjectAgentsDir(): string {
+    return this.getWorkspaceAgentsDir();
+  }
+
+  getWorkspaceTempCheckpointsDir(): string {
+    return path.join(this.getWorkspaceTempDir(), 'checkpoints');
+  }
+
+  /** @deprecated Use getWorkspaceTempCheckpointsDir instead */
   getProjectTempCheckpointsDir(): string {
-    return path.join(this.getProjectTempDir(), 'checkpoints');
+    return this.getWorkspaceTempCheckpointsDir();
   }
 
+  getWorkspaceTempLogsDir(): string {
+    return path.join(this.getWorkspaceTempDir(), 'logs');
+  }
+
+  /** @deprecated Use getWorkspaceTempLogsDir instead */
   getProjectTempLogsDir(): string {
-    return path.join(this.getProjectTempDir(), 'logs');
+    return this.getWorkspaceTempLogsDir();
   }
 
-  getProjectTempPlansDir(): string {
+  getWorkspaceTempPlansDir(): string {
     if (this.sessionId) {
-      return path.join(this.getProjectTempDir(), this.sessionId, 'plans');
+      return path.join(this.getWorkspaceTempDir(), this.sessionId, 'plans');
     }
-    return path.join(this.getProjectTempDir(), 'plans');
+    return path.join(this.getWorkspaceTempDir(), 'plans');
   }
 
+  /** @deprecated Use getWorkspaceTempPlansDir instead */
+  getProjectTempPlansDir(): string {
+    return this.getWorkspaceTempPlansDir();
+  }
+
+  getWorkspaceTempTrackerDir(): string {
+    return path.join(this.getWorkspaceTempDir(), 'tracker');
+  }
+
+  /** @deprecated Use getWorkspaceTempTrackerDir instead */
   getProjectTempTrackerDir(): string {
-    return path.join(this.getProjectTempDir(), 'tracker');
+    return this.getWorkspaceTempTrackerDir();
   }
 
   getPlansDir(): string {
     if (this.customPlansDir) {
       const resolvedPath = path.resolve(
-        this.getProjectRoot(),
+        this.getWorkspaceRoot(),
         this.customPlansDir,
       );
-      const realProjectRoot = resolveToRealPath(this.getProjectRoot());
+      const realWorkspaceRoot = resolveToRealPath(this.getWorkspaceRoot());
       const realResolvedPath = resolveToRealPath(resolvedPath);
 
-      if (!isSubpath(realProjectRoot, realResolvedPath)) {
+      if (!isSubpath(realWorkspaceRoot, realResolvedPath)) {
         throw new Error(
-          `Custom plans directory '${this.customPlansDir}' resolves to '${realResolvedPath}', which is outside the project root '${realProjectRoot}'.`,
+          `Custom plans directory '${this.customPlansDir}' resolves to '${realResolvedPath}', which is outside the workspace root '${realWorkspaceRoot}'.`,
         );
       }
 
       return resolvedPath;
     }
-    return this.getProjectTempPlansDir();
+    return this.getWorkspaceTempPlansDir();
   }
 
-  getProjectTempTasksDir(): string {
+  getWorkspaceTempTasksDir(): string {
     if (this.sessionId) {
-      return path.join(this.getProjectTempDir(), this.sessionId, 'tasks');
+      return path.join(this.getWorkspaceTempDir(), this.sessionId, 'tasks');
     }
-    return path.join(this.getProjectTempDir(), 'tasks');
+    return path.join(this.getWorkspaceTempDir(), 'tasks');
   }
 
-  async listProjectChatFiles(): Promise<
+  /** @deprecated Use getWorkspaceTempTasksDir instead */
+  getProjectTempTasksDir(): string {
+    return this.getWorkspaceTempTasksDir();
+  }
+
+  async listWorkspaceChatFiles(): Promise<
     Array<{ filePath: string; lastUpdated: string }>
   > {
-    const chatsDir = path.join(this.getProjectTempDir(), 'chats');
+    const chatsDir = path.join(this.getWorkspaceTempDir(), 'chats');
     try {
       const files = await fs.promises.readdir(chatsDir);
       const jsonFiles = files.filter((f) => f.endsWith('.json'));
@@ -354,8 +414,15 @@ export class Storage {
     }
   }
 
-  async loadProjectTempFile<T>(filePath: string): Promise<T | null> {
-    const absolutePath = path.join(this.getProjectTempDir(), filePath);
+  /** @deprecated Use listWorkspaceChatFiles instead */
+  async listProjectChatFiles(): Promise<
+    Array<{ filePath: string; lastUpdated: string }>
+  > {
+    return this.listWorkspaceChatFiles();
+  }
+
+  async loadWorkspaceTempFile<T>(filePath: string): Promise<T | null> {
+    const absolutePath = path.join(this.getWorkspaceTempDir(), filePath);
     try {
       const content = await fs.promises.readFile(absolutePath, 'utf8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -374,6 +441,11 @@ export class Storage {
     }
   }
 
+  /** @deprecated Use loadWorkspaceTempFile instead */
+  async loadProjectTempFile<T>(filePath: string): Promise<T | null> {
+    return this.loadWorkspaceTempFile(filePath);
+  }
+
   getExtensionsDir(): string {
     return path.join(this.getGeminiDir(), 'extensions');
   }
@@ -383,6 +455,6 @@ export class Storage {
   }
 
   getHistoryFilePath(): string {
-    return path.join(this.getProjectTempDir(), 'shell_history');
+    return path.join(this.getWorkspaceTempDir(), 'shell_history');
   }
 }

@@ -1646,7 +1646,7 @@ describe('runNonInteractive', () => {
         startTime: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
         firstUserMessage: 'Previous message',
-        projectHash: 'test-hash',
+        workspaceHash: 'test-hash',
       },
       filePath: '/path/to/session.json',
     };

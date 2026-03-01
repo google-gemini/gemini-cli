@@ -25,12 +25,12 @@ export async function listSessions(config: Config): Promise<void> {
   const sessions = await sessionSelector.listSessions();
 
   if (sessions.length === 0) {
-    writeToStdout('No previous sessions found for this project.');
+    writeToStdout('No previous sessions found for this workspace.');
     return;
   }
 
   writeToStdout(
-    `\nAvailable sessions for this project (${sessions.length}):\n`,
+    `\nAvailable sessions for this workspace (${sessions.length}):\n`,
   );
 
   sessions
@@ -59,7 +59,7 @@ export async function deleteSession(
   const sessions = await sessionSelector.listSessions();
 
   if (sessions.length === 0) {
-    writeToStderr('No sessions found for this project.');
+    writeToStderr('No sessions found for this workspace.');
     return;
   }
 

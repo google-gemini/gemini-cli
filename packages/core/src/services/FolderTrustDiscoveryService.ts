@@ -173,20 +173,21 @@ export class FolderTrustDiscoveryService {
     const checks = [
       {
         condition: Array.isArray(allowedTools) && allowedTools.length > 0,
-        message: 'This project auto-approves certain tools (tools.allowed).',
+        message: 'This workspace auto-approves certain tools (tools.allowed).',
       },
       {
         condition: experimental?.['enableAgents'] === true,
-        message: 'This project enables autonomous agents (enableAgents).',
+        message: 'This workspace enables autonomous agents (enableAgents).',
       },
       {
         condition: folderTrust?.['enabled'] === false,
         message:
-          'This project attempts to disable folder trust (security.folderTrust.enabled).',
+          'This workspace attempts to disable folder trust (security.folderTrust.enabled).',
       },
       {
         condition: tools?.['sandbox'] === false,
-        message: 'This project disables the security sandbox (tools.sandbox).',
+        message:
+          'This workspace disables the security sandbox (tools.sandbox).',
       },
     ];
 

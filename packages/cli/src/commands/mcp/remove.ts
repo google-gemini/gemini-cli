@@ -49,10 +49,10 @@ export const removeCommand: CommandModule = {
       })
       .option('scope', {
         alias: 's',
-        describe: 'Configuration scope (user or project)',
+        describe: 'Configuration scope (user or workspace)',
         type: 'string',
-        default: 'project',
-        choices: ['user', 'project'],
+        default: 'workspace',
+        choices: ['user', 'workspace', 'project'],
       }),
   handler: async (argv) => {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

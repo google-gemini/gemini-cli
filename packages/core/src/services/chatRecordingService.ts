@@ -7,7 +7,7 @@
 import { type Config } from '../config/config.js';
 import { type Status } from '../core/coreToolScheduler.js';
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
-import { getProjectHash } from '../utils/paths.js';
+import { getWorkspaceHash } from '../utils/paths.js';
 import { sanitizeFilenamePart } from '../utils/fileUtils.js';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -95,7 +95,7 @@ export type MessageRecord = BaseMessageRecord & ConversationRecordExtra;
  */
 export interface ConversationRecord {
   sessionId: string;
-  projectHash: string;
+  workspaceHash: string;
   startTime: string;
   lastUpdated: string;
   messages: MessageRecord[];
@@ -123,13 +123,13 @@ export interface ResumedSessionData {
  * - Token usage statistics
  * - Assistant thoughts and reasoning
  *
- * Sessions are stored as JSON files in ~/.gemini/tmp/<project_hash>/chats/
+ * Sessions are stored as JSON files in ~/.gemini/tmp/<workspace_hash>/chats/
  */
 export class ChatRecordingService {
   private conversationFile: string | null = null;
   private cachedLastConvData: string | null = null;
   private sessionId: string;
-  private projectHash: string;
+  private workspaceHash: string;
   private kind?: 'main' | 'subagent';
   private queuedThoughts: Array<ThoughtSummary & { timestamp: string }> = [];
   private queuedTokens: TokensSummary | null = null;
@@ -138,7 +138,9 @@ export class ChatRecordingService {
   constructor(config: Config) {
     this.config = config;
     this.sessionId = config.getSessionId();
-    this.projectHash = getProjectHash(config.getProjectRoot());
+    this.workspaceHash = getWorkspaceHash(
+      config.getWorkspaceContext().targetDir,
+    );
   }
 
   /**
@@ -170,7 +172,7 @@ export class ChatRecordingService {
       } else {
         // Create new session
         const chatsDir = path.join(
-          this.config.storage.getProjectTempDir(),
+          this.config.storage.getWorkspaceTempDir(),
           'chats',
         );
         fs.mkdirSync(chatsDir, { recursive: true });
@@ -187,7 +189,7 @@ export class ChatRecordingService {
 
         this.writeConversation({
           sessionId: this.sessionId,
-          projectHash: this.projectHash,
+          workspaceHash: this.workspaceHash,
           startTime: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),
           messages: [],
@@ -443,7 +445,7 @@ export class ChatRecordingService {
       // Placeholder empty conversation if file doesn't exist.
       return {
         sessionId: this.sessionId,
-        projectHash: this.projectHash,
+        workspaceHash: this.workspaceHash,
         startTime: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
         messages: [],
@@ -562,7 +564,7 @@ export class ChatRecordingService {
    */
   deleteSession(sessionId: string): void {
     try {
-      const tempDir = this.config.storage.getProjectTempDir();
+      const tempDir = this.config.storage.getWorkspaceTempDir();
       const chatsDir = path.join(tempDir, 'chats');
       const sessionPath = path.join(chatsDir, `${sessionId}.json`);
       if (fs.existsSync(sessionPath)) {

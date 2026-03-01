@@ -554,6 +554,8 @@ export interface ConfigParameters {
   experiments?: Experiments;
   hooks?: { [K in HookEventName]?: HookDefinition[] };
   disabledHooks?: string[];
+  workspaceHooks?: { [K in HookEventName]?: HookDefinition[] };
+  /** @deprecated Use workspaceHooks instead */
   projectHooks?: { [K in HookEventName]?: HookDefinition[] };
   enableAgents?: boolean;
   enableEventDrivenScheduler?: boolean;
@@ -745,7 +747,7 @@ export class Config implements McpContext {
   private readonly enableHooksUI: boolean;
   private readonly toolOutputMasking: ToolOutputMaskingConfig;
   private hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
-  private projectHooks:
+  private workspaceHooks:
     | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
     | undefined;
   private disabledHooks: string[];
@@ -1004,8 +1006,11 @@ export class Config implements McpContext {
     if (params.hooks) {
       this.hooks = params.hooks;
     }
+    if (params.workspaceHooks) {
+      this.workspaceHooks = params.workspaceHooks;
+    }
     if (params.projectHooks) {
-      this.projectHooks = params.projectHooks;
+      this.workspaceHooks = params.projectHooks;
     }
 
     this.experiments = params.experiments;
@@ -1550,8 +1555,13 @@ export class Config implements McpContext {
     return this.targetDir;
   }
 
-  getProjectRoot(): string {
+  getWorkspaceRoot(): string {
     return this.targetDir;
+  }
+
+  /** @deprecated Use getWorkspaceRoot instead */
+  getProjectRoot(): string {
+    return this.getWorkspaceRoot();
   }
 
   getWorkspaceContext(): WorkspaceContext {
@@ -1824,7 +1834,7 @@ export class Config implements McpContext {
       return {
         global: this.contextManager.getGlobalMemory(),
         extension: this.contextManager.getExtensionMemory(),
-        project: this.contextManager.getEnvironmentMemory(),
+        workspace: this.contextManager.getEnvironmentMemory(),
       };
     }
     return this.userMemory;
@@ -2413,8 +2423,8 @@ export class Config implements McpContext {
     }
 
     const workspaceDirs = this.getWorkspaceContext().getDirectories();
-    const projectTempDir = this.storage.getProjectTempDir();
-    return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+    const workspaceTempDir = this.storage.getWorkspaceTempDir();
+    return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the workspace temp directory: ${workspaceTempDir}`;
   }
 
   /**
@@ -2896,10 +2906,15 @@ export class Config implements McpContext {
   }
 
   /**
-   * Get project-specific hooks configuration
+   * Get workspace-specific hooks configuration
    */
+  getWorkspaceHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
+    return this.workspaceHooks;
+  }
+
+  /** @deprecated Use getWorkspaceHooks instead */
   getProjectHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
-    return this.projectHooks;
+    return this.getWorkspaceHooks();
   }
 
   /**

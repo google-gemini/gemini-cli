@@ -242,7 +242,7 @@ export async function parseArguments(
         .option('list-sessions', {
           type: 'boolean',
           description:
-            'List available sessions for the current project and exit.',
+            'List available sessions for the current workspace and exit.',
         })
         .option('delete-session', {
           type: 'string',

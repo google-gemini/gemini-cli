@@ -39,7 +39,7 @@ export async function* performRestore<
       yield {
         type: 'message',
         messageType: 'info',
-        content: 'Restored project to the state before the tool call.',
+        content: 'Restored workspace to the state before the tool call.',
       };
     } catch (e) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

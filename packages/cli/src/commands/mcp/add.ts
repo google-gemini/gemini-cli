@@ -41,7 +41,7 @@ async function addMcpServer(
   const settings = loadSettings(process.cwd());
   const inHome = settings.workspace.path === settings.user.path;
 
-  if (scope === 'project' && inHome) {
+  if ((scope === 'workspace' || scope === 'project') && inHome) {
     debugLogger.error(
       'Error: Please use --scope user to edit settings in the home directory.',
     );
@@ -159,10 +159,10 @@ export const addCommand: CommandModule = {
       })
       .option('scope', {
         alias: 's',
-        describe: 'Configuration scope (user or project)',
+        describe: 'Configuration scope (user or workspace)',
         type: 'string',
-        default: 'project',
-        choices: ['user', 'project'],
+        default: 'workspace',
+        choices: ['user', 'workspace', 'project'],
       })
       .option('transport', {
         alias: ['t', 'type'],

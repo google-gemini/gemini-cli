@@ -4,7 +4,7 @@ exports[`NewAgentsNotification > renders agent list 1`] = `
 " ╭────────────────────────────────────────────────────────────────────────────────────────────────╮
  │                                                                                                │
  │ New Agents Discovered                                                                          │
- │ The following agents were found in this project. Please review them:                           │
+ │ The following agents were found in this workspace. Please review them:                         │
  │                                                                                                │
  │ ┌────────────────────────────────────────────────────────────────────────────────────────────┐ │
  │ │                                                                                            │ │
@@ -24,7 +24,7 @@ exports[`NewAgentsNotification > truncates list if more than 5 agents 1`] = `
 " ╭────────────────────────────────────────────────────────────────────────────────────────────────╮
  │                                                                                                │
  │ New Agents Discovered                                                                          │
- │ The following agents were found in this project. Please review them:                           │
+ │ The following agents were found in this workspace. Please review them:                         │
  │                                                                                                │
  │ ┌────────────────────────────────────────────────────────────────────────────────────────────┐ │
  │ │                                                                                            │ │

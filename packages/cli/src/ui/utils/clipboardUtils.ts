@@ -245,22 +245,22 @@ const saveFileWithXclip = async (tempFilePath: string) => {
 };
 
 /**
- * Gets the directory where clipboard images should be stored for a specific project.
+ * Gets the directory where clipboard images should be stored for a specific workspace.
  *
- * This uses the global temporary directory but creates a project-specific subdirectory
- * based on the hash of the project path (via `Storage.getProjectTempDir()`).
- * This prevents path conflicts between different projects while keeping the images
- * outside of the user's project directory.
+ * This uses the global temporary directory but creates a workspace-specific subdirectory
+ * based on the hash of the workspace path (via `Storage.getProjectTempDir()`).
+ * This prevents path conflicts between different workspaces while keeping the images
+ * outside of the user's workspace directory.
  *
- * @param targetDir The root directory of the current project.
+ * @param targetDir The root directory of the current workspace.
  * @returns The absolute path to the images directory.
  */
-async function getProjectClipboardImagesDir(
+async function getWorkspaceClipboardImagesDir(
   targetDir: string,
 ): Promise<string> {
   const storage = new Storage(targetDir);
   await storage.initialize();
-  const baseDir = storage.getProjectTempDir();
+  const baseDir = storage.getWorkspaceTempDir();
   return path.join(baseDir, 'images');
 }
 
@@ -273,7 +273,7 @@ export async function saveClipboardImage(
   targetDir: string,
 ): Promise<string | null> {
   try {
-    const tempDir = await getProjectClipboardImagesDir(targetDir);
+    const tempDir = await getWorkspaceClipboardImagesDir(targetDir);
     await fs.mkdir(tempDir, { recursive: true });
 
     // Generate a unique filename with timestamp
@@ -398,7 +398,7 @@ export async function cleanupOldClipboardImages(
   targetDir: string,
 ): Promise<void> {
   try {
-    const tempDir = await getProjectClipboardImagesDir(targetDir);
+    const tempDir = await getWorkspaceClipboardImagesDir(targetDir);
     const files = await fs.readdir(tempDir);
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
 

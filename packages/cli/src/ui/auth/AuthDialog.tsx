@@ -222,7 +222,7 @@ export function AuthDialog({
         </Text>
         <Box marginTop={1}>
           <Text color={theme.text.primary}>
-            How would you like to authenticate for this project?
+            How would you like to authenticate for this workspace?
           </Text>
         </Box>
         <Box marginTop={1}>

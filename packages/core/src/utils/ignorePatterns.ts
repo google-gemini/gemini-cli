@@ -10,7 +10,7 @@ import { getCurrentGeminiMdFilename } from '../tools/memoryTool.js';
 
 /**
  * Common ignore patterns used across multiple tools for basic exclusions.
- * These are the most commonly ignored directories in development projects.
+ * These are the most commonly ignored directories in development workspaces.
  */
 export const COMMON_IGNORE_PATTERNS: string[] = [
   '**/node_modules/**',
@@ -65,7 +65,7 @@ export const MEDIA_FILE_PATTERNS: string[] = [
 ];
 
 /**
- * Common directory patterns that are typically ignored in development projects.
+ * Common directory patterns that are typically ignored in development workspaces.
  */
 export const COMMON_DIRECTORY_EXCLUDES: string[] = [
   '**/.vscode/**',

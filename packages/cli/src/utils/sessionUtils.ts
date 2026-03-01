@@ -50,7 +50,7 @@ export class SessionError extends Error {
   static noSessionsFound(): SessionError {
     return new SessionError(
       'NO_SESSIONS_FOUND',
-      'No previous sessions found for this project.',
+      'No previous sessions found for this workspace.',
     );
   }
 
@@ -463,7 +463,7 @@ export class SessionSelector {
       const sessions = await this.listSessions();
 
       if (sessions.length === 0) {
-        throw new Error('No previous sessions found for this project.');
+        throw new Error('No previous sessions found for this workspace.');
       }
 
       // Sort by startTime (oldest first, so newest sessions get highest numbers)

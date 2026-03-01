@@ -78,7 +78,7 @@ describe('useSessionResume', () => {
       const resumedData: ResumedSessionData = {
         conversation: {
           sessionId: 'test-123',
-          projectHash: 'project-123',
+          workspaceHash: 'project-123',
           startTime: '2025-01-01T00:00:00Z',
           lastUpdated: '2025-01-01T01:00:00Z',
           messages: [] as MessageRecord[],
@@ -133,7 +133,7 @@ describe('useSessionResume', () => {
       const resumedData: ResumedSessionData = {
         conversation: {
           sessionId: 'test-123',
-          projectHash: 'project-123',
+          workspaceHash: 'project-123',
           startTime: '2025-01-01T00:00:00Z',
           lastUpdated: '2025-01-01T01:00:00Z',
           messages: [] as MessageRecord[],
@@ -160,7 +160,7 @@ describe('useSessionResume', () => {
       const resumedData: ResumedSessionData = {
         conversation: {
           sessionId: 'test-123',
-          projectHash: 'project-123',
+          workspaceHash: 'project-123',
           startTime: '2025-01-01T00:00:00Z',
           lastUpdated: '2025-01-01T01:00:00Z',
           messages: [] as MessageRecord[],
@@ -200,7 +200,7 @@ describe('useSessionResume', () => {
       const resumedData: ResumedSessionData = {
         conversation: {
           sessionId: 'test-123',
-          projectHash: 'project-123',
+          workspaceHash: 'project-123',
           startTime: '2025-01-01T00:00:00Z',
           lastUpdated: '2025-01-01T01:00:00Z',
           messages: [] as MessageRecord[],
@@ -240,7 +240,7 @@ describe('useSessionResume', () => {
       const resumedData: ResumedSessionData = {
         conversation: {
           sessionId: 'test-123',
-          projectHash: 'project-123',
+          workspaceHash: 'project-123',
           startTime: '2025-01-01T00:00:00Z',
           lastUpdated: '2025-01-01T01:00:00Z',
           messages: [] as MessageRecord[],
@@ -306,7 +306,7 @@ describe('useSessionResume', () => {
     it('should not resume when user is authenticating', () => {
       const conversation: ConversationRecord = {
         sessionId: 'auto-resume-123',
-        projectHash: 'project-123',
+        workspaceHash: 'project-123',
         startTime: '2025-01-01T00:00:00Z',
         lastUpdated: '2025-01-01T01:00:00Z',
         messages: [
@@ -338,7 +338,7 @@ describe('useSessionResume', () => {
     it('should not resume when Gemini client is not initialized', () => {
       const conversation: ConversationRecord = {
         sessionId: 'auto-resume-123',
-        projectHash: 'project-123',
+        workspaceHash: 'project-123',
         startTime: '2025-01-01T00:00:00Z',
         lastUpdated: '2025-01-01T01:00:00Z',
         messages: [
@@ -370,7 +370,7 @@ describe('useSessionResume', () => {
     it('should automatically resume session when resumedSessionData is provided', async () => {
       const conversation: ConversationRecord = {
         sessionId: 'auto-resume-123',
-        projectHash: 'project-123',
+        workspaceHash: 'project-123',
         startTime: '2025-01-01T00:00:00Z',
         lastUpdated: '2025-01-01T01:00:00Z',
         messages: [
@@ -425,7 +425,7 @@ describe('useSessionResume', () => {
     it('should only resume once even if props change', async () => {
       const conversation: ConversationRecord = {
         sessionId: 'auto-resume-123',
-        projectHash: 'project-123',
+        workspaceHash: 'project-123',
         startTime: '2025-01-01T00:00:00Z',
         lastUpdated: '2025-01-01T01:00:00Z',
         messages: [
@@ -480,7 +480,7 @@ describe('useSessionResume', () => {
     it('should convert session messages correctly during auto-resume', async () => {
       const conversation: ConversationRecord = {
         sessionId: 'auto-resume-with-tools',
-        projectHash: 'project-123',
+        workspaceHash: 'project-123',
         startTime: '2025-01-01T00:00:00Z',
         lastUpdated: '2025-01-01T01:00:00Z',
         messages: [

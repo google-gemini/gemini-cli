@@ -39,7 +39,7 @@ export interface GeminiFileContent {
   content: string | null;
 }
 
-async function findProjectRoot(startDir: string): Promise<string | null> {
+async function findWorkspaceRoot(startDir: string): Promise<string | null> {
   let currentDir = normalizePath(startDir);
   while (true) {
     const gitPath = path.join(currentDir, '.git');
@@ -94,7 +94,7 @@ async function getGeminiMdFilePathsInternal(
   folderTrust: boolean,
   fileFilteringOptions: FileFilteringOptions,
   maxDirs: number,
-): Promise<{ global: string[]; project: string[] }> {
+): Promise<{ global: string[]; workspace: string[] }> {
   const dirs = new Set<string>([
     ...includeDirectoriesToReadGemini,
     currentWorkingDirectory,
@@ -104,7 +104,7 @@ async function getGeminiMdFilePathsInternal(
   const CONCURRENT_LIMIT = 10;
   const dirsArray = Array.from(dirs);
   const globalPaths = new Set<string>();
-  const projectPaths = new Set<string>();
+  const workspacePaths = new Set<string>();
 
   for (let i = 0; i < dirsArray.length; i += CONCURRENT_LIMIT) {
     const batch = dirsArray.slice(i, i + CONCURRENT_LIMIT);
@@ -125,7 +125,7 @@ async function getGeminiMdFilePathsInternal(
     for (const result of batchResults) {
       if (result.status === 'fulfilled') {
         result.value.global.forEach((p) => globalPaths.add(p));
-        result.value.project.forEach((p) => projectPaths.add(p));
+        result.value.workspace.forEach((p) => workspacePaths.add(p));
       } else {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const error = result.reason;
@@ -137,7 +137,7 @@ async function getGeminiMdFilePathsInternal(
 
   return {
     global: Array.from(globalPaths),
-    project: Array.from(projectPaths),
+    workspace: Array.from(workspacePaths),
   };
 }
 
@@ -149,9 +149,9 @@ async function getGeminiMdFilePathsInternalForEachDir(
   folderTrust: boolean,
   fileFilteringOptions: FileFilteringOptions,
   maxDirs: number,
-): Promise<{ global: string[]; project: string[] }> {
+): Promise<{ global: string[]; workspace: string[] }> {
   const globalPaths = new Set<string>();
-  const projectPaths = new Set<string>();
+  const workspacePaths = new Set<string>();
   const geminiMdFilenames = getAllGeminiMdFilenames();
 
   for (const geminiMdFilename of geminiMdFilenames) {
@@ -182,14 +182,14 @@ async function getGeminiMdFilePathsInternalForEachDir(
           `Searching for ${geminiMdFilename} starting from CWD: ${resolvedCwd}`,
         );
 
-      const projectRoot = await findProjectRoot(resolvedCwd);
+      const workspaceRoot = await findWorkspaceRoot(resolvedCwd);
       if (debugMode)
-        logger.debug(`Determined project root: ${projectRoot ?? 'None'}`);
+        logger.debug(`Determined workspace root: ${workspaceRoot ?? 'None'}`);
 
       const upwardPaths: string[] = [];
       let currentDir = resolvedCwd;
-      const ultimateStopDir = projectRoot
-        ? normalizePath(path.dirname(projectRoot))
+      const ultimateStopDir = workspaceRoot
+        ? normalizePath(path.dirname(workspaceRoot))
         : normalizePath(path.dirname(resolvedHome));
 
       while (
@@ -218,7 +218,7 @@ async function getGeminiMdFilePathsInternalForEachDir(
 
         currentDir = normalizePath(path.dirname(currentDir));
       }
-      upwardPaths.forEach((p) => projectPaths.add(p));
+      upwardPaths.forEach((p) => workspacePaths.add(p));
 
       const mergedOptions: FileFilteringOptions = {
         ...DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
@@ -234,14 +234,14 @@ async function getGeminiMdFilePathsInternalForEachDir(
       });
       downwardPaths.sort();
       for (const dPath of downwardPaths) {
-        projectPaths.add(normalizePath(dPath));
+        workspacePaths.add(normalizePath(dPath));
       }
     }
   }
 
   return {
     global: Array.from(globalPaths),
-    project: Array.from(projectPaths),
+    workspace: Array.from(workspacePaths),
   };
 }
 
@@ -397,7 +397,12 @@ export async function getEnvironmentMemoryPaths(
 }
 
 export function categorizeAndConcatenate(
-  paths: { global: string[]; extension: string[]; project: string[] },
+  paths: {
+    global: string[];
+    extension: string[];
+    workspace: string[];
+    project?: string[];
+  },
   contentsMap: Map<string, GeminiFileContent>,
   workingDir: string,
 ): HierarchicalMemory {
@@ -412,7 +417,7 @@ export function categorizeAndConcatenate(
   return {
     global: getConcatenated(paths.global),
     extension: getConcatenated(paths.extension),
-    project: getConcatenated(paths.project),
+    workspace: getConcatenated(paths.workspace || paths.project || []),
   };
 }
 
@@ -529,7 +534,7 @@ export async function loadServerHierarchicalMemory(
   const allFilePaths = Array.from(
     new Set([
       ...discoveryResult.global,
-      ...discoveryResult.project,
+      ...discoveryResult.workspace,
       ...extensionPaths,
     ]),
   );
@@ -538,7 +543,7 @@ export async function loadServerHierarchicalMemory(
     if (debugMode)
       logger.debug('No GEMINI.md files found in hierarchy of the workspace.');
     return {
-      memoryContent: { global: '', extension: '', project: '' },
+      memoryContent: { global: '', extension: '', workspace: '' },
       fileCount: 0,
       filePaths: [],
     };
@@ -552,12 +557,12 @@ export async function loadServerHierarchicalMemory(
   );
   const contentsMap = new Map(allContents.map((c) => [c.filePath, c]));
 
-  // 3. CATEGORIZE: Back into Global, Project, Extension
+  // 3. CATEGORIZE: Back into Global, Workspace, Extension
   const hierarchicalMemory = categorizeAndConcatenate(
     {
       global: discoveryResult.global,
       extension: extensionPaths,
-      project: discoveryResult.project,
+      workspace: discoveryResult.workspace,
     },
     contentsMap,
     currentWorkingDirectory,
@@ -594,7 +599,10 @@ export async function refreshServerHierarchicalMemory(config: Config) {
     config.getMcpClientManager()?.getMcpInstructions() || '';
   const finalMemory: HierarchicalMemory = {
     ...result.memoryContent,
-    project: [result.memoryContent.project, mcpInstructions.trimStart()]
+    workspace: [
+      result.memoryContent.workspace || result.memoryContent.project,
+      mcpInstructions.trimStart(),
+    ]
       .filter(Boolean)
       .join('\n\n'),
   };

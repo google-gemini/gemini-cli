@@ -296,7 +296,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       '<extension_context>\nextension context\n</extension_context>',
     );
     expect(prompt).toContain(
-      '<project_context>\nproject context\n</project_context>',
+      '<workspace_context>\nproject context\n</workspace_context>',
     );
     expect(prompt).toMatchSnapshot();
     // Should also include conflict resolution rules when hierarchical memory is present

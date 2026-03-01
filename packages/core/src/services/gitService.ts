@@ -14,11 +14,11 @@ import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 export class GitService {
-  private projectRoot: string;
+  private workspaceRoot: string;
   private storage: Storage;
 
-  constructor(projectRoot: string, storage: Storage) {
-    this.projectRoot = path.resolve(projectRoot);
+  constructor(workspaceRoot: string, storage: Storage) {
+    this.workspaceRoot = path.resolve(workspaceRoot);
     this.storage = storage;
   }
 
@@ -100,7 +100,7 @@ export class GitService {
       await repo.commit('Initial commit', { '--allow-empty': null });
     }
 
-    const userGitIgnorePath = path.join(this.projectRoot, '.gitignore');
+    const userGitIgnorePath = path.join(this.workspaceRoot, '.gitignore');
     const shadowGitIgnorePath = path.join(repoDir, '.gitignore');
 
     let userGitIgnoreContent = '';
@@ -117,9 +117,9 @@ export class GitService {
 
   private get shadowGitRepository(): SimpleGit {
     const repoDir = this.getHistoryDir();
-    return simpleGit(this.projectRoot).env({
+    return simpleGit(this.workspaceRoot).env({
       GIT_DIR: path.join(repoDir, '.git'),
-      GIT_WORK_TREE: this.projectRoot,
+      GIT_WORK_TREE: this.workspaceRoot,
       ...this.getShadowRepoEnv(repoDir),
     });
   }
@@ -149,10 +149,15 @@ export class GitService {
     }
   }
 
-  async restoreProjectFromSnapshot(commitHash: string): Promise<void> {
+  async restoreWorkspaceFromSnapshot(commitHash: string): Promise<void> {
     const repo = this.shadowGitRepository;
     await repo.raw(['restore', '--source', commitHash, '.']);
     // Removes any untracked files that were introduced post snapshot.
     await repo.clean('f', ['-d']);
+  }
+
+  /** @deprecated Use restoreWorkspaceFromSnapshot instead */
+  async restoreProjectFromSnapshot(commitHash: string): Promise<void> {
+    return this.restoreWorkspaceFromSnapshot(commitHash);
   }
 }

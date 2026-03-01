@@ -172,12 +172,12 @@ export const TriageIssues = ({
     async (issue: Issue): Promise<AnalysisResult> => {
       const client = config.getBaseLlmClient();
       const prompt = `
-I am triaging GitHub issues for the Gemini CLI project. I need to identify issues that should be closed because they are:
+I am triaging GitHub issues for the Gemini CLI workspace. I need to identify issues that should be closed because they are:
 - Bogus (not a real issue/request)
 - Not reproducible (insufficient info, "it doesn't work" without logs/details)
 - Abusive or offensive
 - Gibberish (nonsense text)
-- Clearly out of scope for this project
+- Clearly out of scope for this workspace
 - Non-deterministic model output (e.g., "it gave me a wrong answer once", complaints about model quality without a reproducible test case)
 
 <issue>
