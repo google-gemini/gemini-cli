@@ -27,39 +27,42 @@ vi.mock('../../config/settings.js', () => ({
 }));
 
 describe('ContextUsageDisplay', () => {
-  it('renders correct percentage left', () => {
-    const { lastFrame } = render(
+  it('renders correct percentage left', async () => {
+    const { lastFrame, waitUntilReady } = render(
       <ContextUsageDisplay
         promptTokenCount={5000}
         model="gemini-pro"
         terminalWidth={120}
       />,
     );
+    await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('50% left');
   });
 
-  it('renders short label when terminal width is small', () => {
-    const { lastFrame } = render(
+  it('renders short label when terminal width is small', async () => {
+    const { lastFrame, waitUntilReady } = render(
       <ContextUsageDisplay
         promptTokenCount={2000}
         model="gemini-pro"
         terminalWidth={80}
       />,
     );
+    await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('80%');
     expect(output).not.toContain('context left');
   });
 
-  it('renders 0% when full', () => {
-    const { lastFrame } = render(
+  it('renders 0% when full', async () => {
+    const { lastFrame, waitUntilReady } = render(
       <ContextUsageDisplay
         promptTokenCount={10000}
         model="gemini-pro"
         terminalWidth={120}
       />,
     );
+    await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('0% left');
   });
