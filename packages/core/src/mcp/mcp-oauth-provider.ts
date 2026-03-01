@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -20,15 +20,17 @@ export interface OAuthAuthorizationResponse {
   state: string;
 }
 
+type CallbackServer = {
+  port: Promise<number>;
+  waitForResponse: () => Promise<OAuthAuthorizationResponse>;
+  close: () => Promise<void>;
+};
+
 export class MCPOAuthClientProvider implements OAuthClientProvider {
   private _clientInformation?: OAuthClientInformation;
   private _tokens?: OAuthTokens;
   private _codeVerifier?: string;
-  private _cbServer?: {
-    port: Promise<number>;
-    waitForResponse: () => Promise<OAuthAuthorizationResponse>;
-    close: () => Promise<void>;
-  };
+  private _cbServer?: CallbackServer;
 
   constructor(
     private readonly _redirectUrl: string | URL,
@@ -53,21 +55,11 @@ export class MCPOAuthClientProvider implements OAuthClientProvider {
     return this._clientMetadata;
   }
 
-  saveCallbackServer(server: {
-    port: Promise<number>;
-    waitForResponse: () => Promise<OAuthAuthorizationResponse>;
-    close: () => Promise<void>;
-  }): void {
+  saveCallbackServer(server: CallbackServer): void {
     this._cbServer = server;
   }
 
-  getSavedCallbackServer():
-    | {
-        port: Promise<number>;
-        waitForResponse: () => Promise<OAuthAuthorizationResponse>;
-        close: () => Promise<void>;
-      }
-    | undefined {
+  getSavedCallbackServer(): CallbackServer | undefined {
     return this._cbServer;
   }
 
