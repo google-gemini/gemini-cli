@@ -42,7 +42,7 @@ export const useLoadingIndicator = ({
 
   const isPhraseCyclingActive = streamingState === StreamingState.Responding;
   const isWaiting = streamingState === StreamingState.WaitingForConfirmation;
-  const currentLoadingPhrase = usePhraseCycler(
+  const { currentTip, currentWittyPhrase } = usePhraseCycler(
     isPhraseCyclingActive,
     isWaiting,
     shouldShowFocusHint,
@@ -89,6 +89,8 @@ export const useLoadingIndicator = ({
       streamingState === StreamingState.WaitingForConfirmation
         ? retainedElapsedTime
         : elapsedTimeFromTimer,
-    currentLoadingPhrase: retryPhrase || currentLoadingPhrase,
+    currentLoadingPhrase: retryPhrase || currentTip || currentWittyPhrase,
+    currentTip,
+    currentWittyPhrase,
   };
 };

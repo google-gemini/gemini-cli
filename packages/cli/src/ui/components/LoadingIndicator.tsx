@@ -18,6 +18,8 @@ import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
 
 interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
+  wittyPhrase?: string;
+  wittyPosition?: 'status' | 'inline' | 'ambient';
   elapsedTime: number;
   inline?: boolean;
   rightContent?: React.ReactNode;
@@ -29,6 +31,8 @@ interface LoadingIndicatorProps {
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   currentLoadingPhrase,
+  wittyPhrase,
+  wittyPosition = 'inline',
   elapsedTime,
   inline = false,
   rightContent,
@@ -57,9 +61,11 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       : thought?.subject
         ? (thoughtLabel ?? thought.subject)
         : forceRealStatusOnly
-          ? streamingState === StreamingState.Responding
-            ? 'Waiting for model...'
-            : undefined
+          ? wittyPosition === 'status' && wittyPhrase
+            ? wittyPhrase
+            : streamingState === StreamingState.Responding
+              ? 'Waiting for model...'
+              : undefined
           : currentLoadingPhrase;
   const thinkingIndicator = '';
 
@@ -68,6 +74,16 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
     streamingState !== StreamingState.WaitingForConfirmation
       ? `esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)}`
       : null;
+
+  const wittyPhraseNode =
+    forceRealStatusOnly &&
+    wittyPosition === 'inline' &&
+    wittyPhrase &&
+    primaryText ? (
+      <Box marginLeft={1}>
+        <Text color={theme.text.secondary}>{wittyPhrase}</Text>
+      </Box>
+    ) : null;
 
   if (inline) {
     return (
@@ -91,6 +107,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
             {primaryText}
           </Text>
         )}
+        {wittyPhraseNode}
         {cancelAndTimerContent && (
           <>
             <Box flexShrink={0} width={1} />
@@ -129,6 +146,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
               {primaryText}
             </Text>
           )}
+          {wittyPhraseNode}
           {!isNarrow && cancelAndTimerContent && (
             <>
               <Box flexShrink={0} width={1} />

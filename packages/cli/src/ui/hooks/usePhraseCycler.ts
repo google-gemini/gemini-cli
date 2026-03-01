@@ -31,7 +31,8 @@ export const usePhraseCycler = (
   customPhrases?: string[],
   maxLength?: number,
 ) => {
-  const [currentLoadingPhrase, setCurrentLoadingPhrase] = useState<
+  const [currentTip, setCurrentTip] = useState<string | undefined>(undefined);
+  const [currentWittyPhrase, setCurrentWittyPhrase] = useState<
     string | undefined
   >(undefined);
 
@@ -46,17 +47,20 @@ export const usePhraseCycler = (
     }
 
     if (shouldShowFocusHint) {
-      setCurrentLoadingPhrase(INTERACTIVE_SHELL_WAITING_PHRASE);
+      setCurrentTip(INTERACTIVE_SHELL_WAITING_PHRASE);
+      setCurrentWittyPhrase(undefined);
       return;
     }
 
     if (isWaiting) {
-      setCurrentLoadingPhrase('Waiting for user confirmation...');
+      setCurrentTip('Waiting for user confirmation...');
+      setCurrentWittyPhrase(undefined);
       return;
     }
 
     if (!isActive || loadingPhrasesMode === 'off') {
-      setCurrentLoadingPhrase(undefined);
+      setCurrentTip(undefined);
+      setCurrentWittyPhrase(undefined);
       return;
     }
 
@@ -66,7 +70,6 @@ export const usePhraseCycler = (
         : WITTY_LOADING_PHRASES;
 
     const setRandomPhrase = () => {
-      let phraseList: readonly string[];
       let currentMode = loadingPhrasesMode;
 
       // In 'all' mode, we decide once per phrase cycle what to show
@@ -79,23 +82,12 @@ export const usePhraseCycler = (
         }
       }
 
-      switch (currentMode) {
-        case 'tips':
-          phraseList = INFORMATIVE_TIPS;
-          break;
-        case 'witty':
-          phraseList = wittyPhrases;
-          break;
-        default:
-          phraseList = INFORMATIVE_TIPS;
-          break;
-      }
+      const phraseList =
+        currentMode === 'witty' ? wittyPhrases : INFORMATIVE_TIPS;
 
       // If we have a maxLength, we need to account for potential prefixes.
       // Tips are prefixed with "Tip: " in the Composer UI.
-      const prefixLength = currentMode === 'tips' ? 5 : 0;
-      const adjustedMaxLength =
-        maxLength !== undefined ? maxLength - prefixLength : undefined;
+      const adjustedMaxLength = maxLength;
 
       const filteredList =
         adjustedMaxLength !== undefined
@@ -104,10 +96,18 @@ export const usePhraseCycler = (
 
       if (filteredList.length > 0) {
         const randomIndex = Math.floor(Math.random() * filteredList.length);
-        setCurrentLoadingPhrase(filteredList[randomIndex]);
+        const selected = filteredList[randomIndex];
+        if (currentMode === 'witty') {
+          setCurrentWittyPhrase(selected);
+          setCurrentTip(undefined);
+        } else {
+          setCurrentTip(selected);
+          setCurrentWittyPhrase(undefined);
+        }
       } else {
         // If no phrases fit, try to fallback to a very short list or nothing
-        setCurrentLoadingPhrase(undefined);
+        setCurrentTip(undefined);
+        setCurrentWittyPhrase(undefined);
       }
     };
 
@@ -134,5 +134,5 @@ export const usePhraseCycler = (
     maxLength,
   ]);
 
-  return currentLoadingPhrase;
+  return { currentTip, currentWittyPhrase };
 };
