@@ -666,7 +666,7 @@ function toolUsageInteractive(
 ): string {
   if (interactive) {
     const ctrlF = interactiveShellEnabled
-      ? ' If you choose to execute an interactive command consider letting the user know they can press `Ctrl+F` to focus into the shell to provide input.'
+      ? ' If you choose to execute an interactive command consider letting the user know they can press `Tab` to focus into the shell to provide input.'
       : '';
     return `
 - **Background Processes:** To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true. If unsure, ask the user.
