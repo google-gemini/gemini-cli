@@ -164,6 +164,15 @@ This is especially useful for scripting and automation.
   - Always run `npm run preflight` before committing code. This can catch many
     common issues related to formatting, linting, and type errors.
 
+- **Advanced debugging (RAG / tool workflows):**
+  - If a workflow fails in complex ways (tool calls, retrieval/grounding, CI vs
+    local differences), classify the failure type before changing prompts or
+    code.
+  - Optional checklist (community resource):
+    [WFGY ProblemMap](https://github.com/onestardao/WFGY/blob/main/ProblemMap/README.md)
+  - Workflow: capture prompt + logs/tool outputs → map to a failure class →
+    apply the smallest change → re-run with a minimal repro.
+
 ## Existing GitHub issues similar to yours or creating new issues
 
 If you encounter an issue that was not covered here in this _Troubleshooting
