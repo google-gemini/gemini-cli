@@ -72,7 +72,6 @@ describe('Plan Mode', () => {
         experimental: { plan: true },
         tools: {
           core: ['write_file', 'read_file', 'list_directory'],
-          allowed: ['write_file'],
         },
         general: {
           defaultApprovalMode: 'plan',
@@ -87,15 +86,18 @@ describe('Plan Mode', () => {
       approvalMode: 'plan',
     });
 
-    await run.sendText(
-      'Create a file called plan.md in the plans directory.\\r',
+    await run.type('Create a file called plan.md in the plans directory.');
+    await run.type('\r');
+
+    // In plan mode, write_file to the plans directory is allowed by the default plan policy.
+    await rig.expectToolCallSuccess(['write_file'], 30000, (args) =>
+      args.includes('plan.md'),
     );
 
-    await rig.waitForToolCall('write_file', 30000);
-
-    await run.sendText(
-      'Now create a file called hello.txt in the current directory.\\r',
+    await run.type(
+      'Now create a file called hello.txt in the current directory.',
     );
+    await run.type('\r');
 
     const toolLogs = rig.readToolLogs();
     const writeLogs = toolLogs.filter(
