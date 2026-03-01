@@ -8,6 +8,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawn, exec, execSync } from 'node:child_process';
 import os from 'node:os';
 import fs from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { start_sandbox } from './sandbox.js';
 import { FatalSandboxError, type SandboxConfig } from '@google/gemini-cli-core';
 import { EventEmitter } from 'node:events';
@@ -28,6 +29,9 @@ vi.mock('./sandboxUtils.js', async (importOriginal) => {
 vi.mock('node:child_process');
 vi.mock('node:os');
 vi.mock('node:fs');
+vi.mock('node:crypto', () => ({
+  randomBytes: vi.fn().mockReturnValue(Buffer.from('a1b2c3d4', 'hex')),
+}));
 vi.mock('node:util', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:util')>();
   return {
@@ -416,6 +420,52 @@ describe('sandbox', () => {
           'GOOGLE_GEMINI_BASE_URL=http://gemini.proxy',
           '--env',
           'GOOGLE_VERTEX_BASE_URL=http://vertex.proxy',
+        ]),
+        expect.any(Object),
+      );
+    });
+
+    it('should generate random container names for regular runs', async () => {
+      const config: SandboxConfig = {
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      };
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      expect(randomBytes).toHaveBeenCalledWith(4);
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
+        'docker',
+        expect.arrayContaining([
+          '--name',
+          'gemini-cli-sandbox-a1b2c3d4',
+          '--hostname',
+          'gemini-cli-sandbox-a1b2c3d4',
         ]),
         expect.any(Object),
       );
