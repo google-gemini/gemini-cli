@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FileSearchFactory, AbortError, filter } from './fileSearch.js';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import * as crawler from './crawler.js';
@@ -558,43 +558,49 @@ describe('FileSearch', () => {
     );
   });
 
-  it('should detect truncation and emit a warning when maxFiles is hit', async () => {
-    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
-
-    const largeDir: Record<string, string> = {};
-    for (let i = 0; i < 10; i++) {
-      largeDir[`file${i}.js`] = '';
-    }
-    tmpDir = await createTmpDir(largeDir);
-
-    const fileSearch = FileSearchFactory.create({
-      projectRoot: tmpDir,
-      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
-        respectGitIgnore: false,
-        respectGeminiIgnore: false,
-      }),
-      ignoreDirs: [],
-      cache: false,
-      cacheTtl: 0,
-      enableRecursiveFileSearch: true,
-      enableFuzzySearch: true,
-      maxFiles: 5,
+  describe('truncation warning', () => {
+    beforeEach(() => {
+      vi.resetModules();
     });
 
-    await fileSearch.initialize();
+    it('should detect truncation and emit a warning when maxFiles is hit', async () => {
+      const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
 
-    // It should have emitted the warning once during initialization
-    expect(emitFeedbackSpy).toHaveBeenCalledTimes(1);
-    expect(emitFeedbackSpy).toHaveBeenCalledWith(
-      'warning',
-      expect.stringContaining('Indexed 5 files (limit reached)'),
-    );
+      const largeDir: Record<string, string> = {};
+      for (let i = 0; i < 10; i++) {
+        largeDir[`file${i}.js`] = '';
+      }
+      tmpDir = await createTmpDir(largeDir);
 
-    // Initializing again or searching should not emit the warning again
-    await fileSearch.initialize();
-    await fileSearch.search('');
+      const fileSearch = FileSearchFactory.create({
+        projectRoot: tmpDir,
+        fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+          respectGitIgnore: false,
+          respectGeminiIgnore: false,
+        }),
+        ignoreDirs: [],
+        cache: false,
+        cacheTtl: 0,
+        enableRecursiveFileSearch: true,
+        enableFuzzySearch: true,
+        maxFiles: 5,
+      });
 
-    expect(emitFeedbackSpy).toHaveBeenCalledTimes(1);
+      await fileSearch.initialize();
+
+      // It should have emitted the warning once during initialization
+      expect(emitFeedbackSpy).toHaveBeenCalledTimes(1);
+      expect(emitFeedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('Indexed 5 files (limit reached)'),
+      );
+
+      // Initializing again or searching should not emit the warning again
+      await fileSearch.initialize();
+      await fileSearch.search('');
+
+      expect(emitFeedbackSpy).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('should be cancellable via AbortSignal', async () => {
