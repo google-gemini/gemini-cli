@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, checkModelOutputContent } from './test-helper.js';
+import { TestRig, checkModelOutputContent, GEMINI_DIR } from './test-helper.js';
 
 describe('Plan Mode', () => {
   let rig: TestRig;
@@ -32,6 +34,12 @@ describe('Plan Mode', () => {
           },
         },
       },
+    );
+
+    // Disable the interactive terminal setup prompt in tests
+    writeFileSync(
+      join(rig.homeDir!, GEMINI_DIR, 'state.json'),
+      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
     );
 
     // We use a prompt that asks for both a read-only action and a write action.
