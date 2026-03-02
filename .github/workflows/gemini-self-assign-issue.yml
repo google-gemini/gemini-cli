@@ -25,7 +25,7 @@ jobs:
     if: |-
       github.repository == 'google-gemini/gemini-cli' &&
       github.event_name == 'issue_comment' &&
-      contains(github.event.comment.body, '/assign')
+      (contains(github.event.comment.body, '/assign') || contains(github.event.comment.body, '/unassign'))
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Generate GitHub App Token'
@@ -38,6 +38,7 @@ jobs:
           permission-issues: 'write'
 
       - name: 'Assign issue to user'
+        if: "contains(github.event.comment.body, '/assign')"
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
           github-token: '${{ steps.generate_token.outputs.token }}'
@@ -108,3 +109,42 @@ jobs:
               issue_number: issueNumber,
               body: `👋 @${commenter}, you've been assigned to this issue! Thank you for taking the time to contribute. Make sure to check out our [contributing guidelines](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md).`
             });
+
+      - name: 'Unassign issue from user'
+        if: "contains(github.event.comment.body, '/unassign')"
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |
+            const issueNumber = context.issue.number;
+            const commenter = context.actor;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const commentBody = context.payload.comment.body.trim();
+
+            if (commentBody !== '/unassign') {
+              return;
+            }
+
+            const issue = await github.rest.issues.get({
+              owner: owner,
+              repo: repo,
+              issue_number: issueNumber,
+            });
+
+            const isAssigned = issue.data.assignees.some(assignee => assignee.login === commenter);
+
+            if (isAssigned) {
+              await github.rest.issues.removeAssignees({
+                owner: owner,
+                repo: repo,
+                issue_number: issueNumber,
+                assignees: [commenter]
+              });
+              await github.rest.issues.createComment({
+                owner: owner,
+                repo: repo,
+                issue_number: issueNumber,
+                body: `👋 @${commenter}, you have been unassigned from this issue.`
+              });
+            }
