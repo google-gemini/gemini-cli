@@ -119,6 +119,8 @@ export interface RemoteAgentDefinition<
 > extends BaseAgentDefinition<TOutput> {
   kind: 'remote';
   agentCardUrl: string;
+  /** The user-provided description, before any remote card merging. */
+  originalDescription?: string;
   /**
    * Optional authentication configuration for the remote agent.
    * If not specified, the agent will try to use defaults based on the AgentCard's
