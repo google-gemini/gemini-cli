@@ -417,7 +417,7 @@ export function markdownToAgentDefinition(
     return {
       kind: 'remote',
       name: markdown.name,
-      description: markdown.description || '(Loading description...)',
+      description: markdown.description || '',
       displayName: markdown.display_name,
       agentCardUrl: markdown.agent_card_url,
       auth: markdown.auth
