@@ -29,6 +29,7 @@ import { PolicyDecision } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
+  Kind,
 } from '../tools/tools.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
@@ -427,11 +428,11 @@ export class Scheduler {
         return true;
       }
 
-      // If the first tool is read-only, batch all contiguous read-only tools.
-      if (next.tool?.isReadOnly) {
+      // If the first tool is parallelizable, batch all contiguous parallelizable tools.
+      if (this._isParallelizable(next.tool)) {
         while (this.state.queueLength > 0) {
           const peeked = this.state.peekQueue();
-          if (peeked && peeked.tool?.isReadOnly) {
+          if (peeked && this._isParallelizable(peeked.tool)) {
             this.state.dequeue();
           } else {
             break;
@@ -514,6 +515,11 @@ export class Scheduler {
     // If we are here, we have active calls (likely Validating or Scheduled) but none progressed.
     // This is a stuck state.
     return false;
+  }
+
+  private _isParallelizable(tool?: AnyDeclarativeTool): boolean {
+    if (!tool) return false;
+    return tool.isReadOnly || tool.kind === Kind.Agent;
   }
 
   private async _processValidatingCall(
