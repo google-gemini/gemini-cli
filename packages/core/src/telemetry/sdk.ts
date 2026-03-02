@@ -62,6 +62,7 @@ import type {
   KeychainAvailabilityEvent,
   TokenStorageInitializationEvent,
 } from './types.js';
+import { localMetricReader } from './localBuffer.js';
 
 // For troubleshooting, set the log level to DiagLogLevel.DEBUG
 class DiagLoggerAdapter {
@@ -329,7 +330,7 @@ export async function initializeTelemetry(
     resource,
     spanProcessors: [spanProcessor],
     logRecordProcessors: [logRecordProcessor],
-    metricReader,
+    metricReaders: [metricReader, localMetricReader],
     instrumentations: [new HttpInstrumentation()],
   });
 

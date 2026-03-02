@@ -193,6 +193,10 @@ export { sessionId, createSessionId } from './utils/session.js';
 export * from './utils/compatibility.js';
 export * from './utils/browser.js';
 export { Storage } from './config/storage.js';
+export {
+  getLocalMetricsSnapshot,
+  type PerfSnapshot,
+} from './telemetry/localBuffer.js';
 
 // Export hooks system
 export * from './hooks/index.js';
