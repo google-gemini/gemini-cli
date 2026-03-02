@@ -8,7 +8,8 @@ import { useState, useEffect, useRef } from 'react';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 
-export const PHRASE_CHANGE_INTERVAL_MS = 15000;
+export const PHRASE_CHANGE_INTERVAL_MS = 10000;
+export const WITTY_PHRASE_CHANGE_INTERVAL_MS = 5000;
 export const INTERACTIVE_SHELL_WAITING_PHRASE =
   '! Shell awaiting input (Tab to focus)';
 
@@ -39,18 +40,29 @@ export const usePhraseCycler = (
     string | undefined
   >(undefined);
 
-  const phraseIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastChangeTimeRef = useRef<number>(0);
+  const tipIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const wittyIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTipChangeTimeRef = useRef<number>(0);
+  const lastWittyChangeTimeRef = useRef<number>(0);
   const lastSelectedTipRef = useRef<string | undefined>(undefined);
   const lastSelectedWittyPhraseRef = useRef<string | undefined>(undefined);
   const MIN_TIP_DISPLAY_TIME_MS = 10000;
+  const MIN_WIT_DISPLAY_TIME_MS = 5000;
 
   useEffect(() => {
     // Always clear on re-run
-    if (phraseIntervalRef.current) {
-      clearInterval(phraseIntervalRef.current);
-      phraseIntervalRef.current = null;
-    }
+    const clearTimers = () => {
+      if (tipIntervalRef.current) {
+        clearInterval(tipIntervalRef.current);
+        tipIntervalRef.current = null;
+      }
+      if (wittyIntervalRef.current) {
+        clearInterval(wittyIntervalRef.current);
+        wittyIntervalRef.current = null;
+      }
+    };
+
+    clearTimers();
 
     if (shouldShowFocusHint || isWaiting) {
       // These are handled by the return value directly for immediate feedback
@@ -66,69 +78,85 @@ export const usePhraseCycler = (
         ? customPhrases
         : WITTY_LOADING_PHRASES;
 
-    const setRandomPhrases = (force: boolean = false) => {
+    const setRandomTip = (force: boolean = false) => {
+      if (!showTips) {
+        setCurrentTipState(undefined);
+        lastSelectedTipRef.current = undefined;
+        return;
+      }
+
       const now = Date.now();
       if (
         !force &&
-        now - lastChangeTimeRef.current < MIN_TIP_DISPLAY_TIME_MS &&
-        (lastSelectedTipRef.current || lastSelectedWittyPhraseRef.current)
+        now - lastTipChangeTimeRef.current < MIN_TIP_DISPLAY_TIME_MS &&
+        lastSelectedTipRef.current
       ) {
-        // Sync state if it was cleared by inactivation.
         setCurrentTipState(lastSelectedTipRef.current);
+        return;
+      }
+
+      const filteredTips =
+        maxLength !== undefined
+          ? INFORMATIVE_TIPS.filter((p) => p.length <= maxLength)
+          : INFORMATIVE_TIPS;
+
+      if (filteredTips.length > 0) {
+        const selected =
+          filteredTips[Math.floor(Math.random() * filteredTips.length)];
+        setCurrentTipState(selected);
+        lastSelectedTipRef.current = selected;
+        lastTipChangeTimeRef.current = now;
+      }
+    };
+
+    const setRandomWitty = (force: boolean = false) => {
+      if (!showWit) {
+        setCurrentWittyPhraseState(undefined);
+        lastSelectedWittyPhraseRef.current = undefined;
+        return;
+      }
+
+      const now = Date.now();
+      if (
+        !force &&
+        now - lastWittyChangeTimeRef.current < MIN_WIT_DISPLAY_TIME_MS &&
+        lastSelectedWittyPhraseRef.current
+      ) {
         setCurrentWittyPhraseState(lastSelectedWittyPhraseRef.current);
         return;
       }
 
-      const adjustedMaxLength = maxLength;
+      const filteredWitty =
+        maxLength !== undefined
+          ? wittyPhrasesList.filter((p) => p.length <= maxLength)
+          : wittyPhrasesList;
 
-      if (showTips) {
-        const filteredTips =
-          adjustedMaxLength !== undefined
-            ? INFORMATIVE_TIPS.filter((p) => p.length <= adjustedMaxLength)
-            : INFORMATIVE_TIPS;
-        if (filteredTips.length > 0) {
-          const selected =
-            filteredTips[Math.floor(Math.random() * filteredTips.length)];
-          setCurrentTipState(selected);
-          lastSelectedTipRef.current = selected;
-        }
-      } else {
-        setCurrentTipState(undefined);
-        lastSelectedTipRef.current = undefined;
+      if (filteredWitty.length > 0) {
+        const selected =
+          filteredWitty[Math.floor(Math.random() * filteredWitty.length)];
+        setCurrentWittyPhraseState(selected);
+        lastSelectedWittyPhraseRef.current = selected;
+        lastWittyChangeTimeRef.current = now;
       }
-
-      if (showWit) {
-        const filteredWitty =
-          adjustedMaxLength !== undefined
-            ? wittyPhrasesList.filter((p) => p.length <= adjustedMaxLength)
-            : wittyPhrasesList;
-        if (filteredWitty.length > 0) {
-          const selected =
-            filteredWitty[Math.floor(Math.random() * filteredWitty.length)];
-          setCurrentWittyPhraseState(selected);
-          lastSelectedWittyPhraseRef.current = selected;
-        }
-      } else {
-        setCurrentWittyPhraseState(undefined);
-        lastSelectedWittyPhraseRef.current = undefined;
-      }
-
-      lastChangeTimeRef.current = now;
     };
 
     // Select initial random phrases or resume previous ones
-    setRandomPhrases(false);
+    setRandomTip(false);
+    setRandomWitty(false);
 
-    phraseIntervalRef.current = setInterval(() => {
-      setRandomPhrases(true); // Force change on interval
-    }, PHRASE_CHANGE_INTERVAL_MS);
+    if (showTips) {
+      tipIntervalRef.current = setInterval(() => {
+        setRandomTip(true);
+      }, PHRASE_CHANGE_INTERVAL_MS);
+    }
 
-    return () => {
-      if (phraseIntervalRef.current) {
-        clearInterval(phraseIntervalRef.current);
-        phraseIntervalRef.current = null;
-      }
-    };
+    if (showWit) {
+      wittyIntervalRef.current = setInterval(() => {
+        setRandomWitty(true);
+      }, WITTY_PHRASE_CHANGE_INTERVAL_MS);
+    }
+
+    return clearTimers;
   }, [
     isActive,
     isWaiting,

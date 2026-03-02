@@ -81,8 +81,8 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
     wittyPhrase &&
     primaryText === GENERIC_WORKING_LABEL ? (
       <Box marginLeft={1}>
-        <Text color={theme.text.secondary} italic>
-          {wittyPhrase}
+        <Text color={theme.text.secondary} dimColor italic>
+          {wittyPhrase} :)
         </Text>
       </Box>
     ) : null;

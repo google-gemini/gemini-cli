@@ -251,7 +251,7 @@ describe('usePhraseCycler', () => {
 
     const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
     unmount();
-    expect(clearIntervalSpy).toHaveBeenCalledOnce();
+    expect(clearIntervalSpy).toHaveBeenCalled();
   });
 
   it('should use custom phrases when provided', async () => {

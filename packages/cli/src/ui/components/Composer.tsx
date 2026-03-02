@@ -206,11 +206,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       showMinimalBleedThroughRow ||
       showShortcutsHint);
 
-  const ambientText = isInteractiveShellWaiting
-    ? undefined
-    : (showTips ? uiState.currentTip : undefined) ||
-      (showWit ? uiState.currentWittyPhrase : undefined);
-
   let estimatedStatusLength = 0;
   if (
     isExperimentalLayout &&
@@ -237,6 +232,32 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   } else if (hasPendingActionRequired) {
     estimatedStatusLength = 20; // "↑ Action required"
   }
+
+  const ambientText = (() => {
+    if (isInteractiveShellWaiting) return undefined;
+
+    // Try Tip first
+    if (showTips && uiState.currentTip) {
+      if (
+        estimatedStatusLength + uiState.currentTip.length + 5 <=
+        terminalWidth
+      ) {
+        return uiState.currentTip;
+      }
+    }
+
+    // Fallback to Wit
+    if (showWit && uiState.currentWittyPhrase) {
+      if (
+        estimatedStatusLength + uiState.currentWittyPhrase.length + 5 <=
+        terminalWidth
+      ) {
+        return uiState.currentWittyPhrase;
+      }
+    }
+
+    return undefined;
+  })();
 
   const estimatedAmbientLength = ambientText?.length || 0;
   const willCollideAmbient =
@@ -265,11 +286,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           marginLeft={1}
           marginRight={1}
         >
-          {isExperimentalLayout ? (
-            <ShortcutsHint />
-          ) : (
-            showShortcutsHint && <ShortcutsHint />
-          )}
+          <ShortcutsHint />
         </Box>
       );
     }
