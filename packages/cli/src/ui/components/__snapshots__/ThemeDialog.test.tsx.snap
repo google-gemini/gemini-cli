@@ -59,6 +59,8 @@ exports[`Initial Theme Selection > should default to a dark theme when terminal 
 │                                              │                    if blank)                    │ │
 │                                              │  #3d3f51   border.def Standard border color     │ │
 │                                              │            ault                                 │ │
+│                                              │  #89B4FA   border.foc                           │ │
+│                                              │            used                                 │ │
 │                                              │  #6C7086ui.comme  Color for code comments and   │ │
 │                                              │         nt        metadata                      │ │
 │                                              │  #89DCE ui.symbol Color for technical symbols   │ │
@@ -146,6 +148,8 @@ exports[`Initial Theme Selection > should default to a light theme when terminal
 │                                              │                    if blank)                    │ │
 │                                              │  #d2d6dc   border.def Standard border color     │ │
 │                                              │            ault                                 │ │
+│                                              │  #3B82F6   border.foc                           │ │
+│                                              │            used                                 │ │
 │                                              │  #97a0b0ui.comme  Color for code comments and   │ │
 │                                              │         nt        metadata                      │ │
 │                                              │  #06B6D ui.symbol Color for technical symbols   │ │
@@ -233,6 +237,8 @@ exports[`Initial Theme Selection > should use the theme from settings even if te
 │                                              │                    if blank)                    │ │
 │                                              │  #3d3f51   border.def Standard border color     │ │
 │                                              │            ault                                 │ │
+│                                              │  #89B4FA   border.foc                           │ │
+│                                              │            used                                 │ │
 │                                              │  #6C7086ui.comme  Color for code comments and   │ │
 │                                              │         nt        metadata                      │ │
 │                                              │  #89DCE ui.symbol Color for technical symbols   │ │
@@ -334,6 +340,8 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │                                              │                    if blank)                    │ │
 │                                              │  #3d3f51   border.def Standard border color     │ │
 │                                              │            ault                                 │ │
+│                                              │  #89B4FA   border.foc                           │ │
+│                                              │            used                                 │ │
 │                                              │  #6C7086ui.comme  Color for code comments and   │ │
 │                                              │         nt        metadata                      │ │
 │                                              │  #6C708 ui.symbol Color for technical symbols   │ │
