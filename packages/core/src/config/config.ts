@@ -339,6 +339,15 @@ export interface GeminiCLIExtension {
    * Safety checkers contributed by this extension.
    */
   checkers?: SafetyCheckerRule[];
+  /**
+   * Planning features configuration contributed by this extension.
+   */
+  plan?: {
+    /**
+     * The directory where planning artifacts are stored.
+     */
+    directory?: string;
+  };
 }
 
 export interface ExtensionInstallMetadata {
@@ -1097,8 +1106,13 @@ export class Config implements McpContext {
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
       const plansDir = this.storage.getPlansDir();
-      await fs.promises.mkdir(plansDir, { recursive: true });
-      this.workspaceContext.addDirectory(plansDir);
+      try {
+        await fs.promises.access(plansDir);
+        this.workspaceContext.addDirectory(plansDir);
+      } catch {
+        // Directory does not exist yet, so we don't add it to the workspace context.
+        // It will be created when the first plan is written.
+      }
     }
 
     // Initialize centralized FileDiscoveryService
