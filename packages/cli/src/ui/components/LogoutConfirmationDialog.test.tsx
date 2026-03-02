@@ -45,7 +45,7 @@ describe('LogoutConfirmationDialog', () => {
     expect(RadioButtonSelect).toHaveBeenCalled();
     const mockCall = vi.mocked(RadioButtonSelect).mock.calls[0][0];
     expect(mockCall.items).toEqual([
-      { label: 'Login', value: LogoutChoice.LOGIN, key: 'login' },
+      { label: 'Sign in', value: LogoutChoice.LOGIN, key: 'login' },
       { label: 'Exit', value: LogoutChoice.EXIT, key: 'exit' },
     ]);
     expect(mockCall.isFocused).toBe(true);
