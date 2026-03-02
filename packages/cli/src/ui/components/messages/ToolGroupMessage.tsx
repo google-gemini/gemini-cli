@@ -18,7 +18,10 @@ import { ShellToolMessage } from './ShellToolMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 import { isShellTool, isThisShellFocused } from './ToolShared.js';
-import { shouldHideToolCall } from '@google/gemini-cli-core';
+import {
+  shouldHideToolCall,
+  CoreToolCallStatus,
+} from '@google/gemini-cli-core';
 import { ShowMoreLines } from '../ShowMoreLines.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
@@ -27,6 +30,7 @@ import {
   calculateToolContentMaxLines,
 } from '../../utils/toolLayoutUtils.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
 
 interface ToolGroupMessageProps {
   item: HistoryItem | HistoryItemWithoutId;
@@ -51,19 +55,29 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   borderBottom: borderBottomOverride,
   isExpandable,
 }) => {
+  const settings = useSettings();
+  const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
+
   // Filter out tool calls that should be hidden (e.g. in-progress Ask User, or Plan Mode operations).
   const toolCalls = useMemo(
     () =>
-      allToolCalls.filter(
-        (t) =>
-          !shouldHideToolCall({
-            displayName: t.name,
-            status: t.status,
-            approvalMode: t.approvalMode,
-            hasResultDisplay: !!t.resultDisplay,
-          }),
-      ),
-    [allToolCalls],
+      allToolCalls.filter((t) => {
+        if (
+          isLowErrorVerbosity &&
+          t.status === CoreToolCallStatus.Error &&
+          !t.isClientInitiated
+        ) {
+          return false;
+        }
+
+        return !shouldHideToolCall({
+          displayName: t.name,
+          status: t.status,
+          approvalMode: t.approvalMode,
+          hasResultDisplay: !!t.resultDisplay,
+        });
+      }),
+    [allToolCalls, isLowErrorVerbosity],
   );
 
   const config = useConfig();
