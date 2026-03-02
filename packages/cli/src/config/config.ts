@@ -543,7 +543,7 @@ export async function loadCliConfig(
   }
 
   const question = argv.promptInteractive || argv.prompt || '';
-  const googleCloudLocation = argv.googleCloudLocation || '';
+  const googleCloudLocation = argv.googleCloudLocation;
 
   // Determine approval mode with backward compatibility
   let approvalMode: ApprovalMode;

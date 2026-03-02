@@ -212,9 +212,11 @@ export class LoggingContentGenerator implements ContentGenerator {
 
     // Case 2: Using an API key for Vertex AI.
     if (genConfig?.vertexai) {
+      const cliLocation = this.config.getGoogleCloudLocation();
       const googleCloudLocation =
-        this.config.getGoogleCloudLocation() ||
-        process.env['GOOGLE_CLOUD_LOCATION'];
+        cliLocation !== undefined && cliLocation.trim() !== ''
+          ? cliLocation.trim()
+          : process.env['GOOGLE_CLOUD_LOCATION'];
       if (googleCloudLocation) {
         return {
           address: `${googleCloudLocation}-aiplatform.googleapis.com`,

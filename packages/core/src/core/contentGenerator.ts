@@ -110,10 +110,11 @@ export async function createContentGeneratorConfig(
     process.env['GOOGLE_CLOUD_PROJECT'] ||
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
+  const cliLocation = config.getGoogleCloudLocation();
   const googleCloudLocation =
-    config.getGoogleCloudLocation() ||
-    process.env['GOOGLE_CLOUD_LOCATION'] ||
-    undefined;
+    cliLocation !== undefined && cliLocation.trim() !== ''
+      ? cliLocation.trim()
+      : process.env['GOOGLE_CLOUD_LOCATION'];
 
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
