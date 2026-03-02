@@ -9,7 +9,8 @@ import type {
   ToolCallResponseInfo,
   ToolResult,
   Config,
-  AnsiOutput,
+  ToolResultDisplay,
+  ToolLiveOutput,
 } from '../index.js';
 import {
   ToolErrorType,
@@ -45,7 +46,7 @@ import {
 export interface ToolExecutionContext {
   call: ToolCall;
   signal: AbortSignal;
-  outputUpdateHandler?: (callId: string, output: string | AnsiOutput) => void;
+  outputUpdateHandler?: (callId: string, output: ToolLiveOutput) => void;
   onUpdateToolCall: (updatedCall: ToolCall) => void;
 }
 
@@ -68,7 +69,7 @@ export class ToolExecutor {
     // Setup live output handling
     const liveOutputCallback =
       tool.canUpdateOutput && outputUpdateHandler
-        ? (outputChunk: string | AnsiOutput) => {
+        ? (outputChunk: ToolLiveOutput) => {
             outputUpdateHandler(callId, outputChunk);
           }
         : undefined;
@@ -134,6 +135,7 @@ export class ToolExecutor {
             completedToolCall = this.createCancelledResult(
               call,
               'User cancelled tool execution.',
+              toolResult.returnDisplay,
             );
           } else if (toolResult.error === undefined) {
             completedToolCall = await this.createSuccessResult(
@@ -155,7 +157,12 @@ export class ToolExecutor {
           }
         } catch (executionError: unknown) {
           spanMetadata.error = executionError;
-          if (signal.aborted) {
+          const isAbortError =
+            executionError instanceof Error &&
+            (executionError.name === 'AbortError' ||
+              executionError.message.includes('Operation cancelled by user'));
+
+          if (signal.aborted || isAbortError) {
             completedToolCall = this.createCancelledResult(
               call,
               'User cancelled tool execution.',
@@ -182,6 +189,7 @@ export class ToolExecutor {
   private createCancelledResult(
     call: ToolCall,
     reason: string,
+    resultDisplay?: ToolResultDisplay,
   ): CancelledToolCall {
     const errorMessage = `[Operation Cancelled] ${reason}`;
     const startTime = 'startTime' in call ? call.startTime : undefined;
@@ -206,7 +214,7 @@ export class ToolExecutor {
             },
           },
         ],
-        resultDisplay: undefined,
+        resultDisplay,
         error: undefined,
         errorType: undefined,
         contentLength: errorMessage.length,

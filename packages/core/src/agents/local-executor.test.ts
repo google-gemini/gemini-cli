@@ -711,25 +711,28 @@ describe('LocalAgentExecutor', () => {
         expect.arrayContaining([
           expect.objectContaining({
             type: 'THOUGHT_CHUNK',
-            data: { text: 'T1: Listing' },
+            data: expect.objectContaining({ text: 'T1: Listing' }),
           }),
           expect.objectContaining({
             type: 'TOOL_CALL_END',
-            data: { name: LS_TOOL_NAME, output: 'file1.txt' },
+            data: expect.objectContaining({
+              name: LS_TOOL_NAME,
+              output: 'file1.txt',
+            }),
           }),
           expect.objectContaining({
             type: 'TOOL_CALL_START',
-            data: {
+            data: expect.objectContaining({
               name: TASK_COMPLETE_TOOL_NAME,
               args: { finalResult: 'Found file1.txt' },
-            },
+            }),
           }),
           expect.objectContaining({
             type: 'TOOL_CALL_END',
-            data: {
+            data: expect.objectContaining({
               name: TASK_COMPLETE_TOOL_NAME,
               output: expect.stringContaining('Output submitted'),
-            },
+            }),
           }),
         ]),
       );

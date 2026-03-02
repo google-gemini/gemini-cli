@@ -11,7 +11,11 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText, AnsiLineText } from '../AnsiOutput.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme } from '../../semantic-colors.js';
-import type { AnsiOutput, AnsiLine } from '@google/gemini-cli-core';
+import {
+  type AnsiOutput,
+  type AnsiLine,
+  isSubagentProgress,
+} from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
@@ -20,6 +24,7 @@ import { ScrollableList } from '../shared/ScrollableList.js';
 import { SCROLL_TO_ITEM_END } from '../shared/VirtualizedList.js';
 import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 import { calculateToolContentMaxLines } from '../../utils/toolLayoutUtils.js';
+import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
 
 // Large threshold to ensure we don't cause performance issues for very large
 // outputs that will get truncated further MaxSizedBox anyway.
@@ -167,6 +172,8 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         {formattedJSON}
       </Text>
     );
+  } else if (isSubagentProgress(truncatedResultDisplay)) {
+    content = <SubagentProgressDisplay progress={truncatedResultDisplay} />;
   } else if (
     typeof truncatedResultDisplay === 'string' &&
     renderOutputAsMarkdown
