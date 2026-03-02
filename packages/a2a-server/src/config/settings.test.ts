@@ -142,4 +142,49 @@ describe('loadSettings', () => {
     expect(result.fileFiltering?.respectGitIgnore).toBe(false);
     expect(result.fileFiltering?.enableRecursiveFileSearch).toBeUndefined();
   });
+  it('should load V1 flat tool settings correctly', () => {
+    const settings = {
+      coreTools: ['tool1', 'tool2'],
+      allowedTools: ['tool3'],
+      excludeTools: ['tool4'],
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.coreTools).toEqual(['tool1', 'tool2']);
+    expect(result.allowedTools).toEqual(['tool3']);
+    expect(result.excludeTools).toEqual(['tool4']);
+  });
+
+  it('should load V2 nested tool settings correctly', () => {
+    const settings = {
+      tools: {
+        core: ['tool1', 'tool2'],
+        allowed: ['tool3'],
+        exclude: ['tool4'],
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.tools?.core).toEqual(['tool1', 'tool2']);
+    expect(result.tools?.allowed).toEqual(['tool3']);
+    expect(result.tools?.exclude).toEqual(['tool4']);
+  });
+
+  it('should support both V1 and V2 formats simultaneously', () => {
+    const settings = {
+      coreTools: ['v1-tool'],
+      tools: {
+        core: ['v2-tool'],
+        allowed: ['tool3'],
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.coreTools).toEqual(['v1-tool']);
+    expect(result.tools?.core).toEqual(['v2-tool']);
+    expect(result.tools?.allowed).toEqual(['tool3']);
+  });
 });
