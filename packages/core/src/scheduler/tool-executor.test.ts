@@ -16,6 +16,8 @@ import { MockTool } from '../test-utils/mock-tool.js';
 import type { ScheduledToolCall } from './types.js';
 import { CoreToolCallStatus } from './types.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import type { CallableTool } from '@google/genai';
 import * as fileUtils from '../utils/fileUtils.js';
 import * as coreToolHookTriggers from '../core/coreToolHookTriggers.js';
 import { ShellToolInvocation } from '../tools/shell.js';
@@ -310,6 +312,162 @@ describe('ToolExecutor', () => {
       expect(response).toEqual({ output: 'TruncatedContent...' });
       expect(result.response.outputFile).toBe('/tmp/truncated_output.txt');
     }
+  });
+
+  it('should truncate large MCP tool output with single text Part', async () => {
+    // 1. Setup Config for Truncation
+    vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10);
+    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
+
+    const mcpToolName = 'get_big_text';
+    const messageBus = createMockMessageBus();
+    const mcpTool = new DiscoveredMCPTool(
+      {} as CallableTool,
+      'my-server',
+      'get_big_text',
+      'A test MCP tool',
+      {},
+      messageBus,
+    );
+    const invocation = mcpTool.build({});
+    const longText = 'This is a very long MCP output that should be truncated.';
+
+    // 2. Mock execution returning Part[] with single text Part
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+      llmContent: [{ text: longText }],
+      returnDisplay: longText,
+    });
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-mcp-trunc',
+        name: mcpToolName,
+        args: { query: 'test' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-mcp-trunc',
+      },
+      tool: mcpTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    // 3. Execute
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    // 4. Verify Truncation Logic
+    expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
+      longText,
+      mcpToolName,
+      'call-mcp-trunc',
+      expect.any(String),
+      'test-session-id',
+    );
+
+    expect(fileUtils.formatTruncatedToolOutput).toHaveBeenCalledWith(
+      longText,
+      '/tmp/truncated_output.txt',
+      10,
+    );
+
+    expect(result.status).toBe(CoreToolCallStatus.Success);
+    if (result.status === CoreToolCallStatus.Success) {
+      expect(result.response.outputFile).toBe('/tmp/truncated_output.txt');
+    }
+  });
+
+  it('should not truncate MCP tool output with multiple Parts', async () => {
+    vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10);
+
+    const messageBus = createMockMessageBus();
+    const mcpTool = new DiscoveredMCPTool(
+      {} as CallableTool,
+      'my-server',
+      'get_big_text',
+      'A test MCP tool',
+      {},
+      messageBus,
+    );
+    const invocation = mcpTool.build({});
+    const longText = 'This is long text that exceeds the threshold.';
+
+    // Part[] with multiple parts — should NOT be truncated
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+      llmContent: [{ text: longText }, { text: 'second part' }],
+      returnDisplay: longText,
+    });
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-mcp-multi',
+        name: 'get_big_text',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-mcp-multi',
+      },
+      tool: mcpTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    // Should NOT have been truncated
+    expect(fileUtils.saveTruncatedToolOutput).not.toHaveBeenCalled();
+    expect(fileUtils.formatTruncatedToolOutput).not.toHaveBeenCalled();
+    expect(result.status).toBe(CoreToolCallStatus.Success);
+  });
+
+  it('should not truncate MCP tool output when text is below threshold', async () => {
+    vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10000);
+
+    const messageBus = createMockMessageBus();
+    const mcpTool = new DiscoveredMCPTool(
+      {} as CallableTool,
+      'my-server',
+      'get_big_text',
+      'A test MCP tool',
+      {},
+      messageBus,
+    );
+    const invocation = mcpTool.build({});
+
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+      llmContent: [{ text: 'short' }],
+      returnDisplay: 'short',
+    });
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-mcp-short',
+        name: 'get_big_text',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-mcp-short',
+      },
+      tool: mcpTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(fileUtils.saveTruncatedToolOutput).not.toHaveBeenCalled();
+    expect(result.status).toBe(CoreToolCallStatus.Success);
   });
 
   it('should report PID updates for shell tools', async () => {
