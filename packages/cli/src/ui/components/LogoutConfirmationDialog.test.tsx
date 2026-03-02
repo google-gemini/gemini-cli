@@ -28,9 +28,9 @@ describe('LogoutConfirmationDialog', () => {
     );
     await waitUntilReady();
 
-    expect(lastFrame()).toContain('You are now logged out.');
+    expect(lastFrame()).toContain('You are now signed out');
     expect(lastFrame()).toContain(
-      'Login again to continue using Gemini CLI, or exit the application.',
+      'Sign in again to continue using Gemini CLI, or exit the application.',
     );
     expect(lastFrame()).toContain('(Use Enter to select, Esc to close)');
     unmount();
