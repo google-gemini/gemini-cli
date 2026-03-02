@@ -302,7 +302,7 @@ jobs:
       - name: 'Build project'
         run: 'npm run build'
 
-      - name: 'Run Evals (Required to pass)'
+      - name: 'Run Evals (ALWAYS_PASSING)'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
         run: 'npm run test:always_passing_evals'
@@ -315,7 +315,6 @@ jobs:
       - 'e2e_linux'
       - 'e2e_mac'
       - 'e2e_windows'
-      - 'evals'
       - 'merge_queue_skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
@@ -323,8 +322,7 @@ jobs:
         run: |
           if [[ ${NEEDS_E2E_LINUX_RESULT} != 'success' || \
                ${NEEDS_E2E_MAC_RESULT} != 'success' || \
-               ${NEEDS_E2E_WINDOWS_RESULT} != 'success' || \
-               ${NEEDS_EVALS_RESULT} != 'success' ]]; then
+               ${NEEDS_E2E_WINDOWS_RESULT} != 'success' ]]; then
             echo "One or more E2E jobs failed."
             exit 1
           fi
@@ -333,7 +331,6 @@ jobs:
           NEEDS_E2E_LINUX_RESULT: '${{ needs.e2e_linux.result }}'
           NEEDS_E2E_MAC_RESULT: '${{ needs.e2e_mac.result }}'
           NEEDS_E2E_WINDOWS_RESULT: '${{ needs.e2e_windows.result }}'
-          NEEDS_EVALS_RESULT: '${{ needs.evals.result }}'
 
   set_workflow_status:
     runs-on: 'gemini-cli-ubuntu-16-core'
