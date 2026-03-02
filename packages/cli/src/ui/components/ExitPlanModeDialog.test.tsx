@@ -16,7 +16,6 @@ import {
   validatePlanContent,
   processSingleFileContent,
   type FileSystemService,
-  readFileLines,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 
@@ -32,7 +31,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     validatePlanPath: vi.fn(async () => null),
     validatePlanContent: vi.fn(async () => null),
     processSingleFileContent: vi.fn(),
-    readFileLines: vi.fn(),
   };
 });
 
@@ -128,7 +126,6 @@ Implement a comprehensive authentication system with multiple providers.
     });
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.realpathSync).mockImplementation((p) => p as string);
-    vi.mocked(readFileLines).mockResolvedValue(samplePlanContent.split('\n'));
     onApprove = vi.fn();
     onFeedback = vi.fn();
     onCancel = vi.fn();
@@ -544,7 +541,7 @@ Implement a comprehensive authentication system with multiple providers.
         expect(onFeedback).not.toHaveBeenCalled();
       });
 
-      it('automatically submits feedback if plan was edited via Ctrl+X', async () => {
+      it('automatically submits feedback when Ctrl+X is used to edit the plan', async () => {
         const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
 
         await act(async () => {
@@ -554,14 +551,6 @@ Implement a comprehensive authentication system with multiple providers.
         await waitFor(() => {
           expect(lastFrame()).toContain('Add user authentication');
         });
-
-        // Mock different content for second read
-        vi.mocked(readFileLines)
-          .mockResolvedValueOnce(samplePlanContent.split('\n'))
-          .mockResolvedValueOnce([
-            ...samplePlanContent.split('\n'),
-            '# Added feedback',
-          ]);
 
         // Press Ctrl+X
         await act(async () => {
@@ -570,38 +559,8 @@ Implement a comprehensive authentication system with multiple providers.
 
         await waitFor(() => {
           expect(onFeedback).toHaveBeenCalledWith(
-            'I have annotated the plan with feedback. Please review the edited plan file and update the plan accordingly.',
+            'I have edited the plan or annotated it with feedback. Review the edited plan, update if necessary, and present it again for approval.',
           );
-        });
-      });
-
-      it('does not submit feedback if plan was not edited via Ctrl+X', async () => {
-        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
-
-        await act(async () => {
-          vi.runAllTimers();
-        });
-
-        await waitFor(() => {
-          expect(lastFrame()).toContain('Add user authentication');
-        });
-
-        // Mock same content for both reads
-        vi.mocked(readFileLines).mockResolvedValue(
-          samplePlanContent.split('\n'),
-        );
-
-        // Reset the mock to track the second call during refresh
-        vi.mocked(processSingleFileContent).mockClear();
-
-        // Press Ctrl+X
-        await act(async () => {
-          writeKey(stdin, '\x18'); // Ctrl+X
-        });
-
-        await waitFor(() => {
-          expect(onFeedback).not.toHaveBeenCalled();
-          expect(processSingleFileContent).toHaveBeenCalled();
         });
       });
     },

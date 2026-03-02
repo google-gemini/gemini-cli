@@ -16,7 +16,6 @@ import {
   type EditorType,
   processSingleFileContent,
   debugLogger,
-  readFileLines,
 } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -156,17 +155,12 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
 
   const handleOpenEditor = useCallback(async () => {
     try {
-      const beforeLines = await readFileLines(planPath);
       await openFileInEditor(planPath, stdin, setRawMode, getPreferredEditor());
-      const afterLines = await readFileLines(planPath);
 
-      if (JSON.stringify(beforeLines) !== JSON.stringify(afterLines)) {
-        onFeedback(
-          'I have annotated the plan with feedback. Please review the edited plan file and update the plan accordingly.',
-        );
-      } else {
-        refresh();
-      }
+      onFeedback(
+        'I have edited the plan or annotated it with feedback. Review the edited plan, update if necessary, and present it again for approval.',
+      );
+      refresh();
     } catch (err) {
       debugLogger.error('Failed to open plan in editor:', err);
     }
