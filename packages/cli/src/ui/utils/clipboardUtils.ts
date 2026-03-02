@@ -418,7 +418,7 @@ export async function cleanupOldClipboardImages(
   }
 }
 /**
- * Splits a pasted text block up into escaped path segements if it's a legal
+ * Splits a pasted text block up into escaped path segments if it's a legal
  * drag-and-drop string.
  *
  * There are multiple ways drag-and-drop paths might be escaped:
@@ -430,7 +430,7 @@ export async function cleanupOldClipboardImages(
  * When wrapped in single quotes, actual single quotes in the filename are
  * escaped with "'\''". For example: '/path/to/my '\''fancy file'\''.png'
  *
- * When wrapped in double quotes, actual double quotes are not an issue becuase
+ * When wrapped in double quotes, actual double quotes are not an issue because
  * windows doesn't allow them in filenames.
  *
  * On all systems, a single drag-and-drop may include both wrapped and bare

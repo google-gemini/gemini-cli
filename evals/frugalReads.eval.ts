@@ -99,7 +99,7 @@ describe('Frugal reads eval', () => {
         );
       }
 
-      // Ranged read shoud be frugal and just enough to satisfy the task at hand.
+      // Ranged read should be frugal and just enough to satisfy the task at hand.
       expect(
         totalLinesRead,
         'Agent read more of the file than expected',

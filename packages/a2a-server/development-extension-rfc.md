@@ -413,7 +413,7 @@ This method allows the client to execute a slash command. Following the initial
 mechanism to communicate the command's progress and output. All subsequent
 updates, including textual output, agent thoughts, and any required user
 confirmations for tool calls (like executing a shell command), will be sent as
-`TaskStatusUpdateEvent` messages, re-using the schemas defined above.
+`TaskStatusUpdateEvent` messages, reusing the schemas defined above.
 
 ```proto
 // Request to execute a specific slash command.

@@ -1046,7 +1046,7 @@ describe('AskUserDialog', () => {
         { width: 120 },
       );
 
-      // Answer Q1 and Q2 sequentialy
+      // Answer Q1 and Q2 sequentially
       act(() => {
         stdin.write('\r'); // Select A1 for Q1 -> triggers autoAdvance
       });

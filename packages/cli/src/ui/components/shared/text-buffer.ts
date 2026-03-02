@@ -1508,7 +1508,7 @@ function calculateVisualCursorFromLayout(
   const [visualRow, startColInLogical] =
     segmentsForLogicalLine[targetSegmentIndex];
 
-  // Find the coordinates in transformed space in order to conver to visual
+  // Find the coordinates in transformed space in order to convert to visual
   const transformedToLogicalMap = transformedToLogicalMaps[logicalRow] ?? [];
   let transformedCol = 0;
   for (let i = 0; i < transformedToLogicalMap.length; i++) {
