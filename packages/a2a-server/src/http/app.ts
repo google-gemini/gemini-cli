@@ -98,7 +98,7 @@ const customUserBuilder: UserBuilder = async (req: Request) => {
   }
   if (!auth) return new UnauthenticatedUser();
 
-  // 1. Bearer Auth
+  // Bearer Auth
   if (auth.startsWith('Bearer ')) {
     const token = auth.substring(7);
     if (token === 'valid-token') {
@@ -106,7 +106,7 @@ const customUserBuilder: UserBuilder = async (req: Request) => {
     }
   }
 
-  // 2. Basic Auth
+  // Basic Auth
   if (auth.startsWith('Basic ')) {
     const credentials = Buffer.from(auth.substring(6), 'base64').toString();
     if (credentials === 'admin:password') {
