@@ -11,9 +11,10 @@ const EVALS_FILE_PREFIXES = [
 ];
 
 function main() {
+  const targetBranch = process.env.GITHUB_BASE_REF || 'main';
   try {
-    // Fetch main branch from origin.
-    execSync('git fetch origin main', {
+    // Fetch target branch from origin.
+    execSync(`git fetch origin ${targetBranch}`, {
       stdio: 'ignore',
     });
 
