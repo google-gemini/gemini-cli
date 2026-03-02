@@ -639,6 +639,16 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the footer from the UI',
         showInDialog: true,
       },
+      collapseDrawerDuringApproval: {
+        type: 'boolean',
+        label: 'Collapse Drawer During Approval',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Collapse the entire drawer (status, context, input, footer) when a tool approval request is displayed.',
+        showInDialog: true,
+      },
       newFooterLayout: {
         type: 'enum',
         label: 'New Footer Layout',

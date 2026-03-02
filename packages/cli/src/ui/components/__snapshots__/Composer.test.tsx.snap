@@ -2,7 +2,7 @@
 
 exports[`Composer > Snapshots > matches snapshot in idle state 1`] = `
 "                                                                                       ShortcutsHint
- ApprovalModeIndicator                                                                 StatusDisplay
+ ApprovalModeIndicator ·StatusDisplay
 InputPrompt:   Type your message or @path/to/file
 Footer
 "
@@ -23,9 +23,7 @@ InputPrompt:   Type your message or @path/to/file
 exports[`Composer > Snapshots > matches snapshot in narrow view 1`] = `
 "
 ShortcutsHint
- ApprovalModeIndicator
-
-StatusDisplay
+ ApprovalModeIndicator ·StatusDisplay
 InputPrompt:   Type your message or
 @path/to/file
 Footer

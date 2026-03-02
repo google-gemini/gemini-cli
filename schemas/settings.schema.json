@@ -381,6 +381,13 @@
           "default": false,
           "type": "boolean"
         },
+        "collapseDrawerDuringApproval": {
+          "title": "Collapse Drawer During Approval",
+          "description": "Collapse the entire drawer (status, context, input, footer) when a tool approval request is displayed.",
+          "markdownDescription": "Collapse the entire drawer (status, context, input, footer) when a tool approval request is displayed.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "newFooterLayout": {
           "title": "New Footer Layout",
           "description": "Use the new 2-row layout with inline tips.",

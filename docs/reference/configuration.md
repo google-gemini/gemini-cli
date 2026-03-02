@@ -285,6 +285,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide the footer from the UI
   - **Default:** `false`
 
+- **`ui.collapseDrawerDuringApproval`** (boolean):
+  - **Description:** Collapse the entire drawer (status, context, input, footer)
+    when a tool approval request is displayed.
+  - **Default:** `true`
+
 - **`ui.newFooterLayout`** (enum):
   - **Description:** Use the new 2-row layout with inline tips.
   - **Default:** `"legacy"`
