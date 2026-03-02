@@ -264,6 +264,8 @@ it yourself; just report it.
 | `temperature`  | number | No       | Model temperature (0.0 - 2.0).                                                                                            |
 | `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return. Defaults to `15`.                      |
 | `timeout_mins` | number | No       | Maximum execution time in minutes. Defaults to `5`.                                                                       |
+| `policy`       | object | No       | Scoped policy settings for the agent (see [Policy Engine](../reference/policy-engine.md)).                                |
+| `mcp_servers`  | object | No       | MCP servers private to this agent. Key is server name, value is server configuration.                                     |
 
 ### Optimizing your subagent
 
