@@ -40,19 +40,19 @@ const LLM_LOOP_CHECK_HISTORY_COUNT = 20;
 /**
  * The number of turns that must pass in a single prompt before the LLM-based loop check is activated.
  */
-const LLM_CHECK_AFTER_TURNS = 30;
+const LLM_CHECK_AFTER_TURNS = 40;
 
 /**
  * The default interval, in number of turns, at which the LLM-based loop check is performed.
  * This value is adjusted dynamically based on the LLM's confidence.
  */
-const DEFAULT_LLM_CHECK_INTERVAL = 3;
+const DEFAULT_LLM_CHECK_INTERVAL = 10;
 
 /**
  * The minimum interval for LLM-based loop checks.
  * This is used when the confidence of a loop is high, to check more frequently.
  */
-const MIN_LLM_CHECK_INTERVAL = 5;
+const MIN_LLM_CHECK_INTERVAL = 7;
 
 /**
  * The maximum interval for LLM-based loop checks.
@@ -66,16 +66,40 @@ const MAX_LLM_CHECK_INTERVAL = 15;
 const LLM_CONFIDENCE_THRESHOLD = 0.9;
 const DOUBLE_CHECK_MODEL_ALIAS = 'loop-detection-double-check';
 
-const LOOP_DETECTION_SYSTEM_PROMPT = `You are a sophisticated AI diagnostic agent specializing in identifying when a conversational AI is stuck in an unproductive state. Your task is to analyze the provided conversation history and determine if the assistant has ceased to make meaningful progress.
+const LOOP_DETECTION_SYSTEM_PROMPT = `You are a diagnostic agent that determines whether a conversational AI assistant is stuck in an unproductive loop. Analyze the conversation history (and, if provided, the original user request) to make this determination.
 
-An unproductive state is characterized by one or more of the following patterns over the last 5 or more assistant turns:
+## What constitutes an unproductive state
 
-Repetitive Actions: The assistant repeats the same tool calls or conversational responses a decent number of times. This includes simple loops (e.g., tool_A, tool_A, tool_A) and alternating patterns (e.g., tool_A, tool_B, tool_A, tool_B, ...).
+An unproductive state requires BOTH of the following to be true:
+1. The assistant has exhibited a repetitive pattern over at least 5 consecutive model actions (tool calls or text responses, counting only model-role turns).
+2. The repetition produces NO net change or forward progress toward the user's goal.
 
-Cognitive Loop: The assistant seems unable to determine the next logical step. It might express confusion, repeatedly ask the same questions, or generate responses that don't logically follow from the previous turns, indicating it's stuck and not advancing the task.
+Specific patterns to look for:
+- **Alternating cycles with no net effect:** The assistant cycles between the same actions (e.g., edit_file → run_build → edit_file → run_build) where each iteration applies the same edit and encounters the same error, making zero progress. Note: alternating between actions is only a loop if the arguments and outcomes are substantively identical each cycle. If the assistant is modifying different code or getting different errors, that is debugging progress, not a loop.
+- **Semantic repetition with identical outcomes:** The assistant calls the same tool with semantically equivalent arguments (same file, same line range, same content) multiple times consecutively, and each call produces the same outcome. This does NOT include build/test commands that are re-run after making code changes between invocations — re-running a build to verify a fix is normal workflow.
+- **Stuck reasoning:** The assistant produces multiple consecutive text responses that restate the same plan, question, or analysis without taking any new action or making a decision. This does NOT include command output that happens to contain repeated status lines or warnings.
 
-Crucially, differentiate between a true unproductive state and legitimate, incremental progress.
-For example, a series of 'tool_A' or 'tool_B' tool calls that make small, distinct changes to the same file (like adding docstrings to functions one by one) is considered forward progress and is NOT a loop. A loop would be repeatedly replacing the same text with the same content, or cycling between a small set of files with no net change.`;
+## What is NOT an unproductive state
+
+You MUST distinguish repetitive-looking but productive work from true loops. The following are examples of forward progress and must NOT be flagged:
+
+- **Cross-file batch operations:** A series of tool calls with the same tool name but targeting different files (different file paths in the arguments). For example, adding license headers to 20 files, or running the same refactoring across multiple modules.
+- **Incremental same-file edits:** Multiple edits to the same file that target different line ranges, different functions, or different text content (e.g., adding docstrings to functions one by one).
+- **Sequential processing:** A series of read or search operations on different files/paths to gather information.
+- **Retry with variation:** Re-attempting a failed operation with modified arguments or a different approach.
+
+## Argument analysis (critical)
+
+When evaluating tool calls, you MUST compare the **arguments** of each call, not just the tool name. Pay close attention to:
+- **File paths:** Different file paths mean different targets — this is distinct work, not repetition.
+- **Line numbers and text content:** Different line ranges or different old_string/new_string values indicate distinct edits.
+- **Search queries and patterns:** Different search terms indicate information gathering, not looping.
+
+A loop exists only when the same tool is called with semantically equivalent arguments repeatedly, indicating no forward progress.
+
+## Using the original user request
+
+If the original user request is provided, use it to contextualize the assistant's behavior. If the request implies a batch or multi-step operation (e.g., "update all files", "refactor every module", "add tests for each function"), then repetitive tool calls with varying arguments are expected and should weigh heavily against flagging a loop.`;
 
 const LOOP_DETECTION_SCHEMA: Record<string, unknown> = {
   type: 'object',
@@ -101,6 +125,7 @@ const LOOP_DETECTION_SCHEMA: Record<string, unknown> = {
 export class LoopDetectionService {
   private readonly config: Config;
   private promptId = '';
+  private userPrompt = '';
 
   // Tool call tracking
   private lastToolCallKey: string | null = null;
@@ -450,9 +475,21 @@ export class LoopDetectionService {
 
     const trimmedHistory = this.trimRecentHistory(recentHistory);
 
-    const taskPrompt = `Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state. Provide your response in the requested JSON format.`;
+    const taskPrompt = `Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state. Consider the original user request when evaluating whether repeated tool calls represent legitimate batch work or an actual loop. Provide your response in the requested JSON format.`;
 
     const contents = [
+      ...(this.userPrompt
+        ? [
+            {
+              role: 'user' as const,
+              parts: [
+                {
+                  text: `<original_user_request>\n${this.userPrompt}\n</original_user_request>`,
+                },
+              ],
+            },
+          ]
+        : []),
       ...trimmedHistory,
       { role: 'user', parts: [{ text: taskPrompt }] },
     ];
@@ -602,8 +639,9 @@ export class LoopDetectionService {
   /**
    * Resets all loop detection state.
    */
-  reset(promptId: string): void {
+  reset(promptId: string, userPrompt?: string): void {
     this.promptId = promptId;
+    this.userPrompt = userPrompt ?? '';
     this.resetToolCallCount();
     this.resetContentTracking();
     this.resetLlmCheckTracking();
