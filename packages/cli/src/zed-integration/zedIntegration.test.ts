@@ -157,6 +157,7 @@ describe('GeminiAgent', () => {
     mockConfig = {
       refreshAuth: vi.fn(),
       initialize: vi.fn(),
+      waitForMcpInit: vi.fn(),
       getFileSystemService: vi.fn(),
       setFileSystemService: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
@@ -530,6 +531,7 @@ describe('Session', () => {
       isPlanEnabled: vi.fn().mockReturnValue(false),
       getCheckpointingEnabled: vi.fn().mockReturnValue(false),
       getGitService: vi.fn().mockResolvedValue({} as GitService),
+      waitForMcpInit: vi.fn(),
     } as unknown as Mocked<Config>;
     mockConnection = {
       sessionUpdate: vi.fn(),
@@ -567,6 +569,26 @@ describe('Session', () => {
         }),
       }),
     );
+  it('should await MCP initialization before processing a prompt', async () => {
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [{ content: { parts: [{ text: 'Hi' }] } }] },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'test' }],
+    });
+
+    expect(mockConfig.waitForMcpInit).toHaveBeenCalledOnce();
+    const waitOrder = (mockConfig.waitForMcpInit as Mock).mock
+      .invocationCallOrder[0];
+    const sendOrder = (mockChat.sendMessageStream as Mock).mock
+      .invocationCallOrder[0];
+    expect(waitOrder).toBeLessThan(sendOrder);
   });
 
   it('should handle prompt with text response', async () => {
@@ -798,6 +820,133 @@ describe('Session', () => {
     expect(mockConnection.requestPermission).toHaveBeenCalled();
     expect(confirmationDetails.onConfirm).toHaveBeenCalledWith(
       ToolConfirmationOutcome.ProceedOnce,
+    );
+  });
+
+  it('should use filePath for ACP diff content in permission request', async () => {
+    const confirmationDetails = {
+      type: 'edit',
+      title: 'Confirm Write: test.txt',
+      fileName: 'test.txt',
+      filePath: '/tmp/test.txt',
+      originalContent: 'old',
+      newContent: 'new',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedOnce,
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCall: expect.objectContaining({
+          content: expect.arrayContaining([
+            expect.objectContaining({
+              type: 'diff',
+              path: '/tmp/test.txt',
+              oldText: 'old',
+              newText: 'new',
+            }),
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('should use filePath for ACP diff content in tool result', async () => {
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: vi.fn().mockResolvedValue({
+        llmContent: 'Tool Result',
+        returnDisplay: {
+          fileName: 'test.txt',
+          filePath: '/tmp/test.txt',
+          originalContent: 'old',
+          newContent: 'new',
+        },
+      }),
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    const updateCalls = mockConnection.sessionUpdate.mock.calls.map(
+      (call) => call[0],
+    );
+    const toolCallUpdate = updateCalls.find(
+      (call) => call.update?.sessionUpdate === 'tool_call_update',
+    );
+
+    expect(toolCallUpdate).toEqual(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          content: expect.arrayContaining([
+            expect.objectContaining({
+              type: 'diff',
+              path: '/tmp/test.txt',
+              oldText: 'old',
+              newText: 'new',
+            }),
+          ]),
+        }),
+      }),
     );
   });
 
