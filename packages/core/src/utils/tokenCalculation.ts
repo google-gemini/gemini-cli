@@ -70,37 +70,50 @@ function estimateTextTokens(text: string): number {
 }
 
 /**
- * Estimates audio tokens from base64 data size.
+ * Estimates tokens for duration-based media (audio, video) from base64 data size.
  *
- * Converts the base64 length to a raw byte count, estimates the audio duration
- * using a conservative compressed-audio bitrate, then multiplies by the Gemini
- * API's audio token rate (32 tokens/second).
+ * Converts the base64 length to a raw byte count, estimates the duration
+ * using a conservative bitrate, then multiplies by the token rate.
  *
  * When no base64 data is available (e.g. fileData references), returns a fixed
  * default estimate.
  */
-function estimateAudioTokens(base64Data: string | undefined): number {
-  if (base64Data === undefined) return DEFAULT_AUDIO_TOKEN_ESTIMATE;
+function estimateMediaDurationTokens(
+  base64Data: string | undefined,
+  defaultEstimate: number,
+  bytesPerSecond: number,
+  tokensPerSecond: number,
+): number {
+  if (base64Data === undefined) return defaultEstimate;
   const rawBytes = base64Data.length * 0.75;
-  const estimatedSeconds = rawBytes / COMPRESSED_AUDIO_BYTES_PER_SECOND;
-  return Math.ceil(estimatedSeconds * AUDIO_TOKENS_PER_SECOND);
+  const estimatedSeconds = rawBytes / bytesPerSecond;
+  return Math.ceil(estimatedSeconds * tokensPerSecond);
 }
 
 /**
- * Estimates video tokens from base64 data size.
- *
- * Converts the base64 length to a raw byte count, estimates the video duration
- * using a conservative compressed-video bitrate, then multiplies by the
- * combined frame + audio token rate (258 + 32 = 290 tokens/second).
- *
- * When no base64 data is available (e.g. fileData references), returns a fixed
- * default estimate.
+ * Estimates audio tokens.
+ * @see estimateMediaDurationTokens
+ */
+function estimateAudioTokens(base64Data: string | undefined): number {
+  return estimateMediaDurationTokens(
+    base64Data,
+    DEFAULT_AUDIO_TOKEN_ESTIMATE,
+    COMPRESSED_AUDIO_BYTES_PER_SECOND,
+    AUDIO_TOKENS_PER_SECOND,
+  );
+}
+
+/**
+ * Estimates video tokens.
+ * @see estimateMediaDurationTokens
  */
 function estimateVideoTokens(base64Data: string | undefined): number {
-  if (base64Data === undefined) return DEFAULT_VIDEO_TOKEN_ESTIMATE;
-  const rawBytes = base64Data.length * 0.75;
-  const estimatedSeconds = rawBytes / COMPRESSED_VIDEO_BYTES_PER_SECOND;
-  return Math.ceil(estimatedSeconds * VIDEO_TOKENS_PER_SECOND);
+  return estimateMediaDurationTokens(
+    base64Data,
+    DEFAULT_VIDEO_TOKEN_ESTIMATE,
+    COMPRESSED_VIDEO_BYTES_PER_SECOND,
+    VIDEO_TOKENS_PER_SECOND,
+  );
 }
 
 /**
