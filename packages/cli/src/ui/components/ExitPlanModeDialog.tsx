@@ -156,11 +156,15 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   const handleOpenEditor = useCallback(async () => {
     try {
       await openFileInEditor(planPath, stdin, setRawMode, getPreferredEditor());
+
+      onFeedback(
+        'I have edited the plan or annotated it with feedback. Review the edited plan, update if necessary, and present it again for approval.',
+      );
       refresh();
     } catch (err) {
       debugLogger.error('Failed to open plan in editor:', err);
     }
-  }, [planPath, stdin, setRawMode, getPreferredEditor, refresh]);
+  }, [planPath, stdin, setRawMode, getPreferredEditor, refresh, onFeedback]);
 
   useKeypress(
     (key) => {
