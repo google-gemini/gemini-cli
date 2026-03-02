@@ -91,6 +91,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     Boolean(uiState.quota.proQuotaRequest) ||
     Boolean(uiState.quota.validationRequest) ||
     Boolean(uiState.customDialog);
+
   const isPassiveShortcutsHelpState =
     uiState.isInputActive &&
     uiState.streamingState === StreamingState.Idle &&
@@ -179,6 +180,13 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
     return () => clearTimeout(timeout);
   }, [canShowShortcutsHint]);
+
+  if (
+    hasPendingActionRequired &&
+    settings.merged.ui.collapseDrawerDuringApproval
+  ) {
+    return null;
+  }
 
   const showShortcutsHint =
     settings.merged.ui.showShortcutsHint &&
@@ -751,8 +759,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
       {showUiDetails &&
         !settings.merged.ui.hideFooter &&
-        (!hasPendingActionRequired ||
-          !settings.merged.ui.hideFooterDuringApproval) &&
         !isScreenReaderEnabled && <Footer />}
     </Box>
   );

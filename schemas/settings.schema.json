@@ -365,10 +365,10 @@
           "default": false,
           "type": "boolean"
         },
-        "hideFooterDuringApproval": {
-          "title": "Hide Footer During Approval",
-          "description": "Hide the footer when a tool approval request is displayed.",
-          "markdownDescription": "Hide the footer when a tool approval request is displayed.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+        "collapseDrawerDuringApproval": {
+          "title": "Collapse Drawer During Approval",
+          "description": "Collapse the entire drawer (status, context, input, footer) when a tool approval request is displayed.",
+          "markdownDescription": "Collapse the entire drawer (status, context, input, footer) when a tool approval request is displayed.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
