@@ -66,6 +66,8 @@ export interface SearchableListProps<T extends GenericListItem> {
   onSearch?: (query: string) => void;
   /** Whether to reset selection to the top when items change (e.g. after search) */
   resetSelectionOnItemsChange?: boolean;
+  /** Whether the list is focused and accepts keyboard input. Defaults to true. */
+  isFocused?: boolean;
 }
 
 /**
@@ -84,6 +86,7 @@ export function SearchableList<T extends GenericListItem>({
   useSearch,
   onSearch,
   resetSelectionOnItemsChange = false,
+  isFocused = true,
 }: SearchableListProps<T>): React.JSX.Element {
   const { filteredItems, searchBuffer, maxLabelWidth } = useSearch({
     items,
@@ -109,7 +112,7 @@ export function SearchableList<T extends GenericListItem>({
   const { activeIndex, setActiveIndex } = useSelectionList({
     items: selectionItems,
     onSelect: handleSelectValue,
-    isFocused: true,
+    isFocused,
     showNumbers: false,
     wrapAround: true,
     priority: true,
@@ -155,7 +158,7 @@ export function SearchableList<T extends GenericListItem>({
       }
       return false;
     },
-    { isActive: true },
+    { isActive: isFocused },
   );
 
   const visibleItems = filteredItems.slice(
@@ -207,7 +210,7 @@ export function SearchableList<T extends GenericListItem>({
           <TextInput
             buffer={searchBuffer}
             placeholder={searchPlaceholder}
-            focus={true}
+            focus={isFocused}
           />
         </Box>
       )}
