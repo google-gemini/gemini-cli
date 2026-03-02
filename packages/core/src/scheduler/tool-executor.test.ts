@@ -6,8 +6,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ToolExecutor } from './tool-executor.js';
-import type { Config, AnyToolInvocation } from '../index.js';
-import type { ToolResult } from '../tools/tools.js';
+import {
+  type Config,
+  type ToolResult,
+  type AnyToolInvocation,
+} from '../index.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import type { ScheduledToolCall } from './types.js';
@@ -17,6 +20,12 @@ import * as fileUtils from '../utils/fileUtils.js';
 import * as coreToolHookTriggers from '../core/coreToolHookTriggers.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import {
+  GeminiCliOperation,
+  GEN_AI_TOOL_CALL_ID,
+  GEN_AI_TOOL_DESCRIPTION,
+  GEN_AI_TOOL_NAME,
+} from '../telemetry/constants.js';
 
 // Mock file utils
 vi.mock('../utils/fileUtils.js', () => ({
@@ -28,6 +37,24 @@ vi.mock('../utils/fileUtils.js', () => ({
 vi.mock('../core/coreToolHookTriggers.js', () => ({
   executeToolWithHooks: vi.fn(),
 }));
+// Mock runInDevTraceSpan
+const runInDevTraceSpan = vi.hoisted(() =>
+  vi.fn(async (opts, fn) => {
+    const metadata = { attributes: opts.attributes || {} };
+    return fn({
+      metadata,
+      endSpan: vi.fn(),
+    });
+  }),
+);
+
+vi.mock('../index.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    runInDevTraceSpan,
+  };
+});
 
 describe('ToolExecutor', () => {
   let config: Config;
@@ -57,6 +84,7 @@ describe('ToolExecutor', () => {
   it('should execute a tool successfully', async () => {
     const mockTool = new MockTool({
       name: 'testTool',
+      description: 'Mock description',
       execute: async () => ({
         llmContent: 'Tool output',
         returnDisplay: 'Tool output',
@@ -97,11 +125,37 @@ describe('ToolExecutor', () => {
         ?.response as Record<string, unknown>;
       expect(response).toEqual({ output: 'Tool output' });
     }
+
+    expect(runInDevTraceSpan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: GeminiCliOperation.ToolCall,
+        attributes: expect.objectContaining({
+          [GEN_AI_TOOL_NAME]: 'testTool',
+          [GEN_AI_TOOL_CALL_ID]: 'call-1',
+          [GEN_AI_TOOL_DESCRIPTION]: 'Mock description',
+        }),
+      }),
+      expect.any(Function),
+    );
+
+    const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
+    const fn = spanArgs[1];
+    const metadata = { attributes: {} };
+    await fn({ metadata, endSpan: vi.fn() });
+    expect(metadata).toMatchObject({
+      input: scheduledCall.request,
+      output: {
+        ...result,
+        durationMs: expect.any(Number),
+        endTime: expect.any(Number),
+      },
+    });
   });
 
   it('should handle execution errors', async () => {
     const mockTool = new MockTool({
       name: 'failTool',
+      description: 'Mock description',
     });
     const invocation = mockTool.build({});
 
@@ -134,6 +188,26 @@ describe('ToolExecutor', () => {
     if (result.status === CoreToolCallStatus.Error) {
       expect(result.response.error?.message).toBe('Tool Failed');
     }
+
+    expect(runInDevTraceSpan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: GeminiCliOperation.ToolCall,
+        attributes: expect.objectContaining({
+          [GEN_AI_TOOL_NAME]: 'failTool',
+          [GEN_AI_TOOL_CALL_ID]: 'call-2',
+          [GEN_AI_TOOL_DESCRIPTION]: 'Mock description',
+        }),
+      }),
+      expect.any(Function),
+    );
+
+    const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
+    const fn = spanArgs[1];
+    const metadata = { attributes: {} };
+    await fn({ metadata, endSpan: vi.fn() });
+    expect(metadata).toMatchObject({
+      error: new Error('Tool Failed'),
+    });
   });
 
   it('should return cancelled result when signal is aborted', async () => {
