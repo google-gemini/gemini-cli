@@ -60,13 +60,13 @@ for more details.
 
 ### Ensure consistent use of keyboard shortcuts
 
-Render shortcuts as `Modifier+Key` (for example, `Ctrl+S`). Modifiers should be 
-capitalized; keys should be uppercase. No extra spaces.
+Render shortcuts as `Modifier+Key` (for example, `Ctrl+S`). Modifiers and named keys
+(for example, `Enter`, `Tab`, and `Esc`) should be **Title case**; single character
+keys should be **uppercase**. No extra spaces.
 
 - Use `Esc` instead of "Escape".
+- Use `Enter` instead of "Return".
 - Use Unicode symbols (`⇧`, `⏎`) only if there are tight space constraints.
-
-- **"Escape"** should be written as `Esc` for brevity.
 - If there are space constraints, it is acceptable to use Unicode symbols for
   modifiers, for example `⇧+K` for `Shift+K`, or `⏎` for `Enter`. 
 
