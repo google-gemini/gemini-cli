@@ -174,6 +174,8 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     isFocused: true,
     thought: '',
     currentLoadingPhrase: '',
+    currentTip: '',
+    currentWittyPhrase: '',
     elapsedTime: 0,
     ctrlCPressedOnce: false,
     ctrlDPressedOnce: false,
@@ -370,11 +372,11 @@ describe('Composer', () => {
       expect(output).toContain('LoadingIndicator: Processing');
     });
 
-    it('renders generic thinking text in loading indicator when full inline thinking is enabled', async () => {
+    it('renders actual thought subject in loading indicator even when full inline thinking is enabled', async () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         thought: {
-          subject: 'Detailed in-history thought',
+          subject: 'Thinking about code',
           description: 'Full text is already in history',
         },
       });
@@ -385,7 +387,7 @@ describe('Composer', () => {
       const { lastFrame } = await renderComposer(uiState, settings);
 
       const output = lastFrame();
-      expect(output).toContain('LoadingIndicator: Thinking ...');
+      expect(output).toContain('LoadingIndicator: Thinking...');
     });
 
     it('hides shortcuts hint while loading', async () => {
@@ -402,13 +404,13 @@ describe('Composer', () => {
       expect(output).not.toContain('ShortcutsHint');
     });
 
-    it('renders LoadingIndicator with thought when loadingPhrases is off', async () => {
+    it('renders LoadingIndicator with thought when loadingPhraseLayout is none', async () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         thought: { subject: 'Hidden', description: 'Should not show' },
       });
       const settings = createMockSettings({
-        merged: { ui: { loadingPhrases: 'off' } },
+        merged: { ui: { loadingPhraseLayout: 'none' } },
       });
 
       const { lastFrame } = await renderComposer(uiState, settings);
@@ -455,9 +457,8 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
-      const output = lastFrame();
-      expect(output).not.toContain('LoadingIndicator');
-      expect(output).not.toContain('esc to cancel');
+      const output = lastFrame({ allowEmpty: true });
+      expect(output).toBe('');
     });
 
     it('renders LoadingIndicator when embedded shell is focused but background shell is visible', async () => {
@@ -562,7 +563,7 @@ describe('Composer', () => {
       const output = lastFrame();
       expect(output).toContain('ToastDisplay');
       expect(output).not.toContain('ApprovalModeIndicator');
-      expect(output).toContain('StatusDisplay');
+      expect(output).not.toContain('StatusDisplay');
     });
 
     it('shows ToastDisplay for other toast types', async () => {
@@ -710,9 +711,7 @@ describe('Composer', () => {
       });
 
       const { lastFrame } = await renderComposer(uiState);
-      const output = lastFrame();
-      expect(output).not.toContain('plan');
-      expect(output).not.toContain('ShortcutsHint');
+      expect(lastFrame({ allowEmpty: true })).toBe('');
     });
 
     it('shows Esc rewind prompt in minimal mode without showing full UI', async () => {
@@ -865,9 +864,10 @@ describe('Composer', () => {
         ),
       });
 
-      const { lastFrame } = await renderComposer(uiState);
+      const { lastFrame, unmount } = await renderComposer(uiState);
 
-      expect(lastFrame()).not.toContain('ShortcutsHint');
+      expect(lastFrame({ allowEmpty: true })).toBe('');
+      unmount();
     });
 
     it('keeps shortcuts hint visible when no action is required', async () => {
@@ -1001,24 +1001,22 @@ describe('Composer', () => {
       expect(lastFrame()).not.toContain('ShortcutsHelp');
       unmount();
     });
-
     it('hides shortcuts help when action is required', async () => {
       const uiState = createMockUIState({
         shortcutsHelpVisible: true,
         customDialog: (
           <Box>
-            <Text>Dialog content</Text>
+            <Text>Test Dialog</Text>
           </Box>
         ),
       });
 
       const { lastFrame, unmount } = await renderComposer(uiState);
 
-      expect(lastFrame()).not.toContain('ShortcutsHelp');
+      expect(lastFrame({ allowEmpty: true })).toBe('');
       unmount();
     });
   });
-
   describe('Snapshots', () => {
     it('matches snapshot in idle state', async () => {
       const uiState = createMockUIState();

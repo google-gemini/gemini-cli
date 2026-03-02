@@ -60,7 +60,7 @@ describe('getToolGroupBorderAppearance', () => {
     expect(appearance.borderDimColor).toBe(true);
   });
 
-  it('should use symbol color for shell tools', () => {
+  it('should use active color for shell tools', () => {
     const item = {
       type: 'tool_group' as const,
       tools: [
@@ -73,8 +73,27 @@ describe('getToolGroupBorderAppearance', () => {
       ] as IndividualToolCallDisplay[],
     };
     const appearance = getToolGroupBorderAppearance(item, undefined, false, []);
-    expect(appearance.borderColor).toBe(theme.ui.symbol);
+    expect(appearance.borderColor).toBe(theme.ui.active);
     expect(appearance.borderDimColor).toBe(true);
+  });
+
+  it('should use focus color for focused shell tools', () => {
+    const ptyId = 123;
+    const item = {
+      type: 'tool_group' as const,
+      tools: [
+        {
+          name: 'run_shell_command',
+          status: CoreToolCallStatus.Executing,
+          resultDisplay: '',
+          callId: 'call-1',
+          ptyId,
+        },
+      ] as IndividualToolCallDisplay[],
+    };
+    const appearance = getToolGroupBorderAppearance(item, ptyId, true, []);
+    expect(appearance.borderColor).toBe(theme.ui.focus);
+    expect(appearance.borderDimColor).toBe(false);
   });
 });
 

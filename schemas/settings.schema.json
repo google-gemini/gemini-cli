@@ -327,10 +327,26 @@
           "default": {},
           "type": "object",
           "properties": {
+            "items": {
+              "title": "Footer Items",
+              "description": "List of item IDs to display in the footer. Rendered in order",
+              "markdownDescription": "List of item IDs to display in the footer. Rendered in order\n\n- Category: `UI`\n- Requires restart: `no`",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "showLabels": {
+              "title": "Show Footer Labels",
+              "description": "Display a second line above the footer items with descriptive headers (e.g., /model).",
+              "markdownDescription": "Display a second line above the footer items with descriptive headers (e.g., /model).\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
             "hideCWD": {
               "title": "Hide CWD",
-              "description": "Hide the current working directory path in the footer.",
-              "markdownDescription": "Hide the current working directory path in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+              "description": "Hide the current working directory in the footer.",
+              "markdownDescription": "Hide the current working directory in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             },
@@ -363,6 +379,35 @@
           "description": "Hide the footer from the UI",
           "markdownDescription": "Hide the footer from the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
+          "type": "boolean"
+        },
+        "collapseDrawerDuringApproval": {
+          "title": "Collapse Drawer During Approval",
+          "description": "Collapse the entire drawer (status, context, input, footer) when a tool approval request is displayed.",
+          "markdownDescription": "Collapse the entire drawer (status, context, input, footer) when a tool approval request is displayed.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "newFooterLayout": {
+          "title": "New Footer Layout",
+          "description": "Use the new 2-row layout with inline tips.",
+          "markdownDescription": "Use the new 2-row layout with inline tips.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `legacy`",
+          "default": "legacy",
+          "type": "string",
+          "enum": ["legacy", "new", "new_divider_down"]
+        },
+        "showTips": {
+          "title": "Show Tips",
+          "description": "Show informative tips on the right side of the status line.",
+          "markdownDescription": "Show informative tips on the right side of the status line.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "showWit": {
+          "title": "Show Witty Phrases",
+          "description": "Show witty phrases while waiting.",
+          "markdownDescription": "Show witty phrases while waiting.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "showMemoryUsage": {
@@ -427,14 +472,6 @@
           "markdownDescription": "Show the spinner during operations.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
-        },
-        "loadingPhrases": {
-          "title": "Loading Phrases",
-          "description": "What to show while the model is working: tips, witty comments, both, or nothing.",
-          "markdownDescription": "What to show while the model is working: tips, witty comments, both, or nothing.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `tips`",
-          "default": "tips",
-          "type": "string",
-          "enum": ["tips", "witty", "all", "off"]
         },
         "errorVerbosity": {
           "title": "Error Verbosity",

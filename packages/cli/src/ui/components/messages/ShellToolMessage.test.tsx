@@ -19,6 +19,11 @@ import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SHELL_COMMAND_NAME, ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
+import { Text } from 'ink';
+
+vi.mock('../CliSpinner.js', () => ({
+  CliSpinner: () => <Text>⊶</Text>,
+}));
 
 describe('<ShellToolMessage />', () => {
   const baseProps: ShellToolMessageProps = {

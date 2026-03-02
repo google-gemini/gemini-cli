@@ -98,6 +98,7 @@ describe('<Header />', () => {
         primary: '',
         message: '',
         input: '',
+        focus: '',
         diff: { added: '', removed: '' },
       },
       border: {
@@ -107,7 +108,9 @@ describe('<Header />', () => {
       ui: {
         comment: '',
         symbol: '',
+        active: '',
         dark: '',
+        focus: '',
         gradient: undefined,
       },
       status: {

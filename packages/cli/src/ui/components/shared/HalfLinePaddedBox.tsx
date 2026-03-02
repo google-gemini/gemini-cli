@@ -32,6 +32,11 @@ export interface HalfLinePaddedBoxProps {
    */
   useBackgroundColor?: boolean;
 
+  /**
+   * Optional horizontal margin.
+   */
+  marginX?: number;
+
   children: React.ReactNode;
 }
 
@@ -52,6 +57,7 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
   backgroundBaseColor,
   backgroundOpacity,
   children,
+  marginX = 0,
 }) => {
   const { terminalWidth } = useUIState();
   const terminalBg = theme.background.primary || 'black';
@@ -80,6 +86,8 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
   }
 
   const isITerm = isITerm2();
+  const barWidth = Math.max(0, terminalWidth - marginX * 2);
+  const marginSpaces = ' '.repeat(marginX);
 
   if (isITerm) {
     return (
@@ -91,10 +99,15 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
         flexShrink={0}
       >
         <Box width={terminalWidth} flexDirection="row">
-          <Text color={backgroundColor}>{'▄'.repeat(terminalWidth)}</Text>
+          <Text color={terminalBg}>
+            {marginSpaces}
+            <Text color={backgroundColor}>{'▄'.repeat(barWidth)}</Text>
+            {marginSpaces}
+          </Text>
         </Box>
         <Box
-          width={terminalWidth}
+          width={barWidth}
+          marginLeft={marginX}
           flexDirection="column"
           alignItems="stretch"
           backgroundColor={backgroundColor}
@@ -102,7 +115,11 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
           {children}
         </Box>
         <Box width={terminalWidth} flexDirection="row">
-          <Text color={backgroundColor}>{'▀'.repeat(terminalWidth)}</Text>
+          <Text color={terminalBg}>
+            {marginSpaces}
+            <Text color={backgroundColor}>{'▀'.repeat(barWidth)}</Text>
+            {marginSpaces}
+          </Text>
         </Box>
       </Box>
     );
@@ -115,17 +132,27 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
       alignItems="stretch"
       minHeight={1}
       flexShrink={0}
-      backgroundColor={backgroundColor}
     >
       <Box width={terminalWidth} flexDirection="row">
-        <Text backgroundColor={backgroundColor} color={terminalBg}>
-          {'▀'.repeat(terminalWidth)}
+        <Text color={terminalBg}>
+          {marginSpaces}
+          <Text backgroundColor={backgroundColor}>{'▀'.repeat(barWidth)}</Text>
+          {marginSpaces}
         </Text>
       </Box>
-      {children}
+      <Box
+        width={barWidth}
+        marginLeft={marginX}
+        backgroundColor={backgroundColor}
+        flexDirection="column"
+      >
+        {children}
+      </Box>
       <Box width={terminalWidth} flexDirection="row">
-        <Text color={terminalBg} backgroundColor={backgroundColor}>
-          {'▄'.repeat(terminalWidth)}
+        <Text color={terminalBg}>
+          {marginSpaces}
+          <Text backgroundColor={backgroundColor}>{'▄'.repeat(barWidth)}</Text>
+          {marginSpaces}
         </Text>
       </Box>
     </Box>

@@ -109,9 +109,15 @@
     <text x="9" y="597" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs">  &gt; Apply To                                                                                      </text>
     <text x="891" y="597" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="614" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="27" y="612" width="9" height="17" fill="#394545" />
     <text x="27" y="614" fill="#a6e3a1" textLength="9" lengthAdjust="spacingAndGlyphs">●</text>
+    <rect x="36" y="612" width="9" height="17" fill="#394545" />
+    <rect x="45" y="612" width="18" height="17" fill="#394545" />
     <text x="45" y="614" fill="#a6e3a1" textLength="18" lengthAdjust="spacingAndGlyphs">1.</text>
+    <rect x="63" y="612" width="9" height="17" fill="#394545" />
+    <rect x="72" y="612" width="117" height="17" fill="#394545" />
     <text x="72" y="614" fill="#a6e3a1" textLength="117" lengthAdjust="spacingAndGlyphs">User Settings</text>
+    <rect x="189" y="612" width="684" height="17" fill="#394545" />
     <text x="891" y="614" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="631" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="9" y="631" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs">    2. Workspace Settings                                                                         </text>

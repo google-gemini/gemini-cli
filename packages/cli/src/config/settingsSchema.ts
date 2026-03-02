@@ -571,14 +571,34 @@ const SETTINGS_SCHEMA = {
         description: 'Settings for the footer.',
         showInDialog: false,
         properties: {
+          items: {
+            type: 'array',
+            label: 'Footer Items',
+            category: 'UI',
+            requiresRestart: false,
+            default: undefined as string[] | undefined,
+            description:
+              'List of item IDs to display in the footer. Rendered in order',
+            showInDialog: false,
+            items: { type: 'string' },
+          },
+          showLabels: {
+            type: 'boolean',
+            label: 'Show Footer Labels',
+            category: 'UI',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Display a second line above the footer items with descriptive headers (e.g., /model).',
+            showInDialog: false,
+          },
           hideCWD: {
             type: 'boolean',
             label: 'Hide CWD',
             category: 'UI',
             requiresRestart: false,
             default: false,
-            description:
-              'Hide the current working directory path in the footer.',
+            description: 'Hide the current working directory in the footer.',
             showInDialog: true,
           },
           hideSandboxStatus: {
@@ -619,6 +639,50 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the footer from the UI',
         showInDialog: true,
       },
+      collapseDrawerDuringApproval: {
+        type: 'boolean',
+        label: 'Collapse Drawer During Approval',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Collapse the entire drawer (status, context, input, footer) when a tool approval request is displayed.',
+        showInDialog: true,
+      },
+      newFooterLayout: {
+        type: 'enum',
+        label: 'New Footer Layout',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'legacy',
+        description: 'Use the new 2-row layout with inline tips.',
+        showInDialog: true,
+        options: [
+          { value: 'legacy', label: 'Legacy' },
+          { value: 'new', label: 'New Layout' },
+          { value: 'new_divider_down', label: 'New Layout (Divider Down)' },
+        ],
+      },
+      showTips: {
+        type: 'boolean',
+        label: 'Show Tips',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Show informative tips on the right side of the status line.',
+        showInDialog: true,
+      },
+      showWit: {
+        type: 'boolean',
+        label: 'Show Witty Phrases',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Show witty phrases while waiting.',
+        showInDialog: true,
+      },
+
       showMemoryUsage: {
         type: 'boolean',
         label: 'Show Memory Usage',
@@ -702,22 +766,6 @@ const SETTINGS_SCHEMA = {
         default: true,
         description: 'Show the spinner during operations.',
         showInDialog: true,
-      },
-      loadingPhrases: {
-        type: 'enum',
-        label: 'Loading Phrases',
-        category: 'UI',
-        requiresRestart: false,
-        default: 'tips',
-        description:
-          'What to show while the model is working: tips, witty comments, both, or nothing.',
-        showInDialog: true,
-        options: [
-          { value: 'tips', label: 'Tips' },
-          { value: 'witty', label: 'Witty' },
-          { value: 'all', label: 'All' },
-          { value: 'off', label: 'Off' },
-        ],
       },
       errorVerbosity: {
         type: 'enum',

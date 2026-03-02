@@ -1,0 +1,34 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<FooterConfigDialog /> > renders correctly with default settings 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  Configure Footer                                                                                │
+│                                                                                                  │
+│  Select which items to display in the footer.                                                    │
+│                                                                                                  │
+│  > [✓] workspace (/directory)  Current working directory                                         │
+│    [✓] branch                  Current git branch name (not shown when unavailable)              │
+│    [✓] sandbox                 Sandbox type and trust indicator                                  │
+│    [✓] /model                  Current model identifier                                          │
+│    [✓] /stats                  Remaining usage on daily limit (not shown when unavailable)       │
+│    [ ] context                 Percentage of context window remaining                            │
+│    [ ] memory                  Memory used by the application                                    │
+│    [ ] session                 Unique identifier for the current session                         │
+│    [ ] diff                    Lines added/removed in the session (not shown when zero)          │
+│    [ ] tokens                  Total tokens used in the session (not shown when zero)            │
+│                                                                                                  │
+│    [✓] Show footer labels                                                                        │
+│    Reset to default footer                                                                       │
+│                                                                                                  │
+│  ↑/↓ navigate · ←/→ reorder · enter/space select · esc close                                     │
+│                                                                                                  │
+│  ┌────────────────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Preview:                                                                                   │  │
+│  │ workspace (/directory)   branch   sandbox   /model           /stats                        │  │
+│  │ ~/project/path           main     docker    gemini-2.5-pro   97%                           │  │
+│  └────────────────────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;

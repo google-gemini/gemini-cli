@@ -451,7 +451,7 @@ export function BaseSettingsDialog({
               editingKey
                 ? theme.border.default
                 : focusSection === 'settings'
-                  ? theme.border.focused
+                  ? theme.ui.focus
                   : theme.border.default
             }
             paddingX={1}
@@ -514,12 +514,17 @@ export function BaseSettingsDialog({
 
               return (
                 <React.Fragment key={item.key}>
-                  <Box marginX={1} flexDirection="row" alignItems="flex-start">
+                  <Box
+                    marginX={1}
+                    flexDirection="row"
+                    alignItems="flex-start"
+                    backgroundColor={
+                      isActive ? theme.background.focus : undefined
+                    }
+                  >
                     <Box minWidth={2} flexShrink={0}>
                       <Text
-                        color={
-                          isActive ? theme.status.success : theme.text.secondary
-                        }
+                        color={isActive ? theme.ui.focus : theme.text.secondary}
                       >
                         {isActive ? '●' : ''}
                       </Text>
@@ -536,9 +541,7 @@ export function BaseSettingsDialog({
                         minWidth={0}
                       >
                         <Text
-                          color={
-                            isActive ? theme.status.success : theme.text.primary
-                          }
+                          color={isActive ? theme.ui.focus : theme.text.primary}
                         >
                           {item.label}
                           {item.scopeMessage && (
@@ -557,7 +560,7 @@ export function BaseSettingsDialog({
                         <Text
                           color={
                             isActive
-                              ? theme.status.success
+                              ? theme.ui.focus
                               : item.isGreyedOut
                                 ? theme.text.secondary
                                 : theme.text.primary
