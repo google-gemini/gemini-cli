@@ -751,6 +751,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
       {showUiDetails &&
         !settings.merged.ui.hideFooter &&
+        (!hasPendingActionRequired ||
+          !settings.merged.ui.hideFooterDuringApproval) &&
         !isScreenReaderEnabled && <Footer />}
     </Box>
   );

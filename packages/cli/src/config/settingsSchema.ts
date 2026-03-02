@@ -619,6 +619,16 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the footer from the UI',
         showInDialog: true,
       },
+      hideFooterDuringApproval: {
+        type: 'boolean',
+        label: 'Hide Footer During Approval',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Hide the footer when a tool approval request is displayed.',
+        showInDialog: true,
+      },
       newFooterLayout: {
         type: 'enum',
         label: 'New Footer Layout',
