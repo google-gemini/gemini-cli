@@ -367,6 +367,7 @@ import {
   SimpleExtensionLoader,
 } from '../utils/extensionLoader.js';
 import { McpClientManager } from '../tools/mcp-client-manager.js';
+import { type McpContext } from '../tools/mcp-client.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getErrorMessage } from '../utils/errors.js';
 import {
@@ -580,7 +581,7 @@ export interface ConfigParameters {
   };
 }
 
-export class Config {
+export class Config implements McpContext {
   private toolRegistry!: ToolRegistry;
   private mcpClientManager?: McpClientManager;
   private allowedMcpServers: string[];
@@ -715,6 +716,7 @@ export class Config {
   private compressionTruncationCounter = 0;
   private initialized = false;
   private initPromise: Promise<void> | undefined;
+  private mcpInitializationPromise: Promise<void> | null = null;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
@@ -1123,7 +1125,7 @@ export class Config {
     );
     // We do not await this promise so that the CLI can start up even if
     // MCP servers are slow to connect.
-    const mcpInitialization = Promise.allSettled([
+    this.mcpInitializationPromise = Promise.allSettled([
       this.mcpClientManager.startConfiguredMcpServers(),
       this.getExtensionLoader().start(this),
     ]).then((results) => {
@@ -1135,7 +1137,7 @@ export class Config {
     });
 
     if (!this.interactive || this.experimentalZedIntegration) {
-      await mcpInitialization;
+      await this.mcpInitializationPromise;
     }
 
     if (this.skillsSupport) {
@@ -1769,6 +1771,33 @@ export class Config {
     return this.mcpClientManager;
   }
 
+  setUserInteractedWithMcp(): void {
+    this.mcpClientManager?.setUserInteractedWithMcp();
+  }
+
+  /** @deprecated Use getMcpClientManager().getLastError() directly */
+  getLastMcpError(serverName: string): string | undefined {
+    return this.mcpClientManager?.getLastError(serverName);
+  }
+
+  emitMcpDiagnostic(
+    severity: 'info' | 'warning' | 'error',
+    message: string,
+    error?: unknown,
+    serverName?: string,
+  ): void {
+    if (this.mcpClientManager) {
+      this.mcpClientManager.emitDiagnostic(
+        severity,
+        message,
+        error,
+        serverName,
+      );
+    } else {
+      coreEvents.emitFeedback(severity, message, error);
+    }
+  }
+
   getAllowedMcpServers(): string[] | undefined {
     return this.allowedMcpServers;
   }
@@ -2204,6 +2233,12 @@ export class Config {
 
   getExperimentalZedIntegration(): boolean {
     return this.experimentalZedIntegration;
+  }
+
+  async waitForMcpInit(): Promise<void> {
+    if (this.mcpInitializationPromise) {
+      await this.mcpInitializationPromise;
+    }
   }
 
   getListExtensions(): boolean {
