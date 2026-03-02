@@ -11,6 +11,7 @@ You can directly trigger these tools using special syntax in your prompts.
 
 - **[File access](../reference/commands.md#at-commands-):** Use the `@` symbol
   followed by a file or directory path to include its content in your prompt.
+  This triggers the `read_many_files` tool.
 - **[Shell commands](./shell.md) (`!`):** Use the `!` symbol followed by a
   system command to execute it directly. This triggers the `run_shell_command`
   tool.
