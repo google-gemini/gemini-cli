@@ -2223,7 +2223,7 @@ describe('PolicyEngine', () => {
         expected: [],
       },
       {
-        name: 'should include ASK_USER tools in non-interactive mode',
+        name: 'should exclude ASK_USER tools in non-interactive mode',
         rules: [
           {
             toolName: 'tool1',
