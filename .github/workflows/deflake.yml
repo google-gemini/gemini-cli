@@ -117,7 +117,6 @@ jobs:
     name: 'Slow E2E - Win'
     runs-on: 'gemini-cli-windows-16-core'
     if: "github.repository == 'google-gemini/gemini-cli'"
-
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5

@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, checkModelOutputContent } from './test-helper.js';
+import { TestRig, checkModelOutputContent, GEMINI_DIR } from './test-helper.js';
 
 describe('Plan Mode', () => {
   let rig: TestRig;
@@ -62,50 +64,98 @@ describe('Plan Mode', () => {
     });
   });
 
-  it.skip('should allow write_file only in the plans directory in plan mode', async () => {
-    await rig.setup(
-      'should allow write_file only in the plans directory in plan mode',
-      {
-        settings: {
-          experimental: { plan: true },
-          tools: {
-            core: ['write_file', 'read_file', 'list_directory'],
-            allowed: ['write_file'],
+  it('should allow write_file to the plans directory in plan mode', async () => {
+    const plansDir = '.gemini/tmp/foo/123/plans';
+    const testName =
+      'should allow write_file to the plans directory in plan mode';
+
+    await rig.setup(testName, {
+      settings: {
+        experimental: { plan: true },
+        tools: {
+          core: ['write_file', 'read_file', 'list_directory'],
+        },
+        general: {
+          defaultApprovalMode: 'plan',
+          plan: {
+            directory: plansDir,
           },
-          general: { defaultApprovalMode: 'plan' },
         },
       },
-    );
-
-    // We ask the agent to create a plan for a feature, which should trigger a write_file in the plans directory.
-    // Verify that write_file outside of plan directory fails
-    await rig.run({
-      approvalMode: 'plan',
-      stdin:
-        'Create a file called plan.md in the plans directory. Then create a file called hello.txt in the current directory',
     });
 
-    const toolLogs = rig.readToolLogs();
-    const writeLogs = toolLogs.filter(
-      (l) => l.toolRequest.name === 'write_file',
+    // Disable the interactive terminal setup prompt in tests
+    writeFileSync(
+      join(rig.homeDir!, GEMINI_DIR, 'state.json'),
+      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
     );
 
-    const planWrite = writeLogs.find(
+    const run = await rig.runInteractive({
+      approvalMode: 'plan',
+    });
+
+    await run.type('Create a file called plan.md in the plans directory.');
+    await run.type('\r');
+
+    await rig.expectToolCallSuccess(['write_file'], 30000, (args) =>
+      args.includes('plan.md'),
+    );
+
+    const toolLogs = rig.readToolLogs();
+    const planWrite = toolLogs.find(
       (l) =>
+        l.toolRequest.name === 'write_file' &&
         l.toolRequest.args.includes('plans') &&
         l.toolRequest.args.includes('plan.md'),
     );
+    expect(planWrite?.toolRequest.success).toBe(true);
+  });
 
-    const blockedWrite = writeLogs.find((l) =>
-      l.toolRequest.args.includes('hello.txt'),
+  it('should deny write_file to non-plans directory in plan mode', async () => {
+    const plansDir = '.gemini/tmp/foo/123/plans';
+    const testName =
+      'should deny write_file to non-plans directory in plan mode';
+
+    await rig.setup(testName, {
+      settings: {
+        experimental: { plan: true },
+        tools: {
+          core: ['write_file', 'read_file', 'list_directory'],
+        },
+        general: {
+          defaultApprovalMode: 'plan',
+          plan: {
+            directory: plansDir,
+          },
+        },
+      },
+    });
+
+    // Disable the interactive terminal setup prompt in tests
+    writeFileSync(
+      join(rig.homeDir!, GEMINI_DIR, 'state.json'),
+      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
     );
 
-    // Model is undeterministic, sometimes a blocked write appears in tool logs and sometimes it doesn't
-    if (blockedWrite) {
-      expect(blockedWrite?.toolRequest.success).toBe(false);
-    }
+    const run = await rig.runInteractive({
+      approvalMode: 'plan',
+    });
 
-    expect(planWrite?.toolRequest.success).toBe(true);
+    await run.type('Create a file called hello.txt in the current directory.');
+    await run.type('\r');
+
+    const toolLogs = rig.readToolLogs();
+    const writeLog = toolLogs.find(
+      (l) =>
+        l.toolRequest.name === 'write_file' &&
+        l.toolRequest.args.includes('hello.txt'),
+    );
+
+    // In Plan Mode, writes outside the plans directory should be blocked.
+    // Model is undeterministic, sometimes it doesn't even try, but if it does, it must fail.
+    if (writeLog) {
+      expect(writeLog.toolRequest.success).toBe(false);
+    }
   });
 
   it('should be able to enter plan mode from default mode', async () => {
@@ -118,6 +168,12 @@ describe('Plan Mode', () => {
         },
       },
     });
+
+    // Disable the interactive terminal setup prompt in tests
+    writeFileSync(
+      join(rig.homeDir!, GEMINI_DIR, 'state.json'),
+      JSON.stringify({ terminalSetupPromptShown: true }, null, 2),
+    );
 
     // Start in default mode and ask to enter plan mode.
     await rig.run({
