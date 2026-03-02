@@ -22,6 +22,7 @@ import {
   ASK_USER_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  GENERATE_IMAGE_TOOL_NAME,
 } from './definitions/coreTools.js';
 
 export {
@@ -42,7 +43,10 @@ export {
   ASK_USER_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  GENERATE_IMAGE_TOOL_NAME,
 };
+
+export const GENERATE_IMAGE_DISPLAY_NAME = 'GenerateImage';
 
 export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anything used the old exported name directly
 
@@ -110,6 +114,7 @@ export const ALL_BUILTIN_TOOL_NAMES = [
   GET_INTERNAL_DOCS_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
+  GENERATE_IMAGE_TOOL_NAME,
 ] as const;
 
 /**

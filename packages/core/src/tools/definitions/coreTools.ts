@@ -38,6 +38,7 @@ export {
   ASK_USER_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  GENERATE_IMAGE_TOOL_NAME,
 } from './base-declarations.js';
 
 // Re-export sets for compatibility

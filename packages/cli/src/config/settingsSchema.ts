@@ -1811,6 +1811,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable planning features (Plan Mode and tools).',
         showInDialog: true,
       },
+      imageGeneration: {
+        type: 'boolean',
+        label: 'Image Generation',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable generating images with Nano Banana (experimental).',
+        showInDialog: true,
+      },
       modelSteering: {
         type: 'boolean',
         label: 'Model Steering',
