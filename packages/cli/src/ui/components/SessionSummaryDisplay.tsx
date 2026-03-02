@@ -16,7 +16,7 @@ export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
   duration,
 }) => {
   const { stats } = useSessionStats();
-  const footer = `To resume this session, run:\n  gemini --resume ${stats.sessionId}`;
+  const footer = `To resume this session, run:\n  gemini --resume ${stats.sessionId.replace(/([^a-zA-Z0-9.\-_])/g, '\\$1')}`;
 
   return (
     <StatsDisplay

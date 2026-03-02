@@ -21,10 +21,13 @@ vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
 
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 
-const renderWithMockedStats = async (metrics: SessionMetrics) => {
+const renderWithMockedStats = async (
+  metrics: SessionMetrics,
+  sessionId = 'test-session',
+) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
-      sessionId: 'test-session',
+      sessionId,
       sessionStartTime: new Date(),
       metrics,
       lastPromptTokenCount: 0,
@@ -46,8 +49,30 @@ const renderWithMockedStats = async (metrics: SessionMetrics) => {
 };
 
 describe('<SessionSummaryDisplay />', () => {
+  const emptyMetrics: SessionMetrics = {
+    models: {},
+    tools: {
+      totalCalls: 0,
+      totalSuccess: 0,
+      totalFail: 0,
+      totalDurationMs: 0,
+      totalDecisions: {
+        accept: 0,
+        reject: 0,
+        modify: 0,
+        [ToolCallDecision.AUTO_ACCEPT]: 0,
+      },
+      byName: {},
+    },
+    files: {
+      totalLinesAdded: 0,
+      totalLinesRemoved: 0,
+    },
+  };
+
   it('renders the summary display with a title', async () => {
     const metrics: SessionMetrics = {
+      ...emptyMetrics,
       models: {
         'gemini-2.5-pro': {
           api: { totalRequests: 10, totalErrors: 1, totalLatencyMs: 50234 },
@@ -63,19 +88,6 @@ describe('<SessionSummaryDisplay />', () => {
           roles: {},
         },
       },
-      tools: {
-        totalCalls: 0,
-        totalSuccess: 0,
-        totalFail: 0,
-        totalDurationMs: 0,
-        totalDecisions: {
-          accept: 0,
-          reject: 0,
-          modify: 0,
-          [ToolCallDecision.AUTO_ACCEPT]: 0,
-        },
-        byName: {},
-      },
       files: {
         totalLinesAdded: 42,
         totalLinesRemoved: 15,
@@ -87,6 +99,33 @@ describe('<SessionSummaryDisplay />', () => {
 
     expect(output).toContain('Agent powering down. Goodbye!');
     expect(output).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders a standard UUID-formatted session ID in the footer', async () => {
+    const uuidSessionId = 'a2b4-1b3d-e6g8-5f7h';
+    const { lastFrame, unmount } = await renderWithMockedStats(
+      emptyMetrics,
+      uuidSessionId,
+    );
+    const output = lastFrame();
+
+    // Standard UUID characters (alphanumeric and hyphens) should not be escaped.
+    expect(output).toContain('gemini --resume a2b4-1b3d-e6g8-5f7h');
+    unmount();
+  });
+
+  it('sanitizes a malicious session ID in the footer', async () => {
+    const maliciousSessionId = "'; rm -rf / #";
+    const { lastFrame, unmount } = await renderWithMockedStats(
+      emptyMetrics,
+      maliciousSessionId,
+    );
+    const output = lastFrame();
+
+    // We expect every non-alphanumeric character to be backslash-escaped
+    // to keep it a single argument without needing surrounding quotes.
+    expect(output).toContain("gemini --resume \\'\\;\\ rm\\ -rf\\ \\/\\ \\#");
     unmount();
   });
 });
