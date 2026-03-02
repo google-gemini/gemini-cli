@@ -8,7 +8,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 
 import type { GenerateImageParams } from './generate-image.js';
-import { GenerateImageTool ,
+import {
+  GenerateImageTool,
   promptToFilename,
   getUniqueFilename,
   validateOutputPath,

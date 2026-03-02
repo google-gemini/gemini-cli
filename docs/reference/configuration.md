@@ -1019,6 +1019,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.imageGeneration`** (boolean):
+  - **Description:** Enable generating images with Nano Banana (experimental).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.modelSteering`** (boolean):
   - **Description:** Enable model steering (user hints) to guide the model
     during tool execution.
