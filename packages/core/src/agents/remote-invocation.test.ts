@@ -126,7 +126,7 @@ describe('RemoteAgentInvocation', () => {
   });
 
   describe('Execution Logic', () => {
-    it('should lazy load the agent with ADCHandler if not present', async () => {
+    it('should lazy load the agent without auth handler when no auth configured', async () => {
       mockClientManager.getClient.mockReturnValue(undefined);
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
@@ -151,10 +151,7 @@ describe('RemoteAgentInvocation', () => {
       expect(mockClientManager.loadAgent).toHaveBeenCalledWith(
         'test-agent',
         'http://test-agent/card',
-        expect.objectContaining({
-          headers: expect.any(Function),
-          shouldRetryWithHeaders: expect.any(Function),
-        }),
+        undefined,
       );
     });
 
@@ -203,6 +200,31 @@ describe('RemoteAgentInvocation', () => {
         'test-agent',
         'http://test-agent/card',
         mockHandler,
+      );
+    });
+
+    it('should return error when auth provider factory returns undefined for configured auth', async () => {
+      const authDefinition: RemoteAgentDefinition = {
+        ...mockDefinition,
+        auth: {
+          type: 'http' as const,
+          scheme: 'Bearer' as const,
+          token: 'secret-token',
+        },
+      };
+
+      (A2AAuthProviderFactory.create as Mock).mockResolvedValue(undefined);
+      mockClientManager.getClient.mockReturnValue(undefined);
+
+      const invocation = new RemoteAgentInvocation(
+        authDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error?.message).toContain(
+        "Failed to create auth provider for agent 'test-agent'",
       );
     });
 

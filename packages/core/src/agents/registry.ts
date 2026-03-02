@@ -14,7 +14,6 @@ import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
 import { A2AClientManager } from './a2a-client-manager.js';
-import { ADCHandler } from './remote-invocation.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { type z } from 'zod';
@@ -376,9 +375,10 @@ export class AgentRegistry {
     }
 
     // Basic validation
-    if (!definition.name || !definition.description) {
+    // Remote agents can have an empty description initially as it will be populated from the AgentCard
+    if (!definition.name) {
       debugLogger.warn(
-        `[AgentRegistry] Skipping invalid agent definition. Missing name or description.`,
+        `[AgentRegistry] Skipping invalid agent definition. Missing name.`,
       );
       return;
     }
@@ -401,35 +401,60 @@ export class AgentRegistry {
       debugLogger.log(`[AgentRegistry] Overriding agent '${definition.name}'`);
     }
 
+    const remoteDef = definition;
+
+    // Capture the original description from the first registration
+    if (remoteDef.originalDescription === undefined) {
+      remoteDef.originalDescription = remoteDef.description;
+    }
+
     // Log remote A2A agent registration for visibility.
     try {
       const clientManager = A2AClientManager.getInstance();
-      // Use definition auth if available, otherwise fallback to ADCHandler
       let authHandler: AuthenticationHandler | undefined;
       if (definition.auth) {
-        authHandler = await A2AAuthProviderFactory.create({
+        const provider = await A2AAuthProviderFactory.create({
           authConfig: definition.auth,
           agentName: definition.name,
         });
-      }
-
-      if (!authHandler) {
-        authHandler = new ADCHandler();
+        if (!provider) {
+          throw new Error(
+            `Failed to create auth provider for agent '${definition.name}'`,
+          );
+        }
+        authHandler = provider;
       }
 
       const agentCard = await clientManager.loadAgent(
-        definition.name,
-        definition.agentCardUrl,
+        remoteDef.name,
+        remoteDef.agentCardUrl,
         authHandler,
       );
+
+      const userDescription = remoteDef.originalDescription;
+      const agentDescription = agentCard.description;
+      const descriptions: string[] = [];
+
+      if (userDescription?.trim()) {
+        descriptions.push(`User Description: ${userDescription.trim()}`);
+      }
+      if (agentDescription?.trim()) {
+        descriptions.push(`Agent Description: ${agentDescription.trim()}`);
+      }
       if (agentCard.skills && agentCard.skills.length > 0) {
-        definition.description = agentCard.skills
+        const skillsList = agentCard.skills
           .map(
             (skill: { name: string; description: string }) =>
-              `${skill.name}: ${skill.description}`,
+              `${skill.name}: ${skill.description || 'No description provided'}`,
           )
           .join('\n');
+        descriptions.push(`Skills:\n${skillsList}`);
       }
+
+      if (descriptions.length > 0) {
+        definition.description = descriptions.join('\n');
+      }
+
       if (this.config.getDebugMode()) {
         debugLogger.log(
           `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl}`,

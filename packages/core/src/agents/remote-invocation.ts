@@ -108,7 +108,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     return `Calling remote agent ${this.definition.displayName ?? this.definition.name}`;
   }
 
-  private async getAuthHandler(): Promise<AuthenticationHandler> {
+  private async getAuthHandler(): Promise<AuthenticationHandler | undefined> {
     if (this.authHandler) {
       return this.authHandler;
     }
@@ -118,14 +118,12 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         authConfig: this.definition.auth,
         agentName: this.definition.name,
       });
-      if (provider) {
-        this.authHandler = provider;
+      if (!provider) {
+        throw new Error(
+          `Failed to create auth provider for agent '${this.definition.name}'`,
+        );
       }
-    }
-
-    if (!this.authHandler) {
-      // Fallback to ADC if no auth is configured
-      this.authHandler = new ADCHandler();
+      this.authHandler = provider;
     }
 
     return this.authHandler;

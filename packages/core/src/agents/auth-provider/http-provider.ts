@@ -68,12 +68,16 @@ export class HttpAuthProvider extends BaseA2AAuthProvider {
 
   /**
    * Re-resolves credentials on auth failure (e.g. rotated tokens via $ENV or !command).
+   * Respects MAX_AUTH_RETRIES from the base class to prevent infinite loops.
    */
   override async shouldRetryWithHeaders(
     req: RequestInit,
     res: Response,
   ): Promise<HttpHeaders | undefined> {
     if (res.status === 401 || res.status === 403) {
+      if (this.authRetryCount >= BaseA2AAuthProvider.MAX_AUTH_RETRIES) {
+        return undefined;
+      }
       debugLogger.debug(
         '[HttpAuthProvider] Re-resolving values after auth failure',
       );
