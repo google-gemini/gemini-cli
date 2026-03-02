@@ -75,11 +75,14 @@ Replace `<PR_NUMBER>` with your pull request number. Authors are encouraged to
 run this on their own PRs for self-review, and reviewers should use it to
 augment their manual review process.
 
-### Self assigning issues
+### Self-assigning and unassigning issues
 
-To assign an issue to yourself, simply add a comment with the text `/assign`.
-The comment must contain only that text and nothing else. This command will
-assign the issue to you, provided it is not already assigned.
+To assign an issue to yourself, simply add a comment with the text `/assign`. To
+unassign yourself from an issue, add a comment with the text `/unassign`.
+
+The comment must contain only that text and nothing else. These commands will
+assign or unassign the issue as requested, provided the conditions are met
+(e.g., an issue must be unassigned to be assigned).
 
 Please note that you can have a maximum of 3 issues assigned to you at any given
 time.
