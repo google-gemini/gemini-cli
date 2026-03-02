@@ -98,8 +98,10 @@ class DiffViewManager(private val project: Project) {
                         .refreshAndFindFileByPath(filePath)
                     if (virtualFile != null) {
                         val document = FileDocumentManager.getInstance().getDocument(virtualFile)
-                        document?.setText(content)
-                        FileDocumentManager.getInstance().saveDocument(document!!)
+                        document?.let {
+                            it.setText(content)
+                            FileDocumentManager.getInstance().saveDocument(it)
+                        }
                     } else {
                         // New file — create it
                         val file = File(filePath)

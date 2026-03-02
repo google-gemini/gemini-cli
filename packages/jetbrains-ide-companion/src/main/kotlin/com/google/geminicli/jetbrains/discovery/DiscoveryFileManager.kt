@@ -11,7 +11,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.PosixFilePermissions
 
 /**
@@ -65,16 +67,27 @@ class DiscoveryFileManager {
             )
 
             val content = json.encodeToString(data)
-            Files.writeString(filePath, content)
 
-            // Set file permissions to 0600 (owner read/write only)
+            // Security: Delete any existing file/symlink first to prevent symlink attacks
+            // Use NOFOLLOW_LINKS to detect and refuse to follow symlinks
+            if (Files.exists(filePath, LinkOption.NOFOLLOW_LINKS)) {
+                if (Files.isSymbolicLink(filePath)) {
+                    log.warn("Discovery file path is a symlink, refusing to write: $filePath")
+                    return
+                }
+                Files.delete(filePath)
+            }
+
+            // Create file atomically with CREATE_NEW (fails if file already exists)
+            // and set restrictive permissions before writing content
             try {
-                Files.setPosixFilePermissions(
-                    filePath,
-                    PosixFilePermissions.fromString("rw-------")
-                )
+                val perms = PosixFilePermissions.fromString("rw-------")
+                val attr = PosixFilePermissions.asFileAttribute(perms)
+                Files.createFile(filePath, attr)
+                Files.writeString(filePath, content, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
             } catch (_: UnsupportedOperationException) {
-                // Windows doesn't support POSIX permissions
+                // Windows doesn't support POSIX file attributes — create normally
+                Files.writeString(filePath, content, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
             }
 
             discoveryFile = filePath

@@ -36,6 +36,7 @@ class McpServer(
     }
 
     private var httpServer: HttpServer? = null
+    private var httpExecutor: java.util.concurrent.ExecutorService? = null
     var port: Int = 0
         private set
     var authToken: String = UUID.randomUUID().toString()
@@ -53,9 +54,11 @@ class McpServer(
 
     fun start() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.executor = Executors.newFixedThreadPool(4) { r ->
+        val executor = Executors.newFixedThreadPool(4) { r ->
             Thread(r, "gemini-mcp-http").apply { isDaemon = true }
         }
+        server.executor = executor
+        this.httpExecutor = executor
 
         server.createContext("/mcp") { exchange ->
             try {
@@ -114,6 +117,9 @@ class McpServer(
         sessionsWithInitialNotification.clear()
         httpServer?.stop(1)
         httpServer = null
+        httpExecutor?.shutdownNow()
+        httpExecutor = null
+        scheduler.shutdownNow()
         log.info("MCP server stopped")
     }
 
