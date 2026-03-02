@@ -35,6 +35,7 @@ describe('useLoadingIndicator', () => {
     initialShouldShowFocusHint: boolean = false,
     initialRetryStatus: RetryAttemptPayload | null = null,
     loadingPhrasesMode: LoadingPhrasesMode = 'all',
+    initialErrorVerbosity: 'low' | 'full' = 'full',
   ) => {
     let hookResult: ReturnType<typeof useLoadingIndicator>;
     function TestComponent({
@@ -42,17 +43,20 @@ describe('useLoadingIndicator', () => {
       shouldShowFocusHint,
       retryStatus,
       mode,
+      errorVerbosity,
     }: {
       streamingState: StreamingState;
       shouldShowFocusHint?: boolean;
       retryStatus?: RetryAttemptPayload | null;
       mode?: LoadingPhrasesMode;
+      errorVerbosity?: 'low' | 'full';
     }) {
       hookResult = useLoadingIndicator({
         streamingState,
         shouldShowFocusHint: !!shouldShowFocusHint,
         retryStatus: retryStatus || null,
         loadingPhrasesMode: mode,
+        errorVerbosity,
       });
       return null;
     }
@@ -62,6 +66,7 @@ describe('useLoadingIndicator', () => {
         shouldShowFocusHint={initialShouldShowFocusHint}
         retryStatus={initialRetryStatus}
         mode={loadingPhrasesMode}
+        errorVerbosity={initialErrorVerbosity}
       />,
     );
     return {
@@ -75,7 +80,15 @@ describe('useLoadingIndicator', () => {
         shouldShowFocusHint?: boolean;
         retryStatus?: RetryAttemptPayload | null;
         mode?: LoadingPhrasesMode;
-      }) => rerender(<TestComponent mode={loadingPhrasesMode} {...newProps} />),
+        errorVerbosity?: 'low' | 'full';
+      }) =>
+        rerender(
+          <TestComponent
+            mode={loadingPhrasesMode}
+            errorVerbosity={initialErrorVerbosity}
+            {...newProps}
+          />,
+        ),
     };
   };
 
@@ -227,6 +240,46 @@ describe('useLoadingIndicator', () => {
 
     expect(result.current.currentLoadingPhrase).toContain('Trying to reach');
     expect(result.current.currentLoadingPhrase).toContain('Attempt 3/3');
+  });
+
+  it('should hide low-verbosity retry status for early retry attempts', () => {
+    const retryStatus = {
+      model: 'gemini-pro',
+      attempt: 1,
+      maxAttempts: 5,
+      delayMs: 1000,
+    };
+    const { result } = renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      retryStatus,
+      'all',
+      'low',
+    );
+
+    expect(result.current.currentLoadingPhrase).not.toBe(
+      "This is taking a bit longer, we're still on it.",
+    );
+  });
+
+  it('should show a generic retry phrase in low error verbosity mode for later retries', () => {
+    const retryStatus = {
+      model: 'gemini-pro',
+      attempt: 2,
+      maxAttempts: 5,
+      delayMs: 1000,
+    };
+    const { result } = renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      retryStatus,
+      'all',
+      'low',
+    );
+
+    expect(result.current.currentLoadingPhrase).toBe(
+      "This is taking a bit longer, we're still on it.",
+    );
   });
 
   it('should show no phrases when loadingPhrasesMode is "off"', () => {
