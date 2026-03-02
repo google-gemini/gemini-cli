@@ -279,6 +279,12 @@ describe('Gemini Client (client.ts)', () => {
 
     client = new GeminiClient(mockConfig);
     await client.initialize();
+    vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+      count: 0,
+    });
+    vi.spyOn(client['loopDetector'], 'addAndCheck').mockReturnValue({
+      count: 0,
+    });
     vi.mocked(mockConfig.getGeminiClient).mockReturnValue(client);
 
     vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
@@ -2915,12 +2921,56 @@ ${JSON.stringify(
       expect(mockCheckNextSpeaker).not.toHaveBeenCalled();
     });
 
+    it('should provide feedback on first loop and terminate on second loop', async () => {
+      // 1. First call to turnStarted returns count 1 (Loop detected at start of Turn 1)
+      vi.spyOn(client['loopDetector'], 'turnStarted')
+        .mockResolvedValueOnce({ count: 1, detail: 'Initial loop' }) // Start of Turn 1
+        .mockResolvedValueOnce({ count: 0 }); // Start of Turn 2 (the recovery turn)
+
+      // 2. Mock addAndCheck to trigger second loop during Turn 2 streaming
+      vi.spyOn(client['loopDetector'], 'addAndCheck').mockReturnValue({
+        count: 2,
+        detail: 'Persistent loop',
+      }); // Every event triggers count 2 -> TERMINATE
+
+      const mockStream = (async function* () {
+        yield { type: GeminiEventType.Content, value: 'Model response' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const events = [];
+      const stream = client.sendMessageStream(
+        [{ text: 'Start' }],
+        new AbortController().signal,
+        'loop-test-id',
+      );
+
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      // Verify recursion happened
+      // We expect:
+      // - No ModelInfo for turn 1 (it was preempted)
+      // - recovery turn started
+      // - Turn 2 streaming starts
+      // - LoopDetected event yielded when count hits 2
+      expect(events).toContainEqual(
+        expect.objectContaining({ type: GeminiEventType.LoopDetected }),
+      );
+
+      // sendMessageStream should have been called twice (Original + Recovery)
+      expect(mockTurnRunFn).toHaveBeenCalledTimes(1); // Only once because Turn 1 was preempted before run()
+    });
+
     it('should abort linked signal when loop is detected', async () => {
       // Arrange
-      vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue(false);
+      vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+        count: 0,
+      });
       vi.spyOn(client['loopDetector'], 'addAndCheck')
-        .mockReturnValueOnce(false)
-        .mockReturnValueOnce(true);
+        .mockReturnValueOnce({ count: 0 })
+        .mockReturnValueOnce({ count: 2 }); // Strike 2 -> TERMINATE
 
       let capturedSignal: AbortSignal;
       mockTurnRunFn.mockImplementation((_modelConfigKey, _request, signal) => {
