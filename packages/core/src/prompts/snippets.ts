@@ -702,6 +702,7 @@ function formatToolName(name: string): string {
 /**
  * Provides the system prompt for history compression.
  */
+// Test comment to trigger evals
 export function getCompressionPrompt(): string {
   return `
 You are a specialized system component responsible for distilling chat history into a structured XML <state_snapshot>.
