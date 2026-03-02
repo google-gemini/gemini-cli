@@ -635,6 +635,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (
         key.name === 'escape' &&
+        !shellModeActive &&
+        !reverseSearchActive &&
+        !commandSearchActive &&
+        !completion.showSuggestions &&
         (streamingState === StreamingState.Responding ||
           streamingState === StreamingState.WaitingForConfirmation)
       ) {

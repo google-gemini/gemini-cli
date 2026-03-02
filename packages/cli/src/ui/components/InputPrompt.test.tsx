@@ -2558,6 +2558,23 @@ describe('InputPrompt', () => {
       unmount();
     });
 
+    it('should exit shell mode on ESC even while agent is streaming', async () => {
+      props.shellModeActive = true;
+      props.streamingState = StreamingState.Responding;
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x1B');
+        vi.advanceTimersByTime(100);
+
+        expect(props.setShellModeActive).toHaveBeenCalledWith(false);
+      });
+      unmount();
+    });
+
     it('should handle ESC when completion suggestions are showing', async () => {
       mockedUseCommandCompletion.mockReturnValue({
         ...mockCommandCompletion,
