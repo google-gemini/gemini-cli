@@ -54,6 +54,8 @@ describe('ask_user', () => {
     },
   });
 
+  // --- Regression Tests for Recent Fixes ---
+
   evalTest('USUALLY_PASSES', {
     name: 'Agent does NOT use AskUser to confirm shell commands',
     files: {
