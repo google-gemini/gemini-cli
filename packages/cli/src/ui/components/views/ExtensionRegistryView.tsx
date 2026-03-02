@@ -26,7 +26,10 @@ import { useUIState } from '../../contexts/UIStateContext.js';
 import { ExtensionDetails } from './ExtensionDetails.js';
 
 interface ExtensionRegistryViewProps {
-  onSelect?: (extension: RegistryExtension) => void | Promise<void>;
+  onSelect?: (
+    extension: RegistryExtension,
+    requestConsentOverride?: (consent: string) => Promise<boolean>,
+  ) => void | Promise<void>;
   onClose?: () => void;
   extensionManager: ExtensionManager;
 }
@@ -76,10 +79,16 @@ export function ExtensionRegistryView({
   }, []);
 
   const handleInstall = useCallback(
-    async (extension: RegistryExtension) => {
-      await onSelect?.(extension);
+    async (
+      extension: RegistryExtension,
+      requestConsentOverride?: (consent: string) => Promise<boolean>,
+    ) => {
+      await onSelect?.(extension, requestConsentOverride);
+
       // Refresh installed extensions list
       setInstalledExtensions(extensionManager.getExtensions());
+
+      // Go back to the search page (list view)
       setSelectedExtension(null);
     },
     [onSelect, extensionManager],
@@ -246,7 +255,9 @@ export function ExtensionRegistryView({
         <ExtensionDetails
           extension={selectedExtension}
           onBack={handleBack}
-          onInstall={() => handleInstall(selectedExtension)}
+          onInstall={(requestConsentOverride) =>
+            handleInstall(selectedExtension, requestConsentOverride)
+          }
           isInstalled={installedExtensions.some(
             (e) => e.name === selectedExtension.extensionName,
           )}

@@ -279,8 +279,8 @@ async function exploreAction(
       return {
         type: 'custom_dialog' as const,
         component: React.createElement(ExtensionRegistryView, {
-          onSelect: async (extension) => {
-            await installAction(context, extension.url);
+          onSelect: async (extension, requestConsentOverride) => {
+            await installAction(context, extension.url, requestConsentOverride);
           },
           onClose: () => context.ui.removeComponent(),
           extensionManager,
@@ -456,7 +456,11 @@ async function enableAction(context: CommandContext, args: string) {
   }
 }
 
-async function installAction(context: CommandContext, args: string) {
+async function installAction(
+  context: CommandContext,
+  args: string,
+  requestConsentOverride?: (consent: string) => Promise<boolean>,
+) {
   const extensionLoader = context.services.config?.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
     debugLogger.error(
@@ -503,8 +507,11 @@ async function installAction(context: CommandContext, args: string) {
 
   try {
     const installMetadata = await inferInstallMetadata(source);
-    const extension =
-      await extensionLoader.installOrUpdateExtension(installMetadata);
+    const extension = await extensionLoader.installOrUpdateExtension(
+      installMetadata,
+      undefined,
+      requestConsentOverride,
+    );
     context.ui.addItem({
       type: MessageType.INFO,
       text: `Extension "${extension.name}" installed successfully.`,

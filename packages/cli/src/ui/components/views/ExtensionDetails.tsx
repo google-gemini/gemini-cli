@@ -14,9 +14,13 @@ import { theme } from '../../semantic-colors.js';
 export interface ExtensionDetailsProps {
   extension: RegistryExtension;
   onBack: () => void;
-  onInstall: () => void;
+  onInstall: (
+    requestConsentOverride: (consent: string) => Promise<boolean>,
+  ) => void;
   isInstalled: boolean;
 }
+
+import { useState } from 'react';
 
 export function ExtensionDetails({
   extension,
@@ -24,20 +28,85 @@ export function ExtensionDetails({
   onInstall,
   isInstalled,
 }: ExtensionDetailsProps): React.JSX.Element {
+  const [consentRequest, setConsentRequest] = useState<{
+    prompt: string;
+    resolve: (value: boolean) => void;
+  } | null>(null);
+  const [isInstalling, setIsInstalling] = useState(false);
+
   useKeypress(
     (key) => {
+      if (consentRequest) {
+        if (keyMatchers[Command.ESCAPE](key)) {
+          consentRequest.resolve(false);
+          setConsentRequest(null);
+          setIsInstalling(false);
+          return true;
+        }
+        if (keyMatchers[Command.RETURN](key)) {
+          consentRequest.resolve(true);
+          setConsentRequest(null);
+          return true;
+        }
+        return false;
+      }
+
       if (keyMatchers[Command.ESCAPE](key)) {
         onBack();
         return true;
       }
-      if (keyMatchers[Command.RETURN](key) && !isInstalled) {
-        onInstall();
+      if (keyMatchers[Command.RETURN](key) && !isInstalled && !isInstalling) {
+        setIsInstalling(true);
+        onInstall((prompt: string) => new Promise((resolve) => {
+            setConsentRequest({ prompt, resolve });
+          }));
         return true;
       }
       return false;
     },
     { isActive: true, priority: true },
   );
+
+  if (consentRequest) {
+    return (
+      <Box
+        flexDirection="column"
+        paddingX={1}
+        paddingY={0}
+        height="100%"
+        borderStyle="round"
+        borderColor={theme.status.warning}
+      >
+        <Box marginBottom={1}>
+          <Text color={theme.text.primary}>{consentRequest.prompt}</Text>
+        </Box>
+        <Box flexGrow={1} />
+        <Box flexDirection="row" justifyContent="space-between" marginTop={1}>
+          <Text color={theme.text.secondary}>[Esc] Cancel</Text>
+          <Text color={theme.text.primary}>[Enter] Accept</Text>
+        </Box>
+      </Box>
+    );
+  }
+
+  if (isInstalling) {
+    return (
+      <Box
+        flexDirection="column"
+        paddingX={1}
+        paddingY={0}
+        height="100%"
+        borderStyle="round"
+        borderColor={theme.border.default}
+        justifyContent="center"
+        alignItems="center"
+      >
+        <Text color={theme.text.primary}>
+          Installing {extension.extensionName}...
+        </Text>
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -83,35 +152,33 @@ export function ExtensionDetails({
 
       {/* Features List */}
       <Box flexDirection="row" marginBottom={1}>
-        {extension.hasMCP && (
-          <Box marginRight={1}>
-            <Text color={theme.text.primary}>MCP </Text>
-            <Text color={theme.text.secondary}>|</Text>
-          </Box>
-        )}
-        {extension.hasContext && (
-          <Box marginRight={1}>
-            <Text color={theme.status.error}>Context file </Text>
-            <Text color={theme.text.secondary}>|</Text>
-          </Box>
-        )}
-        {extension.hasHooks && (
-          <Box marginRight={1}>
-            <Text color={theme.status.warning}>Hooks </Text>
-            <Text color={theme.text.secondary}>|</Text>
-          </Box>
-        )}
-        {extension.hasSkills && (
-          <Box marginRight={1}>
-            <Text color={theme.status.success}>Skills </Text>
-            <Text color={theme.text.secondary}>|</Text>
-          </Box>
-        )}
-        {extension.hasCustomCommands && (
-          <Box marginRight={1}>
-            <Text color={theme.text.primary}>Commands</Text>
-          </Box>
-        )}
+        {[
+          extension.hasMCP && { label: 'MCP', color: theme.text.primary },
+          extension.hasContext && {
+            label: 'Context file',
+            color: theme.status.error,
+          },
+          extension.hasHooks && { label: 'Hooks', color: theme.status.warning },
+          extension.hasSkills && {
+            label: 'Skills',
+            color: theme.status.success,
+          },
+          extension.hasCustomCommands && {
+            label: 'Commands',
+            color: theme.text.primary,
+          },
+        ]
+          .filter((f): f is { label: string; color: string } => !!f)
+          .map((feature, index, array) => (
+            <Box key={feature.label} flexDirection="row">
+              <Text color={feature.color}>{feature.label} </Text>
+              {index < array.length - 1 && (
+                <Box marginRight={1}>
+                  <Text color={theme.text.secondary}>|</Text>
+                </Box>
+              )}
+            </Box>
+          ))}
       </Box>
 
       {/* Details about MCP / Context */}

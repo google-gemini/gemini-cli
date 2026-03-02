@@ -227,7 +227,10 @@ describe('ExtensionRegistryView', () => {
     });
 
     await waitFor(() => {
-      expect(mockOnSelect).toHaveBeenCalledWith(mockExtensions[0]);
+      expect(mockOnSelect).toHaveBeenCalledWith(
+        mockExtensions[0],
+        expect.any(Function),
+      );
     });
   });
 });
