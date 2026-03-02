@@ -210,11 +210,9 @@ export class ExtensionManager extends ExtensionLoader {
       await fs.promises.mkdir(extensionsDir, { recursive: true });
 
       if (installMetadata.type === 'local' || installMetadata.type === 'link') {
-        installMetadata.source = getRealPath(
-          path.isAbsolute(installMetadata.source)
-            ? installMetadata.source
-            : path.resolve(this.workspaceDir, installMetadata.source),
-        );
+        installMetadata.source = path.isAbsolute(installMetadata.source)
+          ? installMetadata.source
+          : path.resolve(this.workspaceDir, installMetadata.source);
       }
 
       let tempDir: string | undefined;
@@ -262,7 +260,7 @@ Would you like to attempt to install via "git clone" instead?`,
         installMetadata.type === 'local' ||
         installMetadata.type === 'link'
       ) {
-        localSourcePath = installMetadata.source;
+        localSourcePath = getRealPath(installMetadata.source);
       } else {
         throw new Error(`Unsupported install type: ${installMetadata.type}`);
       }
