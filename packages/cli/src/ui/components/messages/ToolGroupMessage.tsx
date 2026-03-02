@@ -75,6 +75,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           status: t.status,
           approvalMode: t.approvalMode,
           hasResultDisplay: !!t.resultDisplay,
+          parentCallId: t.parentCallId,
         });
       }),
     [allToolCalls, isLowErrorVerbosity],
