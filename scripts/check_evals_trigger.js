@@ -5,6 +5,11 @@
  */
 import { execSync } from 'node:child_process';
 
+const EVALS_FILE_PREFIXES = [
+  'packages/core/src/prompts/',
+  'packages/core/src/tools/',
+];
+
 function main() {
   try {
     // Fetch main branch to compare against. Use || true to avoid failing if already up to date or no remote.
@@ -24,14 +29,12 @@ function main() {
       .split('\n')
       .filter(Boolean);
 
-    const shouldRun = changedFiles.some(
-      (file) =>
-        file.startsWith('packages/core/src/prompts/') ||
-        file.startsWith('packages/core/src/tools/'),
+    const shouldRun = changedFiles.some((file) =>
+      EVALS_FILE_PREFIXES.some((prefix) => file.startsWith(prefix)),
     );
 
     console.log(shouldRun ? 'true' : 'false');
-  } catch (_error) {
+  } catch {
     // If anything fails (e.g., no git history), run evals to be safe
     console.log('true');
   }
