@@ -109,11 +109,8 @@ structure, and consultation level are proportional to the task's complexity:
     - **Iterate:** Provide feedback to refine the plan.
     - **Refine manually:** Press **Ctrl + X** to open the plan file in your
       [preferred external editor]. This allows you to manually refine the plan
-      steps before approval. The CLI will automatically refresh and show the
-      updated plan after you save and close the editor.
-    - **Review edits:** If you added inline annotations or feedback for the
-      agent to consider in the plan file, you can select the **"No, review plan
-      edits as feedback"** option to send the plan back to the agent for
+      steps before approval. If you make any changes and save the file, the CLI
+      will automatically send the updated plan back to the agent for review and
       iteration.
 
 For more complex or specialized planning tasks, you can

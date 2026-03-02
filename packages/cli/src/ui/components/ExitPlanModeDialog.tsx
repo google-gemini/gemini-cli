@@ -16,6 +16,7 @@ import {
   type EditorType,
   processSingleFileContent,
   debugLogger,
+  readFileLines,
 } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -51,7 +52,6 @@ interface PlanContentState {
 enum ApprovalOption {
   Auto = 'Yes, automatically accept edits',
   Manual = 'Yes, manually accept edits',
-  Review = 'No, review plan edits as feedback',
 }
 
 /**
@@ -156,12 +156,21 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
 
   const handleOpenEditor = useCallback(async () => {
     try {
+      const beforeLines = await readFileLines(planPath);
       await openFileInEditor(planPath, stdin, setRawMode, getPreferredEditor());
-      refresh();
+      const afterLines = await readFileLines(planPath);
+
+      if (JSON.stringify(beforeLines) !== JSON.stringify(afterLines)) {
+        onFeedback(
+          'I have annotated the plan with feedback. Please review the edited plan file and update the plan accordingly.',
+        );
+      } else {
+        refresh();
+      }
     } catch (err) {
       debugLogger.error('Failed to open plan in editor:', err);
     }
-  }, [planPath, stdin, setRawMode, getPreferredEditor, refresh]);
+  }, [planPath, stdin, setRawMode, getPreferredEditor, refresh, onFeedback]);
 
   useKeypress(
     (key) => {
@@ -241,11 +250,6 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
                 description:
                   'Approves plan but requires confirmation for each tool',
               },
-              {
-                label: ApprovalOption.Review,
-                description:
-                  'Return plan with annotations to the agent for iteration',
-              },
             ],
             placeholder: 'Type your feedback...',
             multiSelect: false,
@@ -257,10 +261,6 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
             onApprove(ApprovalMode.AUTO_EDIT);
           } else if (answer === ApprovalOption.Manual) {
             onApprove(ApprovalMode.DEFAULT);
-          } else if (answer === ApprovalOption.Review) {
-            onFeedback(
-              'I have annotated the plan with feedback. Please review the edited plan file and update the plan accordingly.',
-            );
           } else if (answer) {
             onFeedback(answer);
           }

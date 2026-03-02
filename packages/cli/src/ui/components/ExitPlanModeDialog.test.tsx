@@ -11,7 +11,6 @@ import { waitFor } from '../../test-utils/async.js';
 import { ExitPlanModeDialog } from './ExitPlanModeDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
-import { openFileInEditor } from '../utils/editorUtils.js';
 import {
   ApprovalMode,
   validatePlanContent,
@@ -19,6 +18,7 @@ import {
   type FileSystemService,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
+import { readFileLines } from '@google/gemini-cli-core/src/tools/grep-utils.js';
 
 vi.mock('../utils/editorUtils.js', () => ({
   openFileInEditor: vi.fn(),
@@ -32,6 +32,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     validatePlanPath: vi.fn(async () => null),
     validatePlanContent: vi.fn(async () => null),
     processSingleFileContent: vi.fn(),
+    readFileLines: vi.fn(),
   };
 });
 
@@ -41,10 +42,6 @@ vi.mock('node:fs', async (importOriginal) => {
     ...actual,
     existsSync: vi.fn(),
     realpathSync: vi.fn((p) => p),
-    promises: {
-      ...actual.promises,
-      readFile: vi.fn(),
-    },
   };
 });
 
@@ -131,6 +128,7 @@ Implement a comprehensive authentication system with multiple providers.
     });
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.realpathSync).mockImplementation((p) => p as string);
+    vi.mocked(readFileLines).mockResolvedValue(samplePlanContent.split('\n'));
     onApprove = vi.fn();
     onFeedback = vi.fn();
     onCancel = vi.fn();
@@ -235,28 +233,6 @@ Implement a comprehensive authentication system with multiple providers.
         });
       });
 
-      it('calls onFeedback with the review message when Review is selected', async () => {
-        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
-
-        await act(async () => {
-          vi.runAllTimers();
-        });
-
-        await waitFor(() => {
-          expect(lastFrame()).toContain('Add user authentication');
-        });
-
-        writeKey(stdin, '\x1b[B'); // Down arrow
-        writeKey(stdin, '\x1b[B'); // Down arrow
-        writeKey(stdin, '\r');
-
-        await waitFor(() => {
-          expect(onFeedback).toHaveBeenCalledWith(
-            'I have annotated the plan with feedback. Please review the edited plan file and update the plan accordingly.',
-          );
-        });
-      });
-
       it('calls onFeedback when feedback is typed and submitted', async () => {
         const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
 
@@ -269,7 +245,6 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         // Navigate to feedback option
-        writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
 
@@ -399,7 +374,6 @@ Implement a comprehensive authentication system with multiple providers.
         // Navigate to feedback option and start typing
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
-        writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\r'); // Select to focus input
 
         // Type some feedback
@@ -484,7 +458,6 @@ Implement a comprehensive authentication system with multiple providers.
         // Navigate to feedback option
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
-        writeKey(stdin, '\x1b[B'); // Down arrow
 
         // Type some feedback
         for (const char of 'test') {
@@ -526,7 +499,6 @@ Implement a comprehensive authentication system with multiple providers.
         // Navigate to feedback option
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
-        writeKey(stdin, '\x1b[B'); // Down arrow
 
         // Press Enter without typing anything
         writeKey(stdin, '\r');
@@ -554,7 +526,6 @@ Implement a comprehensive authentication system with multiple providers.
         // Navigate to feedback option and start typing
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
-        writeKey(stdin, '\x1b[B'); // Down arrow
 
         // Type some feedback
         for (const char of 'test') {
@@ -562,7 +533,6 @@ Implement a comprehensive authentication system with multiple providers.
         }
 
         // Now use up arrow to navigate back to a different option
-        writeKey(stdin, '\x1b[A'); // Up arrow
         writeKey(stdin, '\x1b[A'); // Up arrow
 
         // Press Enter to select the second option (manually accept edits)
@@ -574,7 +544,7 @@ Implement a comprehensive authentication system with multiple providers.
         expect(onFeedback).not.toHaveBeenCalled();
       });
 
-      it('opens plan in external editor when Ctrl+X is pressed', async () => {
+      it('automatically submits feedback if plan was edited via Ctrl+X', async () => {
         const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
 
         await act(async () => {
@@ -585,6 +555,42 @@ Implement a comprehensive authentication system with multiple providers.
           expect(lastFrame()).toContain('Add user authentication');
         });
 
+        // Mock different content for second read
+        vi.mocked(readFileLines)
+          .mockResolvedValueOnce(samplePlanContent.split('\n'))
+          .mockResolvedValueOnce([
+            ...samplePlanContent.split('\n'),
+            '# Added feedback',
+          ]);
+
+        // Press Ctrl+X
+        await act(async () => {
+          writeKey(stdin, '\x18'); // Ctrl+X
+        });
+
+        await waitFor(() => {
+          expect(onFeedback).toHaveBeenCalledWith(
+            'I have annotated the plan with feedback. Please review the edited plan file and update the plan accordingly.',
+          );
+        });
+      });
+
+      it('does not submit feedback if plan was not edited via Ctrl+X', async () => {
+        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
+        await waitFor(() => {
+          expect(lastFrame()).toContain('Add user authentication');
+        });
+
+        // Mock same content for both reads
+        vi.mocked(readFileLines).mockResolvedValue(
+          samplePlanContent.split('\n'),
+        );
+
         // Reset the mock to track the second call during refresh
         vi.mocked(processSingleFileContent).mockClear();
 
@@ -594,16 +600,7 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(openFileInEditor).toHaveBeenCalledWith(
-            mockPlanFullPath,
-            expect.anything(),
-            expect.anything(),
-            undefined,
-          );
-        });
-
-        // Verify that content is refreshed (processSingleFileContent called again)
-        await waitFor(() => {
+          expect(onFeedback).not.toHaveBeenCalled();
           expect(processSingleFileContent).toHaveBeenCalled();
         });
       });
