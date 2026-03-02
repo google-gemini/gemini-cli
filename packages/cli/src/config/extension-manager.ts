@@ -406,7 +406,12 @@ Would you like to attempt to install via "git clone" instead?`,
         }
       } finally {
         if (tempDir) {
-          await fs.promises.rm(tempDir, { recursive: true, force: true });
+          await fs.promises.rm(tempDir, {
+            recursive: true,
+            force: true,
+            maxRetries: 3,
+            retryDelay: 100,
+          });
         }
       }
       return extension;
@@ -478,6 +483,8 @@ Would you like to attempt to install via "git clone" instead?`,
     await fs.promises.rm(storage.getExtensionDir(), {
       recursive: true,
       force: true,
+      maxRetries: 3,
+      retryDelay: 100,
     });
 
     // The rest of the cleanup below here is only for true uninstalls, not
