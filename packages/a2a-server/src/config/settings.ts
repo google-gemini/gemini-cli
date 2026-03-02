@@ -128,11 +128,18 @@ export function loadSettings(workspaceDir: string): Settings {
     }
   }
 
+  // If folderTrust is enabled in user settings, workspace settings are
+  // not trusted and should be ignored to prevent security bypass via
+  // malicious workspace settings (e.g. arbitrary command execution).
+  // This mirrors the trust check in the CLI's mergeSettings() function.
+  const isTrusted = !userSettings.folderTrust;
+  const safeWorkspaceSettings = isTrusted ? workspaceSettings : {};
+
   // If there are overlapping keys, the values of workspaceSettings will
   // override values from userSettings
   return {
     ...userSettings,
-    ...workspaceSettings,
+    ...safeWorkspaceSettings,
   };
 }
 
