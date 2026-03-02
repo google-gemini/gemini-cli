@@ -316,6 +316,18 @@ export class ShellExecutionService {
           [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
             GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
           TERM: 'xterm-256color',
+          // Disable interactive prompts and session-linked credential helpers
+          // in non-interactive mode to prevent hangs in detached process groups.
+          GIT_TERMINAL_PROMPT: '0',
+          GIT_ASKPASS: '',
+          SSH_ASKPASS: '',
+          GH_PROMPT_DISABLED: '1',
+          GCM_INTERACTIVE: 'never',
+          DISPLAY: '',
+          DBUS_SESSION_BUS_ADDRESS: '',
+          GIT_CONFIG_COUNT: '1',
+          GIT_CONFIG_KEY_0: 'credential.helper',
+          GIT_CONFIG_VALUE_0: '',
           PAGER: 'cat',
           GIT_PAGER: 'cat',
         },
