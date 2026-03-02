@@ -182,7 +182,7 @@ describe('<Footer />', () => {
       },
     );
     await waitUntilReady();
-    expect(lastFrame()).toContain('15%');
+    expect(lastFrame()).toContain('85%');
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });

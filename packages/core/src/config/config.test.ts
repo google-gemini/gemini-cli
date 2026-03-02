@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ConfigParameters, SandboxConfig } from './config.js';
 import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
+import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -258,6 +259,29 @@ describe('Server Config (config.ts)', () => {
     model: MODEL,
     usageStatisticsEnabled: false,
   };
+
+  describe('maxAttempts', () => {
+    it('should default to DEFAULT_MAX_ATTEMPTS', () => {
+      const config = new Config(baseParams);
+      expect(config.getMaxAttempts()).toBe(DEFAULT_MAX_ATTEMPTS);
+    });
+
+    it('should use provided maxAttempts if <= DEFAULT_MAX_ATTEMPTS', () => {
+      const config = new Config({
+        ...baseParams,
+        maxAttempts: 5,
+      });
+      expect(config.getMaxAttempts()).toBe(5);
+    });
+
+    it('should cap maxAttempts at DEFAULT_MAX_ATTEMPTS', () => {
+      const config = new Config({
+        ...baseParams,
+        maxAttempts: 20,
+      });
+      expect(config.getMaxAttempts()).toBe(DEFAULT_MAX_ATTEMPTS);
+    });
+  });
 
   beforeEach(() => {
     // Reset mocks if necessary

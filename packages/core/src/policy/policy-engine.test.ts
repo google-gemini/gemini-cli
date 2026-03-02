@@ -2557,4 +2557,68 @@ describe('PolicyEngine', () => {
       expect(checkers[0].priority).toBe(2.5);
     });
   });
+
+  describe('Tool Annotations', () => {
+    it('should match tools by semantic annotations', async () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolAnnotations: { readOnlyHint: true },
+            decision: PolicyDecision.ALLOW,
+            priority: 10,
+          },
+        ],
+        defaultDecision: PolicyDecision.DENY,
+      });
+
+      const readOnlyTool = { name: 'read', args: {} };
+      const readOnlyMeta = { readOnlyHint: true, extra: 'info' };
+
+      const writeTool = { name: 'write', args: {} };
+      const writeMeta = { readOnlyHint: false };
+
+      expect(
+        (await engine.check(readOnlyTool, undefined, readOnlyMeta)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check(writeTool, undefined, writeMeta)).decision,
+      ).toBe(PolicyDecision.DENY);
+      expect((await engine.check(writeTool, undefined, {})).decision).toBe(
+        PolicyDecision.DENY,
+      );
+    });
+
+    it('should support scoped annotation rules', async () => {
+      engine = new PolicyEngine({
+        rules: [
+          {
+            toolName: '*__*',
+            toolAnnotations: { experimental: true },
+            decision: PolicyDecision.DENY,
+            priority: 20,
+          },
+          {
+            toolName: '*__*',
+            decision: PolicyDecision.ALLOW,
+            priority: 10,
+          },
+        ],
+      });
+
+      expect(
+        (
+          await engine.check({ name: 'mcp__test' }, 'mcp', {
+            experimental: true,
+          })
+        ).decision,
+      ).toBe(PolicyDecision.DENY);
+      expect(
+        (
+          await engine.check({ name: 'mcp__stable' }, 'mcp', {
+            experimental: false,
+          })
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+  });
 });
