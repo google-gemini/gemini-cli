@@ -10,10 +10,10 @@ import * as crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
 import {
+  ApprovalMode,
   type PolicyEngineConfig,
   PolicyDecision,
   type PolicyRule,
-  ApprovalMode,
   type PolicySettings,
   type SafetyCheckerRule,
 } from './types.js';
@@ -516,9 +516,8 @@ export function createPolicyUpdater(
       if (message.persist) {
         persistenceQueue = persistenceQueue.then(async () => {
           try {
-            const workspacePoliciesDir = storage.getWorkspacePoliciesDir();
-            await fs.mkdir(workspacePoliciesDir, { recursive: true });
             const policyFile = storage.getAutoSavedPolicyPath();
+            await fs.mkdir(path.dirname(policyFile), { recursive: true });
 
             // Read existing file
             let existingData: { rule?: TomlRule[] } = {};
