@@ -280,7 +280,9 @@ async function exploreAction(
         type: 'custom_dialog' as const,
         component: React.createElement(ExtensionRegistryView, {
           onSelect: (extension) => {
-            debugLogger.debug(`Selected extension: ${extension.extensionName}`);
+            debugLogger.log(`Selected extension: ${extension.extensionName}`);
+            void installAction(context, extension.url);
+            context.ui.removeComponent();
           },
           onClose: () => context.ui.removeComponent(),
           extensionManager,
