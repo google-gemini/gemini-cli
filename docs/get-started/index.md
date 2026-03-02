@@ -38,7 +38,7 @@ cases, you can log in with your existing Google account:
    ```
 
 2. When asked "How would you like to authenticate for this project?" select **1.
-   Login with Google**.
+   Sign in with Google**.
 
 3. Select your Google account.
 
