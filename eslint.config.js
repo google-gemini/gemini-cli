@@ -68,7 +68,7 @@ export default tseslint.config(
   },
   {
     // Rules for packages/*/src (TS/TSX)
-    files: ['packages/*/src/**/*.{ts,tsx}'],
+    files: ['packages/*/src/**/*.{ts,tsx}', 'data/**/*.ts'],
     plugins: {
       import: importPlugin,
     },

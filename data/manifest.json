@@ -1,0 +1,71 @@
+{
+  "project": "Gemini CLI Tool Alignment Optimization",
+  "version": "1.0.0",
+  "optimization_constraints": {
+    "immutable_tokens": [
+      "glob",
+      "grep_search",
+      "list_directory",
+      "read_file",
+      "run_shell_command",
+      "write_file",
+      "replace",
+      "google_web_search",
+      "write_todos",
+      "web_fetch",
+      "read_many_files",
+      "save_memory",
+      "get_internal_docs",
+      "activate_skill",
+      "ask_user",
+      "exit_plan_mode",
+      "enter_plan_mode",
+      "codebase_investigator",
+      "cli_help",
+      "generalist"
+    ],
+    "protected_variables": [
+      "${FILE_PATH}",
+      "${DIR_PATH}",
+      "${PATTERN}",
+      "${OLD_STRING}",
+      "${NEW_STRING}",
+      "${GREP_PATTERN}",
+      "${SEARCH_PATTERN}"
+    ]
+  },
+  "data_inventory": {
+    "target_samples_per_tool": 5,
+    "overrides": {
+      "replace": 12,
+      "write_file": 10
+    },
+    "tools": {
+      "glob": { "description": "Find files by glob pattern" },
+      "grep_search": { "description": "Search text in files" },
+      "list_directory": { "description": "List files in a directory" },
+      "read_file": { "description": "Read a single file" },
+      "run_shell_command": { "description": "Execute shell commands" },
+      "write_file": { "description": "Write a complete file" },
+      "replace": { "description": "Surgical text replacement" },
+      "google_web_search": { "description": "Web search via Google" },
+      "write_todos": { "description": "Manage subtasks" },
+      "web_fetch": { "description": "Extract content from URLs" },
+      "read_many_files": { "description": "Read multiple files" },
+      "save_memory": { "description": "Global user preferences" },
+      "get_internal_docs": { "description": "Gemini CLI internal docs" },
+      "activate_skill": { "description": "Enable specialized skills" },
+      "ask_user": { "description": "Interactive user questions" },
+      "enter_plan_mode": { "description": "Start planning mode" },
+      "exit_plan_mode": { "description": "Exit planning mode" },
+      "codebase_investigator": {
+        "description": "High-level architecture mapping"
+      },
+      "cli_help": { "description": "Assistance with Gemini CLI" },
+      "generalist": { "description": "General purpose agent delegation" }
+    },
+    "file_descriptions": {
+      "data/tool_alignment.jsonl": "Ensures the model selects the correct built-in tool over generic shell commands and optimizes for brevity."
+    }
+  }
+}
