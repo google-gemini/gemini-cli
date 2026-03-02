@@ -1,0 +1,32 @@
+<!--
+  ~ Copyright 2026 Google LLC
+  ~ SPDX-License-Identifier: Apache-2.0
+  -->
+
+<idea-plugin>
+    <id>com.google.geminicli.jetbrains</id>
+    <name>Gemini CLI Companion</name>
+    <vendor email="gemini-cli@google.com" url="https://github.com/google-gemini/gemini-cli">Google</vendor>
+
+    <description><![CDATA[
+    Companion plugin for Gemini CLI that enables IDE integration features including
+    context tracking, diff viewing, and file management when using Gemini CLI
+    from the integrated terminal.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.plugins.terminal</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <projectService
+            serviceImplementation="com.google.geminicli.jetbrains.GeminiCliPlugin"/>
+        <terminal.environmentContributor
+            implementation="com.google.geminicli.jetbrains.discovery.EnvironmentInjector"/>
+    </extensions>
+
+    <projectListeners>
+        <listener
+            class="com.google.geminicli.jetbrains.GeminiCliPlugin$ProjectOpenCloseListener"
+            topic="com.intellij.openapi.project.ProjectManagerListener"/>
+    </projectListeners>
+</idea-plugin>

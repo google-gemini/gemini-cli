@@ -61,6 +61,24 @@ describe('ide-installer', () => {
       expect(installer).not.toBeNull();
       expect(installer?.install).toEqual(expect.any(Function));
     });
+
+    it.each([
+      { ide: IDE_DEFINITIONS.jetbrains },
+      { ide: IDE_DEFINITIONS.intellijidea },
+      { ide: IDE_DEFINITIONS.webstorm },
+      { ide: IDE_DEFINITIONS.pycharm },
+      { ide: IDE_DEFINITIONS.goland },
+      { ide: IDE_DEFINITIONS.androidstudio },
+      { ide: IDE_DEFINITIONS.clion },
+      { ide: IDE_DEFINITIONS.rustrover },
+      { ide: IDE_DEFINITIONS.datagrip },
+      { ide: IDE_DEFINITIONS.phpstorm },
+    ])('returns a JetBrainsInstaller for "$ide.name"', ({ ide }) => {
+      const installer = getIdeInstaller(ide);
+
+      expect(installer).not.toBeNull();
+      expect(installer?.install).toEqual(expect.any(Function));
+    });
   });
 
   describe('VsCodeInstaller', () => {
@@ -303,5 +321,70 @@ describe('AntigravityInstaller', () => {
 
     expect(result.success).toBe(false);
     expect(result.message).toContain('not-a-command not found');
+  });
+});
+
+describe('JetBrainsInstaller', () => {
+  function setup({
+    ide = IDE_DEFINITIONS.intellijidea,
+    execSync = () => '',
+    platform = 'linux' as NodeJS.Platform,
+  }: {
+    ide?: IdeInfo;
+    execSync?: () => string;
+    platform?: NodeJS.Platform;
+  } = {}) {
+    vi.spyOn(child_process, 'execSync').mockImplementation(execSync);
+    const installer = getIdeInstaller(ide, platform)!;
+
+    return { installer };
+  }
+
+  it('installs the plugin using IDE CLI when available', async () => {
+    const { installer } = setup({});
+    const result = await installer.install();
+
+    expect(result.success).toBe(true);
+    expect(child_process.spawnSync).toHaveBeenCalledWith(
+      'idea',
+      ['installPlugins', 'com.google.geminicli.jetbrains'],
+      { stdio: 'pipe', shell: false },
+    );
+    expect(result.message).toContain(
+      'companion plugin was installed successfully',
+    );
+  });
+
+  it('returns manual instructions when CLI is not found', async () => {
+    vi.spyOn(child_process, 'spawnSync').mockReturnValue({
+      status: 1,
+      stderr: Buffer.from('error'),
+    } as ReturnType<typeof child_process.spawnSync>);
+    const { installer } = setup({
+      execSync: () => {
+        throw new Error('Command not found');
+      },
+    });
+    vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+    const result = await installer.install();
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('install it manually');
+    expect(result.message).toContain('Settings > Plugins > Marketplace');
+  });
+
+  it.each([
+    { ide: IDE_DEFINITIONS.webstorm, expectedCmd: 'webstorm' },
+    { ide: IDE_DEFINITIONS.pycharm, expectedCmd: 'pycharm' },
+    { ide: IDE_DEFINITIONS.goland, expectedCmd: 'goland' },
+  ])('uses correct CLI command for $ide.name', async ({ ide, expectedCmd }) => {
+    const { installer } = setup({ ide });
+    await installer.install();
+
+    expect(child_process.spawnSync).toHaveBeenCalledWith(
+      expectedCmd,
+      ['installPlugins', 'com.google.geminicli.jetbrains'],
+      { stdio: 'pipe', shell: false },
+    );
   });
 });
