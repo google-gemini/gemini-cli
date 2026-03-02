@@ -51,6 +51,7 @@ interface PlanContentState {
 enum ApprovalOption {
   Auto = 'Yes, automatically accept edits',
   Manual = 'Yes, manually accept edits',
+  Review = 'No, review plan edits as feedback',
 }
 
 /**
@@ -240,6 +241,11 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
                 description:
                   'Approves plan but requires confirmation for each tool',
               },
+              {
+                label: ApprovalOption.Review,
+                description:
+                  'Return plan with annotations to the agent for iteration',
+              },
             ],
             placeholder: 'Type your feedback...',
             multiSelect: false,
@@ -251,6 +257,10 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
             onApprove(ApprovalMode.AUTO_EDIT);
           } else if (answer === ApprovalOption.Manual) {
             onApprove(ApprovalMode.DEFAULT);
+          } else if (answer === ApprovalOption.Review) {
+            onFeedback(
+              'I have annotated the plan with feedback. Please review the edited plan file and update the plan accordingly.',
+            );
           } else if (answer) {
             onFeedback(answer);
           }

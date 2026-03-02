@@ -111,6 +111,10 @@ structure, and consultation level are proportional to the task's complexity:
       [preferred external editor]. This allows you to manually refine the plan
       steps before approval. The CLI will automatically refresh and show the
       updated plan after you save and close the editor.
+    - **Review edits:** If you added inline annotations or feedback for the
+      agent to consider in the plan file, you can select the **"No, review plan
+      edits as feedback"** option to send the plan back to the agent for
+      iteration.
 
 For more complex or specialized planning tasks, you can
 [customize the planning workflow with skills](#customizing-planning-with-skills).

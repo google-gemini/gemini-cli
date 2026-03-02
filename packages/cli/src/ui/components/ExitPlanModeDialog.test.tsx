@@ -235,6 +235,28 @@ Implement a comprehensive authentication system with multiple providers.
         });
       });
 
+      it('calls onFeedback with the review message when Review is selected', async () => {
+        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
+        await waitFor(() => {
+          expect(lastFrame()).toContain('Add user authentication');
+        });
+
+        writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\r');
+
+        await waitFor(() => {
+          expect(onFeedback).toHaveBeenCalledWith(
+            'I have annotated the plan with feedback. Please review the edited plan file and update the plan accordingly.',
+          );
+        });
+      });
+
       it('calls onFeedback when feedback is typed and submitted', async () => {
         const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
 
@@ -247,6 +269,7 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         // Navigate to feedback option
+        writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
 
@@ -376,6 +399,7 @@ Implement a comprehensive authentication system with multiple providers.
         // Navigate to feedback option and start typing
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\r'); // Select to focus input
 
         // Type some feedback
@@ -460,6 +484,7 @@ Implement a comprehensive authentication system with multiple providers.
         // Navigate to feedback option
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\x1b[B'); // Down arrow
 
         // Type some feedback
         for (const char of 'test') {
@@ -501,6 +526,7 @@ Implement a comprehensive authentication system with multiple providers.
         // Navigate to feedback option
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\x1b[B'); // Down arrow
 
         // Press Enter without typing anything
         writeKey(stdin, '\r');
@@ -528,6 +554,7 @@ Implement a comprehensive authentication system with multiple providers.
         // Navigate to feedback option and start typing
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\x1b[B'); // Down arrow
 
         // Type some feedback
         for (const char of 'test') {
@@ -535,6 +562,7 @@ Implement a comprehensive authentication system with multiple providers.
         }
 
         // Now use up arrow to navigate back to a different option
+        writeKey(stdin, '\x1b[A'); // Up arrow
         writeKey(stdin, '\x1b[A'); // Up arrow
 
         // Press Enter to select the second option (manually accept edits)
