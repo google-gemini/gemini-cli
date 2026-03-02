@@ -381,6 +381,15 @@ export class AgentRegistry {
       if (agentDescription?.trim()) {
         descriptions.push(`Agent Description: ${agentDescription.trim()}`);
       }
+      if (agentCard.skills && agentCard.skills.length > 0) {
+        const skillsList = agentCard.skills
+          .map(
+            (skill: { name: string; description: string }) =>
+              `${skill.name}: ${skill.description}`,
+          )
+          .join('\n');
+        descriptions.push(`Skills:\n${skillsList}`);
+      }
 
       if (descriptions.length > 0) {
         definition.description = descriptions.join('\n');

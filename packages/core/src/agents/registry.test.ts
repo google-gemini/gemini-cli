@@ -572,7 +572,7 @@ describe('AgentRegistry', () => {
       );
     });
 
-    it('should merge user and agent description when registering a remote agent', async () => {
+    it('should merge user and agent description and skills when registering a remote agent', async () => {
       const remoteAgent: AgentDefinition = {
         kind: 'remote',
         name: 'RemoteAgentWithDescription',
@@ -584,6 +584,10 @@ describe('AgentRegistry', () => {
       const mockAgentCard = {
         name: 'RemoteAgentWithDescription',
         description: 'Card-provided description',
+        skills: [
+          { name: 'Skill1', description: 'Desc1' },
+          { name: 'Skill2', description: 'Desc2' },
+        ],
       };
 
       vi.mocked(A2AClientManager.getInstance).mockReturnValue({
@@ -595,11 +599,39 @@ describe('AgentRegistry', () => {
 
       const registered = registry.getDefinition('RemoteAgentWithDescription');
       expect(registered?.description).toBe(
-        'User Description: User-provided description\nAgent Description: Card-provided description',
+        'User Description: User-provided description\nAgent Description: Card-provided description\nSkills:\nSkill1: Desc1\nSkill2: Desc2',
       );
     });
 
-    it('should handle empty user or agent descriptions during merging', async () => {
+    it('should include skills when agent description is empty', async () => {
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgentWithSkillsOnly',
+        description: 'User-provided description',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      const mockAgentCard = {
+        name: 'RemoteAgentWithSkillsOnly',
+        description: '',
+        skills: [{ name: 'Skill1', description: 'Desc1' }],
+      };
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue(mockAgentCard),
+        clearCache: vi.fn(),
+      } as unknown as A2AClientManager);
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      const registered = registry.getDefinition('RemoteAgentWithSkillsOnly');
+      expect(registered?.description).toBe(
+        'User Description: User-provided description\nSkills:\nSkill1: Desc1',
+      );
+    });
+
+    it('should handle empty user or agent descriptions and no skills during merging', async () => {
       const remoteAgent: AgentDefinition = {
         kind: 'remote',
         name: 'RemoteAgentWithEmptyAgentDescription',
@@ -611,6 +643,7 @@ describe('AgentRegistry', () => {
       const mockAgentCard = {
         name: 'RemoteAgentWithEmptyAgentDescription',
         description: '', // Empty agent description
+        skills: [],
       };
 
       vi.mocked(A2AClientManager.getInstance).mockReturnValue({
