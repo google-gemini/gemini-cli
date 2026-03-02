@@ -563,7 +563,7 @@ describe('Composer', () => {
       const output = lastFrame();
       expect(output).toContain('ToastDisplay');
       expect(output).not.toContain('ApprovalModeIndicator');
-      expect(output).toContain('StatusDisplay');
+      expect(output).not.toContain('StatusDisplay');
     });
 
     it('shows ToastDisplay for other toast types', async () => {

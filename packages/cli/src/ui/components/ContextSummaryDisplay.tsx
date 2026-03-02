@@ -40,7 +40,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     skillCount === 0 &&
     backgroundProcessCount === 0
   ) {
-    return <Text> </Text>; // Render an empty space to reserve height
+    return null;
   }
 
   const openFilesText = (() => {

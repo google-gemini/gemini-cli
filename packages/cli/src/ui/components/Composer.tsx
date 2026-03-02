@@ -526,28 +526,20 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             {showShortcutsHelp && <ShortcutsHelp />}
             {showUiDetails && (
               <Box
-                justifyContent={
-                  settings.merged.ui.hideContextSummary
-                    ? 'flex-start'
-                    : 'space-between'
-                }
                 width="100%"
-                flexDirection={isNarrow ? 'column' : 'row'}
-                alignItems={isNarrow ? 'flex-start' : 'center'}
+                flexDirection="row"
+                flexWrap="wrap"
+                alignItems="center"
+                marginLeft={1}
               >
-                <Box
-                  marginLeft={1}
-                  marginRight={isNarrow ? 0 : 1}
-                  flexDirection="row"
-                  alignItems="center"
-                  flexGrow={1}
-                >
-                  {hasToast ? (
-                    <ToastDisplay />
-                  ) : (
+                {hasToast ? (
+                  <ToastDisplay />
+                ) : (
+                  <>
                     <Box
-                      flexDirection={isNarrow ? 'column' : 'row'}
-                      alignItems={isNarrow ? 'flex-start' : 'center'}
+                      flexDirection="row"
+                      alignItems="center"
+                      flexWrap="wrap"
                     >
                       {showApprovalIndicator && (
                         <ApprovalModeIndicator
@@ -558,51 +550,30 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                       {!showLoadingIndicator && (
                         <>
                           {uiState.shellModeActive && (
-                            <Box
-                              marginLeft={
-                                showApprovalIndicator && !isNarrow ? 1 : 0
-                              }
-                              marginTop={
-                                showApprovalIndicator && isNarrow ? 1 : 0
-                              }
-                            >
+                            <Box marginLeft={1}>
                               <ShellModeIndicator />
                             </Box>
                           )}
                           {showRawMarkdownIndicator && (
-                            <Box
-                              marginLeft={
-                                (showApprovalIndicator ||
-                                  uiState.shellModeActive) &&
-                                !isNarrow
-                                  ? 1
-                                  : 0
-                              }
-                              marginTop={
-                                (showApprovalIndicator ||
-                                  uiState.shellModeActive) &&
-                                isNarrow
-                                  ? 1
-                                  : 0
-                              }
-                            >
+                            <Box marginLeft={1}>
                               <RawMarkdownIndicator />
                             </Box>
                           )}
                         </>
                       )}
                     </Box>
-                  )}
-                </Box>
-
-                <Box
-                  flexDirection="column"
-                  alignItems={isNarrow ? 'flex-start' : 'flex-end'}
-                >
-                  {!showLoadingIndicator && (
-                    <StatusDisplay hideContextSummary={hideContextSummary} />
-                  )}
-                </Box>
+                    {!showLoadingIndicator && (
+                      <>
+                        <Box marginLeft={1}>
+                          <Text color={theme.text.secondary}>·</Text>
+                        </Box>
+                        <StatusDisplay
+                          hideContextSummary={hideContextSummary}
+                        />
+                      </>
+                    )}
+                  </>
+                )}
               </Box>
             )}
           </Box>
