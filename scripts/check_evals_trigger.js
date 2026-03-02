@@ -34,8 +34,12 @@ function main() {
     );
 
     console.log(shouldRun ? 'true' : 'false');
-  } catch {
+  } catch (error) {
     // If anything fails (e.g., no git history), run evals to be safe
+    console.warn(
+      'Warning: Failed to determine if evals should run. Defaulting to true.',
+    );
+    console.error(error);
     console.log('true');
   }
 }
