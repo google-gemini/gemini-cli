@@ -94,7 +94,10 @@ export function updateCoderAgentCardUrl(port: number) {
 const customUserBuilder: UserBuilder = async (req: Request) => {
   const auth = req.headers['authorization'];
   if (auth) {
-    logger.info(`[customUserBuilder] Received Authorization header: ${auth}`);
+    const scheme = auth.split(' ')[0];
+    logger.info(
+      `[customUserBuilder] Received Authorization header with scheme: ${scheme}`,
+    );
   }
   if (!auth) return new UnauthenticatedUser();
 

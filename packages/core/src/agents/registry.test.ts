@@ -602,6 +602,42 @@ describe('AgentRegistry', () => {
       );
     });
 
+    it('should not register remote agent when auth provider factory returns undefined', async () => {
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgentBadAuth',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+        auth: {
+          type: 'http' as const,
+          scheme: 'Bearer' as const,
+          token: 'secret-token',
+        },
+      };
+
+      vi.mocked(A2AAuthProviderFactory.create).mockResolvedValue(undefined);
+      const loadAgentSpy = vi.fn();
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: loadAgentSpy,
+        clearCache: vi.fn(),
+      } as unknown as A2AClientManager);
+
+      const warnSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      expect(loadAgentSpy).not.toHaveBeenCalled();
+      expect(registry.getDefinition('RemoteAgentBadAuth')).toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Error loading A2A agent'),
+        expect.any(Error),
+      );
+      warnSpy.mockRestore();
+    });
+
     it('should log remote agent registration in debug mode', async () => {
       const debugConfig = makeMockedConfig({ debugMode: true });
       const debugRegistry = new TestableAgentRegistry(debugConfig);

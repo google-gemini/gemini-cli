@@ -118,13 +118,14 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         authConfig: this.definition.auth,
         agentName: this.definition.name,
       });
-      if (provider) {
-        this.authHandler = provider;
+      if (!provider) {
+        throw new Error(
+          `Failed to create auth provider for agent '${this.definition.name}'`,
+        );
       }
-    }
-
-    if (!this.authHandler) {
-      // Fallback to ADC if no auth is configured
+      this.authHandler = provider;
+    } else {
+      // Use ADCHandler for agents hosted on secure platforms (e.g. Vertex AI)
       this.authHandler = new ADCHandler();
     }
 

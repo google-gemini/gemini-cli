@@ -365,16 +365,21 @@ export class AgentRegistry {
     // Log remote A2A agent registration for visibility.
     try {
       const clientManager = A2AClientManager.getInstance();
-      // Use definition auth if available, otherwise fallback to ADCHandler
-      let authHandler: AuthenticationHandler | undefined;
+      // Use definition auth if available, otherwise use ADCHandler for
+      // agents hosted on secure platforms (e.g. Vertex AI).
+      let authHandler: AuthenticationHandler;
       if (definition.auth) {
-        authHandler = await A2AAuthProviderFactory.create({
+        const provider = await A2AAuthProviderFactory.create({
           authConfig: definition.auth,
           agentName: definition.name,
         });
-      }
-
-      if (!authHandler) {
+        if (!provider) {
+          throw new Error(
+            `Failed to create auth provider for agent '${definition.name}'`,
+          );
+        }
+        authHandler = provider;
+      } else {
         authHandler = new ADCHandler();
       }
 

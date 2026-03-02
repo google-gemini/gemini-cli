@@ -27,14 +27,15 @@ export class HttpAuthProvider extends BaseA2AAuthProvider {
   }
 
   override async initialize(): Promise<void> {
-    if (this.config.scheme === 'Bearer') {
-      this.resolvedToken = await resolveAuthValue(this.config.token);
-    } else if (this.config.scheme === 'Basic') {
-      this.resolvedUsername = await resolveAuthValue(this.config.username);
-      this.resolvedPassword = await resolveAuthValue(this.config.password);
+    const config = this.config;
+    if ('token' in config) {
+      this.resolvedToken = await resolveAuthValue(config.token);
+    } else if ('username' in config) {
+      this.resolvedUsername = await resolveAuthValue(config.username);
+      this.resolvedPassword = await resolveAuthValue(config.password);
     } else {
       // Generic raw value for any other IANA-registered scheme
-      this.resolvedValue = await resolveAuthValue(this.config.value);
+      this.resolvedValue = await resolveAuthValue(config.value);
     }
     debugLogger.debug(
       `[HttpAuthProvider] Initialized with scheme: ${this.config.scheme}`,
@@ -42,13 +43,14 @@ export class HttpAuthProvider extends BaseA2AAuthProvider {
   }
 
   override async headers(): Promise<HttpHeaders> {
-    if (this.config.scheme === 'Bearer') {
+    const config = this.config;
+    if ('token' in config) {
       if (!this.resolvedToken)
         throw new Error('HttpAuthProvider not initialized');
       return { Authorization: `Bearer ${this.resolvedToken}` };
     }
 
-    if (this.config.scheme === 'Basic') {
+    if ('username' in config) {
       if (!this.resolvedUsername || !this.resolvedPassword) {
         throw new Error('HttpAuthProvider not initialized');
       }
@@ -61,17 +63,21 @@ export class HttpAuthProvider extends BaseA2AAuthProvider {
     // Generic raw value for any other IANA-registered scheme
     if (!this.resolvedValue)
       throw new Error('HttpAuthProvider not initialized');
-    return { Authorization: `${this.config.scheme} ${this.resolvedValue}` };
+    return { Authorization: `${config.scheme} ${this.resolvedValue}` };
   }
 
   /**
    * Re-resolves credentials on auth failure (e.g. rotated tokens via $ENV or !command).
+   * Respects MAX_AUTH_RETRIES from the base class to prevent infinite loops.
    */
   override async shouldRetryWithHeaders(
     req: RequestInit,
     res: Response,
   ): Promise<HttpHeaders | undefined> {
     if (res.status === 401 || res.status === 403) {
+      if (this.authRetryCount >= BaseA2AAuthProvider.MAX_AUTH_RETRIES) {
+        return undefined;
+      }
       debugLogger.debug(
         '[HttpAuthProvider] Re-resolving values after auth failure',
       );
