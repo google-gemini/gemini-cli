@@ -9,9 +9,8 @@ and search the web.
 
 You can directly trigger these tools using special syntax in your prompts.
 
-- **[File access](./file-system.md#read_many_files) (`@`):** Use the `@` symbol
+- **[File access](../reference/commands.md#at-commands-):** Use the `@` symbol
   followed by a file or directory path to include its content in your prompt.
-  This triggers the `read_many_files` tool.
 - **[Shell commands](./shell.md) (`!`):** Use the `!` symbol followed by a
   system command to execute it directly. This triggers the `run_shell_command`
   tool.
@@ -26,19 +25,18 @@ these tools manually.
 
 These tools let the model explore and modify your local codebase.
 
-- **[Directory listing](./file-system.md#list_directory) (`list_directory`):**
-  Lists files and subdirectories.
-- **[File reading](./file-system.md#read_file) (`read_file`):** Reads the
-  content of a specific file.
-- **[File writing](./file-system.md#write_file) (`write_file`):** Creates or
-  overwrites a file with new content.
-- **[File search](./file-system.md#glob) (`glob`):** Finds files matching a glob
-  pattern.
-- **[Text search](./file-system.md#search_file_content)
-  (`search_file_content`):** Searches for text within files using grep or
-  ripgrep.
-- **[Text replacement](./file-system.md#replace) (`replace`):** Performs precise
-  edits within a file.
+- **[Directory listing](./file-system.md#list_directory-readfolder)
+  (`list_directory`):** Lists files and subdirectories.
+- **[File reading](./file-system.md#read_file-readfile) (`read_file`):** Reads
+  the content of a specific file.
+- **[File writing](./file-system.md#write_file-writefile) (`write_file`):**
+  Creates or overwrites a file with new content.
+- **[File search](./file-system.md#glob-findfiles) (`glob`):** Finds files
+  matching a glob pattern.
+- **[Text search](./file-system.md#grep_search-searchtext) (`grep_search`):**
+  Searches for text within files using grep or ripgrep.
+- **[Text replacement](./file-system.md#replace-edit) (`replace`):** Performs
+  precise edits within a file.
 
 ### Agent coordination
 
