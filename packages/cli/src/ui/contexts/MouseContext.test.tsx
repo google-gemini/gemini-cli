@@ -4,10 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
 import { act } from 'react';
 import { MouseProvider, useMouseContext, useMouse } from './MouseContext.js';
-import { vi, type Mock } from 'vitest';
 import type React from 'react';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'node:events';

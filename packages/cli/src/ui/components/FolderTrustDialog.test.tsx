@@ -292,7 +292,7 @@ describe('FolderTrustDialog', () => {
 
   describe('directory display', () => {
     it('should correctly display the folder name for a nested directory', async () => {
-      mockedCwd.mockReturnValue('/home/user/project');
+      mockedCwd.mockReturnValue('/home/user/workspace');
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <FolderTrustDialog onSelect={vi.fn()} />,
       );
@@ -302,7 +302,7 @@ describe('FolderTrustDialog', () => {
     });
 
     it('should correctly display the parent folder name for a nested directory', async () => {
-      mockedCwd.mockReturnValue('/home/user/project');
+      mockedCwd.mockReturnValue('/home/user/workspace');
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <FolderTrustDialog onSelect={vi.fn()} />,
       );

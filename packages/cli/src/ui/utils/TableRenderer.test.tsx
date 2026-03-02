@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { describe, it, expect } from 'vitest';
-import '../../../test-utils/customMatchers.js';
+import '../../test-utils/customMatchers.js';
 import { TableRenderer } from './TableRenderer.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 

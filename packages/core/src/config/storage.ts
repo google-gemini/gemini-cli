@@ -203,7 +203,7 @@ export class Storage {
     return crypto.createHash('sha256').update(filePath).digest('hex');
   }
 
-  private getProjectIdentifier(): string {
+  getProjectIdentifier(): string {
     if (!this.projectIdentifier) {
       throw new Error('Storage must be initialized before use');
     }

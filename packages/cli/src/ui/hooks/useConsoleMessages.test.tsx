@@ -5,7 +5,7 @@
  */
 
 import { act, useCallback } from 'react';
-import { vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from '../../test-utils/render.js';
 import { useConsoleMessages } from './useConsoleMessages.js';
 import { CoreEvent, type ConsoleLogPayload } from '@google/gemini-cli-core';

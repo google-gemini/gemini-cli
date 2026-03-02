@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from '../../test-utils/render.js';
-import { vi } from 'vitest';
 import {
   useMemoryMonitor,
   MEMORY_CHECK_INTERVAL,

@@ -7,10 +7,19 @@
 import { debugLogger } from '@google/gemini-cli-core';
 import type React from 'react';
 import { act } from 'react';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import type { Mock } from 'vitest';
-import { vi, afterAll, beforeAll } from 'vitest';
 import type { Key } from './KeypressContext.js';
 import {
   KeypressProvider,

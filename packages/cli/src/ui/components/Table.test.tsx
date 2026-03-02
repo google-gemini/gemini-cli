@@ -1,9 +1,16 @@
 /**
  * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import '../../test-utils/customMatchers.js';
+/**
+ * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { describe, it, expect } from 'vitest';
 import { render } from '../../test-utils/render.js';
 import { Table } from './Table.js';
 import { Text } from 'ink';

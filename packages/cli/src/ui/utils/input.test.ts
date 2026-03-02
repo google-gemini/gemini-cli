@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { describe, expect, it } from 'vitest';
 import { couldBeSGRMouseSequence, SGR_MOUSE_REGEX, ESC } from './input.js';
 
 describe('input utils', () => {

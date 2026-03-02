@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import '../../../test-utils/customMatchers.js';
+import '../../test-utils/customMatchers.js';
 import { getToolGroupBorderAppearance } from './borderStyles.js';
 import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
