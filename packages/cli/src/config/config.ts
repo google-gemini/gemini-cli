@@ -145,7 +145,8 @@ export async function parseArguments(
         })
         .option('voice', {
           type: 'boolean',
-          description: 'Enable hands-free voice mode (experimental).',
+          description:
+            'Enable hands-free voice mode (experimental text placeholder; native audio streaming will come in a future PR).',
           default: false,
         })
         .option('sandbox', {
