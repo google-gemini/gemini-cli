@@ -11,6 +11,7 @@ import type {
   AuthValidationResult,
 } from './types.js';
 import { ApiKeyAuthProvider } from './api-key-provider.js';
+import { HttpAuthProvider } from './http-provider.js';
 
 export interface CreateAuthProviderOptions {
   /** Required for OAuth/OIDC token storage. */
@@ -50,9 +51,11 @@ export class A2AAuthProviderFactory {
         return provider;
       }
 
-      case 'http':
-        // TODO: Implement
-        throw new Error('http auth provider not yet implemented');
+      case 'http': {
+        const provider = new HttpAuthProvider(authConfig);
+        await provider.initialize();
+        return provider;
+      }
 
       case 'oauth2':
         // TODO: Implement
