@@ -8,7 +8,7 @@ import type { Config } from '../config/config.js';
 import type { HookPlanner, HookEventContext } from './hookPlanner.js';
 import type { HookRunner } from './hookRunner.js';
 import type { HookAggregator, AggregatedHookResult } from './hookAggregator.js';
-import { HookEventName } from './types.js';
+import { HookEventName, HookType } from './types.js';
 import type {
   HookConfig,
   HookInput,
@@ -76,12 +76,16 @@ export class HookEventHandler {
     toolName: string,
     toolInput: Record<string, unknown>,
     mcpContext?: McpToolContext,
+    originalRequestName?: string,
   ): Promise<AggregatedHookResult> {
     const input: BeforeToolInput = {
       ...this.createBaseInput(HookEventName.BeforeTool),
       tool_name: toolName,
       tool_input: toolInput,
       ...(mcpContext && { mcp_context: mcpContext }),
+      ...(originalRequestName && {
+        original_request_name: originalRequestName,
+      }),
     };
 
     const context: HookEventContext = { toolName };
@@ -97,6 +101,7 @@ export class HookEventHandler {
     toolInput: Record<string, unknown>,
     toolResponse: Record<string, unknown>,
     mcpContext?: McpToolContext,
+    originalRequestName?: string,
   ): Promise<AggregatedHookResult> {
     const input: AfterToolInput = {
       ...this.createBaseInput(HookEventName.AfterTool),
@@ -104,6 +109,9 @@ export class HookEventHandler {
       tool_input: toolInput,
       tool_response: toolResponse,
       ...(mcpContext && { mcp_context: mcpContext }),
+      ...(originalRequestName && {
+        original_request_name: originalRequestName,
+      }),
     };
 
     const context: HookEventContext = { toolName };
@@ -492,7 +500,10 @@ export class HookEventHandler {
    * Get hook name from config for display or telemetry
    */
   private getHookName(config: HookConfig): string {
-    return config.name || config.command || 'unknown-command';
+    if (config.type === HookType.Command) {
+      return config.name || config.command || 'unknown-command';
+    }
+    return config.name || 'unknown-hook';
   }
 
   /**
@@ -505,7 +516,7 @@ export class HookEventHandler {
   /**
    * Get hook type from execution result for telemetry
    */
-  private getHookTypeFromResult(result: HookExecutionResult): 'command' {
+  private getHookTypeFromResult(result: HookExecutionResult): HookType {
     return result.hookConfig.type;
   }
 }

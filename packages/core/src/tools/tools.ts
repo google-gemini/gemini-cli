@@ -91,6 +91,7 @@ export abstract class BaseToolInvocation<
     readonly _toolName?: string,
     readonly _toolDisplayName?: string,
     readonly _serverName?: string,
+    readonly _toolAnnotations?: Record<string, unknown>,
   ) {}
 
   abstract getDescription(): string;
@@ -199,6 +200,7 @@ export abstract class BaseToolInvocation<
         args: this.params as Record<string, unknown>,
       },
       serverName: this._serverName,
+      toolAnnotations: this._toolAnnotations,
     };
 
     return new Promise<'ALLOW' | 'DENY' | 'ASK_USER'>((resolve) => {
@@ -370,6 +372,10 @@ export abstract class DeclarativeTool<
 
   get isReadOnly(): boolean {
     return READ_ONLY_KINDS.includes(this.kind);
+  }
+
+  get toolAnnotations(): Record<string, unknown> | undefined {
+    return undefined;
   }
 
   getSchema(_modelId?: string): FunctionDeclaration {
@@ -579,6 +585,15 @@ export interface ToolResult {
    * Optional data payload for passing structured information back to the caller.
    */
   data?: Record<string, unknown>;
+
+  /**
+   * Optional request to execute another tool immediately after this one.
+   * The result of this tail call will replace the original tool's response.
+   */
+  tailToolCallRequest?: {
+    name: string;
+    args: Record<string, unknown>;
+  };
 }
 
 /**
@@ -757,6 +772,9 @@ export interface ToolMcpConfirmationDetails {
   serverName: string;
   toolName: string;
   toolDisplayName: string;
+  toolArgs?: Record<string, unknown>;
+  toolDescription?: string;
+  toolParameterSchema?: unknown;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
 }
 
@@ -814,9 +832,11 @@ export enum Kind {
   Search = 'search',
   Execute = 'execute',
   Think = 'think',
+  Agent = 'agent',
   Fetch = 'fetch',
   Communicate = 'communicate',
   Plan = 'plan',
+  SwitchMode = 'switch_mode',
   Other = 'other',
 }
 

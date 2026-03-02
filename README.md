@@ -382,7 +382,7 @@ See the [Uninstall Guide](docs/cli/uninstall.md) for removal instructions.
 ## 📄 Legal
 
 - **License**: [Apache License 2.0](LICENSE)
-- **Terms of Service**: [Terms & Privacy](./docs/tos-privacy.md)
+- **Terms of Service**: [Terms & Privacy](./docs/resources/tos-privacy.md)
 - **Security**: [Security Policy](SECURITY.md)
 
 ---

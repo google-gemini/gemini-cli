@@ -22,7 +22,7 @@ import {
 } from '../tools/memoryTool.js';
 import { flattenMemory } from '../config/memory.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { GEMINI_DIR, normalizePath } from './paths.js';
+import { GEMINI_DIR, normalizePath, homedir as pathsHomedir } from './paths.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 
 function flattenResult(result: {
@@ -61,8 +61,6 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
     homedir: vi.fn(),
   };
 });
-
-import { homedir as pathsHomedir } from './paths.js';
 
 describe('memoryDiscovery', () => {
   const DEFAULT_FOLDER_TRUST = true;

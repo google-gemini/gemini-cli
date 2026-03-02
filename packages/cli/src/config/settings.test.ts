@@ -75,10 +75,12 @@ import {
   SettingScope,
   LoadedSettings,
   sanitizeEnvVar,
+  createTestMergedSettings,
 } from './settings.js';
 import {
   FatalConfigError,
   GEMINI_DIR,
+  Storage,
   type MCPServerConfig,
 } from '@google/gemini-cli-core';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
@@ -126,6 +128,30 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   const os = await import('node:os');
+  const pathMod = await import('node:path');
+  const fsMod = await import('node:fs');
+
+  // Helper to resolve paths using the test's mocked environment
+  const testResolve = (p: string | undefined) => {
+    if (!p) return '';
+    try {
+      // Use the mocked fs.realpathSync if available, otherwise fallback
+      return fsMod.realpathSync(pathMod.resolve(p));
+    } catch {
+      return pathMod.resolve(p);
+    }
+  };
+
+  // Create a smarter mock for isWorkspaceHomeDir
+  vi.spyOn(actual.Storage.prototype, 'isWorkspaceHomeDir').mockImplementation(
+    function (this: Storage) {
+      const target = testResolve(pathMod.dirname(this.getGeminiDir()));
+      // Pick up the mocked home directory specifically from the 'os' mock
+      const home = testResolve(os.homedir());
+      return actual.normalizePath(target) === actual.normalizePath(home);
+    },
+  );
+
   return {
     ...actual,
     coreEvents: mockCoreEvents,
@@ -1491,20 +1517,29 @@ describe('Settings Loading and Merging', () => {
         return pStr;
       });
 
+      // Force the storage check to return true for this specific test
+      const isWorkspaceHomeDirSpy = vi
+        .spyOn(Storage.prototype, 'isWorkspaceHomeDir')
+        .mockReturnValue(true);
+
       (mockFsExistsSync as Mock).mockImplementation(
         (p: string) =>
           // Only return true for workspace settings path to see if it gets loaded
           p === mockWorkspaceSettingsPath,
       );
 
-      const settings = loadSettings(mockSymlinkDir);
+      try {
+        const settings = loadSettings(mockSymlinkDir);
 
-      // Verify that even though the file exists, it was NOT loaded because realpath matched home
-      expect(fs.readFileSync).not.toHaveBeenCalledWith(
-        mockWorkspaceSettingsPath,
-        'utf-8',
-      );
-      expect(settings.workspace.settings).toEqual({});
+        // Verify that even though the file exists, it was NOT loaded because realpath matched home
+        expect(fs.readFileSync).not.toHaveBeenCalledWith(
+          mockWorkspaceSettingsPath,
+          'utf-8',
+        );
+        expect(settings.workspace.settings).toEqual({});
+      } finally {
+        isWorkspaceHomeDirSpy.mockRestore();
+      }
     });
   });
 
@@ -1804,36 +1839,50 @@ describe('Settings Loading and Merging', () => {
       expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
     });
 
-    it('does not load env files from untrusted spaces', () => {
+    it('does not load env files from untrusted spaces when sandboxed', () => {
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
       const settings = {
         security: { folderTrust: { enabled: true } },
+        tools: { sandbox: true },
       } as Settings;
       loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
       expect(process.env['TESTTEST']).not.toEqual('1234');
     });
 
-    it('does not load env files when trust is undefined', () => {
+    it('does load env files from untrusted spaces when NOT sandboxed', () => {
+      setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
+      const settings = {
+        security: { folderTrust: { enabled: true } },
+        tools: { sandbox: false },
+      } as Settings;
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+
+      expect(process.env['TESTTEST']).toEqual('1234');
+    });
+
+    it('does not load env files when trust is undefined and sandboxed', () => {
       delete process.env['TESTTEST'];
       // isWorkspaceTrusted returns {isTrusted: undefined} for matched rules with no trust value, or no matching rules.
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: undefined });
       const settings = {
         security: { folderTrust: { enabled: true } },
+        tools: { sandbox: true },
       } as Settings;
 
       const mockTrustFn = vi.fn().mockReturnValue({ isTrusted: undefined });
       loadEnvironment(settings, MOCK_WORKSPACE_DIR, mockTrustFn);
 
       expect(process.env['TESTTEST']).not.toEqual('1234');
-      expect(process.env['GEMINI_API_KEY']).not.toEqual('test-key');
+      expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
     });
 
     it('loads whitelisted env files from untrusted spaces if sandboxing is enabled', () => {
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      settings.merged.tools.sandbox = true;
-      loadEnvironment(settings.merged, MOCK_WORKSPACE_DIR);
+      const settings = createTestMergedSettings({
+        tools: { sandbox: true },
+      });
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
       // GEMINI_API_KEY is in the whitelist, so it should be loaded.
       expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
@@ -1846,10 +1895,10 @@ describe('Settings Loading and Merging', () => {
       process.argv.push('-s');
       try {
         setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
-        const settings = loadSettings(MOCK_WORKSPACE_DIR);
-        // Ensure sandbox is NOT in settings to test argv sniffing
-        settings.merged.tools.sandbox = undefined;
-        loadEnvironment(settings.merged, MOCK_WORKSPACE_DIR);
+        const settings = createTestMergedSettings({
+          tools: { sandbox: false },
+        });
+        loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
         expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
         expect(process.env['TESTTEST']).not.toEqual('1234');
@@ -2748,7 +2797,7 @@ describe('Settings Loading and Merging', () => {
           MOCK_WORKSPACE_DIR,
         );
 
-        expect(process.env['GEMINI_API_KEY']).toBeUndefined();
+        expect(process.env['GEMINI_API_KEY']).toEqual('secret');
       });
 
       it('should NOT be tricked by positional arguments that look like flags', () => {
@@ -2767,7 +2816,7 @@ describe('Settings Loading and Merging', () => {
           MOCK_WORKSPACE_DIR,
         );
 
-        expect(process.env['GEMINI_API_KEY']).toBeUndefined();
+        expect(process.env['GEMINI_API_KEY']).toEqual('secret');
       });
     });
 

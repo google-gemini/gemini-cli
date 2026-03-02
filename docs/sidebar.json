@@ -61,52 +61,60 @@
       {
         "label": "Features",
         "items": [
-          { "label": "Agent Skills", "slug": "docs/cli/skills" },
-          {
-            "label": "Authentication",
-            "slug": "docs/get-started/authentication"
-          },
-          { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
           {
             "label": "Extensions",
-            "slug": "docs/extensions/index"
+            "collapsed": true,
+            "items": [
+              {
+                "label": "Overview",
+                "slug": "docs/extensions"
+              },
+              {
+                "label": "User guide: Install and manage",
+                "link": "/docs/extensions/#manage-extensions"
+              },
+              {
+                "label": "Developer guide: Build extensions",
+                "slug": "docs/extensions/writing-extensions"
+              },
+              {
+                "label": "Developer guide: Best practices",
+                "slug": "docs/extensions/best-practices"
+              },
+              {
+                "label": "Developer guide: Releasing",
+                "slug": "docs/extensions/releasing"
+              },
+              {
+                "label": "Developer guide: Reference",
+                "slug": "docs/extensions/reference"
+              }
+            ]
           },
+          { "label": "Agent Skills", "slug": "docs/cli/skills" },
+          { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
           { "label": "Headless mode", "slug": "docs/cli/headless" },
-          { "label": "Help", "link": "/docs/reference/commands/#help-or" },
           { "label": "Hooks", "slug": "docs/hooks" },
           { "label": "IDE integration", "slug": "docs/ide-integration" },
           { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
-          {
-            "label": "Memory management",
-            "link": "/docs/reference/commands/#memory"
-          },
           { "label": "Model routing", "slug": "docs/cli/model-routing" },
           { "label": "Model selection", "slug": "docs/cli/model" },
-          { "label": "Plan mode", "badge": "🧪", "slug": "docs/cli/plan-mode" },
+          { "label": "Plan mode", "badge": "🔬", "slug": "docs/cli/plan-mode" },
           {
             "label": "Subagents",
-            "badge": "🧪",
+            "badge": "🔬",
             "slug": "docs/core/subagents"
           },
           {
             "label": "Remote subagents",
-            "badge": "🧪",
+            "badge": "🔬",
             "slug": "docs/core/remote-agents"
           },
           { "label": "Rewind", "slug": "docs/cli/rewind" },
           { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
           { "label": "Settings", "slug": "docs/cli/settings" },
-          {
-            "label": "Shell",
-            "link": "/docs/reference/commands/#shells-or-bashes"
-          },
-          {
-            "label": "Stats",
-            "link": "/docs/reference/commands/#stats"
-          },
           { "label": "Telemetry", "slug": "docs/cli/telemetry" },
-          { "label": "Token caching", "slug": "docs/cli/token-caching" },
-          { "label": "Tools", "link": "/docs/reference/commands/#tools" }
+          { "label": "Token caching", "slug": "docs/cli/token-caching" }
         ]
       },
       {
@@ -136,35 +144,6 @@
           },
           { "label": "Themes", "slug": "docs/cli/themes" },
           { "label": "Trusted folders", "slug": "docs/cli/trusted-folders" }
-        ]
-      },
-      {
-        "label": "Extensions",
-        "items": [
-          {
-            "label": "Overview",
-            "slug": "docs/extensions"
-          },
-          {
-            "label": "User guide: Install and manage",
-            "link": "/docs/extensions/#manage-extensions"
-          },
-          {
-            "label": "Developer guide: Build extensions",
-            "slug": "docs/extensions/writing-extensions"
-          },
-          {
-            "label": "Developer guide: Best practices",
-            "slug": "docs/extensions/best-practices"
-          },
-          {
-            "label": "Developer guide: Releasing",
-            "slug": "docs/extensions/releasing"
-          },
-          {
-            "label": "Developer guide: Reference",
-            "slug": "docs/extensions/reference"
-          }
         ]
       },
       {

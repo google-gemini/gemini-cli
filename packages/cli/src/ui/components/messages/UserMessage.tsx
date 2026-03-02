@@ -15,7 +15,6 @@ import {
   calculateTransformedLine,
 } from '../shared/text-buffer.js';
 import { HalfLinePaddedBox } from '../shared/HalfLinePaddedBox.js';
-import { DEFAULT_BACKGROUND_OPACITY } from '../../constants.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 
 interface UserMessageProps {
@@ -52,8 +51,8 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
 
   return (
     <HalfLinePaddedBox
-      backgroundBaseColor={theme.text.secondary}
-      backgroundOpacity={DEFAULT_BACKGROUND_OPACITY}
+      backgroundBaseColor={theme.background.message}
+      backgroundOpacity={1}
       useBackgroundColor={useBackgroundColor}
     >
       <Box
