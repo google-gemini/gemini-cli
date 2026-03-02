@@ -206,6 +206,14 @@ export class ToolRegistry {
     this.messageBus = messageBus;
   }
 
+  /**
+   * Updates the configuration used by the tool registry.
+   * This is used when creating scoped registries for subagents.
+   */
+  setConfig(config: Config): void {
+    this.config = config;
+  }
+
   getMessageBus(): MessageBus {
     return this.messageBus;
   }
@@ -230,6 +238,13 @@ export class ToolRegistry {
       }
     }
     this.allKnownTools.set(tool.name, tool);
+  }
+
+  /**
+   * Returns all known tools, including inactive ones.
+   */
+  getAllKnownTools(): AnyDeclarativeTool[] {
+    return Array.from(this.allKnownTools.values());
   }
 
   /**

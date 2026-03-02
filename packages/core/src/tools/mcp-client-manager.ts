@@ -76,6 +76,14 @@ export class McpClientManager {
     this.eventEmitter = eventEmitter;
   }
 
+  /**
+   * Updates the configuration used by the MCP client manager.
+   * This is used when creating scoped managers for subagents.
+   */
+  setConfig(config: Config): void {
+    this.cliConfig = config;
+  }
+
   setUserInteractedWithMcp() {
     this.userInteractedWithMcp = true;
   }

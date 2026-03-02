@@ -20,6 +20,9 @@ import {
   DiscoveredMCPTool,
   MCP_QUALIFIED_NAME_SEPARATOR,
 } from '../tools/mcp-tool.js';
+import { PolicyEngine } from '../policy/policy-engine.js';
+import { createPolicyEngineConfig } from '../policy/config.js';
+import { McpClientManager } from '../tools/mcp-client-manager.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
@@ -118,12 +121,81 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     runtimeContext: Config,
     onActivity?: ActivityCallback,
   ): Promise<LocalAgentExecutor<TOutput>> {
+    const parentToolRegistry = runtimeContext.getToolRegistry();
+
     // Create an isolated tool registry for this agent instance.
     const agentToolRegistry = new ToolRegistry(
       runtimeContext,
       runtimeContext.getMessageBus(),
     );
-    const parentToolRegistry = runtimeContext.getToolRegistry();
+
+    // Create a scoped configuration if subagent has private policies or MCP servers.
+    let agentContext = runtimeContext;
+
+    if (definition.policy || definition.mcpServers) {
+      const parentPolicyEngine = runtimeContext.getPolicyEngine();
+      // Admin policies have priority >= ADMIN_POLICY_TIER (5).
+      const adminRules = parentPolicyEngine
+        .getRules()
+        .filter((r) => (r.priority ?? 0) >= 5);
+      const adminCheckers = parentPolicyEngine
+        .getCheckers()
+        .filter((c) => (c.priority ?? 0) >= 5);
+
+      const policyConfig = definition.policy
+        ? await createPolicyEngineConfig(
+            definition.policy,
+            runtimeContext.getApprovalMode(),
+            undefined, // defaultPoliciesDir
+            adminRules,
+            adminCheckers,
+          )
+        : {
+            rules: adminRules,
+            checkers: adminCheckers,
+            approvalMode: runtimeContext.getApprovalMode(),
+          };
+
+      const scopedPolicyEngine = new PolicyEngine(
+        policyConfig,
+        runtimeContext.getCheckerRunner(),
+      );
+
+      // Populate scoped registry with parent's tools (including built-ins).
+      // If a subagent has private MCP servers, tools from those servers will
+      // be registered during discovery and will overwrite any global tools
+      // with the same name in this isolated registry.
+      for (const tool of parentToolRegistry.getAllKnownTools()) {
+        agentToolRegistry.registerTool(tool);
+      }
+
+      let scopedMcpManager: McpClientManager | undefined;
+      if (definition.mcpServers) {
+        scopedMcpManager = new McpClientManager(
+          runtimeContext.getClientVersion(),
+          agentToolRegistry,
+          runtimeContext, // Use parent context for some services, but we will scope it soon
+        );
+      }
+
+      agentContext = runtimeContext.createScopedConfig({
+        policyEngine: scopedPolicyEngine,
+        toolRegistry: agentToolRegistry,
+        mcpClientManager: scopedMcpManager,
+      });
+
+      // Update registry and mcp manager to use the scoped context
+      agentToolRegistry.setConfig(agentContext);
+      if (scopedMcpManager) {
+        scopedMcpManager.setConfig(agentContext);
+
+        // Discover and register subagent-specific MCP tools
+        for (const [name, config] of Object.entries(definition.mcpServers!)) {
+          await scopedMcpManager.maybeDiscoverMcpServer(name, config);
+        }
+      }
+    }
+
     const allAgentNames = new Set(
       runtimeContext.getAgentRegistry().getAllAgentNames(),
     );
@@ -186,7 +258,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     return new LocalAgentExecutor(
       definition,
-      runtimeContext,
+      agentContext,
       agentToolRegistry,
       parentPromptId,
       parentCallId,

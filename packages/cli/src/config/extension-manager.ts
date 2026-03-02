@@ -733,37 +733,47 @@ Would you like to attempt to install via "git clone" instead?`,
         }
       }
 
+      let publicMcpServers: Record<string, MCPServerConfig> | undefined;
+      let privateMcpServers: Record<string, MCPServerConfig> | undefined;
+
       if (config.mcpServers) {
-        if (this.settings.admin.mcp.enabled === false) {
-          config.mcpServers = undefined;
-        } else {
+        if (this.settings.admin.mcp.enabled !== false) {
           // Apply admin allowlist if configured
           const adminAllowlist = this.settings.admin.mcp.config;
-          if (adminAllowlist && Object.keys(adminAllowlist).length > 0) {
-            const result = applyAdminAllowlist(
-              config.mcpServers,
-              adminAllowlist,
-            );
-            config.mcpServers = result.mcpServers;
+          const filteredMcpServers =
+            adminAllowlist && Object.keys(adminAllowlist).length > 0
+              ? (() => {
+                  const result = applyAdminAllowlist(
+                    config.mcpServers,
+                    adminAllowlist,
+                  );
+                  if (result.blockedServerNames.length > 0) {
+                    const message = getAdminBlockedMcpServersMessage(
+                      result.blockedServerNames,
+                      undefined,
+                    );
+                    coreEvents.emitConsoleLog('warn', message);
+                  }
+                  return result.mcpServers ?? {};
+                })()
+              : config.mcpServers;
 
-            if (result.blockedServerNames.length > 0) {
-              const message = getAdminBlockedMcpServersMessage(
-                result.blockedServerNames,
-                undefined,
-              );
-              coreEvents.emitConsoleLog('warn', message);
-            }
-          }
+          const entries = Object.entries(filteredMcpServers).map(
+            ([key, value]) =>
+              [key, filterMcpConfig(value)] as [string, MCPServerConfig],
+          );
 
-          // Then apply local filtering/sanitization
-          if (config.mcpServers) {
-            config.mcpServers = Object.fromEntries(
-              Object.entries(config.mcpServers).map(([key, value]) => [
-                key,
-                filterMcpConfig(value),
-              ]),
-            );
-          }
+          publicMcpServers = Object.fromEntries(
+            entries.filter(([, v]) => v.visibility !== 'private'),
+          );
+          privateMcpServers = Object.fromEntries(
+            entries.filter(([, v]) => v.visibility === 'private'),
+          );
+
+          if (Object.keys(publicMcpServers).length === 0)
+            publicMcpServers = undefined;
+          if (Object.keys(privateMcpServers).length === 0)
+            privateMcpServers = undefined;
         }
       }
 
@@ -854,9 +864,16 @@ Would you like to attempt to install via "git clone" instead?`,
       const agentLoadResult = await loadAgentsFromDirectory(
         path.join(effectiveExtensionPath, 'agents'),
       );
-      agentLoadResult.agents = agentLoadResult.agents.map((agent) =>
-        recursivelyHydrateStrings(agent, hydrationContext),
-      );
+      agentLoadResult.agents = agentLoadResult.agents.map((agent) => {
+        const hydrated = recursivelyHydrateStrings(agent, hydrationContext);
+        if (privateMcpServers && hydrated.kind === 'local') {
+          hydrated.mcpServers = {
+            ...privateMcpServers,
+            ...hydrated.mcpServers,
+          };
+        }
+        return hydrated;
+      });
 
       // Log errors but don't fail the entire extension load
       for (const error of agentLoadResult.errors) {
@@ -871,7 +888,7 @@ Would you like to attempt to install via "git clone" instead?`,
         path: effectiveExtensionPath,
         contextFiles,
         installMetadata,
-        mcpServers: config.mcpServers,
+        mcpServers: publicMcpServers,
         excludeTools: config.excludeTools,
         hooks,
         isActive: this.extensionEnablementManager.isEnabled(

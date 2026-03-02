@@ -550,6 +550,104 @@ describe('LocalAgentExecutor', () => {
 
       getToolSpy.mockRestore();
     });
+
+    it('should support scoped policy and unique toolsets', async () => {
+      const toolToAllow = 'ls';
+      const toolToBlock = READ_FILE_TOOL_NAME;
+
+      const definition = createTestDefinition([toolToAllow, toolToBlock]);
+      definition.policy = {
+        tools: {
+          exclude: [toolToBlock],
+        },
+      };
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      const agentRegistry = executor['toolRegistry'];
+
+      // Tool explicitly allowed in definition but BLOCKED by policy should NOT be active
+      expect(agentRegistry.getTool(toolToAllow)).toBeDefined();
+      expect(agentRegistry.getTool(toolToBlock)).toBeUndefined();
+    });
+
+    it('should incorporate ADMIN policies from parent context into scoped policy engine', async () => {
+      const adminToolToBlock = 'admin_blocked_tool';
+      const userToolToBlock = 'user_blocked_tool';
+
+      // Mock parent policy engine with admin and user rules
+      const parentPolicyEngine = mockConfig.getPolicyEngine();
+      vi.spyOn(parentPolicyEngine, 'getRules').mockReturnValue([
+        {
+          toolName: adminToolToBlock,
+          decision: ApprovalMode.DEFAULT, // Use actual enum value if possible, or cast appropriately
+          priority: 5.1, // Admin tier
+          source: 'Admin Policy',
+        },
+        {
+          toolName: userToolToBlock,
+          decision: ApprovalMode.DEFAULT,
+          priority: 4.1, // User tier
+          source: 'User Policy',
+        },
+      ] as unknown as PolicyRule[]);
+      vi.spyOn(parentPolicyEngine, 'getCheckers').mockReturnValue([]);
+
+      // Create a subagent definition that has its own policy
+      const definition = createTestDefinition([
+        adminToolToBlock,
+        userToolToBlock,
+        LS_TOOL_NAME,
+      ]);
+      definition.policy = {
+        tools: {
+          allowed: [userToolToBlock], // Subagent tries to allow what user blocked
+        },
+      };
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      const scopedPolicyEngine = executor['runtimeContext'].getPolicyEngine();
+      const rules = scopedPolicyEngine.getRules();
+
+      // Should have incorporated the ADMIN rule
+      expect(rules).toContainEqual(
+        expect.objectContaining({
+          toolName: adminToolToBlock,
+          priority: 5.1,
+        }),
+      );
+
+      // Should NOT have incorporated the USER rule
+      expect(rules).not.toContainEqual(
+        expect.objectContaining({
+          toolName: userToolToBlock,
+          priority: 4.1,
+        }),
+      );
+
+      // Verify effective decisions
+      const adminCheck = await scopedPolicyEngine.check(
+        { name: adminToolToBlock, args: {} },
+        undefined,
+      );
+      expect(adminCheck.decision).toBe('deny');
+
+      const userCheck = await scopedPolicyEngine.check(
+        { name: userToolToBlock, args: {} },
+        undefined,
+      );
+      // User block was NOT inherited, and subagent policy allowed it.
+      expect(userCheck.decision).toBe('allow');
+    });
   });
 
   describe('run (Execution Loop and Logic)', () => {
@@ -2449,6 +2547,61 @@ describe('LocalAgentExecutor', () => {
 
       expect(mockSetHistory).toHaveBeenCalledTimes(1);
       expect(mockSetHistory).toHaveBeenCalledWith(compressedHistory);
+    });
+  });
+
+  describe('Isolated Tool Discovery and Shadowing', () => {
+    it('should allow subagent-specific MCP tools to shadow global tools in the isolated registry', async () => {
+      const toolName = 'shadowed_tool';
+      const globalTool = new MockTool({ name: toolName, description: 'Global Version' });
+      parentToolRegistry.registerTool(globalTool);
+
+      const subagentMcpTool = {
+        tool: vi.fn(),
+        callTool: vi.fn(),
+      } as unknown as CallableTool;
+
+      const mcpTool = new DiscoveredMCPTool(
+        subagentMcpTool,
+        'private-server',
+        toolName,
+        'Subagent Version',
+        {},
+        mockConfig.getMessageBus(),
+      );
+
+      // Mock McpClientManager to register our shadowing tool
+      const definition = createTestDefinition();
+      definition.mcpServers = {
+        'private-server': { command: 'node', args: ['server.js'] }
+      };
+
+      // We need to mock the McpClientManager's behavior
+      const McpClientManagerModule = await import('../tools/mcp-client-manager.js');
+      vi.spyOn(McpClientManagerModule.McpClientManager.prototype, 'maybeDiscoverMcpServer')
+        .mockImplementation(async function(this: unknown) {
+          // Manually register the tool into the registry provided to the manager
+          const manager = this as unknown as { toolRegistry: ToolRegistry };
+          manager.toolRegistry.registerTool(mcpTool);
+        });
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      const agentRegistry = executor['toolRegistry'];
+
+      // The tool in the agent's registry should be the subagent's version
+      const tool = agentRegistry.getTool(toolName);
+      expect(tool).toBeDefined();
+      expect(tool?.description).toContain('Subagent Version');
+      expect(tool).not.toBe(globalTool);
+
+      // The global registry should remain unchanged
+      expect(parentToolRegistry.getTool(toolName)).toBe(globalTool);
+      expect(parentToolRegistry.getTool(toolName)?.description).toContain('Global Version');
     });
   });
 });

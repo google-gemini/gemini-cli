@@ -249,6 +249,8 @@ export async function createPolicyEngineConfig(
   settings: PolicySettings,
   approvalMode: ApprovalMode,
   defaultPoliciesDir?: string,
+  baseRules: PolicyRule[] = [],
+  baseCheckers: SafetyCheckerRule[] = [],
 ): Promise<PolicyEngineConfig> {
   const policyDirs = getPolicyDirectories(
     defaultPoliciesDir,
@@ -297,8 +299,8 @@ export async function createPolicyEngineConfig(
     }
   }
 
-  const rules: PolicyRule[] = [...tomlRules];
-  const checkers = [...tomlCheckers];
+  const rules: PolicyRule[] = [...baseRules, ...tomlRules];
+  const checkers = [...baseCheckers, ...tomlCheckers];
 
   // Priority system for policy rules:
 

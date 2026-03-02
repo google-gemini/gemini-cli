@@ -419,6 +419,12 @@ export class MCPServerConfig {
     readonly targetAudience?: string,
     /* targetServiceAccount format: <service-account-name>@<project-num>.iam.gserviceaccount.com */
     readonly targetServiceAccount?: string,
+    /**
+     * Visibility of the MCP server.
+     * 'public' (default): available to all agents.
+     * 'private': hidden from the primary agent, available only to specific subagents.
+     */
+    readonly visibility?: 'public' | 'private',
   ) {}
 }
 
@@ -583,7 +589,9 @@ export interface ConfigParameters {
 
 export class Config implements McpContext {
   private toolRegistry!: ToolRegistry;
+  private _scopedToolRegistry?: ToolRegistry;
   private mcpClientManager?: McpClientManager;
+  private _scopedMcpClientManager?: McpClientManager;
   private allowedMcpServers: string[];
   private blockedMcpServers: string[];
   private allowedEnvironmentVariables: string[];
@@ -723,6 +731,7 @@ export class Config implements McpContext {
   private readonly useWriteTodos: boolean;
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
+  private _scopedPolicyEngine?: PolicyEngine;
   private policyUpdateConfirmationRequest:
     | PolicyUpdateConfirmationRequest
     | undefined;
@@ -1314,8 +1323,16 @@ export class Config implements McpContext {
     return this.sessionId;
   }
 
+  getClientVersion(): string {
+    return this.clientVersion;
+  }
+
   setSessionId(sessionId: string): void {
     this.sessionId = sessionId;
+  }
+
+  getCheckerRunner(): CheckerRunner | undefined {
+    return (this as any).checkerRunner;
   }
 
   setTerminalBackground(terminalBackground: string | undefined): void {
@@ -1567,7 +1584,15 @@ export class Config implements McpContext {
   }
 
   getToolRegistry(): ToolRegistry {
-    return this.toolRegistry;
+    return this._scopedToolRegistry ?? this.toolRegistry;
+  }
+
+  getMcpClientManager(): McpClientManager | undefined {
+    return this._scopedMcpClientManager ?? this.mcpClientManager;
+  }
+
+  setMcpClientManager(manager: McpClientManager): void {
+    this.mcpClientManager = manager;
   }
 
   getPromptRegistry(): PromptRegistry {
@@ -1723,7 +1748,7 @@ export class Config implements McpContext {
       }
     }
 
-    const policyExclusions = this.policyEngine.getExcludedTools(
+    const policyExclusions = this.getPolicyEngine().getExcludedTools(
       toolMetadata,
       allToolNames,
     );
@@ -1767,9 +1792,6 @@ export class Config implements McpContext {
     return this.extensionsEnabled;
   }
 
-  getMcpClientManager(): McpClientManager | undefined {
-    return this.mcpClientManager;
-  }
 
   setUserInteractedWithMcp(): void {
     this.mcpClientManager?.setUserInteractedWithMcp();
@@ -2695,7 +2717,7 @@ export class Config implements McpContext {
   }
 
   getPolicyEngine(): PolicyEngine {
-    return this.policyEngine;
+    return this._scopedPolicyEngine ?? this.policyEngine;
   }
 
   getEnableHooks(): boolean {
@@ -2985,6 +3007,41 @@ export class Config implements McpContext {
       );
     }
   };
+
+  /**
+   * Creates a scoped copy of this configuration with overrides for policy and tools.
+   * Scoped configs are used by subagents to maintain isolation from the primary agent.
+   * This uses prototype-based shadowing for overrides while maintaining access to global state.
+   */
+  createScopedConfig(overrides: {
+    policyEngine?: PolicyEngine;
+    toolRegistry?: ToolRegistry;
+    mcpClientManager?: McpClientManager;
+  }): Config {
+    const scoped = Object.create(this) as unknown as Config;
+    // Define properties explicitly to ensure they shadow the base class properties
+    Object.defineProperties(scoped, {
+      _scopedPolicyEngine: {
+        value: overrides.policyEngine,
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      },
+      _scopedToolRegistry: {
+        value: overrides.toolRegistry,
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      },
+      _scopedMcpClientManager: {
+        value: overrides.mcpClientManager,
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      },
+    });
+    return scoped;
+  }
 
   /**
    * Disposes of resources and removes event listeners.

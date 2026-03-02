@@ -16,6 +16,12 @@ import {
   DEFAULT_MAX_TIME_MINUTES,
 } from './types.js';
 import type { A2AAuthConfig } from './auth-provider/types.js';
+import { type MCPServerConfig } from '../config/config.js';
+import { type PolicySettings } from '../policy/types.js';
+import {
+  PolicySettingsSchema,
+  MCPServersConfigSchema,
+} from '../policy/schemas.js';
 import { isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -38,6 +44,8 @@ interface FrontmatterLocalAgentDefinition
   temperature?: number;
   max_turns?: number;
   timeout_mins?: number;
+  policy?: PolicySettings;
+  mcp_servers?: Record<string, MCPServerConfig>;
 }
 
 /**
@@ -110,6 +118,8 @@ const localAgentSchema = z
     temperature: z.number().optional(),
     max_turns: z.number().int().positive().optional(),
     timeout_mins: z.number().int().positive().optional(),
+    policy: PolicySettingsSchema.optional(),
+    mcp_servers: MCPServersConfigSchema.optional(),
   })
   .strict();
 
@@ -456,6 +466,8 @@ export function markdownToAgentDefinition(
           tools: markdown.tools,
         }
       : undefined,
+    policy: markdown.policy,
+    mcpServers: markdown.mcp_servers,
     inputConfig,
     metadata,
   };
