@@ -118,7 +118,7 @@ describe('GrepTool', () => {
       const params: GrepToolParams = {
         pattern: 'hello',
         dir_path: '.',
-        include: '*.txt',
+        include_pattern: '*.txt',
       };
       expect(grepTool.validateToolParams(params)).toBeNull();
     });
@@ -226,7 +226,10 @@ describe('GrepTool', () => {
     }, 30000);
 
     it('should find matches with an include glob', async () => {
-      const params: GrepToolParams = { pattern: 'hello', include: '*.js' };
+      const params: GrepToolParams = {
+        pattern: 'hello',
+        include_pattern: '*.js',
+      };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
@@ -247,7 +250,7 @@ describe('GrepTool', () => {
       const params: GrepToolParams = {
         pattern: 'hello',
         dir_path: 'sub',
-        include: '*.js',
+        include_pattern: '*.js',
       };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
@@ -493,7 +496,9 @@ describe('GrepTool', () => {
       // sub/fileC.txt has 1 world, so total matches = 2.
       expect(result.llmContent).toContain('Found 2 matches');
       expect(result.llmContent).toContain('File: fileA.txt');
+      // Should be a match
       expect(result.llmContent).toContain('L1: hello world');
+      // Should NOT be a match (but might be in context as L2-)
       expect(result.llmContent).not.toContain('L2: second line with world');
       expect(result.llmContent).toContain('File: sub/fileC.txt');
       expect(result.llmContent).toContain('L1: another world in sub dir');
@@ -530,8 +535,33 @@ describe('GrepTool', () => {
 
       expect(result.llmContent).toContain('Found 1 match');
       expect(result.llmContent).toContain('copyright.txt');
-      expect(result.llmContent).toContain('Copyright 2025 Google LLC');
-      expect(result.llmContent).not.toContain('Copyright 2026 Google LLC');
+      // Should be a match
+      expect(result.llmContent).toContain('L1: Copyright 2025 Google LLC');
+      // Should NOT be a match (but might be in context as L2-)
+      expect(result.llmContent).not.toContain('L2: Copyright 2026 Google LLC');
+    });
+
+    it('should include context when matches are <= 3', async () => {
+      const lines = Array.from({ length: 100 }, (_, i) => `Line ${i + 1}`);
+      lines[50] = 'Target match';
+      await fs.writeFile(
+        path.join(tempRootDir, 'context.txt'),
+        lines.join('\n'),
+      );
+
+      const params: GrepToolParams = { pattern: 'Target match' };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain(
+        'Found 1 match for pattern "Target match"',
+      );
+      // Verify context before
+      expect(result.llmContent).toContain('L40- Line 40');
+      // Verify match line
+      expect(result.llmContent).toContain('L51: Target match');
+      // Verify context after
+      expect(result.llmContent).toContain('L60- Line 60');
     });
   });
 
@@ -545,7 +575,7 @@ describe('GrepTool', () => {
     it('should generate correct description with pattern and include', () => {
       const params: GrepToolParams = {
         pattern: 'testPattern',
-        include: '*.ts',
+        include_pattern: '*.ts',
       };
       const invocation = grepTool.build(params);
       expect(invocation.getDescription()).toBe("'testPattern' in *.ts");
@@ -591,7 +621,7 @@ describe('GrepTool', () => {
       await fs.mkdir(dirPath, { recursive: true });
       const params: GrepToolParams = {
         pattern: 'testPattern',
-        include: '*.ts',
+        include_pattern: '*.ts',
         dir_path: path.join('src', 'app'),
       };
       const invocation = grepTool.build(params);

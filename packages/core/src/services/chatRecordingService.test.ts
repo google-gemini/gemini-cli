@@ -86,6 +86,21 @@ describe('ChatRecordingService', () => {
       expect(files[0]).toMatch(/^session-.*-test-ses\.json$/);
     });
 
+    it('should include the conversation kind when specified', () => {
+      chatRecordingService.initialize(undefined, 'subagent');
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'ping',
+        model: 'm',
+      });
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+      expect(conversation.kind).toBe('subagent');
+    });
+
     it('should resume from an existing session if provided', () => {
       const chatsDir = path.join(testTempDir, 'chats');
       fs.mkdirSync(chatsDir, { recursive: true });

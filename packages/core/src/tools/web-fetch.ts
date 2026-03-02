@@ -8,13 +8,9 @@ import type {
   ToolCallConfirmationDetails,
   ToolInvocation,
   ToolResult,
+  ToolConfirmationOutcome,
 } from './tools.js';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
-  type ToolConfirmationOutcome,
-} from './tools.js';
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -22,6 +18,7 @@ import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
+import { truncateString } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
 import {
   logWebFetchFallbackAttempt,
@@ -37,6 +34,10 @@ import { LRUCache } from 'mnemonist';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
+const MAX_EXPERIMENTAL_FETCH_SIZE = 10 * 1024 * 1024; // 10MB
+const USER_AGENT =
+  'Mozilla/5.0 (compatible; Google-Gemini-CLI/1.0; +https://github.com/google-gemini/gemini-cli)';
+const TRUNCATION_WARNING = '\n\n... [Content truncated due to size limit] ...';
 
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
@@ -111,6 +112,23 @@ export function parsePrompt(text: string): {
   return { validUrls, errors };
 }
 
+/**
+ * Safely converts a GitHub blob URL to a raw content URL.
+ */
+export function convertGithubUrlToRaw(urlStr: string): string {
+  try {
+    const url = new URL(urlStr);
+    if (url.hostname === 'github.com' && url.pathname.includes('/blob/')) {
+      url.hostname = 'raw.githubusercontent.com';
+      url.pathname = url.pathname.replace(/^\/([^/]+\/[^/]+)\/blob\//, '/$1/');
+      return url.href;
+    }
+  } catch {
+    // Ignore invalid URLs
+  }
+  return urlStr;
+}
+
 // Interfaces for grounding metadata (similar to web-search.ts)
 interface GroundingChunkWeb {
   uri?: string;
@@ -139,7 +157,11 @@ export interface WebFetchToolParams {
   /**
    * The prompt containing URL(s) (up to 20) and instructions for processing their content.
    */
-  prompt: string;
+  prompt?: string;
+  /**
+   * Direct URL to fetch (experimental mode).
+   */
+  url?: string;
 }
 
 interface ErrorWithStatus extends Error {
@@ -161,21 +183,22 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   }
 
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
-    const { validUrls: urls } = parsePrompt(this.params.prompt);
+    const { validUrls: urls } = parsePrompt(this.params.prompt!);
     // For now, we only support one URL for fallback
     let url = urls[0];
 
     // Convert GitHub blob URL to raw URL
-    if (url.includes('github.com') && url.includes('/blob/')) {
-      url = url
-        .replace('github.com', 'raw.githubusercontent.com')
-        .replace('/blob/', '/');
-    }
+    url = convertGithubUrlToRaw(url);
 
     try {
       const response = await retryWithBackoff(
         async () => {
-          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS);
+          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
+            signal,
+            headers: {
+              'User-Agent': USER_AGENT,
+            },
+          });
           if (!res.ok) {
             const error = new Error(
               `Request failed with status code ${res.status} ${res.statusText}`,
@@ -190,7 +213,11 @@ class WebFetchToolInvocation extends BaseToolInvocation<
         },
       );
 
-      const rawContent = await response.text();
+      const bodyBuffer = await this.readResponseWithLimit(
+        response,
+        MAX_EXPERIMENTAL_FETCH_SIZE,
+      );
+      const rawContent = bodyBuffer.toString('utf8');
       const contentType = response.headers.get('content-type') || '';
       let textContent: string;
 
@@ -211,7 +238,11 @@ class WebFetchToolInvocation extends BaseToolInvocation<
         textContent = rawContent;
       }
 
-      textContent = textContent.substring(0, MAX_CONTENT_LENGTH);
+      textContent = truncateString(
+        textContent,
+        MAX_CONTENT_LENGTH,
+        TRUNCATION_WARNING,
+      );
 
       const geminiClient = this.config.getGeminiClient();
       const fallbackPrompt = `The user requested the following: "${this.params.prompt}".
@@ -249,10 +280,12 @@ ${textContent}
   }
 
   getDescription(): string {
+    if (this.params.url) {
+      return `Fetching content from: ${this.params.url}`;
+    }
+    const prompt = this.params.prompt || '';
     const displayPrompt =
-      this.params.prompt.length > 100
-        ? this.params.prompt.substring(0, 97) + '...'
-        : this.params.prompt;
+      prompt.length > 100 ? prompt.substring(0, 97) + '...' : prompt;
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
   }
 
@@ -265,22 +298,24 @@ ${textContent}
       return false;
     }
 
-    // Perform GitHub URL conversion here to differentiate between user-provided
-    // URL and the actual URL to be fetched.
-    const { validUrls } = parsePrompt(this.params.prompt);
-    const urls = validUrls.map((url) => {
-      if (url.includes('github.com') && url.includes('/blob/')) {
-        return url
-          .replace('github.com', 'raw.githubusercontent.com')
-          .replace('/blob/', '/');
-      }
-      return url;
-    });
+    let urls: string[] = [];
+    let prompt = this.params.prompt || '';
+
+    if (this.params.url) {
+      urls = [this.params.url];
+      prompt = `Fetch ${this.params.url}`;
+    } else if (this.params.prompt) {
+      const { validUrls } = parsePrompt(this.params.prompt);
+      urls = validUrls;
+    }
+
+    // Perform GitHub URL conversion here
+    urls = urls.map((url) => convertGithubUrlToRaw(url));
 
     const confirmationDetails: ToolCallConfirmationDetails = {
       type: 'info',
       title: `Confirm Web Fetch`,
-      prompt: this.params.prompt,
+      prompt,
       urls,
       onConfirm: async (_outcome: ToolConfirmationOutcome) => {
         // Mode transitions (e.g. AUTO_EDIT) and policy updates are now
@@ -290,8 +325,189 @@ ${textContent}
     return confirmationDetails;
   }
 
+  private async readResponseWithLimit(
+    response: Response,
+    limit: number,
+  ): Promise<Buffer> {
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > limit) {
+      throw new Error(`Content exceeds size limit of ${limit} bytes`);
+    }
+
+    if (!response.body) {
+      return Buffer.alloc(0);
+    }
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalLength = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        totalLength += value.length;
+        if (totalLength > limit) {
+          // Attempt to cancel the reader to stop the stream
+          await reader.cancel().catch(() => {});
+          throw new Error(`Content exceeds size limit of ${limit} bytes`);
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    return Buffer.concat(chunks);
+  }
+
+  private async executeExperimental(signal: AbortSignal): Promise<ToolResult> {
+    if (!this.params.url) {
+      return {
+        llmContent: 'Error: No URL provided.',
+        returnDisplay: 'Error: No URL provided.',
+        error: {
+          message: 'No URL provided.',
+          type: ToolErrorType.INVALID_TOOL_PARAMS,
+        },
+      };
+    }
+
+    let url: string;
+    try {
+      url = new URL(this.params.url).href;
+    } catch {
+      return {
+        llmContent: `Error: Invalid URL "${this.params.url}"`,
+        returnDisplay: `Error: Invalid URL "${this.params.url}"`,
+        error: {
+          message: `Invalid URL "${this.params.url}"`,
+          type: ToolErrorType.INVALID_TOOL_PARAMS,
+        },
+      };
+    }
+
+    // Convert GitHub blob URL to raw URL
+    url = convertGithubUrlToRaw(url);
+
+    try {
+      const response = await retryWithBackoff(
+        async () => {
+          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
+            signal,
+            headers: {
+              Accept:
+                'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, application/pdf;q=0.7, video/*;q=0.7, */*;q=0.5',
+              'User-Agent': USER_AGENT,
+            },
+          });
+          return res;
+        },
+        {
+          retryFetchErrors: this.config.getRetryFetchErrors(),
+        },
+      );
+
+      const contentType = response.headers.get('content-type') || '';
+      const status = response.status;
+      const bodyBuffer = await this.readResponseWithLimit(
+        response,
+        MAX_EXPERIMENTAL_FETCH_SIZE,
+      );
+
+      if (status >= 400) {
+        const rawResponseText = bodyBuffer.toString('utf8');
+        const headers: Record<string, string> = {};
+        response.headers.forEach((value, key) => {
+          headers[key] = value;
+        });
+        const errorContent = `Request failed with status ${status}
+Headers: ${JSON.stringify(headers, null, 2)}
+Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response truncated] ...')}`;
+        return {
+          llmContent: errorContent,
+          returnDisplay: `Failed to fetch ${url} (Status: ${status})`,
+        };
+      }
+
+      const lowContentType = contentType.toLowerCase();
+      if (
+        lowContentType.includes('text/markdown') ||
+        lowContentType.includes('text/plain') ||
+        lowContentType.includes('application/json')
+      ) {
+        const text = truncateString(
+          bodyBuffer.toString('utf8'),
+          MAX_CONTENT_LENGTH,
+          TRUNCATION_WARNING,
+        );
+        return {
+          llmContent: text,
+          returnDisplay: `Fetched ${contentType} content from ${url}`,
+        };
+      }
+
+      if (lowContentType.includes('text/html')) {
+        const html = bodyBuffer.toString('utf8');
+        const textContent = truncateString(
+          convert(html, {
+            wordwrap: false,
+            selectors: [
+              { selector: 'a', options: { ignoreHref: false, baseUrl: url } },
+            ],
+          }),
+          MAX_CONTENT_LENGTH,
+          TRUNCATION_WARNING,
+        );
+        return {
+          llmContent: textContent,
+          returnDisplay: `Fetched and converted HTML content from ${url}`,
+        };
+      }
+
+      if (
+        lowContentType.startsWith('image/') ||
+        lowContentType.startsWith('video/') ||
+        lowContentType === 'application/pdf'
+      ) {
+        const base64Data = bodyBuffer.toString('base64');
+        return {
+          llmContent: {
+            inlineData: {
+              data: base64Data,
+              mimeType: contentType.split(';')[0],
+            },
+          },
+          returnDisplay: `Fetched ${contentType} from ${url}`,
+        };
+      }
+
+      // Fallback for unknown types - try as text
+      const text = truncateString(
+        bodyBuffer.toString('utf8'),
+        MAX_CONTENT_LENGTH,
+        TRUNCATION_WARNING,
+      );
+      return {
+        llmContent: text,
+        returnDisplay: `Fetched ${contentType || 'unknown'} content from ${url}`,
+      };
+    } catch (e) {
+      const errorMessage = `Error during experimental fetch for ${url}: ${getErrorMessage(e)}`;
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_FETCH_FALLBACK_FAILED,
+        },
+      };
+    }
+  }
+
   async execute(signal: AbortSignal): Promise<ToolResult> {
-    const userPrompt = this.params.prompt;
+    if (this.config.getDirectWebFetch()) {
+      return this.executeExperimental(signal);
+    }
+    const userPrompt = this.params.prompt!;
     const { validUrls: urls } = parsePrompt(userPrompt);
     const url = urls[0];
 
@@ -479,6 +695,18 @@ export class WebFetchTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: WebFetchToolParams,
   ): string | null {
+    if (this.config.getDirectWebFetch()) {
+      if (!params.url) {
+        return "The 'url' parameter is required.";
+      }
+      try {
+        new URL(params.url);
+      } catch {
+        return `Invalid URL: "${params.url}"`;
+      }
+      return null;
+    }
+
     if (!params.prompt || params.prompt.trim() === '') {
       return "The 'prompt' parameter cannot be empty and must contain URL(s) and instructions.";
     }
@@ -512,6 +740,25 @@ export class WebFetchTool extends BaseDeclarativeTool<
   }
 
   override getSchema(modelId?: string) {
-    return resolveToolDeclaration(WEB_FETCH_DEFINITION, modelId);
+    const schema = resolveToolDeclaration(WEB_FETCH_DEFINITION, modelId);
+    if (this.config.getDirectWebFetch()) {
+      return {
+        ...schema,
+        description:
+          'Fetch content from a URL directly. Send multiple requests for this tool if multiple URL fetches are needed.',
+        parametersJsonSchema: {
+          type: 'object',
+          properties: {
+            url: {
+              type: 'string',
+              description:
+                'The URL to fetch. Must be a valid http or https URL.',
+            },
+          },
+          required: ['url'],
+        },
+      };
+    }
+    return schema;
   }
 }

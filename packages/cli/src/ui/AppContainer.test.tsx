@@ -105,6 +105,11 @@ import {
   type UIActions,
 } from './contexts/UIActionsContext.js';
 import { KeypressProvider } from './contexts/KeypressContext.js';
+import { OverflowProvider } from './contexts/OverflowContext.js';
+import {
+  useOverflowActions,
+  type OverflowActions,
+} from './contexts/OverflowContext.js';
 
 // Mock useStdout to capture terminal title writes
 vi.mock('ink', async (importOriginal) => {
@@ -120,9 +125,11 @@ vi.mock('ink', async (importOriginal) => {
 // so we can assert against them in our tests.
 let capturedUIState: UIState;
 let capturedUIActions: UIActions;
+let capturedOverflowActions: OverflowActions;
 function TestContextConsumer() {
   capturedUIState = useContext(UIStateContext)!;
   capturedUIActions = useContext(UIActionsContext)!;
+  capturedOverflowActions = useOverflowActions()!;
   return null;
 }
 
@@ -229,7 +236,10 @@ import {
   disableMouseEvents,
 } from '@google/gemini-cli-core';
 import { type ExtensionManager } from '../config/extension-manager.js';
-import { WARNING_PROMPT_DURATION_MS } from './constants.js';
+import {
+  WARNING_PROMPT_DURATION_MS,
+  EXPAND_HINT_DURATION_MS,
+} from './constants.js';
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
@@ -255,13 +265,15 @@ describe('AppContainer State Management', () => {
   } = {}) => (
     <SettingsContext.Provider value={settings}>
       <KeypressProvider config={config}>
-        <AppContainer
-          config={config}
-          version={version}
-          initializationResult={initResult}
-          startupWarnings={startupWarnings}
-          resumedSessionData={resumedSessionData}
-        />
+        <OverflowProvider>
+          <AppContainer
+            config={config}
+            version={version}
+            initializationResult={initResult}
+            startupWarnings={startupWarnings}
+            resumedSessionData={resumedSessionData}
+          />
+        </OverflowProvider>
       </KeypressProvider>
     </SettingsContext.Provider>
   );
@@ -2532,6 +2544,136 @@ describe('AppContainer State Management', () => {
     });
   });
 
+  describe('Expansion Persistence', () => {
+    let rerender: () => void;
+    let unmount: () => void;
+    let stdin: ReturnType<typeof render>['stdin'];
+
+    const setupExpansionPersistenceTest = async (
+      HighPriorityChild?: React.FC,
+    ) => {
+      const getTree = () => (
+        <SettingsContext.Provider value={mockSettings}>
+          <KeypressProvider config={mockConfig}>
+            <OverflowProvider>
+              <AppContainer
+                config={mockConfig}
+                version="1.0.0"
+                initializationResult={mockInitResult}
+              />
+              {HighPriorityChild && <HighPriorityChild />}
+            </OverflowProvider>
+          </KeypressProvider>
+        </SettingsContext.Provider>
+      );
+
+      const renderResult = render(getTree());
+      stdin = renderResult.stdin;
+      await act(async () => {
+        vi.advanceTimersByTime(100);
+      });
+      rerender = () => renderResult.rerender(getTree());
+      unmount = () => renderResult.unmount();
+    };
+
+    const writeStdin = async (sequence: string) => {
+      await act(async () => {
+        stdin.write(sequence);
+        // Advance timers to allow escape sequence parsing and broadcasting
+        vi.advanceTimersByTime(100);
+      });
+      rerender();
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('should reset expansion when a key is NOT handled by anyone', async () => {
+      await setupExpansionPersistenceTest();
+
+      // Expand first
+      act(() => capturedUIActions.setConstrainHeight(false));
+      rerender();
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      // Press a random key that no one handles (hits Low priority fallback)
+      await writeStdin('x');
+
+      // Should be reset to true (collapsed)
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      unmount();
+    });
+
+    it('should toggle expansion when Ctrl+O is pressed', async () => {
+      await setupExpansionPersistenceTest();
+
+      // Initial state is collapsed
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      // Press Ctrl+O to expand (Ctrl+O is sequence \x0f)
+      await writeStdin('\x0f');
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      // Press Ctrl+O again to collapse
+      await writeStdin('\x0f');
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      unmount();
+    });
+
+    it('should NOT collapse when a high-priority component handles the key (e.g., up/down arrows)', async () => {
+      const NavigationHandler = () => {
+        // use real useKeypress
+        useKeypress(
+          (key: Key) => {
+            if (key.name === 'up' || key.name === 'down') {
+              return true; // Handle navigation
+            }
+            return false;
+          },
+          { isActive: true, priority: true }, // High priority
+        );
+        return null;
+      };
+
+      await setupExpansionPersistenceTest(NavigationHandler);
+
+      // Expand first
+      act(() => capturedUIActions.setConstrainHeight(false));
+      rerender();
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      // 1. Simulate Up arrow (handled by high priority child)
+      // CSI A is Up arrow
+      await writeStdin('\u001b[A');
+
+      // Should STILL be expanded
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      // 2. Simulate Down arrow (handled by high priority child)
+      // CSI B is Down arrow
+      await writeStdin('\u001b[B');
+
+      // Should STILL be expanded
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      // 3. Sanity check: press an unhandled key
+      await writeStdin('x');
+
+      // Should finally collapse
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      unmount();
+    });
+  });
+
   describe('Shortcuts Help Visibility', () => {
     let handleGlobalKeypress: (key: Key) => boolean;
     let mockedUseKeypress: Mock;
@@ -2663,6 +2805,10 @@ describe('AppContainer State Management', () => {
       isAlternateMode = false,
       childHandler?: Mock,
     ) => {
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(
+        isAlternateMode,
+      );
+
       // Update settings for this test run
       const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const testSettings = {
@@ -2687,12 +2833,14 @@ describe('AppContainer State Management', () => {
       const getTree = (settings: LoadedSettings) => (
         <SettingsContext.Provider value={settings}>
           <KeypressProvider config={mockConfig}>
-            <AppContainer
-              config={mockConfig}
-              version="1.0.0"
-              initializationResult={mockInitResult}
-            />
-            <TestChild />
+            <OverflowProvider>
+              <AppContainer
+                config={mockConfig}
+                version="1.0.0"
+                initializationResult={mockInitResult}
+              />
+              <TestChild />
+            </OverflowProvider>
           </KeypressProvider>
         </SettingsContext.Provider>
       );
@@ -3300,6 +3448,310 @@ describe('AppContainer State Management', () => {
 
       expect(clearTerminalCalls).toHaveLength(0);
       compUnmount();
+    });
+  });
+
+  describe('Submission Handling', () => {
+    it('resets expansion state on submission when not in alternate buffer', async () => {
+      const { checkPermissions } = await import(
+        './hooks/atCommandProcessor.js'
+      );
+      vi.mocked(checkPermissions).mockResolvedValue([]);
+
+      let unmount: () => void;
+      await act(async () => {
+        unmount = renderAppContainer({
+          settings: {
+            ...mockSettings,
+            merged: {
+              ...mockSettings.merged,
+              ui: { ...mockSettings.merged.ui, useAlternateBuffer: false },
+            },
+          } as LoadedSettings,
+        }).unmount;
+      });
+
+      await waitFor(() => expect(capturedUIActions).toBeTruthy());
+
+      // Expand first
+      act(() => capturedUIActions.setConstrainHeight(false));
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      // Reset mock stdout to clear any initial writes
+      mocks.mockStdout.write.mockClear();
+
+      // Submit
+      await act(async () => capturedUIActions.handleFinalSubmit('test prompt'));
+
+      // Should be reset
+      expect(capturedUIState.constrainHeight).toBe(true);
+      // Should refresh static (which clears terminal in non-alternate buffer)
+      expect(mocks.mockStdout.write).toHaveBeenCalledWith(
+        ansiEscapes.clearTerminal,
+      );
+      unmount!();
+    });
+
+    it('resets expansion state on submission when in alternate buffer without clearing terminal', async () => {
+      const { checkPermissions } = await import(
+        './hooks/atCommandProcessor.js'
+      );
+      vi.mocked(checkPermissions).mockResolvedValue([]);
+
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
+
+      let unmount: () => void;
+      await act(async () => {
+        unmount = renderAppContainer({
+          settings: {
+            ...mockSettings,
+            merged: {
+              ...mockSettings.merged,
+              ui: { ...mockSettings.merged.ui, useAlternateBuffer: true },
+            },
+          } as LoadedSettings,
+        }).unmount;
+      });
+
+      await waitFor(() => expect(capturedUIActions).toBeTruthy());
+
+      // Expand first
+      act(() => capturedUIActions.setConstrainHeight(false));
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      // Reset mock stdout
+      mocks.mockStdout.write.mockClear();
+
+      // Submit
+      await act(async () => capturedUIActions.handleFinalSubmit('test prompt'));
+
+      // Should be reset
+      expect(capturedUIState.constrainHeight).toBe(true);
+      // Should NOT refresh static's clearTerminal in alternate buffer
+      expect(mocks.mockStdout.write).not.toHaveBeenCalledWith(
+        ansiEscapes.clearTerminal,
+      );
+      unmount!();
+    });
+  });
+
+  describe('Overflow Hint Handling', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('sets showIsExpandableHint when overflow occurs in Standard Mode and hides after 10s', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      // Trigger overflow
+      act(() => {
+        capturedOverflowActions.addOverflowingId('test-id');
+      });
+
+      await waitFor(() => {
+        // Should show hint because we are in Standard Mode (default settings) and have overflow
+        expect(capturedUIState.showIsExpandableHint).toBe(true);
+      });
+
+      // Advance just before the timeout
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS - 100);
+      });
+      expect(capturedUIState.showIsExpandableHint).toBe(true);
+
+      // Advance to hit the timeout mark
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(false);
+      });
+
+      unmount!();
+    });
+
+    it('toggles expansion state and resets the hint timer when Ctrl+O is pressed in Standard Mode', async () => {
+      let unmount: () => void;
+      let stdin: ReturnType<typeof renderAppContainer>['stdin'];
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+        stdin = result.stdin;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      // Initial state is constrainHeight = true
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      // Trigger overflow so the hint starts showing
+      act(() => {
+        capturedOverflowActions.addOverflowingId('test-id');
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(true);
+      });
+
+      // Advance half the duration
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2);
+      });
+      expect(capturedUIState.showIsExpandableHint).toBe(true);
+
+      // Simulate Ctrl+O
+      act(() => {
+        stdin.write('\x0f'); // \x0f is Ctrl+O
+      });
+
+      await waitFor(() => {
+        // constrainHeight should toggle
+        expect(capturedUIState.constrainHeight).toBe(false);
+      });
+
+      // Advance enough that the original timer would have expired if it hadn't reset
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2 + 1000);
+      });
+
+      // We expect it to still be true because Ctrl+O should have reset the timer
+      expect(capturedUIState.showIsExpandableHint).toBe(true);
+
+      // Advance remaining time to reach the new timeout
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2 - 1000);
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(false);
+      });
+
+      unmount!();
+    });
+
+    it('toggles Ctrl+O multiple times and verifies the hint disappears exactly after the last toggle', async () => {
+      let unmount: () => void;
+      let stdin: ReturnType<typeof renderAppContainer>['stdin'];
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+        stdin = result.stdin;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      // Initial state is constrainHeight = true
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      // Trigger overflow so the hint starts showing
+      act(() => {
+        capturedOverflowActions.addOverflowingId('test-id');
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(true);
+      });
+
+      // Advance half the duration
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2);
+      });
+      expect(capturedUIState.showIsExpandableHint).toBe(true);
+
+      // First toggle 'on' (expanded)
+      act(() => {
+        stdin.write('\x0f'); // Ctrl+O
+      });
+      await waitFor(() => {
+        expect(capturedUIState.constrainHeight).toBe(false);
+      });
+
+      // Wait 1 second
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(capturedUIState.showIsExpandableHint).toBe(true);
+
+      // Second toggle 'off' (collapsed)
+      act(() => {
+        stdin.write('\x0f'); // Ctrl+O
+      });
+      await waitFor(() => {
+        expect(capturedUIState.constrainHeight).toBe(true);
+      });
+
+      // Wait 1 second
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(capturedUIState.showIsExpandableHint).toBe(true);
+
+      // Third toggle 'on' (expanded)
+      act(() => {
+        stdin.write('\x0f'); // Ctrl+O
+      });
+      await waitFor(() => {
+        expect(capturedUIState.constrainHeight).toBe(false);
+      });
+
+      // Now we wait just before the timeout from the LAST toggle.
+      // It should still be true.
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS - 100);
+      });
+      expect(capturedUIState.showIsExpandableHint).toBe(true);
+
+      // Wait 0.1s more to hit exactly the timeout since the last toggle.
+      // It should hide now.
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(false);
+      });
+
+      unmount!();
+    });
+
+    it('does NOT set showIsExpandableHint when overflow occurs in Alternate Buffer Mode', async () => {
+      const alternateSettings = mergeSettings({}, {}, {}, {}, true);
+      const settingsWithAlternateBuffer = {
+        merged: {
+          ...alternateSettings,
+          ui: {
+            ...alternateSettings.ui,
+            useAlternateBuffer: true,
+          },
+        },
+      } as unknown as LoadedSettings;
+
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({
+          settings: settingsWithAlternateBuffer,
+        });
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      // Trigger overflow
+      act(() => {
+        capturedOverflowActions.addOverflowingId('test-id');
+      });
+
+      // Should NOT show hint because we are in Alternate Buffer Mode
+      expect(capturedUIState.showIsExpandableHint).toBe(false);
+
+      unmount!();
     });
   });
 

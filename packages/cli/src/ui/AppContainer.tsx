@@ -47,6 +47,7 @@ import {
   type IdeInfo,
   type IdeContext,
   type UserTierId,
+  type GeminiUserTier,
   type UserFeedbackPayload,
   type AgentDefinition,
   type ApprovalMode,
@@ -82,6 +83,8 @@ import {
   CoreToolCallStatus,
   generateSteeringAckMessage,
   buildUserSteeringHintPrompt,
+  logBillingEvent,
+  ApiKeyUpdatedEvent,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -95,6 +98,10 @@ import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { useModelCommand } from './hooks/useModelCommand.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
+import {
+  useOverflowActions,
+  useOverflowState,
+} from './contexts/OverflowContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
@@ -141,16 +148,17 @@ import { useSessionResume } from './hooks/useSessionResume.js';
 import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
 import { useSessionRetentionCheck } from './hooks/useSessionRetentionCheck.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
-import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useBanner } from './hooks/useBanner.js';
+import { useTerminalSetupPrompt } from './utils/terminalSetup.js';
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useBackgroundShellManager } from './hooks/useBackgroundShellManager.js';
 import {
   WARNING_PROMPT_DURATION_MS,
   QUEUE_ERROR_DISPLAY_DURATION_MS,
+  EXPAND_HINT_DURATION_MS,
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
@@ -214,6 +222,7 @@ const SHELL_HEIGHT_PADDING = 10;
 export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
   const settings = useSettings();
+  const { reset } = useOverflowActions()!;
   const notificationsEnabled = isNotificationsEnabled(settings);
 
   const historyManager = useHistory({
@@ -221,7 +230,7 @@ export const AppContainer = (props: AppContainerProps) => {
   });
 
   useMemoryMonitor(historyManager);
-  const isAlternateBuffer = useAlternateBuffer();
+  const isAlternateBuffer = config.getUseAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
   const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
@@ -257,11 +266,37 @@ export const AppContainer = (props: AppContainerProps) => {
     () => isWorkspaceTrusted(settings.merged).isTrusted,
   );
 
-  const [queueErrorMessage, setQueueErrorMessage] = useState<string | null>(
-    null,
+  const [queueErrorMessage, setQueueErrorMessage] = useTimedMessage<string>(
+    QUEUE_ERROR_DISPLAY_DURATION_MS,
   );
 
   const [newAgents, setNewAgents] = useState<AgentDefinition[] | null>(null);
+  const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
+  const [expandHintTrigger, triggerExpandHint] = useTimedMessage<boolean>(
+    EXPAND_HINT_DURATION_MS,
+  );
+  const showIsExpandableHint = Boolean(expandHintTrigger);
+  const overflowState = useOverflowState();
+  const overflowingIdsSize = overflowState?.overflowingIds.size ?? 0;
+  const hasOverflowState = overflowingIdsSize > 0 || !constrainHeight;
+
+  /**
+   * Manages the visibility and x-second timer for the expansion hint.
+   *
+   * This effect triggers the timer countdown whenever an overflow is detected
+   * or the user manually toggles the expansion state with Ctrl+O. We use a stable
+   * boolean dependency (hasOverflowState) to ensure the timer only resets on
+   * genuine state transitions, preventing it from infinitely resetting during
+   * active text streaming.
+   *
+   * In alternate buffer mode, we don't trigger the hint automatically on overflow
+   * to avoid noise, but the user can still trigger it manually with Ctrl+O.
+   */
+  useEffect(() => {
+    if (hasOverflowState && !isAlternateBuffer) {
+      triggerExpandHint(true);
+    }
+  }, [hasOverflowState, isAlternateBuffer, triggerExpandHint]);
 
   const [defaultBannerText, setDefaultBannerText] = useState('');
   const [warningBannerText, setWarningBannerText] = useState('');
@@ -359,6 +394,9 @@ export const AppContainer = (props: AppContainerProps) => {
       ? { remaining, limit, resetTime }
       : undefined;
   });
+  const [paidTier, setPaidTier] = useState<GeminiUserTier | undefined>(
+    undefined,
+  );
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
 
@@ -512,7 +550,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();
 
-  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, settings);
+  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, config);
   // Derive widths for InputPrompt using shared helper
   const { inputWidth, suggestionsWidth } = useMemo(() => {
     const { inputWidth, suggestionsWidth } =
@@ -551,6 +589,12 @@ export const AppContainer = (props: AppContainerProps) => {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     initializeFromLogger(logger);
   }, [logger, initializeFromLogger]);
+
+  // One-time prompt to suggest running /terminal-setup when it would help.
+  useTerminalSetupPrompt({
+    addConfirmUpdateExtensionRequest,
+    addItem: historyManager.addItem,
+  });
 
   const refreshStatic = useCallback(() => {
     if (!isAlternateBuffer) {
@@ -631,7 +675,14 @@ export const AppContainer = (props: AppContainerProps) => {
     onAuthError,
     apiKeyDefaultValue,
     reloadApiKey,
-  } = useAuthCommand(settings, config, initializationResult.authError);
+    accountSuspensionInfo,
+    setAccountSuspensionInfo,
+  } = useAuthCommand(
+    settings,
+    config,
+    initializationResult.authError,
+    initializationResult.accountSuspensionInfo,
+  );
   const [authContext, setAuthContext] = useState<{ requiresRestart?: boolean }>(
     {},
   );
@@ -648,12 +699,20 @@ export const AppContainer = (props: AppContainerProps) => {
     handleProQuotaChoice,
     validationRequest,
     handleValidationChoice,
+    // G1 AI Credits
+    overageMenuRequest,
+    handleOverageMenuChoice,
+    emptyWalletRequest,
+    handleEmptyWalletChoice,
   } = useQuotaAndFallback({
     config,
     historyManager,
     userTier,
+    paidTier,
+    settings,
     setModelSwitchedFromQuotaError,
     onShowAuthSelection: () => setAuthState(AuthState.Updating),
+    errorVerbosity: settings.merged.ui.errorVerbosity,
   });
 
   // Derive auth state variables for backward compatibility with UIStateContext
@@ -691,6 +750,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const handleAuthSelect = useCallback(
     async (authType: AuthType | undefined, scope: LoadableSettingScope) => {
       if (authType) {
+        const previousAuthType =
+          config.getContentGeneratorConfig()?.authType ?? 'unknown';
         if (authType === AuthType.LOGIN_WITH_GOOGLE) {
           setAuthContext({ requiresRestart: true });
         } else {
@@ -703,6 +764,10 @@ export const AppContainer = (props: AppContainerProps) => {
           config.setRemoteAdminSettings(undefined);
           await config.refreshAuth(authType);
           setAuthState(AuthState.Authenticated);
+          logBillingEvent(
+            config,
+            new ApiKeyUpdatedEvent(previousAuthType, authType),
+          );
         } catch (e) {
           if (e instanceof ChangeAuthRequestedError) {
             return;
@@ -765,6 +830,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     // Only sync when not currently authenticating
     if (authState === AuthState.Authenticated) {
       setUserTier(config.getUserTier());
+      setPaidTier(config.getUserPaidTier());
     }
   }, [config, authState]);
 
@@ -1189,6 +1255,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const handleFinalSubmit = useCallback(
     async (submittedValue: string) => {
+      reset();
+      // Explicitly hide the expansion hint and clear its x-second timer when a new turn begins.
+      triggerExpandHint(null);
+      if (!constrainHeight) {
+        setConstrainHeight(true);
+        if (!isAlternateBuffer) {
+          refreshStatic();
+        }
+      }
+
       const isSlash = isSlashCommand(submittedValue.trim());
       const isIdle = streamingState === StreamingState.Idle;
       const isAgentRunning =
@@ -1247,15 +1323,30 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingSlashCommandHistoryItems,
       pendingGeminiHistoryItems,
       config,
+      constrainHeight,
+      setConstrainHeight,
+      isAlternateBuffer,
+      refreshStatic,
+      reset,
       handleHintSubmit,
+      triggerExpandHint,
     ],
   );
 
   const handleClearScreen = useCallback(() => {
+    reset();
+    // Explicitly hide the expansion hint and clear its x-second timer when clearing the screen.
+    triggerExpandHint(null);
     historyManager.clearItems();
     clearConsoleMessagesState();
     refreshStatic();
-  }, [historyManager, clearConsoleMessagesState, refreshStatic]);
+  }, [
+    historyManager,
+    clearConsoleMessagesState,
+    refreshStatic,
+    reset,
+    triggerExpandHint,
+  ]);
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
@@ -1425,7 +1516,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       windowMs: WARNING_PROMPT_DURATION_MS,
       onRepeat: handleExitRepeat,
     });
-  const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
+
   const [ideContextState, setIdeContextState] = useState<
     IdeContext | undefined
   >();
@@ -1542,17 +1633,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [ideNeedsRestart]);
 
   useEffect(() => {
-    if (queueErrorMessage) {
-      const timer = setTimeout(() => {
-        setQueueErrorMessage(null);
-      }, QUEUE_ERROR_DISPLAY_DURATION_MS);
-
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [queueErrorMessage, setQueueErrorMessage]);
-
-  useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
       return;
@@ -1609,6 +1689,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     retryStatus,
     loadingPhrasesMode: settings.merged.ui.loadingPhrases,
     customWittyPhrases: settings.merged.ui.customWittyPhrases,
+    errorVerbosity: settings.merged.ui.errorVerbosity,
   });
 
   const handleGlobalKeypress = useCallback(
@@ -1655,6 +1736,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (!constrainHeight) {
         enteringConstrainHeightMode = true;
         setConstrainHeight(true);
+        if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
+          // If the user manually collapses the view, show the hint and reset the x-second timer.
+          triggerExpandHint(true);
+        }
+        if (!isAlternateBuffer) {
+          refreshStatic();
+        }
       }
 
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
@@ -1698,6 +1786,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
         !enteringConstrainHeightMode
       ) {
         setConstrainHeight(false);
+        // If the user manually expands the view, show the hint and reset the x-second timer.
+        triggerExpandHint(true);
+        if (!isAlternateBuffer) {
+          refreshStatic();
+        }
         return true;
       } else if (
         (keyMatchers[Command.FOCUS_SHELL_INPUT](key) ||
@@ -1799,10 +1892,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
       showTransientMessage,
       settings.merged.general.devtools,
       showErrorDetails,
+      triggerExpandHint,
     ],
   );
 
-  useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
+  useKeypress(handleGlobalKeypress, {
+    isActive: true,
+    priority: KeypressPriority.Low,
+  });
 
   useKeypress(
     () => {
@@ -1941,6 +2038,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     showIdeRestartPrompt ||
     !!proQuotaRequest ||
     !!validationRequest ||
+    !!overageMenuRequest ||
+    !!emptyWalletRequest ||
     isSessionBrowserOpen ||
     authState === AuthState.AwaitingApiKeyInput ||
     !!newAgents;
@@ -1968,6 +2067,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     hasLoopDetectionConfirmationRequest ||
     !!proQuotaRequest ||
     !!validationRequest ||
+    !!overageMenuRequest ||
+    !!emptyWalletRequest ||
     !!customDialog;
 
   const allowPlanMode =
@@ -2108,6 +2209,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isAuthenticating,
       isConfigInitialized,
       authError,
+      accountSuspensionInfo,
       isAuthDialogOpen,
       isAwaitingApiKeyInput: authState === AuthState.AwaitingApiKeyInput,
       apiKeyDefaultValue,
@@ -2178,6 +2280,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
         stats: quotaStats,
         proQuotaRequest,
         validationRequest,
+        // G1 AI Credits dialog state
+        overageMenuRequest,
+        emptyWalletRequest,
       },
       contextFileNames,
       errorCount,
@@ -2218,6 +2323,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isBackgroundShellListOpen,
       adminSettingsChanged,
       newAgents,
+      showIsExpandableHint,
       hintMode:
         config.isModelSteeringEnabled() &&
         isToolExecuting([
@@ -2235,6 +2341,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isAuthenticating,
       isConfigInitialized,
       authError,
+      accountSuspensionInfo,
       isAuthDialogOpen,
       editorError,
       isEditorDialogOpen,
@@ -2301,6 +2408,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       quotaStats,
       proQuotaRequest,
       validationRequest,
+      overageMenuRequest,
+      emptyWalletRequest,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -2344,6 +2453,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       backgroundShells,
       adminSettingsChanged,
       newAgents,
+      showIsExpandableHint,
     ],
   );
 
@@ -2381,6 +2491,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleClearScreen,
       handleProQuotaChoice,
       handleValidationChoice,
+      // G1 AI Credits handlers
+      handleOverageMenuChoice,
+      handleEmptyWalletChoice,
       openSessionBrowser,
       closeSessionBrowser,
       handleResumeSession,
@@ -2437,6 +2550,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
         setNewAgents(null);
       },
+      getPreferredEditor,
+      clearAccountSuspension: () => {
+        setAccountSuspensionInfo(null);
+        setAuthState(AuthState.Updating);
+      },
     }),
     [
       handleThemeSelect,
@@ -2466,6 +2584,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleClearScreen,
       handleProQuotaChoice,
       handleValidationChoice,
+      handleOverageMenuChoice,
+      handleEmptyWalletChoice,
       openSessionBrowser,
       closeSessionBrowser,
       handleResumeSession,
@@ -2485,9 +2605,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setActiveBackgroundShellPid,
       setIsBackgroundShellListOpen,
       setAuthContext,
+      setAccountSuspensionInfo,
       newAgents,
       config,
       historyManager,
+      getPreferredEditor,
     ],
   );
 

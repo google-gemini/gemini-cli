@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
 import { describe, it, expect, vi } from 'vitest';
 import type { ConsoleMessageItem } from '../types.js';
 import { Box } from 'ink';
 import type React from 'react';
+import { createMockSettings } from '../../test-utils/settings.js';
 
 vi.mock('./shared/ScrollableList.js', () => ({
   ScrollableList: ({
@@ -29,13 +30,18 @@ vi.mock('./shared/ScrollableList.js', () => ({
 
 describe('DetailedMessagesDisplay', () => {
   it('renders nothing when messages are empty', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <DetailedMessagesDisplay
         messages={[]}
         maxHeight={10}
         width={80}
         hasFocus={false}
       />,
+      {
+        settings: createMockSettings({
+          merged: { ui: { errorVerbosity: 'full' } },
+        }),
+      },
     );
     await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })).toBe('');
@@ -50,13 +56,18 @@ describe('DetailedMessagesDisplay', () => {
       { type: 'debug', content: 'Debug message', count: 1 },
     ];
 
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <DetailedMessagesDisplay
         messages={messages}
         maxHeight={20}
         width={80}
         hasFocus={true}
       />,
+      {
+        settings: createMockSettings({
+          merged: { ui: { errorVerbosity: 'full' } },
+        }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -65,18 +76,69 @@ describe('DetailedMessagesDisplay', () => {
     unmount();
   });
 
+  it('hides the F12 hint in low error verbosity mode', async () => {
+    const messages: ConsoleMessageItem[] = [
+      { type: 'error', content: 'Error message', count: 1 },
+    ];
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <DetailedMessagesDisplay
+        messages={messages}
+        maxHeight={20}
+        width={80}
+        hasFocus={true}
+      />,
+      {
+        settings: createMockSettings({
+          merged: { ui: { errorVerbosity: 'low' } },
+        }),
+      },
+    );
+    await waitUntilReady();
+    expect(lastFrame()).not.toContain('(F12 to close)');
+    unmount();
+  });
+
+  it('shows the F12 hint in full error verbosity mode', async () => {
+    const messages: ConsoleMessageItem[] = [
+      { type: 'error', content: 'Error message', count: 1 },
+    ];
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <DetailedMessagesDisplay
+        messages={messages}
+        maxHeight={20}
+        width={80}
+        hasFocus={true}
+      />,
+      {
+        settings: createMockSettings({
+          merged: { ui: { errorVerbosity: 'full' } },
+        }),
+      },
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toContain('(F12 to close)');
+    unmount();
+  });
+
   it('renders message counts', async () => {
     const messages: ConsoleMessageItem[] = [
       { type: 'log', content: 'Repeated message', count: 5 },
     ];
 
-    const { lastFrame, waitUntilReady, unmount } = render(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <DetailedMessagesDisplay
         messages={messages}
         maxHeight={10}
         width={80}
         hasFocus={false}
       />,
+      {
+        settings: createMockSettings({
+          merged: { ui: { errorVerbosity: 'full' } },
+        }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame();

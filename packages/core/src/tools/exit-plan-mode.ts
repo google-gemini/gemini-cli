@@ -20,30 +20,12 @@ import type { Config } from '../config/config.js';
 import { EXIT_PLAN_MODE_TOOL_NAME } from './tool-names.js';
 import { validatePlanPath, validatePlanContent } from '../utils/planUtils.js';
 import { ApprovalMode } from '../policy/types.js';
-import { checkExhaustive } from '../utils/checks.js';
 import { resolveToRealPath, isSubpath } from '../utils/paths.js';
 import { logPlanExecution } from '../telemetry/loggers.js';
 import { PlanExecutionEvent } from '../telemetry/types.js';
 import { getExitPlanModeDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
-
-/**
- * Returns a human-readable description for an approval mode.
- */
-function getApprovalModeDescription(mode: ApprovalMode): string {
-  switch (mode) {
-    case ApprovalMode.AUTO_EDIT:
-      return 'Auto-Edit mode (edits will be applied automatically)';
-    case ApprovalMode.DEFAULT:
-      return 'Default mode (edits will require confirmation)';
-    case ApprovalMode.YOLO:
-    case ApprovalMode.PLAN:
-      // YOLO and PLAN are not valid modes to enter when exiting plan mode
-      throw new Error(`Unexpected approval mode: ${mode}`);
-    default:
-      checkExhaustive(mode);
-  }
-}
+import { getPlanModeExitMessage } from '../utils/approvalModeUtils.js';
 
 export interface ExitPlanModeParams {
   plan_path: string;
@@ -222,15 +204,20 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
     const payload = this.approvalPayload;
     if (payload?.approved) {
       const newMode = payload.approvalMode ?? ApprovalMode.DEFAULT;
+
+      if (newMode === ApprovalMode.PLAN || newMode === ApprovalMode.YOLO) {
+        throw new Error(`Unexpected approval mode: ${newMode}`);
+      }
+
       this.config.setApprovalMode(newMode);
       this.config.setApprovedPlanPath(resolvedPlanPath);
 
       logPlanExecution(this.config, new PlanExecutionEvent(newMode));
 
-      const description = getApprovalModeDescription(newMode);
+      const exitMessage = getPlanModeExitMessage(newMode);
 
       return {
-        llmContent: `Plan approved. Switching to ${description}.
+        llmContent: `${exitMessage}
 
 The approved implementation plan is stored at: ${resolvedPlanPath}
 Read and follow the plan strictly during implementation.`,

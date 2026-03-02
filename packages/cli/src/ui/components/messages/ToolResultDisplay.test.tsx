@@ -277,21 +277,47 @@ describe('ToolResultDisplay', () => {
           inverse: false,
         },
       ],
+      [
+        {
+          text: 'Line 4',
+          fg: '',
+          bg: '',
+          bold: false,
+          italic: false,
+          underline: false,
+          dim: false,
+          inverse: false,
+        },
+      ],
+      [
+        {
+          text: 'Line 5',
+          fg: '',
+          bg: '',
+          bold: false,
+          italic: false,
+          underline: false,
+          dim: false,
+          inverse: false,
+        },
+      ],
     ];
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay={ansiResult}
         terminalWidth={80}
         availableTerminalHeight={20}
-        maxLines={2}
+        maxLines={3}
       />,
     );
     await waitUntilReady();
     const output = lastFrame();
 
     expect(output).not.toContain('Line 1');
-    expect(output).toContain('Line 2');
-    expect(output).toContain('Line 3');
+    expect(output).not.toContain('Line 2');
+    expect(output).not.toContain('Line 3');
+    expect(output).toContain('Line 4');
+    expect(output).toContain('Line 5');
     unmount();
   });
 

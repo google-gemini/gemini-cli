@@ -7,7 +7,7 @@
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { act } from 'react';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
 import { ExitCodes } from '@google/gemini-cli-core';
 import * as processUtils from '../../utils/processUtils.js';
@@ -173,7 +173,9 @@ describe('FolderTrustDialog', () => {
     // Initial state: truncated
     await waitFor(() => {
       expect(lastFrame()).toContain('Do you trust the files in this folder?');
-      expect(lastFrame()).toContain('Press ctrl-o to show more lines');
+      // In standard terminal mode, the expansion hint is handled globally by ToastDisplay
+      // via AppContainer, so it should not be present in the dialog's local frame.
+      expect(lastFrame()).not.toContain('Press Ctrl+O');
       expect(lastFrame()).toContain('hidden');
     });
 
