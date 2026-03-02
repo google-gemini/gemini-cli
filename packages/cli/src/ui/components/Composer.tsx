@@ -596,7 +596,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                 </Box>
 
                 <Box
-                  marginTop={isNarrow ? 1 : 0}
                   flexDirection="column"
                   alignItems={isNarrow ? 'flex-start' : 'flex-end'}
                 >

@@ -24,7 +24,6 @@ exports[`Composer > Snapshots > matches snapshot in narrow view 1`] = `
 "
 ShortcutsHint
  ApprovalModeIndicator
-
 StatusDisplay
 InputPrompt:   Type your message or
 @path/to/file
