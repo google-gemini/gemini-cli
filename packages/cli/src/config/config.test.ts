@@ -3530,7 +3530,7 @@ describe('loadCliConfig mcpEnabled', () => {
   describe('extension plan settings', () => {
     beforeEach(() => {
       vi.spyOn(Storage.prototype, 'getProjectTempDir').mockReturnValue(
-        '/tmp/test-project',
+        '/mock/home/user/.gemini/tmp/test-project',
       );
     });
 
@@ -3594,6 +3594,32 @@ describe('loadCliConfig mcpEnabled', () => {
       const config = await loadCliConfig(settings, 'test-session', argv);
       expect(config.storage.getPlansDir()).not.toContain(
         'ext-plans-dir-inactive',
+      );
+    });
+
+    it('should use default path if neither user nor extension settings provide a plan directory', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        experimental: { plan: true },
+      });
+      const argv = await parseArguments(settings);
+
+      // No extensions providing plan directory
+      vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      // Should return the default managed temp directory path
+      expect(config.storage.getPlansDir()).toBe(
+        path.join(
+          '/mock',
+          'home',
+          'user',
+          '.gemini',
+          'tmp',
+          'test-project',
+          'test-session',
+          'plans',
+        ),
       );
     });
   });

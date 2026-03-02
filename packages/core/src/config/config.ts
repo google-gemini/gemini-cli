@@ -1111,7 +1111,9 @@ export class Config implements McpContext {
         this.workspaceContext.addDirectory(plansDir);
       } catch {
         // Directory does not exist yet, so we don't add it to the workspace context.
-        // It will be created when the first plan is written.
+        // It will be created when the first plan is written. Since custom plan
+        // directories must be within the project root, they are automatically
+        // covered by the project-wide file discovery once created.
       }
     }
 
