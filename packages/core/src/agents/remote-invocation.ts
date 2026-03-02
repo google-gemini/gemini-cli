@@ -108,7 +108,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     return `Calling remote agent ${this.definition.displayName ?? this.definition.name}`;
   }
 
-  private async getAuthHandler(): Promise<AuthenticationHandler> {
+  private async getAuthHandler(): Promise<AuthenticationHandler | undefined> {
     if (this.authHandler) {
       return this.authHandler;
     }
@@ -124,9 +124,6 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         );
       }
       this.authHandler = provider;
-    } else {
-      // Use ADCHandler for agents hosted on secure platforms (e.g. Vertex AI)
-      this.authHandler = new ADCHandler();
     }
 
     return this.authHandler;

@@ -126,7 +126,7 @@ describe('RemoteAgentInvocation', () => {
   });
 
   describe('Execution Logic', () => {
-    it('should lazy load the agent with ADCHandler if not present', async () => {
+    it('should lazy load the agent without auth handler when no auth configured', async () => {
       mockClientManager.getClient.mockReturnValue(undefined);
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
@@ -151,10 +151,7 @@ describe('RemoteAgentInvocation', () => {
       expect(mockClientManager.loadAgent).toHaveBeenCalledWith(
         'test-agent',
         'http://test-agent/card',
-        expect.objectContaining({
-          headers: expect.any(Function),
-          shouldRetryWithHeaders: expect.any(Function),
-        }),
+        undefined,
       );
     });
 
