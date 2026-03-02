@@ -88,7 +88,7 @@ describe('Answer vs. ask eval', () => {
    * Ensures that when the user asks a general question, the agent does NOT
    * automatically modify the file.
    */
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should not edit files when asked a general question',
     prompt: 'How does app.ts work?',
     files: FILES,

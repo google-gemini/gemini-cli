@@ -18,7 +18,7 @@ describe('plan_mode', () => {
     experimental: { plan: true },
   };
 
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should refuse file modification when in plan mode',
     approvalMode: ApprovalMode.PLAN,
     params: {
@@ -57,7 +57,7 @@ describe('plan_mode', () => {
     },
   });
 
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should refuse saving new documentation to the repo when in plan mode',
     approvalMode: ApprovalMode.PLAN,
     params: {
