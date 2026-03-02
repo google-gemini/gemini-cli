@@ -47,7 +47,7 @@ describe('auth', () => {
   });
 
   it('should return error message on failed auth', async () => {
-    const error = new Error('Auth failed');
+    const error = new Error('Authentication failed');
     vi.mocked(mockConfig.refreshAuth).mockRejectedValue(error);
     const result = await performInitialAuth(
       mockConfig,
