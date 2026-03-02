@@ -42,7 +42,7 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
         <Text color={theme.text.primary}>
           {authType === AuthType.LOGIN_WITH_GOOGLE ? (
             <Text>
-              <Text bold>Logged in with Google{email ? ':' : ''}</Text>
+              <Text bold>Signed in with Google{email ? ':' : ''}</Text>
               {email ? ` ${email}` : ''}
             </Text>
           ) : (

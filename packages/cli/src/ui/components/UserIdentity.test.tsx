@@ -45,7 +45,7 @@ describe('<UserIdentity />', () => {
     await waitUntilReady();
 
     const output = lastFrame();
-    expect(output).toContain('Logged in with Google: test@example.com');
+    expect(output).toContain('Signed in with Google: test@example.com');
     expect(output).toContain('/auth');
     unmount();
   });
@@ -72,8 +72,8 @@ describe('<UserIdentity />', () => {
     await waitUntilReady();
 
     const output = lastFrame();
-    expect(output).toContain('Logged in with Google');
-    expect(output).not.toContain('Logged in with Google:');
+    expect(output).toContain('Signed in with Google');
+    expect(output).not.toContain('Signed in with Google:');
     expect(output).toContain('/auth');
     unmount();
   });
@@ -92,13 +92,13 @@ describe('<UserIdentity />', () => {
     await waitUntilReady();
 
     const output = lastFrame();
-    expect(output).toContain('Logged in with Google: test@example.com');
+    expect(output).toContain('Signed in with Google: test@example.com');
     expect(output).toContain('/auth');
     expect(output).toContain('Plan: Premium Plan');
 
     // Check for two lines (or more if wrapped, but here it should be separate)
     const lines = output?.split('\n').filter((line) => line.trim().length > 0);
-    expect(lines?.some((line) => line.includes('Logged in with Google'))).toBe(
+    expect(lines?.some((line) => line.includes('Signed in with Google'))).toBe(
       true,
     );
     expect(lines?.some((line) => line.includes('Plan: Premium Plan'))).toBe(
