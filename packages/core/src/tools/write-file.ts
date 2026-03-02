@@ -9,7 +9,11 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import * as Diff from 'diff';
-import { WRITE_FILE_TOOL_NAME, WRITE_FILE_DISPLAY_NAME } from './tool-names.js';
+import {
+  WRITE_FILE_TOOL_NAME,
+  WRITE_FILE_DISPLAY_NAME,
+  EDIT_TOOL_NAME,
+} from './tool-names.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 
@@ -268,6 +272,44 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       !fileExists ||
       (correctedContentResult.error !== undefined &&
         !correctedContentResult.fileExists);
+
+    // Guard: block write_file on existing files when it's being used for a partial edit.
+    // If >20% of the original lines are unchanged, this is a partial edit that should
+    // use the replace tool instead. Only allow write_file for new files or near-complete rewrites.
+    if (!isNewFile && originalContent) {
+      const diffLines = Diff.diffLines(originalContent, fileContent);
+      let unchangedLines = 0;
+      let totalOriginalLines = 0;
+      for (const part of diffLines) {
+        if (!part.added) {
+          totalOriginalLines += part.count ?? 0;
+        }
+        if (!part.added && !part.removed) {
+          unchangedLines += part.count ?? 0;
+        }
+      }
+      const unchangedRatio =
+        totalOriginalLines > 0 ? unchangedLines / totalOriginalLines : 0;
+      // Threshold: if more than 20% of original lines are untouched, it's a partial edit.
+      const PARTIAL_EDIT_THRESHOLD = 0.2;
+      if (unchangedRatio > PARTIAL_EDIT_THRESHOLD) {
+        const pct = Math.round(unchangedRatio * 100);
+        const errorMsg =
+          `Error: '${WRITE_FILE_TOOL_NAME}' was called on an existing file, but ` +
+          `${pct}% of the original content is unchanged — this is a partial edit. ` +
+          `Use '${EDIT_TOOL_NAME}' (replace) to make targeted, surgical changes instead. ` +
+          `Only use '${WRITE_FILE_TOOL_NAME}' when creating a new file or performing a ` +
+          `complete intentional rewrite where virtually all content is replaced.`;
+        return {
+          llmContent: errorMsg,
+          returnDisplay: `Error: Use '${EDIT_TOOL_NAME}' for partial edits to existing files.`,
+          error: {
+            message: errorMsg,
+            type: ToolErrorType.FILE_WRITE_FAILURE,
+          },
+        };
+      }
+    }
 
     try {
       const dirName = path.dirname(this.resolvedPath);
