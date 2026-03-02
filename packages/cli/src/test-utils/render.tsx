@@ -547,6 +547,11 @@ const baseMockUiState = {
   },
   hintMode: false,
   hintBuffer: '',
+  bannerData: {
+    defaultText: '',
+    warningText: '',
+  },
+  bannerVisible: false,
 };
 
 export const mockAppState: AppState = {
@@ -698,6 +703,21 @@ export const renderWithProviders = (
     });
   }
 
+  // Wrap config in a Proxy so useAlternateBuffer hook (which reads from Config) gets the correct value,
+  // without replacing the entire config object and its other values.
+  let finalConfig = config;
+  if (useAlternateBuffer !== undefined) {
+    finalConfig = new Proxy(config, {
+      get(target, prop, receiver) {
+        if (prop === 'getUseAlternateBuffer') {
+          return () => useAlternateBuffer;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+  }
+
   const mainAreaWidth = terminalWidth;
 
   const finalUiState = {
@@ -726,7 +746,7 @@ export const renderWithProviders = (
 
   const renderResult = render(
     <AppContext.Provider value={appState}>
-      <ConfigContext.Provider value={config}>
+      <ConfigContext.Provider value={finalConfig}>
         <SettingsContext.Provider value={finalSettings}>
           <UIStateContext.Provider value={finalUiState}>
             <VimModeProvider settings={finalSettings}>
@@ -738,7 +758,7 @@ export const renderWithProviders = (
                     <UIActionsContext.Provider value={finalUIActions}>
                       <OverflowProvider>
                         <ToolActionsProvider
-                          config={config}
+                          config={finalConfig}
                           toolCalls={allToolCalls}
                         >
                           <AskUserActionsProvider
