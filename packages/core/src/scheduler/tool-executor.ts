@@ -18,6 +18,7 @@ import {
   runInDevTraceSpan,
 } from '../index.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
@@ -252,6 +253,45 @@ export class ToolExecutor {
             threshold,
           }),
         );
+      }
+    } else if (
+      Array.isArray(content) &&
+      content.length === 1 &&
+      'tool' in call &&
+      call.tool instanceof DiscoveredMCPTool
+    ) {
+      const firstPart = content[0];
+      if (typeof firstPart === 'object' && typeof firstPart.text === 'string') {
+        const textContent = firstPart.text;
+        const threshold = this.config.getTruncateToolOutputThreshold();
+
+        if (threshold > 0 && textContent.length > threshold) {
+          const originalContentLength = textContent.length;
+          const { outputFile: savedPath } = await saveTruncatedToolOutput(
+            textContent,
+            toolName,
+            callId,
+            this.config.storage.getProjectTempDir(),
+            this.config.getSessionId(),
+          );
+          outputFile = savedPath;
+          const truncatedText = formatTruncatedToolOutput(
+            textContent,
+            outputFile,
+            threshold,
+          );
+          content[0] = { ...firstPart, text: truncatedText };
+
+          logToolOutputTruncated(
+            this.config,
+            new ToolOutputTruncatedEvent(call.request.prompt_id, {
+              toolName,
+              originalContentLength,
+              truncatedContentLength: truncatedText.length,
+              threshold,
+            }),
+          );
+        }
       }
     }
 
