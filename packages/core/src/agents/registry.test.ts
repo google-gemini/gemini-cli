@@ -662,6 +662,91 @@ describe('AgentRegistry', () => {
       );
     });
 
+    it('should not accumulate descriptions on repeated registration', async () => {
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgentAccumulationTest',
+        description: 'User-provided description',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      const mockAgentCard = {
+        name: 'RemoteAgentAccumulationTest',
+        description: 'Card-provided description',
+        skills: [{ name: 'Skill1', description: 'Desc1' }],
+      };
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue(mockAgentCard),
+        clearCache: vi.fn(),
+      } as unknown as A2AClientManager);
+
+      // Register first time
+      await registry.testRegisterAgent(remoteAgent);
+      let registered = registry.getDefinition('RemoteAgentAccumulationTest');
+      const firstDescription = registered?.description;
+      expect(firstDescription).toBe(
+        'User Description: User-provided description\nAgent Description: Card-provided description\nSkills:\nSkill1: Desc1',
+      );
+
+      // Register second time with the SAME object
+      await registry.testRegisterAgent(remoteAgent);
+      registered = registry.getDefinition('RemoteAgentAccumulationTest');
+      expect(registered?.description).toBe(firstDescription);
+    });
+
+    it('should allow registering a remote agent with an empty initial description', async () => {
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'EmptyDescAgent',
+        description: '', // Empty initial description
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue({
+          name: 'EmptyDescAgent',
+          description: 'Loaded from card',
+        }),
+        clearCache: vi.fn(),
+      } as unknown as A2AClientManager);
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      const registered = registry.getDefinition('EmptyDescAgent');
+      expect(registered?.description).toBe(
+        'Agent Description: Loaded from card',
+      );
+    });
+
+    it('should provide fallback for skill descriptions if missing in the card', async () => {
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'SkillFallbackAgent',
+        description: 'User description',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue({
+          name: 'SkillFallbackAgent',
+          description: 'Card description',
+          skills: [{ name: 'SkillNoDesc' }], // Missing description
+        }),
+        clearCache: vi.fn(),
+      } as unknown as A2AClientManager);
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      const registered = registry.getDefinition('SkillFallbackAgent');
+      expect(registered?.description).toContain(
+        'SkillNoDesc: No description provided',
+      );
+    });
+
     it('should handle special characters in agent names', async () => {
       const specialAgent = {
         ...MOCK_AGENT_V1,
