@@ -239,11 +239,6 @@ describe('Settings Loading and Merging', () => {
 
         expect(fs.readFileSync).toHaveBeenCalledWith(path, 'utf-8');
         const expectedSettings = { ...content };
-        // Account for migrateDeprecatedSettings
-        if (expectedSettings.ui) {
-          expectedSettings.ui.themeLight = content.ui?.themeLight;
-          expectedSettings.ui.themeDark = content.ui?.themeLight;
-        }
         expect(
           settings[scope as 'system' | 'user' | 'workspace'].settings,
         ).toEqual(expectedSettings);
