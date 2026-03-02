@@ -16,6 +16,7 @@ describe('ThinkingMessage', () => {
         thought={{ subject: 'Planning', description: 'test' }}
         terminalWidth={80}
         isFirstThinking={true}
+        isLastThinking={true}
       />,
     );
     await renderResult.waitUntilReady();
@@ -34,6 +35,8 @@ describe('ThinkingMessage', () => {
       <ThinkingMessage
         thought={{ subject: '', description: 'Processing details' }}
         terminalWidth={80}
+        isFirstThinking={true}
+        isLastThinking={true}
       />,
     );
     await renderResult.waitUntilReady();
@@ -54,6 +57,8 @@ describe('ThinkingMessage', () => {
           description: 'I am planning the solution.',
         }}
         terminalWidth={80}
+        isFirstThinking={true}
+        isLastThinking={true}
       />,
     );
     await renderResult.waitUntilReady();
@@ -76,6 +81,7 @@ describe('ThinkingMessage', () => {
         }}
         terminalWidth={80}
         isFirstThinking={true}
+        isLastThinking={true}
       />,
     );
     await renderResult.waitUntilReady();
@@ -97,6 +103,8 @@ describe('ThinkingMessage', () => {
           description: '\\n\\nSome more text',
         }}
         terminalWidth={80}
+        isFirstThinking={true}
+        isLastThinking={true}
       />,
     );
     await renderResult.waitUntilReady();
@@ -111,6 +119,8 @@ describe('ThinkingMessage', () => {
       <ThinkingMessage
         thought={{ subject: '', description: '' }}
         terminalWidth={80}
+        isFirstThinking={true}
+        isLastThinking={true}
       />,
     );
     await renderResult.waitUntilReady();
@@ -125,7 +135,8 @@ describe('ThinkingMessage', () => {
         <ThinkingMessage
           thought={{
             subject: 'Initial analysis',
-            description: 'Understanding the core requirements of the prompt.',
+            description:
+              'This is a multiple line paragraph for the first thinking message of how the model analyzes the problem.',
           }}
           terminalWidth={80}
           isFirstThinking={true}
@@ -133,7 +144,8 @@ describe('ThinkingMessage', () => {
         <ThinkingMessage
           thought={{
             subject: 'Planning execution',
-            description: 'Formulating a step-by-step plan to achieve the goal.',
+            description:
+              'This a second multiple line paragraph for the second thinking message explaining the plan in detail so that it wraps around the terminal display.',
           }}
           terminalWidth={80}
         />
@@ -141,9 +153,10 @@ describe('ThinkingMessage', () => {
           thought={{
             subject: 'Refining approach',
             description:
-              'Optimizing the proposed solution for better performance.',
+              'And finally a third multiple line paragraph for the third thinking message to refine the solution.',
           }}
           terminalWidth={80}
+          isLastThinking={true}
         />
       </React.Fragment>,
     );
