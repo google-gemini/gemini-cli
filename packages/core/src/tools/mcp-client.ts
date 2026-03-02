@@ -226,7 +226,7 @@ export class McpClient implements McpProgressReporter {
     // Validate MCP tool names in policy rules against discovered tools
     try {
       const discoveredToolNames = tools.map((t) => t.serverToolName);
-      const policyRules = cliConfig.getPolicyEngine().getRules();
+      const policyRules = cliConfig.getPolicyEngine?.()?.getRules() ?? [];
       const warnings = validateMcpPolicyToolNames(
         this.serverName,
         discoveredToolNames,
@@ -1595,6 +1595,9 @@ export interface McpContext {
   ): void;
   setUserInteractedWithMcp?(): void;
   isTrustedFolder(): boolean;
+  getPolicyEngine?(): {
+    getRules(): ReadonlyArray<{ toolName?: string; source?: string }>;
+  };
 }
 
 /**
