@@ -306,11 +306,11 @@ jobs:
       - name: 'Check if evals should run'
         id: 'check_evals'
         run: |
-          SHOULD_RUN=$(node scripts/check_evals_trigger.js)
+          SHOULD_RUN=$(node scripts/changed_prompt.js)
           echo "should_run=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
 
       - name: 'Run Evals (Required to pass)'
-        if: steps.check_evals.outputs.should_run == 'true'
+        if: "${{ steps.check_evals.outputs.should_run == 'true' }}"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
         run: 'npm run test:always_passing_evals'
