@@ -305,6 +305,15 @@ export class CodeAssistServer implements ContentGenerator {
       responseType: 'json',
       body: JSON.stringify(req),
       signal,
+      retryConfig: {
+        retry: 3,
+        noResponseRetries: 3,
+        statusCodesToRetry: [
+          [429, 429],
+          [499, 499],
+          [500, 599],
+        ],
+      },
     });
     return res.data;
   }
@@ -352,6 +361,15 @@ export class CodeAssistServer implements ContentGenerator {
       responseType: 'stream',
       body: JSON.stringify(req),
       signal,
+      retryConfig: {
+        retry: 3,
+        noResponseRetries: 3,
+        statusCodesToRetry: [
+          [429, 429],
+          [499, 499],
+          [500, 599],
+        ],
+      },
     });
 
     return (async function* (): AsyncGenerator<T> {
