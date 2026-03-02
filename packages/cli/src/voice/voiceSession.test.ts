@@ -7,7 +7,7 @@
 import { describe, it, vi, expect, beforeEach } from 'vitest';
 
 // Mock dependencies before they are imported
-const mockRunNonInteractive = vi.fn();
+const mockRunNonInteractive = vi.hoisted(() => vi.fn());
 vi.mock('../nonInteractiveCli.js', () => ({
   runNonInteractive: mockRunNonInteractive,
 }));
