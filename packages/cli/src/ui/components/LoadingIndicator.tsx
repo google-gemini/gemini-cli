@@ -67,7 +67,16 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
           (streamingState === StreamingState.Responding
             ? GENERIC_WORKING_LABEL
             : undefined);
-  const thinkingIndicator = '';
+
+  const hasThoughtIndicator =
+    currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
+    Boolean(thought?.subject?.trim());
+
+  // Avoid "Thinking... Thinking..." duplication if primaryText already starts with "Thinking"
+  const thinkingIndicator =
+    hasThoughtIndicator && !primaryText?.startsWith('Thinking')
+      ? 'Thinking... '
+      : '';
 
   const cancelAndTimerContent =
     showCancelAndTimer &&

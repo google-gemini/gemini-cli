@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import stripAnsi from 'strip-ansi';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { type HistoryItem } from '../types.js';
 import { MessageType } from '../types.js';
@@ -290,6 +291,27 @@ describe('<HistoryItemDisplay />', () => {
       unmount();
     });
 
+    it('renders "Thinking..." header when isFirstThinking is true', async () => {
+      const item: HistoryItem = {
+        ...baseItem,
+        type: 'thinking',
+        thought: { subject: 'Thinking', description: 'test' },
+      };
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <HistoryItemDisplay {...baseItem} item={item} isFirstThinking={true} />,
+        {
+          settings: createMockSettings({
+            merged: { ui: { inlineThinkingMode: 'full' } },
+          }),
+        },
+      );
+      await waitUntilReady();
+
+      const output = stripAnsi(lastFrame());
+      expect(output).toContain(' Thinking...');
+      expect(output).toContain('Thinking');
+      unmount();
+    });
     it('does not render thinking item when disabled', async () => {
       const item: HistoryItem = {
         ...baseItem,
