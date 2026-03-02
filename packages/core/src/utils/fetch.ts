@@ -8,7 +8,7 @@ import { getErrorMessage, isNodeError } from './errors.js';
 import { URL } from 'node:url';
 import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
 
-const DEFAULT_HEADERS_TIMEOUT = 60000; // 60 seconds
+const DEFAULT_HEADERS_TIMEOUT = 300000; // 5 minutes
 const DEFAULT_BODY_TIMEOUT = 300000; // 5 minutes
 
 // Configure default global dispatcher with higher timeouts
