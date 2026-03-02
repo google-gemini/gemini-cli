@@ -2902,6 +2902,7 @@ ${JSON.stringify(
 
       // Assert
       expect(events).toContainEqual({ type: GeminiEventType.LoopDetected });
+      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(capturedSignal!.aborted).toBe(true);
     });
   });
