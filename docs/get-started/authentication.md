@@ -121,7 +121,20 @@ Regardless of your authentication method for Vertex AI, you'll need to set
 enabled, and `GOOGLE_CLOUD_LOCATION` to the location of your Vertex AI resources
 or the location where you want to run your jobs.
 
+You can set the location using either:
+
+- The `--google-cloud-location` CLI flag (takes priority), or
+- The `GOOGLE_CLOUD_LOCATION` environment variable.
+
 For example:
+
+**Using the CLI flag**
+
+```bash
+gemini --google-cloud-location us-central1
+```
+
+**Using environment variables**
 
 **macOS/Linux**
 

@@ -460,6 +460,7 @@ export interface ConfigParameters {
   targetDir: string;
   debugMode: boolean;
   question?: string;
+  googleCloudLocation?: string;
 
   coreTools?: string[];
   /** @deprecated Use Policy Engine instead */
@@ -586,6 +587,7 @@ export class Config implements McpContext {
   private mcpClientManager?: McpClientManager;
   private allowedMcpServers: string[];
   private blockedMcpServers: string[];
+  private readonly googleCloudLocation?: string;
   private allowedEnvironmentVariables: string[];
   private blockedEnvironmentVariables: string[];
   private readonly enableEnvironmentVariableRedaction: boolean;
@@ -816,6 +818,7 @@ export class Config implements McpContext {
     this.blockedEnvironmentVariables = params.blockedEnvironmentVariables ?? [];
     this.enableEnvironmentVariableRedaction =
       params.enableEnvironmentVariableRedaction ?? false;
+    this.googleCloudLocation = params.googleCloudLocation ?? undefined;
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
@@ -1393,6 +1396,10 @@ export class Config implements McpContext {
 
   getActiveModel(): string {
     return this._activeModel ?? this.model;
+  }
+
+  getGoogleCloudLocation(): string | undefined {
+    return this.googleCloudLocation;
   }
 
   setActiveModel(model: string): void {

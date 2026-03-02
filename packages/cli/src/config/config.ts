@@ -75,6 +75,7 @@ export interface CliArgs {
   debug: boolean | undefined;
   prompt: string | undefined;
   promptInteractive: string | undefined;
+  googleCloudLocation: string | undefined;
 
   yolo: boolean | undefined;
   approvalMode: string | undefined;
@@ -180,6 +181,10 @@ export async function parseArguments(
         .option('experimental-acp', {
           type: 'boolean',
           description: 'Starts the agent in ACP mode',
+        })
+        .option('google-cloud-location', {
+          type: 'string',
+          description: 'The Google Cloud location to use',
         })
         .option('allowed-mcp-server-names', {
           type: 'array',
@@ -538,6 +543,7 @@ export async function loadCliConfig(
   }
 
   const question = argv.promptInteractive || argv.prompt || '';
+  const googleCloudLocation = argv.googleCloudLocation;
 
   // Determine approval mode with backward compatibility
   let approvalMode: ApprovalMode;
@@ -765,6 +771,7 @@ export async function loadCliConfig(
       settings.context?.loadMemoryFromIncludeDirectories || false,
     debugMode,
     question,
+    googleCloudLocation,
 
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,

@@ -212,9 +212,16 @@ export class LoggingContentGenerator implements ContentGenerator {
 
     // Case 2: Using an API key for Vertex AI.
     if (genConfig?.vertexai) {
-      const location = process.env['GOOGLE_CLOUD_LOCATION'];
-      if (location) {
-        return { address: `${location}-aiplatform.googleapis.com`, port: 443 };
+      const cliLocation = this.config.getGoogleCloudLocation();
+      const googleCloudLocation =
+        cliLocation !== undefined && cliLocation.trim() !== ''
+          ? cliLocation.trim()
+          : process.env['GOOGLE_CLOUD_LOCATION'];
+      if (googleCloudLocation) {
+        return {
+          address: `${googleCloudLocation}-aiplatform.googleapis.com`,
+          port: 443,
+        };
       } else {
         return { address: 'unknown', port: 0 };
       }

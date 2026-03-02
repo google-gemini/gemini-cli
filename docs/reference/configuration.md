@@ -1407,6 +1407,7 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GOOGLE_CLOUD_LOCATION`**:
   - Your Google Cloud Project Location (e.g., us-central1).
   - Required for using Vertex AI in non-express mode.
+  - Can be overridden by the `--google-cloud-location` CLI flag.
   - Example: `export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"` (Windows
     PowerShell: `$env:GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"`).
 - **`GEMINI_SANDBOX`**:
