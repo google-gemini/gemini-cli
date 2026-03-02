@@ -727,6 +727,7 @@ export class Config implements McpContext {
   private readonly useWriteTodos: boolean;
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
+  private readonly checkerRunner: CheckerRunner;
   private _scopedPolicyEngine?: PolicyEngine;
   private policyUpdateConfirmationRequest:
     | PolicyUpdateConfirmationRequest
@@ -964,6 +965,7 @@ export class Config implements McpContext {
       checkersPath,
       timeout: 30000, // 30 seconds to allow for LLM-based checkers
     });
+    this.checkerRunner = checkerRunner;
     this.policyUpdateConfirmationRequest =
       params.policyUpdateConfirmationRequest;
 
@@ -1327,7 +1329,7 @@ export class Config implements McpContext {
   }
 
   getCheckerRunner(): CheckerRunner | undefined {
-    return (this as any).checkerRunner;
+    return this.checkerRunner;
   }
 
   setTerminalBackground(terminalBackground: string | undefined): void {
