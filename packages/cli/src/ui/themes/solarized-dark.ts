@@ -47,6 +47,7 @@ const semanticColors: SemanticColors = {
   },
   border: {
     default: '#073642',
+    focused: '#268bd2',
   },
   ui: {
     comment: '#586e75',
