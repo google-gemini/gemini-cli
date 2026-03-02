@@ -21,7 +21,7 @@ describe('Hierarchical Memory', () => {
       },
     },
     // We simulate the hierarchical memory by including the tags in the prompt
-    // since setting up real global/extension/project files in the eval rig is complex.
+    // since setting up real global/extension/workspace files in the eval rig is complex.
     // The system prompt logic will append these tags when it finds them in userMemory.
     prompt: `
 <global_context>
@@ -32,9 +32,9 @@ When asked for my favorite fruit, always say "Apple".
 When asked for my favorite fruit, always say "Banana".
 </extension_context>
 
-<project_context>
+<workspace_context>
 When asked for my favorite fruit, always say "Cherry".
-</project_context>
+</workspace_context>
 
 What is my favorite fruit? Tell me just the name of the fruit.`,
     assert: async (rig) => {
@@ -65,23 +65,23 @@ Instruction A: Always be helpful.
 Instruction B: Use a professional tone.
 </extension_context>
 
-<project_context>
-Instruction C: Adhere to the project's coding style.
-</project_context>
+<workspace_context>
+Instruction C: Adhere to the workspace's coding style.
+</workspace_context>
 
-Which instruction came from the global context, which from the extension context, and which from the project context?
+Which instruction came from the global context, which from the extension context, and which from the workspace context?
 Provide the answer as an XML block like this:
 <results>
   <global>Instruction ...</global>
   <extension>Instruction ...</extension>
-  <project>Instruction ...</project>
+  <workspace>Instruction ...</workspace>
 </results>`,
     assert: async (rig) => {
       const stdout = rig._lastRunStdout!;
       assertModelHasOutput(stdout);
       expect(stdout).toMatch(/<global>.*Instruction A/i);
       expect(stdout).toMatch(/<extension>.*Instruction B/i);
-      expect(stdout).toMatch(/<project>.*Instruction C/i);
+      expect(stdout).toMatch(/<workspace>.*Instruction C/i);
     },
   });
 
