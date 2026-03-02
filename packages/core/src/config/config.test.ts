@@ -1931,8 +1931,11 @@ describe('Generation Config Merging (HACK)', () => {
 
     // Assert that the default aliases are present
     expect(serviceConfig.aliases).toEqual(DEFAULT_MODEL_CONFIGS.aliases);
-    // Assert that the user's overrides are present
-    expect(serviceConfig.overrides).toEqual(userOverrides);
+    // Assert that both default and user overrides are present, with user overrides appended
+    expect(serviceConfig.overrides).toEqual([
+      ...(DEFAULT_MODEL_CONFIGS.overrides ?? []),
+      ...userOverrides,
+    ]);
   });
 
   it('should merge default overrides when user provides only aliases', () => {
@@ -1956,8 +1959,11 @@ describe('Generation Config Merging (HACK)', () => {
       }
     ).config;
 
-    // Assert that the user's aliases are present
-    expect(serviceConfig.aliases).toEqual(userAliases);
+    // Assert that user aliases are merged with default aliases
+    expect(serviceConfig.aliases).toEqual({
+      ...DEFAULT_MODEL_CONFIGS.aliases,
+      ...userAliases,
+    });
     // Assert that the default overrides are present
     expect(serviceConfig.overrides).toEqual(DEFAULT_MODEL_CONFIGS.overrides);
   });
@@ -1984,7 +1990,11 @@ describe('Generation Config Merging (HACK)', () => {
     ).config;
 
     // Assert that the user's aliases are used, not the defaults
-    expect(serviceConfig.aliases).toEqual(userAliases);
+    // Assert that user aliases are merged with defaults, with user values taking priority
+    expect(serviceConfig.aliases).toEqual({
+      ...DEFAULT_MODEL_CONFIGS.aliases,
+      ...userAliases,
+    });
   });
 
   it('should use default generation config if none is provided', () => {
