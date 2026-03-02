@@ -51,8 +51,7 @@ const ACCOUNT_CHOOSER_URL = 'https://accounts.google.com/AccountChooser';
 
 /** UTM parameters for CLI tracking */
 const UTM_SOURCE = 'gemini_cli';
-// TODO: change to 'desktop' when G1 service fix is rolled out
-const UTM_MEDIUM = 'web';
+const UTM_MEDIUM = 'desktop';
 
 /**
  * Wraps a URL in the AccountChooser redirect to maintain user context.
