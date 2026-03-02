@@ -9,8 +9,8 @@ import { evalTest } from './test-helper.js';
 
 describe('ask_user', () => {
   evalTest('USUALLY_PASSES', {
-    name: 'Agent uses AskUser tool when explicitly instructed',
-    prompt: `Please ask me what my favorite color is. Provide 3 options: red, green, or blue.`,
+    name: 'Agent uses AskUser tool to present multiple choice options',
+    prompt: `Use the ask_user tool to ask me what my favorite color is. Provide 3 options: red, green, or blue.`,
     assert: async (rig) => {
       const wasToolCalled = await rig.waitForToolCall('ask_user');
       expect(wasToolCalled, 'Expected ask_user tool to be called').toBe(true);
@@ -19,7 +19,10 @@ describe('ask_user', () => {
 
   evalTest('USUALLY_PASSES', {
     name: 'Agent uses AskUser tool to clarify ambiguous requirements',
-    prompt: `I want to build a new web app. Ask me questions to clarify the framework and styling preferences before proceeding.`,
+    files: {
+      'package.json': JSON.stringify({ name: 'my-app', version: '1.0.0' }),
+    },
+    prompt: `I want to build a new feature in this app. Ask me questions to clarify the requirements before proceeding.`,
     assert: async (rig) => {
       const wasToolCalled = await rig.waitForToolCall('ask_user');
       expect(wasToolCalled, 'Expected ask_user tool to be called').toBe(true);
@@ -28,11 +31,24 @@ describe('ask_user', () => {
 
   evalTest('USUALLY_PASSES', {
     name: 'Agent uses AskUser tool before performing significant ambiguous rework',
+    files: {
+      'packages/core/src/index.ts': '// index\nexport const version = "1.0.0";',
+      'packages/core/src/util.ts': '// util\nexport function help() {}',
+      'packages/core/package.json': JSON.stringify({
+        name: '@google/gemini-cli-core',
+      }),
+      'README.md': '# Gemini CLI',
+    },
     prompt: `Refactor the entire core package to be better.`,
     assert: async (rig) => {
-      const wasToolCalled = await rig.waitForToolCall('ask_user');
+      const wasPlanModeCalled = await rig.waitForToolCall('enter_plan_mode');
+      expect(wasPlanModeCalled, 'Expected enter_plan_mode to be called').toBe(
+        true,
+      );
+
+      const wasAskUserCalled = await rig.waitForToolCall('ask_user');
       expect(
-        wasToolCalled,
+        wasAskUserCalled,
         'Expected ask_user tool to be called to clarify the significant rework',
       ).toBe(true);
     },
@@ -40,18 +56,27 @@ describe('ask_user', () => {
 
   evalTest('USUALLY_PASSES', {
     name: 'Agent does NOT use AskUser to confirm shell commands',
+    files: {
+      'package.json': JSON.stringify({
+        scripts: { build: 'echo building' },
+      }),
+    },
     prompt: `Run 'npm run build' in the current directory.`,
     assert: async (rig) => {
-      const wasShellCalled = await rig.waitForToolCall('run_shell_command');
+      await rig.waitForTelemetryReady();
+
+      const toolLogs = rig.readToolLogs();
+      const wasShellCalled = toolLogs.some(
+        (log) => log.toolRequest.name === 'run_shell_command',
+      );
+      const wasAskUserCalled = toolLogs.some(
+        (log) => log.toolRequest.name === 'ask_user',
+      );
+
       expect(
         wasShellCalled,
         'Expected run_shell_command tool to be called',
       ).toBe(true);
-
-      await rig.waitForTelemetryReady();
-      const wasAskUserCalled = rig
-        .readToolLogs()
-        .some((log) => log.toolRequest.name === 'ask_user');
       expect(
         wasAskUserCalled,
         'ask_user should not be called to confirm shell commands',
