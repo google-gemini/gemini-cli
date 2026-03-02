@@ -541,6 +541,42 @@ describe('ShellExecutionService', () => {
       expect(mockPtyProcess.resize).toHaveBeenCalledWith(100, 40);
       expect(mockHeadlessTerminal.resize).not.toHaveBeenCalled();
     });
+
+    it('should not throw when resizing a stale PTY fd (EBADF - Linux/tmux race condition)', () => {
+      // Simulates the race condition on Linux/tmux where a resize event fires
+      // on a stale PTY file descriptor after the shell command has already exited.
+      const ebadfError = Object.assign(new Error('bad file descriptor'), {
+        code: 'EBADF',
+      });
+      mockPtyProcess.resize.mockImplementation(() => {
+        throw ebadfError;
+      });
+
+      expect(() => {
+        ShellExecutionService.resizePty(mockPtyProcess.pid, 100, 40);
+      }).not.toThrow();
+
+      expect(mockPtyProcess.resize).toHaveBeenCalledWith(100, 40);
+      expect(mockHeadlessTerminal.resize).not.toHaveBeenCalled();
+    });
+
+    it('should not throw when resizing a stale PTY fd (ESRCH - Unix process already exited)', () => {
+      // Simulates the Unix case where the process has already exited
+      // and the PTY resize ioctl returns ESRCH (no such process).
+      const esrchError = Object.assign(new Error('no such process'), {
+        code: 'ESRCH',
+      });
+      mockPtyProcess.resize.mockImplementation(() => {
+        throw esrchError;
+      });
+
+      expect(() => {
+        ShellExecutionService.resizePty(mockPtyProcess.pid, 100, 40);
+      }).not.toThrow();
+
+      expect(mockPtyProcess.resize).toHaveBeenCalledWith(100, 40);
+      expect(mockHeadlessTerminal.resize).not.toHaveBeenCalled();
+    });
   });
 
   describe('Failed Execution', () => {
