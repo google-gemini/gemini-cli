@@ -174,6 +174,15 @@ describe('resolvePathFromEnv', () => {
         isDisabled: false,
       });
     });
+
+    it('does not expand ~username/ paths (only ~/ is expanded)', () => {
+      // ~someuser/path does NOT start with ~/ or equal ~, so it falls through
+      // to path.resolve(), treating it as a relative path from cwd.
+      const result = resolvePathFromEnv('~someuser/path');
+      expect(result.isSwitch).toBe(false);
+      expect(result.isDisabled).toBe(false);
+      expect(result.value).toBe(path.resolve('~someuser/path'));
+    });
   });
 });
 
@@ -271,6 +280,19 @@ describe('applySubstitutions', () => {
       '',
     );
     expect(result).toBe('Use ReadFile to read and EditFile to edit.');
+  });
+
+  it('replaces multiple occurrences of the same _ToolName placeholder', () => {
+    vi.mocked(mockConfig.getToolRegistry).mockReturnValue({
+      getAllToolNames: vi.fn().mockReturnValue(['ReadFile']),
+    } as never);
+
+    const result = applySubstitutions(
+      'Use ${ReadFile_ToolName} here and ${ReadFile_ToolName} there',
+      mockConfig,
+      '',
+    );
+    expect(result).toBe('Use ReadFile here and ReadFile there');
   });
 
   it('returns original string when no placeholders are present', () => {
