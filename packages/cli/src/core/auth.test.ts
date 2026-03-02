@@ -54,7 +54,7 @@ describe('auth', () => {
       AuthType.LOGIN_WITH_GOOGLE,
     );
     expect(result).toEqual({
-      authError: 'Failed to login. Message: Auth failed',
+      authError: 'Failed to sign in. Message: Authentication failed',
       accountSuspensionInfo: null,
     });
     expect(mockConfig.refreshAuth).toHaveBeenCalledWith(

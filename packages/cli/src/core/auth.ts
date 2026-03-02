@@ -55,7 +55,7 @@ export async function performInitialAuth(
       };
     }
     return {
-      authError: `Failed to login. Message: ${getErrorMessage(e)}`,
+      authError: `Failed to sign in. Message: ${getErrorMessage(e)}`,
       accountSuspensionInfo: null,
     };
   }
