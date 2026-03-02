@@ -354,6 +354,53 @@ class JetBrainsInstaller implements IdeInstaller {
   }
 }
 
+class NeovimInstaller implements IdeInstaller {
+  constructor(
+    readonly ideInfo: IdeInfo,
+    readonly platform = process.platform,
+  ) {}
+
+  async install(): Promise<InstallResult> {
+    return {
+      success: false,
+      message: `Neovim companion plugin cannot be auto-installed. To install manually:\n\nUsing lazy.nvim, add to your config:\n  { "google/gemini-cli", config = function() require("gemini-cli").setup() end }\n\nOr clone the plugin manually:\n  git clone https://github.com/google/gemini-cli ~/.local/share/nvim/site/pack/gemini/start/gemini-cli\n\nThen add to your init.lua:\n  require("gemini-cli").setup()`,
+    };
+  }
+}
+
+class ZedInstaller implements IdeInstaller {
+  constructor(
+    readonly ideInfo: IdeInfo,
+    readonly platform = process.platform,
+  ) {}
+
+  async install(): Promise<InstallResult> {
+    // Try cargo install
+    try {
+      const result = child_process.spawnSync(
+        'cargo',
+        ['install', 'gemini-cli-zed-companion'],
+        { stdio: 'pipe', shell: this.platform === 'win32' },
+      );
+
+      if (result.status === 0) {
+        return {
+          success: true,
+          message:
+            'Zed companion binary was installed successfully via cargo. Run `gemini-cli-zed-companion` to start the companion server.',
+        };
+      }
+    } catch {
+      // Fall through to manual instructions
+    }
+
+    return {
+      success: false,
+      message: `Could not automatically install the Zed companion. To install manually:\n\n  cargo install gemini-cli-zed-companion\n\nOr build from source:\n  cd packages/zed-ide-companion && cargo build --release`,
+    };
+  }
+}
+
 const JETBRAINS_IDE_NAMES = new Set<string>([
   IDE_DEFINITIONS.jetbrains.name,
   IDE_DEFINITIONS.intellijidea.name,
@@ -379,6 +426,10 @@ export function getIdeInstaller(
       return new PositronInstaller(ide, platform);
     case IDE_DEFINITIONS.antigravity.name:
       return new AntigravityInstaller(ide, platform);
+    case IDE_DEFINITIONS.neovim.name:
+      return new NeovimInstaller(ide, platform);
+    case IDE_DEFINITIONS.zed.name:
+      return new ZedInstaller(ide, platform);
     default:
       if (JETBRAINS_IDE_NAMES.has(ide.name)) {
         return new JetBrainsInstaller(ide, platform);

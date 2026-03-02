@@ -5,8 +5,9 @@ context-aware experience. This integration allows the CLI to understand your
 workspace better and enables powerful features like native in-editor diffing.
 
 Currently, the supported IDEs are [Antigravity](https://antigravity.google),
-[Visual Studio Code](https://code.visualstudio.com/), and other editors that
-support VS Code extensions. To build support for other editors, see the
+[Visual Studio Code](https://code.visualstudio.com/) (and VS Code forks),
+[JetBrains IDEs](https://www.jetbrains.com/), [Neovim](./neovim.md), and
+[Zed](./zed.md). To build support for other editors, see the
 [IDE Companion Extension Spec](./ide-companion-spec.md).
 
 ## Features
@@ -72,6 +73,13 @@ You can also install the extension directly from a marketplace.
 >
 > After manually installing the extension, you must run `/ide enable` in the CLI
 > to activate the integration.
+
+### Editor-specific guides
+
+- **Neovim:** See the [Neovim integration guide](./neovim.md) for installation
+  via lazy.nvim/packer.nvim and usage with vimdiff.
+- **Zed:** See the [Zed integration guide](./zed.md) for the standalone
+  companion binary setup.
 
 ## Usage
 
@@ -212,8 +220,8 @@ to connect using the provided PID.
   `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: [List of IDEs]`
   - **Cause:** You are running Gemini CLI in a terminal or environment that is
     not a supported IDE.
-  - **Solution:** Run Gemini CLI from the integrated terminal of a supported
-    IDE, like Antigravity or VS Code.
+  - **Solution:** Run Gemini CLI from the integrated terminal of a supported IDE
+    (Antigravity, VS Code, JetBrains, Neovim, or Zed).
 
 - **Message:**
   `No installer is available for IDE. Please install the Gemini CLI Companion extension manually from the marketplace.`

@@ -1,0 +1,19 @@
+[package]
+name = "gemini-cli-zed-companion"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Gemini CLI IDE companion server for Zed editor"
+
+[[bin]]
+name = "gemini-cli-zed-companion"
+path = "src/main.rs"
+
+[dependencies]
+axum = { version = "0.7", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+tower-http = { version = "0.5", features = ["cors"] }
+tokio-stream = "0.1"

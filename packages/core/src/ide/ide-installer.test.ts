@@ -324,6 +324,54 @@ describe('AntigravityInstaller', () => {
   });
 });
 
+describe('NeovimInstaller', () => {
+  it('returns a NeovimInstaller for "neovim"', () => {
+    const installer = getIdeInstaller(IDE_DEFINITIONS.neovim);
+    expect(installer).not.toBeNull();
+    expect(installer?.install).toEqual(expect.any(Function));
+  });
+
+  it('returns manual install instructions (cannot auto-install)', async () => {
+    const installer = getIdeInstaller(IDE_DEFINITIONS.neovim)!;
+    const result = await installer.install();
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('cannot be auto-installed');
+    expect(result.message).toContain('lazy.nvim');
+  });
+});
+
+describe('ZedInstaller', () => {
+  it('returns a ZedInstaller for "zed"', () => {
+    const installer = getIdeInstaller(IDE_DEFINITIONS.zed);
+    expect(installer).not.toBeNull();
+    expect(installer?.install).toEqual(expect.any(Function));
+  });
+
+  it('returns success when cargo install succeeds', async () => {
+    vi.mocked(child_process.spawnSync).mockReturnValueOnce({
+      status: 0,
+    } as ReturnType<typeof child_process.spawnSync>);
+    const installer = getIdeInstaller(IDE_DEFINITIONS.zed, 'linux')!;
+    const result = await installer.install();
+
+    expect(result.success).toBe(true);
+    expect(result.message).toContain('installed successfully via cargo');
+  });
+
+  it('returns manual instructions when cargo install fails', async () => {
+    vi.mocked(child_process.spawnSync).mockReturnValueOnce({
+      status: 1,
+      stderr: Buffer.from('error'),
+    } as ReturnType<typeof child_process.spawnSync>);
+    const installer = getIdeInstaller(IDE_DEFINITIONS.zed, 'linux')!;
+    const result = await installer.install();
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('cargo install');
+  });
+});
+
 describe('JetBrainsInstaller', () => {
   function setup({
     ide = IDE_DEFINITIONS.intellijidea,

@@ -17,6 +17,8 @@ export const IDE_DEFINITIONS = {
   positron: { name: 'positron', displayName: 'Positron' },
   antigravity: { name: 'antigravity', displayName: 'Antigravity' },
   sublimetext: { name: 'sublimetext', displayName: 'Sublime Text' },
+  neovim: { name: 'neovim', displayName: 'Neovim' },
+  zed: { name: 'zed', displayName: 'Zed' },
   jetbrains: { name: 'jetbrains', displayName: 'JetBrains IDE' },
   intellijidea: { name: 'intellijidea', displayName: 'IntelliJ IDEA' },
   webstorm: { name: 'webstorm', displayName: 'WebStorm' },
@@ -71,6 +73,15 @@ export function detectIdeFromEnv(): IdeInfo {
   }
   if (process.env['POSITRON'] === '1') {
     return IDE_DEFINITIONS.positron;
+  }
+  if (process.env['NVIM']) {
+    return IDE_DEFINITIONS.neovim;
+  }
+  if (
+    process.env['ZED_TERM'] === '1' ||
+    process.env['TERM_PROGRAM'] === 'zed'
+  ) {
+    return IDE_DEFINITIONS.zed;
   }
   if (process.env['TERM_PROGRAM'] === 'sublime') {
     return IDE_DEFINITIONS.sublimetext;
@@ -147,11 +158,14 @@ export function detectIde(
     };
   }
 
-  // Only VS Code, Sublime Text and JetBrains integrations are currently supported.
+  // Only VS Code, Sublime Text, JetBrains, Neovim, and Zed integrations are currently supported.
   if (
     process.env['TERM_PROGRAM'] !== 'vscode' &&
     process.env['TERM_PROGRAM'] !== 'sublime' &&
-    !isJetBrains()
+    !isJetBrains() &&
+    !process.env['NVIM'] &&
+    process.env['ZED_TERM'] !== '1' &&
+    process.env['TERM_PROGRAM'] !== 'zed'
   ) {
     return undefined;
   }
