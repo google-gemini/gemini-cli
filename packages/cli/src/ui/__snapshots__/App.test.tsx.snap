@@ -38,6 +38,7 @@ Tips for getting started:
 
 
 
+
 Notifications
 Composer
 "
@@ -103,6 +104,7 @@ exports[`App > Snapshots > renders with dialogs visible 1`] = `
 
 
 
+
 Notifications
 DialogManager
 "
@@ -138,6 +140,7 @@ HistoryItemDisplay
 │   3. No, suggest changes (esc)                                                                   │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+
 
 
 

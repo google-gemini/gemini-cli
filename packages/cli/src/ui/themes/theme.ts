@@ -335,6 +335,7 @@ export class Theme {
       },
       border: {
         default: this.colors.DarkGray,
+        focused: this.colors.AccentBlue,
       },
       ui: {
         comment: this.colors.Gray,
@@ -620,6 +621,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
     },
     border: {
       default: colors.DarkGray,
+      focused: colors.AccentBlue,
     },
     ui: {
       comment: customTheme.ui?.comment ?? colors.Comment,

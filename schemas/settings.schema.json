@@ -365,6 +365,28 @@
           "default": false,
           "type": "boolean"
         },
+        "newFooterLayout": {
+          "title": "New Footer Layout",
+          "description": "Use the new 2-row layout with inline tips.",
+          "markdownDescription": "Use the new 2-row layout with inline tips.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `legacy`",
+          "default": "legacy",
+          "type": "string",
+          "enum": ["legacy", "new", "new_divider_down"]
+        },
+        "showTips": {
+          "title": "Show Tips",
+          "description": "Show informative tips on the right side of the status line.",
+          "markdownDescription": "Show informative tips on the right side of the status line.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "showWit": {
+          "title": "Show Witty Phrases",
+          "description": "Show witty phrases while waiting.",
+          "markdownDescription": "Show witty phrases while waiting.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "showMemoryUsage": {
           "title": "Show Memory Usage",
           "description": "Display memory usage information in the UI",
@@ -427,14 +449,6 @@
           "markdownDescription": "Show the spinner during operations.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
-        },
-        "loadingPhrases": {
-          "title": "Loading Phrases",
-          "description": "What to show while the model is working: tips, witty comments, both, or nothing.",
-          "markdownDescription": "What to show while the model is working: tips, witty comments, both, or nothing.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `tips`",
-          "default": "tips",
-          "type": "string",
-          "enum": ["tips", "witty", "all", "off"]
         },
         "errorVerbosity": {
           "title": "Error Verbosity",

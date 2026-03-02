@@ -83,17 +83,17 @@ describe('SettingsSchema', () => {
       ).toBe('boolean');
     });
 
-    it('should have loadingPhrases enum property', () => {
-      const definition = getSettingsSchema().ui?.properties?.loadingPhrases;
-      expect(definition).toBeDefined();
-      expect(definition?.type).toBe('enum');
-      expect(definition?.default).toBe('tips');
-      expect(definition?.options?.map((o) => o.value)).toEqual([
-        'tips',
-        'witty',
-        'all',
-        'off',
-      ]);
+    it('should have showTips property', () => {
+      const showTips = getSettingsSchema().ui?.properties?.showTips;
+      expect(showTips).toBeDefined();
+      expect(showTips?.type).toBe('boolean');
+    });
+
+    it('should have showWit property', () => {
+      const showWit = getSettingsSchema().ui?.properties?.showWit;
+      expect(showWit).toBeDefined();
+      expect(showWit?.type).toBe('boolean');
+      expect(showWit?.default).toBe(true);
     });
 
     it('should have errorVerbosity enum property', () => {

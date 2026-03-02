@@ -174,6 +174,8 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     isFocused: true,
     thought: '',
     currentLoadingPhrase: '',
+    currentTip: '',
+    currentWittyPhrase: '',
     elapsedTime: 0,
     ctrlCPressedOnce: false,
     ctrlDPressedOnce: false,
@@ -402,13 +404,13 @@ describe('Composer', () => {
       expect(output).not.toContain('ShortcutsHint');
     });
 
-    it('renders LoadingIndicator with thought when loadingPhrases is off', async () => {
+    it('renders LoadingIndicator with thought when loadingPhraseLayout is none', async () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         thought: { subject: 'Hidden', description: 'Should not show' },
       });
       const settings = createMockSettings({
-        merged: { ui: { loadingPhrases: 'off' } },
+        merged: { ui: { loadingPhraseLayout: 'none' } },
       });
 
       const { lastFrame } = await renderComposer(uiState, settings);

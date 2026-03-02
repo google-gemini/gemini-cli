@@ -26,6 +26,7 @@ export interface SemanticColors {
   };
   border: {
     default: string;
+    focused: string;
   };
   ui: {
     comment: string;
@@ -62,6 +63,7 @@ export const lightSemanticColors: SemanticColors = {
   },
   border: {
     default: lightTheme.DarkGray,
+    focused: lightTheme.AccentBlue,
   },
   ui: {
     comment: lightTheme.Comment,
@@ -98,6 +100,7 @@ export const darkSemanticColors: SemanticColors = {
   },
   border: {
     default: darkTheme.DarkGray,
+    focused: darkTheme.AccentBlue,
   },
   ui: {
     comment: darkTheme.Comment,

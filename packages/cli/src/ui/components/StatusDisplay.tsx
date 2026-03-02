@@ -29,6 +29,7 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
   }
 
   if (
+    settings.merged.ui.newFooterLayout === 'legacy' &&
     uiState.activeHooks.length > 0 &&
     settings.merged.hooksConfig.notifications
   ) {
