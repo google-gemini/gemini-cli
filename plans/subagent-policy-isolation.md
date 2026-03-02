@@ -21,17 +21,21 @@ tools:
 # Scoped policy for the subagent
 policy:
   tools:
-    allow:
+    allowed:
       - "builtin:read_file"
       - "mcp:security-scanner:*"
     exclude:
       - "builtin:shell"
       - "builtin:write_file"
-  mcp_servers:
-    allow:
+  mcp:
+    allowed:
       - "security-scanner"
-    exclude:
+    excluded:
       - "*"
+  # Trust configuration for MCP servers
+  mcp_servers:
+    security-scanner:
+      trust: true
 
 # MCP servers private to this subagent
 mcp_servers:
