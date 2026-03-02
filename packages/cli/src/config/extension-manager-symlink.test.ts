@@ -1,11 +1,22 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { ExtensionManager } from './extension-manager.js';
 import { ExtensionStorage } from './extensions/storage.js';
-import { TrustLevel, loadTrustedFolders, isWorkspaceTrusted } from './trustedFolders.js';
+import {
+  TrustLevel,
+  loadTrustedFolders,
+  isWorkspaceTrusted,
+} from './trustedFolders.js';
 import { getRealPath } from '@google/gemini-cli-core';
+import type { MergedSettings } from './settings.js';
 
 describe('ExtensionManager symlink handling', () => {
   let tmpDir: string;
@@ -27,7 +38,7 @@ describe('ExtensionManager symlink handling', () => {
 
     fs.writeFileSync(
       path.join(extensionDir, 'gemini-extension.json'),
-      JSON.stringify({ name: 'test-ext', version: '1.0.0' })
+      JSON.stringify({ name: 'test-ext', version: '1.0.0' }),
     );
 
     fs.symlinkSync(extensionDir, symlinkDir);
@@ -38,7 +49,7 @@ describe('ExtensionManager symlink handling', () => {
 
     // Mock user extensions dir to be inside our tmp home
     vi.spyOn(ExtensionStorage, 'getUserExtensionsDir').mockReturnValue(
-      userExtensionsDir
+      userExtensionsDir,
     );
   });
 
@@ -53,12 +64,12 @@ describe('ExtensionManager symlink handling', () => {
       workspaceDir,
       settings: {
         security: {
-          folderTrust: { enabled: false } // Disable trust for simplicity in this test
+          folderTrust: { enabled: false }, // Disable trust for simplicity in this test
         },
         experimental: { extensionConfig: false },
         admin: { extensions: { enabled: true }, mcp: { enabled: true } },
-        hooksConfig: { enabled: true }
-      } as any,
+        hooksConfig: { enabled: true },
+      } as unknown as MergedSettings,
       requestConsent: () => Promise.resolve(true),
       requestSetting: null,
     });
@@ -83,15 +94,15 @@ describe('ExtensionManager symlink handling', () => {
     // This simulates the logic in packages/cli/src/commands/extensions/install.ts
     const absolutePath = path.resolve(symlinkDir);
     const realPath = getRealPath(absolutePath);
-    
+
     const settings = {
-        security: {
-          folderTrust: { enabled: true }
-        },
-        experimental: { extensionConfig: false },
-        admin: { extensions: { enabled: true }, mcp: { enabled: true } },
-        hooksConfig: { enabled: true }
-      } as any;
+      security: {
+        folderTrust: { enabled: true },
+      },
+      experimental: { extensionConfig: false },
+      admin: { extensions: { enabled: true }, mcp: { enabled: true } },
+      hooksConfig: { enabled: true },
+    } as unknown as MergedSettings;
 
     // Trust the REAL path
     const trustedFolders = loadTrustedFolders();
