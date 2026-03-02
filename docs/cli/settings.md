@@ -32,8 +32,8 @@ they appear in the UI.
 | Plan Model Routing      | `general.plan.modelRouting`        | Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.                           | `true`      |
 | Max Chat Model Attempts | `general.maxAttempts`              | Maximum number of attempts for requests to the main chat model. Cannot exceed 10.                                                                                              | `10`        |
 | Debug Keystroke Logging | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.                                                                                                                             | `false`     |
-| Enable Session Cleanup  | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                               | `false`     |
-| Keep chat history       | `general.sessionRetention.maxAge`  | Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")                                                                                        | `undefined` |
+| Enable Session Cleanup  | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                               | `true`      |
+| Keep chat history       | `general.sessionRetention.maxAge`  | Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")                                                                                        | `"30d"`     |
 
 ### Output
 
