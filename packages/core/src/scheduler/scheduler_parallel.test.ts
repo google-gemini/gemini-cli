@@ -20,10 +20,18 @@ vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(),
 }));
 
+const runInDevTraceSpan = vi.hoisted(() =>
+  vi.fn(async (opts, fn) => {
+    const metadata = { name: '', attributes: opts.attributes || {} };
+    return fn({
+      metadata,
+      endSpan: vi.fn(),
+    });
+  }),
+);
+
 vi.mock('../telemetry/trace.js', () => ({
-  runInDevTraceSpan: vi.fn(async (_opts, fn) =>
-    fn({ metadata: { input: {}, output: {} } }),
-  ),
+  runInDevTraceSpan,
 }));
 vi.mock('../telemetry/loggers.js', () => ({
   logToolCall: vi.fn(),
@@ -62,6 +70,7 @@ import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 import {
   type AnyDeclarativeTool,
   type AnyToolInvocation,
+  Kind,
 } from '../tools/tools.js';
 import type {
   ToolCallRequestInfo,
@@ -71,6 +80,7 @@ import type {
   ToolCall,
 } from './types.js';
 import { ROOT_SCHEDULER_ID } from './types.js';
+import { GeminiCliOperation } from '../telemetry/constants.js';
 import type { EditorType } from '../utils/editor.js';
 
 describe('Scheduler Parallel Execution', () => {
@@ -115,18 +125,51 @@ describe('Scheduler Parallel Execution', () => {
     schedulerId: ROOT_SCHEDULER_ID,
   };
 
+  const agentReq1: ToolCallRequestInfo = {
+    callId: 'agent-1',
+    name: 'agent-tool-1',
+    args: { query: 'do thing 1' },
+    isClientInitiated: false,
+    prompt_id: 'p1',
+    schedulerId: ROOT_SCHEDULER_ID,
+  };
+
+  const agentReq2: ToolCallRequestInfo = {
+    callId: 'agent-2',
+    name: 'agent-tool-2',
+    args: { query: 'do thing 2' },
+    isClientInitiated: false,
+    prompt_id: 'p1',
+    schedulerId: ROOT_SCHEDULER_ID,
+  };
+
   const readTool1 = {
     name: 'read-tool-1',
+    kind: Kind.Read,
     isReadOnly: true,
     build: vi.fn(),
   } as unknown as AnyDeclarativeTool;
   const readTool2 = {
     name: 'read-tool-2',
+    kind: Kind.Read,
     isReadOnly: true,
     build: vi.fn(),
   } as unknown as AnyDeclarativeTool;
   const writeTool = {
     name: 'write-tool',
+    kind: Kind.Execute,
+    isReadOnly: false,
+    build: vi.fn(),
+  } as unknown as AnyDeclarativeTool;
+  const agentTool1 = {
+    name: 'agent-tool-1',
+    kind: Kind.Agent,
+    isReadOnly: false,
+    build: vi.fn(),
+  } as unknown as AnyDeclarativeTool;
+  const agentTool2 = {
+    name: 'agent-tool-2',
+    kind: Kind.Agent,
     isReadOnly: false,
     build: vi.fn(),
   } as unknown as AnyDeclarativeTool;
@@ -151,11 +194,19 @@ describe('Scheduler Parallel Execution', () => {
         if (name === 'read-tool-1') return readTool1;
         if (name === 'read-tool-2') return readTool2;
         if (name === 'write-tool') return writeTool;
+        if (name === 'agent-tool-1') return agentTool1;
+        if (name === 'agent-tool-2') return agentTool2;
         return undefined;
       }),
       getAllToolNames: vi
         .fn()
-        .mockReturnValue(['read-tool-1', 'read-tool-2', 'write-tool']),
+        .mockReturnValue([
+          'read-tool-1',
+          'read-tool-2',
+          'write-tool',
+          'agent-tool-1',
+          'agent-tool-2',
+        ]),
     } as unknown as Mocked<ToolRegistry>;
 
     mockConfig = {
@@ -270,6 +321,12 @@ describe('Scheduler Parallel Execution', () => {
     vi.mocked(writeTool.build).mockReturnValue(
       mockInvocation as unknown as AnyToolInvocation,
     );
+    vi.mocked(agentTool1.build).mockReturnValue(
+      mockInvocation as unknown as AnyToolInvocation,
+    );
+    vi.mocked(agentTool2.build).mockReturnValue(
+      mockInvocation as unknown as AnyToolInvocation,
+    );
   });
 
   afterEach(() => {
@@ -306,6 +363,21 @@ describe('Scheduler Parallel Execution', () => {
     );
 
     expect(executionLog).toContain('end-call-3');
+
+    expect(runInDevTraceSpan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: GeminiCliOperation.ScheduleToolCalls,
+      }),
+      expect.any(Function),
+    );
+
+    const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
+    const fn = spanArgs[1];
+    const metadata = { name: '', attributes: {} };
+    await fn({ metadata, endSpan: vi.fn() });
+    expect(metadata).toMatchObject({
+      input: [req1, req2, req3],
+    });
   });
 
   it('should execute non-read-only tools sequentially', async () => {
@@ -393,5 +465,42 @@ describe('Scheduler Parallel Execution', () => {
     // Must start after call-3 ends
     expect(executionLog.indexOf('start-call-4')).toBeGreaterThan(end3);
     expect(executionLog.indexOf('start-call-5')).toBeGreaterThan(end3);
+  });
+
+  it('should execute [Agent, Agent, Sequential, Parallelizable] in three waves', async () => {
+    const executionLog: string[] = [];
+
+    mockExecutor.execute.mockImplementation(async ({ call }) => {
+      const id = call.request.callId;
+      executionLog.push(`start-${id}`);
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      executionLog.push(`end-${id}`);
+      return {
+        status: 'success',
+        response: { callId: id, responseParts: [] },
+      } as unknown as SuccessfulToolCall;
+    });
+
+    // Schedule: agentReq1 (Parallel), agentReq2 (Parallel), req3 (Sequential/Write), req1 (Parallel/Read)
+    await scheduler.schedule([agentReq1, agentReq2, req3, req1], signal);
+
+    // Wave 1: agent-1, agent-2 (parallel)
+    expect(executionLog.slice(0, 2)).toContain('start-agent-1');
+    expect(executionLog.slice(0, 2)).toContain('start-agent-2');
+
+    // Both agents must end before anything else starts
+    const endAgent1 = executionLog.indexOf('end-agent-1');
+    const endAgent2 = executionLog.indexOf('end-agent-2');
+    const wave1End = Math.max(endAgent1, endAgent2);
+
+    // Wave 2: call-3 (sequential/write)
+    const start3 = executionLog.indexOf('start-call-3');
+    const end3 = executionLog.indexOf('end-call-3');
+    expect(start3).toBeGreaterThan(wave1End);
+    expect(end3).toBeGreaterThan(start3);
+
+    // Wave 3: call-1 (parallelizable/read)
+    const start1 = executionLog.indexOf('start-call-1');
+    expect(start1).toBeGreaterThan(end3);
   });
 });
