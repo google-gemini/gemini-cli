@@ -281,14 +281,12 @@ export const DialogManager = ({
     return (
       <Box flexDirection="column">
         <SettingsDialog
-          settings={settings}
           onSelect={() => uiActions.closeSettingsDialog()}
           onRestartRequest={async () => {
             await runExitCleanup();
             process.exit(RELAUNCH_EXIT_CODE);
           }}
           availableTerminalHeight={terminalHeight - staticExtraHeight}
-          config={config}
         />
       </Box>
     );
