@@ -16,9 +16,9 @@ import {
   validatePlanContent,
   processSingleFileContent,
   type FileSystemService,
+  readFileLines,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
-import { readFileLines } from '@google/gemini-cli-core/src/tools/grep-utils.js';
 
 vi.mock('../utils/editorUtils.js', () => ({
   openFileInEditor: vi.fn(),
