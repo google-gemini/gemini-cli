@@ -144,7 +144,7 @@ export const useAuthCommand = (
             appealLinkText: suspendedError.appealLinkText,
           });
         } else {
-          onAuthError(`Failed to login. Message: ${getErrorMessage(e)}`);
+          onAuthError(`Failed to sign in. Message: ${getErrorMessage(e)}`);
         }
       }
     })();

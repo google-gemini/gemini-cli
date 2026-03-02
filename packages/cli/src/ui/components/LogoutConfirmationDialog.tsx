@@ -37,9 +37,9 @@ export const LogoutConfirmationDialog: React.FC<
 
   const options: Array<RadioSelectItem<LogoutChoice>> = [
     {
-      label: 'Login',
+      label: 'Sign in',
       value: LogoutChoice.LOGIN,
-      key: 'login',
+      key: 'signin',
     },
     {
       label: 'Exit',
@@ -61,10 +61,10 @@ export const LogoutConfirmationDialog: React.FC<
       >
         <Box flexDirection="column" marginBottom={1}>
           <Text bold color={theme.text.primary}>
-            You are now logged out.
+            You are now signed out.
           </Text>
           <Text color={theme.text.secondary}>
-            Login again to continue using Gemini CLI, or exit the application.
+            Sign in again to continue using Gemini CLI, or exit the application.
           </Text>
         </Box>
 

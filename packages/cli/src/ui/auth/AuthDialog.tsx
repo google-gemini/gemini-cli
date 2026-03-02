@@ -45,7 +45,7 @@ export function AuthDialog({
   const [exiting, setExiting] = useState(false);
   let items = [
     {
-      label: 'Login with Google',
+      label: 'Sign in with Google',
       value: AuthType.LOGIN_WITH_GOOGLE,
       key: AuthType.LOGIN_WITH_GOOGLE,
     },
@@ -200,7 +200,7 @@ export function AuthDialog({
         alignItems="flex-start"
       >
         <Text color={theme.text.primary}>
-          Logging in with Google... Restarting Gemini CLI to continue.
+          Signing in with Google... Restarting Gemini CLI to continue.
         </Text>
       </Box>
     );
