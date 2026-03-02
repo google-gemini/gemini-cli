@@ -158,14 +158,15 @@
             "enabled": {
               "title": "Enable Session Cleanup",
               "description": "Enable automatic session cleanup",
-              "markdownDescription": "Enable automatic session cleanup\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
+              "markdownDescription": "Enable automatic session cleanup\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             },
             "maxAge": {
               "title": "Keep chat history",
               "description": "Automatically delete chats older than this time period (e.g., \"30d\", \"7d\", \"24h\", \"1w\")",
-              "markdownDescription": "Automatically delete chats older than this time period (e.g., \"30d\", \"7d\", \"24h\", \"1w\")\n\n- Category: `General`\n- Requires restart: `no`",
+              "markdownDescription": "Automatically delete chats older than this time period (e.g., \"30d\", \"7d\", \"24h\", \"1w\")\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `30d`",
+              "default": "30d",
               "type": "string"
             },
             "maxCount": {
@@ -180,13 +181,6 @@
               "markdownDescription": "Minimum retention period (safety limit, defaults to \"1d\")\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `1d`",
               "default": "1d",
               "type": "string"
-            },
-            "warningAcknowledged": {
-              "title": "Warning Acknowledged",
-              "description": "INTERNAL: Whether the user has acknowledged the session retention warning",
-              "markdownDescription": "INTERNAL: Whether the user has acknowledged the session retention warning\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
-              "type": "boolean"
             }
           },
           "additionalProperties": false
