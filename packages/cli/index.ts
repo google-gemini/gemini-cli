@@ -25,16 +25,6 @@ process.on('uncaughtException', (error) => {
     return;
   }
 
-  // On Linux (e.g. tmux workflows), a PTY resize event can fire on a stale fd
-  // after the shell command exits, producing EBADF. Treat it as a no-op.
-  if (
-    error instanceof Error &&
-    (error as NodeJS.ErrnoException).code === 'EBADF' &&
-    error.stack?.includes('resizePty')
-  ) {
-    return;
-  }
-
   // For other errors, we rely on the default behavior, but since we attached a listener,
   // we must manually replicate it.
   if (error instanceof Error) {
