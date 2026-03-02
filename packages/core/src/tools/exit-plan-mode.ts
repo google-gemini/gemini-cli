@@ -35,6 +35,8 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
   ExitPlanModeParams,
   ToolResult
 > {
+  static readonly Name = EXIT_PLAN_MODE_TOOL_NAME;
+
   constructor(
     private config: Config,
     messageBus: MessageBus,
@@ -42,7 +44,7 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
     const plansDir = config.storage.getPlansDir();
     const definition = getExitPlanModeDefinition(plansDir);
     super(
-      EXIT_PLAN_MODE_TOOL_NAME,
+      ExitPlanModeTool.Name,
       'Exit Plan Mode',
       definition.base.description!,
       Kind.Plan,
