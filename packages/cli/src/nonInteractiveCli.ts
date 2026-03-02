@@ -260,7 +260,7 @@ export async function runNonInteractive({
           query: input,
           config,
           addItem: (_item, _timestamp) => 0,
-          onDebugMessage: () => {},
+          onDebugMessage: () => { },
           messageId: Date.now(),
           signal: abortController.signal,
         });
@@ -386,7 +386,14 @@ export async function runNonInteractive({
             return;
           } else if (event.type === GeminiEventType.AgentExecutionBlocked) {
             const blockMessage = `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`;
-            if (config.getOutputFormat() === OutputFormat.TEXT) {
+            if (streamFormatter) {
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.ERROR,
+                timestamp: new Date().toISOString(),
+                severity: 'warning',
+                message: blockMessage,
+              });
+            } else if (config.getOutputFormat() === OutputFormat.TEXT) {
               process.stderr.write(`[WARNING] ${blockMessage}\n`);
             }
           }
@@ -417,9 +424,9 @@ export async function runNonInteractive({
                     : undefined,
                 error: toolResponse.error
                   ? {
-                      type: toolResponse.errorType || 'TOOL_EXECUTION_ERROR',
-                      message: toolResponse.error.message,
-                    }
+                    type: toolResponse.errorType || 'TOOL_EXECUTION_ERROR',
+                    message: toolResponse.error.message,
+                  }
                   : undefined,
               });
             }
