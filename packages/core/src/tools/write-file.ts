@@ -277,7 +277,10 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     // If >20% of the original lines are unchanged, this is a partial edit that should
     // use the replace tool instead. Only allow write_file for new files or near-complete rewrites.
     if (!isNewFile && originalContent) {
-      const diffLines = Diff.diffLines(originalContent, fileContent);
+      const diffLines = Diff.diffLines(
+        originalContent.replace(/\r\n/g, '\n'),
+        fileContent.replace(/\r\n/g, '\n'),
+      );
       let unchangedLines = 0;
       let totalOriginalLines = 0;
       for (const part of diffLines) {
