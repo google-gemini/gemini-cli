@@ -126,7 +126,7 @@ export class McpClientManager {
     this.shownDiagnostics.set(diagnosticKey, 'silent');
 
     // Otherwise, be less annoying
-    debugLogger.log(`[MCP ${severity}] ${message}`, error);
+    debugLogger.error(`[MCP ${severity}] ${message}`, error);
 
     if (severity === 'error' || severity === 'warning') {
       if (!this.hintShown) {
