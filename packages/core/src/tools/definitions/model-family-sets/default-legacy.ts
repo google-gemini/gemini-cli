@@ -108,7 +108,7 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
 
   write_file: {
     name: WRITE_FILE_TOOL_NAME,
-    description: `Writes content to a specified file in the local filesystem.
+    description: `Writes the complete content to a specified file in the local filesystem. ONLY use this tool for creating brand-new files or when performing a complete, intentional rewrite of an entire file. NEVER use this tool to add, modify, or delete specific parts of an existing file — use the replace/edit tool for any targeted changes to existing files.
 
       The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
     parametersJsonSchema: {
