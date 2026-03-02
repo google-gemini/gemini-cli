@@ -27,7 +27,7 @@ describe('agentUtils', () => {
     it('should return error message if status is error', () => {
       const result: AgentActionResult = {
         status: 'error',
-        agentName: 'my-agent',
+        featureName: 'my-agent',
         action: 'enable',
         modifiedScopes: [],
         alreadyInStateScopes: [],
@@ -41,7 +41,7 @@ describe('agentUtils', () => {
     it('should return default error message if status is error and no error message provided', () => {
       const result: AgentActionResult = {
         status: 'error',
-        agentName: 'my-agent',
+        featureName: 'my-agent',
         action: 'enable',
         modifiedScopes: [],
         alreadyInStateScopes: [],
@@ -54,7 +54,7 @@ describe('agentUtils', () => {
     it('should return no-op message for enable', () => {
       const result: AgentActionResult = {
         status: 'no-op',
-        agentName: 'my-agent',
+        featureName: 'my-agent',
         action: 'enable',
         modifiedScopes: [],
         alreadyInStateScopes: [],
@@ -67,7 +67,7 @@ describe('agentUtils', () => {
     it('should return no-op message for disable', () => {
       const result: AgentActionResult = {
         status: 'no-op',
-        agentName: 'my-agent',
+        featureName: 'my-agent',
         action: 'disable',
         modifiedScopes: [],
         alreadyInStateScopes: [],
@@ -80,7 +80,7 @@ describe('agentUtils', () => {
     it('should return success message for enable (single scope)', () => {
       const result: AgentActionResult = {
         status: 'success',
-        agentName: 'my-agent',
+        featureName: 'my-agent',
         action: 'enable',
         modifiedScopes: [
           { scope: SettingScope.User, path: '/path/to/user/settings' },
@@ -95,7 +95,7 @@ describe('agentUtils', () => {
     it('should return success message for enable (two scopes)', () => {
       const result: AgentActionResult = {
         status: 'success',
-        agentName: 'my-agent',
+        featureName: 'my-agent',
         action: 'enable',
         modifiedScopes: [
           { scope: SettingScope.User, path: '/path/to/user/settings' },
@@ -115,7 +115,7 @@ describe('agentUtils', () => {
     it('should return success message for disable (single scope)', () => {
       const result: AgentActionResult = {
         status: 'success',
-        agentName: 'my-agent',
+        featureName: 'my-agent',
         action: 'disable',
         modifiedScopes: [
           { scope: SettingScope.User, path: '/path/to/user/settings' },
@@ -130,7 +130,7 @@ describe('agentUtils', () => {
     it('should return success message for disable (two scopes)', () => {
       const result: AgentActionResult = {
         status: 'success',
-        agentName: 'my-agent',
+        featureName: 'my-agent',
         action: 'disable',
         modifiedScopes: [
           { scope: SettingScope.User, path: '/path/to/user/settings' },

@@ -19,7 +19,7 @@ export function renderAgentActionFeedback(
   result: AgentActionResult,
   formatScope: (label: string, path: string) => string,
 ): string {
-  const { agentName, action, status, error } = result;
+  const { featureName: agentName, action, status, error } = result;
 
   if (status === 'error') {
     return (

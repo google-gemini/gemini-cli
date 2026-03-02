@@ -30,7 +30,7 @@ export function renderSkillActionFeedback(
   result: SkillActionResult,
   formatScope: (label: string, path: string) => string,
 ): string {
-  const { skillName, action, status, error } = result;
+  const { featureName: skillName, action, status, error } = result;
 
   if (status === 'error') {
     return (

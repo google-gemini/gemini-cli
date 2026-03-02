@@ -16,7 +16,7 @@ export function renderHookActionFeedback(
   result: HookActionResult,
   formatScope: (label: string, path: string) => string,
 ): string {
-  const { hookName, action, status, error } = result;
+  const { featureName: hookName, action, status, error } = result;
 
   if (status === 'error') {
     return (

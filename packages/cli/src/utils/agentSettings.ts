@@ -4,29 +4,52 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { type SettingScope, type LoadedSettings } from '../config/settings.js';
 import {
-  SettingScope,
-  isLoadableSettingScope,
-  type LoadedSettings,
-} from '../config/settings.js';
-import type { ModifiedScope } from './skillSettings.js';
+  type FeatureActionResult,
+  type FeatureToggleConfig,
+  enableFeature,
+  disableFeature,
+} from './featureToggleUtils.js';
 
-export type AgentActionStatus = 'success' | 'no-op' | 'error';
+export type AgentActionResult = FeatureActionResult;
 
 /**
- * Metadata representing the result of an agent settings operation.
+ * Agents use an override-based toggle: `agents.overrides.<name>.enabled`
+ * is set to `true` or `false`.
+ *
+ * The enable flow treats a scope as "disabled" when the override is not
+ * explicitly `true` (i.e., absent or false).
+ * The disable flow treats a scope as "already disabled" only when the
+ * override is explicitly `false`.
  */
-export interface AgentActionResult {
-  status: AgentActionStatus;
-  agentName: string;
-  action: 'enable' | 'disable';
-  /** Scopes where the agent's state was actually changed. */
-  modifiedScopes: ModifiedScope[];
-  /** Scopes where the agent was already in the desired state. */
-  alreadyInStateScopes: ModifiedScope[];
-  /** Error message if status is 'error'. */
-  error?: string;
-}
+const agentEnableConfig: FeatureToggleConfig = {
+  isDisabledInScope(scopeFile, featureName) {
+    return (
+      scopeFile.settings.agents?.overrides?.[featureName]?.enabled !== true
+    );
+  },
+  applyEnable(settings, scope, featureName) {
+    settings.setValue(scope, `agents.overrides.${featureName}.enabled`, true);
+  },
+  applyDisable() {
+    // Not used via the enable config.
+  },
+};
+
+const agentDisableConfig: FeatureToggleConfig = {
+  isDisabledInScope(scopeFile, featureName) {
+    return (
+      scopeFile.settings.agents?.overrides?.[featureName]?.enabled === false
+    );
+  },
+  applyEnable() {
+    // Not used via the disable config.
+  },
+  applyDisable(settings, scope, featureName) {
+    settings.setValue(scope, `agents.overrides.${featureName}.enabled`, false);
+  },
+};
 
 /**
  * Enables an agent by ensuring it is enabled in any writable scope (User and Workspace).
@@ -36,51 +59,7 @@ export function enableAgent(
   settings: LoadedSettings,
   agentName: string,
 ): AgentActionResult {
-  const writableScopes = [SettingScope.Workspace, SettingScope.User];
-  const foundInDisabledScopes: ModifiedScope[] = [];
-  const alreadyEnabledScopes: ModifiedScope[] = [];
-
-  for (const scope of writableScopes) {
-    if (isLoadableSettingScope(scope)) {
-      const scopePath = settings.forScope(scope).path;
-      const agentOverrides =
-        settings.forScope(scope).settings.agents?.overrides;
-      const isEnabled = agentOverrides?.[agentName]?.enabled === true;
-
-      if (!isEnabled) {
-        foundInDisabledScopes.push({ scope, path: scopePath });
-      } else {
-        alreadyEnabledScopes.push({ scope, path: scopePath });
-      }
-    }
-  }
-
-  if (foundInDisabledScopes.length === 0) {
-    return {
-      status: 'no-op',
-      agentName,
-      action: 'enable',
-      modifiedScopes: [],
-      alreadyInStateScopes: alreadyEnabledScopes,
-    };
-  }
-
-  const modifiedScopes: ModifiedScope[] = [];
-  for (const { scope, path } of foundInDisabledScopes) {
-    if (isLoadableSettingScope(scope)) {
-      // Explicitly enable it.
-      settings.setValue(scope, `agents.overrides.${agentName}.enabled`, true);
-      modifiedScopes.push({ scope, path });
-    }
-  }
-
-  return {
-    status: 'success',
-    agentName,
-    action: 'enable',
-    modifiedScopes,
-    alreadyInStateScopes: alreadyEnabledScopes,
-  };
+  return enableFeature(settings, agentName, agentEnableConfig);
 }
 
 /**
@@ -91,56 +70,5 @@ export function disableAgent(
   agentName: string,
   scope: SettingScope,
 ): AgentActionResult {
-  if (!isLoadableSettingScope(scope)) {
-    return {
-      status: 'error',
-      agentName,
-      action: 'disable',
-      modifiedScopes: [],
-      alreadyInStateScopes: [],
-      error: `Invalid settings scope: ${scope}`,
-    };
-  }
-
-  const scopePath = settings.forScope(scope).path;
-  const agentOverrides = settings.forScope(scope).settings.agents?.overrides;
-  const isEnabled = agentOverrides?.[agentName]?.enabled !== false;
-
-  if (!isEnabled) {
-    return {
-      status: 'no-op',
-      agentName,
-      action: 'disable',
-      modifiedScopes: [],
-      alreadyInStateScopes: [{ scope, path: scopePath }],
-    };
-  }
-
-  // Check if it's already disabled in the other writable scope
-  const otherScope =
-    scope === SettingScope.Workspace
-      ? SettingScope.User
-      : SettingScope.Workspace;
-  const alreadyDisabledInOther: ModifiedScope[] = [];
-
-  if (isLoadableSettingScope(otherScope)) {
-    const otherOverrides =
-      settings.forScope(otherScope).settings.agents?.overrides;
-    if (otherOverrides?.[agentName]?.enabled === false) {
-      alreadyDisabledInOther.push({
-        scope: otherScope,
-        path: settings.forScope(otherScope).path,
-      });
-    }
-  }
-
-  settings.setValue(scope, `agents.overrides.${agentName}.enabled`, false);
-
-  return {
-    status: 'success',
-    agentName,
-    action: 'disable',
-    modifiedScopes: [{ scope, path: scopePath }],
-    alreadyInStateScopes: alreadyDisabledInOther,
-  };
+  return disableFeature(settings, agentName, scope, agentDisableConfig);
 }

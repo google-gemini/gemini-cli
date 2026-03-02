@@ -154,7 +154,7 @@ describe('agentsCommand', () => {
 
     vi.mocked(enableAgent).mockReturnValue({
       status: 'success',
-      agentName: 'test-agent',
+      featureName: 'test-agent',
       action: 'enable',
       modifiedScopes: [],
       alreadyInStateScopes: [],
@@ -241,7 +241,7 @@ describe('agentsCommand', () => {
     });
     vi.mocked(disableAgent).mockReturnValue({
       status: 'success',
-      agentName: 'test-agent',
+      featureName: 'test-agent',
       action: 'disable',
       modifiedScopes: [],
       alreadyInStateScopes: [],

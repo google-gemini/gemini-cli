@@ -17,7 +17,7 @@ describe('hookUtils', () => {
     it('should render error message', () => {
       const result: HookActionResult = {
         status: 'error',
-        hookName: 'test-hook',
+        featureName: 'test-hook',
         action: 'enable',
         modifiedScopes: [],
         alreadyInStateScopes: [],
@@ -31,7 +31,7 @@ describe('hookUtils', () => {
     it('should render default error message if error string is missing', () => {
       const result: HookActionResult = {
         status: 'error',
-        hookName: 'test-hook',
+        featureName: 'test-hook',
         action: 'enable',
         modifiedScopes: [],
         alreadyInStateScopes: [],
@@ -46,7 +46,7 @@ describe('hookUtils', () => {
     it('should render no-op message for enable', () => {
       const result: HookActionResult = {
         status: 'no-op',
-        hookName: 'test-hook',
+        featureName: 'test-hook',
         action: 'enable',
         modifiedScopes: [],
         alreadyInStateScopes: [],
@@ -59,7 +59,7 @@ describe('hookUtils', () => {
     it('should render no-op message for disable', () => {
       const result: HookActionResult = {
         status: 'no-op',
-        hookName: 'test-hook',
+        featureName: 'test-hook',
         action: 'disable',
         modifiedScopes: [],
         alreadyInStateScopes: [],
@@ -72,7 +72,7 @@ describe('hookUtils', () => {
     it('should render success message for enable (single scope)', () => {
       const result: HookActionResult = {
         status: 'success',
-        hookName: 'test-hook',
+        featureName: 'test-hook',
         action: 'enable',
         modifiedScopes: [{ scope: SettingScope.User, path: '/path/user.json' }],
         alreadyInStateScopes: [
@@ -90,7 +90,7 @@ describe('hookUtils', () => {
       // E.g. Workspace doesn't exist or isn't loadable, so only User is affected.
       const result: HookActionResult = {
         status: 'success',
-        hookName: 'test-hook',
+        featureName: 'test-hook',
         action: 'enable',
         modifiedScopes: [{ scope: SettingScope.User, path: '/path/user.json' }],
         alreadyInStateScopes: [],
@@ -105,7 +105,7 @@ describe('hookUtils', () => {
     it('should render success message for disable (single scope)', () => {
       const result: HookActionResult = {
         status: 'success',
-        hookName: 'test-hook',
+        featureName: 'test-hook',
         action: 'disable',
         modifiedScopes: [
           { scope: SettingScope.Workspace, path: '/path/workspace.json' },
@@ -123,7 +123,7 @@ describe('hookUtils', () => {
       // E.g. Disabled in Workspace, but ALREADY disabled in User.
       const result: HookActionResult = {
         status: 'success',
-        hookName: 'test-hook',
+        featureName: 'test-hook',
         action: 'disable',
         modifiedScopes: [
           { scope: SettingScope.Workspace, path: '/path/workspace.json' },
