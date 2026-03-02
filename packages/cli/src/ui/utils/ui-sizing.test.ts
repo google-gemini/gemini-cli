@@ -4,29 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { calculateMainAreaWidth } from './ui-sizing.js';
-import { type LoadedSettings } from '../../config/settings.js';
-
-// Mock dependencies
-const mocks = vi.hoisted(() => ({
-  isAlternateBufferEnabled: vi.fn(),
-}));
-
-vi.mock('../hooks/useAlternateBuffer.js', () => ({
-  isAlternateBufferEnabled: mocks.isAlternateBufferEnabled,
-}));
+import type { Config } from '@google/gemini-cli-core';
 
 describe('ui-sizing', () => {
-  const createSettings = (useFullWidth?: boolean): LoadedSettings =>
-    ({
-      merged: {
-        ui: {
-          useFullWidth,
-        },
-      },
-    }) as unknown as LoadedSettings;
-
   describe('calculateMainAreaWidth', () => {
     it.each([
       // expected, width, altBuffer
@@ -37,10 +19,10 @@ describe('ui-sizing', () => {
     ])(
       'should return %i when width=%i and altBuffer=%s',
       (expected, width, altBuffer) => {
-        mocks.isAlternateBufferEnabled.mockReturnValue(altBuffer);
-        const settings = createSettings();
-
-        expect(calculateMainAreaWidth(width, settings)).toBe(expected);
+        const mockConfig = {
+          getUseAlternateBuffer: () => altBuffer,
+        } as unknown as Config;
+        expect(calculateMainAreaWidth(width, mockConfig)).toBe(expected);
       },
     );
   });

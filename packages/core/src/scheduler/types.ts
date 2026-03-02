@@ -128,6 +128,8 @@ export type ExecutingToolCall = {
   liveOutput?: string | AnsiOutput;
   progressMessage?: string;
   progressPercent?: number;
+  progress?: number;
+  progressTotal?: number;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
   pid?: number;

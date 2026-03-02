@@ -91,6 +91,7 @@ export abstract class BaseToolInvocation<
     readonly _toolName?: string,
     readonly _toolDisplayName?: string,
     readonly _serverName?: string,
+    readonly _toolAnnotations?: Record<string, unknown>,
   ) {}
 
   abstract getDescription(): string;
@@ -199,6 +200,7 @@ export abstract class BaseToolInvocation<
         args: this.params as Record<string, unknown>,
       },
       serverName: this._serverName,
+      toolAnnotations: this._toolAnnotations,
     };
 
     return new Promise<'ALLOW' | 'DENY' | 'ASK_USER'>((resolve) => {
@@ -370,6 +372,10 @@ export abstract class DeclarativeTool<
 
   get isReadOnly(): boolean {
     return READ_ONLY_KINDS.includes(this.kind);
+  }
+
+  get toolAnnotations(): Record<string, unknown> | undefined {
+    return undefined;
   }
 
   getSchema(_modelId?: string): FunctionDeclaration {
@@ -826,6 +832,7 @@ export enum Kind {
   Search = 'search',
   Execute = 'execute',
   Think = 'think',
+  Agent = 'agent',
   Fetch = 'fetch',
   Communicate = 'communicate',
   Plan = 'plan',

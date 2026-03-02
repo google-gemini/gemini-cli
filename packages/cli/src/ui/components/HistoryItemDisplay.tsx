@@ -146,6 +146,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
                 }
               : undefined
           }
+          creditBalance={itemForDisplay.creditBalance}
         />
       )}
       {itemForDisplay.type === 'model_stats' && (

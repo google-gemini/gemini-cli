@@ -2,14 +2,14 @@
 
 exports[`App > Snapshots > renders default layout correctly 1`] = `
 "
- ███         █████████
+ ███         █████████ 
 ░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
+  ░░░███   ███     ░░░ 
+    ░░░███░███         
      ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+   ███░   ░░███  ░░███ 
+ ███░      ░░█████████ 
+░░░         ░░░░░░░░░  
 
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
@@ -47,14 +47,14 @@ exports[`App > Snapshots > renders screen reader layout correctly 1`] = `
 "Notifications
 Footer
 
- ███         █████████
+ ███         █████████ 
 ░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
+  ░░░███   ███     ░░░ 
+    ░░░███░███         
      ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+   ███░   ░░███  ░░███ 
+ ███░      ░░█████████ 
+░░░         ░░░░░░░░░  
 
 Tips for getting started:
 1. Ask questions, edit files, or run commands.
@@ -67,14 +67,14 @@ Composer
 
 exports[`App > Snapshots > renders with dialogs visible 1`] = `
 "
- ███         █████████
+ ███         █████████ 
 ░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
+  ░░░███   ███     ░░░ 
+    ░░░███░███         
      ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+   ███░   ░░███  ░░███ 
+ ███░      ░░█████████ 
+░░░         ░░░░░░░░░  
 
 
 
@@ -110,14 +110,14 @@ DialogManager
 
 exports[`App > should render ToolConfirmationQueue along with Composer when tool is confirming and experiment is on 1`] = `
 "
- ███         █████████
+ ███         █████████ 
 ░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
+  ░░░███   ███     ░░░ 
+    ░░░███░███         
      ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+   ███░   ░░███  ░░███ 
+ ███░      ░░█████████ 
+░░░         ░░░░░░░░░  
 
 Tips for getting started:
 1. Ask questions, edit files, or run commands.

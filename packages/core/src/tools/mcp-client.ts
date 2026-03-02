@@ -33,9 +33,12 @@ import {
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 import { parse } from 'shell-quote';
-import type { Config, MCPServerConfig } from '../config/config.js';
+import type {
+  Config,
+  MCPServerConfig,
+  GeminiCLIExtension,
+} from '../config/config.js';
 import { AuthProviderType } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
@@ -147,7 +150,7 @@ export class McpClient implements McpProgressReporter {
     private readonly promptRegistry: PromptRegistry,
     private readonly resourceRegistry: ResourceRegistry,
     private readonly workspaceContext: WorkspaceContext,
-    private readonly cliConfig: Config,
+    private readonly cliConfig: McpContext,
     private readonly debugMode: boolean,
     private readonly clientVersion: string,
     private readonly onToolsUpdated?: (signal?: AbortSignal) => Promise<void>,
@@ -170,7 +173,7 @@ export class McpClient implements McpProgressReporter {
         this.serverConfig,
         this.debugMode,
         this.workspaceContext,
-        this.cliConfig.sanitizationConfig,
+        this.cliConfig,
       );
 
       this.registerNotificationHandlers();
@@ -181,10 +184,11 @@ export class McpClient implements McpProgressReporter {
           return;
         }
         if (originalOnError) originalOnError(error);
-        coreEvents.emitFeedback(
+        this.cliConfig.emitMcpDiagnostic(
           'error',
           `MCP ERROR (${this.serverName})`,
           error,
+          this.serverName,
         );
         this.updateStatus(MCPServerStatus.DISCONNECTED);
       };
@@ -198,7 +202,7 @@ export class McpClient implements McpProgressReporter {
   /**
    * Discovers tools and prompts from the MCP server.
    */
-  async discover(cliConfig: Config): Promise<void> {
+  async discover(cliConfig: McpContext): Promise<void> {
     this.assertConnected();
 
     const prompts = await this.fetchPrompts();
@@ -262,7 +266,7 @@ export class McpClient implements McpProgressReporter {
   }
 
   private async discoverTools(
-    cliConfig: Config,
+    cliConfig: McpContext,
     options?: { timeout?: number; signal?: AbortSignal },
   ): Promise<DiscoveredMCPTool[]> {
     this.assertConnected();
@@ -285,12 +289,17 @@ export class McpClient implements McpProgressReporter {
     signal?: AbortSignal;
   }): Promise<DiscoveredMCPPrompt[]> {
     this.assertConnected();
-    return discoverPrompts(this.serverName, this.client!, options);
+    return discoverPrompts(
+      this.serverName,
+      this.client!,
+      this.cliConfig,
+      options,
+    );
   }
 
   private async discoverResources(): Promise<Resource[]> {
     this.assertConnected();
-    return discoverResources(this.serverName, this.client!);
+    return discoverResources(this.serverName, this.client!, this.cliConfig);
   }
 
   private updateResourceRegistry(resources: Resource[]): void {
@@ -434,9 +443,11 @@ export class McpClient implements McpProgressReporter {
 
         clearTimeout(timeoutId);
 
-        coreEvents.emitFeedback(
+        this.cliConfig.emitMcpDiagnostic(
           'info',
           `Resources updated for server: ${this.serverName}`,
+          undefined,
+          this.serverName,
         );
       } while (this.pendingResourceRefresh);
     } catch (error) {
@@ -505,9 +516,11 @@ export class McpClient implements McpProgressReporter {
 
         clearTimeout(timeoutId);
 
-        coreEvents.emitFeedback(
+        this.cliConfig.emitMcpDiagnostic(
           'info',
           `Prompts updated for server: ${this.serverName}`,
+          undefined,
+          this.serverName,
         );
       } while (this.pendingPromptRefresh);
     } catch (error) {
@@ -582,9 +595,11 @@ export class McpClient implements McpProgressReporter {
 
         clearTimeout(timeoutId);
 
-        coreEvents.emitFeedback(
+        this.cliConfig.emitMcpDiagnostic(
           'info',
           `Tools updated for server: ${this.serverName}`,
+          undefined,
+          this.serverName,
         );
       } while (this.pendingToolRefresh);
     } catch (error) {
@@ -716,6 +731,7 @@ async function handleAutomaticOAuth(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   wwwAuthenticate: string,
+  cliConfig: McpContext,
 ): Promise<boolean> {
   try {
     debugLogger.log(`🔐 '${mcpServerName}' requires OAuth authentication`);
@@ -735,9 +751,11 @@ async function handleAutomaticOAuth(
     }
 
     if (!oauthConfig) {
-      coreEvents.emitFeedback(
+      cliConfig.emitMcpDiagnostic(
         'error',
         `Could not configure OAuth for '${mcpServerName}' - please authenticate manually with /mcp auth ${mcpServerName}`,
+        undefined,
+        mcpServerName,
       );
       return false;
     }
@@ -765,10 +783,11 @@ async function handleAutomaticOAuth(
     );
     return true;
   } catch (error) {
-    coreEvents.emitFeedback(
+    cliConfig.emitMcpDiagnostic(
       'error',
       `Failed to handle automatic OAuth for server '${mcpServerName}': ${getErrorMessage(error)}`,
       error,
+      mcpServerName,
     );
     return false;
   }
@@ -779,15 +798,25 @@ async function handleAutomaticOAuth(
  *
  * @param mcpServerConfig The MCP server configuration
  * @param headers Additional headers
+ * @param sanitizationConfig Configuration for environment sanitization
  */
 function createTransportRequestInit(
   mcpServerConfig: MCPServerConfig,
   headers: Record<string, string>,
+  sanitizationConfig: EnvironmentSanitizationConfig,
 ): RequestInit {
+  const extensionEnv = getExtensionEnvironment(mcpServerConfig.extension);
+  const expansionEnv = { ...process.env, ...extensionEnv };
+
+  const sanitizedEnv = sanitizeEnvironment(expansionEnv, {
+    ...sanitizationConfig,
+    enableEnvironmentVariableRedaction: true,
+  });
+
   const expandedHeaders: Record<string, string> = {};
   if (mcpServerConfig.headers) {
     for (const [key, value] of Object.entries(mcpServerConfig.headers)) {
-      expandedHeaders[key] = expandEnvVars(value, process.env);
+      expandedHeaders[key] = expandEnvVars(value, sanitizedEnv);
     }
   }
 
@@ -827,12 +856,14 @@ function createAuthProvider(
  * @param mcpServerName The name of the MCP server
  * @param mcpServerConfig The MCP server configuration
  * @param accessToken The OAuth access token
+ * @param cliConfig The CLI configuration providing sanitization and diagnostic reporting
  * @returns The transport with OAuth token, or null if creation fails
  */
 async function createTransportWithOAuth(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   accessToken: string,
+  cliConfig: McpContext,
 ): Promise<StreamableHTTPClientTransport | SSEClientTransport | null> {
   try {
     const headers: Record<string, string> = {
@@ -841,15 +872,20 @@ async function createTransportWithOAuth(
     const transportOptions:
       | StreamableHTTPClientTransportOptions
       | SSEClientTransportOptions = {
-      requestInit: createTransportRequestInit(mcpServerConfig, headers),
+      requestInit: createTransportRequestInit(
+        mcpServerConfig,
+        headers,
+        cliConfig.sanitizationConfig,
+      ),
     };
 
     return createUrlTransport(mcpServerName, mcpServerConfig, transportOptions);
   } catch (error) {
-    coreEvents.emitFeedback(
+    cliConfig.emitMcpDiagnostic(
       'error',
       `Failed to create OAuth transport for server '${mcpServerName}': ${getErrorMessage(error)}`,
       error,
+      mcpServerName,
     );
     return null;
   }
@@ -971,7 +1007,7 @@ export async function connectAndDiscover(
   promptRegistry: PromptRegistry,
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
-  cliConfig: Config,
+  cliConfig: McpContext,
 ): Promise<void> {
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
 
@@ -983,16 +1019,21 @@ export async function connectAndDiscover(
       mcpServerConfig,
       debugMode,
       workspaceContext,
-      cliConfig.sanitizationConfig,
+      cliConfig,
     );
 
     mcpClient.onerror = (error) => {
-      coreEvents.emitFeedback('error', `MCP ERROR (${mcpServerName}):`, error);
+      cliConfig.emitMcpDiagnostic(
+        'error',
+        `MCP ERROR (${mcpServerName}):`,
+        error,
+        mcpServerName,
+      );
       updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
     };
 
     // Attempt to discover both prompts and tools
-    const prompts = await discoverPrompts(mcpServerName, mcpClient);
+    const prompts = await discoverPrompts(mcpServerName, mcpClient, cliConfig);
     const tools = await discoverTools(
       mcpServerName,
       mcpServerConfig,
@@ -1023,12 +1064,13 @@ export async function connectAndDiscover(
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       mcpClient.close();
     }
-    coreEvents.emitFeedback(
+    cliConfig.emitMcpDiagnostic(
       'error',
       `Error connecting to MCP server '${mcpServerName}': ${getErrorMessage(
         error,
       )}`,
       error,
+      mcpServerName,
     );
     updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
   }
@@ -1051,7 +1093,7 @@ export async function discoverTools(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   mcpClient: Client,
-  cliConfig: Config,
+  cliConfig: McpContext,
   messageBus: MessageBus,
   options?: {
     timeout?: number;
@@ -1078,8 +1120,9 @@ export async function discoverTools(
           options?.progressReporter,
         );
 
-        // Extract readOnlyHint from annotations
-        const isReadOnly = toolDef.annotations?.readOnlyHint === true;
+        // Extract annotations from the tool definition
+        const annotations = toolDef.annotations;
+        const isReadOnly = annotations?.readOnlyHint === true;
 
         const tool = new DiscoveredMCPTool(
           mcpCallableTool,
@@ -1094,28 +1137,19 @@ export async function discoverTools(
           cliConfig,
           mcpServerConfig.extension?.name,
           mcpServerConfig.extension?.id,
+          annotations as Record<string, unknown> | undefined,
         );
-
-        // If the tool is read-only, allow it in Plan mode
-        if (isReadOnly) {
-          cliConfig.getPolicyEngine().addRule({
-            toolName: tool.getFullyQualifiedName(),
-            decision: PolicyDecision.ASK_USER,
-            priority: 50, // Match priority of built-in plan tools
-            modes: [ApprovalMode.PLAN],
-            source: `MCP Annotation (readOnlyHint) - ${mcpServerName}`,
-          });
-        }
 
         discoveredTools.push(tool);
       } catch (error) {
-        coreEvents.emitFeedback(
+        cliConfig.emitMcpDiagnostic(
           'error',
           `Error discovering tool: '${
             toolDef.name
             // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           }' from MCP server '${mcpServerName}': ${(error as Error).message}`,
           error,
+          mcpServerName,
         );
       }
     }
@@ -1125,12 +1159,13 @@ export async function discoverTools(
       error instanceof Error &&
       !error.message?.includes('Method not found')
     ) {
-      coreEvents.emitFeedback(
+      cliConfig.emitMcpDiagnostic(
         'error',
         `Error discovering tools from ${mcpServerName}: ${getErrorMessage(
           error,
         )}`,
         error,
+        mcpServerName,
       );
     }
     return [];
@@ -1226,6 +1261,7 @@ class McpCallableTool implements CallableTool {
 export async function discoverPrompts(
   mcpServerName: string,
   mcpClient: Client,
+  cliConfig: McpContext,
   options?: { signal?: AbortSignal },
 ): Promise<DiscoveredMCPPrompt[]> {
   // Only request prompts if the server supports them.
@@ -1237,19 +1273,26 @@ export async function discoverPrompts(
       ...prompt,
       serverName: mcpServerName,
       invoke: (params: Record<string, unknown>) =>
-        invokeMcpPrompt(mcpServerName, mcpClient, prompt.name, params),
+        invokeMcpPrompt(
+          mcpServerName,
+          mcpClient,
+          prompt.name,
+          params,
+          cliConfig,
+        ),
     }));
   } catch (error) {
     // It's okay if the method is not found, which is a common case.
     if (error instanceof Error && error.message?.includes('Method not found')) {
       return [];
     }
-    coreEvents.emitFeedback(
+    cliConfig.emitMcpDiagnostic(
       'error',
       `Error discovering prompts from ${mcpServerName}: ${getErrorMessage(
         error,
       )}`,
       error,
+      mcpServerName,
     );
     throw error;
   }
@@ -1258,18 +1301,20 @@ export async function discoverPrompts(
 export async function discoverResources(
   mcpServerName: string,
   mcpClient: Client,
+  cliConfig: McpContext,
 ): Promise<Resource[]> {
   if (mcpClient.getServerCapabilities()?.resources == null) {
     return [];
   }
 
-  const resources = await listResources(mcpServerName, mcpClient);
+  const resources = await listResources(mcpServerName, mcpClient, cliConfig);
   return resources;
 }
 
 async function listResources(
   mcpServerName: string,
   mcpClient: Client,
+  cliConfig: McpContext,
 ): Promise<Resource[]> {
   const resources: Resource[] = [];
   let cursor: string | undefined;
@@ -1289,12 +1334,13 @@ async function listResources(
     if (error instanceof Error && error.message?.includes('Method not found')) {
       return [];
     }
-    coreEvents.emitFeedback(
+    cliConfig.emitMcpDiagnostic(
       'error',
       `Error discovering resources from ${mcpServerName}: ${getErrorMessage(
         error,
       )}`,
       error,
+      mcpServerName,
     );
     throw error;
   }
@@ -1315,7 +1361,9 @@ export async function invokeMcpPrompt(
   mcpClient: Client,
   promptName: string,
   promptParams: Record<string, unknown>,
+  cliConfig: McpContext,
 ): Promise<GetPromptResult> {
+  cliConfig.setUserInteractedWithMcp?.();
   try {
     const sanitizedParams: Record<string, string> = {};
     for (const [key, value] of Object.entries(promptParams)) {
@@ -1335,12 +1383,13 @@ export async function invokeMcpPrompt(
       error instanceof Error &&
       !error.message?.includes('Method not found')
     ) {
-      coreEvents.emitFeedback(
+      cliConfig.emitMcpDiagnostic(
         'error',
         `Error invoking prompt '${promptName}' from ${mcpServerName} ${promptParams}: ${getErrorMessage(
           error,
         )}`,
         error,
+        mcpServerName,
       );
     }
     throw error;
@@ -1425,14 +1474,17 @@ async function connectWithSSETransport(
  * @param serverName The name of the MCP server
  * @throws Always throws an error with authentication instructions
  */
-async function showAuthRequiredMessage(serverName: string): Promise<never> {
+async function showAuthRequiredMessage(
+  serverName: string,
+  cliConfig: McpContext,
+): Promise<never> {
   const hasRejectedToken = !!(await getStoredOAuthToken(serverName));
 
   const message = hasRejectedToken
     ? `MCP server '${serverName}' rejected stored OAuth token. Please re-authenticate using: /mcp auth ${serverName}`
     : `MCP server '${serverName}' requires authentication using: /mcp auth ${serverName}`;
 
-  coreEvents.emitFeedback('info', message);
+  cliConfig.emitMcpDiagnostic('info', message, undefined, serverName);
   throw new UnauthorizedError(message);
 }
 
@@ -1445,6 +1497,7 @@ async function showAuthRequiredMessage(serverName: string): Promise<never> {
  * @param config The MCP server configuration
  * @param accessToken The OAuth access token to use
  * @param httpReturned404 Whether the HTTP transport returned 404 (indicating SSE-only server)
+ * @param cliConfig The CLI configuration providing sanitization and diagnostic reporting
  */
 async function retryWithOAuth(
   client: Client,
@@ -1452,6 +1505,7 @@ async function retryWithOAuth(
   config: MCPServerConfig,
   accessToken: string,
   httpReturned404: boolean,
+  cliConfig: McpContext,
 ): Promise<void> {
   if (httpReturned404) {
     // HTTP returned 404, only try SSE
@@ -1472,6 +1526,7 @@ async function retryWithOAuth(
     serverName,
     config,
     accessToken,
+    cliConfig,
   );
   if (!httpTransport) {
     throw new Error(
@@ -1508,6 +1563,23 @@ async function retryWithOAuth(
 }
 
 /**
+ * Interface for MCP operations that require configuration or diagnostic reporting.
+ * This is implemented by the central Config class and can be mocked for testing
+ * or used by the non-interactive CLI.
+ */
+export interface McpContext {
+  readonly sanitizationConfig: EnvironmentSanitizationConfig;
+  emitMcpDiagnostic(
+    severity: 'info' | 'warning' | 'error',
+    message: string,
+    error?: unknown,
+    serverName?: string,
+  ): void;
+  setUserInteractedWithMcp?(): void;
+  isTrustedFolder(): boolean;
+}
+
+/**
  * Creates and connects an MCP client to a server based on the provided configuration.
  * It determines the appropriate transport (Stdio, SSE, or Streamable HTTP) and
  * establishes a connection. It also applies a patch to handle request timeouts.
@@ -1523,7 +1595,7 @@ export async function connectToMcpServer(
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
-  sanitizationConfig: EnvironmentSanitizationConfig,
+  cliConfig: McpContext,
 ): Promise<Client> {
   const mcpClient = new Client(
     {
@@ -1590,7 +1662,7 @@ export async function connectToMcpServer(
       mcpServerName,
       mcpServerConfig,
       debugMode,
-      sanitizationConfig,
+      cliConfig,
     );
     try {
       await mcpClient.connect(transport, {
@@ -1669,7 +1741,7 @@ export async function connectToMcpServer(
       const shouldTriggerOAuth = mcpServerConfig.oauth?.enabled;
 
       if (!shouldTriggerOAuth) {
-        await showAuthRequiredMessage(mcpServerName);
+        await showAuthRequiredMessage(mcpServerName, cliConfig);
       }
 
       // Try to extract www-authenticate header from the error
@@ -1735,6 +1807,7 @@ export async function connectToMcpServer(
           mcpServerName,
           mcpServerConfig,
           wwwAuthenticate,
+          cliConfig,
         );
         if (oauthSuccess) {
           // Retry connection with OAuth token
@@ -1751,6 +1824,7 @@ export async function connectToMcpServer(
             mcpServerConfig,
             accessToken,
             httpReturned404,
+            cliConfig,
           );
           return mcpClient;
         } else {
@@ -1764,7 +1838,7 @@ export async function connectToMcpServer(
         const shouldTryDiscovery = mcpServerConfig.oauth?.enabled;
 
         if (!shouldTryDiscovery) {
-          await showAuthRequiredMessage(mcpServerName);
+          await showAuthRequiredMessage(mcpServerName, cliConfig);
         }
 
         // For SSE/HTTP servers, try to discover OAuth configuration from the base URL
@@ -1823,6 +1897,7 @@ export async function connectToMcpServer(
               mcpServerName,
               mcpServerConfig,
               accessToken,
+              cliConfig,
             );
             if (!oauthTransport) {
               throw new Error(
@@ -1910,7 +1985,7 @@ export async function createTransport(
   mcpServerName: string,
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
-  sanitizationConfig: EnvironmentSanitizationConfig,
+  cliConfig: McpContext,
 ): Promise<Transport> {
   const noUrl = !mcpServerConfig.url && !mcpServerConfig.httpUrl;
   if (noUrl) {
@@ -1948,9 +2023,11 @@ export async function createTransport(
 
         if (!accessToken) {
           // Emit info message (not error) since this is expected behavior
-          coreEvents.emitFeedback(
+          cliConfig.emitMcpDiagnostic(
             'info',
             `MCP server '${mcpServerName}' requires authentication using: /mcp auth ${mcpServerName}`,
+            undefined,
+            mcpServerName,
           );
         }
       } else {
@@ -1970,7 +2047,11 @@ export async function createTransport(
     const transportOptions:
       | StreamableHTTPClientTransportOptions
       | SSEClientTransportOptions = {
-      requestInit: createTransportRequestInit(mcpServerConfig, headers),
+      requestInit: createTransportRequestInit(
+        mcpServerConfig,
+        headers,
+        cliConfig.sanitizationConfig,
+      ),
       authProvider,
     };
 
@@ -1978,15 +2059,24 @@ export async function createTransport(
   }
 
   if (mcpServerConfig.command) {
+    if (!cliConfig.isTrustedFolder()) {
+      throw new Error(
+        `MCP server '${mcpServerName}' uses stdio transport but current folder is not trusted. Use 'gemini trust' to enable it.`,
+      );
+    }
+    const extensionEnv = getExtensionEnvironment(mcpServerConfig.extension);
+    const expansionEnv = { ...process.env, ...extensionEnv };
+
     // 1. Sanitize the base process environment to prevent unintended leaks of system-wide secrets.
-    const sanitizedEnv = sanitizeEnvironment(process.env, {
-      ...sanitizationConfig,
+    const sanitizedEnv = sanitizeEnvironment(expansionEnv, {
+      ...cliConfig.sanitizationConfig,
       enableEnvironmentVariableRedaction: true,
     });
 
     const finalEnv: Record<string, string> = {
       [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
         GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
+      ...extensionEnv,
     };
     for (const [key, value] of Object.entries(sanitizedEnv)) {
       if (value !== undefined) {
@@ -1997,7 +2087,7 @@ export async function createTransport(
     // Expand and merge explicit environment variables from the MCP configuration.
     if (mcpServerConfig.env) {
       for (const [key, value] of Object.entries(mcpServerConfig.env)) {
-        finalEnv[key] = expandEnvVars(value, process.env);
+        finalEnv[key] = expandEnvVars(value, expansionEnv);
       }
     }
 
@@ -2053,6 +2143,20 @@ export async function createTransport(
 
 interface NamedTool {
   name?: string;
+}
+
+function getExtensionEnvironment(
+  extension?: GeminiCLIExtension,
+): Record<string, string> {
+  const env: Record<string, string> = {};
+  if (extension?.resolvedSettings) {
+    for (const setting of extension.resolvedSettings) {
+      if (setting.value !== undefined) {
+        env[setting.envVar] = setting.value;
+      }
+    }
+  }
+  return env;
 }
 
 /** Visible for testing */

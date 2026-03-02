@@ -46,6 +46,7 @@ import { CoreToolCallStatus } from '../scheduler/types.js';
 import { ToolExecutor } from '../scheduler/tool-executor.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getPolicyDenialError } from '../scheduler/policy.js';
+import { GeminiCliOperation } from '../telemetry/constants.js';
 
 export type {
   ToolCall,
@@ -424,7 +425,7 @@ export class CoreToolScheduler {
     signal: AbortSignal,
   ): Promise<void> {
     return runInDevTraceSpan(
-      { name: 'schedule' },
+      { operation: GeminiCliOperation.ScheduleToolCalls },
       async ({ metadata: spanMetadata }) => {
         spanMetadata.input = request;
         if (this.isRunning() || this.isScheduling) {
@@ -624,10 +625,11 @@ export class CoreToolScheduler {
           toolCall.tool instanceof DiscoveredMCPTool
             ? toolCall.tool.serverName
             : undefined;
+        const toolAnnotations = toolCall.tool.toolAnnotations;
 
         const { decision, rule } = await this.config
           .getPolicyEngine()
-          .check(toolCallForPolicy, serverName);
+          .check(toolCallForPolicy, serverName, toolAnnotations);
 
         if (decision === PolicyDecision.DENY) {
           const { errorMessage, errorType } = getPolicyDenialError(
