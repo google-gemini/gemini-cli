@@ -203,10 +203,10 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.loopDetectionConfirmationRequest) {
+  if (uiState.disableLoopDetectionConfirmationRequest) {
     return (
       <LoopDetectionConfirmation
-        onComplete={uiState.loopDetectionConfirmationRequest.onComplete}
+        onComplete={uiState.disableLoopDetectionConfirmationRequest.onComplete}
       />
     );
   }

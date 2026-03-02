@@ -71,7 +71,7 @@ describe('AppRig', () => {
     await rig.initialize();
     await act(async () => {
       rig!.render();
-      // Allow async initializations (like banners) to settle within the act boundary
+      // Allow async initializations (like hideBanners) to settle within the act boundary
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 

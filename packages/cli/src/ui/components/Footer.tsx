@@ -63,15 +63,17 @@ export const Footer: React.FC = () => {
   const isFullErrorVerbosity = settings.merged.ui.errorVerbosity === 'full';
   const showErrorSummary =
     !showErrorDetails && errorCount > 0 && (isFullErrorVerbosity || debugMode);
-  const hideCWD = settings.merged.ui.footer.hideCWD;
-  const hideSandboxStatus = settings.merged.ui.footer.hideSandboxStatus;
-  const hideModelInfo = settings.merged.ui.footer.hideModelInfo;
-  const hideContextPercentage = settings.merged.ui.footer.hideContextPercentage;
+
+  const showCWD = !settings.merged.ui.footer.hideCWD;
+  const showSandboxStatus = !settings.merged.ui.footer.hideSandboxStatus;
+  const showModelInfo = !settings.merged.ui.footer.hideModelInfo;
+  const showContextPercentage = !settings.merged.ui.footer.hideContextPercentage;
 
   const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
   const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
 
-  const justifyContent = hideCWD && hideModelInfo ? 'center' : 'space-between';
+  const justifyContent =
+    !showCWD && !showModelInfo ? 'center' : 'space-between';
   const displayVimMode = vimEnabled ? vimMode : undefined;
 
   const showDebugProfiler = debugMode || isDevelopment;
@@ -84,13 +86,13 @@ export const Footer: React.FC = () => {
       alignItems="center"
       paddingX={1}
     >
-      {(showDebugProfiler || displayVimMode || !hideCWD) && (
+      {(showDebugProfiler || displayVimMode || showCWD) && (
         <Box>
           {showDebugProfiler && <DebugProfiler />}
           {displayVimMode && (
             <Text color={theme.text.secondary}>[{displayVimMode}] </Text>
           )}
-          {!hideCWD && (
+          {showCWD && (
             <Text color={theme.text.primary}>
               {displayPath}
               {branchName && (
@@ -107,7 +109,7 @@ export const Footer: React.FC = () => {
       )}
 
       {/* Middle Section: Centered Trust/Sandbox Info */}
-      {!hideSandboxStatus && (
+      {showSandboxStatus && (
         <Box
           flexGrow={1}
           alignItems="center"
@@ -140,13 +142,13 @@ export const Footer: React.FC = () => {
       )}
 
       {/* Right Section: Gemini Label and Console Summary */}
-      {!hideModelInfo && (
+      {showModelInfo && (
         <Box alignItems="center" justifyContent="flex-end">
           <Box alignItems="center">
             <Text color={theme.text.primary}>
               <Text color={theme.text.secondary}>/model </Text>
               {getDisplayString(model)}
-              {!hideContextPercentage && (
+              {showContextPercentage && (
                 <>
                   {' '}
                   <ContextUsageDisplay

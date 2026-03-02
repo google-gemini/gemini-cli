@@ -15,7 +15,7 @@ import * as processUtils from '../../utils/processUtils.js';
 import { usePermissionsModifyTrust } from '../hooks/usePermissionsModifyTrust.js';
 
 // Hoist mocks for dependencies of the usePermissionsModifyTrust hook
-const mockedCwd = vi.hoisted(() => vi.fn());
+const cwd = vi.hoisted(() => vi.fn());
 const mockedLoadTrustedFolders = vi.hoisted(() => vi.fn());
 const mockedIsWorkspaceTrusted = vi.hoisted(() => vi.fn());
 
@@ -24,7 +24,7 @@ vi.mock('node:process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:process')>();
   return {
     ...actual,
-    cwd: mockedCwd,
+    cwd,
   };
 });
 
@@ -45,7 +45,7 @@ describe('PermissionsModifyTrustDialog', () => {
   let mockCommitTrustLevelChange: Mock;
 
   beforeEach(() => {
-    mockedCwd.mockReturnValue('/test/dir');
+    cwd.mockReturnValue('/test/dir');
     mockUpdateTrustLevel = vi.fn();
     mockCommitTrustLevelChange = vi.fn();
     vi.mocked(usePermissionsModifyTrust).mockReturnValue({

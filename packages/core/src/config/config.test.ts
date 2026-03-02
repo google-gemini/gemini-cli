@@ -72,7 +72,9 @@ vi.mock('../tools/tool-registry', () => {
   const ToolRegistryMock = vi.fn();
   ToolRegistryMock.prototype.registerTool = vi.fn();
   ToolRegistryMock.prototype.unregisterTool = vi.fn();
-  ToolRegistryMock.prototype.discoverAllTools = vi.fn();
+  ToolRegistryMock.prototype.discoverAllTools = vi
+    .fn()
+    .mockResolvedValue(undefined);
   ToolRegistryMock.prototype.sortTools = vi.fn();
   ToolRegistryMock.prototype.getAllTools = vi.fn(() => []); // Mock methods if needed
   ToolRegistryMock.prototype.getTool = vi.fn();
@@ -89,6 +91,13 @@ vi.mock('../tools/mcp-client-manager.js', () => ({
 
 vi.mock('../utils/memoryDiscovery.js', () => ({
   loadServerHierarchicalMemory: vi.fn(),
+}));
+
+vi.mock('../utils/extensionLoader.js', () => ({
+  SimpleExtensionLoader: vi.fn().mockImplementation(() => ({
+    start: vi.fn().mockResolvedValue(undefined),
+    getExtensions: vi.fn().mockReturnValue([]),
+  })),
 }));
 
 // Mock individual tools if their constructors are complex or have side effects
@@ -113,7 +122,18 @@ vi.mock('../tools/memoryTool', () => ({
   GEMINI_DIR: '.gemini',
 }));
 
-vi.mock('../core/contentGenerator.js');
+vi.mock('../core/contentGenerator.js', () => ({
+  createContentGenerator: vi.fn().mockResolvedValue({
+    userTier: 'test-tier',
+    userTierName: 'test-tier-name',
+  }),
+  createContentGeneratorConfig: vi.fn().mockResolvedValue({}),
+  AuthType: {
+    USE_GEMINI: 'USE_GEMINI',
+    USE_VERTEX_AI: 'USE_VERTEX_AI',
+    LOGIN_WITH_GOOGLE: 'LOGIN_WITH_GOOGLE',
+  },
+}));
 
 vi.mock('../core/client.js', () => ({
   GeminiClient: vi.fn().mockImplementation(() => ({
@@ -166,7 +186,7 @@ vi.mock('../ide/ide-client.js', () => ({
 
 vi.mock('../agents/registry.js', () => {
   const AgentRegistryMock = vi.fn();
-  AgentRegistryMock.prototype.initialize = vi.fn();
+  AgentRegistryMock.prototype.initialize = vi.fn().mockResolvedValue(undefined);
   AgentRegistryMock.prototype.getAllDefinitions = vi.fn(() => []);
   AgentRegistryMock.prototype.getDefinition = vi.fn();
   return { AgentRegistry: AgentRegistryMock };
@@ -1519,6 +1539,9 @@ describe('GemmaModelRouterSettings', () => {
 });
 
 describe('setApprovalMode with folder trust', () => {
+  beforeEach(() => {
+    vi.spyOn(Storage.prototype, 'getPlansDir').mockReturnValue('/tmp/plans');
+  });
   const baseParams: ConfigParameters = {
     sessionId: 'test',
     targetDir: '.',
@@ -2968,6 +2991,9 @@ describe('Plans Directory Initialization', () => {
 });
 
 describe('syncPlanModeTools', () => {
+  beforeEach(() => {
+    vi.spyOn(Storage.prototype, 'getPlansDir').mockReturnValue('/tmp/plans');
+  });
   const baseParams: ConfigParameters = {
     sessionId: 'test-session',
     targetDir: '.',

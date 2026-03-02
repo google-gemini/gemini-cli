@@ -18,7 +18,7 @@ interface BannerData {
 export function useBanner(bannerData: BannerData) {
   const { defaultText, warningText } = bannerData;
 
-  const [bannerCounts] = useState(
+  const [hideBannerCounts] = useState(
     () => persistentState.get('defaultBannerShownCount') || {},
   );
 
@@ -27,7 +27,7 @@ export function useBanner(bannerData: BannerData) {
     .update(defaultText)
     .digest('hex');
 
-  const currentBannerCount = bannerCounts[hashedText] || 0;
+  const currentBannerCount = hideBannerCounts[hashedText] || 0;
 
   const showDefaultBanner =
     warningText === '' && currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT;

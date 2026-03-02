@@ -4,13 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from 'react';
 import { Box, Text } from 'ink';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
 import type { LoadableSettingScope } from '../../../config/settings.js';
 import { getScopeItems } from '../../../utils/dialogScopeUtils.js';
 import { RadioButtonSelect } from './RadioButtonSelect.js';
+import { TabHeader, type Tab } from './TabHeader.js';
 import { TextInput } from './TextInput.js';
 import type { TextBuffer } from './text-buffer.js';
 import {
@@ -30,6 +37,8 @@ export interface SettingsDialogItem {
   key: string;
   /** Display label */
   label: string;
+  /** Optional category for grouping */
+  category?: string;
   /** Optional description below label */
   description?: string;
   /** Item type for determining interaction behavior */
@@ -62,6 +71,12 @@ export interface BaseSettingsDialogProps {
   /** Text buffer for search input */
   searchBuffer?: TextBuffer;
 
+  // Tabs
+  /** Array of tab definitions */
+  tabs?: Tab[];
+  /** Currently active tab index */
+  currentIndex?: number;
+
   // Items - parent provides the list
   /** List of items to display */
   items: SettingsDialogItem[];
@@ -75,8 +90,8 @@ export interface BaseSettingsDialogProps {
   onScopeChange?: (scope: LoadableSettingScope) => void;
 
   // Layout
-  /** Maximum number of items to show at once */
-  maxItemsToShow: number;
+  /** Maximum height in rows for the settings list section */
+  maxListHeight: number;
   /** Maximum label width for alignment */
   maxLabelWidth?: number;
 
@@ -114,11 +129,13 @@ export function BaseSettingsDialog({
   searchEnabled = true,
   searchPlaceholder = 'Search to filter',
   searchBuffer,
+  tabs,
+  currentIndex,
   items,
   showScopeSelector = true,
   selectedScope,
   onScopeChange,
-  maxItemsToShow,
+  maxListHeight,
   maxLabelWidth,
   onItemToggle,
   onEditCommit,
@@ -138,38 +155,100 @@ export function BaseSettingsDialog({
   const [editCursorPos, setEditCursorPos] = useState(0);
   const [cursorVisible, setCursorVisible] = useState(true);
 
-  const prevItemsRef = useRef(items);
+  // Helper to calculate height of an item including its optional header
+  const getItemTotalHeight = useCallback(
+    (idx: number): number => {
+      const item = items[idx];
+      if (!item) return 0;
 
-  // Preserve focus when items change (e.g., search filter)
+      const previousItem = idx > 0 ? items[idx - 1] : undefined;
+      const hasHeader =
+        item.category && item.category !== previousItem?.category;
+
+      let height = 3; // base item height (label + description + spacing)
+      if (hasHeader) {
+        height += 3; // header height (marginTop(1) + Label(1) + marginBottom(1))
+      }
+      return height;
+    },
+    [items],
+  );
+
+  const prevItemsRef = useRef(items);
+  const prevTabIndexRef = useRef(currentIndex);
+
+  // Preserve focus when items change (e.g., search filter) or handle tab changes
   useEffect(() => {
     const prevItems = prevItemsRef.current;
-    if (prevItems !== items) {
-      const prevActiveItem = prevItems[activeIndex];
-      if (prevActiveItem) {
-        const newIndex = items.findIndex((i) => i.key === prevActiveItem.key);
-        if (newIndex !== -1) {
-          // Item still exists in the filtered list, keep focus on it
-          setActiveIndex(newIndex);
-          // Adjust scroll offset to ensure the item is visible
-          let newScroll = scrollOffset;
-          if (newIndex < scrollOffset) newScroll = newIndex;
-          else if (newIndex >= scrollOffset + maxItemsToShow)
-            newScroll = newIndex - maxItemsToShow + 1;
+    const prevTabIndex = prevTabIndexRef.current;
 
-          const maxScroll = Math.max(0, items.length - maxItemsToShow);
-          setScrollOffset(Math.min(newScroll, maxScroll));
+    const tabChanged =
+      currentIndex !== undefined &&
+      prevTabIndex !== undefined &&
+      currentIndex !== prevTabIndex;
+    const itemsChanged = prevItems !== items;
+
+    if (tabChanged || itemsChanged) {
+      // Always reset to top when navigating back to "All" (index 0)
+      // or if tab changed and we want standard top-of-list behavior
+      if (tabChanged && currentIndex === 0) {
+        setActiveIndex(0);
+        setScrollOffset(0);
+      } else if (itemsChanged) {
+        const prevActiveItem = prevItems[activeIndex];
+        if (prevActiveItem) {
+          const newIndex = items.findIndex((i) => i.key === prevActiveItem.key);
+          if (newIndex !== -1) {
+            // Item still exists in the filtered list, keep focus on it
+            setActiveIndex(newIndex);
+
+            // Adjust scroll offset to ensure the item is visible within the height budget
+            if (newIndex < scrollOffset) {
+              setScrollOffset(newIndex);
+            } else {
+              // Calculate height from scrollOffset to newIndex
+              let heightUsed = 0;
+
+              // Forward scan to see if current index fits
+              for (let i = scrollOffset; i <= newIndex; i++) {
+                heightUsed += getItemTotalHeight(i);
+              }
+
+              if (heightUsed > maxListHeight) {
+                // Too far down, scroll until it fits
+                let tempHeight = 0;
+                let startIdx = newIndex;
+                while (
+                  startIdx >= 0 &&
+                  tempHeight + getItemTotalHeight(startIdx) <= maxListHeight
+                ) {
+                  tempHeight += getItemTotalHeight(startIdx);
+                  startIdx--;
+                }
+                setScrollOffset(startIdx + 1);
+              }
+            }
+          } else {
+            // Item was filtered out, reset to the top
+            setActiveIndex(0);
+            setScrollOffset(0);
+          }
         } else {
-          // Item was filtered out, reset to the top
           setActiveIndex(0);
           setScrollOffset(0);
         }
-      } else {
-        setActiveIndex(0);
-        setScrollOffset(0);
       }
       prevItemsRef.current = items;
+      prevTabIndexRef.current = currentIndex;
     }
-  }, [items, activeIndex, scrollOffset, maxItemsToShow]);
+  }, [
+    items,
+    currentIndex,
+    activeIndex,
+    scrollOffset,
+    maxListHeight,
+    getItemTotalHeight,
+  ]);
 
   // Cursor blink effect
   useEffect(() => {
@@ -194,12 +273,25 @@ export function BaseSettingsDialog({
     key: item.value,
   }));
 
-  // Calculate visible items based on scroll offset
-  const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
+  // Calculate which items fit in the current scroll window given maxListHeight
+  const { visibleItems } = useMemo(() => {
+    const visible: SettingsDialogItem[] = [];
+    let currentHeight = 0;
+
+    for (let i = scrollOffset; i < items.length; i++) {
+      const itemHeight = getItemTotalHeight(i);
+      if (currentHeight + itemHeight > maxListHeight) break;
+      visible.push(items[i]);
+      currentHeight += itemHeight;
+    }
+
+    return { visibleItems: visible };
+  }, [items, scrollOffset, maxListHeight, getItemTotalHeight]);
 
   // Show scroll indicators if there are more items than can be displayed
-  const showScrollUp = items.length > maxItemsToShow;
-  const showScrollDown = items.length > maxItemsToShow;
+  const showScrollUp = scrollOffset > 0;
+  const showScrollDown =
+    items.length > 0 && items.length > scrollOffset + visibleItems.length;
 
   // Get current item
   const currentItem = items[activeIndex];
@@ -237,6 +329,37 @@ export function BaseSettingsDialog({
     },
     [onScopeChange],
   );
+
+  // Helper to scroll down until target index fits at bottom
+  const scrollToFitBottom = useCallback(
+    (targetIdx: number) => {
+      let tempHeight = 0;
+      let startIdx = targetIdx;
+      while (
+        startIdx >= 0 &&
+        tempHeight + getItemTotalHeight(startIdx) <= maxListHeight
+      ) {
+        tempHeight += getItemTotalHeight(startIdx);
+        startIdx--;
+      }
+      setScrollOffset(startIdx + 1);
+    },
+    [getItemTotalHeight, maxListHeight],
+  );
+
+  // Helper to find scrollOffset when wrapping from top to bottom
+  const getBottomScrollOffset = useCallback(() => {
+    let tempHeight = 0;
+    let startIdx = items.length - 1;
+    while (
+      startIdx >= 0 &&
+      tempHeight + getItemTotalHeight(startIdx) <= maxListHeight
+    ) {
+      tempHeight += getItemTotalHeight(startIdx);
+      startIdx--;
+    }
+    return startIdx + 1;
+  }, [items.length, getItemTotalHeight, maxListHeight]);
 
   // Keyboard handling
   useKeypress(
@@ -312,7 +435,7 @@ export function BaseSettingsDialog({
           const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
           setActiveIndex(newIndex);
           if (newIndex === items.length - 1) {
-            setScrollOffset(Math.max(0, items.length - maxItemsToShow));
+            setScrollOffset(getBottomScrollOffset());
           } else if (newIndex < scrollOffset) {
             setScrollOffset(newIndex);
           }
@@ -324,8 +447,15 @@ export function BaseSettingsDialog({
           setActiveIndex(newIndex);
           if (newIndex === 0) {
             setScrollOffset(0);
-          } else if (newIndex >= scrollOffset + maxItemsToShow) {
-            setScrollOffset(newIndex - maxItemsToShow + 1);
+          } else {
+            // Check if it fits
+            let heightUsed = 0;
+            for (let i = scrollOffset; i <= newIndex; i++) {
+              heightUsed += getItemTotalHeight(i);
+            }
+            if (heightUsed > maxListHeight) {
+              scrollToFitBottom(newIndex);
+            }
           }
           return;
         }
@@ -359,7 +489,7 @@ export function BaseSettingsDialog({
           const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
           setActiveIndex(newIndex);
           if (newIndex === items.length - 1) {
-            setScrollOffset(Math.max(0, items.length - maxItemsToShow));
+            setScrollOffset(getBottomScrollOffset());
           } else if (newIndex < scrollOffset) {
             setScrollOffset(newIndex);
           }
@@ -370,8 +500,15 @@ export function BaseSettingsDialog({
           setActiveIndex(newIndex);
           if (newIndex === 0) {
             setScrollOffset(0);
-          } else if (newIndex >= scrollOffset + maxItemsToShow) {
-            setScrollOffset(newIndex - maxItemsToShow + 1);
+          } else {
+            // Check if it fits
+            let heightUsed = 0;
+            for (let i = scrollOffset; i <= newIndex; i++) {
+              heightUsed += getItemTotalHeight(i);
+            }
+            if (heightUsed > maxListHeight) {
+              scrollToFitBottom(newIndex);
+            }
           }
           return true;
         }
@@ -443,6 +580,18 @@ export function BaseSettingsDialog({
           </Text>
         </Box>
 
+        {/* Tabs */}
+        {tabs && currentIndex !== undefined && (
+          <Box marginX={1} marginTop={1}>
+            <TabHeader
+              tabs={tabs}
+              currentIndex={currentIndex}
+              showStatusIcons={false}
+              showArrows={false}
+            />
+          </Box>
+        )}
+
         {/* Search input (if enabled) */}
         {searchEnabled && searchBuffer && (
           <Box
@@ -469,123 +618,163 @@ export function BaseSettingsDialog({
         <Box height={1} />
 
         {/* Items list */}
-        {visibleItems.length === 0 ? (
-          <Box marginX={1} height={1} flexDirection="column">
-            <Text color={theme.text.secondary}>No matches found.</Text>
-          </Box>
-        ) : (
-          <>
-            {showScrollUp && (
-              <Box marginX={1}>
-                <Text color={theme.text.secondary}>▲</Text>
-              </Box>
-            )}
-            {visibleItems.map((item, idx) => {
-              const globalIndex = idx + scrollOffset;
-              const isActive =
-                focusSection === 'settings' && activeIndex === globalIndex;
+        <Box height={maxListHeight} flexDirection="column">
+          {visibleItems.length === 0 ? (
+            <Box marginX={1} height={1} flexDirection="column">
+              <Text color={theme.text.secondary}>No matches found.</Text>
+            </Box>
+          ) : (
+            <>
+              {showScrollUp ? (
+                <Box marginX={1}>
+                  <Text color={theme.text.secondary}>▲</Text>
+                </Box>
+              ) : (
+                <Box height={1} />
+              )}
+              {visibleItems.map((item, idx) => {
+                const globalIndex = idx + scrollOffset;
+                const isActive =
+                  focusSection === 'settings' && activeIndex === globalIndex;
 
-              // Compute display value with edit mode cursor
-              let displayValue: string;
-              if (editingKey === item.key) {
-                // Show edit buffer with cursor highlighting
-                if (cursorVisible && editCursorPos < cpLen(editBuffer)) {
-                  // Cursor is in the middle or at start of text
-                  const beforeCursor = cpSlice(editBuffer, 0, editCursorPos);
-                  const atCursor = cpSlice(
-                    editBuffer,
-                    editCursorPos,
-                    editCursorPos + 1,
-                  );
-                  const afterCursor = cpSlice(editBuffer, editCursorPos + 1);
-                  displayValue =
-                    beforeCursor + chalk.inverse(atCursor) + afterCursor;
-                } else if (editCursorPos >= cpLen(editBuffer)) {
-                  // Cursor is at the end - show inverted space
-                  displayValue =
-                    editBuffer + (cursorVisible ? chalk.inverse(' ') : ' ');
+                const previousItem =
+                  globalIndex > 0 ? items[globalIndex - 1] : undefined;
+                const showCategoryHeader =
+                  item.category && item.category !== previousItem?.category;
+
+                // Compute display value with edit mode cursor
+                let displayValue: string;
+                if (editingKey === item.key) {
+                  // Show edit buffer with cursor highlighting
+                  if (cursorVisible && editCursorPos < cpLen(editBuffer)) {
+                    // Cursor is in the middle or at start of text
+                    const beforeCursor = cpSlice(editBuffer, 0, editCursorPos);
+                    const atCursor = cpSlice(
+                      editBuffer,
+                      editCursorPos,
+                      editCursorPos + 1,
+                    );
+                    const afterCursor = cpSlice(editBuffer, editCursorPos + 1);
+                    displayValue =
+                      beforeCursor + chalk.inverse(atCursor) + afterCursor;
+                  } else if (editCursorPos >= cpLen(editBuffer)) {
+                    // Cursor is at the end - show inverted space
+                    displayValue =
+                      editBuffer + (cursorVisible ? chalk.inverse(' ') : ' ');
+                  } else {
+                    // Cursor not visible
+                    displayValue = editBuffer;
+                  }
                 } else {
-                  // Cursor not visible
-                  displayValue = editBuffer;
+                  displayValue = item.displayValue;
                 }
-              } else {
-                displayValue = item.displayValue;
-              }
 
-              return (
-                <React.Fragment key={item.key}>
-                  <Box marginX={1} flexDirection="row" alignItems="flex-start">
-                    <Box minWidth={2} flexShrink={0}>
-                      <Text
-                        color={
-                          isActive ? theme.status.success : theme.text.secondary
-                        }
+                return (
+                  <React.Fragment key={item.key}>
+                    {showCategoryHeader && (
+                      <Box
+                        marginX={1}
+                        marginBottom={1}
+                        marginTop={idx === 0 ? 0 : 1}
+                        flexDirection="row"
+                        alignItems="center"
                       >
-                        {isActive ? '●' : ''}
-                      </Text>
-                    </Box>
+                        <Box flexShrink={0}>
+                          <Text bold>{item.category} </Text>
+                        </Box>
+                        <Box
+                          flexGrow={1}
+                          borderStyle="single"
+                          borderTop={false}
+                          borderBottom
+                          borderLeft={false}
+                          borderRight={false}
+                          borderColor={theme.border.default}
+                          height={0}
+                        />
+                      </Box>
+                    )}
                     <Box
+                      marginX={1}
                       flexDirection="row"
-                      flexGrow={1}
-                      minWidth={0}
                       alignItems="flex-start"
                     >
-                      <Box
-                        flexDirection="column"
-                        width={maxLabelWidth}
-                        minWidth={0}
-                      >
-                        <Text
-                          color={
-                            isActive ? theme.status.success : theme.text.primary
-                          }
-                        >
-                          {item.label}
-                          {item.scopeMessage && (
-                            <Text color={theme.text.secondary}>
-                              {' '}
-                              {item.scopeMessage}
-                            </Text>
-                          )}
-                        </Text>
-                        <Text color={theme.text.secondary} wrap="truncate">
-                          {item.description ?? ''}
-                        </Text>
-                      </Box>
-                      <Box minWidth={3} />
-                      <Box flexShrink={0}>
+                      <Box minWidth={2} flexShrink={0}>
                         <Text
                           color={
                             isActive
                               ? theme.status.success
-                              : item.isGreyedOut
-                                ? theme.text.secondary
-                                : theme.text.primary
+                              : theme.text.secondary
                           }
-                          terminalCursorFocus={
-                            editingKey === item.key && cursorVisible
-                          }
-                          terminalCursorPosition={cpIndexToOffset(
-                            editBuffer,
-                            editCursorPos,
-                          )}
                         >
-                          {displayValue}
+                          {isActive ? '●' : ''}
                         </Text>
                       </Box>
+                      <Box
+                        flexDirection="row"
+                        flexGrow={1}
+                        minWidth={0}
+                        alignItems="flex-start"
+                      >
+                        <Box
+                          flexDirection="column"
+                          width={maxLabelWidth}
+                          minWidth={0}
+                        >
+                          <Text
+                            color={
+                              isActive
+                                ? theme.status.success
+                                : theme.text.primary
+                            }
+                          >
+                            {item.label}
+                            {item.scopeMessage && (
+                              <Text color={theme.text.secondary}>
+                                {' '}
+                                {item.scopeMessage}
+                              </Text>
+                            )}
+                          </Text>
+                          <Text color={theme.text.secondary} wrap="truncate">
+                            {item.description ?? ''}
+                          </Text>
+                        </Box>
+                        <Box minWidth={3} />
+                        <Box flexShrink={0}>
+                          <Text
+                            color={
+                              isActive
+                                ? theme.status.success
+                                : item.isGreyedOut
+                                  ? theme.text.secondary
+                                  : theme.text.primary
+                            }
+                            terminalCursorFocus={
+                              editingKey === item.key && cursorVisible
+                            }
+                            terminalCursorPosition={cpIndexToOffset(
+                              editBuffer,
+                              editCursorPos,
+                            )}
+                          >
+                            {displayValue}
+                          </Text>
+                        </Box>
+                      </Box>
                     </Box>
-                  </Box>
-                  <Box height={1} />
-                </React.Fragment>
-              );
-            })}
-            {showScrollDown && (
-              <Box marginX={1}>
-                <Text color={theme.text.secondary}>▼</Text>
-              </Box>
-            )}
-          </>
-        )}
+                    <Box height={1} />
+                  </React.Fragment>
+                );
+              })}
+              {showScrollDown && (
+                <Box marginX={1}>
+                  <Text color={theme.text.secondary}>▼</Text>
+                </Box>
+              )}
+            </>
+          )}
+        </Box>
 
         <Box height={1} />
 

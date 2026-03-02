@@ -131,6 +131,24 @@ export type MemoryImportFormat = 'tree' | 'flat';
 export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
 
 /**
+ * The canonical order for setting categories.
+ */
+export const SETTING_CATEGORY_ORDER = [
+  'General',
+  'UI',
+  'Model',
+  'Context',
+  'Tools',
+  'IDE',
+  'Privacy',
+  'Extensions',
+  'Security',
+  'Experimental',
+  'Admin',
+  'Advanced',
+] as const;
+
+/**
  * The canonical schema for all settings.
  * The structure of this object defines the structure of the `Settings` type.
  * `as const` is crucial for TypeScript to infer the most specific types possible.
@@ -191,9 +209,9 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Vim keybindings',
         showInDialog: true,
       },
-      defaultApprovalMode: {
+      approvalMode: {
         type: 'enum',
-        label: 'Default Approval Mode',
+        label: 'Approval Mode',
         category: 'General',
         requiresRestart: false,
         default: 'default',
@@ -218,27 +236,27 @@ const SETTINGS_SCHEMA = {
         description: 'Enable DevTools inspector on launch.',
         showInDialog: false,
       },
-      enableAutoUpdate: {
+      disableAutoUpdate: {
         type: 'boolean',
-        label: 'Enable Auto Update',
+        label: 'Auto Update',
         category: 'General',
         requiresRestart: false,
-        default: true,
-        description: 'Enable automatic updates.',
+        default: false,
+        description: 'Disable automatic updates.',
         showInDialog: true,
       },
-      enableAutoUpdateNotification: {
+      disableUpdateNag: {
         type: 'boolean',
-        label: 'Enable Auto Update Notification',
+        label: 'Auto Update Notification',
         category: 'General',
         requiresRestart: false,
-        default: true,
-        description: 'Enable update notification prompts.',
+        default: false,
+        description: 'Disable update notification prompts.',
         showInDialog: false,
       },
       enableNotifications: {
         type: 'boolean',
-        label: 'Enable Notifications',
+        label: 'Notifications',
         category: 'General',
         requiresRestart: false,
         default: false,
@@ -257,7 +275,7 @@ const SETTINGS_SCHEMA = {
         properties: {
           enabled: {
             type: 'boolean',
-            label: 'Enable Checkpointing',
+            label: 'Checkpointing',
             category: 'General',
             requiresRestart: true,
             default: false,
@@ -336,7 +354,7 @@ const SETTINGS_SCHEMA = {
         properties: {
           enabled: {
             type: 'boolean',
-            label: 'Enable Session Cleanup',
+            label: 'Session Cleanup',
             category: 'General',
             requiresRestart: false,
             default: false,
@@ -345,7 +363,7 @@ const SETTINGS_SCHEMA = {
           },
           maxAge: {
             type: 'string',
-            label: 'Keep chat history',
+            label: 'Chat History Period',
             category: 'General',
             requiresRestart: false,
             default: undefined as string | undefined,
@@ -466,7 +484,7 @@ const SETTINGS_SCHEMA = {
       },
       hideWindowTitle: {
         type: 'boolean',
-        label: 'Hide Window Title',
+        label: 'Window Title',
         category: 'UI',
         requiresRestart: true,
         default: false,
@@ -488,7 +506,7 @@ const SETTINGS_SCHEMA = {
       },
       showStatusInTitle: {
         type: 'boolean',
-        label: 'Show Thoughts in Title',
+        label: 'Thoughts in Title',
         category: 'UI',
         requiresRestart: false,
         default: false,
@@ -508,7 +526,7 @@ const SETTINGS_SCHEMA = {
       },
       showHomeDirectoryWarning: {
         type: 'boolean',
-        label: 'Show Home Directory Warning',
+        label: 'Home Directory Warning',
         category: 'UI',
         requiresRestart: true,
         default: true,
@@ -518,7 +536,7 @@ const SETTINGS_SCHEMA = {
       },
       showCompatibilityWarnings: {
         type: 'boolean',
-        label: 'Show Compatibility Warnings',
+        label: 'Compatibility Warnings',
         category: 'UI',
         requiresRestart: true,
         default: true,
@@ -527,7 +545,7 @@ const SETTINGS_SCHEMA = {
       },
       hideTips: {
         type: 'boolean',
-        label: 'Hide Tips',
+        label: 'Tips',
         category: 'UI',
         requiresRestart: false,
         default: false,
@@ -536,7 +554,7 @@ const SETTINGS_SCHEMA = {
       },
       showShortcutsHint: {
         type: 'boolean',
-        label: 'Show Shortcuts Hint',
+        label: 'Shortcuts Hint',
         category: 'UI',
         requiresRestart: false,
         default: true,
@@ -545,7 +563,7 @@ const SETTINGS_SCHEMA = {
       },
       hideBanner: {
         type: 'boolean',
-        label: 'Hide Banner',
+        label: 'Banner',
         category: 'UI',
         requiresRestart: false,
         default: false,
@@ -554,7 +572,7 @@ const SETTINGS_SCHEMA = {
       },
       hideContextSummary: {
         type: 'boolean',
-        label: 'Hide Context Summary',
+        label: 'Context Summary',
         category: 'UI',
         requiresRestart: false,
         default: false,
@@ -573,7 +591,7 @@ const SETTINGS_SCHEMA = {
         properties: {
           hideCWD: {
             type: 'boolean',
-            label: 'Hide CWD',
+            label: 'CWD',
             category: 'UI',
             requiresRestart: false,
             default: false,
@@ -583,7 +601,7 @@ const SETTINGS_SCHEMA = {
           },
           hideSandboxStatus: {
             type: 'boolean',
-            label: 'Hide Sandbox Status',
+            label: 'Sandbox Status',
             category: 'UI',
             requiresRestart: false,
             default: false,
@@ -592,7 +610,7 @@ const SETTINGS_SCHEMA = {
           },
           hideModelInfo: {
             type: 'boolean',
-            label: 'Hide Model Info',
+            label: 'Model Info',
             category: 'UI',
             requiresRestart: false,
             default: false,
@@ -601,27 +619,27 @@ const SETTINGS_SCHEMA = {
           },
           hideContextPercentage: {
             type: 'boolean',
-            label: 'Hide Context Window Percentage',
+            label: 'Context Window Percentage',
             category: 'UI',
             requiresRestart: false,
             default: true,
-            description: 'Hides the context window remaining percentage.',
+            description: 'Hide the context window remaining percentage.',
             showInDialog: true,
           },
         },
       },
       hideFooter: {
         type: 'boolean',
-        label: 'Hide Footer',
+        label: 'Footer',
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Hide the footer from the UI',
+        description: 'Hide the footer in the UI',
         showInDialog: true,
       },
       showMemoryUsage: {
         type: 'boolean',
-        label: 'Show Memory Usage',
+        label: 'Memory Usage',
         category: 'UI',
         requiresRestart: false,
         default: false,
@@ -630,7 +648,7 @@ const SETTINGS_SCHEMA = {
       },
       showLineNumbers: {
         type: 'boolean',
-        label: 'Show Line Numbers',
+        label: 'Line Numbers',
         category: 'UI',
         requiresRestart: false,
         default: true,
@@ -639,7 +657,7 @@ const SETTINGS_SCHEMA = {
       },
       showCitations: {
         type: 'boolean',
-        label: 'Show Citations',
+        label: 'Citations',
         category: 'UI',
         requiresRestart: false,
         default: false,
@@ -648,7 +666,7 @@ const SETTINGS_SCHEMA = {
       },
       showModelInfoInChat: {
         type: 'boolean',
-        label: 'Show Model Info In Chat',
+        label: 'Model Info In Chat',
         category: 'UI',
         requiresRestart: false,
         default: false,
@@ -657,7 +675,7 @@ const SETTINGS_SCHEMA = {
       },
       showUserIdentity: {
         type: 'boolean',
-        label: 'Show User Identity',
+        label: 'User Identity',
         category: 'UI',
         requiresRestart: false,
         default: true,
@@ -667,7 +685,7 @@ const SETTINGS_SCHEMA = {
       },
       useAlternateBuffer: {
         type: 'boolean',
-        label: 'Use Alternate Screen Buffer',
+        label: 'Alternate Screen Buffer',
         category: 'UI',
         requiresRestart: true,
         default: false,
@@ -677,7 +695,7 @@ const SETTINGS_SCHEMA = {
       },
       useBackgroundColor: {
         type: 'boolean',
-        label: 'Use Background Color',
+        label: 'Background Color',
         category: 'UI',
         requiresRestart: false,
         default: true,
@@ -696,7 +714,7 @@ const SETTINGS_SCHEMA = {
       },
       showSpinner: {
         type: 'boolean',
-        label: 'Show Spinner',
+        label: 'Spinner',
         category: 'UI',
         requiresRestart: false,
         default: true,
@@ -791,7 +809,7 @@ const SETTINGS_SCHEMA = {
     properties: {
       enabled: {
         type: 'boolean',
-        label: 'IDE Mode',
+        label: 'IDE',
         category: 'IDE',
         requiresRestart: true,
         default: false,
@@ -800,7 +818,7 @@ const SETTINGS_SCHEMA = {
       },
       hasSeenNudge: {
         type: 'boolean',
-        label: 'Has Seen IDE Integration Nudge',
+        label: 'IDE Integration Nudge',
         category: 'IDE',
         requiresRestart: false,
         default: false,
@@ -821,7 +839,7 @@ const SETTINGS_SCHEMA = {
     properties: {
       usageStatisticsEnabled: {
         type: 'boolean',
-        label: 'Enable Usage Statistics',
+        label: 'Usage Statistics',
         category: 'Privacy',
         requiresRestart: true,
         default: true,
@@ -933,7 +951,7 @@ const SETTINGS_SCHEMA = {
       },
       disableLoopDetection: {
         type: 'boolean',
-        label: 'Disable Loop Detection',
+        label: 'Loop Detection',
         category: 'Model',
         requiresRestart: true,
         default: false,
@@ -943,7 +961,7 @@ const SETTINGS_SCHEMA = {
       },
       skipNextSpeakerCheck: {
         type: 'boolean',
-        label: 'Skip Next Speaker Check',
+        label: 'Next Speaker Check',
         category: 'Model',
         requiresRestart: false,
         default: true,
@@ -1116,7 +1134,7 @@ const SETTINGS_SCHEMA = {
       },
       includeDirectoryTree: {
         type: 'boolean',
-        label: 'Include Directory Tree',
+        label: 'Directory Tree',
         category: 'Context',
         requiresRestart: false,
         default: true,
@@ -1126,7 +1144,7 @@ const SETTINGS_SCHEMA = {
       },
       discoveryMaxDirs: {
         type: 'number',
-        label: 'Memory Discovery Max Dirs',
+        label: 'Discovery Max Dirs',
         category: 'Context',
         requiresRestart: false,
         default: 200,
@@ -1149,7 +1167,7 @@ const SETTINGS_SCHEMA = {
       },
       loadMemoryFromIncludeDirectories: {
         type: 'boolean',
-        label: 'Load Memory From Include Directories',
+        label: 'Memory From Include Directories',
         category: 'Context',
         requiresRestart: false,
         default: false,
@@ -1170,7 +1188,7 @@ const SETTINGS_SCHEMA = {
         properties: {
           respectGitIgnore: {
             type: 'boolean',
-            label: 'Respect .gitignore',
+            label: '.gitignore',
             category: 'Context',
             requiresRestart: true,
             default: true,
@@ -1179,7 +1197,7 @@ const SETTINGS_SCHEMA = {
           },
           respectGeminiIgnore: {
             type: 'boolean',
-            label: 'Respect .geminiignore',
+            label: '.geminiignore',
             category: 'Context',
             requiresRestart: true,
             default: true,
@@ -1188,7 +1206,7 @@ const SETTINGS_SCHEMA = {
           },
           enableRecursiveFileSearch: {
             type: 'boolean',
-            label: 'Enable Recursive File Search',
+            label: 'Recursive File Search',
             category: 'Context',
             requiresRestart: true,
             default: true,
@@ -1199,7 +1217,7 @@ const SETTINGS_SCHEMA = {
           },
           enableFuzzySearch: {
             type: 'boolean',
-            label: 'Enable Fuzzy Search',
+            label: 'Fuzzy Search',
             category: 'Context',
             requiresRestart: true,
             default: true,
@@ -1256,7 +1274,7 @@ const SETTINGS_SCHEMA = {
         properties: {
           enableInteractiveShell: {
             type: 'boolean',
-            label: 'Enable Interactive Shell',
+            label: 'Interactive Shell',
             category: 'Tools',
             requiresRestart: true,
             default: true,
@@ -1278,7 +1296,7 @@ const SETTINGS_SCHEMA = {
           },
           showColor: {
             type: 'boolean',
-            label: 'Show Color',
+            label: 'Color',
             category: 'Tools',
             requiresRestart: false,
             default: false,
@@ -1297,7 +1315,7 @@ const SETTINGS_SCHEMA = {
           },
           enableShellOutputEfficiency: {
             type: 'boolean',
-            label: 'Enable Shell Output Efficiency',
+            label: 'Shell Output Efficiency',
             category: 'Tools',
             requiresRestart: false,
             default: true,
@@ -1369,7 +1387,7 @@ const SETTINGS_SCHEMA = {
       },
       useRipgrep: {
         type: 'boolean',
-        label: 'Use Ripgrep',
+        label: 'Ripgrep',
         category: 'Tools',
         requiresRestart: false,
         default: true,
@@ -1389,7 +1407,7 @@ const SETTINGS_SCHEMA = {
       },
       disableLLMCorrection: {
         type: 'boolean',
-        label: 'Disable LLM Correction',
+        label: 'LLM Correction',
         category: 'Tools',
         requiresRestart: true,
         default: true,
@@ -1398,6 +1416,24 @@ const SETTINGS_SCHEMA = {
           When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.
         `,
         showInDialog: true,
+      },
+      approvalMode: {
+        type: 'enum',
+        label: 'Approval Mode',
+        category: 'Tools',
+        requiresRestart: false,
+        default: 'default',
+        description: oneLine`
+          The default approval mode for tool execution.
+          'default' prompts for approval, 'auto_edit' auto-approves edit tools,
+          and 'plan' is read-only mode. 'yolo' is not supported yet.
+        `,
+        showInDialog: true,
+        options: [
+          { value: 'default', label: 'Default' },
+          { value: 'auto_edit', label: 'Auto Edit' },
+          { value: 'plan', label: 'Plan' },
+        ],
       },
     },
   },
@@ -1463,7 +1499,7 @@ const SETTINGS_SCHEMA = {
     properties: {
       disableYoloMode: {
         type: 'boolean',
-        label: 'Disable YOLO Mode',
+        label: 'YOLO Mode',
         category: 'Security',
         requiresRestart: true,
         default: false,
@@ -1472,7 +1508,7 @@ const SETTINGS_SCHEMA = {
       },
       enablePermanentToolApproval: {
         type: 'boolean',
-        label: 'Allow Permanent Tool Approval',
+        label: 'Permanent Tool Approval',
         category: 'Security',
         requiresRestart: false,
         default: false,
@@ -1482,7 +1518,7 @@ const SETTINGS_SCHEMA = {
       },
       blockGitExtensions: {
         type: 'boolean',
-        label: 'Blocks extensions from Git',
+        label: 'Git Extensions',
         category: 'Security',
         requiresRestart: true,
         default: false,
@@ -1552,7 +1588,7 @@ const SETTINGS_SCHEMA = {
           },
           enabled: {
             type: 'boolean',
-            label: 'Enable Environment Variable Redaction',
+            label: 'Environment Variable Redaction',
             category: 'Security',
             requiresRestart: true,
             default: false,
@@ -1592,7 +1628,7 @@ const SETTINGS_SCHEMA = {
           },
           useExternal: {
             type: 'boolean',
-            label: 'Use External Auth',
+            label: 'External Auth',
             category: 'Security',
             requiresRestart: true,
             default: undefined as boolean | undefined,
@@ -1687,7 +1723,7 @@ const SETTINGS_SCHEMA = {
         properties: {
           enabled: {
             type: 'boolean',
-            label: 'Enable Tool Output Masking',
+            label: 'Tool Output Masking',
             category: 'Experimental',
             requiresRestart: true,
             default: true,
@@ -1728,7 +1764,7 @@ const SETTINGS_SCHEMA = {
       },
       enableAgents: {
         type: 'boolean',
-        label: 'Enable Agents',
+        label: 'Agents',
         category: 'Experimental',
         requiresRestart: true,
         default: false,
@@ -1784,7 +1820,7 @@ const SETTINGS_SCHEMA = {
       },
       useOSC52Paste: {
         type: 'boolean',
-        label: 'Use OSC 52 Paste',
+        label: 'OSC 52 Paste',
         category: 'Experimental',
         requiresRestart: false,
         default: false,
@@ -1794,7 +1830,7 @@ const SETTINGS_SCHEMA = {
       },
       useOSC52Copy: {
         type: 'boolean',
-        label: 'Use OSC 52 Copy',
+        label: 'OSC 52 Copy',
         category: 'Experimental',
         requiresRestart: false,
         default: false,
@@ -1931,7 +1967,7 @@ const SETTINGS_SCHEMA = {
     properties: {
       enabled: {
         type: 'boolean',
-        label: 'Enable Agent Skills',
+        label: 'Agent Skills',
         category: 'Advanced',
         requiresRestart: true,
         default: true,
@@ -1964,7 +2000,7 @@ const SETTINGS_SCHEMA = {
     properties: {
       enabled: {
         type: 'boolean',
-        label: 'Enable Hooks',
+        label: 'Hooks',
         category: 'Advanced',
         requiresRestart: true,
         default: true,

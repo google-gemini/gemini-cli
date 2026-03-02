@@ -544,8 +544,8 @@ export async function loadCliConfig(
   const rawApprovalMode =
     argv.approvalMode ||
     (argv.yolo ? 'yolo' : undefined) ||
-    ((settings.general?.defaultApprovalMode as string) !== 'yolo'
-      ? settings.general?.defaultApprovalMode
+    ((settings.tools?.approvalMode as string) !== 'yolo'
+      ? settings.tools?.approvalMode
       : undefined);
 
   if (rawApprovalMode) {
@@ -578,7 +578,7 @@ export async function loadCliConfig(
     approvalMode = ApprovalMode.DEFAULT;
   }
 
-  // Override approval mode if disableYoloMode is set.
+  // Override approval mode if disableYoloMode is true.
   if (settings.security?.disableYoloMode || settings.admin?.secureModeEnabled) {
     if (approvalMode === ApprovalMode.YOLO) {
       if (settings.admin?.secureModeEnabled) {
@@ -587,7 +587,7 @@ export async function loadCliConfig(
         );
       } else {
         debugLogger.error(
-          'YOLO mode is disabled by the "disableYolo" setting.',
+          'YOLO mode is disabled by the "disableYoloMode" setting.',
         );
       }
       throw new FatalConfigError(

@@ -424,6 +424,9 @@ export function AgentConfigDialog({
       <Text color={theme.text.secondary}>Changes saved automatically.</Text>
     ) : null;
 
+  // Estimate height needed for the list
+  const maxListHeight = Math.max(15, maxItemsToShow * 3);
+
   return (
     <BaseSettingsDialog
       title={`Configure: ${displayName}`}
@@ -432,7 +435,7 @@ export function AgentConfigDialog({
       showScopeSelector={true}
       selectedScope={selectedScope}
       onScopeChange={handleScopeChange}
-      maxItemsToShow={maxItemsToShow}
+      maxListHeight={maxListHeight}
       maxLabelWidth={maxLabelWidth}
       onItemToggle={handleItemToggle}
       onEditCommit={handleEditCommit}

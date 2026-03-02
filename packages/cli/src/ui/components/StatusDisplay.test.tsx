@@ -70,7 +70,9 @@ const createMockConfig = (overrides = {}) => ({
 });
 
 const renderStatusDisplay = async (
-  props: { hideContextSummary: boolean } = { hideContextSummary: false },
+  props: { forceHideContextSummary: boolean } = {
+    forceHideContextSummary: false,
+  },
   uiState: UIState = createMockUIState(),
   settings = createMockSettings(),
   config = createMockConfig(),
@@ -99,7 +101,7 @@ describe('StatusDisplay', () => {
 
   it('renders nothing by default if context summary is hidden via props', async () => {
     const { lastFrame, unmount } = await renderStatusDisplay({
-      hideContextSummary: true,
+      forceHideContextSummary: true,
     });
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
@@ -123,7 +125,7 @@ describe('StatusDisplay', () => {
       activeHooks: [{ name: 'hook', eventName: 'event' }],
     });
     const { lastFrame, unmount } = await renderStatusDisplay(
-      { hideContextSummary: false },
+      { forceHideContextSummary: false },
       uiState,
     );
     expect(lastFrame()).toMatchSnapshot();
@@ -138,7 +140,7 @@ describe('StatusDisplay', () => {
       hooksConfig: { notifications: false },
     });
     const { lastFrame, unmount } = await renderStatusDisplay(
-      { hideContextSummary: false },
+      { forceHideContextSummary: false },
       uiState,
       settings,
     );
@@ -146,12 +148,12 @@ describe('StatusDisplay', () => {
     unmount();
   });
 
-  it('hides ContextSummaryDisplay if configured in settings', async () => {
+  it('hides ContextSummaryDisplay if disabled in settings', async () => {
     const settings = createMockSettings({
       ui: { hideContextSummary: true },
     });
     const { lastFrame, unmount } = await renderStatusDisplay(
-      { hideContextSummary: false },
+      { forceHideContextSummary: false },
       undefined,
       settings,
     );
@@ -164,7 +166,7 @@ describe('StatusDisplay', () => {
       backgroundShellCount: 3,
     });
     const { lastFrame, unmount } = await renderStatusDisplay(
-      { hideContextSummary: false },
+      { forceHideContextSummary: false },
       uiState,
     );
     expect(lastFrame()).toContain('Shells: 3');

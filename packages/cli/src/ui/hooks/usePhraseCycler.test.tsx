@@ -12,7 +12,7 @@ import {
   usePhraseCycler,
   PHRASE_CHANGE_INTERVAL_MS,
 } from './usePhraseCycler.js';
-import { INFORMATIVE_TIPS } from '../constants/tips.js';
+import { INFORMATIVE_TIPS } from '../constants/hideTips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 import type { LoadingPhrasesMode } from '../../config/settings.js';
 

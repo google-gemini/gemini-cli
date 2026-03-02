@@ -207,9 +207,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Custom theme definitions.
   - **Default:** `{}`
 
-- **`ui.hideWindowTitle`** (boolean):
-  - **Description:** Hide the window title bar
-  - **Default:** `false`
+- **`ui.windowTitle`** (boolean):
+  - **Description:** Show the window title bar
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`ui.inlineThinkingMode`** (enum):
@@ -238,42 +238,42 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`ui.hideTips`** (boolean):
-  - **Description:** Hide helpful tips in the UI
-  - **Default:** `false`
+- **`ui.tips`** (boolean):
+  - **Description:** Show helpful tips in the UI
+  - **Default:** `true`
 
 - **`ui.showShortcutsHint`** (boolean):
   - **Description:** Show the "? for shortcuts" hint above the input.
   - **Default:** `true`
 
-- **`ui.hideBanner`** (boolean):
-  - **Description:** Hide the application banner
-  - **Default:** `false`
-
-- **`ui.hideContextSummary`** (boolean):
-  - **Description:** Hide the context summary (GEMINI.md, MCP servers) above the
-    input.
-  - **Default:** `false`
-
-- **`ui.footer.hideCWD`** (boolean):
-  - **Description:** Hide the current working directory path in the footer.
-  - **Default:** `false`
-
-- **`ui.footer.hideSandboxStatus`** (boolean):
-  - **Description:** Hide the sandbox status indicator in the footer.
-  - **Default:** `false`
-
-- **`ui.footer.hideModelInfo`** (boolean):
-  - **Description:** Hide the model name and context usage in the footer.
-  - **Default:** `false`
-
-- **`ui.footer.hideContextPercentage`** (boolean):
-  - **Description:** Hides the context window remaining percentage.
+- **`ui.banner`** (boolean):
+  - **Description:** Show the application banner
   - **Default:** `true`
 
-- **`ui.hideFooter`** (boolean):
-  - **Description:** Hide the footer from the UI
+- **`ui.contextSummary`** (boolean):
+  - **Description:** Show the context summary (GEMINI.md, MCP servers) above the
+    input.
+  - **Default:** `true`
+
+- **`ui.footer.cwd`** (boolean):
+  - **Description:** Show the current working directory path in the footer.
+  - **Default:** `true`
+
+- **`ui.footer.sandboxStatus`** (boolean):
+  - **Description:** Show the sandbox status indicator in the footer.
+  - **Default:** `true`
+
+- **`ui.footer.modelInfo`** (boolean):
+  - **Description:** Show the model name and context usage in the footer.
+  - **Default:** `true`
+
+- **`ui.footer.contextPercentage`** (boolean):
+  - **Description:** Shows the context window remaining percentage.
   - **Default:** `false`
+
+- **`ui.footerEnabled`** (boolean):
+  - **Description:** Show the footer in the UI
+  - **Default:** `true`
 
 - **`ui.showMemoryUsage`** (boolean):
   - **Description:** Display memory usage information in the UI
@@ -395,15 +395,15 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `0.5`
   - **Requires restart:** Yes
 
-- **`model.disableLoopDetection`** (boolean):
-  - **Description:** Disable automatic detection and prevention of infinite
+- **`model.loopDetection`** (boolean):
+  - **Description:** Enable automatic detection and prevention of infinite
     loops.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`model.skipNextSpeakerCheck`** (boolean):
-  - **Description:** Skip the next speaker check.
-  - **Default:** `true`
+- **`model.nextSpeakerCheck`** (boolean):
+  - **Description:** Enable the next speaker check.
+  - **Default:** `false`
 
 #### `modelConfigs`
 
@@ -824,11 +824,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `40000`
   - **Requires restart:** Yes
 
-- **`tools.disableLLMCorrection`** (boolean):
-  - **Description:** Disable LLM-based error correction for edit tools. When
-    enabled, tools will fail immediately if exact string matches are not found,
-    instead of attempting to self-correct.
-  - **Default:** `true`
+- **`tools.llmCorrection`** (boolean):
+  - **Description:** Enable LLM-based error correction for edit tools. When
+    enabled, tools will attempt to self-correct if exact string matches are not
+    found.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 #### `mcp`
@@ -856,9 +856,9 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `security`
 
-- **`security.disableYoloMode`** (boolean):
-  - **Description:** Disable YOLO mode, even if enabled by a flag.
-  - **Default:** `false`
+- **`security.yoloModeAllowed`** (boolean):
+  - **Description:** Allow YOLO mode to be used.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`security.enablePermanentToolApproval`** (boolean):
@@ -866,15 +866,15 @@ their corresponding top-level category object in your `settings.json` file.
     confirmation dialogs.
   - **Default:** `false`
 
-- **`security.blockGitExtensions`** (boolean):
-  - **Description:** Blocks installing and loading extensions from Git.
-  - **Default:** `false`
+- **`security.gitExtensionsEnabled`** (boolean):
+  - **Description:** Allow installing and loading extensions from Git.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`security.allowedExtensions`** (array):
   - **Description:** List of Regex patterns for allowed extensions. If nonempty,
     only extensions that match the patterns in this list are allowed. Overrides
-    the blockGitExtensions setting.
+    the gitExtensionsEnabled setting.
   - **Default:** `[]`
   - **Requires restart:** Yes
 

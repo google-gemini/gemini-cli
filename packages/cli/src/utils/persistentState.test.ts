@@ -32,7 +32,7 @@ describe('PersistentState', () => {
   });
 
   it('should load state from file if it exists', () => {
-    const mockData = { defaultBannerShownCount: { banner1: 1 } };
+    const mockData = { defaultBannerShownCount: { hideBanner1: 1 } };
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(mockData));
 
@@ -49,14 +49,14 @@ describe('PersistentState', () => {
 
   it('should save state to file', () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
-    persistentState.set('defaultBannerShownCount', { banner1: 1 });
+    persistentState.set('defaultBannerShownCount', { hideBanner1: 1 });
 
     expect(fs.mkdirSync).toHaveBeenCalledWith(path.normalize(mockDir), {
       recursive: true,
     });
     expect(fs.writeFileSync).toHaveBeenCalledWith(
       mockFilePath,
-      JSON.stringify({ defaultBannerShownCount: { banner1: 1 } }, null, 2),
+      JSON.stringify({ defaultBannerShownCount: { hideBanner1: 1 } }, null, 2),
     );
   });
 
@@ -77,7 +77,7 @@ describe('PersistentState', () => {
       throw new Error('Write error');
     });
 
-    persistentState.set('defaultBannerShownCount', { banner1: 1 });
+    persistentState.set('defaultBannerShownCount', { hideBanner1: 1 });
     expect(debugLogger.warn).toHaveBeenCalled();
   });
 });

@@ -640,11 +640,12 @@ export const AppContainer = (props: AppContainerProps) => {
 
   useEffect(() => {
     if (
-      !(settings.merged.ui.hideBanner || config.getScreenReader()) &&
+      !settings.merged.ui.hideBanner &&
+      !config.getScreenReader() &&
       bannerVisible &&
       bannerText
     ) {
-      // The header should show a banner but the Header is rendered in static
+      // The header should show a hideBanner but the Header is rendered in static
       // so we must trigger a static refresh for it to be visible.
       refreshStatic();
     }
@@ -1100,7 +1101,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     pendingToolCalls,
     handleApprovalModeChange,
     activePtyId,
-    loopDetectionConfirmationRequest,
+    disableLoopDetectionConfirmationRequest,
     lastOutputTime,
     backgroundShellCount,
     isBackgroundShellVisible,
@@ -2025,7 +2026,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!permissionConfirmationRequest ||
     !!customDialog ||
     confirmUpdateExtensionRequests.length > 0 ||
-    !!loopDetectionConfirmationRequest ||
+    !!disableLoopDetectionConfirmationRequest ||
     isThemeDialogOpen ||
     isSettingsDialogOpen ||
     isModelDialogOpen ||
@@ -2057,7 +2058,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const hasConfirmUpdateExtensionRequests =
     confirmUpdateExtensionRequests.length > 0;
   const hasLoopDetectionConfirmationRequest =
-    !!loopDetectionConfirmationRequest;
+    !!disableLoopDetectionConfirmationRequest;
 
   const hasPendingActionRequired =
     hasPendingToolConfirmation ||
@@ -2234,7 +2235,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       commandConfirmationRequest,
       authConsentRequest,
       confirmUpdateExtensionRequests,
-      loopDetectionConfirmationRequest,
+      disableLoopDetectionConfirmationRequest,
       permissionConfirmationRequest,
       geminiMdFileCount,
       streamingState,
@@ -2364,7 +2365,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       commandConfirmationRequest,
       authConsentRequest,
       confirmUpdateExtensionRequests,
-      loopDetectionConfirmationRequest,
+      disableLoopDetectionConfirmationRequest,
       permissionConfirmationRequest,
       geminiMdFileCount,
       streamingState,
