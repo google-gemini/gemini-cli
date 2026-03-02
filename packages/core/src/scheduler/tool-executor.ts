@@ -25,6 +25,7 @@ import {
   formatTruncatedToolOutput,
 } from '../utils/fileUtils.js';
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
+import { isAbortError } from '../utils/errors.js';
 import {
   CoreToolCallStatus,
   type CompletedToolCall,
@@ -159,15 +160,17 @@ export class ToolExecutor {
           }
         } catch (executionError: unknown) {
           spanMetadata.error = executionError;
-          const isAbortError =
-            executionError instanceof Error &&
-            (executionError.name === 'AbortError' ||
+          const abortedByError =
+            isAbortError(executionError) ||
+            (executionError instanceof Error &&
               executionError.message.includes('Operation cancelled by user'));
 
-          if (signal.aborted || isAbortError) {
+          if (signal.aborted || abortedByError) {
             completedToolCall = await this.createCancelledResult(
               call,
-              'User cancelled tool execution.',
+              isAbortError(executionError)
+                ? 'Operation cancelled.'
+                : 'User cancelled tool execution.',
             );
           } else {
             const error =
