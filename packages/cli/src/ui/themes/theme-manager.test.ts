@@ -55,7 +55,8 @@ const validCustomTheme: CustomTheme = {
 
 describe('ThemeManager', () => {
   beforeEach(() => {
-    // Reset themeManager state
+    // Reset themeManager state and inject mocks
+    themeManager.reinitialize({ fs, homedir: os.homedir });
     themeManager.loadCustomThemes({});
     themeManager.setActiveTheme(DEFAULT_THEME.name);
     themeManager.setTerminalBackground(undefined);
