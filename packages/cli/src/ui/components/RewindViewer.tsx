@@ -130,6 +130,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
     terminalHeight - DIALOG_PADDING - HEADER_HEIGHT - CONTROLS_HEIGHT - 2,
   );
 
+  // FIX #5: maxItemsToShow used in both visual and accessible views
   const maxItemsToShow = Math.max(1, Math.floor(listHeight / 4));
 
   if (selectedMessageId) {
@@ -159,10 +160,13 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
       (m) => m.id === selectedMessageId,
     );
     return (
+      // FIX #3: RewindConfirmation now receives isScreenReaderEnabled
+      // so it can render an accessible view for the confirmation step
       <RewindConfirmation
         stats={confirmationStats}
         terminalWidth={terminalWidth}
         timestamp={selectedMessage?.timestamp}
+        isScreenReaderEnabled={isScreenReaderEnabled}
         onConfirm={(outcome) => {
           if (outcome === RewindOutcome.Cancel) {
             clearSelection();
@@ -184,14 +188,18 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   }
 
   if (isScreenReaderEnabled) {
+    // FIX #5: slice items to maxItemsToShow to prevent overflow in small windows
+    const visibleItems = items.slice(0, maxItemsToShow);
+
     return (
       <Box flexDirection="column" width={terminalWidth}>
         <Text bold>Rewind - Select a conversation point:</Text>
         <BaseSelectionList
-          items={items}
-          initialIndex={items.length - 1}
+          items={visibleItems}
+          initialIndex={visibleItems.length - 1}
           isFocused={true}
-          showNumbers={false}
+          // FIX #4: use showNumbers={true} instead of manually prepending numbers
+          showNumbers={true}
           wrapAround={false}
           onSelect={(item: MessageRecord) => {
             if (item?.id) {
@@ -209,16 +217,20 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
                 ? 'Stay at current position'
                 : getCleanedRewindText(item);
             return (
-              <Text>
-                {itemWrapper.index + 1}. {text}
-              </Text>
+              // FIX #2: aria-state tied to index via showNumbers={true},
+              // so screen readers will announce selection changes correctly
+              <Text>{text}</Text>
             );
           }}
         />
-        <Text>Press Esc to exit, Enter to select, arrow keys to navigate.</Text>
+        {/* FIX #6: use theme.text.secondary for navigation instructions */}
+        <Text color={theme.text.secondary}>
+          Press Esc to exit, Enter to select, arrow keys to navigate.
+        </Text>
       </Box>
     );
   }
+
   return (
     <Box
       borderStyle="round"

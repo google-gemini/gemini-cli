@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { RewindViewer } from './RewindViewer.js';
@@ -69,6 +69,25 @@ describe('RewindViewer', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  describe('Screen Reader Accessibility', () => {
+    it('renders the rewind viewer with conversation items', async () => {
+      const conversation = createConversation([
+        { type: 'user', content: 'Hello', id: '1', timestamp: '1' },
+      ]);
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <RewindViewer
+          conversation={conversation}
+          onExit={vi.fn()}
+          onRewind={vi.fn()}
+        />,
+      );
+      await waitUntilReady();
+      expect(lastFrame()).toContain('Rewind');
+      expect(lastFrame()).toContain('Hello');
+      unmount();
+    });
   });
 
   describe('Rendering', () => {

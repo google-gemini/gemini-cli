@@ -50,6 +50,8 @@ interface RewindConfirmationProps {
   onConfirm: (outcome: RewindOutcome) => void;
   terminalWidth: number;
   timestamp?: string;
+  // FIX #3: accept isScreenReaderEnabled to render accessible confirmation view
+  isScreenReaderEnabled?: boolean;
 }
 
 export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
@@ -57,6 +59,7 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
   onConfirm,
   terminalWidth,
   timestamp,
+  isScreenReaderEnabled = false,
 }) => {
   useKeypress(
     (key) => {
@@ -83,6 +86,56 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
         option.value !== RewindOutcome.RevertOnly,
     );
   }, [stats]);
+
+  // FIX #3: accessible plain-text confirmation view for screen reader users
+  if (isScreenReaderEnabled) {
+    return (
+      <Box flexDirection="column" width={terminalWidth}>
+        <Text bold>Confirm Rewind</Text>
+
+        {stats && (
+          <Box flexDirection="column">
+            <Text>
+              {stats.fileCount === 1
+                ? `File: ${stats.details?.at(0)?.fileName}`
+                : `${stats.fileCount} files affected`}
+            </Text>
+            <Text>Lines added: {stats.addedLines}</Text>
+            <Text>Lines removed: {stats.removedLines}</Text>
+            {timestamp && <Text>({formatTimeAgo(timestamp)})</Text>}
+            <Text>
+              Note: Rewinding does not affect files edited manually or by the
+              shell tool.
+            </Text>
+          </Box>
+        )}
+
+        {!stats && (
+          <Box>
+            <Text color={theme.text.secondary}>No code changes to revert.</Text>
+            {timestamp && (
+              <Text color={theme.text.secondary}>
+                {' '}
+                ({formatTimeAgo(timestamp)})
+              </Text>
+            )}
+          </Box>
+        )}
+
+        <Text>Select an action:</Text>
+        {/* FIX #6: use theme.text.secondary for navigation hint */}
+        <Text color={theme.text.secondary}>
+          Use arrow keys to navigate, Enter to confirm, Esc to cancel.
+        </Text>
+
+        <RadioButtonSelect
+          items={options}
+          onSelect={handleSelect}
+          isFocused={true}
+        />
+      </Box>
+    );
+  }
 
   return (
     <Box
