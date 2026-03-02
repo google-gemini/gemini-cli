@@ -370,14 +370,22 @@ export class AgentRegistry {
         definition.agentCardUrl,
         authHandler,
       );
-      if (agentCard.skills && agentCard.skills.length > 0) {
-        definition.description = agentCard.skills
-          .map(
-            (skill: { name: string; description: string }) =>
-              `${skill.name}: ${skill.description}`,
-          )
-          .join('\n');
+
+      const userDescription = definition.description;
+      const agentDescription = agentCard.description;
+      const descriptions: string[] = [];
+
+      if (userDescription?.trim()) {
+        descriptions.push(`User Description: ${userDescription.trim()}`);
       }
+      if (agentDescription?.trim()) {
+        descriptions.push(`Agent Description: ${agentDescription.trim()}`);
+      }
+
+      if (descriptions.length > 0) {
+        definition.description = descriptions.join('\n');
+      }
+
       if (this.config.getDebugMode()) {
         debugLogger.log(
           `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl}`,

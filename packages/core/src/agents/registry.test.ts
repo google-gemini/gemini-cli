@@ -572,6 +572,63 @@ describe('AgentRegistry', () => {
       );
     });
 
+    it('should merge user and agent description when registering a remote agent', async () => {
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgentWithDescription',
+        description: 'User-provided description',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      const mockAgentCard = {
+        name: 'RemoteAgentWithDescription',
+        description: 'Card-provided description',
+      };
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue(mockAgentCard),
+        clearCache: vi.fn(),
+      } as unknown as A2AClientManager);
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      const registered = registry.getDefinition('RemoteAgentWithDescription');
+      expect(registered?.description).toBe(
+        'User Description: User-provided description\nAgent Description: Card-provided description',
+      );
+    });
+
+    it('should handle empty user or agent descriptions during merging', async () => {
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgentWithEmptyAgentDescription',
+        description: 'User-provided description',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      const mockAgentCard = {
+        name: 'RemoteAgentWithEmptyAgentDescription',
+        description: '', // Empty agent description
+      };
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue(mockAgentCard),
+        clearCache: vi.fn(),
+      } as unknown as A2AClientManager);
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      const registered = registry.getDefinition(
+        'RemoteAgentWithEmptyAgentDescription',
+      );
+      // Should only contain user description
+      expect(registered?.description).toBe(
+        'User Description: User-provided description',
+      );
+    });
+
     it('should handle special characters in agent names', async () => {
       const specialAgent = {
         ...MOCK_AGENT_V1,
