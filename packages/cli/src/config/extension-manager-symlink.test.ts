@@ -130,4 +130,64 @@ describe('ExtensionManager symlink handling', () => {
     expect(extension.installMetadata?.source).toBe(absolutePath);
     expect(extension.installMetadata?.source).not.toBe(realPath);
   });
+
+  it('enforces allowedExtensions using the real path', async () => {
+    const absolutePath = path.resolve(symlinkDir);
+    const realPath = getRealPath(absolutePath);
+    
+    const settings = {
+        security: {
+          folderTrust: { enabled: false },
+          // Only allow the real path, not the symlink path
+          allowedExtensions: [realPath.replace(/\\/g, '\\\\')] 
+        },
+        experimental: { extensionConfig: false },
+        admin: { extensions: { enabled: true }, mcp: { enabled: true } },
+        hooksConfig: { enabled: true }
+      } as unknown as MergedSettings;
+
+    const manager = new ExtensionManager({
+      workspaceDir,
+      settings,
+      requestConsent: () => Promise.resolve(true),
+      requestSetting: null,
+    });
+
+    const installMetadata = {
+      source: absolutePath,
+      type: 'link' as const,
+    };
+
+    await manager.loadExtensions();
+    // This should pass because realPath is allowed
+    const extension = await manager.installOrUpdateExtension(installMetadata);
+    expect(extension.name).toBe('test-ext');
+
+    // Now try with a settings that only allows the symlink path string
+    const settingsOnlySymlink = {
+        security: {
+          folderTrust: { enabled: false },
+          // Only allow the symlink path string explicitly
+          allowedExtensions: [absolutePath.replace(/\\/g, '\\\\')]
+        },
+        experimental: { extensionConfig: false },
+        admin: { extensions: { enabled: true }, mcp: { enabled: true } },
+        hooksConfig: { enabled: true }
+      } as unknown as MergedSettings;
+
+    const manager2 = new ExtensionManager({
+      workspaceDir,
+      settings: settingsOnlySymlink,
+      requestConsent: () => Promise.resolve(true),
+      requestSetting: null,
+    });
+
+    // This should FAIL because it checks the real path against the pattern
+    // (Unless symlinkDir === extensionDir, which shouldn't happen in this test setup)
+    if (absolutePath !== realPath) {
+        await expect(manager2.installOrUpdateExtension(installMetadata)).rejects.toThrow(
+            /is not allowed by the "allowedExtensions" security setting/
+        );
+    }
+  });
 });
