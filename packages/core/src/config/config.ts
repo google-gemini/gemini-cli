@@ -1056,7 +1056,7 @@ export class Config implements McpContext {
         ...DEFAULT_MODEL_CONFIGS,
         ...modelConfigServiceConfig,
         aliases: {
-          ...DEFAULT_MODEL_CONFIGS.aliases,
+          ...(DEFAULT_MODEL_CONFIGS.aliases ?? {}),
           ...(modelConfigServiceConfig.aliases ?? {}),
         },
         overrides: [
