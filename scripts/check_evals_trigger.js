@@ -12,8 +12,8 @@ const EVALS_FILE_PREFIXES = [
 
 function main() {
   try {
-    // Fetch main branch to compare against. Use || true to avoid failing if already up to date or no remote.
-    execSync('git fetch https://github.com/google-gemini/gemini-cli.git main', {
+    // Fetch main branch from origin.
+    execSync('git fetch origin main', {
       stdio: 'ignore',
     });
 
