@@ -193,9 +193,15 @@ export async function start_sandbox(
           );
         });
         debugLogger.log('waiting for proxy to start ...');
-        await execAsync(
-          `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
-        );
+        try {
+          await execAsync(
+            `timeout 30 bash -c 'until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done'`,
+          );
+        } catch {
+          throw new FatalSandboxError(
+            `Proxy health check timed out after 30s. Verify that GEMINI_SANDBOX_PROXY_COMMAND is correct: '${proxyCommand}'`,
+          );
+        }
       }
       // spawn child and let it inherit stdio
       process.stdin.pause();
@@ -726,9 +732,15 @@ export async function start_sandbox(
         );
       });
       debugLogger.log('waiting for proxy to start ...');
-      await execAsync(
-        `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
-      );
+      try {
+        await execAsync(
+          `timeout 30 bash -c 'until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done'`,
+        );
+      } catch {
+        throw new FatalSandboxError(
+          `Proxy health check timed out after 30s. Verify that GEMINI_SANDBOX_PROXY_COMMAND is correct: '${proxyCommand}'`,
+        );
+      }
       // connect proxy container to sandbox network
       // (workaround for older versions of docker that don't support multiple --network args)
       await execAsync(
