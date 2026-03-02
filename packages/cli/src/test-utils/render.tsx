@@ -211,7 +211,7 @@ class XtermStdout extends EventEmitter {
     }
     await act(async () => {
       if (vi.isFakeTimers()) {
-        await vi.advanceTimersByTimeAsync(200);
+        await vi.advanceTimersByTimeAsync(50);
       } else {
         // Wait for at least one render to be called if we haven't rendered yet or since start of this call,
         // but don't wait forever as some renders might be synchronous or skipped.
@@ -220,7 +220,7 @@ class XtermStdout extends EventEmitter {
             this.once('render', resolve),
           );
           const timeoutPromise = new Promise((resolve) =>
-            setTimeout(resolve, 200),
+            setTimeout(resolve, 50),
           );
           await Promise.race([renderPromise, timeoutPromise]);
         }
@@ -261,13 +261,6 @@ class XtermStdout extends EventEmitter {
           (this.lastRenderOutput === undefined || expectedFrame === '') &&
           currentFrame === ''
         ) {
-          return true;
-        }
-
-        if (this.lastRenderOutput === undefined && currentFrame !== '') {
-          // If Ink hasn't reported a render yet but terminal has content,
-          // it means a render happened but metrics weren't captured or reported yet.
-          // In this case, we consider it a match if we are just waiting for "anything" (empty expected).
           return true;
         }
 
