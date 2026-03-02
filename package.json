@@ -62,8 +62,8 @@
     "release:version": "node scripts/version.js",
     "telemetry": "node scripts/telemetry.js",
     "data:validate": "tsx scripts/validate-data.ts",
-    "data:format": "prettier --write 'data/**/*.ts' 'data/*.json' 'scripts/validate-data.ts'",
-    "data:lint": "eslint 'data/**/*.ts' 'scripts/validate-data.ts'",
+    "data:format": "prettier --write 'data/**/*.ts' 'data/*.json' 'scripts/validate-data.ts' 'packages/core/src/evals/**/*.ts'",
+    "data:lint": "eslint 'data/**/*.ts' 'scripts/validate-data.ts' 'packages/core/src/evals/**/*.ts'",
     "check:lockfile": "node scripts/check-lockfile.js",
     "clean": "node scripts/clean.js",
     "pre-commit": "node scripts/pre-commit.js"

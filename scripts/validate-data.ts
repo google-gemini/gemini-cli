@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Scenario } from '../data/schema.ts';
+import type { Scenario } from '../packages/core/src/evals/schema.ts';
 
 const MANIFEST_FILE = 'data/manifest.json';
 const DEFAULT_DATA_DIR = 'data';
