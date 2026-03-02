@@ -213,6 +213,12 @@ describe('<AppHeader />', () => {
 
   it('should NOT render Tips when tipsShown is 10 or more', async () => {
     const mockConfig = makeFakeConfig();
+    const uiState = {
+      bannerData: {
+        defaultText: '',
+        warningText: '',
+      },
+    };
 
     persistentStateMock.setData({ tipsShown: 10 });
 
@@ -220,6 +226,7 @@ describe('<AppHeader />', () => {
       <AppHeader version="1.0.0" />,
       {
         config: mockConfig,
+        uiState,
       },
     );
     await waitUntilReady();
