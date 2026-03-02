@@ -48,6 +48,7 @@ and parameters.
 | `--delete-session`               | -     | string  | -         | Delete a session by index number (use `--list-sessions` to see available sessions)                                                                                     |
 | `--include-directories`          | -     | array   | -         | Additional directories to include in the workspace (comma-separated or multiple flags)                                                                                 |
 | `--screen-reader`                | -     | boolean | -         | Enable screen reader mode for accessibility                                                                                                                            |
+| `--google-cloud-location`        | -     | string  | -         | Google Cloud location for Vertex AI (e.g., `us-central1`). Overrides the `GOOGLE_CLOUD_LOCATION` environment variable.                                                 |
 | `--output-format`                | `-o`  | string  | `text`    | The format of the CLI output. Choices: `text`, `json`, `stream-json`                                                                                                   |
 
 ## Model selection
