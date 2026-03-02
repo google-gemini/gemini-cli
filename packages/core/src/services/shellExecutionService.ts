@@ -305,6 +305,12 @@ export class ShellExecutionService {
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const spawnArgs = [...argsPrefix, guardedCommand];
 
+      const sanitizedEnv = sanitizeEnvironment(process.env, sanitizationConfig);
+      const gitConfigCount = parseInt(
+        sanitizedEnv['GIT_CONFIG_COUNT'] || '0',
+        10,
+      );
+
       const child = cpSpawn(executable, spawnArgs, {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -312,7 +318,7 @@ export class ShellExecutionService {
         shell: false,
         detached: !isWindows,
         env: {
-          ...sanitizeEnvironment(process.env, sanitizationConfig),
+          ...sanitizedEnv,
           [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
             GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
           TERM: 'xterm-256color',
@@ -325,9 +331,9 @@ export class ShellExecutionService {
           GCM_INTERACTIVE: 'never',
           DISPLAY: '',
           DBUS_SESSION_BUS_ADDRESS: '',
-          GIT_CONFIG_COUNT: '1',
-          GIT_CONFIG_KEY_0: 'credential.helper',
-          GIT_CONFIG_VALUE_0: '',
+          GIT_CONFIG_COUNT: (gitConfigCount + 1).toString(),
+          [`GIT_CONFIG_KEY_${gitConfigCount}`]: 'credential.helper',
+          [`GIT_CONFIG_VALUE_${gitConfigCount}`]: '',
           PAGER: 'cat',
           GIT_PAGER: 'cat',
         },

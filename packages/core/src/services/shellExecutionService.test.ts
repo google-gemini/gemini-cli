@@ -1704,8 +1704,14 @@ describe('ShellExecutionService environment variables', () => {
     await new Promise(process.nextTick);
   });
 
-  it('should include headless git and gh environment variables in non-interactive mode', async () => {
+  it('should include headless git and gh environment variables in non-interactive mode and append git config safely', async () => {
     vi.resetModules();
+    vi.stubEnv('GIT_CONFIG_COUNT', '2');
+    vi.stubEnv('GIT_CONFIG_KEY_0', 'core.editor');
+    vi.stubEnv('GIT_CONFIG_VALUE_0', 'vim');
+    vi.stubEnv('GIT_CONFIG_KEY_1', 'pull.rebase');
+    vi.stubEnv('GIT_CONFIG_VALUE_1', 'true');
+
     const { ShellExecutionService } = await import(
       './shellExecutionService.js'
     );
@@ -1729,13 +1735,23 @@ describe('ShellExecutionService environment variables', () => {
     expect(cpEnv).toHaveProperty('GCM_INTERACTIVE', 'never');
     expect(cpEnv).toHaveProperty('DISPLAY', '');
     expect(cpEnv).toHaveProperty('DBUS_SESSION_BUS_ADDRESS', '');
-    expect(cpEnv).toHaveProperty('GIT_CONFIG_COUNT', '1');
-    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_0', 'credential.helper');
-    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_0', '');
+
+    // Existing values should be preserved
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_0', 'core.editor');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_0', 'vim');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_1', 'pull.rebase');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_1', 'true');
+
+    // The new credential.helper override should be appended at index 2
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_COUNT', '3');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_2', 'credential.helper');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_2', '');
 
     // Ensure child_process exits
     mockChildProcess.emit('exit', 0, null);
     mockChildProcess.emit('close', 0, null);
     await new Promise(process.nextTick);
+
+    vi.unstubAllEnvs();
   });
 });
