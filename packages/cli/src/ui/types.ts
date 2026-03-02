@@ -115,6 +115,7 @@ export interface IndividualToolCallDisplay {
   originalRequestName?: string;
   progress?: number;
   progressTotal?: number;
+  progressPercent?: number;
 }
 
 export interface CompressionProps {
