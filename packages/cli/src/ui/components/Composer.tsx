@@ -229,8 +229,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                 inline
                 thought={
                   uiState.streamingState ===
-                    StreamingState.WaitingForConfirmation ||
-                  settings.merged.ui.loadingPhrases === 'off'
+                  StreamingState.WaitingForConfirmation
                     ? undefined
                     : uiState.thought
                 }
@@ -273,8 +272,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                   inline
                   thought={
                     uiState.streamingState ===
-                      StreamingState.WaitingForConfirmation ||
-                    settings.merged.ui.loadingPhrases === 'off'
+                    StreamingState.WaitingForConfirmation
                       ? undefined
                       : uiState.thought
                   }
