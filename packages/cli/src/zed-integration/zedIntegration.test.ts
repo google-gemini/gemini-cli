@@ -569,6 +569,8 @@ describe('Session', () => {
         }),
       }),
     );
+  });
+
   it('should await MCP initialization before processing a prompt', async () => {
     const stream = createMockStream([
       {
