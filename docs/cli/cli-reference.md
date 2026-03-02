@@ -49,16 +49,17 @@ and parameters.
 | `--include-directories`          | -     | array   | -         | Additional directories to include in the workspace (comma-separated or multiple flags)                                                                                 |
 | `--screen-reader`                | -     | boolean | -         | Enable screen reader mode for accessibility                                                                                                                            |
 | `--output-format`                | `-o`  | string  | `text`    | The format of the CLI output. Choices: `text`, `json`, `stream-json`                                                                                                   |
-| `--voice`                        | -     | boolean | `false`   | Enable Hands-Free Voice Mode (experimental). This release uses text input as a temporary placeholder. Native audio streaming will be added in a future update.         |
+| `--voice`                        | -     | boolean | `false`   | Enable Hands-Free Voice Mode (experimental). This release uses terminal text input as a placeholder; native audio streaming is planned for a future PR.                |
 
 ## Hands-Free Voice Mode (experimental)
 
-Use `gemini --voice` to start a scaffolded voice-mode loop.
+Use `gemini --voice` to run the current voice-mode scaffold.
 
-- Current behavior uses text input via the terminal as a placeholder.
-- Responses are steered to short, voice-friendly sentences.
-- Native microphone/audio streaming is not implemented yet and will be added in
-  a future PR.
+- It currently accepts text input in the terminal as a placeholder for spoken
+  input.
+- Responses are steered toward concise, voice-friendly output.
+- Native microphone/audio streaming is not implemented in this PR and will be
+  added in a future PR.
 
 ## Model selection
 
