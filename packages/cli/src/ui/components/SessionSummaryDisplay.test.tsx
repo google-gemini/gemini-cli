@@ -103,15 +103,15 @@ describe('<SessionSummaryDisplay />', () => {
   });
 
   it('renders a standard UUID-formatted session ID in the footer', async () => {
-    const uuidSessionId = 'a2b4-1b3d-e6g8-5f7h';
+    const uuidSessionId = '1234-abcd-5678-efgh';
     const { lastFrame, unmount } = await renderWithMockedStats(
       emptyMetrics,
       uuidSessionId,
     );
     const output = lastFrame();
 
-    // Standard UUID characters (alphanumeric and hyphens) should not be escaped.
-    expect(output).toContain('gemini --resume a2b4-1b3d-e6g8-5f7h');
+    // Standard UUID characters should not be escaped/quoted by default for bash.
+    expect(output).toContain('gemini --resume 1234-abcd-5678-efgh');
     unmount();
   });
 
@@ -123,9 +123,8 @@ describe('<SessionSummaryDisplay />', () => {
     );
     const output = lastFrame();
 
-    // We expect every non-alphanumeric character to be backslash-escaped
-    // to keep it a single argument without needing surrounding quotes.
-    expect(output).toContain("gemini --resume \\'\\;\\ rm\\ -rf\\ \\/\\ \\#");
+    // escapeShellArg (using shell-quote for bash) will wrap special characters in double quotes.
+    expect(output).toContain('gemini --resume "\'; rm -rf / #"');
     unmount();
   });
 });
