@@ -18,6 +18,7 @@ export * from './policy/policy-engine.js';
 export * from './policy/toml-loader.js';
 export * from './policy/config.js';
 export * from './policy/integrity.js';
+export * from './billing/index.js';
 export * from './confirmation-bus/types.js';
 export * from './confirmation-bus/message-bus.js';
 
@@ -76,8 +77,10 @@ export * from './utils/quotaErrorDetection.js';
 export * from './utils/userAccountManager.js';
 export * from './utils/authConsent.js';
 export * from './utils/googleQuotaErrors.js';
+export * from './utils/googleErrors.js';
 export * from './utils/fileUtils.js';
 export * from './utils/planUtils.js';
+export * from './utils/approvalModeUtils.js';
 export * from './utils/fileDiffUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
@@ -97,6 +100,7 @@ export * from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';
 export * from './utils/promptIdContext.js';
 export * from './utils/thoughtUtils.js';
+export * from './utils/secure-browser-launcher.js';
 export * from './utils/debugLogger.js';
 export * from './utils/events.js';
 export * from './utils/extensionLoader.js';
@@ -107,6 +111,7 @@ export * from './utils/secure-browser-launcher.js';
 export * from './utils/apiConversionUtils.js';
 export * from './utils/channel.js';
 export * from './utils/constants.js';
+export * from './utils/sessionUtils.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -181,6 +186,9 @@ export { OAuthUtils } from './mcp/oauth-utils.js';
 
 // Export telemetry functions
 export * from './telemetry/index.js';
+export * from './telemetry/billingEvents.js';
+export { logBillingEvent } from './telemetry/loggers.js';
+export * from './telemetry/constants.js';
 export { sessionId, createSessionId } from './utils/session.js';
 export * from './utils/compatibility.js';
 export * from './utils/browser.js';

@@ -29,7 +29,11 @@ import {
   getThemeTypeFromBackgroundColor,
   resolveColor,
 } from './color-utils.js';
-import { DEFAULT_BORDER_OPACITY } from '../constants.js';
+import {
+  DEFAULT_BACKGROUND_OPACITY,
+  DEFAULT_INPUT_BACKGROUND_OPACITY,
+  DEFAULT_BORDER_OPACITY,
+} from '../constants.js';
 import { ANSI } from './ansi.js';
 import { ANSILight } from './ansi-light.js';
 import { NoColorTheme } from './no-color.js';
@@ -57,7 +61,13 @@ class ThemeManager {
   private cachedSemanticColors: SemanticColors | undefined;
   private lastCacheKey: string | undefined;
 
-  constructor() {
+  private fs: typeof fs;
+  private homedir: () => string;
+
+  constructor(dependencies?: { fs?: typeof fs; homedir?: () => string }) {
+    this.fs = dependencies?.fs ?? fs;
+    this.homedir = dependencies?.homedir ?? homedir;
+
     this.availableThemes = [
       AyuDark,
       AyuLight,
@@ -238,10 +248,44 @@ class ThemeManager {
   }
 
   /**
-   * Sets the active theme.
-   * @param themeName The name of the theme to set as active.
-   * @returns True if the theme was successfully set, false otherwise.
+   * Clears all themes loaded from files.
+   * This is primarily for testing purposes to reset state between tests.
    */
+  clearFileThemes(): void {
+    this.fileThemes.clear();
+  }
+
+  /**
+   * Re-initializes the ThemeManager with new dependencies.
+   * This is primarily for testing to allow injecting mocks.
+   */
+  reinitialize(dependencies: { fs?: typeof fs; homedir?: () => string }): void {
+    if (dependencies.fs) {
+      this.fs = dependencies.fs;
+    }
+    if (dependencies.homedir) {
+      this.homedir = dependencies.homedir;
+    }
+  }
+
+  /**
+   * Resets the ThemeManager state to defaults.
+   * This is for testing purposes to ensure test isolation.
+   */
+  resetForTesting(dependencies?: {
+    fs?: typeof fs;
+    homedir?: () => string;
+  }): void {
+    if (dependencies) {
+      this.reinitialize(dependencies);
+    }
+    this.settingsThemes.clear();
+    this.extensionThemes.clear();
+    this.fileThemes.clear();
+    this.activeTheme = DEFAULT_THEME;
+    this.terminalBackground = undefined;
+    this.clearCache();
+  }
   setActiveTheme(themeName: string | undefined): boolean {
     const theme = this.findThemeByName(themeName);
     if (!theme) {
@@ -310,7 +354,21 @@ class ThemeManager {
       this.cachedColors = {
         ...colors,
         Background: this.terminalBackground,
-        DarkGray: interpolateColor(colors.Gray, this.terminalBackground, 0.5),
+        DarkGray: interpolateColor(
+          this.terminalBackground,
+          colors.Gray,
+          DEFAULT_BORDER_OPACITY,
+        ),
+        InputBackground: interpolateColor(
+          this.terminalBackground,
+          colors.Gray,
+          DEFAULT_INPUT_BACKGROUND_OPACITY,
+        ),
+        MessageBackground: interpolateColor(
+          this.terminalBackground,
+          colors.Gray,
+          DEFAULT_BACKGROUND_OPACITY,
+        ),
       };
     } else {
       this.cachedColors = colors;
@@ -336,27 +394,22 @@ class ThemeManager {
       this.terminalBackground &&
       this.isThemeCompatible(activeTheme, this.terminalBackground)
     ) {
+      const colors = this.getColors();
       this.cachedSemanticColors = {
         ...semanticColors,
         background: {
           ...semanticColors.background,
           primary: this.terminalBackground,
+          message: colors.MessageBackground!,
+          input: colors.InputBackground!,
         },
         border: {
           ...semanticColors.border,
-          default: interpolateColor(
-            this.terminalBackground,
-            activeTheme.colors.Gray,
-            DEFAULT_BORDER_OPACITY,
-          ),
+          default: colors.DarkGray,
         },
         ui: {
           ...semanticColors.ui,
-          dark: interpolateColor(
-            activeTheme.colors.Gray,
-            this.terminalBackground,
-            0.5,
-          ),
+          dark: colors.DarkGray,
         },
       };
     } else {
@@ -492,7 +545,7 @@ class ThemeManager {
   private loadThemeFromFile(themePath: string): Theme | undefined {
     try {
       // realpathSync resolves the path and throws if it doesn't exist.
-      const canonicalPath = fs.realpathSync(path.resolve(themePath));
+      const canonicalPath = this.fs.realpathSync(path.resolve(themePath));
 
       // 1. Check cache using the canonical path.
       if (this.fileThemes.has(canonicalPath)) {
@@ -500,7 +553,7 @@ class ThemeManager {
       }
 
       // 2. Perform security check.
-      const homeDir = path.resolve(homedir());
+      const homeDir = path.resolve(this.homedir());
       if (!canonicalPath.startsWith(homeDir)) {
         debugLogger.warn(
           `Theme file at "${themePath}" is outside your home directory. ` +
@@ -510,7 +563,7 @@ class ThemeManager {
       }
 
       // 3. Read, parse, and validate the theme file.
-      const themeContent = fs.readFileSync(canonicalPath, 'utf-8');
+      const themeContent = this.fs.readFileSync(canonicalPath, 'utf-8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const customThemeConfig = JSON.parse(themeContent) as CustomTheme;
 

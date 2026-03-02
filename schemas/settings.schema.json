@@ -117,16 +117,16 @@
               "description": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.",
               "markdownDescription": "The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.\n\n- Category: `General`\n- Requires restart: `yes`",
               "type": "string"
+            },
+            "modelRouting": {
+              "title": "Plan Model Routing",
+              "description": "Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.",
+              "markdownDescription": "Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
             }
           },
           "additionalProperties": false
-        },
-        "enablePromptCompletion": {
-          "title": "Enable Prompt Completion",
-          "description": "Enable AI-powered prompt completion suggestions while typing.",
-          "markdownDescription": "Enable AI-powered prompt completion suggestions while typing.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
         },
         "retryFetchErrors": {
           "title": "Retry Fetch Errors",
@@ -134,6 +134,13 @@
           "markdownDescription": "Retry on \"exception TypeError: fetch failed sending request\" errors.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "maxAttempts": {
+          "title": "Max Chat Model Attempts",
+          "description": "Maximum number of attempts for requests to the main chat model. Cannot exceed 10.",
+          "markdownDescription": "Maximum number of attempts for requests to the main chat model. Cannot exceed 10.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `10`",
+          "default": 10,
+          "type": "number"
         },
         "debugKeystrokeLogging": {
           "title": "Debug Keystroke Logging",
@@ -429,6 +436,14 @@
           "type": "string",
           "enum": ["tips", "witty", "all", "off"]
         },
+        "errorVerbosity": {
+          "title": "Error Verbosity",
+          "description": "Controls whether recoverable errors are hidden (low) or fully shown (full).",
+          "markdownDescription": "Controls whether recoverable errors are hidden (low) or fully shown (full).\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `low`",
+          "default": "low",
+          "type": "string",
+          "enum": ["low", "full"]
+        },
         "customWittyPhrases": {
           "title": "Custom Witty Phrases",
           "description": "Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.",
@@ -512,6 +527,24 @@
       "description": "Telemetry configuration.",
       "markdownDescription": "Telemetry configuration.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
       "$ref": "#/$defs/TelemetrySettings"
+    },
+    "billing": {
+      "title": "Billing",
+      "description": "Billing and AI credits settings.",
+      "markdownDescription": "Billing and AI credits settings.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "overageStrategy": {
+          "title": "Overage Strategy",
+          "description": "How to handle quota exhaustion when AI credits are available. 'ask' prompts each time, 'always' automatically uses credits, 'never' disables credit usage.",
+          "markdownDescription": "How to handle quota exhaustion when AI credits are available. 'ask' prompts each time, 'always' automatically uses credits, 'never' disables credit usage.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `ask`",
+          "default": "ask",
+          "type": "string",
+          "enum": ["ask", "always", "never"]
+        }
+      },
+      "additionalProperties": false
     },
     "model": {
       "title": "Model",
@@ -1093,6 +1126,43 @@
           "additionalProperties": {
             "$ref": "#/$defs/AgentOverride"
           }
+        },
+        "browser": {
+          "title": "Browser Agent",
+          "description": "Settings specific to the browser agent.",
+          "markdownDescription": "Settings specific to the browser agent.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "sessionMode": {
+              "title": "Browser Session Mode",
+              "description": "Session mode: 'persistent', 'isolated', or 'existing'.",
+              "markdownDescription": "Session mode: 'persistent', 'isolated', or 'existing'.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `persistent`",
+              "default": "persistent",
+              "type": "string",
+              "enum": ["persistent", "isolated", "existing"]
+            },
+            "headless": {
+              "title": "Browser Headless",
+              "description": "Run browser in headless mode.",
+              "markdownDescription": "Run browser in headless mode.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "profilePath": {
+              "title": "Browser Profile Path",
+              "description": "Path to browser profile directory for session persistence.",
+              "markdownDescription": "Path to browser profile directory for session persistence.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+              "type": "string"
+            },
+            "visualModel": {
+              "title": "Browser Visual Model",
+              "description": "Model override for the visual agent.",
+              "markdownDescription": "Model override for the visual agent.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -1479,6 +1549,13 @@
             }
           },
           "additionalProperties": false
+        },
+        "enableConseca": {
+          "title": "Enable Context-Aware Security",
+          "description": "Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.",
+          "markdownDescription": "Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -1636,6 +1713,54 @@
           "markdownDescription": "Enable model steering (user hints) to guide the model during tool execution.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "directWebFetch": {
+          "title": "Direct Web Fetch",
+          "description": "Enable web fetch behavior that bypasses LLM summarization.",
+          "markdownDescription": "Enable web fetch behavior that bypasses LLM summarization.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "gemmaModelRouter": {
+          "title": "Gemma Model Router",
+          "description": "Enable Gemma model router (experimental).",
+          "markdownDescription": "Enable Gemma model router (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Gemma Model Router",
+              "description": "Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.",
+              "markdownDescription": "Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "classifier": {
+              "title": "Classifier",
+              "description": "Classifier configuration.",
+              "markdownDescription": "Classifier configuration.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "host": {
+                  "title": "Host",
+                  "description": "The host of the classifier.",
+                  "markdownDescription": "The host of the classifier.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `http://localhost:9379`",
+                  "default": "http://localhost:9379",
+                  "type": "string"
+                },
+                "model": {
+                  "title": "Model",
+                  "description": "The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.",
+                  "markdownDescription": "The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemma3-1b-gpu-custom`",
+                  "default": "gemma3-1b-gpu-custom",
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

@@ -25,6 +25,54 @@ import {
   GET_INTERNAL_DOCS_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  // Shared parameter names
+  PARAM_FILE_PATH,
+  PARAM_DIR_PATH,
+  PARAM_PATTERN,
+  PARAM_CASE_SENSITIVE,
+  PARAM_RESPECT_GIT_IGNORE,
+  PARAM_RESPECT_GEMINI_IGNORE,
+  PARAM_FILE_FILTERING_OPTIONS,
+  // Tool-specific parameter names
+  READ_FILE_PARAM_START_LINE,
+  READ_FILE_PARAM_END_LINE,
+  WRITE_FILE_PARAM_CONTENT,
+  GREP_PARAM_INCLUDE_PATTERN,
+  GREP_PARAM_EXCLUDE_PATTERN,
+  GREP_PARAM_NAMES_ONLY,
+  GREP_PARAM_MAX_MATCHES_PER_FILE,
+  GREP_PARAM_TOTAL_MAX_MATCHES,
+  GREP_PARAM_FIXED_STRINGS,
+  GREP_PARAM_CONTEXT,
+  GREP_PARAM_AFTER,
+  GREP_PARAM_BEFORE,
+  GREP_PARAM_NO_IGNORE,
+  EDIT_PARAM_INSTRUCTION,
+  EDIT_PARAM_OLD_STRING,
+  EDIT_PARAM_NEW_STRING,
+  EDIT_PARAM_ALLOW_MULTIPLE,
+  LS_PARAM_IGNORE,
+  WEB_SEARCH_PARAM_QUERY,
+  WEB_FETCH_PARAM_PROMPT,
+  READ_MANY_PARAM_INCLUDE,
+  READ_MANY_PARAM_EXCLUDE,
+  READ_MANY_PARAM_RECURSIVE,
+  READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
+  MEMORY_PARAM_FACT,
+  TODOS_PARAM_TODOS,
+  TODOS_ITEM_PARAM_DESCRIPTION,
+  TODOS_ITEM_PARAM_STATUS,
+  DOCS_PARAM_PATH,
+  ASK_USER_PARAM_QUESTIONS,
+  ASK_USER_QUESTION_PARAM_QUESTION,
+  ASK_USER_QUESTION_PARAM_HEADER,
+  ASK_USER_QUESTION_PARAM_TYPE,
+  ASK_USER_QUESTION_PARAM_OPTIONS,
+  ASK_USER_QUESTION_PARAM_MULTI_SELECT,
+  ASK_USER_QUESTION_PARAM_PLACEHOLDER,
+  ASK_USER_OPTION_PARAM_LABEL,
+  ASK_USER_OPTION_PARAM_DESCRIPTION,
+  PLAN_MODE_PARAM_REASON,
 } from '../base-declarations.js';
 import {
   getShellDeclaration,
@@ -42,42 +90,42 @@ export const GEMINI_3_SET: CoreToolSet = {
     parametersJsonSchema: {
       type: 'object',
       properties: {
-        file_path: {
+        [PARAM_FILE_PATH]: {
           description: 'The path to the file to read.',
           type: 'string',
         },
-        start_line: {
+        [READ_FILE_PARAM_START_LINE]: {
           description:
             'Optional: The 1-based line number to start reading from.',
           type: 'number',
         },
-        end_line: {
+        [READ_FILE_PARAM_END_LINE]: {
           description:
             'Optional: The 1-based line number to end reading at (inclusive).',
           type: 'number',
         },
       },
-      required: ['file_path'],
+      required: [PARAM_FILE_PATH],
     },
   },
 
   write_file: {
     name: WRITE_FILE_TOOL_NAME,
-    description: `Writes content to a specified file in the local filesystem.
-The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
+    description: `Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use '${EDIT_TOOL_NAME}' for targeted edits to large files.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
-        file_path: {
-          description: 'The path to the file to write to.',
+        [PARAM_FILE_PATH]: {
+          description: 'Path to the file.',
           type: 'string',
         },
-        content: {
-          description: 'The content to write to the file.',
+        [WRITE_FILE_PARAM_CONTENT]: {
+          description:
+            "The complete content to write. Provide the full file; do not use placeholders like '// ... rest of code'.",
           type: 'string',
         },
       },
-      required: ['file_path', 'content'],
+      required: [PARAM_FILE_PATH, WRITE_FILE_PARAM_CONTENT],
     },
   },
 
@@ -88,43 +136,43 @@ The user has the ability to modify \`content\`. If modified, this will be stated
     parametersJsonSchema: {
       type: 'object',
       properties: {
-        pattern: {
+        [PARAM_PATTERN]: {
           description: `The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').`,
           type: 'string',
         },
-        dir_path: {
+        [PARAM_DIR_PATH]: {
           description:
             'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
           type: 'string',
         },
-        include: {
+        [GREP_PARAM_INCLUDE_PATTERN]: {
           description: `Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).`,
           type: 'string',
         },
-        exclude_pattern: {
+        [GREP_PARAM_EXCLUDE_PATTERN]: {
           description:
             'Optional: A regular expression pattern to exclude from the search results. If a line matches both the pattern and the exclude_pattern, it will be omitted.',
           type: 'string',
         },
-        names_only: {
+        [GREP_PARAM_NAMES_ONLY]: {
           description:
             'Optional: If true, only the file paths of the matches will be returned, without the line content or line numbers. This is useful for gathering a list of files.',
           type: 'boolean',
         },
-        max_matches_per_file: {
+        [GREP_PARAM_MAX_MATCHES_PER_FILE]: {
           description:
             'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
           type: 'integer',
           minimum: 1,
         },
-        total_max_matches: {
+        [GREP_PARAM_TOTAL_MAX_MATCHES]: {
           description:
             'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.',
           type: 'integer',
           minimum: 1,
         },
       },
-      required: ['pattern'],
+      required: [PARAM_PATTERN],
     },
   },
 
@@ -135,76 +183,76 @@ The user has the ability to modify \`content\`. If modified, this will be stated
     parametersJsonSchema: {
       type: 'object',
       properties: {
-        pattern: {
+        [PARAM_PATTERN]: {
           description: `The pattern to search for. By default, treated as a Rust-flavored regular expression. Use '\\b' for precise symbol matching (e.g., '\\bMatchMe\\b').`,
           type: 'string',
         },
-        dir_path: {
+        [PARAM_DIR_PATH]: {
           description:
             "Directory or file to search. Directories are searched recursively. Relative paths are resolved against current working directory. Defaults to current working directory ('.') if omitted.",
           type: 'string',
         },
-        include: {
+        [GREP_PARAM_INCLUDE_PATTERN]: {
           description:
             "Glob pattern to filter files (e.g., '*.ts', 'src/**'). Recommended for large repositories to reduce noise. Defaults to all files if omitted.",
           type: 'string',
         },
-        exclude_pattern: {
+        [GREP_PARAM_EXCLUDE_PATTERN]: {
           description:
             'Optional: A regular expression pattern to exclude from the search results. If a line matches both the pattern and the exclude_pattern, it will be omitted.',
           type: 'string',
         },
-        names_only: {
+        [GREP_PARAM_NAMES_ONLY]: {
           description:
             'Optional: If true, only the file paths of the matches will be returned, without the line content or line numbers. This is useful for gathering a list of files.',
           type: 'boolean',
         },
-        case_sensitive: {
+        [PARAM_CASE_SENSITIVE]: {
           description:
             'If true, search is case-sensitive. Defaults to false (ignore case) if omitted.',
           type: 'boolean',
         },
-        fixed_strings: {
+        [GREP_PARAM_FIXED_STRINGS]: {
           description:
             'If true, treats the `pattern` as a literal string instead of a regular expression. Defaults to false (basic regex) if omitted.',
           type: 'boolean',
         },
-        context: {
+        [GREP_PARAM_CONTEXT]: {
           description:
             'Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.',
           type: 'integer',
         },
-        after: {
+        [GREP_PARAM_AFTER]: {
           description:
             'Show this many lines after each match (equivalent to grep -A). Defaults to 0 if omitted.',
           type: 'integer',
           minimum: 0,
         },
-        before: {
+        [GREP_PARAM_BEFORE]: {
           description:
             'Show this many lines before each match (equivalent to grep -B). Defaults to 0 if omitted.',
           type: 'integer',
           minimum: 0,
         },
-        no_ignore: {
+        [GREP_PARAM_NO_IGNORE]: {
           description:
             'If true, searches all files including those usually ignored (like in .gitignore, build/, dist/, etc). Defaults to false if omitted.',
           type: 'boolean',
         },
-        max_matches_per_file: {
+        [GREP_PARAM_MAX_MATCHES_PER_FILE]: {
           description:
             'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
           type: 'integer',
           minimum: 1,
         },
-        total_max_matches: {
+        [GREP_PARAM_TOTAL_MAX_MATCHES]: {
           description:
             'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.',
           type: 'integer',
           minimum: 1,
         },
       },
-      required: ['pattern'],
+      required: [PARAM_PATTERN],
     },
   },
 
@@ -215,33 +263,33 @@ The user has the ability to modify \`content\`. If modified, this will be stated
     parametersJsonSchema: {
       type: 'object',
       properties: {
-        pattern: {
+        [PARAM_PATTERN]: {
           description:
             "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
           type: 'string',
         },
-        dir_path: {
+        [PARAM_DIR_PATH]: {
           description:
             'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
           type: 'string',
         },
-        case_sensitive: {
+        [PARAM_CASE_SENSITIVE]: {
           description:
             'Optional: Whether the search should be case-sensitive. Defaults to false.',
           type: 'boolean',
         },
-        respect_git_ignore: {
+        [PARAM_RESPECT_GIT_IGNORE]: {
           description:
             'Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.',
           type: 'boolean',
         },
-        respect_gemini_ignore: {
+        [PARAM_RESPECT_GEMINI_IGNORE]: {
           description:
             'Optional: Whether to respect .geminiignore patterns when finding files. Defaults to true.',
           type: 'boolean',
         },
       },
-      required: ['pattern'],
+      required: [PARAM_PATTERN],
     },
   },
 
@@ -252,28 +300,28 @@ The user has the ability to modify \`content\`. If modified, this will be stated
     parametersJsonSchema: {
       type: 'object',
       properties: {
-        dir_path: {
+        [PARAM_DIR_PATH]: {
           description: 'The path to the directory to list',
           type: 'string',
         },
-        ignore: {
+        [LS_PARAM_IGNORE]: {
           description: 'List of glob patterns to ignore',
           items: {
             type: 'string',
           },
           type: 'array',
         },
-        file_filtering_options: {
+        [PARAM_FILE_FILTERING_OPTIONS]: {
           description:
             'Optional: Whether to respect ignore patterns from .gitignore or .geminiignore',
           type: 'object',
           properties: {
-            respect_git_ignore: {
+            [PARAM_RESPECT_GIT_IGNORE]: {
               description:
                 'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
               type: 'boolean',
             },
-            respect_gemini_ignore: {
+            [PARAM_RESPECT_GEMINI_IGNORE]: {
               description:
                 'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
               type: 'boolean',
@@ -281,7 +329,7 @@ The user has the ability to modify \`content\`. If modified, this will be stated
           },
         },
       },
-      required: ['dir_path'],
+      required: [PARAM_DIR_PATH],
     },
   },
 
@@ -290,70 +338,74 @@ The user has the ability to modify \`content\`. If modified, this will be stated
 
   replace: {
     name: EDIT_TOOL_NAME,
-    description: `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences ONLY when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting.
+    description: `Replaces text within a file. By default, the tool expects to find and replace exactly ONE occurrence of \`old_string\`. If you want to replace multiple occurrences of the exact same string, set \`allow_multiple\` to true. This tool requires providing significant context around the change to ensure precise targeting.
 The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
-        file_path: {
+        [PARAM_FILE_PATH]: {
           description: 'The path to the file to modify.',
           type: 'string',
         },
-        instruction: {
+        [EDIT_PARAM_INSTRUCTION]: {
           description: `A clear, semantic instruction for the code change, acting as a high-quality prompt for an expert LLM assistant. It must be self-contained and explain the goal of the change.`,
           type: 'string',
         },
-        old_string: {
+        [EDIT_PARAM_OLD_STRING]: {
           description:
             'The exact literal text to replace, unescaped. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
           type: 'string',
         },
-        new_string: {
+        [EDIT_PARAM_NEW_STRING]: {
           description:
-            'The exact literal text to replace `old_string` with, unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic.',
+            "The exact literal text to replace `old_string` with, unescaped. Provide the EXACT text. Ensure the resulting code is correct and idiomatic. Do not use omission placeholders like '(rest of methods ...)', '...', or 'unchanged code'; provide exact literal code.",
           type: 'string',
         },
-        expected_replacements: {
-          type: 'number',
+        [EDIT_PARAM_ALLOW_MULTIPLE]: {
+          type: 'boolean',
           description:
-            'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
-          minimum: 1,
+            'If true, the tool will replace all occurrences of `old_string`. If false (default), it will only succeed if exactly one occurrence is found.',
         },
       },
-      required: ['file_path', 'instruction', 'old_string', 'new_string'],
+      required: [
+        PARAM_FILE_PATH,
+        EDIT_PARAM_INSTRUCTION,
+        EDIT_PARAM_OLD_STRING,
+        EDIT_PARAM_NEW_STRING,
+      ],
     },
   },
 
   google_web_search: {
     name: WEB_SEARCH_TOOL_NAME,
-    description:
-      'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.',
+    description: `Performs a grounded Google Search to find information across the internet. Returns a synthesized answer with citations (e.g., [1]) and source URIs. Best for finding up-to-date documentation, troubleshooting obscure errors, or broad research. Use this when you don't have a specific URL. If a search result requires deeper analysis, follow up by using '${WEB_FETCH_TOOL_NAME}' on the provided URI.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
-        query: {
+        [WEB_SEARCH_PARAM_QUERY]: {
           type: 'string',
-          description: 'The search query to find information on the web.',
+          description:
+            "The search query. Supports natural language questions (e.g., 'Latest breaking changes in React 19') or specific technical queries.",
         },
       },
-      required: ['query'],
+      required: [WEB_SEARCH_PARAM_QUERY],
     },
   },
 
   web_fetch: {
     name: WEB_FETCH_TOOL_NAME,
     description:
-      "Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
+      "Analyzes and extracts information from up to 20 URLs. Ideal for documentation review, technical research, or reading raw code from GitHub. You can provide specific, complex instructions for the extraction (e.g., 'Summarize the breaking changes'). Provides cited answers based on the content. GitHub 'blob' URLs are automatically converted to raw versions for better processing. Supports HTTP/HTTPS only.",
     parametersJsonSchema: {
       type: 'object',
       properties: {
-        prompt: {
+        [WEB_FETCH_PARAM_PROMPT]: {
           description:
-            'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). All URLs to be fetched must be valid and complete, starting with "http://" or "https://", and be fully-formed with a valid hostname (e.g., a domain name like "example.com" or an IP address). For example, "https://example.com" is valid, but "example.com" is not.',
+            'A string containing the URL(s) and your specific analysis instructions. Be clear about what information you want to find or summarize. Supports up to 20 URLs.',
           type: 'string',
         },
       },
-      required: ['prompt'],
+      required: [WEB_FETCH_PARAM_PROMPT],
     },
   },
 
@@ -372,7 +424,7 @@ Use this tool when the user's query implies needing the content of several files
     parametersJsonSchema: {
       type: 'object',
       properties: {
-        include: {
+        [READ_MANY_PARAM_INCLUDE]: {
           type: 'array',
           items: {
             type: 'string',
@@ -382,7 +434,7 @@ Use this tool when the user's query implies needing the content of several files
           description:
             'An array of glob patterns or paths. Examples: ["src/**/*.ts"], ["README.md", "docs/"]',
         },
-        exclude: {
+        [READ_MANY_PARAM_EXCLUDE]: {
           type: 'array',
           items: {
             type: 'string',
@@ -392,30 +444,30 @@ Use this tool when the user's query implies needing the content of several files
             'Optional. Glob patterns for files/directories to exclude. Added to default excludes if useDefaultExcludes is true. Example: "**/*.log", "temp/"',
           default: [],
         },
-        recursive: {
+        [READ_MANY_PARAM_RECURSIVE]: {
           type: 'boolean',
           description:
             'Optional. Whether to search recursively (primarily controlled by `**` in glob patterns). Defaults to true.',
           default: true,
         },
 
-        useDefaultExcludes: {
+        [READ_MANY_PARAM_USE_DEFAULT_EXCLUDES]: {
           type: 'boolean',
           description:
             'Optional. Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, binary files). Defaults to true.',
           default: true,
         },
-        file_filtering_options: {
+        [PARAM_FILE_FILTERING_OPTIONS]: {
           description:
             'Whether to respect ignore patterns from .gitignore or .geminiignore',
           type: 'object',
           properties: {
-            respect_git_ignore: {
+            [PARAM_RESPECT_GIT_IGNORE]: {
               description:
                 'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
               type: 'boolean',
             },
-            respect_gemini_ignore: {
+            [PARAM_RESPECT_GEMINI_IGNORE]: {
               description:
                 'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
               type: 'boolean',
@@ -423,30 +475,23 @@ Use this tool when the user's query implies needing the content of several files
           },
         },
       },
-      required: ['include'],
+      required: [READ_MANY_PARAM_INCLUDE],
     },
   },
 
   save_memory: {
     name: MEMORY_TOOL_NAME,
-    description: `
-Saves concise global user context (preferences, facts) for use across ALL workspaces.
-
-### CRITICAL: GLOBAL CONTEXT ONLY
-NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.
-
-- Use for "Remember X" or clear personal facts.
-- Do NOT use for session context.`,
+    description: `Persists global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike '${WRITE_FILE_TOOL_NAME}', which is for project-specific files, this appends to a global memory file loaded in every workspace. If you are unsure whether a fact should be remembered globally, ask the user first. CRITICAL: Do not use for session-specific context or temporary data.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
-        fact: {
+        [MEMORY_PARAM_FACT]: {
           type: 'string',
           description:
-            'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
+            "A concise, global fact or preference (e.g., 'I prefer using tabs'). Do not include local paths or project-specific names.",
         },
       },
-      required: ['fact'],
+      required: [MEMORY_PARAM_FACT],
       additionalProperties: false,
     },
   },
@@ -519,7 +564,7 @@ The agent did not use the todo list because this task could be completed by a ti
     parametersJsonSchema: {
       type: 'object',
       properties: {
-        todos: {
+        [TODOS_PARAM_TODOS]: {
           type: 'array',
           description:
             'The complete list of todo items. This will replace the existing list.',
@@ -527,22 +572,22 @@ The agent did not use the todo list because this task could be completed by a ti
             type: 'object',
             description: 'A single todo item.',
             properties: {
-              description: {
+              [TODOS_ITEM_PARAM_DESCRIPTION]: {
                 type: 'string',
                 description: 'The description of the task.',
               },
-              status: {
+              [TODOS_ITEM_PARAM_STATUS]: {
                 type: 'string',
                 description: 'The current status of the task.',
                 enum: ['pending', 'in_progress', 'completed', 'cancelled'],
               },
             },
-            required: ['description', 'status'],
+            required: [TODOS_ITEM_PARAM_DESCRIPTION, TODOS_ITEM_PARAM_STATUS],
             additionalProperties: false,
           },
         },
       },
-      required: ['todos'],
+      required: [TODOS_PARAM_TODOS],
       additionalProperties: false,
     },
   },
@@ -554,7 +599,7 @@ The agent did not use the todo list because this task could be completed by a ti
     parametersJsonSchema: {
       type: 'object',
       properties: {
-        path: {
+        [DOCS_PARAM_PATH]: {
           description:
             "The relative path to the documentation file (e.g., 'cli/commands.md'). If omitted, lists all available documentation.",
           type: 'string',
@@ -566,51 +611,57 @@ The agent did not use the todo list because this task could be completed by a ti
   ask_user: {
     name: ASK_USER_TOOL_NAME,
     description:
-      'Ask the user one or more questions to gather preferences, clarify requirements, or make decisions.',
+      'Ask the user one or more questions to gather preferences, clarify requirements, or make decisions. When using this tool, prefer providing multiple-choice options with detailed descriptions and enable multi-select where appropriate to provide maximum flexibility.',
     parametersJsonSchema: {
       type: 'object',
-      required: ['questions'],
+      required: [ASK_USER_PARAM_QUESTIONS],
       properties: {
-        questions: {
+        [ASK_USER_PARAM_QUESTIONS]: {
           type: 'array',
           minItems: 1,
           maxItems: 4,
           items: {
             type: 'object',
-            required: ['question', 'header', 'type'],
+            required: [
+              ASK_USER_QUESTION_PARAM_QUESTION,
+              ASK_USER_QUESTION_PARAM_HEADER,
+              ASK_USER_QUESTION_PARAM_TYPE,
+            ],
             properties: {
-              question: {
+              [ASK_USER_QUESTION_PARAM_QUESTION]: {
                 type: 'string',
                 description:
                   'The complete question to ask the user. Should be clear, specific, and end with a question mark.',
               },
-              header: {
+              [ASK_USER_QUESTION_PARAM_HEADER]: {
                 type: 'string',
-                maxLength: 16,
                 description:
-                  'MUST be 16 characters or fewer or the call will fail. Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".',
+                  'Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".',
               },
-              type: {
+              [ASK_USER_QUESTION_PARAM_TYPE]: {
                 type: 'string',
                 enum: ['choice', 'text', 'yesno'],
                 default: 'choice',
                 description:
                   "Question type: 'choice' (default) for multiple-choice with options, 'text' for free-form input, 'yesno' for Yes/No confirmation.",
               },
-              options: {
+              [ASK_USER_QUESTION_PARAM_OPTIONS]: {
                 type: 'array',
                 description:
                   "The selectable choices for 'choice' type questions. Provide 2-4 options. An 'Other' option is automatically added. Not needed for 'text' or 'yesno' types.",
                 items: {
                   type: 'object',
-                  required: ['label', 'description'],
+                  required: [
+                    ASK_USER_OPTION_PARAM_LABEL,
+                    ASK_USER_OPTION_PARAM_DESCRIPTION,
+                  ],
                   properties: {
-                    label: {
+                    [ASK_USER_OPTION_PARAM_LABEL]: {
                       type: 'string',
                       description:
                         'The display text for this option (1-5 words). Example: "OAuth 2.0"',
                     },
-                    description: {
+                    [ASK_USER_OPTION_PARAM_DESCRIPTION]: {
                       type: 'string',
                       description:
                         'Brief explanation of this option. Example: "Industry standard, supports SSO"',
@@ -618,12 +669,12 @@ The agent did not use the todo list because this task could be completed by a ti
                   },
                 },
               },
-              multiSelect: {
+              [ASK_USER_QUESTION_PARAM_MULTI_SELECT]: {
                 type: 'boolean',
                 description:
                   "Only applies when type='choice'. Set to true to allow selecting multiple options.",
               },
-              placeholder: {
+              [ASK_USER_QUESTION_PARAM_PLACEHOLDER]: {
                 type: 'string',
                 description:
                   "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
@@ -642,7 +693,7 @@ The agent did not use the todo list because this task could be completed by a ti
     parametersJsonSchema: {
       type: 'object',
       properties: {
-        reason: {
+        [PLAN_MODE_PARAM_REASON]: {
           type: 'string',
           description:
             'Short reason explaining why you are entering plan mode.',

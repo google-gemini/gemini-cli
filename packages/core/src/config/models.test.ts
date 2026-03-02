@@ -36,6 +36,7 @@ describe('isPreviewModel', () => {
   it('should return true for preview models', () => {
     expect(isPreviewModel(PREVIEW_GEMINI_MODEL)).toBe(true);
     expect(isPreviewModel(PREVIEW_GEMINI_3_1_MODEL)).toBe(true);
+    expect(isPreviewModel(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL)).toBe(true);
     expect(isPreviewModel(PREVIEW_GEMINI_FLASH_MODEL)).toBe(true);
     expect(isPreviewModel(PREVIEW_GEMINI_MODEL_AUTO)).toBe(true);
   });

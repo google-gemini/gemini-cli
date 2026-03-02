@@ -14,6 +14,7 @@ import {
   Scheduler,
   type EditorType,
   type ToolCallsUpdateMessage,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 
@@ -114,22 +115,56 @@ export function useToolScheduler(
 
   useEffect(() => {
     const handler = (event: ToolCallsUpdateMessage) => {
-      // Update output timer for UI spinners (Side Effect)
-      if (event.toolCalls.some((tc) => tc.status === 'executing')) {
-        setLastToolOutputTime(Date.now());
-      }
+      const isRoot = event.schedulerId === ROOT_SCHEDULER_ID;
 
       setToolCallsMap((prev) => {
-        const adapted = internalAdaptToolCalls(
-          event.toolCalls,
-          prev[event.schedulerId] ?? [],
-        );
+        const prevCalls = prev[event.schedulerId] ?? [];
+        const prevCallIds = new Set(prevCalls.map((tc) => tc.request.callId));
+
+        // For non-root schedulers, we only show tool calls that:
+        // 1. Are currently awaiting approval.
+        // 2. Were previously shown (e.g., they are now executing or completed).
+        // This prevents "thinking" tools (reads/searches) from flickering in the UI
+        // unless they specifically required user interaction.
+        const filteredToolCalls = isRoot
+          ? event.toolCalls
+          : event.toolCalls.filter(
+              (tc) =>
+                tc.status === CoreToolCallStatus.AwaitingApproval ||
+                prevCallIds.has(tc.request.callId),
+            );
+
+        // If this is a subagent and we have no tools to show and weren't showing any,
+        // we can skip the update entirely to avoid unnecessary re-renders.
+        if (
+          !isRoot &&
+          filteredToolCalls.length === 0 &&
+          prevCalls.length === 0
+        ) {
+          return prev;
+        }
+
+        const adapted = internalAdaptToolCalls(filteredToolCalls, prevCalls);
 
         return {
           ...prev,
           [event.schedulerId]: adapted,
         };
       });
+
+      // Update output timer for UI spinners (Side Effect)
+      const hasExecuting = event.toolCalls.some(
+        (tc) =>
+          tc.status === CoreToolCallStatus.Executing ||
+          ((tc.status === CoreToolCallStatus.Success ||
+            tc.status === CoreToolCallStatus.Error) &&
+            'tailToolCallRequest' in tc &&
+            tc.tailToolCallRequest != null),
+      );
+
+      if (hasExecuting) {
+        setLastToolOutputTime(Date.now());
+      }
     };
 
     messageBus.subscribe(MessageBusType.TOOL_CALLS_UPDATE, handler);
@@ -238,9 +273,23 @@ function adaptToolCalls(
     const prev = prevMap.get(coreCall.request.callId);
     const responseSubmittedToGemini = prev?.responseSubmittedToGemini ?? false;
 
+    let status = coreCall.status;
+    // If a tool call has completed but scheduled a tail call, it is in a transitional
+    // state. Force the UI to render it as "executing".
+    if (
+      (status === CoreToolCallStatus.Success ||
+        status === CoreToolCallStatus.Error) &&
+      'tailToolCallRequest' in coreCall &&
+      coreCall.tailToolCallRequest != null
+    ) {
+      status = CoreToolCallStatus.Executing;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return {
       ...coreCall,
+      status,
       responseSubmittedToGemini,
-    };
+    } as TrackedToolCall;
   });
 }
