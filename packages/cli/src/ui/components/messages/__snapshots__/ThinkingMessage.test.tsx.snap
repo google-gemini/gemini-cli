@@ -1,8 +1,83 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ThinkingMessage > normalizes escaped newline tokens 1`] = `
-" │
- │ Matching the Blocks
+" │ Matching the Blocks
  │ Some more text
 "
 `;
+
+exports[`ThinkingMessage > normalizes escaped newline tokens 2`] = `
+" │ Matching the Blocks
+ │ Some more text"
+`;
+
+exports[`ThinkingMessage > renders "Thinking..." header when isFirstThinking is true 1`] = `
+" Thinking... 
+ │
+ │ Summary line
+ │ First body line
+"
+`;
+
+exports[`ThinkingMessage > renders "Thinking..." header when isFirstThinking is true 2`] = `
+" Thinking... 
+ │
+ │ Summary line
+ │ First body line"
+`;
+
+exports[`ThinkingMessage > renders full mode with left border and full text 1`] = `
+" │ Planning
+ │ I am planning the solution.
+"
+`;
+
+exports[`ThinkingMessage > renders full mode with left border and full text 2`] = `
+" │ Planning
+ │ I am planning the solution."
+`;
+
+exports[`ThinkingMessage > renders multiple thinking messages sequentially correctly 1`] = `
+" Thinking... 
+ │
+ │ Initial analysis
+ │ Understanding the core requirements of the prompt.
+ │ Planning execution
+ │ Formulating a step-by-step plan to achieve the goal.
+ │ Refining approach
+ │ Optimizing the proposed solution for better performance.
+"
+`;
+
+exports[`ThinkingMessage > renders multiple thinking messages sequentially correctly 2`] = `
+" Thinking... 
+ │
+ │ Initial analysis
+ │ Understanding the core requirements of the prompt.
+ │ Planning execution
+ │ Formulating a step-by-step plan to achieve the goal.
+ │ Refining approach
+ │ Optimizing the proposed solution for better performance."
+`;
+
+exports[`ThinkingMessage > renders subject line with vertical rule and "Thinking..." header 1`] = `
+" Thinking... 
+ │
+ │ Planning
+ │ test
+"
+`;
+
+exports[`ThinkingMessage > renders subject line with vertical rule and "Thinking..." header 2`] = `
+" Thinking... 
+ │
+ │ Planning
+ │ test"
+`;
+
+exports[`ThinkingMessage > uses description when subject is empty 1`] = `
+" │ Processing details
+"
+`;
+
+exports[`ThinkingMessage > uses description when subject is empty 2`] = `" │ Processing details"`;

@@ -172,14 +172,6 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
         </>
       )}
 
-      {!isFirstThinking && (
-        <Box flexDirection="row">
-          <Box width={THINKING_LEFT_PADDING} />
-          {verticalLine}
-          <Text> </Text>
-        </Box>
-      )}
-
       {fullSummaryDisplayLines.map((line, index) => (
         <Box key={`summary-line-row-${index}`} flexDirection="row">
           <Box width={THINKING_LEFT_PADDING} />

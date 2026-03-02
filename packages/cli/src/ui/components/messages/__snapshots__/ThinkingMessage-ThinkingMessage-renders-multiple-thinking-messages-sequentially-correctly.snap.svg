@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="156" viewBox="0 0 920 156">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="156" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs"> Thinking...                                                                                        </text>
+    <text x="9" y="19" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="36" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="36" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs"> Initial analysis                                                                                 </text>
+    <text x="9" y="53" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="53" fill="#6c7086" textLength="450" lengthAdjust="spacingAndGlyphs">Understanding the core requirements of the prompt.</text>
+    <text x="9" y="70" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="70" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs"> Planning execution                                                                               </text>
+    <text x="9" y="87" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="87" fill="#6c7086" textLength="468" lengthAdjust="spacingAndGlyphs">Formulating a step-by-step plan to achieve the goal.</text>
+    <text x="9" y="104" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="18" y="104" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs"> Refining approach                                                                                </text>
+    <text x="9" y="121" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="121" fill="#6c7086" textLength="504" lengthAdjust="spacingAndGlyphs">Optimizing the proposed solution for better performance.</text>
+  </g>
+</svg>
