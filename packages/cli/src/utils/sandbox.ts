@@ -197,9 +197,10 @@ export async function start_sandbox(
           await execAsync(
             `timeout 30 bash -c 'until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done'`,
           );
-        } catch {
+        } catch (e) {
+          debugLogger.error('Proxy health check failed:', e);
           throw new FatalSandboxError(
-            `Proxy health check timed out after 30s. Verify that GEMINI_SANDBOX_PROXY_COMMAND is correct: '${proxyCommand}'`,
+            `Proxy health check failed or timed out after 30s. Verify that GEMINI_SANDBOX_PROXY_COMMAND is correct: '${proxyCommand}'`,
           );
         }
       }
@@ -736,9 +737,10 @@ export async function start_sandbox(
         await execAsync(
           `timeout 30 bash -c 'until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done'`,
         );
-      } catch {
+      } catch (e) {
+        debugLogger.error('Proxy health check failed:', e);
         throw new FatalSandboxError(
-          `Proxy health check timed out after 30s. Verify that GEMINI_SANDBOX_PROXY_COMMAND is correct: '${proxyCommand}'`,
+          `Proxy health check failed or timed out after 30s. Verify that GEMINI_SANDBOX_PROXY_COMMAND is correct: '${proxyCommand}'`,
         );
       }
       // connect proxy container to sandbox network
