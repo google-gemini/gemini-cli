@@ -112,7 +112,7 @@ export async function maybePromptForSettings(
   const nonSensitiveSettings: Record<string, string> = {};
   for (const setting of settings) {
     const value = allSettings[setting.envVar];
-    if (value === undefined) {
+    if (value === undefined || value === '') {
       continue;
     }
     if (setting.sensitive) {
@@ -124,13 +124,34 @@ export async function maybePromptForSettings(
 
   const envContent = formatEnvContent(nonSensitiveSettings);
 
+  if (fsSync.existsSync(envFilePath)) {
+    const stat = fsSync.statSync(envFilePath);
+    if (stat.isDirectory()) {
+      throw new Error(
+        `Cannot write extension settings to ${envFilePath} because it is a directory.`,
+      );
+    }
+  }
+
   await fs.writeFile(envFilePath, envContent);
 }
 
 function formatEnvContent(settings: Record<string, string>): string {
   let envContent = '';
   for (const [key, value] of Object.entries(settings)) {
-    const formattedValue = value.includes(' ') ? `"${value}"` : value;
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) {
+      throw new Error(
+        `Invalid environment variable name: "${key}". Must contain only alphanumeric characters and underscores.`,
+      );
+    }
+    if (value.includes('\n') || value.includes('\r')) {
+      throw new Error(
+        `Invalid environment variable value for "${key}". Values cannot contain newlines.`,
+      );
+    }
+    const formattedValue = value.includes(' ')
+      ? `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+      : value;
     envContent += `${key}=${formattedValue}\n`;
   }
   return envContent;
@@ -144,6 +165,7 @@ export async function promptForSetting(
     name: 'value',
     message: `${setting.name}\n${setting.description}`,
   });
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return response.value;
 }
 
@@ -160,8 +182,11 @@ export async function getScopedEnvContents(
   const envFilePath = getEnvFilePath(extensionName, scope, workspaceDir);
   let customEnv: Record<string, string> = {};
   if (fsSync.existsSync(envFilePath)) {
-    const envFile = fsSync.readFileSync(envFilePath, 'utf-8');
-    customEnv = dotenv.parse(envFile);
+    const stat = fsSync.statSync(envFilePath);
+    if (!stat.isDirectory()) {
+      const envFile = fsSync.readFileSync(envFilePath, 'utf-8');
+      customEnv = dotenv.parse(envFile);
+    }
   }
 
   if (extensionConfig.settings) {
@@ -207,7 +232,7 @@ export async function updateSetting(
   settingKey: string,
   requestSetting: (setting: ExtensionSetting) => Promise<string>,
   scope: ExtensionSettingScope,
-  workspaceDir?: string,
+  workspaceDir: string,
 ): Promise<void> {
   const { name: extensionName, settings } = extensionConfig;
   if (!settings || settings.length === 0) {
@@ -230,7 +255,15 @@ export async function updateSetting(
   );
 
   if (settingToUpdate.sensitive) {
-    await keychain.setSecret(settingToUpdate.envVar, newValue);
+    if (newValue) {
+      await keychain.setSecret(settingToUpdate.envVar, newValue);
+    } else {
+      try {
+        await keychain.deleteSecret(settingToUpdate.envVar);
+      } catch {
+        // Ignore if secret does not exist
+      }
+    }
     return;
   }
 
@@ -239,11 +272,21 @@ export async function updateSetting(
   const envFilePath = getEnvFilePath(extensionName, scope, workspaceDir);
   let envContent = '';
   if (fsSync.existsSync(envFilePath)) {
+    const stat = fsSync.statSync(envFilePath);
+    if (stat.isDirectory()) {
+      throw new Error(
+        `Cannot write extension settings to ${envFilePath} because it is a directory.`,
+      );
+    }
     envContent = await fs.readFile(envFilePath, 'utf-8');
   }
 
   const parsedEnv = dotenv.parse(envContent);
-  parsedEnv[settingToUpdate.envVar] = newValue;
+  if (!newValue) {
+    delete parsedEnv[settingToUpdate.envVar];
+  } else {
+    parsedEnv[settingToUpdate.envVar] = newValue;
+  }
 
   // We only want to write back the variables that are not sensitive.
   const nonSensitiveSettings: Record<string, string> = {};
@@ -299,7 +342,10 @@ async function clearSettings(
   keychain: KeychainTokenStorage,
 ) {
   if (fsSync.existsSync(envFilePath)) {
-    await fs.writeFile(envFilePath, '');
+    const stat = fsSync.statSync(envFilePath);
+    if (!stat.isDirectory()) {
+      await fs.writeFile(envFilePath, '');
+    }
   }
   if (!(await keychain.isAvailable())) {
     return;

@@ -5,15 +5,17 @@
  */
 
 import { Storage } from '../config/storage.js';
-import { coreEvents, CoreEvent } from '../utils/events.js';
+import { CoreEvent, coreEvents } from '../utils/events.js';
 import type { AgentOverride, Config } from '../config/config.js';
 import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
+import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
 import { A2AClientManager } from './a2a-client-manager.js';
-import { ADCHandler } from './remote-invocation.js';
+import { A2AAuthProviderFactory } from './auth-provider/factory.js';
+import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { type z } from 'zod';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isAutoModel } from '../config/models.js';
@@ -21,6 +23,7 @@ import {
   type ModelConfig,
   ModelConfigService,
 } from '../services/modelConfigService.js';
+import { PolicyDecision, PRIORITY_SUBAGENT_TOOL } from '../policy/types.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -74,6 +77,23 @@ export class AgentRegistry {
   }
 
   /**
+   * Acknowledges and registers a previously unacknowledged agent.
+   */
+  async acknowledgeAgent(agent: AgentDefinition): Promise<void> {
+    const ackService = this.config.getAcknowledgedAgentsService();
+    const projectRoot = this.config.getProjectRoot();
+    if (agent.metadata?.hash) {
+      await ackService.acknowledge(
+        projectRoot,
+        agent.name,
+        agent.metadata.hash,
+      );
+      await this.registerAgent(agent);
+      coreEvents.emitAgentsRefreshed();
+    }
+  }
+
+  /**
    * Disposes of resources and removes event listeners.
    */
   dispose(): void {
@@ -99,7 +119,20 @@ export class AgentRegistry {
       coreEvents.emitFeedback('error', `Agent loading error: ${error.message}`);
     }
     await Promise.allSettled(
-      userAgents.agents.map((agent) => this.registerAgent(agent)),
+      userAgents.agents.map(async (agent) => {
+        try {
+          await this.registerAgent(agent);
+        } catch (e) {
+          debugLogger.warn(
+            `[AgentRegistry] Error registering user agent "${agent.name}":`,
+            e,
+          );
+          coreEvents.emitFeedback(
+            'error',
+            `Error registering user agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`,
+          );
+        }
+      }),
     );
 
     // Load project-level agents: .gemini/agents/ (relative to Project Root)
@@ -115,8 +148,59 @@ export class AgentRegistry {
           `Agent loading error: ${error.message}`,
         );
       }
+
+      const ackService = this.config.getAcknowledgedAgentsService();
+      const projectRoot = this.config.getProjectRoot();
+      const unacknowledgedAgents: AgentDefinition[] = [];
+      const agentsToRegister: AgentDefinition[] = [];
+
+      for (const agent of projectAgents.agents) {
+        // If it's a remote agent, use the agentCardUrl as the hash.
+        // This allows multiple remote agents in a single file to be tracked independently.
+        if (agent.kind === 'remote') {
+          if (!agent.metadata) {
+            agent.metadata = {};
+          }
+          agent.metadata.hash = agent.agentCardUrl;
+        }
+
+        if (!agent.metadata?.hash) {
+          agentsToRegister.push(agent);
+          continue;
+        }
+
+        const isAcknowledged = await ackService.isAcknowledged(
+          projectRoot,
+          agent.name,
+          agent.metadata.hash,
+        );
+
+        if (isAcknowledged) {
+          agentsToRegister.push(agent);
+        } else {
+          unacknowledgedAgents.push(agent);
+        }
+      }
+
+      if (unacknowledgedAgents.length > 0) {
+        coreEvents.emitAgentsDiscovered(unacknowledgedAgents);
+      }
+
       await Promise.allSettled(
-        projectAgents.agents.map((agent) => this.registerAgent(agent)),
+        agentsToRegister.map(async (agent) => {
+          try {
+            await this.registerAgent(agent);
+          } catch (e) {
+            debugLogger.warn(
+              `[AgentRegistry] Error registering project agent "${agent.name}":`,
+              e,
+            );
+            coreEvents.emitFeedback(
+              'error',
+              `Error registering project agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`,
+            );
+          }
+        }),
       );
     } else {
       coreEvents.emitFeedback(
@@ -129,7 +213,20 @@ export class AgentRegistry {
     for (const extension of this.config.getExtensions()) {
       if (extension.isActive && extension.agents) {
         await Promise.allSettled(
-          extension.agents.map((agent) => this.registerAgent(agent)),
+          extension.agents.map(async (agent) => {
+            try {
+              await this.registerAgent(agent);
+            } catch (e) {
+              debugLogger.warn(
+                `[AgentRegistry] Error registering extension agent "${agent.name}":`,
+                e,
+              );
+              coreEvents.emitFeedback(
+                'error',
+                `Error registering extension agent "${agent.name}": ${e instanceof Error ? e.message : String(e)}`,
+              );
+            }
+          }),
         );
       }
     }
@@ -145,6 +242,13 @@ export class AgentRegistry {
     this.registerLocalAgent(CodebaseInvestigatorAgent(this.config));
     this.registerLocalAgent(CliHelpAgent(this.config));
     this.registerLocalAgent(GeneralistAgent(this.config));
+
+    // Register the browser agent if enabled in settings.
+    // Tools are configured dynamically at invocation time via browserAgentFactory.
+    const browserConfig = this.config.getBrowserAgentConfig();
+    if (browserConfig.enabled) {
+      this.registerLocalAgent(BrowserAgentDefinition(this.config));
+    }
   }
 
   private async refreshAgents(): Promise<void> {
@@ -211,6 +315,39 @@ export class AgentRegistry {
     this.agents.set(mergedDefinition.name, mergedDefinition);
 
     this.registerModelConfigs(mergedDefinition);
+    this.addAgentPolicy(mergedDefinition);
+  }
+
+  private addAgentPolicy(definition: AgentDefinition<z.ZodTypeAny>): void {
+    const policyEngine = this.config.getPolicyEngine();
+    if (!policyEngine) {
+      return;
+    }
+
+    // If the user has explicitly defined a policy for this tool, respect it.
+    // ignoreDynamic=true means we only check for rules NOT added by this registry.
+    if (policyEngine.hasRuleForTool(definition.name, true)) {
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] User policy exists for '${definition.name}', skipping dynamic registration.`,
+        );
+      }
+      return;
+    }
+
+    // Clean up any old dynamic policy for this tool (e.g. if we are overwriting an agent)
+    policyEngine.removeRulesForTool(definition.name, 'AgentRegistry (Dynamic)');
+
+    // Add the new dynamic policy
+    policyEngine.addRule({
+      toolName: definition.name,
+      decision:
+        definition.kind === 'local'
+          ? PolicyDecision.ALLOW
+          : PolicyDecision.ASK_USER,
+      priority: PRIORITY_SUBAGENT_TOOL,
+      source: 'AgentRegistry (Dynamic)',
+    });
   }
 
   private isAgentEnabled<TOutput extends z.ZodTypeAny>(
@@ -238,9 +375,10 @@ export class AgentRegistry {
     }
 
     // Basic validation
-    if (!definition.name || !definition.description) {
+    // Remote agents can have an empty description initially as it will be populated from the AgentCard
+    if (!definition.name) {
       debugLogger.warn(
-        `[AgentRegistry] Skipping invalid agent definition. Missing name or description.`,
+        `[AgentRegistry] Skipping invalid agent definition. Missing name.`,
       );
       return;
     }
@@ -263,35 +401,71 @@ export class AgentRegistry {
       debugLogger.log(`[AgentRegistry] Overriding agent '${definition.name}'`);
     }
 
+    const remoteDef = definition;
+
+    // Capture the original description from the first registration
+    if (remoteDef.originalDescription === undefined) {
+      remoteDef.originalDescription = remoteDef.description;
+    }
+
     // Log remote A2A agent registration for visibility.
     try {
       const clientManager = A2AClientManager.getInstance();
-      // Use ADCHandler to ensure we can load agents hosted on secure platforms (e.g. Vertex AI)
-      const authHandler = new ADCHandler();
+      let authHandler: AuthenticationHandler | undefined;
+      if (definition.auth) {
+        const provider = await A2AAuthProviderFactory.create({
+          authConfig: definition.auth,
+          agentName: definition.name,
+        });
+        if (!provider) {
+          throw new Error(
+            `Failed to create auth provider for agent '${definition.name}'`,
+          );
+        }
+        authHandler = provider;
+      }
+
       const agentCard = await clientManager.loadAgent(
-        definition.name,
-        definition.agentCardUrl,
+        remoteDef.name,
+        remoteDef.agentCardUrl,
         authHandler,
       );
+
+      const userDescription = remoteDef.originalDescription;
+      const agentDescription = agentCard.description;
+      const descriptions: string[] = [];
+
+      if (userDescription?.trim()) {
+        descriptions.push(`User Description: ${userDescription.trim()}`);
+      }
+      if (agentDescription?.trim()) {
+        descriptions.push(`Agent Description: ${agentDescription.trim()}`);
+      }
       if (agentCard.skills && agentCard.skills.length > 0) {
-        definition.description = agentCard.skills
+        const skillsList = agentCard.skills
           .map(
             (skill: { name: string; description: string }) =>
-              `${skill.name}: ${skill.description}`,
+              `${skill.name}: ${skill.description || 'No description provided'}`,
           )
           .join('\n');
+        descriptions.push(`Skills:\n${skillsList}`);
       }
+
+      if (descriptions.length > 0) {
+        definition.description = descriptions.join('\n');
+      }
+
       if (this.config.getDebugMode()) {
         debugLogger.log(
           `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl}`,
         );
       }
       this.agents.set(definition.name, definition);
+      this.addAgentPolicy(definition);
     } catch (e) {
-      debugLogger.warn(
-        `[AgentRegistry] Error loading A2A agent "${definition.name}":`,
-        e,
-      );
+      const errorMessage = `Error loading A2A agent "${definition.name}": ${e instanceof Error ? e.message : String(e)}`;
+      debugLogger.warn(`[AgentRegistry] ${errorMessage}`, e);
+      coreEvents.emitFeedback('error', errorMessage);
     }
   }
 
@@ -304,6 +478,7 @@ export class AgentRegistry {
     }
 
     // Use Object.create to preserve lazy getters on the definition object
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const merged: LocalAgentDefinition<TOutput> = Object.create(definition);
 
     if (overrides.runConfig) {
@@ -390,38 +565,5 @@ export class AgentRegistry {
    */
   getDiscoveredDefinition(name: string): AgentDefinition | undefined {
     return this.allDefinitions.get(name);
-  }
-
-  /**
-   * Generates a markdown "Phone Book" of available agents and their schemas.
-   * This MUST be injected into the System Prompt of the parent agent.
-   */
-  getDirectoryContext(): string {
-    if (this.agents.size === 0) {
-      return 'No sub-agents are currently available.';
-    }
-
-    let context = '## Available Sub-Agents\n';
-    context += `Sub-agents are specialized expert agents that you can use to assist you in
-      the completion of all or part of a task.
-
-      Each sub-agent is available as a tool of the same name.
-
-      You MUST always delegate tasks to the sub-agent with the
-      relevant expertise, if one is available.
-
-      The following tools can be used to start sub-agents:\n\n`;
-
-    for (const [name] of this.agents) {
-      context += `- ${name}\n`;
-    }
-
-    context += `Remember that the closest relevant sub-agent should still be used even if its expertise is broader than the given task.
-
-    For example:
-    - A license-agent -> Should be used for a range of tasks, including reading, validating, and updating licenses and headers.
-    - A test-fixing-agent -> Should be used both for fixing tests as well as investigating test failures.`;
-
-    return context;
   }
 }

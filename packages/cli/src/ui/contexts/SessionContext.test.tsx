@@ -100,6 +100,7 @@ describe('SessionStatsContext', () => {
             thoughts: 20,
             tool: 10,
           },
+          roles: {},
         },
       },
       tools: {
@@ -180,6 +181,7 @@ describe('SessionStatsContext', () => {
             thoughts: 0,
             tool: 0,
           },
+          roles: {},
         },
       },
       tools: {

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -43,6 +43,7 @@ describe('codeAssist', () => {
     const mockUserData = {
       projectId: 'test-project',
       userTier: UserTierId.FREE,
+      userTierName: 'free-tier-name',
     };
 
     it('should create a server for LOGIN_WITH_GOOGLE', async () => {
@@ -63,6 +64,7 @@ describe('codeAssist', () => {
       expect(setupUser).toHaveBeenCalledWith(
         mockAuthClient,
         mockValidationHandler,
+        httpOptions,
       );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
         mockAuthClient,
@@ -70,7 +72,9 @@ describe('codeAssist', () => {
         httpOptions,
         'session-123',
         'free-tier',
+        'free-tier-name',
         undefined,
+        mockConfig,
       );
       expect(generator).toBeInstanceOf(MockedCodeAssistServer);
     });
@@ -92,6 +96,7 @@ describe('codeAssist', () => {
       expect(setupUser).toHaveBeenCalledWith(
         mockAuthClient,
         mockValidationHandler,
+        httpOptions,
       );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
         mockAuthClient,
@@ -99,7 +104,9 @@ describe('codeAssist', () => {
         httpOptions,
         undefined, // No session ID
         'free-tier',
+        'free-tier-name',
         undefined,
+        mockConfig,
       );
       expect(generator).toBeInstanceOf(MockedCodeAssistServer);
     });

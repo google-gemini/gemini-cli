@@ -17,8 +17,8 @@ import {
   BeforeToolSelectionHookOutput,
   AfterModelHookOutput,
   AfterAgentHookOutput,
+  HookEventName,
 } from './types.js';
-import { HookEventName } from './types.js';
 
 /**
  * Aggregated hook result
@@ -102,6 +102,7 @@ export class HookAggregator {
 
       case HookEventName.BeforeToolSelection:
         return this.mergeToolSelectionOutputs(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           outputs as BeforeToolSelectionOutput[],
         );
 

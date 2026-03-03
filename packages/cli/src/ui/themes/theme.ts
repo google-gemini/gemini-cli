@@ -5,12 +5,23 @@
  */
 
 import type { CSSProperties } from 'react';
+
 import type { SemanticColors } from './semantic-tokens.js';
+
 import {
   resolveColor,
   interpolateColor,
   getThemeTypeFromBackgroundColor,
 } from './color-utils.js';
+
+import type { CustomTheme } from '@google/gemini-cli-core';
+import {
+  DEFAULT_BACKGROUND_OPACITY,
+  DEFAULT_INPUT_BACKGROUND_OPACITY,
+  DEFAULT_BORDER_OPACITY,
+} from '../constants.js';
+
+export type { CustomTheme };
 
 export type ThemeType = 'light' | 'dark' | 'ansi' | 'custom';
 
@@ -30,57 +41,8 @@ export interface ColorsTheme {
   Comment: string;
   Gray: string;
   DarkGray: string;
-  GradientColors?: string[];
-}
-
-export interface CustomTheme {
-  type: 'custom';
-  name: string;
-
-  text?: {
-    primary?: string;
-    secondary?: string;
-    link?: string;
-    accent?: string;
-    response?: string;
-  };
-  background?: {
-    primary?: string;
-    diff?: {
-      added?: string;
-      removed?: string;
-    };
-  };
-  border?: {
-    default?: string;
-    focused?: string;
-  };
-  ui?: {
-    comment?: string;
-    symbol?: string;
-    gradient?: string[];
-  };
-  status?: {
-    error?: string;
-    success?: string;
-    warning?: string;
-  };
-
-  // Legacy properties (all optional)
-  Background?: string;
-  Foreground?: string;
-  LightBlue?: string;
-  AccentBlue?: string;
-  AccentPurple?: string;
-  AccentCyan?: string;
-  AccentGreen?: string;
-  AccentYellow?: string;
-  AccentRed?: string;
-  DiffAdded?: string;
-  DiffRemoved?: string;
-  Comment?: string;
-  Gray?: string;
-  DarkGray?: string;
+  InputBackground?: string;
+  MessageBackground?: string;
   GradientColors?: string[];
 }
 
@@ -99,7 +61,17 @@ export const lightTheme: ColorsTheme = {
   DiffRemoved: '#FFCCCC',
   Comment: '#008000',
   Gray: '#97a0b0',
-  DarkGray: interpolateColor('#97a0b0', '#FAFAFA', 0.5),
+  DarkGray: interpolateColor('#FAFAFA', '#97a0b0', DEFAULT_BORDER_OPACITY),
+  InputBackground: interpolateColor(
+    '#FAFAFA',
+    '#97a0b0',
+    DEFAULT_INPUT_BACKGROUND_OPACITY,
+  ),
+  MessageBackground: interpolateColor(
+    '#FAFAFA',
+    '#97a0b0',
+    DEFAULT_BACKGROUND_OPACITY,
+  ),
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
@@ -118,7 +90,17 @@ export const darkTheme: ColorsTheme = {
   DiffRemoved: '#430000',
   Comment: '#6C7086',
   Gray: '#6C7086',
-  DarkGray: interpolateColor('#6C7086', '#1E1E2E', 0.5),
+  DarkGray: interpolateColor('#1E1E2E', '#6C7086', DEFAULT_BORDER_OPACITY),
+  InputBackground: interpolateColor(
+    '#1E1E2E',
+    '#6C7086',
+    DEFAULT_INPUT_BACKGROUND_OPACITY,
+  ),
+  MessageBackground: interpolateColor(
+    '#1E1E2E',
+    '#6C7086',
+    DEFAULT_BACKGROUND_OPACITY,
+  ),
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
@@ -138,6 +120,8 @@ export const ansiTheme: ColorsTheme = {
   Comment: 'gray',
   Gray: 'gray',
   DarkGray: 'gray',
+  InputBackground: 'black',
+  MessageBackground: 'black',
 };
 
 export class Theme {
@@ -175,13 +159,27 @@ export class Theme {
       },
       background: {
         primary: this.colors.Background,
+        message:
+          this.colors.MessageBackground ??
+          interpolateColor(
+            this.colors.Background,
+            this.colors.Gray,
+            DEFAULT_BACKGROUND_OPACITY,
+          ),
+        input:
+          this.colors.InputBackground ??
+          interpolateColor(
+            this.colors.Background,
+            this.colors.Gray,
+            DEFAULT_INPUT_BACKGROUND_OPACITY,
+          ),
         diff: {
           added: this.colors.DiffAdded,
           removed: this.colors.DiffRemoved,
         },
       },
       border: {
-        default: this.colors.Gray,
+        default: this.colors.DarkGray,
         focused: this.colors.AccentBlue,
       },
       ui: {
@@ -282,10 +280,20 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
     DarkGray:
       customTheme.DarkGray ??
       interpolateColor(
-        customTheme.text?.secondary ?? customTheme.Gray ?? '',
         customTheme.background?.primary ?? customTheme.Background ?? '',
-        0.5,
+        customTheme.text?.secondary ?? customTheme.Gray ?? '',
+        DEFAULT_BORDER_OPACITY,
       ),
+    InputBackground: interpolateColor(
+      customTheme.background?.primary ?? customTheme.Background ?? '',
+      customTheme.text?.secondary ?? customTheme.Gray ?? '',
+      DEFAULT_INPUT_BACKGROUND_OPACITY,
+    ),
+    MessageBackground: interpolateColor(
+      customTheme.background?.primary ?? customTheme.Background ?? '',
+      customTheme.text?.secondary ?? customTheme.Gray ?? '',
+      DEFAULT_BACKGROUND_OPACITY,
+    ),
     GradientColors: customTheme.ui?.gradient ?? customTheme.GradientColors,
   };
 
@@ -440,13 +448,15 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
     },
     background: {
       primary: customTheme.background?.primary ?? colors.Background,
+      message: colors.MessageBackground!,
+      input: colors.InputBackground!,
       diff: {
         added: customTheme.background?.diff?.added ?? colors.DiffAdded,
         removed: customTheme.background?.diff?.removed ?? colors.DiffRemoved,
       },
     },
     border: {
-      default: customTheme.border?.default ?? colors.Gray,
+      default: colors.DarkGray,
       focused: customTheme.border?.focused ?? colors.AccentBlue,
     },
     ui: {

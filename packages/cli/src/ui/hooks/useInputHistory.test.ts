@@ -25,6 +25,7 @@ describe('useInputHistory', () => {
         onSubmit: mockOnSubmit,
         isActive: true,
         currentQuery: '',
+        currentCursorOffset: 0,
         onChange: mockOnChange,
       }),
     );
@@ -45,6 +46,7 @@ describe('useInputHistory', () => {
           onSubmit: mockOnSubmit,
           isActive: true,
           currentQuery: '  test query  ',
+          currentCursorOffset: 0,
           onChange: mockOnChange,
         }),
       );
@@ -68,6 +70,7 @@ describe('useInputHistory', () => {
           onSubmit: mockOnSubmit,
           isActive: true,
           currentQuery: '',
+          currentCursorOffset: 0,
           onChange: mockOnChange,
         }),
       );
@@ -88,6 +91,7 @@ describe('useInputHistory', () => {
           onSubmit: mockOnSubmit,
           isActive: false,
           currentQuery: 'current',
+          currentCursorOffset: 0,
           onChange: mockOnChange,
         }),
       );
@@ -105,6 +109,7 @@ describe('useInputHistory', () => {
           onSubmit: mockOnSubmit,
           isActive: true,
           currentQuery: 'current',
+          currentCursorOffset: 0,
           onChange: mockOnChange,
         }),
       );
@@ -123,6 +128,7 @@ describe('useInputHistory', () => {
           onSubmit: mockOnSubmit,
           isActive: true,
           currentQuery,
+          currentCursorOffset: 0,
           onChange: mockOnChange,
         }),
       );
@@ -131,17 +137,19 @@ describe('useInputHistory', () => {
         result.current.navigateUp();
       });
 
-      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2]); // Last message
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2], 'start'); // Last message
     });
 
-    it('should store currentQuery as originalQueryBeforeNav on first navigateUp', () => {
+    it('should store currentQuery and currentCursorOffset as original state on first navigateUp', () => {
       const currentQuery = 'original user input';
+      const currentCursorOffset = 5;
       const { result } = renderHook(() =>
         useInputHistory({
           userMessages,
           onSubmit: mockOnSubmit,
           isActive: true,
           currentQuery,
+          currentCursorOffset,
           onChange: mockOnChange,
         }),
       );
@@ -149,13 +157,16 @@ describe('useInputHistory', () => {
       act(() => {
         result.current.navigateUp(); // historyIndex becomes 0
       });
-      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2]);
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2], 'start');
 
-      // Navigate down to restore original query
+      // Navigate down to restore original query and cursor position
       act(() => {
         result.current.navigateDown(); // historyIndex becomes -1
       });
-      expect(mockOnChange).toHaveBeenCalledWith(currentQuery);
+      expect(mockOnChange).toHaveBeenCalledWith(
+        currentQuery,
+        currentCursorOffset,
+      );
     });
 
     it('should navigate through history messages on subsequent navigateUp calls', () => {
@@ -165,6 +176,7 @@ describe('useInputHistory', () => {
           onSubmit: mockOnSubmit,
           isActive: true,
           currentQuery: '',
+          currentCursorOffset: 0,
           onChange: mockOnChange,
         }),
       );
@@ -172,17 +184,17 @@ describe('useInputHistory', () => {
       act(() => {
         result.current.navigateUp(); // Navigates to 'message 3'
       });
-      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2]);
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2], 'start');
 
       act(() => {
         result.current.navigateUp(); // Navigates to 'message 2'
       });
-      expect(mockOnChange).toHaveBeenCalledWith(userMessages[1]);
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[1], 'start');
 
       act(() => {
         result.current.navigateUp(); // Navigates to 'message 1'
       });
-      expect(mockOnChange).toHaveBeenCalledWith(userMessages[0]);
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[0], 'start');
     });
   });
 
@@ -193,6 +205,7 @@ describe('useInputHistory', () => {
         onSubmit: mockOnSubmit,
         isActive: true, // Start active to allow setup navigation
         currentQuery: 'current',
+        currentCursorOffset: 0,
         onChange: mockOnChange,
       };
       const { result, rerender } = renderHook(
@@ -225,6 +238,7 @@ describe('useInputHistory', () => {
           onSubmit: mockOnSubmit,
           isActive: true,
           currentQuery: 'current',
+          currentCursorOffset: 0,
           onChange: mockOnChange,
         }),
       );
@@ -235,28 +249,235 @@ describe('useInputHistory', () => {
       expect(mockOnChange).not.toHaveBeenCalled();
     });
 
-    it('should restore originalQueryBeforeNav when navigating down to initial state', () => {
+    it('should restore cursor offset only when in middle of compose prompt', () => {
       const originalQuery = 'my original input';
+      const originalCursorOffset = 5; // Middle
       const { result } = renderHook(() =>
         useInputHistory({
           userMessages,
           onSubmit: mockOnSubmit,
           isActive: true,
           currentQuery: originalQuery,
+          currentCursorOffset: originalCursorOffset,
           onChange: mockOnChange,
         }),
       );
 
       act(() => {
-        result.current.navigateUp(); // Navigates to 'message 3', stores 'originalQuery'
+        result.current.navigateUp();
       });
-      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2]);
       mockOnChange.mockClear();
 
       act(() => {
-        result.current.navigateDown(); // Navigates back to original query
+        result.current.navigateDown();
       });
-      expect(mockOnChange).toHaveBeenCalledWith(originalQuery);
+      // Should restore middle offset
+      expect(mockOnChange).toHaveBeenCalledWith(
+        originalQuery,
+        originalCursorOffset,
+      );
+    });
+
+    it('should NOT restore cursor offset if it was at start or end of compose prompt', () => {
+      const originalQuery = 'my original input';
+      const { result, rerender } = renderHook(
+        (props) => useInputHistory(props),
+        {
+          initialProps: {
+            userMessages,
+            onSubmit: mockOnSubmit,
+            isActive: true,
+            currentQuery: originalQuery,
+            currentCursorOffset: 0, // Start
+            onChange: mockOnChange,
+          },
+        },
+      );
+
+      // Case 1: Start
+      act(() => {
+        result.current.navigateUp();
+      });
+      mockOnChange.mockClear();
+      act(() => {
+        result.current.navigateDown();
+      });
+      // Should use 'end' default instead of 0
+      expect(mockOnChange).toHaveBeenCalledWith(originalQuery, 'end');
+
+      // Case 2: End
+      rerender({
+        userMessages,
+        onSubmit: mockOnSubmit,
+        isActive: true,
+        currentQuery: originalQuery,
+        currentCursorOffset: originalQuery.length, // End
+        onChange: mockOnChange,
+      });
+      act(() => {
+        result.current.navigateUp();
+      });
+      mockOnChange.mockClear();
+      act(() => {
+        result.current.navigateDown();
+      });
+      // Should use 'end' default
+      expect(mockOnChange).toHaveBeenCalledWith(originalQuery, 'end');
+    });
+
+    it('should remember text edits but use default cursor when navigating between history items', () => {
+      const originalQuery = 'my original input';
+      const originalCursorOffset = 5;
+      const { result, rerender } = renderHook(
+        (props) => useInputHistory(props),
+        {
+          initialProps: {
+            userMessages,
+            onSubmit: mockOnSubmit,
+            isActive: true,
+            currentQuery: originalQuery,
+            currentCursorOffset: originalCursorOffset,
+            onChange: mockOnChange,
+          },
+        },
+      );
+
+      // 1. Navigate UP from compose prompt (-1 -> 0)
+      act(() => {
+        result.current.navigateUp();
+      });
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2], 'start');
+      mockOnChange.mockClear();
+
+      // Simulate being at History[0] ('message 3') and editing it
+      const editedHistoryText = 'message 3 edited';
+      const editedHistoryOffset = 5;
+      rerender({
+        userMessages,
+        onSubmit: mockOnSubmit,
+        isActive: true,
+        currentQuery: editedHistoryText,
+        currentCursorOffset: editedHistoryOffset,
+        onChange: mockOnChange,
+      });
+
+      // 2. Navigate UP to next history item (0 -> 1)
+      act(() => {
+        result.current.navigateUp();
+      });
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[1], 'start');
+      mockOnChange.mockClear();
+
+      // 3. Navigate DOWN back to History[0] (1 -> 0)
+      act(() => {
+        result.current.navigateDown();
+      });
+      // Should restore edited text AND the offset because we just came from History[0]
+      expect(mockOnChange).toHaveBeenCalledWith(
+        editedHistoryText,
+        editedHistoryOffset,
+      );
+      mockOnChange.mockClear();
+
+      // Simulate being at History[0] (restored) and navigating DOWN to compose prompt (0 -> -1)
+      rerender({
+        userMessages,
+        onSubmit: mockOnSubmit,
+        isActive: true,
+        currentQuery: editedHistoryText,
+        currentCursorOffset: editedHistoryOffset,
+        onChange: mockOnChange,
+      });
+
+      // 4. Navigate DOWN to compose prompt
+      act(() => {
+        result.current.navigateDown();
+      });
+      // Level -1 should ALWAYS restore its offset if it was in the middle
+      expect(mockOnChange).toHaveBeenCalledWith(
+        originalQuery,
+        originalCursorOffset,
+      );
+    });
+
+    it('should restore offset for history items ONLY if returning from them immediately', () => {
+      const originalQuery = 'my original input';
+      const initialProps = {
+        userMessages,
+        onSubmit: mockOnSubmit,
+        isActive: true,
+        currentQuery: originalQuery,
+        currentCursorOffset: 5,
+        onChange: mockOnChange,
+      };
+
+      const { result, rerender } = renderHook(
+        (props) => useInputHistory(props),
+        {
+          initialProps,
+        },
+      );
+
+      // -1 -> 0 ('message 3')
+      act(() => {
+        result.current.navigateUp();
+      });
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2], 'start');
+      const historyOffset = 4;
+      // Manually update props to reflect current level
+      rerender({
+        ...initialProps,
+        currentQuery: userMessages[2],
+        currentCursorOffset: historyOffset,
+      });
+
+      // 0 -> 1 ('message 2')
+      act(() => {
+        result.current.navigateUp();
+      });
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[1], 'start');
+      rerender({
+        ...initialProps,
+        currentQuery: userMessages[1],
+        currentCursorOffset: 0,
+      });
+
+      // 1 -> 2 ('message 1')
+      act(() => {
+        result.current.navigateUp();
+      });
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[0], 'start');
+      rerender({
+        ...initialProps,
+        currentQuery: userMessages[0],
+        currentCursorOffset: 0,
+      });
+
+      mockOnChange.mockClear();
+
+      // 2 -> 1 ('message 2')
+      act(() => {
+        result.current.navigateDown();
+      });
+      // 2 -> 1 is immediate back-and-forth.
+      // But Level 1 offset was 0 (not in middle), so use 'end' default.
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[1], 'end');
+      mockOnChange.mockClear();
+
+      // Rerender to reflect Level 1 state
+      rerender({
+        ...initialProps,
+        currentQuery: userMessages[1],
+        currentCursorOffset: userMessages[1].length,
+      });
+
+      // 1 -> 0 ('message 3')
+      act(() => {
+        result.current.navigateDown();
+      });
+      // 1 -> 0 is NOT immediate (Level 2 was the last jump point).
+      // So Level 0 SHOULD use default 'end' even though it has a middle offset saved.
+      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2], 'end');
     });
   });
 });

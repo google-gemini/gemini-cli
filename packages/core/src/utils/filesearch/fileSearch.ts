@@ -13,12 +13,12 @@ import { crawl } from './crawler.js';
 import type { FzfResultItem } from 'fzf';
 import { AsyncFzf } from 'fzf';
 import { unescapePath } from '../paths.js';
+import type { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
 
 export interface FileSearchOptions {
   projectRoot: string;
   ignoreDirs: string[];
-  useGitignore: boolean;
-  useGeminiignore: boolean;
+  fileDiscoveryService: FileDiscoveryService;
   cache: boolean;
   cacheTtl: number;
   enableRecursiveFileSearch: boolean;
@@ -101,7 +101,10 @@ class RecursiveFileSearch implements FileSearch {
   constructor(private readonly options: FileSearchOptions) {}
 
   async initialize(): Promise<void> {
-    this.ignore = loadIgnoreRules(this.options);
+    this.ignore = loadIgnoreRules(
+      this.options.fileDiscoveryService,
+      this.options.ignoreDirs,
+    );
 
     this.allFiles = await crawl({
       crawlDirectory: this.options.projectRoot,
@@ -142,9 +145,11 @@ class RecursiveFileSearch implements FileSearch {
       if (pattern.includes('*') || !this.fzf) {
         filteredCandidates = await filter(candidates, pattern, options.signal);
       } else {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         filteredCandidates = await this.fzf
           .find(pattern)
           .then((results: Array<FzfResultItem<string>>) =>
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
             results.map((entry: FzfResultItem<string>) => entry.item),
           )
           .catch(() => {
@@ -200,7 +205,10 @@ class DirectoryFileSearch implements FileSearch {
   constructor(private readonly options: FileSearchOptions) {}
 
   async initialize(): Promise<void> {
-    this.ignore = loadIgnoreRules(this.options);
+    this.ignore = loadIgnoreRules(
+      this.options.fileDiscoveryService,
+      this.options.ignoreDirs,
+    );
   }
 
   async search(

@@ -4,7 +4,6 @@ exports[`ToolConfirmationMessage > should display multiple commands for exec typ
 "echo "hello"
 ls -la
 whoami
-
 Allow execution of 3 commands?
 
 ● 1. Allow once
@@ -18,7 +17,6 @@ exports[`ToolConfirmationMessage > should display urls if prompt and url are dif
 
 URLs to fetch:
  - https://raw.githubusercontent.com/google/gemini-react/main/README.md
-
 Do you want to proceed?
 
 ● 1. Allow once
@@ -29,12 +27,23 @@ Do you want to proceed?
 
 exports[`ToolConfirmationMessage > should not display urls if prompt and url are the same 1`] = `
 "https://example.com
-
 Do you want to proceed?
 
 ● 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
+"
+`;
+
+exports[`ToolConfirmationMessage > should strip BiDi characters from MCP tool and server names 1`] = `
+"MCP Server: testserver
+Tool: testtool
+Allow execution of MCP tool "testtool" from server "testserver"?
+
+● 1. Allow once
+  2. Allow tool for this session
+  3. Allow all server tools for this session
+  4. No, suggest changes (esc)
 "
 `;
 
@@ -44,7 +53,6 @@ exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' 
 │ No changes detected.                                                         │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-
 Apply this change?
 
 ● 1. Allow once
@@ -59,7 +67,6 @@ exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' 
 │ No changes detected.                                                         │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-
 Apply this change?
 
 ● 1. Allow once
@@ -71,7 +78,6 @@ Apply this change?
 
 exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' > should NOT show "allow always" when folder is untrusted 1`] = `
 "echo "hello"
-
 Allow execution of: 'echo'?
 
 ● 1. Allow once
@@ -81,7 +87,6 @@ Allow execution of: 'echo'?
 
 exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' > should show "allow always" when folder is trusted 1`] = `
 "echo "hello"
-
 Allow execution of: 'echo'?
 
 ● 1. Allow once
@@ -92,7 +97,6 @@ Allow execution of: 'echo'?
 
 exports[`ToolConfirmationMessage > with folder trust > 'for info confirmations' > should NOT show "allow always" when folder is untrusted 1`] = `
 "https://example.com
-
 Do you want to proceed?
 
 ● 1. Allow once
@@ -102,7 +106,6 @@ Do you want to proceed?
 
 exports[`ToolConfirmationMessage > with folder trust > 'for info confirmations' > should show "allow always" when folder is trusted 1`] = `
 "https://example.com
-
 Do you want to proceed?
 
 ● 1. Allow once
@@ -114,7 +117,6 @@ Do you want to proceed?
 exports[`ToolConfirmationMessage > with folder trust > 'for mcp confirmations' > should NOT show "allow always" when folder is untrusted 1`] = `
 "MCP Server: test-server
 Tool: test-tool
-
 Allow execution of MCP tool "test-tool" from server "test-server"?
 
 ● 1. Allow once
@@ -125,7 +127,6 @@ Allow execution of MCP tool "test-tool" from server "test-server"?
 exports[`ToolConfirmationMessage > with folder trust > 'for mcp confirmations' > should show "allow always" when folder is trusted 1`] = `
 "MCP Server: test-server
 Tool: test-tool
-
 Allow execution of MCP tool "test-tool" from server "test-server"?
 
 ● 1. Allow once

@@ -8,7 +8,7 @@ import { spawn } from 'node:child_process';
 import { RELAUNCH_EXIT_CODE } from './processUtils.js';
 import {
   writeToStderr,
-  type FetchAdminControlsResponse,
+  type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 
 export async function relaunchOnExitCode(runner: () => Promise<number>) {
@@ -34,11 +34,13 @@ export async function relaunchOnExitCode(runner: () => Promise<number>) {
 export async function relaunchAppInChildProcess(
   additionalNodeArgs: string[],
   additionalScriptArgs: string[],
-  remoteAdminSettings?: FetchAdminControlsResponse,
+  remoteAdminSettings?: AdminControlsSettings,
 ) {
   if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
     return;
   }
+
+  let latestAdminSettings = remoteAdminSettings;
 
   const runner = () => {
     // process.argv is [node, script, ...args]
@@ -63,9 +65,15 @@ export async function relaunchAppInChildProcess(
       env: newEnv,
     });
 
-    if (remoteAdminSettings) {
-      child.send({ type: 'admin-settings', settings: remoteAdminSettings });
+    if (latestAdminSettings) {
+      child.send({ type: 'admin-settings', settings: latestAdminSettings });
     }
+
+    child.on('message', (msg: { type?: string; settings?: unknown }) => {
+      if (msg.type === 'admin-settings-update' && msg.settings) {
+        latestAdminSettings = msg.settings as AdminControlsSettings;
+      }
+    });
 
     return new Promise<number>((resolve, reject) => {
       child.on('error', reject);

@@ -8,7 +8,7 @@ import type { Config } from '../config/config.js';
 import type { HookPlanner, HookEventContext } from './hookPlanner.js';
 import type { HookRunner } from './hookRunner.js';
 import type { HookAggregator, AggregatedHookResult } from './hookAggregator.js';
-import { HookEventName } from './types.js';
+import { HookEventName, HookType } from './types.js';
 import type {
   HookConfig,
   HookInput,
@@ -49,6 +49,13 @@ export class HookEventHandler {
   private readonly hookRunner: HookRunner;
   private readonly hookAggregator: HookAggregator;
 
+  /**
+   * Track reported failures to suppress duplicate warnings during streaming.
+   * Uses a WeakMap with the original request object as a key to ensure
+   * failures are only reported once per logical model interaction.
+   */
+  private readonly reportedFailures = new WeakMap<object, Set<string>>();
+
   constructor(
     config: Config,
     hookPlanner: HookPlanner,
@@ -69,12 +76,16 @@ export class HookEventHandler {
     toolName: string,
     toolInput: Record<string, unknown>,
     mcpContext?: McpToolContext,
+    originalRequestName?: string,
   ): Promise<AggregatedHookResult> {
     const input: BeforeToolInput = {
       ...this.createBaseInput(HookEventName.BeforeTool),
       tool_name: toolName,
       tool_input: toolInput,
       ...(mcpContext && { mcp_context: mcpContext }),
+      ...(originalRequestName && {
+        original_request_name: originalRequestName,
+      }),
     };
 
     const context: HookEventContext = { toolName };
@@ -90,6 +101,7 @@ export class HookEventHandler {
     toolInput: Record<string, unknown>,
     toolResponse: Record<string, unknown>,
     mcpContext?: McpToolContext,
+    originalRequestName?: string,
   ): Promise<AggregatedHookResult> {
     const input: AfterToolInput = {
       ...this.createBaseInput(HookEventName.AfterTool),
@@ -97,6 +109,9 @@ export class HookEventHandler {
       tool_input: toolInput,
       tool_response: toolResponse,
       ...(mcpContext && { mcp_context: mcpContext }),
+      ...(originalRequestName && {
+        original_request_name: originalRequestName,
+      }),
     };
 
     const context: HookEventContext = { toolName };
@@ -210,7 +225,12 @@ export class HookEventHandler {
       llm_request: defaultHookTranslator.toHookLLMRequest(llmRequest),
     };
 
-    return this.executeHooks(HookEventName.BeforeModel, input);
+    return this.executeHooks(
+      HookEventName.BeforeModel,
+      input,
+      undefined,
+      llmRequest,
+    );
   }
 
   /**
@@ -227,7 +247,12 @@ export class HookEventHandler {
       llm_response: defaultHookTranslator.toHookLLMResponse(llmResponse),
     };
 
-    return this.executeHooks(HookEventName.AfterModel, input);
+    return this.executeHooks(
+      HookEventName.AfterModel,
+      input,
+      undefined,
+      llmRequest,
+    );
   }
 
   /**
@@ -242,7 +267,12 @@ export class HookEventHandler {
       llm_request: defaultHookTranslator.toHookLLMRequest(llmRequest),
     };
 
-    return this.executeHooks(HookEventName.BeforeToolSelection, input);
+    return this.executeHooks(
+      HookEventName.BeforeToolSelection,
+      input,
+      undefined,
+      llmRequest,
+    );
   }
 
   /**
@@ -253,6 +283,7 @@ export class HookEventHandler {
     eventName: HookEventName,
     input: HookInput,
     context?: HookEventContext,
+    requestContext?: object,
   ): Promise<AggregatedHookResult> {
     try {
       // Create execution plan
@@ -311,7 +342,13 @@ export class HookEventHandler {
       this.processCommonHookOutputFields(aggregated);
 
       // Log hook execution
-      this.logHookExecution(eventName, input, results, aggregated);
+      this.logHookExecution(
+        eventName,
+        input,
+        results,
+        aggregated,
+        requestContext,
+      );
 
       return aggregated;
     } catch (error) {
@@ -354,6 +391,7 @@ export class HookEventHandler {
     input: HookInput,
     results: HookExecutionResult[],
     aggregated: AggregatedHookResult,
+    requestContext?: object,
   ): void {
     const failedHooks = results.filter((r) => !r.success);
     const successCount = results.length - failedHooks.length;
@@ -364,15 +402,33 @@ export class HookEventHandler {
         .map((r) => this.getHookNameFromResult(r))
         .join(', ');
 
+      let shouldEmit = true;
+      if (requestContext) {
+        let reportedSet = this.reportedFailures.get(requestContext);
+        if (!reportedSet) {
+          reportedSet = new Set<string>();
+          this.reportedFailures.set(requestContext, reportedSet);
+        }
+
+        const failureKey = `${eventName}:${failedNames}`;
+        if (reportedSet.has(failureKey)) {
+          shouldEmit = false;
+        } else {
+          reportedSet.add(failureKey);
+        }
+      }
+
       debugLogger.warn(
         `Hook execution for ${eventName}: ${successCount} succeeded, ${errorCount} failed (${failedNames}), ` +
           `total duration: ${aggregated.totalDuration}ms`,
       );
 
-      coreEvents.emitFeedback(
-        'warning',
-        `Hook(s) [${failedNames}] failed for event ${eventName}. Press F12 to see the debug drawer for more details.\n`,
-      );
+      if (shouldEmit) {
+        coreEvents.emitFeedback(
+          'warning',
+          `Hook(s) [${failedNames}] failed for event ${eventName}. Press F12 to see the debug drawer for more details.\n`,
+        );
+      }
     } else {
       debugLogger.debug(
         `Hook execution for ${eventName}: ${successCount} hooks executed successfully, ` +
@@ -444,7 +500,10 @@ export class HookEventHandler {
    * Get hook name from config for display or telemetry
    */
   private getHookName(config: HookConfig): string {
-    return config.name || config.command || 'unknown-command';
+    if (config.type === HookType.Command) {
+      return config.name || config.command || 'unknown-command';
+    }
+    return config.name || 'unknown-hook';
   }
 
   /**
@@ -457,7 +516,7 @@ export class HookEventHandler {
   /**
    * Get hook type from execution result for telemetry
    */
-  private getHookTypeFromResult(result: HookExecutionResult): 'command' {
+  private getHookTypeFromResult(result: HookExecutionResult): HookType {
     return result.hookConfig.type;
   }
 }

@@ -119,11 +119,7 @@ const _ExpandableText: React.FC<ExpandableTextProps> = ({
       {before}
       {match
         ? match.split(/(\s+)/).map((part, index) => (
-            <Text
-              key={`match-${index}`}
-              color={theme.background.primary}
-              backgroundColor={theme.text.primary}
-            >
+            <Text key={`match-${index}`} inverse color={textColor}>
               {part}
             </Text>
           ))

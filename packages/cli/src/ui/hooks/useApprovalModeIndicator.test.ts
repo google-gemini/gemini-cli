@@ -30,6 +30,9 @@ vi.mock('@google/gemini-cli-core', async () => {
   return {
     ...actualServerModule,
     Config: vi.fn(),
+    getAdminErrorMessage: vi.fn(
+      (featureName: string) => `[Mock] ${featureName} is disabled`,
+    ),
   };
 });
 
@@ -52,6 +55,9 @@ interface MockConfigInstanceShape {
   getUserMemory: Mock<() => string>;
   getGeminiMdFileCount: Mock<() => number>;
   getToolRegistry: Mock<() => { discoverTools: Mock<() => void> }>;
+  getRemoteAdminSettings: Mock<
+    () => { strictModeDisabled?: boolean; mcpEnabled?: boolean } | undefined
+  >;
 }
 
 type UseKeypressHandler = (key: Key) => void;
@@ -108,6 +114,9 @@ describe('useApprovalModeIndicator', () => {
           .fn()
           .mockReturnValue({ discoverTools: vi.fn() }) as Mock<
           () => { discoverTools: Mock<() => void> }
+        >,
+        getRemoteAdminSettings: vi.fn().mockReturnValue(undefined) as Mock<
+          () => { strictModeDisabled?: boolean } | undefined
         >,
       };
       instanceSetApprovalModeMock.mockImplementation((value: ApprovalMode) => {
@@ -193,7 +202,7 @@ describe('useApprovalModeIndicator', () => {
     );
     expect(result.current).toBe(ApprovalMode.YOLO);
 
-    // Shift+Tab cycles back to DEFAULT (since PLAN is disabled by default in mock)
+    // Shift+Tab cycles back to AUTO_EDIT (from YOLO)
     act(() => {
       capturedUseKeypressHandler({
         name: 'tab',
@@ -225,41 +234,6 @@ describe('useApprovalModeIndicator', () => {
       ApprovalMode.AUTO_EDIT,
     );
     expect(result.current).toBe(ApprovalMode.AUTO_EDIT);
-  });
-
-  it('should cycle through DEFAULT -> AUTO_EDIT -> PLAN -> DEFAULT when plan is enabled', () => {
-    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
-    mockConfigInstance.isPlanEnabled.mockReturnValue(true);
-    renderHook(() =>
-      useApprovalModeIndicator({
-        config: mockConfigInstance as unknown as ActualConfigType,
-        addItem: vi.fn(),
-      }),
-    );
-
-    // DEFAULT -> PLAN
-    act(() => {
-      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
-    });
-    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
-      ApprovalMode.PLAN,
-    );
-
-    // PLAN -> AUTO_EDIT
-    act(() => {
-      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
-    });
-    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
-      ApprovalMode.AUTO_EDIT,
-    );
-
-    // AUTO_EDIT -> DEFAULT
-    act(() => {
-      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
-    });
-    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
-      ApprovalMode.DEFAULT,
-    );
   });
 
   it('should not toggle if only one key or other keys combinations are pressed', () => {
@@ -517,6 +491,9 @@ describe('useApprovalModeIndicator', () => {
 
     it('should not enable YOLO mode when Ctrl+Y is pressed and add an info message', () => {
       mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+      mockConfigInstance.getRemoteAdminSettings.mockReturnValue({
+        strictModeDisabled: true,
+      });
       const mockAddItem = vi.fn();
       const { result } = renderHook(() =>
         useApprovalModeIndicator({
@@ -543,6 +520,58 @@ describe('useApprovalModeIndicator', () => {
       );
       // The mode should not change
       expect(result.current).toBe(ApprovalMode.DEFAULT);
+    });
+
+    it('should show admin error message when YOLO mode is disabled by admin', () => {
+      mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+      mockConfigInstance.getRemoteAdminSettings.mockReturnValue({
+        mcpEnabled: true,
+      });
+
+      const mockAddItem = vi.fn();
+      renderHook(() =>
+        useApprovalModeIndicator({
+          config: mockConfigInstance as unknown as ActualConfigType,
+          addItem: mockAddItem,
+        }),
+      );
+
+      act(() => {
+        capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.WARNING,
+          text: '[Mock] YOLO mode is disabled',
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should show default error message when admin settings are empty', () => {
+      mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+      mockConfigInstance.getRemoteAdminSettings.mockReturnValue({});
+
+      const mockAddItem = vi.fn();
+      renderHook(() =>
+        useApprovalModeIndicator({
+          config: mockConfigInstance as unknown as ActualConfigType,
+          addItem: mockAddItem,
+        }),
+      );
+
+      act(() => {
+        capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.WARNING,
+          text: 'You cannot enter YOLO mode since it is disabled in your settings.',
+        },
+        expect.any(Number),
+      );
     });
   });
 
@@ -663,6 +692,46 @@ describe('useApprovalModeIndicator', () => {
     expect(mockOnApprovalModeChange).toHaveBeenNthCalledWith(
       2,
       ApprovalMode.AUTO_EDIT,
+    );
+  });
+
+  it('should cycle to PLAN when allowPlanMode is true', () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.AUTO_EDIT);
+
+    renderHook(() =>
+      useApprovalModeIndicator({
+        config: mockConfigInstance as unknown as ActualConfigType,
+        addItem: vi.fn(),
+        allowPlanMode: true,
+      }),
+    );
+
+    // AUTO_EDIT -> PLAN
+    act(() => {
+      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
+    });
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.PLAN,
+    );
+  });
+
+  it('should cycle to DEFAULT when allowPlanMode is false', () => {
+    mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.AUTO_EDIT);
+
+    renderHook(() =>
+      useApprovalModeIndicator({
+        config: mockConfigInstance as unknown as ActualConfigType,
+        addItem: vi.fn(),
+        allowPlanMode: false,
+      }),
+    );
+
+    // AUTO_EDIT -> DEFAULT
+    act(() => {
+      capturedUseKeypressHandler({ name: 'tab', shift: true } as Key);
+    });
+    expect(mockConfigInstance.setApprovalMode).toHaveBeenCalledWith(
+      ApprovalMode.DEFAULT,
     );
   });
 });

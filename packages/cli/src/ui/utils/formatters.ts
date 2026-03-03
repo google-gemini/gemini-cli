@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,7 +9,7 @@ import {
   REFERENCE_CONTENT_END,
 } from '@google/gemini-cli-core';
 
-export const formatMemoryUsage = (bytes: number): string => {
+export const formatBytes = (bytes: number): string => {
   const gb = bytes / (1024 * 1024 * 1024);
   if (bytes < 1024 * 1024) {
     return `${(bytes / 1024).toFixed(1)} KB`;
@@ -97,3 +97,27 @@ export function stripReferenceContent(text: string): string {
 
   return text.replace(pattern, '').trim();
 }
+
+export const formatResetTime = (resetTime: string): string => {
+  const diff = new Date(resetTime).getTime() - Date.now();
+  if (diff <= 0) return '';
+
+  const totalMinutes = Math.ceil(diff / (1000 * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  const fmt = (val: number, unit: 'hour' | 'minute') =>
+    new Intl.NumberFormat('en', {
+      style: 'unit',
+      unit,
+      unitDisplay: 'narrow',
+    }).format(val);
+
+  if (hours > 0 && minutes > 0) {
+    return `resets in ${fmt(hours, 'hour')} ${fmt(minutes, 'minute')}`;
+  } else if (hours > 0) {
+    return `resets in ${fmt(hours, 'hour')}`;
+  }
+
+  return `resets in ${fmt(minutes, 'minute')}`;
+};

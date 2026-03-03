@@ -33,6 +33,7 @@ export class GitService {
         'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.',
       );
     }
+    await this.storage.initialize();
     try {
       await this.setupShadowGitRepository();
     } catch (error) {
@@ -51,6 +52,16 @@ export class GitService {
     }
   }
 
+  private getShadowRepoEnv(repoDir: string) {
+    const gitConfigPath = path.join(repoDir, '.gitconfig');
+    const systemConfigPath = path.join(repoDir, '.gitconfig_system_empty');
+    return {
+      // Prevent git from using the user's global git config.
+      GIT_CONFIG_GLOBAL: gitConfigPath,
+      GIT_CONFIG_SYSTEM: systemConfigPath,
+    };
+  }
+
   /**
    * Creates a hidden git repository in the project root.
    * The Git repository is used to support checkpointing.
@@ -67,7 +78,9 @@ export class GitService {
       '[user]\n  name = Gemini CLI\n  email = gemini-cli@google.com\n[commit]\n  gpgsign = false\n';
     await fs.writeFile(gitConfigPath, gitConfigContent);
 
-    const repo = simpleGit(repoDir);
+    const shadowRepoEnv = this.getShadowRepoEnv(repoDir);
+    await fs.writeFile(shadowRepoEnv.GIT_CONFIG_SYSTEM, '');
+    const repo = simpleGit(repoDir).env(shadowRepoEnv);
     let isRepoDefined = false;
     try {
       isRepoDefined = await repo.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
@@ -107,9 +120,7 @@ export class GitService {
     return simpleGit(this.projectRoot).env({
       GIT_DIR: path.join(repoDir, '.git'),
       GIT_WORK_TREE: this.projectRoot,
-      // Prevent git from using the user's global git config.
-      HOME: repoDir,
-      XDG_CONFIG_HOME: repoDir,
+      ...this.getShadowRepoEnv(repoDir),
     });
   }
 

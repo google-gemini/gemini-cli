@@ -20,6 +20,7 @@ import {
 } from '../utils/directoryUtils.js';
 import type { Config } from '@google/gemini-cli-core';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 
 async function finishAddingDirectories(
   config: Config,
@@ -48,6 +49,7 @@ async function finishAddingDirectories(
         text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join('\n- ')}`,
       });
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       errors.push(`Error refreshing memory: ${(error as Error).message}`);
     }
   }
@@ -56,6 +58,13 @@ async function finishAddingDirectories(
     const gemini = config.getGeminiClient();
     if (gemini) {
       await gemini.addDirectoryContext();
+
+      // Persist directories to session file for resume support
+      const chatRecordingService = gemini.getChatRecordingService();
+      const workspaceContext = config.getWorkspaceContext();
+      chatRecordingService?.recordDirectories(
+        workspaceContext.getDirectories(),
+      );
     }
     addItem({
       type: MessageType.INFO,
@@ -100,7 +109,7 @@ export const directoryCommand: SlashCommand = {
           const workspaceContext =
             context.services.config.getWorkspaceContext();
           const existingDirs = new Set(
-            workspaceContext.getDirectories().map((dir) => path.normalize(dir)),
+            workspaceContext.getDirectories().map((dir) => path.resolve(dir)),
           );
 
           filteredSuggestions = suggestions.filter((s) => {
@@ -172,12 +181,23 @@ export const directoryCommand: SlashCommand = {
         const pathsToProcess: string[] = [];
 
         for (const pathToAdd of pathsToAdd) {
-          const expandedPath = expandHomeDir(pathToAdd.trim());
-          if (currentWorkspaceDirs.includes(expandedPath)) {
-            alreadyAdded.push(pathToAdd.trim());
-          } else {
-            pathsToProcess.push(pathToAdd.trim());
+          const trimmedPath = pathToAdd.trim();
+          const expandedPath = expandHomeDir(trimmedPath);
+          try {
+            const absolutePath = path.resolve(
+              workspaceContext.targetDir,
+              expandedPath,
+            );
+            const resolvedPath = fs.realpathSync(absolutePath);
+            if (currentWorkspaceDirs.includes(resolvedPath)) {
+              alreadyAdded.push(trimmedPath);
+              continue;
+            }
+          } catch (_e) {
+            // Path might not exist or be inaccessible.
+            // We'll let batchAddDirectories handle it later.
           }
+          pathsToProcess.push(trimmedPath);
         }
 
         if (alreadyAdded.length > 0) {

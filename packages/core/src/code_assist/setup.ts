@@ -7,15 +7,18 @@
 import type {
   ClientMetadata,
   GeminiUserTier,
+  IneligibleTier,
   LoadCodeAssistResponse,
   OnboardUserRequest,
 } from './types.js';
 import { UserTierId, IneligibleTierReasonCode } from './types.js';
+import type { HttpOptions } from './server.js';
 import { CodeAssistServer } from './server.js';
 import type { AuthClient } from 'google-auth-library';
 import type { ValidationHandler } from '../fallback/types.js';
 import { ChangeAuthRequestedError } from '../utils/errors.js';
 import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export class ProjectIdRequiredError extends Error {
   constructor() {
@@ -35,20 +38,49 @@ export class ValidationCancelledError extends Error {
   }
 }
 
+export class IneligibleTierError extends Error {
+  readonly ineligibleTiers: IneligibleTier[];
+
+  constructor(ineligibleTiers: IneligibleTier[]) {
+    const reasons = ineligibleTiers.map((t) => t.reasonMessage).join(', ');
+    super(reasons);
+    this.ineligibleTiers = ineligibleTiers;
+  }
+}
+
 export interface UserData {
   projectId: string;
   userTier: UserTierId;
   userTierName?: string;
+  paidTier?: GeminiUserTier;
 }
 
 /**
+ * Sets up the user by loading their Code Assist configuration and onboarding if needed.
  *
- * @param projectId the user's project id, if any
- * @returns the user's actual project id
+ * Tier eligibility:
+ * - FREE tier: Eligibility is determined by the Code Assist server response.
+ * - STANDARD tier: User is always eligible if they have a valid project ID.
+ *
+ * If no valid project ID is available (from env var or server response):
+ * - Surfaces ineligibility reasons for the FREE tier from the server.
+ * - Throws ProjectIdRequiredError if no ineligibility reasons are available.
+ *
+ * Handles VALIDATION_REQUIRED via the optional validation handler, allowing
+ * retry, auth change, or cancellation.
+ *
+ * @param client - The authenticated client to use for API calls
+ * @param validationHandler - Optional handler for account validation flow
+ * @returns The user's project ID, tier ID, and tier name
+ * @throws {ValidationRequiredError} If account validation is required
+ * @throws {ProjectIdRequiredError} If no project ID is available and required
+ * @throws {ValidationCancelledError} If user cancels validation
+ * @throws {ChangeAuthRequestedError} If user requests to change auth method
  */
 export async function setupUser(
   client: AuthClient,
   validationHandler?: ValidationHandler,
+  httpOptions: HttpOptions = {},
 ): Promise<UserData> {
   const projectId =
     process.env['GOOGLE_CLOUD_PROJECT'] ||
@@ -57,7 +89,7 @@ export async function setupUser(
   const caServer = new CodeAssistServer(
     client,
     projectId,
-    {},
+    httpOptions,
     '',
     undefined,
     undefined,
@@ -100,24 +132,44 @@ export async function setupUser(
   }
 
   if (loadRes.currentTier) {
+    if (!loadRes.paidTier?.id && !loadRes.currentTier.id) {
+      debugLogger.warn(
+        'Warning: Code Assist API did not return a user tier ID. Defaulting to STANDARD tier.',
+      );
+    }
+
     if (!loadRes.cloudaicompanionProject) {
       if (projectId) {
         return {
           projectId,
-          userTier: loadRes.currentTier.id,
-          userTierName: loadRes.currentTier.name,
+          userTier:
+            loadRes.paidTier?.id ??
+            loadRes.currentTier.id ??
+            UserTierId.STANDARD,
+          userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
+          paidTier: loadRes.paidTier ?? undefined,
         };
       }
-      throw new ProjectIdRequiredError();
+
+      // If user is not setup for standard tier, inform them about all other tiers they are ineligible for.
+      throwIneligibleOrProjectIdError(loadRes);
     }
     return {
       projectId: loadRes.cloudaicompanionProject,
-      userTier: loadRes.currentTier.id,
-      userTierName: loadRes.currentTier.name,
+      userTier:
+        loadRes.paidTier?.id ?? loadRes.currentTier.id ?? UserTierId.STANDARD,
+      userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
+      paidTier: loadRes.paidTier ?? undefined,
     };
   }
 
   const tier = getOnboardTier(loadRes);
+
+  if (!tier.id) {
+    debugLogger.warn(
+      'Warning: Code Assist API did not return an onboarding tier ID. Defaulting to STANDARD tier.',
+    );
+  }
 
   let onboardReq: OnboardUserRequest;
   if (tier.id === UserTierId.FREE) {
@@ -151,18 +203,26 @@ export async function setupUser(
     if (projectId) {
       return {
         projectId,
-        userTier: tier.id,
+        userTier: tier.id ?? UserTierId.STANDARD,
         userTierName: tier.name,
       };
     }
-    throw new ProjectIdRequiredError();
+
+    throwIneligibleOrProjectIdError(loadRes);
   }
 
   return {
     projectId: lroRes.response.cloudaicompanionProject.id,
-    userTier: tier.id,
+    userTier: tier.id ?? UserTierId.STANDARD,
     userTierName: tier.name,
   };
+}
+
+function throwIneligibleOrProjectIdError(res: LoadCodeAssistResponse): never {
+  if (res.ineligibleTiers && res.ineligibleTiers.length > 0) {
+    throw new IneligibleTierError(res.ineligibleTiers);
+  }
+  throw new ProjectIdRequiredError();
 }
 
 function getOnboardTier(res: LoadCodeAssistResponse): GeminiUserTier {
@@ -188,7 +248,6 @@ function validateLoadCodeAssistResponse(res: LoadCodeAssistResponse): void {
     res.ineligibleTiers &&
     res.ineligibleTiers.length > 0
   ) {
-    // Check for VALIDATION_REQUIRED first - this is a recoverable state
     const validationTier = res.ineligibleTiers.find(
       (t) =>
         t.validationUrl &&
@@ -203,9 +262,5 @@ function validateLoadCodeAssistResponse(res: LoadCodeAssistResponse): void {
         validationTier.reasonMessage,
       );
     }
-
-    // For other ineligibility reasons, throw a generic error
-    const reasons = res.ineligibleTiers.map((t) => t.reasonMessage).join(', ');
-    throw new Error(reasons);
   }
 }

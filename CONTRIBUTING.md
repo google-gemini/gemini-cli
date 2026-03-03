@@ -45,7 +45,7 @@ The process for contributing code is as follows:
     `🔒Maintainers only`, this means it is reserved for project maintainers. We
     will not accept pull requests related to these issues. In the near future,
     we will explicitly mark issues looking for contributions using the
-    `help  wanted` label. If you believe an issue is a good candidate for
+    `help-wanted` label. If you believe an issue is a good candidate for
     community contribution, please leave a comment on the issue. A maintainer
     will review it and apply the `help-wanted` label if appropriate. Only
     maintainers should attempt to add the `help-wanted` label to an issue.
@@ -75,11 +75,14 @@ Replace `<PR_NUMBER>` with your pull request number. Authors are encouraged to
 run this on their own PRs for self-review, and reviewers should use it to
 augment their manual review process.
 
-### Self assigning issues
+### Self-assigning and unassigning issues
 
-To assign an issue to yourself, simply add a comment with the text `/assign`.
-The comment must contain only that text and nothing else. This command will
-assign the issue to you, provided it is not already assigned.
+To assign an issue to yourself, simply add a comment with the text `/assign`. To
+unassign yourself from an issue, add a comment with the text `/unassign`.
+
+The comment must contain only that text and nothing else. These commands will
+assign or unassign the issue as requested, provided the conditions are met
+(e.g., an issue must be unassigned to be assigned).
 
 Please note that you can have a maximum of 3 issues assigned to you at any given
 time.
@@ -372,8 +375,7 @@ specific debug settings.
 
 ### React DevTools
 
-To debug the CLI's React-based UI, you can use React DevTools. Ink, the library
-used for the CLI's interface, is compatible with React DevTools version 4.x.
+To debug the CLI's React-based UI, you can use React DevTools.
 
 1.  **Start the Gemini CLI in development mode:**
 
@@ -381,20 +383,20 @@ used for the CLI's interface, is compatible with React DevTools version 4.x.
     DEV=true npm start
     ```
 
-2.  **Install and run React DevTools version 4.28.5 (or the latest compatible
-    4.x version):**
+2.  **Install and run React DevTools version 6 (which matches the CLI's
+    `react-devtools-core`):**
 
     You can either install it globally:
 
     ```bash
-    npm install -g react-devtools@4.28.5
+    npm install -g react-devtools@6
     react-devtools
     ```
 
     Or run it directly using npx:
 
     ```bash
-    npx react-devtools@4.28.5
+    npx react-devtools@6
     ```
 
     Your running CLI application should then connect to React DevTools.
@@ -408,12 +410,13 @@ On macOS, `gemini` uses Seatbelt (`sandbox-exec`) under a `permissive-open`
 profile (see `packages/cli/src/utils/sandbox-macos-permissive-open.sb`) that
 restricts writes to the project folder but otherwise allows all other operations
 and outbound network traffic ("open") by default. You can switch to a
-`restrictive-closed` profile (see
-`packages/cli/src/utils/sandbox-macos-restrictive-closed.sb`) that declines all
-operations and outbound network traffic ("closed") by default by setting
-`SEATBELT_PROFILE=restrictive-closed` in your environment or `.env` file.
-Available built-in profiles are `{permissive,restrictive}-{open,closed,proxied}`
-(see below for proxied networking). You can also switch to a custom profile
+`strict-open` profile (see
+`packages/cli/src/utils/sandbox-macos-strict-open.sb`) that restricts both reads
+and writes to the working directory while allowing outbound network traffic by
+setting `SEATBELT_PROFILE=strict-open` in your environment or `.env` file.
+Available built-in profiles are `permissive-{open,proxied}`,
+`restrictive-{open,proxied}`, and `strict-{open,proxied}` (see below for proxied
+networking). You can also switch to a custom profile
 `SEATBELT_PROFILE=<profile>` if you also create a file
 `.gemini/sandbox-macos-<profile>.sb` under your project settings directory
 `.gemini`.
@@ -545,7 +548,7 @@ Before submitting your documentation pull request, please:
 
 If you have questions about contributing documentation:
 
-- Check our [FAQ](/docs/faq.md).
+- Check our [FAQ](/docs/resources/faq.md).
 - Review existing documentation for examples.
 - Open [an issue](https://github.com/google-gemini/gemini-cli/issues) to discuss
   your proposed changes.

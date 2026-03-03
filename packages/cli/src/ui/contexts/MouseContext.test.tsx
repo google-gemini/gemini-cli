@@ -229,4 +229,88 @@ describe('MouseContext', () => {
       },
     );
   });
+
+  it('should emit a double-click event when two left-presses occur quickly at the same position', () => {
+    const handler = vi.fn();
+    const { result } = renderHook(() => useMouseContext(), { wrapper });
+
+    act(() => {
+      result.current.subscribe(handler);
+    });
+
+    // First click
+    act(() => {
+      stdin.write('\x1b[<0;10;20M');
+    });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenLastCalledWith(
+      expect.objectContaining({ name: 'left-press', col: 10, row: 20 }),
+    );
+
+    // Second click (within threshold)
+    act(() => {
+      stdin.write('\x1b[<0;10;20M');
+    });
+
+    // Should have called for the second left-press AND the double-click
+    expect(handler).toHaveBeenCalledTimes(3);
+    expect(handler).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'double-click', col: 10, row: 20 }),
+    );
+  });
+
+  it('should NOT emit a double-click event if clicks are too far apart', () => {
+    const handler = vi.fn();
+    const { result } = renderHook(() => useMouseContext(), { wrapper });
+
+    act(() => {
+      result.current.subscribe(handler);
+    });
+
+    // First click
+    act(() => {
+      stdin.write('\x1b[<0;10;20M');
+    });
+
+    // Second click (too far)
+    act(() => {
+      stdin.write('\x1b[<0;15;25M');
+    });
+
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(handler).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'double-click' }),
+    );
+  });
+
+  it('should NOT emit a double-click event if too much time passes', async () => {
+    vi.useFakeTimers();
+    const handler = vi.fn();
+    const { result } = renderHook(() => useMouseContext(), { wrapper });
+
+    act(() => {
+      result.current.subscribe(handler);
+    });
+
+    // First click
+    act(() => {
+      stdin.write('\x1b[<0;10;20M');
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(500); // Threshold is 400ms
+    });
+
+    // Second click
+    act(() => {
+      stdin.write('\x1b[<0;10;20M');
+    });
+
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(handler).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'double-click' }),
+    );
+    vi.useRealTimers();
+  });
 });

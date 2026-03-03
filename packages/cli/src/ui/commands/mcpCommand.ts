@@ -52,6 +52,8 @@ const authCommand: SlashCommand = {
       };
     }
 
+    config.setUserInteractedWithMcp();
+
     const mcpServers = config.getMcpClientManager()?.getMcpServers() ?? {};
 
     if (!serverName) {
@@ -184,6 +186,8 @@ const listAction = async (
     };
   }
 
+  config.setUserInteractedWithMcp();
+
   const toolRegistry = config.getToolRegistry();
   if (!toolRegistry) {
     return {
@@ -250,6 +254,13 @@ const listAction = async (
     enablementState[serverName] =
       await enablementManager.getDisplayState(serverName);
   }
+  const errors: Record<string, string> = {};
+  for (const serverName of serverNames) {
+    const error = config.getMcpClientManager()?.getLastError(serverName);
+    if (error) {
+      errors[serverName] = error;
+    }
+  }
 
   const mcpStatusItem: HistoryItemMcpStatus = {
     type: MessageType.MCP_STATUS,
@@ -274,16 +285,19 @@ const listAction = async (
     })),
     authStatus,
     enablementState,
-    blockedServers: blockedMcpServers,
+    errors,
+    blockedServers: blockedMcpServers.map((s) => ({
+      name: s.name,
+      extensionName: s.extensionName,
+    })),
     discoveryInProgress,
     connectingServers,
-    showDescriptions,
-    showSchema,
+    showDescriptions: Boolean(showDescriptions),
+    showSchema: Boolean(showSchema),
   };
 
   context.ui.addItem(mcpStatusItem);
 };
-
 const listCommand: SlashCommand = {
   name: 'list',
   altNames: ['ls', 'nodesc', 'nodescription'],
@@ -313,6 +327,7 @@ const schemaCommand: SlashCommand = {
 
 const refreshCommand: SlashCommand = {
   name: 'refresh',
+  altNames: ['reload'],
   description: 'Restarts MCP servers',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
@@ -371,6 +386,8 @@ async function handleEnableDisable(
     };
   }
 
+  config.setUserInteractedWithMcp();
+
   const parts = args.trim().split(/\s+/);
   const isSession = parts.includes('--session');
   const serverName = parts.filter((p) => p !== '--session')[0];
@@ -394,19 +411,6 @@ async function handleEnableDisable(
       type: 'message',
       messageType: 'error',
       content: `Server '${serverName}' not found. Use /mcp list to see available servers.`,
-    };
-  }
-
-  // Check if server is from an extension
-  const serverKey = Object.keys(servers).find(
-    (key) => normalizeServerId(key) === name,
-  );
-  const server = serverKey ? servers[serverKey] : undefined;
-  if (server?.extension) {
-    return {
-      type: 'message',
-      messageType: 'error',
-      content: `Server '${serverName}' is provided by extension '${server.extension.name}'.\nUse '/extensions ${action} ${server.extension.name}' to manage this extension.`,
     };
   }
 

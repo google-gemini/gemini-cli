@@ -324,11 +324,41 @@ export class McpServerEnablementManager {
   }
 
   /**
+   * Auto-enable any disabled MCP servers by name.
+   * Returns server names that were actually re-enabled.
+   */
+  async autoEnableServers(serverNames: string[]): Promise<string[]> {
+    const enabledServers: string[] = [];
+
+    for (const serverName of serverNames) {
+      const normalizedName = normalizeServerId(serverName);
+      const state = await this.getDisplayState(normalizedName);
+
+      let wasDisabled = false;
+      if (state.isPersistentDisabled) {
+        await this.enable(normalizedName);
+        wasDisabled = true;
+      }
+      if (state.isSessionDisabled) {
+        this.clearSessionDisable(normalizedName);
+        wasDisabled = true;
+      }
+
+      if (wasDisabled) {
+        enabledServers.push(serverName);
+      }
+    }
+
+    return enabledServers;
+  }
+
+  /**
    * Read config from file asynchronously.
    */
   private async readConfig(): Promise<McpServerEnablementConfig> {
     try {
       const content = await fs.readFile(this.configFilePath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(content) as McpServerEnablementConfig;
     } catch (error) {
       if (

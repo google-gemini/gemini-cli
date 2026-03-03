@@ -8,6 +8,7 @@ import {
   readPackageUp,
   type PackageJson as BasePackageJson,
 } from 'read-package-up';
+import { debugLogger } from './debugLogger.js';
 
 export type PackageJson = BasePackageJson & {
   config?: {
@@ -32,10 +33,15 @@ export type PackageJson = BasePackageJson & {
 export async function getPackageJson(
   cwd: string,
 ): Promise<PackageJson | undefined> {
-  const result = await readPackageUp({ cwd });
-  if (!result) {
+  try {
+    const result = await readPackageUp({ cwd, normalize: false });
+    if (!result) {
+      return undefined;
+    }
+
+    return result.packageJson;
+  } catch (error) {
+    debugLogger.error('Error occurred while reading package.json', error);
     return undefined;
   }
-
-  return result.packageJson;
 }

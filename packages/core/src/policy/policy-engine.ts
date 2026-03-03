@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -24,6 +24,77 @@ import {
   splitCommands,
   hasRedirection,
 } from '../utils/shell-utils.js';
+import { getToolAliases } from '../tools/tool-names.js';
+
+function isWildcardPattern(name: string): boolean {
+  return name === '*' || name.includes('*');
+}
+
+/**
+ * Checks if a tool call matches a wildcard pattern.
+ * Supports global (*) and composite (server__*, *__tool, *__*) patterns.
+ */
+function matchesWildcard(
+  pattern: string,
+  toolName: string,
+  serverName: string | undefined,
+): boolean {
+  if (pattern === '*') {
+    return true;
+  }
+
+  if (pattern.includes('__')) {
+    return matchesCompositePattern(pattern, toolName, serverName);
+  }
+
+  return toolName === pattern;
+}
+
+/**
+ * Matches composite patterns like "server__*", "*__tool", or "*__*".
+ */
+function matchesCompositePattern(
+  pattern: string,
+  toolName: string,
+  serverName: string | undefined,
+): boolean {
+  const parts = pattern.split('__');
+  if (parts.length !== 2) return false;
+  const [patternServer, patternTool] = parts;
+
+  // 1. Identify the tool's components
+  const { actualServer, actualTool } = getToolMetadata(toolName, serverName);
+
+  // 2. Composite patterns require a server context
+  if (actualServer === undefined) {
+    return false;
+  }
+
+  // 3. Robustness: if serverName is provided, toolName MUST be qualified by it.
+  // This prevents "malicious-server" from spoofing "trusted-server" by naming itself "trusted-server__malicious".
+  if (serverName !== undefined && !toolName.startsWith(serverName + '__')) {
+    return false;
+  }
+
+  // 4. Match components
+  const serverMatch = patternServer === '*' || patternServer === actualServer;
+  const toolMatch = patternTool === '*' || patternTool === actualTool;
+
+  return serverMatch && toolMatch;
+}
+
+/**
+ * Extracts the server and unqualified tool name from a tool call context.
+ */
+function getToolMetadata(toolName: string, serverName: string | undefined) {
+  const sepIndex = toolName.indexOf('__');
+  const isQualified = sepIndex !== -1;
+  return {
+    actualServer:
+      serverName ?? (isQualified ? toolName.substring(0, sepIndex) : undefined),
+    actualTool: isQualified ? toolName.substring(sepIndex + 2) : toolName,
+  };
+}
 
 function ruleMatches(
   rule: PolicyRule | SafetyCheckerRule,
@@ -31,6 +102,7 @@ function ruleMatches(
   stringifiedArgs: string | undefined,
   serverName: string | undefined,
   currentApprovalMode: ApprovalMode,
+  toolAnnotations?: Record<string, unknown>,
 ): boolean {
   // Check if rule applies to current approval mode
   if (rule.modes && rule.modes.length > 0) {
@@ -42,21 +114,29 @@ function ruleMatches(
   // Check tool name if specified
   if (rule.toolName) {
     // Support wildcard patterns: "serverName__*" matches "serverName__anyTool"
-    if (rule.toolName.endsWith('__*')) {
-      const prefix = rule.toolName.slice(0, -3); // Remove "__*"
-      if (serverName !== undefined) {
-        // Robust check: if serverName is provided, it MUST match the prefix exactly.
-        // This prevents "malicious-server" from spoofing "trusted-server" by naming itself "trusted-server__malicious".
-        if (serverName !== prefix) {
-          return false;
-        }
-      }
-      // Always verify the prefix, even if serverName matched
-      if (!toolCall.name || !toolCall.name.startsWith(prefix + '__')) {
+    if (rule.toolName === '*') {
+      // Match all tools
+    } else if (isWildcardPattern(rule.toolName)) {
+      if (
+        !toolCall.name ||
+        !matchesWildcard(rule.toolName, toolCall.name, serverName)
+      ) {
         return false;
       }
     } else if (toolCall.name !== rule.toolName) {
       return false;
+    }
+  }
+
+  // Check annotations if specified
+  if (rule.toolAnnotations) {
+    if (!toolAnnotations) {
+      return false;
+    }
+    for (const [key, value] of Object.entries(rule.toolAnnotations)) {
+      if (toolAnnotations[key] !== value) {
+        return false;
+      }
     }
   }
 
@@ -140,6 +220,7 @@ export class PolicyEngine {
     dir_path: string | undefined,
     allowRedirection?: boolean,
     rule?: PolicyRule,
+    toolAnnotations?: Record<string, unknown>,
   ): Promise<CheckResult> {
     if (!command) {
       return {
@@ -152,14 +233,28 @@ export class PolicyEngine {
     const subCommands = splitCommands(command);
 
     if (subCommands.length === 0) {
+      // If the matched rule says DENY, we should respect it immediately even if parsing fails.
+      if (ruleDecision === PolicyDecision.DENY) {
+        return { decision: PolicyDecision.DENY, rule };
+      }
+
+      // In YOLO mode, we should proceed anyway even if we can't parse the command.
+      if (this.approvalMode === ApprovalMode.YOLO) {
+        return {
+          decision: PolicyDecision.ALLOW,
+          rule,
+        };
+      }
+
       debugLogger.debug(
         `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to ASK_USER.`,
       );
+
       // Parsing logic failed, we can't trust it. Force ASK_USER (or DENY).
-      // We don't blame a specific rule here, unless the input rule was stricter.
+      // We return the rule that matched so the evaluation loop terminates.
       return {
         decision: this.applyNonInteractiveMode(PolicyDecision.ASK_USER),
-        rule: undefined,
+        rule,
       };
     }
 
@@ -216,6 +311,7 @@ export class PolicyEngine {
         const subResult = await this.check(
           { name: toolName, args: { command: subCmd, dir_path } },
           serverName,
+          toolAnnotations,
         );
 
         // subResult.decision is already filtered through applyNonInteractiveMode by this.check()
@@ -273,6 +369,7 @@ export class PolicyEngine {
   async check(
     toolCall: FunctionCall,
     serverName: string | undefined,
+    toolAnnotations?: Record<string, unknown>,
   ): Promise<CheckResult> {
     let stringifiedArgs: string | undefined;
     // Compute stringified args once before the loop
@@ -297,6 +394,7 @@ export class PolicyEngine {
 
     if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
       isShellCommand = true;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const args = toolCall.args as { command?: string; dir_path?: string };
       command = args?.command;
       shellDirPath = args?.dir_path;
@@ -308,17 +406,30 @@ export class PolicyEngine {
 
     // For tools with a server name, we want to try matching both the
     // original name and the fully qualified name (server__tool).
-    const toolCallsToTry: FunctionCall[] = [toolCall];
-    if (serverName && toolCall.name && !toolCall.name.includes('__')) {
-      toolCallsToTry.push({
-        ...toolCall,
-        name: `${serverName}__${toolCall.name}`,
-      });
+    // We also want to check legacy aliases for the tool name.
+    const toolNamesToTry = toolCall.name ? getToolAliases(toolCall.name) : [];
+
+    const toolCallsToTry: FunctionCall[] = [];
+    for (const name of toolNamesToTry) {
+      toolCallsToTry.push({ ...toolCall, name });
+      if (serverName && !name.includes('__')) {
+        toolCallsToTry.push({
+          ...toolCall,
+          name: `${serverName}__${name}`,
+        });
+      }
     }
 
     for (const rule of this.rules) {
       const match = toolCallsToTry.some((tc) =>
-        ruleMatches(rule, tc, stringifiedArgs, serverName, this.approvalMode),
+        ruleMatches(
+          rule,
+          tc,
+          stringifiedArgs,
+          serverName,
+          this.approvalMode,
+          toolAnnotations,
+        ),
       );
 
       if (match) {
@@ -335,6 +446,7 @@ export class PolicyEngine {
             shellDirPath,
             rule.allowRedirection,
             rule,
+            toolAnnotations,
           );
           decision = shellResult.decision;
           if (shellResult.rule) {
@@ -361,6 +473,9 @@ export class PolicyEngine {
           this.defaultDecision,
           serverName,
           shellDirPath,
+          undefined,
+          undefined,
+          toolAnnotations,
         );
         decision = shellResult.decision;
         matchedRule = shellResult.rule;
@@ -379,6 +494,7 @@ export class PolicyEngine {
             stringifiedArgs,
             serverName,
             this.approvalMode,
+            toolAnnotations,
           )
         ) {
           debugLogger.debug(
@@ -438,10 +554,49 @@ export class PolicyEngine {
   }
 
   /**
-   * Remove rules for a specific tool.
+   * Remove rules matching a specific tier (priority band).
    */
-  removeRulesForTool(toolName: string): void {
-    this.rules = this.rules.filter((rule) => rule.toolName !== toolName);
+  removeRulesByTier(tier: number): void {
+    this.rules = this.rules.filter(
+      (rule) => Math.floor(rule.priority ?? 0) !== tier,
+    );
+  }
+
+  /**
+   * Remove rules matching a specific source.
+   */
+  removeRulesBySource(source: string): void {
+    this.rules = this.rules.filter((rule) => rule.source !== source);
+  }
+
+  /**
+   * Remove checkers matching a specific tier (priority band).
+   */
+  removeCheckersByTier(tier: number): void {
+    this.checkers = this.checkers.filter(
+      (checker) => Math.floor(checker.priority ?? 0) !== tier,
+    );
+  }
+
+  /**
+   * Remove checkers matching a specific source.
+   */
+  removeCheckersBySource(source: string): void {
+    this.checkers = this.checkers.filter(
+      (checker) => checker.source !== source,
+    );
+  }
+
+  /**
+   * Remove rules for a specific tool.
+   * If source is provided, only rules matching that source are removed.
+   */
+  removeRulesForTool(toolName: string, source?: string): void {
+    this.rules = this.rules.filter(
+      (rule) =>
+        rule.toolName !== toolName ||
+        (source !== undefined && rule.source !== source),
+    );
   }
 
   /**
@@ -449,6 +604,18 @@ export class PolicyEngine {
    */
   getRules(): readonly PolicyRule[] {
     return this.rules;
+  }
+
+  /**
+   * Check if a rule for a specific tool already exists.
+   * If ignoreDynamic is true, it only returns true if a rule exists that was NOT added by AgentRegistry.
+   */
+  hasRuleForTool(toolName: string, ignoreDynamic = false): boolean {
+    return this.rules.some(
+      (rule) =>
+        rule.toolName === toolName &&
+        (!ignoreDynamic || rule.source !== 'AgentRegistry (Dynamic)'),
+    );
   }
 
   getCheckers(): readonly SafetyCheckerRule[] {
@@ -468,6 +635,167 @@ export class PolicyEngine {
    */
   getHookCheckers(): readonly HookCheckerRule[] {
     return this.hookCheckers;
+  }
+
+  /**
+   * Get tools that are effectively denied by the current rules.
+   * This takes into account:
+   * 1. Global rules (no argsPattern)
+   * 2. Priority order (higher priority wins)
+   * 3. Non-interactive mode (ASK_USER becomes DENY)
+   * 4. Annotation-based rules (when toolMetadata is provided)
+   *
+   * @param toolMetadata Optional map of tool names to their annotations.
+   *   When provided, annotation-based rules can match tools by their metadata.
+   *   When not provided, rules with toolAnnotations are skipped (conservative fallback).
+   */
+  getExcludedTools(
+    toolMetadata?: Map<string, Record<string, unknown>>,
+    allToolNames?: Set<string>,
+  ): Set<string> {
+    const excludedTools = new Set<string>();
+    const processedTools = new Set<string>();
+    let globalVerdict: PolicyDecision | undefined;
+
+    for (const rule of this.rules) {
+      if (rule.argsPattern) {
+        if (rule.toolName && rule.decision !== PolicyDecision.DENY) {
+          processedTools.add(rule.toolName);
+        }
+        continue;
+      }
+
+      // Check if rule applies to current approval mode
+      if (rule.modes && rule.modes.length > 0) {
+        if (!rule.modes.includes(this.approvalMode)) {
+          continue;
+        }
+      }
+
+      // Handle annotation-based rules
+      if (rule.toolAnnotations) {
+        if (!toolMetadata) {
+          // Without metadata, we can't evaluate annotation rules — skip (conservative fallback)
+          continue;
+        }
+        // Iterate over all known tools and check if their annotations match this rule
+        for (const [toolName, annotations] of toolMetadata) {
+          if (processedTools.has(toolName)) {
+            continue;
+          }
+          // Check if annotations match the rule's toolAnnotations (partial match)
+          let annotationsMatch = true;
+          for (const [key, value] of Object.entries(rule.toolAnnotations)) {
+            if (annotations[key] !== value) {
+              annotationsMatch = false;
+              break;
+            }
+          }
+          if (!annotationsMatch) {
+            continue;
+          }
+          // Check if the tool name matches the rule's toolName pattern (if any)
+          if (rule.toolName) {
+            if (isWildcardPattern(rule.toolName)) {
+              // For composite patterns (e.g. "*__*"), construct a qualified
+              // name from metadata so matchesWildcard can resolve it.
+              const rawServerName = annotations['_serverName'];
+              const serverName =
+                typeof rawServerName === 'string' ? rawServerName : undefined;
+              const qualifiedName =
+                serverName && !toolName.includes('__')
+                  ? `${serverName}__${toolName}`
+                  : toolName;
+              if (!matchesWildcard(rule.toolName, qualifiedName, undefined)) {
+                continue;
+              }
+            } else if (toolName !== rule.toolName) {
+              continue;
+            }
+          }
+          // Determine decision considering global verdict
+          let decision: PolicyDecision;
+          if (globalVerdict !== undefined) {
+            decision = globalVerdict;
+          } else {
+            decision = rule.decision;
+          }
+          if (decision === PolicyDecision.DENY) {
+            excludedTools.add(toolName);
+          }
+          processedTools.add(toolName);
+        }
+        continue;
+      }
+
+      // Handle Global Rules
+      if (!rule.toolName) {
+        if (globalVerdict === undefined) {
+          globalVerdict = rule.decision;
+          if (globalVerdict !== PolicyDecision.DENY) {
+            // Global ALLOW/ASK found.
+            // Since rules are sorted by priority, this overrides any lower-priority rules.
+            // We can stop processing because nothing else will be excluded.
+            break;
+          }
+          // If Global DENY, we continue to find specific tools to add to excluded set
+        }
+        continue;
+      }
+
+      const toolName = rule.toolName;
+
+      // Check if already processed (exact match)
+      if (processedTools.has(toolName)) {
+        continue;
+      }
+
+      // Check if covered by a processed wildcard
+      let coveredByWildcard = false;
+      for (const processed of processedTools) {
+        if (
+          isWildcardPattern(processed) &&
+          matchesWildcard(processed, toolName, undefined)
+        ) {
+          // It's covered by a higher-priority wildcard rule.
+          // If that wildcard rule resulted in exclusion, this tool should also be excluded.
+          if (excludedTools.has(processed)) {
+            excludedTools.add(toolName);
+          }
+          coveredByWildcard = true;
+          break;
+        }
+      }
+      if (coveredByWildcard) {
+        continue;
+      }
+
+      processedTools.add(toolName);
+
+      // Determine decision
+      let decision: PolicyDecision;
+      if (globalVerdict !== undefined) {
+        decision = globalVerdict;
+      } else {
+        decision = rule.decision;
+      }
+
+      if (decision === PolicyDecision.DENY) {
+        excludedTools.add(toolName);
+      }
+    }
+
+    // If there's a global DENY and we know all tool names, exclude any tool
+    // that wasn't explicitly allowed by a higher-priority rule.
+    if (globalVerdict === PolicyDecision.DENY && allToolNames) {
+      for (const name of allToolNames) {
+        if (!processedTools.has(name)) {
+          excludedTools.add(name);
+        }
+      }
+    }
+
+    return excludedTools;
   }
 
   private applyNonInteractiveMode(decision: PolicyDecision): PolicyDecision {

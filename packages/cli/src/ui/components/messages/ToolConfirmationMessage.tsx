@@ -5,15 +5,16 @@
  */
 
 import type React from 'react';
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import {
   type SerializableConfirmationDetails,
-  type ToolCallConfirmationDetails,
   type Config,
+  type ToolConfirmationPayload,
   ToolConfirmationOutcome,
+  type EditorType,
   hasRedirection,
   debugLogger,
 } from '@google/gemini-cli-core';
@@ -21,22 +22,35 @@ import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox, MINIMUM_MAX_HEIGHT } from '../shared/MaxSizedBox.js';
+import {
+  sanitizeForDisplay,
+  stripUnsafeCharacters,
+} from '../../utils/textUtils.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
+import { keyMatchers, Command } from '../../keyMatchers.js';
+import { formatCommand } from '../../utils/keybindingUtils.js';
 import {
   REDIRECTION_WARNING_NOTE_LABEL,
   REDIRECTION_WARNING_NOTE_TEXT,
   REDIRECTION_WARNING_TIP_LABEL,
   REDIRECTION_WARNING_TIP_TEXT,
 } from '../../textConstants.js';
+import { AskUserDialog } from '../AskUserDialog.js';
+import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
+import { WarningMessage } from './WarningMessage.js';
+import {
+  getDeceptiveUrlDetails,
+  toUnicodeUrl,
+  type DeceptiveUrlDetails,
+} from '../../utils/urlSecurityUtils.js';
 
 export interface ToolConfirmationMessageProps {
   callId: string;
-  confirmationDetails:
-    | ToolCallConfirmationDetails
-    | SerializableConfirmationDetails;
+  confirmationDetails: SerializableConfirmationDetails;
   config: Config;
+  getPreferredEditor: () => EditorType | undefined;
   isFocused?: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
@@ -48,19 +62,36 @@ export const ToolConfirmationMessage: React.FC<
   callId,
   confirmationDetails,
   config,
+  getPreferredEditor,
   isFocused = true,
   availableTerminalHeight,
   terminalWidth,
 }) => {
-  const { confirm } = useToolActions();
+  const { confirm, isDiffingEnabled } = useToolActions();
+  const [mcpDetailsExpansionState, setMcpDetailsExpansionState] = useState<{
+    callId: string;
+    expanded: boolean;
+  }>({
+    callId,
+    expanded: false,
+  });
+  const isMcpToolDetailsExpanded =
+    mcpDetailsExpansionState.callId === callId
+      ? mcpDetailsExpansionState.expanded
+      : false;
 
   const settings = useSettings();
   const allowPermanentApproval =
     settings.merged.security.enablePermanentToolApproval;
 
+  const handlesOwnUI =
+    confirmationDetails.type === 'ask_user' ||
+    confirmationDetails.type === 'exit_plan_mode';
+  const isTrustedFolder = config.isTrustedFolder();
+
   const handleConfirm = useCallback(
-    (outcome: ToolConfirmationOutcome) => {
-      void confirm(callId, outcome).catch((error) => {
+    (outcome: ToolConfirmationOutcome, payload?: ToolConfirmationPayload) => {
+      void confirm(callId, outcome, payload).catch((error: unknown) => {
         debugLogger.error(
           `Failed to handle tool confirmation for ${callId}:`,
           error,
@@ -70,22 +101,130 @@ export const ToolConfirmationMessage: React.FC<
     [confirm, callId],
   );
 
-  const isTrustedFolder = config.isTrustedFolder();
+  const mcpToolDetailsText = useMemo(() => {
+    if (confirmationDetails.type !== 'mcp') {
+      return null;
+    }
+
+    const detailsLines: string[] = [];
+    const hasNonEmptyToolArgs =
+      confirmationDetails.toolArgs !== undefined &&
+      !(
+        typeof confirmationDetails.toolArgs === 'object' &&
+        confirmationDetails.toolArgs !== null &&
+        Object.keys(confirmationDetails.toolArgs).length === 0
+      );
+    if (hasNonEmptyToolArgs) {
+      let argsText: string;
+      try {
+        argsText = stripUnsafeCharacters(
+          JSON.stringify(confirmationDetails.toolArgs, null, 2),
+        );
+      } catch {
+        argsText = '[unserializable arguments]';
+      }
+      detailsLines.push('Invocation Arguments:');
+      detailsLines.push(argsText);
+    }
+
+    const description = confirmationDetails.toolDescription?.trim();
+    if (description) {
+      if (detailsLines.length > 0) {
+        detailsLines.push('');
+      }
+      detailsLines.push('Description:');
+      detailsLines.push(stripUnsafeCharacters(description));
+    }
+
+    if (confirmationDetails.toolParameterSchema !== undefined) {
+      let schemaText: string;
+      try {
+        schemaText = stripUnsafeCharacters(
+          JSON.stringify(confirmationDetails.toolParameterSchema, null, 2),
+        );
+      } catch {
+        schemaText = '[unserializable schema]';
+      }
+      if (detailsLines.length > 0) {
+        detailsLines.push('');
+      }
+      detailsLines.push('Input Schema:');
+      detailsLines.push(schemaText);
+    }
+
+    if (detailsLines.length === 0) {
+      return null;
+    }
+
+    return detailsLines.join('\n');
+  }, [confirmationDetails]);
+
+  const hasMcpToolDetails = !!mcpToolDetailsText;
+  const expandDetailsHintKey = formatCommand(Command.SHOW_MORE_LINES);
 
   useKeypress(
     (key) => {
-      if (!isFocused) return;
-      if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
-        handleConfirm(ToolConfirmationOutcome.Cancel);
+      if (!isFocused) return false;
+      if (
+        confirmationDetails.type === 'mcp' &&
+        hasMcpToolDetails &&
+        keyMatchers[Command.SHOW_MORE_LINES](key)
+      ) {
+        setMcpDetailsExpansionState({
+          callId,
+          expanded: !isMcpToolDetailsExpanded,
+        });
+        return true;
       }
+      if (keyMatchers[Command.ESCAPE](key)) {
+        handleConfirm(ToolConfirmationOutcome.Cancel);
+        return true;
+      }
+      if (keyMatchers[Command.QUIT](key)) {
+        // Return false to let ctrl-C bubble up to AppContainer for exit flow.
+        // AppContainer will call cancelOngoingRequest which will cancel the tool.
+        return false;
+      }
+      return false;
     },
-    { isActive: isFocused },
+    { isActive: isFocused, priority: true },
   );
 
   const handleSelect = useCallback(
     (item: ToolConfirmationOutcome) => handleConfirm(item),
     [handleConfirm],
   );
+
+  const deceptiveUrlWarnings = useMemo(() => {
+    const urls: string[] = [];
+    if (confirmationDetails.type === 'info' && confirmationDetails.urls) {
+      urls.push(...confirmationDetails.urls);
+    } else if (confirmationDetails.type === 'exec') {
+      const commands =
+        confirmationDetails.commands && confirmationDetails.commands.length > 0
+          ? confirmationDetails.commands
+          : [confirmationDetails.command];
+      for (const cmd of commands) {
+        const matches = cmd.match(/https?:\/\/[^\s"'`<>;&|()]+/g);
+        if (matches) urls.push(...matches);
+      }
+    }
+
+    const uniqueUrls = Array.from(new Set(urls));
+    return uniqueUrls
+      .map(getDeceptiveUrlDetails)
+      .filter((d): d is DeceptiveUrlDetails => d !== null);
+  }, [confirmationDetails]);
+
+  const deceptiveUrlWarningText = useMemo(() => {
+    if (deceptiveUrlWarnings.length === 0) return null;
+    return `**Warning:** Deceptive URL(s) detected:\n\n${deceptiveUrlWarnings
+      .map(
+        (w) =>
+          `   **Original:** ${w.originalUrl}\n   **Actual Host (Punycode):** ${w.punycodeUrl}`,
+      )
+      .join('\n\n')}`;
+  }, [deceptiveUrlWarnings]);
 
   const getOptions = useCallback(() => {
     const options: Array<RadioSelectItem<ToolConfirmationOutcome>> = [];
@@ -111,9 +250,9 @@ export const ToolConfirmationMessage: React.FC<
             });
           }
         }
-        // We hide "Modify with external editor" if IDE mode is active, assuming
-        // the IDE provides a better interface (diff view) for this.
-        if (!config.getIdeMode()) {
+        // We hide "Modify with external editor" if IDE mode is active AND
+        // the IDE is actually capable of showing a diff (connected).
+        if (!config.getIdeMode() || !isDiffingEnabled) {
           options.push({
             label: 'Modify with external editor',
             value: ToolConfirmationOutcome.ModifyWithEditor,
@@ -177,7 +316,7 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.Cancel,
         key: 'No, suggest changes (esc)',
       });
-    } else {
+    } else if (confirmationDetails.type === 'mcp') {
       // mcp tool confirmation
       options.push({
         label: 'Allow once',
@@ -210,11 +349,21 @@ export const ToolConfirmationMessage: React.FC<
       });
     }
     return options;
-  }, [confirmationDetails, isTrustedFolder, allowPermanentApproval, config]);
+  }, [
+    confirmationDetails,
+    isTrustedFolder,
+    allowPermanentApproval,
+    config,
+    isDiffingEnabled,
+  ]);
 
   const availableBodyContentHeight = useCallback(() => {
     if (availableTerminalHeight === undefined) {
       return undefined;
+    }
+
+    if (handlesOwnUI) {
+      return availableTerminalHeight;
     }
 
     // Calculate the vertical space (in lines) consumed by UI elements
@@ -231,15 +380,75 @@ export const ToolConfirmationMessage: React.FC<
       MARGIN_BODY_BOTTOM +
       HEIGHT_QUESTION +
       MARGIN_QUESTION_BOTTOM +
-      optionsCount;
+      optionsCount +
+      1; // Reserve one line for 'ShowMoreLines' hint
 
     return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
-  }, [availableTerminalHeight, getOptions]);
+  }, [availableTerminalHeight, getOptions, handlesOwnUI]);
 
-  const { question, bodyContent, options } = useMemo(() => {
+  const { question, bodyContent, options, securityWarnings } = useMemo<{
+    question: string;
+    bodyContent: React.ReactNode;
+    options: Array<RadioSelectItem<ToolConfirmationOutcome>>;
+    securityWarnings: React.ReactNode;
+  }>(() => {
     let bodyContent: React.ReactNode | null = null;
+    let securityWarnings: React.ReactNode | null = null;
     let question = '';
     const options = getOptions();
+
+    if (deceptiveUrlWarningText) {
+      securityWarnings = <WarningMessage text={deceptiveUrlWarningText} />;
+    }
+
+    if (confirmationDetails.type === 'ask_user') {
+      bodyContent = (
+        <AskUserDialog
+          questions={confirmationDetails.questions}
+          onSubmit={(answers) => {
+            handleConfirm(ToolConfirmationOutcome.ProceedOnce, { answers });
+          }}
+          onCancel={() => {
+            handleConfirm(ToolConfirmationOutcome.Cancel);
+          }}
+          width={terminalWidth}
+          availableHeight={availableBodyContentHeight()}
+        />
+      );
+      return {
+        question: '',
+        bodyContent,
+        options: [],
+        securityWarnings: null,
+      };
+    }
+
+    if (confirmationDetails.type === 'exit_plan_mode') {
+      bodyContent = (
+        <ExitPlanModeDialog
+          planPath={confirmationDetails.planPath}
+          getPreferredEditor={getPreferredEditor}
+          onApprove={(approvalMode) => {
+            handleConfirm(ToolConfirmationOutcome.ProceedOnce, {
+              approved: true,
+              approvalMode,
+            });
+          }}
+          onFeedback={(feedback) => {
+            handleConfirm(ToolConfirmationOutcome.ProceedOnce, {
+              approved: false,
+              feedback,
+            });
+          }}
+          onCancel={() => {
+            handleConfirm(ToolConfirmationOutcome.Cancel);
+          }}
+          width={terminalWidth}
+          availableHeight={availableBodyContentHeight()}
+        />
+      );
+      return { question: '', bodyContent, options: [], securityWarnings: null };
+    }
 
     if (confirmationDetails.type === 'edit') {
       if (!confirmationDetails.isModifying) {
@@ -251,22 +460,22 @@ export const ToolConfirmationMessage: React.FC<
       if (executionProps.commands && executionProps.commands.length > 1) {
         question = `Allow execution of ${executionProps.commands.length} commands?`;
       } else {
-        question = `Allow execution of: '${executionProps.rootCommand}'?`;
+        question = `Allow execution of: '${sanitizeForDisplay(executionProps.rootCommand)}'?`;
       }
     } else if (confirmationDetails.type === 'info') {
       question = `Do you want to proceed?`;
-    } else {
+    } else if (confirmationDetails.type === 'mcp') {
       // mcp tool confirmation
       const mcpProps = confirmationDetails;
-      question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
+      question = `Allow execution of MCP tool "${sanitizeForDisplay(mcpProps.toolName)}" from server "${sanitizeForDisplay(mcpProps.serverName)}"?`;
     }
 
     if (confirmationDetails.type === 'edit') {
       if (!confirmationDetails.isModifying) {
         bodyContent = (
           <DiffRenderer
-            diffContent={confirmationDetails.fileDiff}
-            filename={confirmationDetails.fileName}
+            diffContent={stripUnsafeCharacters(confirmationDetails.fileDiff)}
+            filename={sanitizeForDisplay(confirmationDetails.fileName)}
             availableTerminalHeight={availableBodyContentHeight()}
             terminalWidth={terminalWidth}
           />
@@ -340,7 +549,7 @@ export const ToolConfirmationMessage: React.FC<
             <Box flexDirection="column">
               {commandsToDisplay.map((cmd, idx) => (
                 <Text key={idx} color={theme.text.link}>
-                  {cmd}
+                  {sanitizeForDisplay(cmd)}
                 </Text>
               ))}
             </Box>
@@ -367,35 +576,70 @@ export const ToolConfirmationMessage: React.FC<
           {displayUrls && infoProps.urls && infoProps.urls.length > 0 && (
             <Box flexDirection="column" marginTop={1}>
               <Text color={theme.text.primary}>URLs to fetch:</Text>
-              {infoProps.urls.map((url) => (
-                <Text key={url}>
+              {infoProps.urls.map((urlString) => (
+                <Text key={urlString}>
                   {' '}
-                  - <RenderInline text={url} />
+                  - <RenderInline text={toUnicodeUrl(urlString)} />
                 </Text>
               ))}
             </Box>
           )}
         </Box>
       );
-    } else {
+    } else if (confirmationDetails.type === 'mcp') {
       // mcp tool confirmation
       const mcpProps = confirmationDetails;
 
       bodyContent = (
         <Box flexDirection="column">
-          <Text color={theme.text.link}>MCP Server: {mcpProps.serverName}</Text>
-          <Text color={theme.text.link}>Tool: {mcpProps.toolName}</Text>
+          <>
+            <Text color={theme.text.link}>
+              MCP Server: {sanitizeForDisplay(mcpProps.serverName)}
+            </Text>
+            <Text color={theme.text.link}>
+              Tool: {sanitizeForDisplay(mcpProps.toolName)}
+            </Text>
+          </>
+          {hasMcpToolDetails && (
+            <Box flexDirection="column" marginTop={1}>
+              <Text color={theme.text.primary}>MCP Tool Details:</Text>
+              {isMcpToolDetailsExpanded ? (
+                <>
+                  <Text color={theme.text.secondary}>
+                    (press {expandDetailsHintKey} to collapse MCP tool details)
+                  </Text>
+                  <Text color={theme.text.link}>{mcpToolDetailsText}</Text>
+                </>
+              ) : (
+                <Text color={theme.text.secondary}>
+                  (press {expandDetailsHintKey} to expand MCP tool details)
+                </Text>
+              )}
+            </Box>
+          )}
         </Box>
       );
     }
 
-    return { question, bodyContent, options };
+    return { question, bodyContent, options, securityWarnings };
   }, [
     confirmationDetails,
     getOptions,
     availableBodyContentHeight,
     terminalWidth,
+    handleConfirm,
+    deceptiveUrlWarningText,
+    isMcpToolDetailsExpanded,
+    hasMcpToolDetails,
+    mcpToolDetailsText,
+    expandDetailsHintKey,
+    getPreferredEditor,
   ]);
+
+  const bodyOverflowDirection: 'top' | 'bottom' =
+    confirmationDetails.type === 'mcp' && isMcpToolDetailsExpanded
+      ? 'bottom'
+      : 'top';
 
   if (confirmationDetails.type === 'edit') {
     if (confirmationDetails.isModifying) {
@@ -419,32 +663,44 @@ export const ToolConfirmationMessage: React.FC<
   }
 
   return (
-    <Box flexDirection="column" paddingTop={0} paddingBottom={1}>
-      {/* Body Content (Diff Renderer or Command Info) */}
-      {/* No separate context display here anymore for edits */}
-      <Box flexGrow={1} flexShrink={1} overflow="hidden" marginBottom={1}>
-        <MaxSizedBox
-          maxHeight={availableBodyContentHeight()}
-          maxWidth={terminalWidth}
-          overflowDirection="top"
-        >
-          {bodyContent}
-        </MaxSizedBox>
-      </Box>
+    <Box
+      flexDirection="column"
+      paddingTop={0}
+      paddingBottom={handlesOwnUI ? 0 : 1}
+    >
+      {handlesOwnUI ? (
+        bodyContent
+      ) : (
+        <>
+          <Box flexGrow={1} flexShrink={1} overflow="hidden">
+            <MaxSizedBox
+              maxHeight={availableBodyContentHeight()}
+              maxWidth={terminalWidth}
+              overflowDirection={bodyOverflowDirection}
+            >
+              {bodyContent}
+            </MaxSizedBox>
+          </Box>
 
-      {/* Confirmation Question */}
-      <Box marginBottom={1} flexShrink={0}>
-        <Text color={theme.text.primary}>{question}</Text>
-      </Box>
+          {securityWarnings && (
+            <Box flexShrink={0} marginBottom={1}>
+              {securityWarnings}
+            </Box>
+          )}
 
-      {/* Select Input for Options */}
-      <Box flexShrink={0}>
-        <RadioButtonSelect
-          items={options}
-          onSelect={handleSelect}
-          isFocused={isFocused}
-        />
-      </Box>
+          <Box marginBottom={1} flexShrink={0}>
+            <Text color={theme.text.primary}>{question}</Text>
+          </Box>
+
+          <Box flexShrink={0}>
+            <RadioButtonSelect
+              items={options}
+              onSelect={handleSelect}
+              isFocused={isFocused}
+            />
+          </Box>
+        </>
+      )}
     </Box>
   );
 };

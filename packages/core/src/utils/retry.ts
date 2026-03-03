@@ -18,6 +18,7 @@ import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
 
 export type { RetryAvailabilityContext };
+export const DEFAULT_MAX_ATTEMPTS = 10;
 
 export interface RetryOptions {
   maxAttempts: number;
@@ -40,7 +41,7 @@ export interface RetryOptions {
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
-  maxAttempts: 10,
+  maxAttempts: DEFAULT_MAX_ATTEMPTS,
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
   shouldRetryOnError: isRetryableError,
@@ -53,6 +54,12 @@ const RETRYABLE_NETWORK_CODES = [
   'ENOTFOUND',
   'EAI_AGAIN',
   'ECONNREFUSED',
+  // SSL/TLS transient errors
+  'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC',
+  'ERR_SSL_WRONG_VERSION_NUMBER',
+  'ERR_SSL_DECRYPTION_FAILED_OR_BAD_RECORD_MAC',
+  'ERR_SSL_BAD_RECORD_MAC',
+  'EPROTO', // Generic protocol error (often SSL-related)
 ];
 
 function getNetworkErrorCode(error: unknown): string | undefined {
@@ -61,6 +68,7 @@ function getNetworkErrorCode(error: unknown): string | undefined {
       return undefined;
     }
     if ('code' in obj && typeof (obj as { code: unknown }).code === 'string') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return (obj as { code: string }).code;
     }
     return undefined;
@@ -71,8 +79,22 @@ function getNetworkErrorCode(error: unknown): string | undefined {
     return directCode;
   }
 
-  if (typeof error === 'object' && error !== null && 'cause' in error) {
-    return getCode((error as { cause: unknown }).cause);
+  // Traverse the cause chain to find error codes (SSL errors are often nested)
+  let current: unknown = error;
+  const maxDepth = 5; // Prevent infinite loops in case of circular references
+  for (let depth = 0; depth < maxDepth; depth++) {
+    if (
+      typeof current !== 'object' ||
+      current === null ||
+      !('cause' in current)
+    ) {
+      break;
+    }
+    current = (current as { cause: unknown }).cause;
+    const code = getCode(current);
+    if (code) {
+      return code;
+    }
   }
 
   return undefined;
@@ -108,13 +130,17 @@ export function isRetryableError(
   if (error instanceof ApiError) {
     // Explicitly do not retry 400 (Bad Request)
     if (error.status === 400) return false;
-    return error.status === 429 || (error.status >= 500 && error.status < 600);
+    return (
+      error.status === 429 ||
+      error.status === 499 ||
+      (error.status >= 500 && error.status < 600)
+    );
   }
 
   // Check for status using helper (handles other error shapes)
   const status = getErrorStatus(error);
   if (status !== undefined) {
-    return status === 429 || (status >= 500 && status < 600);
+    return status === 429 || status === 499 || (status >= 500 && status < 600);
   }
 
   return false;
@@ -175,6 +201,7 @@ export async function retryWithBackoff<T>(
 
       if (
         shouldRetryOnContent &&
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         shouldRetryOnContent(result as GenerateContentResponse)
       ) {
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
@@ -279,13 +306,18 @@ export async function retryWithBackoff<T>(
           classifiedError instanceof RetryableQuotaError &&
           classifiedError.retryDelayMs !== undefined
         ) {
+          currentDelay = Math.max(currentDelay, classifiedError.retryDelayMs);
+          // Positive jitter up to +20% while respecting server minimum delay
+          const jitter = currentDelay * 0.2 * Math.random();
+          const delayWithJitter = currentDelay + jitter;
           debugLogger.warn(
-            `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${classifiedError.retryDelayMs}ms...`,
+            `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${Math.round(delayWithJitter)}ms...`,
           );
           if (onRetry) {
-            onRetry(attempt, error, classifiedError.retryDelayMs);
+            onRetry(attempt, error, delayWithJitter);
           }
-          await delay(classifiedError.retryDelayMs, signal);
+          await delay(delayWithJitter, signal);
+          currentDelay = Math.min(maxDelayMs, currentDelay * 2);
           continue;
         } else {
           const errorStatus = getErrorStatus(error);
@@ -306,6 +338,7 @@ export async function retryWithBackoff<T>(
       // Generic retry logic for other errors
       if (
         attempt >= maxAttempts ||
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         !shouldRetryOnError(error as Error, retryFetchErrors)
       ) {
         throw error;

@@ -4,14 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import yaml from 'js-yaml';
+import { load } from 'js-yaml';
 import * as fs from 'node:fs/promises';
 import { type Dirent } from 'node:fs';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import { z } from 'zod';
-import type { AgentDefinition } from './types.js';
+import {
+  type AgentDefinition,
+  DEFAULT_MAX_TURNS,
+  DEFAULT_MAX_TIME_MINUTES,
+} from './types.js';
+import type { A2AAuthConfig } from './auth-provider/types.js';
 import { isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
+import { getErrorMessage } from '../utils/errors.js';
 
 /**
  * DTO for Markdown parsing - represents the structure from frontmatter.
@@ -33,11 +40,29 @@ interface FrontmatterLocalAgentDefinition
   timeout_mins?: number;
 }
 
+/**
+ * Authentication configuration for remote agents in frontmatter format.
+ */
+interface FrontmatterAuthConfig {
+  type: 'apiKey' | 'http';
+  agent_card_requires_auth?: boolean;
+  // API Key
+  key?: string;
+  name?: string;
+  // HTTP
+  scheme?: string;
+  token?: string;
+  username?: string;
+  password?: string;
+  value?: string;
+}
+
 interface FrontmatterRemoteAgentDefinition
   extends FrontmatterBaseAgentDefinition {
   kind: 'remote';
   description?: string;
   agent_card_url: string;
+  auth?: FrontmatterAuthConfig;
 }
 
 type FrontmatterAgentDefinition =
@@ -89,6 +114,73 @@ const localAgentSchema = z
   })
   .strict();
 
+/**
+ * Base fields shared by all auth configs.
+ */
+const baseAuthFields = {
+  agent_card_requires_auth: z.boolean().optional(),
+};
+
+/**
+ * API Key auth schema.
+ * Supports sending key in header, query parameter, or cookie.
+ */
+const apiKeyAuthSchema = z.object({
+  ...baseAuthFields,
+  type: z.literal('apiKey'),
+  key: z.string().min(1, 'API key is required'),
+  name: z.string().optional(),
+});
+
+/**
+ * HTTP auth schema (Bearer or Basic).
+ * Note: Validation for scheme-specific fields is applied in authConfigSchema
+ * since discriminatedUnion doesn't support refined schemas directly.
+ */
+const httpAuthSchema = z.object({
+  ...baseAuthFields,
+  type: z.literal('http'),
+  scheme: z.string().min(1),
+  token: z.string().min(1).optional(),
+  username: z.string().min(1).optional(),
+  password: z.string().min(1).optional(),
+  value: z.string().min(1).optional(),
+});
+
+const authConfigSchema = z
+  .discriminatedUnion('type', [apiKeyAuthSchema, httpAuthSchema])
+  .superRefine((data, ctx) => {
+    if (data.type === 'http') {
+      if (data.value) {
+        // Raw mode - only scheme and value are needed
+        return;
+      }
+      if (data.scheme === 'Bearer' && !data.token) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Bearer scheme requires "token"',
+          path: ['token'],
+        });
+      }
+      if (data.scheme === 'Basic') {
+        if (!data.username) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Basic authentication requires "username"',
+            path: ['username'],
+          });
+        }
+        if (!data.password) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Basic authentication requires "password"',
+            path: ['password'],
+          });
+        }
+      }
+    }
+  });
+
 const remoteAgentSchema = z
   .object({
     kind: z.literal('remote').optional().default('remote'),
@@ -96,6 +188,7 @@ const remoteAgentSchema = z
     description: z.string().optional(),
     display_name: z.string().optional(),
     agent_card_url: z.string().url(),
+    auth: authConfigSchema.optional(),
   })
   .strict();
 
@@ -139,24 +232,30 @@ function formatZodError(error: z.ZodError, context: string): string {
  * Parses and validates an agent Markdown file with frontmatter.
  *
  * @param filePath Path to the Markdown file.
+ * @param content Optional pre-loaded content of the file.
  * @returns An array containing the single parsed agent definition.
  * @throws AgentLoadError if parsing or validation fails.
  */
 export async function parseAgentMarkdown(
   filePath: string,
+  content?: string,
 ): Promise<FrontmatterAgentDefinition[]> {
-  let content: string;
-  try {
-    content = await fs.readFile(filePath, 'utf-8');
-  } catch (error) {
-    throw new AgentLoadError(
-      filePath,
-      `Could not read file: ${(error as Error).message}`,
-    );
+  let fileContent: string;
+  if (content !== undefined) {
+    fileContent = content;
+  } else {
+    try {
+      fileContent = await fs.readFile(filePath, 'utf-8');
+    } catch (error) {
+      throw new AgentLoadError(
+        filePath,
+        `Could not read file: ${getErrorMessage(error)}`,
+      );
+    }
   }
 
   // Split frontmatter and body
-  const match = content.match(FRONTMATTER_REGEX);
+  const match = fileContent.match(FRONTMATTER_REGEX);
   if (!match) {
     throw new AgentLoadError(
       filePath,
@@ -169,10 +268,11 @@ export async function parseAgentMarkdown(
 
   let rawFrontmatter: unknown;
   try {
-    rawFrontmatter = yaml.load(frontmatterStr);
+    rawFrontmatter = load(frontmatterStr);
   } catch (error) {
     throw new AgentLoadError(
       filePath,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       `YAML frontmatter parsing failed: ${(error as Error).message}`,
     );
   }
@@ -226,13 +326,92 @@ export async function parseAgentMarkdown(
 }
 
 /**
+ * Converts frontmatter auth config to the internal A2AAuthConfig type.
+ * This handles the mapping from snake_case YAML to the internal type structure.
+ */
+function convertFrontmatterAuthToConfig(
+  frontmatter: FrontmatterAuthConfig,
+): A2AAuthConfig {
+  const base = {
+    agent_card_requires_auth: frontmatter.agent_card_requires_auth,
+  };
+
+  switch (frontmatter.type) {
+    case 'apiKey':
+      if (!frontmatter.key) {
+        throw new Error('Internal error: API key missing after validation.');
+      }
+      return {
+        ...base,
+        type: 'apiKey',
+        key: frontmatter.key,
+        name: frontmatter.name,
+      };
+
+    case 'http': {
+      if (!frontmatter.scheme) {
+        throw new Error(
+          'Internal error: HTTP scheme missing after validation.',
+        );
+      }
+      if (frontmatter.value) {
+        return {
+          ...base,
+          type: 'http',
+          scheme: frontmatter.scheme,
+          value: frontmatter.value,
+        };
+      }
+      switch (frontmatter.scheme) {
+        case 'Bearer':
+          if (!frontmatter.token) {
+            throw new Error(
+              'Internal error: Bearer token missing after validation.',
+            );
+          }
+          return {
+            ...base,
+            type: 'http',
+            scheme: 'Bearer',
+            token: frontmatter.token,
+          };
+        case 'Basic':
+          if (!frontmatter.username || !frontmatter.password) {
+            throw new Error(
+              'Internal error: Basic auth credentials missing after validation.',
+            );
+          }
+          return {
+            ...base,
+            type: 'http',
+            scheme: 'Basic',
+            username: frontmatter.username,
+            password: frontmatter.password,
+          };
+        default: {
+          // Other IANA schemes without a value should not reach here after validation
+          throw new Error(`Unknown HTTP scheme: ${frontmatter.scheme}`);
+        }
+      }
+    }
+
+    default: {
+      const exhaustive: never = frontmatter.type;
+      throw new Error(`Unknown auth type: ${exhaustive}`);
+    }
+  }
+}
+
+/**
  * Converts a FrontmatterAgentDefinition DTO to the internal AgentDefinition structure.
  *
  * @param markdown The parsed Markdown/Frontmatter definition.
+ * @param metadata Optional metadata including hash and file path.
  * @returns The internal AgentDefinition.
  */
 export function markdownToAgentDefinition(
   markdown: FrontmatterAgentDefinition,
+  metadata?: { hash?: string; filePath?: string },
 ): AgentDefinition {
   const inputConfig = {
     inputSchema: {
@@ -252,10 +431,14 @@ export function markdownToAgentDefinition(
     return {
       kind: 'remote',
       name: markdown.name,
-      description: markdown.description || '(Loading description...)',
+      description: markdown.description || '',
       displayName: markdown.display_name,
       agentCardUrl: markdown.agent_card_url,
+      auth: markdown.auth
+        ? convertFrontmatterAuthToConfig(markdown.auth)
+        : undefined,
       inputConfig,
+      metadata,
     };
   }
 
@@ -279,8 +462,8 @@ export function markdownToAgentDefinition(
       },
     },
     runConfig: {
-      maxTurns: markdown.max_turns,
-      maxTimeMinutes: markdown.timeout_mins || 5,
+      maxTurns: markdown.max_turns ?? DEFAULT_MAX_TURNS,
+      maxTimeMinutes: markdown.timeout_mins ?? DEFAULT_MAX_TIME_MINUTES,
     },
     toolConfig: markdown.tools
       ? {
@@ -288,6 +471,7 @@ export function markdownToAgentDefinition(
         }
       : undefined,
     inputConfig,
+    metadata,
   };
 }
 
@@ -312,12 +496,14 @@ export async function loadAgentsFromDirectory(
     dirEntries = await fs.readdir(dir, { withFileTypes: true });
   } catch (error) {
     // If directory doesn't exist, just return empty
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return result;
     }
     result.errors.push(
       new AgentLoadError(
         dir,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         `Could not list directory: ${(error as Error).message}`,
       ),
     );
@@ -334,9 +520,11 @@ export async function loadAgentsFromDirectory(
   for (const entry of files) {
     const filePath = path.join(dir, entry.name);
     try {
-      const agentDefs = await parseAgentMarkdown(filePath);
+      const content = await fs.readFile(filePath, 'utf-8');
+      const hash = crypto.createHash('sha256').update(content).digest('hex');
+      const agentDefs = await parseAgentMarkdown(filePath, content);
       for (const def of agentDefs) {
-        const agent = markdownToAgentDefinition(def);
+        const agent = markdownToAgentDefinition(def, { hash, filePath });
         result.agents.push(agent);
       }
     } catch (error) {
@@ -346,6 +534,7 @@ export async function loadAgentsFromDirectory(
         result.errors.push(
           new AgentLoadError(
             filePath,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             `Unexpected error: ${(error as Error).message}`,
           ),
         );

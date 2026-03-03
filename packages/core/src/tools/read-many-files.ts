@@ -8,7 +8,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
-import * as fs from 'node:fs';
+import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob, escape } from 'glob';
 import type { ProcessedFileReadResult } from '../utils/fileUtils.js';
@@ -29,6 +29,8 @@ import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { ToolErrorType } from './tool-error.js';
 import { READ_MANY_FILES_TOOL_NAME } from './tool-names.js';
+import { READ_MANY_FILES_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 import { REFERENCE_CONTENT_END } from '../utils/constants.js';
 
@@ -169,7 +171,15 @@ ${finalExclusionPatternsForDescription
         for (const p of include) {
           const normalizedP = p.replace(/\\/g, '/');
           const fullPath = path.join(dir, normalizedP);
-          if (fs.existsSync(fullPath)) {
+          let exists = false;
+          try {
+            await fsPromises.access(fullPath);
+            exists = true;
+          } catch {
+            exists = false;
+          }
+
+          if (exists) {
             processedPatterns.push(escape(normalizedP));
           } else {
             // The path does not exist or is not a file, so we treat it as a glob pattern.
@@ -195,6 +205,7 @@ ${finalExclusionPatternsForDescription
       );
 
       const fileDiscovery = this.config.getFileService();
+
       const { filteredPaths, ignoredCount } =
         fileDiscovery.filterFilesWithReport(relativeEntries, {
           respectGitIgnore:
@@ -211,12 +222,15 @@ ${finalExclusionPatternsForDescription
         // Security check: ensure the glob library didn't return something outside the workspace.
 
         const fullPath = path.resolve(this.config.getTargetDir(), relativePath);
-        if (
-          !this.config.getWorkspaceContext().isPathWithinWorkspace(fullPath)
-        ) {
+
+        const validationError = this.config.validatePathAccess(
+          fullPath,
+          'read',
+        );
+        if (validationError) {
           skippedFiles.push({
             path: fullPath,
-            reason: `Security: Glob library returned path outside workspace. Path: ${fullPath}`,
+            reason: 'Security: Path not in workspace',
           });
           continue;
         }
@@ -451,77 +465,12 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
     private config: Config,
     messageBus: MessageBus,
   ) {
-    const parameterSchema = {
-      type: 'object',
-      properties: {
-        include: {
-          type: 'array',
-          items: {
-            type: 'string',
-            minLength: 1,
-          },
-          minItems: 1,
-          description:
-            'An array of glob patterns or paths. Examples: ["src/**/*.ts"], ["README.md", "docs/"]',
-        },
-        exclude: {
-          type: 'array',
-          items: {
-            type: 'string',
-            minLength: 1,
-          },
-          description:
-            'Optional. Glob patterns for files/directories to exclude. Added to default excludes if useDefaultExcludes is true. Example: "**/*.log", "temp/"',
-          default: [],
-        },
-        recursive: {
-          type: 'boolean',
-          description:
-            'Optional. Whether to search recursively (primarily controlled by `**` in glob patterns). Defaults to true.',
-          default: true,
-        },
-        useDefaultExcludes: {
-          type: 'boolean',
-          description:
-            'Optional. Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, binary files). Defaults to true.',
-          default: true,
-        },
-        file_filtering_options: {
-          description:
-            'Whether to respect ignore patterns from .gitignore or .geminiignore',
-          type: 'object',
-          properties: {
-            respect_git_ignore: {
-              description:
-                'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
-              type: 'boolean',
-            },
-            respect_gemini_ignore: {
-              description:
-                'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
-              type: 'boolean',
-            },
-          },
-        },
-      },
-      required: ['include'],
-    };
-
     super(
       ReadManyFilesTool.Name,
       'ReadManyFiles',
-      `Reads content from multiple files specified by glob patterns within a configured target directory. For text files, it concatenates their content into a single string. It is primarily designed for text-based files. However, it can also process image (e.g., .png, .jpg), audio (e.g., .mp3, .wav), and PDF (.pdf) files if their file names or extensions are explicitly included in the 'include' argument. For these explicitly requested non-text files, their data is read and included in a format suitable for model consumption (e.g., base64 encoded).
-
-This tool is useful when you need to understand or analyze a collection of files, such as:
-- Getting an overview of a codebase or parts of it (e.g., all TypeScript files in the 'src' directory).
-- Finding where specific functionality is implemented if the user asks broad questions about code.
-- Reviewing documentation files (e.g., all Markdown files in the 'docs' directory).
-- Gathering context from multiple configuration files.
-- When the user asks to "read all files in X directory" or "show me the content of all Y files".
-
-Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. The tool inserts a '${REFERENCE_CONTENT_END}' after the last file. Ensure glob patterns are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/audio/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/audio/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.`,
+      READ_MANY_FILES_DEFINITION.base.description!,
       Kind.Read,
-      parameterSchema,
+      READ_MANY_FILES_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
@@ -541,5 +490,9 @@ Use this tool when the user's query implies needing the content of several files
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(READ_MANY_FILES_DEFINITION, modelId);
   }
 }
