@@ -735,5 +735,59 @@ describe('SettingsUtils', () => {
         expect(result).toBe('false');
       });
     });
+
+    describe('getDisplayValue with units', () => {
+      it('should format percentage correctly when unit is %', () => {
+        vi.mocked(getSettingsSchema).mockReturnValue({
+          model: {
+            properties: {
+              compressionThreshold: {
+                type: 'number',
+                label: 'Context Compression Threshold',
+                category: 'Model',
+                requiresRestart: true,
+                default: 0.5,
+                unit: '%',
+              },
+            },
+          },
+        } as unknown as SettingsSchemaType);
+
+        const settings = makeMockSettings({
+          model: { compressionThreshold: 0.8 },
+        });
+        const result = getDisplayValue(
+          'model.compressionThreshold',
+          settings,
+          makeMockSettings({}),
+        );
+        expect(result).toBe('0.8 (80%)*');
+      });
+
+      it('should append unit for non-% units', () => {
+        vi.mocked(getSettingsSchema).mockReturnValue({
+          ui: {
+            properties: {
+              pollingInterval: {
+                type: 'number',
+                label: 'Polling Interval',
+                category: 'UI',
+                requiresRestart: false,
+                default: 60,
+                unit: 's',
+              },
+            },
+          },
+        } as unknown as SettingsSchemaType);
+
+        const settings = makeMockSettings({ ui: { pollingInterval: 30 } });
+        const result = getDisplayValue(
+          'ui.pollingInterval',
+          settings,
+          makeMockSettings({}),
+        );
+        expect(result).toBe('30s*');
+      });
+    });
   });
 });

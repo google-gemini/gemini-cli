@@ -30,7 +30,7 @@ export const INFORMATIVE_TIPS = [
   'Choose a specific Gemini model for conversations (/settings)…',
   'Limit the number of turns in your session history (/settings)…',
   'Automatically summarize large tool outputs to save tokens (settings.json)…',
-  'Control when chat history gets compressed based on token usage (settings.json)…',
+  'Control when chat history gets compressed based on context compression threshold (settings.json)…',
   'Define custom context file names, like CONTEXT.md (settings.json)…',
   'Set max directories to scan for context files (/settings)…',
   'Expand your workspace with additional directories (/directory)…',
