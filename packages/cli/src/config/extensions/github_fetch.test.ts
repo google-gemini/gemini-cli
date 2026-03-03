@@ -104,6 +104,65 @@ describe('fetchJson', () => {
     ).resolves.toEqual({ permanent: true });
   });
 
+  it('should reject with "Too many redirects" after exceeding the redirect limit', async () => {
+    // Simulate 11 consecutive redirects (limit is 10)
+    for (let i = 0; i <= 10; i++) {
+      getMock.mockImplementationOnce((_url, _options, callback) => {
+        const res = new EventEmitter() as IncomingMessage;
+        res.statusCode = 302;
+        res.headers = { location: `https://example.com/redirect-${i + 1}` };
+        (callback as (res: IncomingMessage) => void)(res);
+        return new EventEmitter() as ClientRequest;
+      });
+    }
+
+    await expect(fetchJson('https://example.com/loop')).rejects.toThrow(
+      'Too many redirects',
+    );
+  });
+
+  it('should reject when redirect has no location header', async () => {
+    getMock.mockImplementationOnce((_url, _options, callback) => {
+      const res = new EventEmitter() as IncomingMessage;
+      res.statusCode = 301;
+      res.headers = {};
+      (callback as (res: IncomingMessage) => void)(res);
+      return new EventEmitter() as ClientRequest;
+    });
+
+    await expect(fetchJson('https://example.com/no-location')).rejects.toThrow(
+      'No location header in redirect response',
+    );
+  });
+
+  it('should succeed on the last allowed redirect (exactly at limit)', async () => {
+    // 10 redirects followed by a 200 — should succeed (limit is >= 10, so 0-9 = 10 redirects allowed)
+    for (let i = 0; i < 10; i++) {
+      getMock.mockImplementationOnce((_url, _options, callback) => {
+        const res = new EventEmitter() as IncomingMessage;
+        res.statusCode = 302;
+        res.headers = { location: `https://example.com/redirect-${i + 1}` };
+        (callback as (res: IncomingMessage) => void)(res);
+        return new EventEmitter() as ClientRequest;
+      });
+    }
+    // Final successful response
+    getMock.mockImplementationOnce((_url, _options, callback) => {
+      const res = new EventEmitter() as IncomingMessage;
+      res.statusCode = 200;
+      (callback as (res: IncomingMessage) => void)(res);
+      res.emit('data', Buffer.from('{"redirected": true}'));
+      res.emit('end');
+      return new EventEmitter() as ClientRequest;
+    });
+
+    await expect(
+      fetchJson('https://example.com/many-redirects'),
+    ).resolves.toEqual({
+      redirected: true,
+    });
+  });
+
   it('should reject on non-200/30x status code', async () => {
     getMock.mockImplementationOnce((_url, _options, callback) => {
       const res = new EventEmitter() as IncomingMessage;
