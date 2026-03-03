@@ -78,7 +78,6 @@ exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows ✓ for Success
 exports[`<ToolMessage /> > renders AnsiOutputText for AnsiOutput results 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │
-│                                                                              │
 │ hello                                                                        │
 "
 `;
@@ -95,9 +94,9 @@ exports[`<ToolMessage /> > renders DiffRenderer for diff results 1`] = `
 exports[`<ToolMessage /> > renders McpProgressIndicator with percentage and message for executing tools 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ MockRespondingSpinnertest-tool A tool for testing                            │
-│                                                                              │
 │ ████████░░░░░░░░░░░░ 42%                                                     │
 │ Working on it...                                                             │
+│                                                                              │
 │ Test result                                                                  │
 "
 `;
@@ -129,8 +128,8 @@ exports[`<ToolMessage /> > renders emphasis correctly 2`] = `
 exports[`<ToolMessage /> > renders indeterminate progress when total is missing 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ MockRespondingSpinnertest-tool A tool for testing                            │
-│                                                                              │
 │ ███████░░░░░░░░░░░░░ 7                                                       │
+│                                                                              │
 │ Test result                                                                  │
 "
 `;
@@ -138,8 +137,8 @@ exports[`<ToolMessage /> > renders indeterminate progress when total is missing 
 exports[`<ToolMessage /> > renders only percentage when progressMessage is missing 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ MockRespondingSpinnertest-tool A tool for testing                            │
-│                                                                              │
 │ ███████████████░░░░░ 75%                                                     │
+│                                                                              │
 │ Test result                                                                  │
 "
 `;

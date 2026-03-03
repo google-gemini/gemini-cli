@@ -124,6 +124,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         borderColor={borderColor}
         borderDimColor={borderDimColor}
         containerRef={headerRef}
+        showSeparator={false}
       >
         <ToolStatusIndicator status={status} name={name} />
 

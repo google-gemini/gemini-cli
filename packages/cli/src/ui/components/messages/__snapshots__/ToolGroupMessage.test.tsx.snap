@@ -54,7 +54,7 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls arra
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  tool-1 Description 1. This is a long description that will need to b… │
-│──────────────────────────────────────────────────────────────────────────│
+│ line4                                                                    │
 │ line5                                                                    │                       █
 │                                                                          │                       █
 │ ✓  tool-2 Description 2                                                  │                       █
@@ -153,7 +153,6 @@ exports[`<ToolGroupMessage /> > Height Calculation > calculates available height
 │ Result 2                                                                 │
 │                                                                          │
 │ ✓  test-tool A tool for testing                                          │
-│                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;

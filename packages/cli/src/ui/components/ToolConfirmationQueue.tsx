@@ -85,6 +85,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           isFirst={true}
           borderColor={borderColor}
           borderDimColor={false}
+          showSeparator={false}
         >
           <Box flexDirection="column" width={mainAreaWidth - 4}>
             {/* Header */}
@@ -143,7 +144,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           />
         </Box>
         <Box
-          height={1}
+          height={0}
           width={mainAreaWidth}
           borderLeft={true}
           borderRight={true}

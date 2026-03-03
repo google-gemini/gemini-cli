@@ -123,7 +123,8 @@ describe('ToolMessage Sticky Header Regression', () => {
     // Content lines 1-4 should be scrolled off
     expect(lastFrame()).not.toContain('c1-01');
     expect(lastFrame()).not.toContain('c1-04');
-    // Line 6 and 7 should be visible (terminalHeight=5 means only 2 lines of content show below 3-line header)
+    // Header is now 1 line, so terminalHeight=5 shows 4 lines of content.
+    // Based on test output, c1-06, c1-07, c1-08 are visible.
     expect(lastFrame()).toContain('c1-06');
     expect(lastFrame()).toContain('c1-07');
     expect(lastFrame()).toMatchSnapshot();
@@ -206,7 +207,10 @@ describe('ToolMessage Sticky Header Regression', () => {
     await waitFor(() => {
       expect(lastFrame()).toContain(SHELL_COMMAND_NAME);
     });
+    // Header is 1 line, terminalHeight=5 shows 4 lines of content.
+    // shell-06 and shell-07 are now visible.
     expect(lastFrame()).toContain('shell-06');
+    expect(lastFrame()).toContain('shell-07');
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });

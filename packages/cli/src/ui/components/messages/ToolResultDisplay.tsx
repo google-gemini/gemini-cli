@@ -231,19 +231,21 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   // 4. Final render based on session mode
   if (isAlternateBuffer) {
     return (
-      <Scrollable
-        width={childWidth}
-        maxHeight={maxLines ?? availableHeight}
-        hasFocus={hasFocus} // Allow scrolling via keyboard (Shift+Up/Down)
-        scrollToBottom={true}
-      >
-        {content}
-      </Scrollable>
+      <Box width={childWidth} marginTop={1}>
+        <Scrollable
+          width={childWidth}
+          maxHeight={maxLines ?? availableHeight}
+          hasFocus={hasFocus} // Allow scrolling via keyboard (Shift+Up/Down)
+          scrollToBottom={true}
+        >
+          {content}
+        </Scrollable>
+      </Box>
     );
   }
 
   return (
-    <Box width={childWidth} flexDirection="column">
+    <Box width={childWidth} flexDirection="column" marginTop={1}>
       <MaxSizedBox
         maxHeight={availableHeight}
         maxWidth={childWidth}
