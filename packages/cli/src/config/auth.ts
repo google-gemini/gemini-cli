@@ -19,8 +19,13 @@ export function validateAuthMethod(authMethod: string): string | null {
   if (authMethod === AuthType.USE_GEMINI) {
     if (!process.env['GEMINI_API_KEY']) {
       return (
-        'When using Gemini API, you must specify the GEMINI_API_KEY environment variable.\n' +
-        'Update your environment and try again (no reload needed if using .env)!'
+        'Gemini CLI could not find a Gemini API key (GEMINI_API_KEY environment variable).\n\n' +
+        'To fix this:\n' +
+        '1. Create or copy an API key from https://aistudio.google.com/app/apikey.\n' +
+        '2. Set the GEMINI_API_KEY environment variable for your shell:\n' +
+        '   - Mac/Linux (bash, zsh, etc.): export GEMINI_API_KEY="your_key_here"\n' +
+        '   - Windows (PowerShell or Command Prompt): setx GEMINI_API_KEY "your_key_here"\n' +
+        '3. Restart your terminal so the new environment variable is picked up, then run Gemini CLI again.\n'
       );
     }
     return null;
