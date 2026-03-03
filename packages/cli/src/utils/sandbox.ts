@@ -828,25 +828,20 @@ async function start_lxc_sandbox(
   }
 
   // Remove the workspace device from the container when the process exits.
+  // Only the 'exit' event is needed — the CLI's cleanup.ts already handles
+  // SIGINT and SIGTERM by calling process.exit(), which fires 'exit'.
   const removeDevice = () => {
     try {
-      execFileSync('lxc', [
-        'config',
-        'device',
-        'remove',
-        containerName,
-        deviceName,
-      ]);
+      execFileSync(
+        'lxc',
+        ['config', 'device', 'remove', containerName, deviceName],
+        { timeout: 2000 },
+      );
     } catch {
       // Best-effort cleanup; ignore errors on exit.
     }
   };
-  process.off('exit', removeDevice);
   process.on('exit', removeDevice);
-  process.off('SIGINT', removeDevice);
-  process.on('SIGINT', removeDevice);
-  process.off('SIGTERM', removeDevice);
-  process.on('SIGTERM', removeDevice);
 
   // Build the environment variable arguments for `lxc exec`.
   const envArgs: string[] = [];
@@ -929,6 +924,7 @@ async function start_lxc_sandbox(
 
     sandboxProcess.on('close', (code, signal) => {
       process.stdin.resume();
+      process.off('exit', removeDevice);
       removeDevice();
       if (code !== 0 && code !== null) {
         debugLogger.log(
