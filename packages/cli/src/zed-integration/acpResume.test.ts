@@ -96,6 +96,7 @@ describe('GeminiAgent Session Resume', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
       getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
+      getCheckpointingEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
     mockSettings = {
       merged: {

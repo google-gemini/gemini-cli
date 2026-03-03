@@ -15,6 +15,7 @@ import {
   type Mocked,
 } from 'vitest';
 import { GeminiAgent, Session } from './zedIntegration.js';
+import type { CommandHandler } from './commandHandler.js';
 import * as acp from '@agentclientprotocol/sdk';
 import {
   AuthType,
@@ -26,6 +27,7 @@ import {
   type Config,
   type MessageBus,
   LlmRole,
+  type GitService,
 } from '@google/gemini-cli-core';
 import {
   SettingScope,
@@ -62,7 +64,33 @@ vi.mock('node:path', async (importOriginal) => {
   };
 });
 
-// Mock ReadManyFilesTool
+vi.mock('../ui/commands/memoryCommand.js', () => ({
+  memoryCommand: {
+    name: 'memory',
+    action: vi.fn(),
+  },
+}));
+
+vi.mock('../ui/commands/extensionsCommand.js', () => ({
+  extensionsCommand: vi.fn().mockReturnValue({
+    name: 'extensions',
+    action: vi.fn(),
+  }),
+}));
+
+vi.mock('../ui/commands/restoreCommand.js', () => ({
+  restoreCommand: vi.fn().mockReturnValue({
+    name: 'restore',
+    action: vi.fn(),
+  }),
+}));
+
+vi.mock('../ui/commands/initCommand.js', () => ({
+  initCommand: {
+    name: 'init',
+    action: vi.fn(),
+  },
+}));
 vi.mock(
   '@google/gemini-cli-core',
   async (
@@ -147,6 +175,7 @@ describe('GeminiAgent', () => {
       isPlanEnabled: vi.fn().mockReturnValue(false),
       getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
+      getCheckpointingEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Awaited<ReturnType<typeof loadCliConfig>>>;
     mockSettings = {
       merged: {
@@ -227,6 +256,7 @@ describe('GeminiAgent', () => {
   });
 
   it('should create a new session', async () => {
+    vi.useFakeTimers();
     mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
       apiKey: 'test-key',
     });
@@ -239,6 +269,17 @@ describe('GeminiAgent', () => {
     expect(loadCliConfig).toHaveBeenCalled();
     expect(mockConfig.initialize).toHaveBeenCalled();
     expect(mockConfig.getGeminiClient).toHaveBeenCalled();
+
+    // Verify deferred call
+    await vi.runAllTimersAsync();
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'available_commands_update',
+        }),
+      }),
+    );
+    vi.useRealTimers();
   });
 
   it('should return modes without plan mode when plan is disabled', async () => {
@@ -546,6 +587,7 @@ describe('Session', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getMcpServers: vi.fn(),
       getFileService: vi.fn().mockReturnValue({
         shouldIgnoreFile: vi.fn().mockReturnValue(false),
       }),
@@ -557,6 +599,8 @@ describe('Session', () => {
       setApprovalMode: vi.fn(),
       setModel: vi.fn(),
       isPlanEnabled: vi.fn().mockReturnValue(false),
+      getCheckpointingEnabled: vi.fn().mockReturnValue(false),
+      getGitService: vi.fn().mockResolvedValue({} as GitService),
       waitForMcpInit: vi.fn(),
     } as unknown as Mocked<Config>;
     mockConnection = {
@@ -565,11 +609,36 @@ describe('Session', () => {
       sendNotification: vi.fn(),
     } as unknown as Mocked<acp.AgentSideConnection>;
 
-    session = new Session('session-1', mockChat, mockConfig, mockConnection);
+    session = new Session('session-1', mockChat, mockConfig, mockConnection, {
+      system: { settings: {} },
+      systemDefaults: { settings: {} },
+      user: { settings: {} },
+      workspace: { settings: {} },
+      merged: { settings: {} },
+      errors: [],
+    } as unknown as LoadedSettings);
   });
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('should send available commands', async () => {
+    await session.sendAvailableCommands();
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'available_commands_update',
+          availableCommands: expect.arrayContaining([
+            expect.objectContaining({ name: 'memory' }),
+            expect.objectContaining({ name: 'extensions' }),
+            expect.objectContaining({ name: 'restore' }),
+            expect.objectContaining({ name: 'init' }),
+          ]),
+        }),
+      }),
+    );
   });
 
   it('should await MCP initialization before processing a prompt', async () => {
@@ -619,6 +688,113 @@ describe('Session', () => {
       },
     });
     expect(result).toEqual({ stopReason: 'end_turn' });
+  });
+
+  it('should handle /memory command', async () => {
+    const handleCommandSpy = vi
+      .spyOn(
+        (session as unknown as { commandHandler: CommandHandler })
+          .commandHandler,
+        'handleCommand',
+      )
+      .mockResolvedValue(true);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: '/memory view' }],
+    });
+
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(handleCommandSpy).toHaveBeenCalledWith(
+      '/memory view',
+      expect.any(Object),
+    );
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
+  });
+
+  it('should handle /extensions command', async () => {
+    const handleCommandSpy = vi
+      .spyOn(
+        (session as unknown as { commandHandler: CommandHandler })
+          .commandHandler,
+        'handleCommand',
+      )
+      .mockResolvedValue(true);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: '/extensions list' }],
+    });
+
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(handleCommandSpy).toHaveBeenCalledWith(
+      '/extensions list',
+      expect.any(Object),
+    );
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
+  });
+
+  it('should handle /extensions explore command', async () => {
+    const handleCommandSpy = vi
+      .spyOn(
+        (session as unknown as { commandHandler: CommandHandler })
+          .commandHandler,
+        'handleCommand',
+      )
+      .mockResolvedValue(true);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: '/extensions explore' }],
+    });
+
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(handleCommandSpy).toHaveBeenCalledWith(
+      '/extensions explore',
+      expect.any(Object),
+    );
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
+  });
+
+  it('should handle /restore command', async () => {
+    const handleCommandSpy = vi
+      .spyOn(
+        (session as unknown as { commandHandler: CommandHandler })
+          .commandHandler,
+        'handleCommand',
+      )
+      .mockResolvedValue(true);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: '/restore' }],
+    });
+
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(handleCommandSpy).toHaveBeenCalledWith(
+      '/restore',
+      expect.any(Object),
+    );
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
+  });
+
+  it('should handle /init command', async () => {
+    const handleCommandSpy = vi
+      .spyOn(
+        (session as unknown as { commandHandler: CommandHandler })
+          .commandHandler,
+        'handleCommand',
+      )
+      .mockResolvedValue(true);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: '/init' }],
+    });
+
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(handleCommandSpy).toHaveBeenCalledWith('/init', expect.any(Object));
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
   });
 
   it('should handle tool calls', async () => {
@@ -1281,5 +1457,26 @@ describe('Session', () => {
   it('should set model on config', () => {
     session.setModel('gemini-2.0-flash-exp');
     expect(mockConfig.setModel).toHaveBeenCalledWith('gemini-2.0-flash-exp');
+  });
+
+  it('should handle unquoted commands from autocomplete (with empty leading parts)', async () => {
+    // Mock handleCommand to verify it gets called
+    const handleCommandSpy = vi
+      .spyOn(
+        (session as unknown as { commandHandler: CommandHandler })
+          .commandHandler,
+        'handleCommand',
+      )
+      .mockResolvedValue(true);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [
+        { type: 'text', text: '' },
+        { type: 'text', text: '/memory' },
+      ],
+    });
+
+    expect(handleCommandSpy).toHaveBeenCalledWith('/memory', expect.anything());
   });
 });
