@@ -51,12 +51,11 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
           terminalWidth={Math.max(terminalWidth - prefixWidth, 0)}
           renderMarkdown={renderMarkdown}
         />
-        <Box
-          marginTop={isAlternateBuffer ? 0 : 1}
-          marginBottom={isAlternateBuffer ? 1 : 0}
-        >
+        <Box>
           <ShowMoreLines
             constrainHeight={availableTerminalHeight !== undefined}
+            marginTop={isAlternateBuffer ? 0 : 1}
+            marginBottom={isAlternateBuffer ? 1 : 0}
           />
         </Box>
       </Box>
