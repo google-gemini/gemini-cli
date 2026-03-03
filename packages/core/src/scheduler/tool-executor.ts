@@ -4,19 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
-  ToolResult,
-  Config,
-  ToolResultDisplay,
-  ToolLiveOutput,
-} from '../index.js';
 import {
   ToolErrorType,
   ToolOutputTruncatedEvent,
   logToolOutputTruncated,
   runInDevTraceSpan,
+  type ToolCallRequestInfo,
+  type ToolCallResponseInfo,
+  type ToolResult,
+  type Config,
+  type ToolResultDisplay,
+  type ToolLiveOutput,
 } from '../index.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
@@ -27,15 +25,15 @@ import {
   formatTruncatedToolOutput,
 } from '../utils/fileUtils.js';
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
-import type {
-  CompletedToolCall,
-  ToolCall,
-  ExecutingToolCall,
-  ErroredToolCall,
-  SuccessfulToolCall,
-  CancelledToolCall,
+import {
+  CoreToolCallStatus,
+  type CompletedToolCall,
+  type ToolCall,
+  type ExecutingToolCall,
+  type ErroredToolCall,
+  type SuccessfulToolCall,
+  type CancelledToolCall,
 } from './types.js';
-import { CoreToolCallStatus } from './types.js';
 import {
   GeminiCliOperation,
   GEN_AI_TOOL_CALL_ID,

@@ -16,8 +16,9 @@ import type {
   ValidatingToolCall,
   ExecutingToolCall,
   ToolCallResponseInfo,
+  CoreToolCallStatus,
+  ROOT_SCHEDULER_ID,
 } from './types.js';
-import { CoreToolCallStatus, ROOT_SCHEDULER_ID } from './types.js';
 import type {
   ToolConfirmationOutcome,
   ToolResultDisplay,

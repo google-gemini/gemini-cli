@@ -86,8 +86,9 @@ import type {
   ExecutingToolCall,
   Status,
   ToolCall,
+  CoreToolCallStatus,
+  ROOT_SCHEDULER_ID,
 } from './types.js';
-import { CoreToolCallStatus, ROOT_SCHEDULER_ID } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
 import * as ToolUtils from '../utils/tool-utils.js';
