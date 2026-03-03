@@ -106,7 +106,7 @@
     <text x="0" y="580" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="580" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="597" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="9" y="597" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs">  &gt; Apply To                                                                                      </text>
+    <text x="27" y="597" fill="#ffffff" textLength="90" lengthAdjust="spacingAndGlyphs" font-weight="bold">&gt; Apply To</text>
     <text x="891" y="597" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="614" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="27" y="614" fill="#a6e3a1" textLength="9" lengthAdjust="spacingAndGlyphs">●</text>

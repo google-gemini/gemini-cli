@@ -6,11 +6,11 @@
   <g transform="translate(10, 10)">
     <text x="0" y="19" fill="#333333" textLength="495" lengthAdjust="spacingAndGlyphs">┌───────────────────┬───────────────┬─────────────────┐</text>
     <text x="0" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="18" y="36" fill="#89b4fa" textLength="117" lengthAdjust="spacingAndGlyphs">Punctuation 1</text>
+    <text x="18" y="36" fill="#89b4fa" textLength="117" lengthAdjust="spacingAndGlyphs" font-weight="bold">Punctuation 1</text>
     <text x="180" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="198" y="36" fill="#89b4fa" textLength="117" lengthAdjust="spacingAndGlyphs">Punctuation 2</text>
+    <text x="198" y="36" fill="#89b4fa" textLength="117" lengthAdjust="spacingAndGlyphs" font-weight="bold">Punctuation 2</text>
     <text x="324" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="342" y="36" fill="#89b4fa" textLength="117" lengthAdjust="spacingAndGlyphs">Punctuation 3</text>
+    <text x="342" y="36" fill="#89b4fa" textLength="117" lengthAdjust="spacingAndGlyphs" font-weight="bold">Punctuation 3</text>
     <text x="486" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="53" fill="#333333" textLength="495" lengthAdjust="spacingAndGlyphs">├───────────────────┼───────────────┼─────────────────┤</text>
     <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
