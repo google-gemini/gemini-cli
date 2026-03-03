@@ -42,10 +42,18 @@ export function useInputHistory({
     Record<number, { text: string; offset: number }>
   >({});
 
+  // Last edited buffer stores the unsent draft that was being composed
+  // when the user first navigated away from the current input.
+  // This prevents data loss on accidental deletion or when returning to compose.
+  const lastEditedBufferRef = useRef<{ text: string; offset: number } | null>(
+    null,
+  );
+
   const resetHistoryNav = useCallback(() => {
     setHistoryIndex(-1);
     previousHistoryIndexRef.current = undefined;
     historyCacheRef.current = {};
+    lastEditedBufferRef.current = null;
   }, []);
 
   const handleSubmit = useCallback(
@@ -69,10 +77,23 @@ export function useInputHistory({
         offset: currentCursorOffset,
       };
 
-      // 2. Update index
+      // 2. Save to lastEditedBuffer when first navigating away from current compose (index -1)
+      // This preserves the unsent draft for recovery
+      if (
+        prevIndexBeforeMove === -1 &&
+        lastEditedBufferRef.current === null &&
+        currentQuery.trim().length > 0
+      ) {
+        lastEditedBufferRef.current = {
+          text: currentQuery,
+          offset: currentCursorOffset,
+        };
+      }
+
+      // 3. Update index
       setHistoryIndex(nextIndex);
 
-      // 3. Restore next state
+      // 4. Restore next state
       const saved = historyCacheRef.current[nextIndex];
 
       // We robustly restore the cursor position IF:
@@ -90,7 +111,17 @@ export function useInputHistory({
       ) {
         onChange(saved.text, saved.offset);
       } else if (nextIndex === -1) {
-        onChange(saved ? saved.text : '', defaultCursor);
+        // When returning to current compose, prefer lastEditedBuffer if cache is empty
+        if (saved) {
+          onChange(saved.text, defaultCursor);
+        } else if (lastEditedBufferRef.current) {
+          onChange(
+            lastEditedBufferRef.current.text,
+            lastEditedBufferRef.current.offset,
+          );
+        } else {
+          onChange('', defaultCursor);
+        }
       } else {
         // For regular history browsing, use default cursor position.
         if (saved) {
@@ -109,14 +140,35 @@ export function useInputHistory({
 
   const navigateUp = useCallback(() => {
     if (!isActive) return false;
-    if (userMessages.length === 0) return false;
+
+    // Even with no history, save the current draft to lastEditedBuffer
+    if (userMessages.length === 0) {
+      if (
+        historyIndex === -1 &&
+        lastEditedBufferRef.current === null &&
+        currentQuery.trim().length > 0
+      ) {
+        lastEditedBufferRef.current = {
+          text: currentQuery,
+          offset: currentCursorOffset,
+        };
+      }
+      return false;
+    }
 
     if (historyIndex < userMessages.length - 1) {
       navigateTo(historyIndex + 1, 'start');
       return true;
     }
     return false;
-  }, [historyIndex, userMessages, isActive, navigateTo]);
+  }, [
+    historyIndex,
+    userMessages,
+    isActive,
+    navigateTo,
+    currentQuery,
+    currentCursorOffset,
+  ]);
 
   const navigateDown = useCallback(() => {
     if (!isActive) return false;
