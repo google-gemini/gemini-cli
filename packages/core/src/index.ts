@@ -107,7 +107,6 @@ export * from './utils/extensionLoader.js';
 export * from './utils/package.js';
 export * from './utils/version.js';
 export * from './utils/checkpointUtils.js';
-export * from './utils/secure-browser-launcher.js';
 export * from './utils/apiConversionUtils.js';
 export * from './utils/channel.js';
 export * from './utils/constants.js';
@@ -202,9 +201,6 @@ export * from './hooks/index.js';
 
 // Export hook types
 export * from './hooks/types.js';
-
-// Export agent types
-export * from './agents/types.js';
 
 // Export stdio utils
 export * from './utils/stdio.js';

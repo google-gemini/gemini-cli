@@ -5,6 +5,7 @@
  */
 
 import { type Config } from '../../config/config.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../../config/models.js';
 import { coreEvents } from '../../utils/events.js';
 import { resolveExecutable } from '../../utils/shell-utils.js';
 import { LlmRole } from '../../telemetry/llmRole.js';
@@ -210,7 +211,7 @@ export class GeminiRestBackend implements VoiceBackend {
     if (!generator) throw new Error('Gemini API not initialized');
 
     const request: GenerateContentParameters = {
-      model: 'gemini-2.0-flash',
+      model: DEFAULT_GEMINI_FLASH_MODEL,
       contents: [
         {
           role: 'user',
