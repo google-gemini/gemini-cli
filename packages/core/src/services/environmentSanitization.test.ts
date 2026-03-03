@@ -130,6 +130,18 @@ describe('sanitizeEnvironment', () => {
     });
   });
 
+  it('should redact always-allowed variable names if their values contain sensitive patterns', () => {
+    const env = {
+      PATH: 'AKIAxxxxxxxxxxxxxxxx',
+      GEMINI_CLI_TEST: '-----BEGIN CERTIFICATE-----...',
+      SAFE_VAR: 'is-safe',
+    };
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+    expect(sanitized).toEqual({
+      SAFE_VAR: 'is-safe',
+    });
+  });
+
   it('should not redact variables that look similar to sensitive patterns', () => {
     const env = {
       // Not a credential in URL

@@ -156,6 +156,15 @@ function shouldRedactEnvironmentVariable(
     return true;
   }
 
+  // Redact if the value looks like a key/cert.
+  if (value) {
+    for (const pattern of NEVER_ALLOWED_VALUE_PATTERNS) {
+      if (pattern.test(value)) {
+        return true;
+      }
+    }
+  }
+
   // These are never redacted.
   if (
     ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES.has(key) ||
@@ -177,15 +186,6 @@ function shouldRedactEnvironmentVariable(
   for (const pattern of NEVER_ALLOWED_NAME_PATTERNS) {
     if (pattern.test(key)) {
       return true;
-    }
-  }
-
-  // Redact if the value looks like a key/cert.
-  if (value) {
-    for (const pattern of NEVER_ALLOWED_VALUE_PATTERNS) {
-      if (pattern.test(value)) {
-        return true;
-      }
     }
   }
 
