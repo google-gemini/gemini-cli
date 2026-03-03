@@ -182,6 +182,7 @@ export async function runNonInteractive({
     };
 
     let errorToHandle: unknown | undefined;
+    let scheduler: Scheduler | undefined;
     try {
       consolePatcher.patch();
 
@@ -210,7 +211,7 @@ export async function runNonInteractive({
       });
 
       const geminiClient = config.getGeminiClient();
-      const scheduler = new Scheduler({
+      scheduler = new Scheduler({
         config,
         messageBus: config.getMessageBus(),
         getPreferredEditor: () => undefined,
@@ -523,6 +524,7 @@ export async function runNonInteractive({
       // Cleanup stdin cancellation before other cleanup
       cleanupStdinCancellation();
 
+      scheduler?.dispose();
       consolePatcher.cleanup();
       coreEvents.off(CoreEvent.UserFeedback, handleUserFeedback);
     }

@@ -12,9 +12,13 @@ import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { ToolCallRequestInfo } from '../scheduler/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
+const mockSchedulerSchedule = vi.hoisted(() => vi.fn());
+const mockSchedulerDispose = vi.hoisted(() => vi.fn());
+
 vi.mock('../scheduler/scheduler.js', () => ({
   Scheduler: vi.fn().mockImplementation(() => ({
-    schedule: vi.fn().mockResolvedValue([{ status: 'success' }]),
+    schedule: mockSchedulerSchedule,
+    dispose: mockSchedulerDispose,
   })),
 }));
 
@@ -24,6 +28,10 @@ describe('agent-scheduler', () => {
   let mockMessageBus: Mocked<MessageBus>;
 
   beforeEach(() => {
+    mockSchedulerSchedule.mockReset();
+    mockSchedulerSchedule.mockResolvedValue([{ status: 'success' }]);
+    mockSchedulerDispose.mockReset();
+
     mockMessageBus = {} as Mocked<MessageBus>;
     mockToolRegistry = {
       getTool: vi.fn(),
@@ -70,5 +78,49 @@ describe('agent-scheduler', () => {
     // Verify that the scheduler's config has the overridden tool registry
     const schedulerConfig = vi.mocked(Scheduler).mock.calls[0][0].config;
     expect(schedulerConfig.getToolRegistry()).toBe(mockToolRegistry);
+  });
+
+  it('should dispose scheduler after successful scheduling', async () => {
+    const requests: ToolCallRequestInfo[] = [
+      {
+        callId: 'call-2',
+        name: 'test-tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-2',
+      },
+    ];
+
+    await scheduleAgentTools(mockConfig as unknown as Config, requests, {
+      schedulerId: 'subagent-2',
+      toolRegistry: mockToolRegistry as unknown as ToolRegistry,
+      signal: new AbortController().signal,
+    });
+
+    expect(mockSchedulerDispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('should dispose scheduler when scheduling throws', async () => {
+    mockSchedulerSchedule.mockRejectedValueOnce(new Error('schedule failed'));
+
+    const requests: ToolCallRequestInfo[] = [
+      {
+        callId: 'call-3',
+        name: 'test-tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-3',
+      },
+    ];
+
+    await expect(
+      scheduleAgentTools(mockConfig as unknown as Config, requests, {
+        schedulerId: 'subagent-3',
+        toolRegistry: mockToolRegistry as unknown as ToolRegistry,
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toThrow('schedule failed');
+
+    expect(mockSchedulerDispose).toHaveBeenCalledTimes(1);
   });
 });
