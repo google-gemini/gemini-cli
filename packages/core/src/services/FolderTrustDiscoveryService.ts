@@ -169,11 +169,15 @@ export class FolderTrustDiscoveryService {
         : undefined;
 
     const allowedTools = tools?.['allowed'];
+    const trustedTools = tools?.['trusted'];
 
     const checks = [
       {
-        condition: Array.isArray(allowedTools) && allowedTools.length > 0,
-        message: 'This project auto-approves certain tools (tools.allowed).',
+        condition:
+          (Array.isArray(allowedTools) && allowedTools.length > 0) ||
+          (Array.isArray(trustedTools) && trustedTools.length > 0),
+        message:
+          'This project auto-approves certain tools (tools.allowed/tools.trusted).',
       },
       {
         condition: experimental?.['enableAgents'] === true,

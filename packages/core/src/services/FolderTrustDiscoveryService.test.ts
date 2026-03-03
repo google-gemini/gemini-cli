@@ -76,7 +76,7 @@ describe('FolderTrustDiscoveryService', () => {
 
     const settings = {
       tools: {
-        allowed: ['git'],
+        trusted: ['save_memory'],
         sandbox: false,
       },
       experimental: {
@@ -96,7 +96,7 @@ describe('FolderTrustDiscoveryService', () => {
     const results = await FolderTrustDiscoveryService.discover(tempDir);
 
     expect(results.securityWarnings).toContain(
-      'This project auto-approves certain tools (tools.allowed).',
+      'This project auto-approves certain tools (tools.allowed/tools.trusted).',
     );
     expect(results.securityWarnings).toContain(
       'This project enables autonomous agents (enableAgents).',

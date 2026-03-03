@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -632,7 +632,12 @@ export async function loadCliConfig(
     (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
       !argv.isCommand);
 
-  const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
+  const deprecatedAllowedTools =
+    argv.allowedTools ?? settings.tools?.allowed ?? [];
+  const trustedTools = argv.allowedTools ? [] : (settings.tools?.trusted ?? []);
+  const allowedTools = [
+    ...new Set([...deprecatedAllowedTools, ...trustedTools]),
+  ];
   const allowedToolsSet = new Set(allowedTools);
 
   // In non-interactive mode, exclude tools that require a prompt.
