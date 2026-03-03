@@ -1,8 +1,0 @@
-{
-  "track_id": "fix_token_compression_20260303",
-  "type": "bug",
-  "status": "new",
-  "created_at": "2026-03-03T12:00:00Z",
-  "updated_at": "2026-03-03T12:00:00Z",
-  "description": "Fix incorrect \u0027input token count exceeds maximum\u0027 error during chat history compression"
-}
