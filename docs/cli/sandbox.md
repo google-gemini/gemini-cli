@@ -50,6 +50,27 @@ Cross-platform sandboxing with complete process isolation.
 **Note**: Requires building the sandbox image locally or using a published image
 from your organization's registry.
 
+### 3. gVisor / runsc (Linux only)
+
+Strongest isolation available: runs containers inside a user-space kernel via
+[gVisor](https://github.com/google/gvisor). gVisor intercepts all container
+system calls and handles them in a sandboxed kernel written in Go, providing a
+strong security barrier between AI operations and the host OS.
+
+**Prerequisites**:
+
+- Linux only (gVisor does not support macOS or Windows).
+- Install gVisor: see the
+  [official installation guide](https://gvisor.dev/docs/user_guide/install/).
+- Docker must be installed as the container manager.
+
+When `sandbox: true` is set on Linux and both `runsc` and `docker` are detected,
+Gemini CLI automatically prefers gVisor over plain Docker.
+
+**How it works**: Gemini CLI runs `docker run --runtime runsc ...`; Docker
+delays to gVisor's `runsc` OCI runtime, which interposes the container's system
+calls through a user-space kernel rather than passing them directly to the host.
+
 ## Quickstart
 
 ```bash
@@ -73,6 +94,13 @@ $env:GEMINI_SANDBOX="true"
 gemini -p "run the test suite"
 ```
 
+### Using gVisor (Linux only)
+
+```bash
+export GEMINI_SANDBOX=runsc
+gemini -p "run the test suite"
+```
+
 **Configure in settings.json**
 
 ```json
@@ -88,9 +116,18 @@ gemini -p "run the test suite"
 ### Enable sandboxing (in order of precedence)
 
 1. **Command flag**: `-s` or `--sandbox`
-2. **Environment variable**: `GEMINI_SANDBOX=true|docker|podman|sandbox-exec`
+2. **Environment variable**:
+   `GEMINI_SANDBOX=true|docker|podman|sandbox-exec|runsc`
 3. **Settings file**: `"sandbox": true` in the `tools` object of your
    `settings.json` file (e.g., `{"tools": {"sandbox": true}}`).
+
+**Auto-detection order on Linux** (when `sandbox: true`):
+
+1. gVisor (`runsc`) — if `runsc` and `docker` are both installed
+2. Docker — if `docker` is installed
+3. Podman — if `podman` is installed
+
+**Auto-detection order on macOS**: macOS Seatbelt (`sandbox-exec`).
 
 ### macOS Seatbelt profiles
 

@@ -27,6 +27,7 @@ const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
   'docker',
   'podman',
   'sandbox-exec',
+  'runsc',
 ];
 
 function isSandboxCommand(value: string): value is SandboxConfig['command'] {
@@ -63,6 +64,25 @@ function getSandboxCommand(
         )}`,
       );
     }
+    // For runsc, verify both runsc and docker are present (docker is used as the container manager)
+    if (sandbox === 'runsc') {
+      if (os.platform() !== 'linux') {
+        throw new FatalSandboxError(
+          'gVisor (runsc) sandboxing is only supported on Linux',
+        );
+      }
+      if (!commandExists.sync('runsc')) {
+        throw new FatalSandboxError(
+          "Missing 'runsc' (gVisor). See https://gvisor.dev/docs/user_guide/install/ for installation.",
+        );
+      }
+      if (!commandExists.sync('docker')) {
+        throw new FatalSandboxError(
+          "'runsc' sandboxing requires Docker to be installed as the container manager.",
+        );
+      }
+      return 'runsc';
+    }
     // confirm that specified command exists
     if (commandExists.sync(sandbox)) {
       return sandbox;
@@ -76,6 +96,14 @@ function getSandboxCommand(
   // for container-based sandboxing, require sandbox to be enabled explicitly
   if (os.platform() === 'darwin' && commandExists.sync('sandbox-exec')) {
     return 'sandbox-exec';
+  } else if (
+    os.platform() === 'linux' &&
+    commandExists.sync('runsc') &&
+    commandExists.sync('docker') &&
+    sandbox === true
+  ) {
+    // On Linux, prefer gVisor (runsc) over plain Docker when available
+    return 'runsc';
   } else if (commandExists.sync('docker') && sandbox === true) {
     return 'docker';
   } else if (commandExists.sync('podman') && sandbox === true) {

@@ -97,7 +97,7 @@ describe('loadSandboxConfig', () => {
     it('should throw if GEMINI_SANDBOX is an invalid command', async () => {
       process.env['GEMINI_SANDBOX'] = 'invalid-command';
       await expect(loadSandboxConfig({}, {})).rejects.toThrow(
-        "Invalid sandbox command 'invalid-command'. Must be one of docker, podman, sandbox-exec",
+        "Invalid sandbox command 'invalid-command'. Must be one of docker, podman, sandbox-exec, runsc",
       );
     });
 
@@ -178,8 +178,71 @@ describe('loadSandboxConfig', () => {
       await expect(
         loadSandboxConfig({}, { sandbox: 'invalid-command' }),
       ).rejects.toThrow(
-        "Invalid sandbox command 'invalid-command'. Must be one of docker, podman, sandbox-exec",
+        "Invalid sandbox command 'invalid-command'. Must be one of docker, podman, sandbox-exec, runsc",
       );
+    });
+  });
+
+  describe('with sandbox: runsc (gVisor)', () => {
+    it('should use runsc on Linux when runsc and docker are available', async () => {
+      mockedOsPlatform.mockReturnValue('linux');
+      mockedCommandExistsSync.mockImplementation(
+        (cmd) => cmd === 'runsc' || cmd === 'docker',
+      );
+      const config = await loadSandboxConfig({}, { sandbox: 'runsc' });
+      expect(config).toEqual({ command: 'runsc', image: 'default/image' });
+      expect(mockedCommandExistsSync).toHaveBeenCalledWith('runsc');
+      expect(mockedCommandExistsSync).toHaveBeenCalledWith('docker');
+    });
+
+    it('should throw if runsc is specified on a non-Linux platform', async () => {
+      mockedOsPlatform.mockReturnValue('darwin');
+      mockedCommandExistsSync.mockReturnValue(true);
+      await expect(loadSandboxConfig({}, { sandbox: 'runsc' })).rejects.toThrow(
+        'gVisor (runsc) sandboxing is only supported on Linux',
+      );
+    });
+
+    it('should throw if runsc is specified but runsc binary is missing', async () => {
+      mockedOsPlatform.mockReturnValue('linux');
+      mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'docker'); // only docker
+      await expect(loadSandboxConfig({}, { sandbox: 'runsc' })).rejects.toThrow(
+        "Missing 'runsc' (gVisor).",
+      );
+    });
+
+    it('should throw if runsc is specified but docker is missing', async () => {
+      mockedOsPlatform.mockReturnValue('linux');
+      mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'runsc'); // only runsc
+      await expect(loadSandboxConfig({}, { sandbox: 'runsc' })).rejects.toThrow(
+        "'runsc' sandboxing requires Docker to be installed",
+      );
+    });
+
+    it('should auto-detect runsc on Linux when sandbox: true and both runsc+docker available', async () => {
+      mockedOsPlatform.mockReturnValue('linux');
+      mockedCommandExistsSync.mockImplementation(
+        (cmd) => cmd === 'runsc' || cmd === 'docker',
+      );
+      const config = await loadSandboxConfig({}, { sandbox: true });
+      expect(config).toEqual({ command: 'runsc', image: 'default/image' });
+    });
+
+    it('should fall back to docker if runsc is not available on Linux with sandbox: true', async () => {
+      mockedOsPlatform.mockReturnValue('linux');
+      mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'docker');
+      const config = await loadSandboxConfig({}, { sandbox: true });
+      expect(config).toEqual({ command: 'docker', image: 'default/image' });
+    });
+
+    it('should use GEMINI_SANDBOX=runsc env var on Linux with required commands', async () => {
+      process.env['GEMINI_SANDBOX'] = 'runsc';
+      mockedOsPlatform.mockReturnValue('linux');
+      mockedCommandExistsSync.mockImplementation(
+        (cmd) => cmd === 'runsc' || cmd === 'docker',
+      );
+      const config = await loadSandboxConfig({}, {});
+      expect(config).toEqual({ command: 'runsc', image: 'default/image' });
     });
   });
 
