@@ -22,7 +22,7 @@ export interface UseLoadingIndicatorProps {
   retryStatus: RetryAttemptPayload | null;
   loadingPhrasesMode?: LoadingPhrasesMode;
   customWittyPhrases?: string[];
-  errorVerbosity?: 'low' | 'full';
+  errorVerbosity: 'low' | 'full';
 }
 
 export const useLoadingIndicator = ({
@@ -31,7 +31,7 @@ export const useLoadingIndicator = ({
   retryStatus,
   loadingPhrasesMode,
   customWittyPhrases,
-  errorVerbosity = 'full',
+  errorVerbosity,
 }: UseLoadingIndicatorProps) => {
   const [timerResetKey, setTimerResetKey] = useState(0);
   const isTimerActive = streamingState === StreamingState.Responding;
