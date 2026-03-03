@@ -51,7 +51,7 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
     // Always use taskkill /f /t to reap the complete process tree on Windows.
     // pty.kill() only signals the PTY session leader; nested background
     // processes survive without this tree-wide forced termination.
-    cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
+cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']).on('error', () => { /* Ignore spawn errors */ });
     return;
   }
 
