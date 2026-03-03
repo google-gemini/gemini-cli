@@ -911,6 +911,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         const delta = now - lastSpacePressRef.current;
         if (delta > 0 && delta < 300) {
           lastSpacePressRef.current = 0;
+
+          // The first space was already inserted into the buffer on the previous keypress
+          // (because we let it pass through to keep typing feeling responsive).
+          // We must manually delete that first space now before starting recording.
+          if (buffer.text.length > 0 && buffer.text.endsWith(' ')) {
+            buffer.setText(buffer.text.slice(0, -1));
+          }
+
           void toggleRecording();
           return true; // Consume the second space
         }
