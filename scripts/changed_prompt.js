@@ -8,6 +8,7 @@ import { execSync } from 'node:child_process';
 const EVALS_FILE_PREFIXES = [
   'packages/core/src/prompts/',
   'packages/core/src/tools/',
+  'evals/',
 ];
 
 function main() {
@@ -18,7 +19,7 @@ function main() {
       stdio: 'ignore',
     });
 
-    // Find the merge base with main
+    // Find the merge base with the target branch.
     const mergeBase = execSync('git merge-base HEAD FETCH_HEAD', {
       encoding: 'utf-8',
     }).trim();
