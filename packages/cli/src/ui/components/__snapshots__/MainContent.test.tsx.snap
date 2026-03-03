@@ -5,7 +5,6 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Focuse
 AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊷  Shell Command Running a long command...                                                   │
-│                                                                                              │
 │ Line 10                                                                                      │
 │ Line 11                                                                                      │
 │ Line 12                                                                                      │
@@ -27,7 +26,6 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Unfocu
 AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊷  Shell Command Running a long command...                                                   │
-│                                                                                              │
 │ Line 10                                                                                      │
 │ Line 11                                                                                      │
 │ Line 12                                                                                      │
@@ -48,7 +46,6 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Con
 "AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊷  Shell Command Running a long command...                                                   │
-│                                                                                              │
 │ ... first 11 lines hidden (Ctrl+O to show) ...                                               │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
@@ -68,7 +65,6 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unc
 "AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊷  Shell Command Running a long command...                                                   │
-│                                                                                              │
 │ Line 1                                                                                       │
 │ Line 2                                                                                       │
 │ Line 3                                                                                       │
@@ -98,11 +94,9 @@ exports[`MainContent > renders a split tool group without a gap between static a
 "AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                                              │
-│                                                                                              │
 │ Part 1                                                                                       │
 │                                                                                              │
 │ ✓  test-tool A tool for testing                                                              │
-│                                                                                              │
 │ Part 2                                                                                       │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
 ShowMoreLines
