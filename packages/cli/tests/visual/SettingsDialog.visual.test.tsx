@@ -61,7 +61,7 @@ async function runVisualTest(
   const buffer = fs.readFileSync(outputPath);
 
   // 3. Update Baseline logic (Only updates if flag is set or baseline is missing)
-  if (isUpdate || !fs.existsSync(baselinePath)) {
+  if (isUpdate) {
     fs.writeFileSync(baselinePath, buffer);
     return;
   }

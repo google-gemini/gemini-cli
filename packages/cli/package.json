@@ -88,6 +88,7 @@
     "joi": "^18.0.2",
     "local-pkg": "^1.1.2",
     "pac-proxy-agent": "^7.2.0",
+    "pngjs": "^7.0.0",
     "proxy-agent": "^6.5.0",
     "proxy-from-env": "^2.0.0",
     "socks-proxy-agent": "^8.0.5",
