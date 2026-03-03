@@ -45,6 +45,10 @@ Write precisely to ensure your instructions are unambiguous.
   specific verbs.
 - **Examples:** Use meaningful names in examples; avoid placeholders like
   "foo" or "bar."
+- **Quota and limit terminology:** For any content involving resource capacity
+  or using the word "quota" or "limit", strictly adhere to the guidelines in
+  the `quota-limit-style-guide.md` resource file. Generally, Use "quota" for the
+  administrative bucket and "limit" for the numerical ceiling.
 
 ### Formatting and syntax
 Apply consistent formatting to make documentation visually organized and
