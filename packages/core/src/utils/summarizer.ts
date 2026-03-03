@@ -77,8 +77,10 @@ export async function summarizeToolOutput(
   abortSignal: AbortSignal,
 ): Promise<string> {
   const maxOutputTokens =
-    config.modelConfigService.getResolvedConfig(modelConfigKey)
-      .generateContentConfig.maxOutputTokens ?? 2000;
+    config.modelConfigService.getResolvedConfig(
+      modelConfigKey,
+      config.getActiveModel(),
+    ).generateContentConfig.maxOutputTokens ?? 2000;
   // There is going to be a slight difference here since we are comparing length of string with maxOutputTokens.
   // This is meant to be a ballpark estimation of if we need to summarize the tool output.
   if (!textToSummarize || textToSummarize.length < maxOutputTokens) {

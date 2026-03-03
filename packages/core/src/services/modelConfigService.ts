@@ -5,6 +5,21 @@
  */
 
 import type { GenerateContentConfig } from '@google/genai';
+import {
+  PREVIEW_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+} from '../config/modelConstants.js';
+import { isGemini3Model } from '../config/models.js';
+
+// Internal aliases that should respect the active model family.
+const FAMILY_AWARE_INTERNAL_ALIASES = new Set([
+  'classifier',
+  'summarizer-default',
+  'summarizer-shell',
+  'prompt-completion',
+  'fast-ack-helper',
+  'edit-corrector',
+]);
 
 // The primary key for the ModelConfig is the model string. However, we also
 // support a secondary key to limit the override scope, typically an agent name.
@@ -305,13 +320,29 @@ export class ModelConfigService {
     });
   }
 
-  getResolvedConfig(context: ModelConfigKey): ResolvedModelConfig {
+  getResolvedConfig(
+    context: ModelConfigKey,
+    activeModel?: string,
+  ): ResolvedModelConfig {
     const resolved = this.internalGetResolvedConfig(context);
 
     if (!resolved.model) {
       throw new Error(
         `Could not resolve a model name for alias "${context.model}". Please ensure the alias chain or a matching override specifies a model.`,
       );
+    }
+
+    // Apply family-aware overrides for internal utility models.
+    // If the active model is Gemini 3 and we're using a known internal alias,
+    // force it to the Gemini 3 Flash model to prevent leakage.
+    if (
+      activeModel &&
+      FAMILY_AWARE_INTERNAL_ALIASES.has(context.model) &&
+      resolved.model === DEFAULT_GEMINI_FLASH_LITE_MODEL
+    ) {
+      if (isGemini3Model(activeModel)) {
+        resolved.model = PREVIEW_GEMINI_FLASH_MODEL;
+      }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

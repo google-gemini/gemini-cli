@@ -153,8 +153,12 @@ function classifyValidationRequiredError(
     // Look for "Learn more" link - identified by description or support.google.com hostname
     const learnMoreLink = helpDetail.links.find((link) => {
       if (link.description.toLowerCase().trim() === 'learn more') return true;
-      const parsed = URL.parse(link.url);
-      return parsed?.hostname === 'support.google.com';
+      try {
+        const parsed = new URL(link.url);
+        return parsed.hostname === 'support.google.com';
+      } catch (_e) {
+        return false;
+      }
     });
     if (learnMoreLink) {
       learnMoreUrl = learnMoreLink.url;

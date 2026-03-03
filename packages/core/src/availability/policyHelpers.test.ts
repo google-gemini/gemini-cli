@@ -201,6 +201,7 @@ describe('policyHelpers', () => {
       overrides: Partial<Config> = {},
     ): Config => {
       const defaults = {
+        getActiveModel: vi.fn(),
         getModelAvailabilityService: () => mockAvailabilityService,
         setActiveModel: vi.fn(),
         modelConfigService: mockModelConfigService,
@@ -257,14 +258,20 @@ describe('policyHelpers', () => {
         topP: 1,
       });
 
-      expect(mockModelConfigService.getResolvedConfig).toHaveBeenCalledWith({
-        model: 'gemini-pro',
-        isChatModel: true,
-      });
-      expect(mockModelConfigService.getResolvedConfig).toHaveBeenCalledWith({
-        model: 'gemini-flash',
-        isChatModel: true,
-      });
+      expect(mockModelConfigService.getResolvedConfig).toHaveBeenCalledWith(
+        {
+          model: 'gemini-pro',
+          isChatModel: true,
+        },
+        undefined,
+      );
+      expect(mockModelConfigService.getResolvedConfig).toHaveBeenCalledWith(
+        {
+          model: 'gemini-flash',
+          isChatModel: true,
+        },
+        undefined,
+      );
       expect(config.setActiveModel).toHaveBeenCalledWith('gemini-flash');
     });
 

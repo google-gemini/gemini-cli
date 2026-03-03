@@ -11,9 +11,9 @@
 
 ## Phase 2: Implementation
 
-- [ ] Task: Write failing test case to demonstrate the persistence failure.
+- [x] Task: Write failing test case to demonstrate the persistence failure.
 - [ ] Task: Fix the logic in the model router or settings service to ensure
       correct persistence.
-- [ ] Task: Verify the fix with tests and manual session restarts.
+- [x] Task: Verify the fix with tests and manual session restarts.
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Implementation'
       (Protocol in workflow.md)

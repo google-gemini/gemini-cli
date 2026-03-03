@@ -307,8 +307,10 @@ export class GeminiChat {
     this.sendPromise = streamDonePromise;
 
     const userContent = createUserContent(message);
-    const { model } =
-      this.config.modelConfigService.getResolvedConfig(modelConfigKey);
+    const { model } = this.config.modelConfigService.getResolvedConfig(
+      modelConfigKey,
+      this.config.getActiveModel(),
+    );
 
     // Record user input - capture complete message with all parts (text, files, images, etc.)
     // but skip recording function responses (tool call results) as they should be stored in tool call records
@@ -510,10 +512,13 @@ export class GeminiChat {
 
       if (modelToUse !== lastModelToUse) {
         const { generateContentConfig: newConfig } =
-          this.config.modelConfigService.getResolvedConfig({
-            ...modelConfigKey,
-            model: modelToUse,
-          });
+          this.config.modelConfigService.getResolvedConfig(
+            {
+              ...modelConfigKey,
+              model: modelToUse,
+            },
+            modelToUse,
+          );
         currentGenerateContentConfig = newConfig;
       }
 

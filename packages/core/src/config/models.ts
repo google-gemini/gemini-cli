@@ -4,14 +4,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview';
-export const PREVIEW_GEMINI_3_1_MODEL = 'gemini-3.1-pro-preview';
-export const PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL =
-  'gemini-3.1-pro-preview-customtools';
-export const PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
-export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
-export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
+import {
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  GEMINI_MODEL_ALIAS_AUTO,
+  GEMINI_MODEL_ALIAS_PRO,
+  GEMINI_MODEL_ALIAS_FLASH,
+  GEMINI_MODEL_ALIAS_FLASH_LITE,
+} from './modelConstants.js';
+
+export {
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  GEMINI_MODEL_ALIAS_AUTO,
+  GEMINI_MODEL_ALIAS_PRO,
+  GEMINI_MODEL_ALIAS_FLASH,
+  GEMINI_MODEL_ALIAS_FLASH_LITE,
+  DEFAULT_GEMINI_EMBEDDING_MODEL,
+  DEFAULT_THINKING_MODE,
+} from './modelConstants.js';
 
 export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_MODEL,
@@ -22,20 +47,6 @@ export const VALID_GEMINI_MODELS = new Set([
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
 ]);
-
-export const PREVIEW_GEMINI_MODEL_AUTO = 'auto-gemini-3';
-export const DEFAULT_GEMINI_MODEL_AUTO = 'auto-gemini-2.5';
-
-// Model aliases for user convenience.
-export const GEMINI_MODEL_ALIAS_AUTO = 'auto';
-export const GEMINI_MODEL_ALIAS_PRO = 'pro';
-export const GEMINI_MODEL_ALIAS_FLASH = 'flash';
-export const GEMINI_MODEL_ALIAS_FLASH_LITE = 'flash-lite';
-
-export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
-
-// Cap the thinking at 8192 to prevent run-away thinking loops.
-export const DEFAULT_THINKING_MODE = 8192;
 
 /**
  * Resolves the requested model alias (e.g., 'auto-gemini-3', 'pro', 'flash', 'flash-lite')
@@ -90,12 +101,17 @@ export function resolveClassifierModel(
   useGemini3_1: boolean = false,
   useCustomToolModel: boolean = false,
 ): string {
-  if (modelAlias === GEMINI_MODEL_ALIAS_FLASH) {
+  if (
+    modelAlias === GEMINI_MODEL_ALIAS_FLASH ||
+    modelAlias === GEMINI_MODEL_ALIAS_FLASH_LITE
+  ) {
     if (
       requestedModel === DEFAULT_GEMINI_MODEL_AUTO ||
       requestedModel === DEFAULT_GEMINI_MODEL
     ) {
-      return DEFAULT_GEMINI_FLASH_MODEL;
+      return modelAlias === GEMINI_MODEL_ALIAS_FLASH_LITE
+        ? DEFAULT_GEMINI_FLASH_LITE_MODEL
+        : DEFAULT_GEMINI_FLASH_MODEL;
     }
     if (
       requestedModel === PREVIEW_GEMINI_MODEL_AUTO ||
@@ -103,7 +119,7 @@ export function resolveClassifierModel(
     ) {
       return PREVIEW_GEMINI_FLASH_MODEL;
     }
-    return resolveModel(GEMINI_MODEL_ALIAS_FLASH);
+    return resolveModel(modelAlias);
   }
   return resolveModel(requestedModel, useGemini3_1, useCustomToolModel);
 }

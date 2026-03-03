@@ -126,8 +126,10 @@ export class BaseLlmClient {
       maxAttempts,
     } = options;
 
-    const { model } =
-      this.config.modelConfigService.getResolvedConfig(modelConfigKey);
+    const resolved = this.config.modelConfigService.getResolvedConfig(
+      modelConfigKey,
+      this.config.getActiveModel(),
+    );
 
     const shouldRetryOnContent = (response: GenerateContentResponse) => {
       const text = getResponseText(response)?.trim();
@@ -136,7 +138,7 @@ export class BaseLlmClient {
       }
       try {
         // We don't use the result, just check if it's valid JSON
-        JSON.parse(this.cleanJsonResponse(text, model));
+        JSON.parse(this.cleanJsonResponse(text, resolved.model));
         return false; // It's valid, don't retry
       } catch (_e) {
         return true; // It's not valid, retry
@@ -164,7 +166,7 @@ export class BaseLlmClient {
     // If we are here, the content is valid (not empty and parsable).
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return JSON.parse(
-      this.cleanJsonResponse(getResponseText(result)!.trim(), model),
+      this.cleanJsonResponse(getResponseText(result)!.trim(), resolved.model),
     );
   }
 
@@ -291,10 +293,13 @@ export class BaseLlmClient {
           initialActiveModel = activeModel;
           // Re-resolve config if model changed during retry
           const { model: resolvedModel, generateContentConfig } =
-            this.config.modelConfigService.getResolvedConfig({
-              ...modelConfigKey,
-              model: activeModel,
-            });
+            this.config.modelConfigService.getResolvedConfig(
+              {
+                ...modelConfigKey,
+                model: activeModel,
+              },
+              activeModel,
+            );
           currentModel = resolvedModel;
           currentGenerateContentConfig = generateContentConfig;
         }

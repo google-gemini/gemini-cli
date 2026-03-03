@@ -112,7 +112,9 @@ describe('BaseLlmClient', () => {
       modelConfigService: {
         getResolvedConfig: vi
           .fn()
-          .mockImplementation(({ model }) => makeResolvedModelConfig(model)),
+          .mockImplementation(({ model }, _activeModel) =>
+            makeResolvedModelConfig(model),
+          ),
       } as unknown as ModelConfigService,
       getModelAvailabilityService: vi
         .fn()
@@ -862,7 +864,7 @@ describe('BaseLlmClient', () => {
 
       expect(
         mockConfig.modelConfigService.getResolvedConfig,
-      ).toHaveBeenCalledWith({ model: fallbackModel });
+      ).toHaveBeenCalledWith({ model: fallbackModel }, fallbackModel);
       expect(secondCall?.model).toBe(fallbackModel);
       expect(secondCall?.config?.temperature).toBe(0.9);
     });

@@ -934,8 +934,10 @@ export class GeminiClient {
     abortSignal: AbortSignal,
     role: LlmRole,
   ): Promise<GenerateContentResponse> {
-    const desiredModelConfig =
-      this.config.modelConfigService.getResolvedConfig(modelConfigKey);
+    const desiredModelConfig = this.config.modelConfigService.getResolvedConfig(
+      modelConfigKey,
+      this.config.getActiveModel(),
+    );
     let {
       model: currentAttemptModel,
       generateContentConfig: currentAttemptGenerateContentConfig,
@@ -970,10 +972,13 @@ export class GeminiClient {
           initialActiveModel = active;
           // Re-resolve config if model changed
           const { model: resolvedModel, generateContentConfig } =
-            this.config.modelConfigService.getResolvedConfig({
-              ...modelConfigKey,
-              model: active,
-            });
+            this.config.modelConfigService.getResolvedConfig(
+              {
+                ...modelConfigKey,
+                model: active,
+              },
+              active,
+            );
           currentAttemptModel = resolvedModel;
           currentAttemptGenerateContentConfig = generateContentConfig;
         }
