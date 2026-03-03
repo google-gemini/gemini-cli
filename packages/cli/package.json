@@ -84,6 +84,7 @@
     "extract-zip": "^2.0.1",
     "http-proxy-agent": "^7.0.2",
     "https-proxy-agent": "^7.0.6",
+    "ink-visual-testing": "^1.0.2",
     "joi": "^18.0.2",
     "local-pkg": "^1.1.2",
     "pac-proxy-agent": "^7.2.0",
