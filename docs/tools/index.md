@@ -35,7 +35,7 @@ These tools let the model explore and modify your local codebase.
 - **[File search](./file-system.md#glob-findfiles) (`glob`):** Finds files
   matching a glob pattern.
 - **[Text search](./file-system.md#grep_search-searchtext) (`grep_search`):**
-  Searches for text within files using grep or ripgrep.
+  Searches for text within files using grep or a JavaScript-based search.
 - **[Text replacement](./file-system.md#replace-edit) (`replace`):** Performs
   precise edits within a file.
 
