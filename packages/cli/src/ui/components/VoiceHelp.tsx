@@ -57,7 +57,8 @@ export const VoiceHelp: React.FC = () => (
         Ctrl+Space
       </Text>
       {' - Start/stop recording'}
-    </Text>    <Text color={theme.text.primary}>
+    </Text>
+    <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
         Esc
       </Text>

@@ -58,5 +58,6 @@ export const VoiceStatus: React.FC<Props> = ({ item }) => (
         /voice help
       </Text>
       {' for all commands'}
-    </Text>  </Box>
+    </Text>
+  </Box>
 );
