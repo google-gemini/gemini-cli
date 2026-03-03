@@ -3,7 +3,6 @@
 exports[`<ToolMessage /> > JSON rendering > renders pretty JSON in ink frame 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │
-│                                                                              │
 │ {                                                                            │
 │   "a": 1,                                                                    │
 │   "b": 2                                                                     │
@@ -14,7 +13,6 @@ exports[`<ToolMessage /> > JSON rendering > renders pretty JSON in ink frame 1`]
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows ? for Confirming status 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ?  test-tool A tool for testing                                              │
-│                                                                              │
 │ Test result                                                                  │
 "
 `;
@@ -22,7 +20,6 @@ exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows ? for Confirmin
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows - for Canceled status 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ -  test-tool A tool for testing                                              │
-│                                                                              │
 │ Test result                                                                  │
 "
 `;
@@ -30,7 +27,6 @@ exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows - for Canceled 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows MockRespondingSpinner for Executing status when streamingState is Responding 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ MockRespondingSpinnertest-tool A tool for testing                            │
-│                                                                              │
 │ Test result                                                                  │
 "
 `;
@@ -38,7 +34,6 @@ exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows MockRespondingS
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows o for Pending status 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ o  test-tool A tool for testing                                              │
-│                                                                              │
 │ Test result                                                                  │
 "
 `;
@@ -46,7 +41,6 @@ exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows o for Pending s
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows paused spinner for Executing status when streamingState is Idle 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ MockRespondingSpinnertest-tool A tool for testing                            │
-│                                                                              │
 │ Test result                                                                  │
 "
 `;
@@ -54,7 +48,6 @@ exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows paused spinner 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows paused spinner for Executing status when streamingState is WaitingForConfirmation 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ MockRespondingSpinnertest-tool A tool for testing                            │
-│                                                                              │
 │ Test result                                                                  │
 "
 `;
@@ -62,7 +55,6 @@ exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows paused spinner 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows x for Error status 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ x  test-tool A tool for testing                                              │
-│                                                                              │
 │ Test result                                                                  │
 "
 `;
@@ -70,7 +62,6 @@ exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows x for Error sta
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows ✓ for Success status 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │
-│                                                                              │
 │ Test result                                                                  │
 "
 `;
@@ -78,7 +69,6 @@ exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows ✓ for Success
 exports[`<ToolMessage /> > renders AnsiOutputText for AnsiOutput results 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │
-│                                                                              │
 │ hello                                                                        │
 "
 `;
@@ -86,7 +76,6 @@ exports[`<ToolMessage /> > renders AnsiOutputText for AnsiOutput results 1`] = `
 exports[`<ToolMessage /> > renders DiffRenderer for diff results 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │
-│                                                                              │
 │ 1 - old                                                                      │
 │ 1 + new                                                                      │
 "
@@ -95,7 +84,6 @@ exports[`<ToolMessage /> > renders DiffRenderer for diff results 1`] = `
 exports[`<ToolMessage /> > renders McpProgressIndicator with percentage and message for executing tools 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ MockRespondingSpinnertest-tool A tool for testing                            │
-│                                                                              │
 │ ████████░░░░░░░░░░░░ 42%                                                     │
 │ Working on it...                                                             │
 │ Test result                                                                  │
@@ -105,7 +93,6 @@ exports[`<ToolMessage /> > renders McpProgressIndicator with percentage and mess
 exports[`<ToolMessage /> > renders basic tool information 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │
-│                                                                              │
 │ Test result                                                                  │
 "
 `;
@@ -113,7 +100,6 @@ exports[`<ToolMessage /> > renders basic tool information 1`] = `
 exports[`<ToolMessage /> > renders emphasis correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                            ← │
-│                                                                              │
 │ Test result                                                                  │
 "
 `;
@@ -121,7 +107,6 @@ exports[`<ToolMessage /> > renders emphasis correctly 1`] = `
 exports[`<ToolMessage /> > renders emphasis correctly 2`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │
-│                                                                              │
 │ Test result                                                                  │
 "
 `;
@@ -129,7 +114,6 @@ exports[`<ToolMessage /> > renders emphasis correctly 2`] = `
 exports[`<ToolMessage /> > renders indeterminate progress when total is missing 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ MockRespondingSpinnertest-tool A tool for testing                            │
-│                                                                              │
 │ ███████░░░░░░░░░░░░░ 7                                                       │
 │ Test result                                                                  │
 "
@@ -138,7 +122,6 @@ exports[`<ToolMessage /> > renders indeterminate progress when total is missing 
 exports[`<ToolMessage /> > renders only percentage when progressMessage is missing 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ MockRespondingSpinnertest-tool A tool for testing                            │
-│                                                                              │
 │ ███████████████░░░░░ 75%                                                     │
 │ Test result                                                                  │
 "

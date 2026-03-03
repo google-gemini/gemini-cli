@@ -27,7 +27,8 @@ import { useUIState } from '../../contexts/UIStateContext.js';
 import { type Config } from '@google/gemini-cli-core';
 import { calculateShellMaxLines } from '../../utils/toolLayoutUtils.js';
 
-export interface ShellToolMessageProps extends ToolMessageProps {
+export interface ShellToolMessageProps
+  extends Omit<ToolMessageProps, 'renderOutputAsMarkdown'> {
   config?: Config;
   isExpandable?: boolean;
 }
@@ -46,8 +47,6 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   terminalWidth,
 
   emphasis = 'medium',
-
-  renderOutputAsMarkdown = true,
 
   ptyId,
 
@@ -124,6 +123,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         borderColor={borderColor}
         borderDimColor={borderDimColor}
         containerRef={headerRef}
+        showSeparator={false}
       >
         <ToolStatusIndicator status={status} name={name} />
 
@@ -160,7 +160,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           resultDisplay={resultDisplay}
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
-          renderOutputAsMarkdown={renderOutputAsMarkdown}
+          renderOutputAsMarkdown={false}
           hasFocus={isThisShellFocused}
           maxLines={calculateShellMaxLines({
             status,

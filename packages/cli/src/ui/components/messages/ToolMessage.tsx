@@ -87,6 +87,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         isFirst={isFirst}
         borderColor={borderColor}
         borderDimColor={borderDimColor}
+        showSeparator={false}
       >
         <ToolStatusIndicator status={status} name={name} />
         <ToolInfo

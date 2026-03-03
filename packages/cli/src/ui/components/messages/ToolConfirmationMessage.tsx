@@ -663,11 +663,7 @@ export const ToolConfirmationMessage: React.FC<
   }
 
   return (
-    <Box
-      flexDirection="column"
-      paddingTop={0}
-      paddingBottom={handlesOwnUI ? 0 : 1}
-    >
+    <Box flexDirection="column" paddingTop={0} paddingBottom={0}>
       {handlesOwnUI ? (
         bodyContent
       ) : (
@@ -688,7 +684,7 @@ export const ToolConfirmationMessage: React.FC<
             </Box>
           )}
 
-          <Box marginBottom={1} flexShrink={0}>
+          <Box marginBottom={question ? 1 : 0} flexShrink={0}>
             <Text color={theme.text.primary}>{question}</Text>
           </Box>
 
