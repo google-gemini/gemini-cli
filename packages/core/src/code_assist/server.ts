@@ -506,6 +506,16 @@ export class CodeAssistServer implements ContentGenerator {
 }
 
 interface VpcScErrorResponse {
+  response?: {
+    data?: {
+      error?: {
+        details?: unknown[];
+      };
+    };
+  };
+}
+
+function isVpcScErrorResponse(error: unknown): error is VpcScErrorResponse & {
   response: {
     data: {
       error: {
@@ -513,9 +523,7 @@ interface VpcScErrorResponse {
       };
     };
   };
-}
-
-function isVpcScErrorResponse(error: unknown): error is VpcScErrorResponse {
+} {
   return (
     !!error &&
     typeof error === 'object' &&

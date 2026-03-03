@@ -260,8 +260,10 @@ export function isValidToolName(
       return !!options.allowWildcards;
     }
 
-    // Basic slug validation for server and tool names
-    const slugRegex = /^[a-z0-9-_]+$/i;
+    // Basic slug validation for server and tool names.
+    // We allow dots (.) and colons (:) as they are valid in function names and
+    // used for truncation markers.
+    const slugRegex = /^[a-z0-9_.:-]+$/i;
     return slugRegex.test(server) && slugRegex.test(tool);
   }
 

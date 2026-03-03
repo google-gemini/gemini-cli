@@ -31,6 +31,7 @@ import {
   MessageBusType,
   type SerializableConfirmationDetails,
 } from '../confirmation-bus/types.js';
+import { isToolCallResponseInfo } from '../utils/tool-utils.js';
 
 /**
  * Handler for terminal tool calls.
@@ -128,7 +129,7 @@ export class SchedulerStateManager {
   updateStatus(
     callId: string,
     status: CoreToolCallStatus.Cancelled,
-    data: string,
+    data: string | ToolCallResponseInfo,
   ): void;
   updateStatus(
     callId: string,
@@ -265,7 +266,7 @@ export class SchedulerStateManager {
   ): ToolCall {
     switch (newStatus) {
       case CoreToolCallStatus.Success: {
-        if (!this.isToolCallResponseInfo(auxiliaryData)) {
+        if (!isToolCallResponseInfo(auxiliaryData)) {
           throw new Error(
             `Invalid data for 'success' transition (callId: ${call.request.callId})`,
           );
@@ -273,7 +274,7 @@ export class SchedulerStateManager {
         return this.toSuccess(call, auxiliaryData);
       }
       case CoreToolCallStatus.Error: {
-        if (!this.isToolCallResponseInfo(auxiliaryData)) {
+        if (!isToolCallResponseInfo(auxiliaryData)) {
           throw new Error(
             `Invalid data for 'error' transition (callId: ${call.request.callId})`,
           );
@@ -291,9 +292,12 @@ export class SchedulerStateManager {
       case CoreToolCallStatus.Scheduled:
         return this.toScheduled(call);
       case CoreToolCallStatus.Cancelled: {
-        if (typeof auxiliaryData !== 'string') {
+        if (
+          typeof auxiliaryData !== 'string' &&
+          !isToolCallResponseInfo(auxiliaryData)
+        ) {
           throw new Error(
-            `Invalid reason (string) for 'cancelled' transition (callId: ${call.request.callId})`,
+            `Invalid reason (string) or response for 'cancelled' transition (callId: ${call.request.callId})`,
           );
         }
         return this.toCancelled(call, auxiliaryData);
@@ -316,15 +320,6 @@ export class SchedulerStateManager {
         return exhaustiveCheck;
       }
     }
-  }
-
-  private isToolCallResponseInfo(data: unknown): data is ToolCallResponseInfo {
-    return (
-      typeof data === 'object' &&
-      data !== null &&
-      'callId' in data &&
-      'responseParts' in data
-    );
   }
 
   private isExecutingToolCallPatch(
@@ -452,7 +447,10 @@ export class SchedulerStateManager {
     };
   }
 
-  private toCancelled(call: ToolCall, reason: string): CancelledToolCall {
+  private toCancelled(
+    call: ToolCall,
+    reason: string | ToolCallResponseInfo,
+  ): CancelledToolCall {
     this.validateHasToolAndInvocation(call, CoreToolCallStatus.Cancelled);
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
@@ -477,6 +475,20 @@ export class SchedulerStateManager {
           newContent: details.newContent,
         };
       }
+    }
+
+    if (isToolCallResponseInfo(reason)) {
+      return {
+        request: call.request,
+        tool: call.tool,
+        invocation: call.invocation,
+        status: CoreToolCallStatus.Cancelled,
+        response: reason,
+        durationMs: startTime ? Date.now() - startTime : undefined,
+        outcome: call.outcome,
+        schedulerId: call.schedulerId,
+        approvalMode: call.approvalMode,
+      };
     }
 
     const errorMessage = `[Operation Cancelled] Reason: ${reason}`;
