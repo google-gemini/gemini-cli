@@ -178,6 +178,86 @@ describe('tokenCalculation', () => {
       // PDF estimate: 25800 tokens (~100 pages at 258 tokens/page)
       expect(count).toBe(25800);
     });
+
+    it('should estimate audio tokens from inline data size in fallback', async () => {
+      vi.mocked(mockContentGenerator.countTokens).mockRejectedValue(
+        new Error('API error'),
+      );
+      // Simulate ~10s of 32kbps audio: 10 * 32000 / 8 = 40000 raw bytes
+      // base64 size ≈ 40000 / 0.75 ≈ 53333 chars
+      const audioBase64 = 'A'.repeat(53333);
+      const request = [
+        { inlineData: { mimeType: 'audio/mp3', data: audioBase64 } },
+      ];
+
+      const count = await calculateRequestTokenCount(
+        request,
+        mockContentGenerator,
+        model,
+      );
+
+      // ~10s * 32 tokens/s = 320 tokens
+      expect(count).toBeGreaterThanOrEqual(310);
+      expect(count).toBeLessThanOrEqual(330);
+    });
+
+    it('should use fixed audio estimate when inline data is absent in fallback', async () => {
+      vi.mocked(mockContentGenerator.countTokens).mockRejectedValue(
+        new Error('API error'),
+      );
+      const request = [
+        { fileData: { mimeType: 'audio/wav', fileUri: 'gs://bucket/file' } },
+      ];
+
+      const count = await calculateRequestTokenCount(
+        request,
+        mockContentGenerator,
+        model,
+      );
+
+      // Fixed audio fallback: 1000 tokens
+      expect(count).toBe(1000);
+    });
+
+    it('should estimate video tokens from inline data size in fallback', async () => {
+      vi.mocked(mockContentGenerator.countTokens).mockRejectedValue(
+        new Error('API error'),
+      );
+      // Simulate ~5s of 1Mbps video: 5 * 1_000_000 / 8 = 625000 raw bytes
+      // base64 size ≈ 625000 / 0.75 ≈ 833333 chars
+      const videoBase64 = 'A'.repeat(833333);
+      const request = [
+        { inlineData: { mimeType: 'video/mp4', data: videoBase64 } },
+      ];
+
+      const count = await calculateRequestTokenCount(
+        request,
+        mockContentGenerator,
+        model,
+      );
+
+      // ~5s * 258 tokens/s = 1290 tokens
+      expect(count).toBeGreaterThanOrEqual(1280);
+      expect(count).toBeLessThanOrEqual(1300);
+    });
+
+    it('should use fixed video estimate when inline data is absent in fallback', async () => {
+      vi.mocked(mockContentGenerator.countTokens).mockRejectedValue(
+        new Error('API error'),
+      );
+      const request = [
+        { fileData: { mimeType: 'video/webm', fileUri: 'gs://bucket/clip' } },
+      ];
+
+      const count = await calculateRequestTokenCount(
+        request,
+        mockContentGenerator,
+        model,
+      );
+
+      // Fixed video fallback: 5160 tokens (~20s clip)
+      expect(count).toBe(5160);
+    });
   });
 
   describe('estimateTokenCountSync', () => {
