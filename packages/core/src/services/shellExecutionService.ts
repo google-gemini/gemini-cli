@@ -541,6 +541,47 @@ export class ShellExecutionService {
     }
   }
 
+  /**
+   * Destroys a PTY process to release its file descriptors.
+   * This is critical to prevent system-wide PTY exhaustion (see #15945).
+   */
+  private static destroyPtyProcess(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ptyProcess: any,
+  ): void {
+    try {
+      if (typeof ptyProcess?.destroy === 'function') {
+         
+        ptyProcess.destroy();
+      } else if (typeof ptyProcess?.kill === 'function') {
+        // Fallback: if destroy() is unavailable, kill() may still close FDs
+         
+        ptyProcess.kill();
+      }
+    } catch {
+      // Ignore errors during PTY cleanup — process may already be dead
+    }
+  }
+
+  /**
+   * Cleans up all resources associated with a PTY entry:
+   * the PTY process (file descriptors) and the headless terminal (memory buffers).
+   */
+  private static cleanupPtyEntry(pid: number): void {
+    const entry = this.activePtys.get(pid);
+    if (!entry) return;
+
+    this.destroyPtyProcess(entry.ptyProcess);
+
+    try {
+      entry.headlessTerminal.dispose();
+    } catch {
+      // Ignore errors during terminal cleanup
+    }
+
+    this.activePtys.delete(pid);
+  }
+
   private static async executeWithPty(
     commandToExecute: string,
     cwd: string,
@@ -553,6 +594,12 @@ export class ShellExecutionService {
       // This should not happen, but as a safeguard...
       throw new Error('PTY implementation not found');
     }
+
+    // Declared outside try block so the catch block can clean up if spawn
+    // succeeds but a later step (e.g. Terminal construction) throws.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let ptyProcess: any = null;
+
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
@@ -569,7 +616,7 @@ export class ShellExecutionService {
       const args = [...argsPrefix, guardedCommand];
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const ptyProcess = ptyInfo.module.spawn(executable, args, {
+      ptyProcess = ptyInfo.module.spawn(executable, args, {
         cwd,
         name: 'xterm-256color',
         cols,
@@ -791,14 +838,11 @@ export class ShellExecutionService {
           ({ exitCode, signal }: { exitCode: number; signal?: number }) => {
             exited = true;
             abortSignal.removeEventListener('abort', abortHandler);
-            this.activePtys.delete(ptyProcess.pid);
-            // Attempt to destroy the PTY to ensure FD is closed
-            try {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-              (ptyProcess as IPty & { destroy?: () => void }).destroy?.();
-            } catch {
-              // Ignore errors during cleanup
-            }
+
+            // Immediately destroy the PTY to release its master FD.
+            // The headless terminal is kept alive until finalize() extracts
+            // its buffer contents, then disposed to free memory.
+            ShellExecutionService.destroyPtyProcess(ptyProcess);
 
             const finalize = () => {
               render(true);
@@ -812,7 +856,6 @@ export class ShellExecutionService {
                 5 * 60 * 1000,
               ).unref();
 
-              this.activePtys.delete(ptyProcess.pid);
               this.activeResolvers.delete(ptyProcess.pid);
 
               const event: ShellOutputEvent = {
@@ -825,10 +868,20 @@ export class ShellExecutionService {
               this.activeListeners.delete(ptyProcess.pid);
 
               const finalBuffer = Buffer.concat(outputChunks);
+              const finalOutput = getFullBufferText(headlessTerminal);
+
+              // Dispose the headless terminal to free scrollback buffers.
+              // This must happen after getFullBufferText() extracts the output.
+              try {
+                headlessTerminal.dispose();
+              } catch {
+                // Ignore errors during terminal cleanup
+              }
+              this.activePtys.delete(ptyProcess.pid);
 
               resolve({
                 rawOutput: finalBuffer,
-                output: getFullBufferText(headlessTerminal),
+                output: finalOutput,
                 exitCode,
                 signal: signal ?? null,
                 error,
@@ -881,6 +934,13 @@ export class ShellExecutionService {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       return { pid: ptyProcess.pid, result };
     } catch (e) {
+      // Clean up PTY file descriptors if spawn succeeded but a later step
+      // (e.g. Terminal construction) threw. Without this, the master FD
+      // opened by node-pty leaks and accumulates over time (#15945).
+      if (ptyProcess) {
+        ShellExecutionService.destroyPtyProcess(ptyProcess);
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
       if (error.message.includes('posix_spawnp failed')) {
@@ -1009,7 +1069,8 @@ export class ShellExecutionService {
       this.activeChildProcesses.delete(pid);
     } else if (activePty) {
       killProcessGroup({ pid, pty: activePty.ptyProcess }).catch(() => {});
-      this.activePtys.delete(pid);
+      // Destroy PTY process and dispose terminal to release FDs and memory
+      this.cleanupPtyEntry(pid);
     }
 
     this.activeResolvers.delete(pid);
