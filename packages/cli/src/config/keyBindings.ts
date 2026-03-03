@@ -489,7 +489,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUBMIT]: 'Submit the current prompt.',
   [Command.NEWLINE]: 'Insert a newline without submitting.',
   [Command.OPEN_EXTERNAL_EDITOR]:
-    'Open the current prompt in an external editor.',
+    'Open the current prompt or the plan in an external editor.',
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
 
   // App Controls

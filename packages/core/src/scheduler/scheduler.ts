@@ -29,6 +29,7 @@ import { PolicyDecision } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
+  Kind,
 } from '../tools/tools.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
@@ -46,6 +47,7 @@ import {
   CoreEvent,
   type McpProgressPayload,
 } from '../utils/events.js';
+import { GeminiCliOperation } from '../telemetry/constants.js';
 
 interface SchedulerQueueItem {
   requests: ToolCallRequestInfo[];
@@ -131,13 +133,27 @@ export class Scheduler {
   }
 
   private readonly handleMcpProgress = (payload: McpProgressPayload) => {
-    const callId = payload.callId;
+    const { callId } = payload;
+
+    const call = this.state.getToolCall(callId);
+    if (!call || call.status !== CoreToolCallStatus.Executing) {
+      return;
+    }
+
+    const validTotal =
+      payload.total !== undefined &&
+      Number.isFinite(payload.total) &&
+      payload.total > 0
+        ? payload.total
+        : undefined;
+
     this.state.updateStatus(callId, CoreToolCallStatus.Executing, {
       progressMessage: payload.message,
-      progressPercent:
-        payload.total && payload.total > 0
-          ? (payload.progress / payload.total) * 100
-          : undefined,
+      progressPercent: validTotal
+        ? Math.min(100, (payload.progress / validTotal) * 100)
+        : undefined,
+      progress: payload.progress,
+      progressTotal: validTotal,
     });
   };
 
@@ -172,16 +188,22 @@ export class Scheduler {
     signal: AbortSignal,
   ): Promise<CompletedToolCall[]> {
     return runInDevTraceSpan(
-      { name: 'schedule' },
+      { operation: GeminiCliOperation.ScheduleToolCalls },
       async ({ metadata: spanMetadata }) => {
         const requests = Array.isArray(request) ? request : [request];
+
         spanMetadata.input = requests;
 
+        let toolCallResponse: CompletedToolCall[] = [];
+
         if (this.isProcessing || this.state.isActive) {
-          return this._enqueueRequest(requests, signal);
+          toolCallResponse = await this._enqueueRequest(requests, signal);
+        } else {
+          toolCallResponse = await this._startBatch(requests, signal);
         }
 
-        return this._startBatch(requests, signal);
+        spanMetadata.output = toolCallResponse;
+        return toolCallResponse;
       },
     );
   }
@@ -406,11 +428,11 @@ export class Scheduler {
         return true;
       }
 
-      // If the first tool is read-only, batch all contiguous read-only tools.
-      if (next.tool?.isReadOnly) {
+      // If the first tool is parallelizable, batch all contiguous parallelizable tools.
+      if (this._isParallelizable(next.tool)) {
         while (this.state.queueLength > 0) {
           const peeked = this.state.peekQueue();
-          if (peeked && peeked.tool?.isReadOnly) {
+          if (peeked && this._isParallelizable(peeked.tool)) {
             this.state.dequeue();
           } else {
             break;
@@ -493,6 +515,11 @@ export class Scheduler {
     // If we are here, we have active calls (likely Validating or Scheduled) but none progressed.
     // This is a stuck state.
     return false;
+  }
+
+  private _isParallelizable(tool?: AnyDeclarativeTool): boolean {
+    if (!tool) return false;
+    return tool.isReadOnly || tool.kind === Kind.Agent;
   }
 
   private async _processValidatingCall(
