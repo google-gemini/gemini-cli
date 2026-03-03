@@ -94,7 +94,14 @@
           { "label": "Agent Skills", "slug": "docs/cli/skills" },
           { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
           { "label": "Headless mode", "slug": "docs/cli/headless" },
-          { "label": "Hooks", "slug": "docs/hooks" },
+          {
+            "label": "Hooks",
+            "collapsed": true,
+            "items": [
+              { "label": "Overview", "slug": "docs/hooks" },
+              { "label": "Reference", "slug": "docs/hooks/reference" }
+            ]
+          },
           { "label": "IDE integration", "slug": "docs/ide-integration" },
           { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
           { "label": "Model routing", "slug": "docs/cli/model-routing" },
