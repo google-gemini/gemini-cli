@@ -364,5 +364,26 @@ describe('LocalSubagentInvocation', () => {
         'Operation cancelled by user',
       );
     });
+
+    it('should start the executor in the background when is_background is true', async () => {
+      const backgroundInvocation = new LocalSubagentInvocation(
+        testDefinition,
+        mockConfig,
+        { ...params, is_background: true },
+        mockMessageBus,
+      );
+
+      const result = await backgroundInvocation.execute(signal, updateOutput);
+
+      expect(result.backgrounded).toBe(true);
+      expect(result.llmContent).toEqual([
+        { text: expect.stringContaining('started in background') },
+      ]);
+      expect(result.data).toHaveProperty('agentId');
+      expect(result.data?.['agentName']).toBe('MockAgent');
+
+      // Executor run should have been called in the background
+      expect(mockExecutorInstance.run).toHaveBeenCalled();
+    });
   });
 });

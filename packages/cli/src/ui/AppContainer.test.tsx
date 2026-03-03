@@ -328,6 +328,12 @@ describe('AppContainer State Management', () => {
     backgroundShells: new Map(),
     registerBackgroundShell: vi.fn(),
     dismissBackgroundShell: vi.fn(),
+    retryStatus: null,
+    backgroundAgentCount: 0,
+    isBackgroundAgentVisible: false,
+    toggleBackgroundAgent: vi.fn(),
+    backgroundAgents: new Map(),
+    dismissBackgroundAgent: vi.fn(),
   };
 
   beforeEach(() => {

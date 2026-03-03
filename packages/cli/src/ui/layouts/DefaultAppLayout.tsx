@@ -16,6 +16,7 @@ import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
 import { BackgroundShellDisplay } from '../components/BackgroundShellDisplay.js';
+import { BackgroundAgentDisplay } from '../components/BackgroundAgentDisplay.js';
 import { StreamingState } from '../types.js';
 
 export const DefaultAppLayout: React.FC = () => {
@@ -56,6 +57,25 @@ export const DefaultAppLayout: React.FC = () => {
                 uiState.embeddedShellFocused && !uiState.dialogsVisible
               }
               isListOpenProp={uiState.isBackgroundShellListOpen}
+            />
+          </Box>
+        )}
+
+      {uiState.isBackgroundAgentVisible &&
+        uiState.backgroundAgents.size > 0 &&
+        uiState.activeBackgroundAgentId &&
+        uiState.backgroundAgentHeight > 0 &&
+        uiState.streamingState !== StreamingState.WaitingForConfirmation && (
+          <Box height={uiState.backgroundAgentHeight} flexShrink={0}>
+            <BackgroundAgentDisplay
+              agents={uiState.backgroundAgents}
+              activeId={uiState.activeBackgroundAgentId}
+              width={uiState.terminalWidth}
+              height={uiState.backgroundAgentHeight}
+              isFocused={
+                uiState.embeddedShellFocused && !uiState.dialogsVisible
+              }
+              isListOpenProp={uiState.isBackgroundAgentListOpen}
             />
           </Box>
         )}

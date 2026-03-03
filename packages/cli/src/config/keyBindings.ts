@@ -76,6 +76,7 @@ export enum Command {
   BACKGROUND_SHELL_SELECT = 'backgroundShellSelect',
   TOGGLE_BACKGROUND_SHELL = 'toggleBackgroundShell',
   TOGGLE_BACKGROUND_SHELL_LIST = 'toggleBackgroundShellList',
+  TOGGLE_BACKGROUND_AGENT = 'toggleBackgroundAgent',
   KILL_BACKGROUND_SHELL = 'backgroundShell.kill',
   UNFOCUS_BACKGROUND_SHELL = 'backgroundShell.unfocus',
   UNFOCUS_BACKGROUND_SHELL_LIST = 'backgroundShell.listUnfocus',
@@ -281,6 +282,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.CYCLE_APPROVAL_MODE]: [{ key: 'tab', shift: true }],
   [Command.TOGGLE_BACKGROUND_SHELL]: [{ key: 'b', ctrl: true }],
   [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [{ key: 'l', ctrl: true }],
+  [Command.TOGGLE_BACKGROUND_AGENT]: [{ key: 'a', ctrl: true }],
   [Command.KILL_BACKGROUND_SHELL]: [{ key: 'k', ctrl: true }],
   [Command.UNFOCUS_BACKGROUND_SHELL]: [{ key: 'tab', shift: true }],
   [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: [{ key: 'tab', shift: false }],
@@ -405,6 +407,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.EXPAND_PASTE,
       Command.TOGGLE_BACKGROUND_SHELL,
       Command.TOGGLE_BACKGROUND_SHELL_LIST,
+      Command.TOGGLE_BACKGROUND_AGENT,
       Command.KILL_BACKGROUND_SHELL,
       Command.BACKGROUND_SHELL_SELECT,
       Command.BACKGROUND_SHELL_ESCAPE,
@@ -511,6 +514,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.TOGGLE_BACKGROUND_SHELL]:
     'Toggle current background shell visibility.',
   [Command.TOGGLE_BACKGROUND_SHELL_LIST]: 'Toggle background shell list.',
+  [Command.TOGGLE_BACKGROUND_AGENT]:
+    'Toggle current background agent visibility.',
   [Command.KILL_BACKGROUND_SHELL]: 'Kill the active background shell.',
   [Command.UNFOCUS_BACKGROUND_SHELL]:
     'Move focus from background shell to Gemini.',

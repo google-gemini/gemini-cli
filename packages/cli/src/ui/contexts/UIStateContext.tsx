@@ -30,6 +30,7 @@ import type {
   AgentDefinition,
   FolderDiscoveryResults,
   PolicyUpdateConfirmationRequest,
+  BackgroundAgent,
 } from '@google/gemini-cli-core';
 import { type TransientMessageType } from '../../utils/events.js';
 import type { DOMElement } from 'ink';
@@ -218,6 +219,12 @@ export interface UIState {
   activeBackgroundShellPid: number | null;
   backgroundShellHeight: number;
   isBackgroundShellListOpen: boolean;
+  backgroundAgents: Map<string, BackgroundAgent>;
+  activeBackgroundAgentId: string | null;
+  backgroundAgentHeight: number;
+  isBackgroundAgentListOpen: boolean;
+  isBackgroundAgentVisible: boolean;
+  backgroundAgentCount: number;
   adminSettingsChanged: boolean;
   newAgents: AgentDefinition[] | null;
   showIsExpandableHint: boolean;

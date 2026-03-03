@@ -23,7 +23,10 @@ import {
 } from '../../tools/tools.js';
 import { ToolErrorType } from '../../tools/tool-error.js';
 import type { AgentInputs, SubagentActivityEvent } from '../types.js';
+import { AgentTerminateMode } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
+import { randomUUID } from 'node:crypto';
+import { BackgroundAgentService } from '../../services/backgroundAgentService.js';
 import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
@@ -64,13 +67,14 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
    */
   getDescription(): string {
     const inputSummary = Object.entries(this.params)
-      .map(
-        ([key, value]) =>
-          `${key}: ${String(value).slice(0, INPUT_PREVIEW_MAX_LENGTH)}`,
-      )
+      .map(([key, value]) => {
+        if (key === 'is_background') return '';
+        return `${key}: ${String(value).slice(0, INPUT_PREVIEW_MAX_LENGTH)}`;
+      })
+      .filter(Boolean)
       .join(', ');
 
-    const description = `Running browser agent with inputs: { ${inputSummary} }`;
+    const description = `Running browser agent with inputs: { ${inputSummary} }${this.params['is_background'] ? ' [background]' : ''}`;
     return description.slice(0, DESCRIPTION_MAX_LENGTH);
   }
 
@@ -87,6 +91,100 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
+    if (this.params['is_background']) {
+      const backgroundAgentId = randomUUID();
+      const backgroundAgentService = BackgroundAgentService.getInstance();
+
+      const backgroundRun = async () => {
+        let browserManager;
+        try {
+          const result = await createBrowserAgentDefinition(
+            this.config,
+            this.messageBus,
+          );
+          const { definition } = result;
+          browserManager = result.browserManager;
+
+          const onActivity = (activity: SubagentActivityEvent): void => {
+            if (
+              activity.type === 'THOUGHT_CHUNK' &&
+              typeof activity.data['text'] === 'string'
+            ) {
+              backgroundAgentService.updateAgentProgress(backgroundAgentId, {
+                isSubagentProgress: true,
+                agentName: 'browser_agent',
+                recentActivity: [
+                  {
+                    id: randomUUID(),
+                    type: 'thought',
+                    content: activity.data['text'],
+                    status: 'running',
+                  },
+                ],
+                state: 'running',
+              });
+            }
+          };
+
+          const executor = await LocalAgentExecutor.create(
+            definition,
+            this.config,
+            onActivity,
+          );
+
+          const output = await executor.run(this.params, signal);
+          backgroundAgentService.updateAgentProgress(backgroundAgentId, {
+            isSubagentProgress: true,
+            agentName: 'browser_agent',
+            recentActivity: [],
+            state:
+              output.terminate_reason === AgentTerminateMode.GOAL
+                ? 'completed'
+                : output.terminate_reason === AgentTerminateMode.ABORTED
+                  ? 'cancelled'
+                  : 'error',
+          });
+        } catch (_error) {
+          backgroundAgentService.updateAgentProgress(backgroundAgentId, {
+            isSubagentProgress: true,
+            agentName: 'browser_agent',
+            recentActivity: [],
+            state: 'error',
+          });
+        } finally {
+          if (browserManager) {
+            await cleanupBrowserAgent(browserManager);
+          }
+        }
+      };
+
+      backgroundAgentService.registerAgent({
+        id: backgroundAgentId,
+        name: 'browser_agent',
+        displayName: 'Browser Agent',
+        command: this.getDescription(),
+        output: {
+          isSubagentProgress: true,
+          agentName: 'browser_agent',
+          recentActivity: [],
+          state: 'running',
+        },
+      });
+
+      void backgroundRun();
+
+      const msg = `Browser agent started in background (ID: ${backgroundAgentId.slice(0, 8)}).`;
+      return {
+        llmContent: [{ text: msg }],
+        returnDisplay: msg,
+        backgrounded: true,
+        data: {
+          agentId: backgroundAgentId,
+          agentName: 'browser_agent',
+        },
+      };
+    }
+
     let browserManager;
 
     try {

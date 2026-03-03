@@ -41,12 +41,43 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
     private readonly config: Config,
     messageBus: MessageBus,
   ) {
+    const originalSchema = definition.inputConfig.inputSchema;
+    const originalProperties =
+      typeof originalSchema === 'object' &&
+      originalSchema !== null &&
+      !Array.isArray(originalSchema) &&
+      'properties' in originalSchema &&
+      typeof originalSchema['properties'] === 'object' &&
+      originalSchema['properties'] !== null
+        ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+          (originalSchema['properties'] as Record<string, any>)
+        : {};
+
+    const augmentedSchema =
+      typeof originalSchema === 'object' &&
+      originalSchema !== null &&
+      !Array.isArray(originalSchema)
+        ? {
+            ...originalSchema,
+            properties: {
+              ...originalProperties,
+              is_background: {
+                type: 'boolean',
+                description:
+                  'Set to true to run the agent in the background. ' +
+                  'The agent will return immediately and you can continue your task.',
+              },
+            },
+          }
+        : originalSchema;
+
     super(
       definition.name,
       definition.displayName ?? definition.name,
       definition.description,
       Kind.Agent,
-      definition.inputConfig.inputSchema,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+      augmentedSchema as any,
       messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,

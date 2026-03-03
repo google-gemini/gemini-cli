@@ -588,6 +588,11 @@ export interface ToolResult {
   data?: Record<string, unknown>;
 
   /**
+   * Whether the tool call was moved to the background.
+   */
+  backgrounded?: boolean;
+
+  /**
    * Optional request to execute another tool immediately after this one.
    * The result of this tail call will replace the original tool's response.
    */

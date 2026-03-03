@@ -80,9 +80,14 @@ export interface UIActions {
   revealCleanUiDetailsTemporarily: (durationMs?: number) => void;
   handleWarning: (message: string) => void;
   setEmbeddedShellFocused: (value: boolean) => void;
+  toggleBackgroundShell: () => void;
+  toggleBackgroundAgent: () => void;
   dismissBackgroundShell: (pid: number) => void;
+  dismissBackgroundAgent: (id: string) => void;
   setActiveBackgroundShellPid: (pid: number) => void;
+  setActiveBackgroundAgentId: (id: string | null) => void;
   setIsBackgroundShellListOpen: (isOpen: boolean) => void;
+  setIsBackgroundAgentListOpen: (isOpen: boolean) => void;
   setAuthContext: (context: { requiresRestart?: boolean }) => void;
   onHintInput: (char: string) => void;
   onHintBackspace: () => void;

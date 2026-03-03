@@ -154,6 +154,7 @@ import { useBanner } from './hooks/useBanner.js';
 import { useTerminalSetupPrompt } from './utils/terminalSetup.js';
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useBackgroundShellManager } from './hooks/useBackgroundShellManager.js';
+import { useBackgroundAgentManager } from './hooks/useBackgroundAgentManager.js';
 import {
   WARNING_PROMPT_DURATION_MS,
   QUEUE_ERROR_DISPLAY_DURATION_MS,
@@ -1108,6 +1109,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
     backgroundShells,
     dismissBackgroundShell,
     retryStatus,
+    backgroundAgentCount,
+    isBackgroundAgentVisible,
+    toggleBackgroundAgent,
+    backgroundAgents,
+    dismissBackgroundAgent,
   } = useGeminiStream(
     config.getGeminiClient(),
     historyManager.history,
@@ -1133,6 +1139,19 @@ Logging in with Google... Restarting Gemini CLI to continue.
   toggleBackgroundShellRef.current = toggleBackgroundShell;
   isBackgroundShellVisibleRef.current = isBackgroundShellVisible;
   backgroundShellsRef.current = backgroundShells;
+
+  const {
+    isBackgroundAgentListOpen,
+    setIsBackgroundAgentListOpen,
+    activeBackgroundAgentId,
+    setActiveBackgroundAgentId,
+    backgroundAgentHeight,
+  } = useBackgroundAgentManager({
+    backgroundAgents,
+    backgroundAgentCount,
+    isBackgroundAgentVisible,
+    terminalHeight,
+  });
 
   const {
     activeBackgroundShellPid,
@@ -1386,7 +1405,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       controlsHeight -
       staticExtraHeight -
       2 -
-      backgroundShellHeight,
+      backgroundShellHeight -
+      backgroundAgentHeight,
   );
 
   config.setShellExecutionConfig({
@@ -1830,6 +1850,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
           }
         }
         return true;
+      } else if (keyMatchers[Command.TOGGLE_BACKGROUND_AGENT](key)) {
+        toggleBackgroundAgent();
+        if (!isBackgroundAgentVisible && backgroundAgents.size > 0) {
+          setEmbeddedShellFocused(true);
+          if (backgroundAgents.size > 1) {
+            setIsBackgroundAgentListOpen(true);
+          }
+        } else {
+          setEmbeddedShellFocused(false);
+        }
+        return true;
       } else if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL_LIST](key)) {
         if (backgroundShells.size > 0 && isBackgroundShellVisible) {
           if (!embeddedShellFocused) {
@@ -1865,6 +1896,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       backgroundShells,
       isBackgroundShellVisible,
       setIsBackgroundShellListOpen,
+      backgroundAgents.size,
+      isBackgroundAgentVisible,
+      setIsBackgroundAgentListOpen,
+      toggleBackgroundAgent,
       lastOutputTimeRef,
       showTransientMessage,
       settings.merged.general.devtools,
@@ -2296,6 +2331,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
       activeBackgroundShellPid,
       backgroundShellHeight,
       isBackgroundShellListOpen,
+      backgroundAgents,
+      activeBackgroundAgentId,
+      backgroundAgentHeight,
+      isBackgroundAgentListOpen,
+      isBackgroundAgentVisible,
+      backgroundAgentCount,
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,
@@ -2424,6 +2465,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isBackgroundShellListOpen,
       activeBackgroundShellPid,
       backgroundShells,
+      backgroundAgents,
+      activeBackgroundAgentId,
+      backgroundAgentHeight,
+      isBackgroundAgentListOpen,
+      isBackgroundAgentVisible,
+      backgroundAgentCount,
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,
@@ -2482,9 +2529,24 @@ Logging in with Google... Restarting Gemini CLI to continue.
       revealCleanUiDetailsTemporarily,
       handleWarning,
       setEmbeddedShellFocused,
+      toggleBackgroundShell: () => {
+        toggleBackgroundShellRef.current();
+        if (!isBackgroundShellVisibleRef.current) {
+          setEmbeddedShellFocused(true);
+          if (backgroundShellsRef.current.size > 1) {
+            setIsBackgroundShellListOpenRef.current(true);
+          } else {
+            setIsBackgroundShellListOpenRef.current(false);
+          }
+        }
+      },
+      toggleBackgroundAgent,
       dismissBackgroundShell,
+      dismissBackgroundAgent,
       setActiveBackgroundShellPid,
+      setActiveBackgroundAgentId,
       setIsBackgroundShellListOpen,
+      setIsBackgroundAgentListOpen,
       setAuthContext,
       onHintInput: () => {},
       onHintBackspace: () => {},
@@ -2574,9 +2636,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
       revealCleanUiDetailsTemporarily,
       handleWarning,
       setEmbeddedShellFocused,
+      toggleBackgroundAgent,
       dismissBackgroundShell,
+      dismissBackgroundAgent,
       setActiveBackgroundShellPid,
+      setActiveBackgroundAgentId,
       setIsBackgroundShellListOpen,
+      setIsBackgroundAgentListOpen,
       setAuthContext,
       setAccountSuspensionInfo,
       newAgents,

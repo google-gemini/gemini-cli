@@ -109,6 +109,7 @@ available combinations.
 | Expand or collapse a paste placeholder when cursor is over placeholder.                                                                            | `Ctrl + O`       |
 | Toggle current background shell visibility.                                                                                                        | `Ctrl + B`       |
 | Toggle background shell list.                                                                                                                      | `Ctrl + L`       |
+| Toggle current background agent visibility.                                                                                                        | `Ctrl + A`       |
 | Kill the active background shell.                                                                                                                  | `Ctrl + K`       |
 | Confirm selection in background shell list.                                                                                                        | `Enter`          |
 | Dismiss background shell list.                                                                                                                     | `Esc`            |

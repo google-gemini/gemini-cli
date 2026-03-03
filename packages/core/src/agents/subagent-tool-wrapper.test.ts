@@ -98,9 +98,20 @@ describe('SubagentToolWrapper', () => {
 
       expect(schema.name).toBe(mockDefinition.name);
       expect(schema.description).toBe(mockDefinition.description);
-      expect(schema.parametersJsonSchema).toEqual(
-        mockDefinition.inputConfig.inputSchema,
-      );
+      expect(schema.parametersJsonSchema).toEqual({
+        ...(mockDefinition.inputConfig.inputSchema as Record<string, unknown>),
+        properties: {
+          ...((
+            mockDefinition.inputConfig.inputSchema as Record<string, unknown>
+          )['properties'] as Record<string, unknown>),
+          is_background: {
+            type: 'boolean',
+            description:
+              'Set to true to run the agent in the background. ' +
+              'The agent will return immediately and you can continue your task.',
+          },
+        },
+      });
     });
   });
 

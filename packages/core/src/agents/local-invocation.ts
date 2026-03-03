@@ -21,6 +21,7 @@ import {
 } from './types.js';
 import { randomUUID } from 'node:crypto';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { BackgroundAgentService } from '../services/backgroundAgentService.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -68,13 +69,14 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
    */
   getDescription(): string {
     const inputSummary = Object.entries(this.params)
-      .map(
-        ([key, value]) =>
-          `${key}: ${String(value).slice(0, INPUT_PREVIEW_MAX_LENGTH)}`,
-      )
+      .map(([key, value]) => {
+        if (key === 'is_background') return '';
+        return `${key}: ${String(value).slice(0, INPUT_PREVIEW_MAX_LENGTH)}`;
+      })
+      .filter(Boolean)
       .join(', ');
 
-    const description = `Running subagent '${this.definition.name}' with inputs: { ${inputSummary} }`;
+    const description = `Running subagent '${this.definition.name}' with inputs: { ${inputSummary} }${this.params['is_background'] ? ' [background]' : ''}`;
     return description.slice(0, DESCRIPTION_MAX_LENGTH);
   }
 
@@ -92,23 +94,9 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
   ): Promise<ToolResult> {
     let recentActivity: SubagentActivityItem[] = [];
 
-    try {
-      if (updateOutput) {
-        // Send initial state
-        const initialProgress: SubagentProgress = {
-          isSubagentProgress: true,
-          agentName: this.definition.name,
-          recentActivity: [],
-          state: 'running',
-        };
-        updateOutput(initialProgress);
-      }
-
-      // Create an activity callback to bridge the executor's events to the
-      // tool's streaming output.
-      const onActivity = (activity: SubagentActivityEvent): void => {
-        if (!updateOutput) return;
-
+    const createActivityHandler =
+      (onUpdate?: (progress: SubagentProgress) => void) =>
+      (activity: SubagentActivityEvent): void => {
         let updated = false;
 
         switch (activity.type) {
@@ -216,9 +204,110 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
             state: 'running',
           };
 
-          updateOutput(progress);
+          if (onUpdate) {
+            onUpdate(progress);
+          }
         }
       };
+
+    try {
+      if (this.params['is_background']) {
+        const backgroundAgentId = randomUUID();
+        const backgroundAgentService = BackgroundAgentService.getInstance();
+
+        const backgroundHandler = createActivityHandler((progress) => {
+          backgroundAgentService.updateAgentProgress(
+            backgroundAgentId,
+            progress,
+          );
+        });
+
+        const executor = await LocalAgentExecutor.create(
+          this.definition,
+          this.config,
+          backgroundHandler,
+        );
+
+        // Start running in background
+        const backgroundRun = async () => {
+          try {
+            const output = await executor.run(this.params, signal);
+            backgroundAgentService.updateAgentProgress(backgroundAgentId, {
+              isSubagentProgress: true,
+              agentName: this.definition.name,
+              recentActivity: [...recentActivity],
+              state:
+                output.terminate_reason === AgentTerminateMode.GOAL
+                  ? 'completed'
+                  : output.terminate_reason === AgentTerminateMode.ABORTED
+                    ? 'cancelled'
+                    : 'error',
+            });
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            backgroundAgentService.updateAgentProgress(backgroundAgentId, {
+              isSubagentProgress: true,
+              agentName: this.definition.name,
+              recentActivity: [
+                ...recentActivity,
+                {
+                  id: randomUUID(),
+                  type: 'thought',
+                  content: `Error: ${errorMessage}`,
+                  status: 'error',
+                },
+              ],
+              state: 'error',
+            });
+          }
+        };
+
+        backgroundAgentService.registerAgent({
+          id: backgroundAgentId,
+          name: this.definition.name,
+          displayName: this.definition.displayName ?? this.definition.name,
+          command: this.getDescription(),
+          output: {
+            isSubagentProgress: true,
+            agentName: this.definition.name,
+            recentActivity: [],
+            state: 'running',
+          },
+        });
+
+        void backgroundRun();
+
+        const msg = `Agent '${this.definition.name}' started in background (ID: ${backgroundAgentId.slice(0, 8)}).`;
+        return {
+          llmContent: [{ text: msg }],
+          returnDisplay: msg,
+          backgrounded: true,
+          data: {
+            agentId: backgroundAgentId,
+            agentName: this.definition.name,
+          },
+        };
+      }
+
+      if (updateOutput) {
+        // Send initial state
+        const initialProgress: SubagentProgress = {
+          isSubagentProgress: true,
+          agentName: this.definition.name,
+          recentActivity: [],
+          state: 'running',
+        };
+        updateOutput(initialProgress);
+      }
+
+      // Create an activity callback to bridge the executor's events to the
+      // tool's streaming output.
+      const onActivity = createActivityHandler((progress) => {
+        if (updateOutput) {
+          updateOutput(progress);
+        }
+      });
 
       const executor = await LocalAgentExecutor.create(
         this.definition,

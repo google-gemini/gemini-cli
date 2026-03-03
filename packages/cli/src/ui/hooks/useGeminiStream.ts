@@ -38,8 +38,11 @@ import {
   generateSteeringAckMessage,
   GeminiCliOperation,
   getPlanModeExitMessage,
+  BackgroundAgentService,
 } from '@google/gemini-cli-core';
 import type {
+  BackgroundAgent,
+  BackgroundAgentEvent,
   Config,
   EditorType,
   GeminiClient,
@@ -612,6 +615,42 @@ export const useGeminiStream = (
     },
     [addItem, config, isLowErrorVerbosity],
   );
+
+  const [backgroundAgents, setBackgroundAgents] = useState<
+    Map<string, BackgroundAgent>
+  >(new Map());
+  const [isBackgroundAgentVisible, setIsBackgroundAgentVisible] =
+    useState(false);
+
+  useEffect(() => {
+    const service = BackgroundAgentService.getInstance();
+    const unsubscribe = service.onEvent((event: BackgroundAgentEvent) => {
+      setBackgroundAgents((prev) => {
+        const next = new Map(prev);
+        if (event.type === 'added') {
+          next.set(event.agent.id, event.agent);
+        } else if (event.type === 'updated') {
+          next.set(event.agent.id, event.agent);
+        } else if (event.type === 'removed') {
+          next.delete(event.id);
+        }
+        return next;
+      });
+    });
+    return unsubscribe;
+  }, []);
+
+  const toggleBackgroundAgent = useCallback(() => {
+    if (backgroundAgents.size > 0) {
+      setIsBackgroundAgentVisible((prev) => !prev);
+    }
+  }, [backgroundAgents.size]);
+
+  const dismissBackgroundAgent = useCallback((id: string) => {
+    BackgroundAgentService.getInstance().removeAgent(id);
+  }, []);
+
+  const backgroundAgentCount = backgroundAgents.size;
 
   const cancelOngoingRequest = useCallback(() => {
     if (
@@ -1909,5 +1948,10 @@ export const useGeminiStream = (
     backgroundShells,
     dismissBackgroundShell,
     retryStatus,
+    backgroundAgentCount,
+    isBackgroundAgentVisible,
+    toggleBackgroundAgent,
+    backgroundAgents,
+    dismissBackgroundAgent,
   };
 };

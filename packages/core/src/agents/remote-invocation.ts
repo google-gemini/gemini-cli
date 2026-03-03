@@ -17,6 +17,8 @@ import type {
   AgentInputs,
 } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { randomUUID } from 'node:crypto';
+import { BackgroundAgentService } from '../services/backgroundAgentService.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { extractIdsFromResponse, A2AResultReassembler } from './a2aUtils.js';
 import { GoogleAuth } from 'google-auth-library';
@@ -105,7 +107,11 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    return `Calling remote agent ${this.definition.displayName ?? this.definition.name}`;
+    const isBackground =
+      'is_background' in this.params && !!this.params['is_background'];
+    return `Calling remote agent ${this.definition.displayName ?? this.definition.name}${
+      isBackground ? ' [background]' : ''
+    }`;
   }
 
   private async getAuthHandler(): Promise<AuthenticationHandler | undefined> {
@@ -144,6 +150,65 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
   }
 
   async execute(
+    _signal: AbortSignal,
+    updateOutput?: (output: string | AnsiOutput) => void,
+  ): Promise<ToolResult> {
+    const isBackground =
+      'is_background' in this.params && !!this.params['is_background'];
+    if (isBackground) {
+      const backgroundAgentId = randomUUID();
+      const backgroundAgentService = BackgroundAgentService.getInstance();
+
+      const backgroundRun = async () => {
+        try {
+          await this.executeInternal(_signal);
+          backgroundAgentService.updateAgentProgress(backgroundAgentId, {
+            isSubagentProgress: true,
+            agentName: this.definition.name,
+            recentActivity: [],
+            state: 'completed',
+          });
+        } catch (_error) {
+          backgroundAgentService.updateAgentProgress(backgroundAgentId, {
+            isSubagentProgress: true,
+            agentName: this.definition.name,
+            recentActivity: [],
+            state: 'error',
+          });
+        }
+      };
+
+      backgroundAgentService.registerAgent({
+        id: backgroundAgentId,
+        name: this.definition.name,
+        displayName: this.definition.displayName ?? this.definition.name,
+        command: this.getDescription(),
+        output: {
+          isSubagentProgress: true,
+          agentName: this.definition.name,
+          recentActivity: [],
+          state: 'running',
+        },
+      });
+
+      void backgroundRun();
+
+      const msg = `Remote agent '${this.definition.name}' started in background (ID: ${backgroundAgentId.slice(0, 8)}).`;
+      return {
+        llmContent: [{ text: msg }],
+        returnDisplay: msg,
+        backgrounded: true,
+        data: {
+          agentId: backgroundAgentId,
+          agentName: this.definition.name,
+        },
+      };
+    }
+
+    return this.executeInternal(_signal, updateOutput);
+  }
+
+  private async executeInternal(
     _signal: AbortSignal,
     updateOutput?: (output: string | AnsiOutput) => void,
   ): Promise<ToolResult> {
