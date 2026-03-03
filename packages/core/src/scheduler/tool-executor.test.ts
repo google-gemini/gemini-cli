@@ -5,7 +5,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import fsPromises from 'node:fs/promises';
 import { ToolExecutor } from './tool-executor.js';
 import {
   type Config,
