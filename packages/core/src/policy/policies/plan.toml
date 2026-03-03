@@ -72,7 +72,16 @@ priority = 70
 modes = ["plan"]
 
 [[rule]]
-toolName = ["glob", "grep_search", "list_directory", "read_file", "google_web_search", "activate_skill"]
+toolName = [
+  "glob",
+  "grep_search",
+  "list_directory",
+  "read_file",
+  "google_web_search",
+  "activate_skill",
+  "codebase_investigator",
+  "cli_help"
+]
 decision = "allow"
 priority = 70
 modes = ["plan"]
