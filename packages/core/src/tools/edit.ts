@@ -922,6 +922,7 @@ export class EditTool
       {
         properties: {
           file_path: {
+            description: 'The path to the file to modify. This should be an absolute path within the project directory.',
             description: 'The path to the file to modify.',
             type: 'string',
           },
