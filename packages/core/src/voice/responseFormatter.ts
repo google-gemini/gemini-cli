@@ -58,9 +58,9 @@ const STACK_FRAME_RE = /^[ \t]+at .+$/gm;
 const UNIX_PATH_RE =
   /(?:^|(?<=\s|[(`"']))(\/(?:[-\w.]+\/)*[-\w.]+)(:\d+(?::\d+)?)?/g;
 
-// Absolute Windows paths  C:\...  or  C:/...
+// Absolute Windows paths  C:\...  or  C:/...  (any drive letter)
 const WIN_PATH_RE =
-  /(?:^|(?<=\s|[(`"']))[A-Za-z]:[/\\]((?:[-\w. ]+[/\\])*[-\w. ]+)(:\d+(?::\d+)?)?/g;
+  /(?:^|(?<=\s|[(`"']))([A-Za-z]:[/\\](?:[-\w. ]+[/\\])*[-\w. ]+)(:\d+(?::\d+)?)?/g;
 
 /**
  * Abbreviates an absolute path to at most `depth` trailing segments,
@@ -160,10 +160,9 @@ export function formatForSpeech(
 
   // 5. Abbreviate absolute paths
   //    Windows paths first to avoid the leading letter being caught by Unix RE
-  out = out.replace(WIN_PATH_RE, (_m, body: string, suffix?: string) => {
-    const full = 'C:\\' + body;
-    return abbreviatePath(full, suffix, pathDepth);
-  });
+  out = out.replace(WIN_PATH_RE, (_m, full: string, suffix?: string) =>
+    abbreviatePath(full, suffix, pathDepth),
+  );
   out = out.replace(UNIX_PATH_RE, (_m, full: string, suffix?: string) =>
     abbreviatePath(full, suffix, pathDepth),
   );

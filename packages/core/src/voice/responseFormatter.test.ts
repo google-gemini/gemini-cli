@@ -172,6 +172,23 @@ describe('formatForSpeech', () => {
       // Only 2 segments — no abbreviation needed
       expect(result).toBe('/src/file.ts');
     });
+
+    it('should abbreviate a Windows path on a non-C drive', () => {
+      const result = formatForSpeech(
+        'D:\\Users\\project\\packages\\core\\src\\file.ts',
+        { pathDepth: 3 },
+      );
+      expect(result).toContain('\u2026/core/src/file.ts');
+      expect(result).not.toContain('D:\\Users\\project');
+    });
+
+    it('should convert :line on a Windows path on a non-C drive', () => {
+      const result = formatForSpeech(
+        'Error at D:\\Users\\project\\src\\tools\\file.ts:55',
+      );
+      expect(result).toContain('line 55');
+      expect(result).not.toContain('D:\\Users\\project');
+    });
   });
 
   describe('stack trace collapsing', () => {
@@ -193,6 +210,21 @@ describe('formatForSpeech', () => {
         'Error: ENOENT\n    at Object.open (/project/src/file.ts:10:5)';
       const result = formatForSpeech(trace);
       expect(result).not.toContain('more frames');
+    });
+
+    it('should preserve surrounding text when collapsing a stack trace', () => {
+      const input = [
+        'Operation failed.',
+        '    at Object.open (/project/src/file.ts:10:5)',
+        '    at Module._load (/project/node_modules/loader.js:20:3)',
+        '    at Function.load (/project/node_modules/loader.js:30:3)',
+        'Please try again.',
+      ].join('\n');
+
+      const result = formatForSpeech(input);
+      expect(result).toContain('Operation failed.');
+      expect(result).toContain('Please try again.');
+      expect(result).toContain('and 2 more frames');
     });
   });
 
