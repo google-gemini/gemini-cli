@@ -28,6 +28,7 @@ implementation. It allows you to:
     - [Example: Enable research subagents in Plan Mode](#example-enable-research-subagents-in-plan-mode)
   - [Custom Plan Directory and Policies](#custom-plan-directory-and-policies)
 - [Automatic Model Routing](#automatic-model-routing)
+- [Cleanup](#cleanup)
 
 ## Enabling Plan Mode
 
@@ -290,6 +291,24 @@ performance. You can disable this automatic switching in your settings:
 }
 ```
 
+## Cleanup
+
+By default, Gemini CLI automatically cleans up old session data, including all
+associated plan files and task trackers.
+
+- **Default behavior:** Sessions (and their plans) are retained for **30 days**.
+- **Configuration:** You can customize this behavior via the `/settings` command
+  (search for **Session Retention**) or in your `settings.json` file. See
+  [session retention] for more details.
+
+Manual deletion also removes all associated artifacts:
+
+- **Command Line:** Use `gemini --delete-session <index|id>`.
+- **Session Browser:** Press `/resume`, navigate to a session, and press `x`.
+
+If you use a [custom plans directory](#custom-plan-directory-and-policies),
+those files are not automatically deleted and must be managed manually.
+
 [`list_directory`]: /docs/tools/file-system.md#1-list_directory-readfolder
 [`read_file`]: /docs/tools/file-system.md#2-read_file-readfile
 [`grep_search`]: /docs/tools/file-system.md#5-grep_search-searchtext
@@ -311,3 +330,4 @@ performance. You can disable this automatic switching in your settings:
 [auto model]: /docs/reference/configuration.md#model-settings
 [model routing]: /docs/cli/telemetry.md#model-routing
 [preferred external editor]: /docs/reference/configuration.md#general
+[session retention]: /docs/cli/session-management.md#session-retention
