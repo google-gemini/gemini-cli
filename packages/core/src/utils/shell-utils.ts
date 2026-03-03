@@ -541,10 +541,27 @@ export function parseCommandDetails(
  * This ensures we can execute command strings predictably and securely across platforms
  * using the `spawn(executable, [...argsPrefix, commandString], { shell: false })` pattern.
  *
+ * On Windows, callers do `spawn(exe, [...argsPrefix, command])`. PowerShell
+ * concatenates all arguments that follow `-Command` with spaces, so the extra
+ * element in `argsPrefix` acts as a script prefix that is prepended to every
+ * command without requiring any changes at call sites.
+ *
  * @returns The ShellConfiguration for the current environment.
  */
 export function getShellConfiguration(): ShellConfiguration {
   if (isWindows()) {
+    // PowerShell 5.1 defaults to the system OEM code page for console output,
+    // which causes Node.js to misinterpret non-ASCII characters. Prepend a
+    // one-liner that forces UTF-8 for both the byte stream sent to the OS
+    // ([Console]::OutputEncoding) and PowerShell's internal pipeline
+    // ($OutputEncoding). Because PowerShell joins all args after -Command with
+    // spaces, this prefix is transparently prepended to every command.
+    const powershellArgsPrefix = [
+      '-NoProfile',
+      '-Command',
+      '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $OutputEncoding = [System.Text.Encoding]::UTF8;',
+    ];
+
     const comSpec = process.env['ComSpec'];
     if (comSpec) {
       const executable = comSpec.toLowerCase();
@@ -554,7 +571,7 @@ export function getShellConfiguration(): ShellConfiguration {
       ) {
         return {
           executable: comSpec,
-          argsPrefix: ['-NoProfile', '-Command'],
+          argsPrefix: powershellArgsPrefix,
           shell: 'powershell',
         };
       }
@@ -563,7 +580,7 @@ export function getShellConfiguration(): ShellConfiguration {
     // Default to PowerShell for all other Windows configurations.
     return {
       executable: 'powershell.exe',
-      argsPrefix: ['-NoProfile', '-Command'],
+      argsPrefix: powershellArgsPrefix,
       shell: 'powershell',
     };
   }
