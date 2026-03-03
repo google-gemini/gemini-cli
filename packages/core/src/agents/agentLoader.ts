@@ -44,7 +44,7 @@ interface FrontmatterLocalAgentDefinition
  * Authentication configuration for remote agents in frontmatter format.
  */
 interface FrontmatterAuthConfig {
-  type: 'apiKey' | 'http';
+  type: 'apiKey' | 'http' | 'google-credentials';
   agent_card_requires_auth?: boolean;
   // API Key
   key?: string;
@@ -55,6 +55,8 @@ interface FrontmatterAuthConfig {
   username?: string;
   password?: string;
   value?: string;
+  // Google Credentials
+  scopes?: string[];
 }
 
 interface FrontmatterRemoteAgentDefinition
@@ -147,8 +149,21 @@ const httpAuthSchema = z.object({
   value: z.string().min(1).optional(),
 });
 
+/**
+ * Google Credentials auth schema.
+ */
+const googleCredentialsAuthSchema = z.object({
+  ...baseAuthFields,
+  type: z.literal('google-credentials'),
+  scopes: z.array(z.string()).optional(),
+});
+
 const authConfigSchema = z
-  .discriminatedUnion('type', [apiKeyAuthSchema, httpAuthSchema])
+  .discriminatedUnion('type', [
+    apiKeyAuthSchema,
+    httpAuthSchema,
+    googleCredentialsAuthSchema,
+  ])
   .superRefine((data, ctx) => {
     if (data.type === 'http') {
       if (data.value) {
@@ -346,6 +361,13 @@ function convertFrontmatterAuthToConfig(
         type: 'apiKey',
         key: frontmatter.key,
         name: frontmatter.name,
+      };
+
+    case 'google-credentials':
+      return {
+        ...base,
+        type: 'google-credentials',
+        scopes: frontmatter.scopes,
       };
 
     case 'http': {

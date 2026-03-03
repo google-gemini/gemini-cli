@@ -416,6 +416,7 @@ export class AgentRegistry {
         const provider = await A2AAuthProviderFactory.create({
           authConfig: definition.auth,
           agentName: definition.name,
+          targetUrl: definition.agentCardUrl,
         });
         if (!provider) {
           throw new Error(
