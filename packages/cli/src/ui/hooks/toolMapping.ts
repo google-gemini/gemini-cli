@@ -53,6 +53,7 @@ export function mapToDisplay(
 
     const baseDisplayProperties = {
       callId: call.request.callId,
+      parentCallId: call.request.parentCallId,
       name: displayName,
       description,
       renderOutputAsMarkdown,
