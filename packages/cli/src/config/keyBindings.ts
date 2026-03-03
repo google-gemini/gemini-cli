@@ -301,8 +301,9 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.RESTART_APP]: [{ key: 'r' }],
   [Command.SUSPEND_APP]: [{ key: 'z', ctrl: true }],
 
-  // Voice Input — triggered by double-space on empty input (see InputPrompt.tsx)
-  [Command.VOICE_INPUT]: [],
+  // Voice Input — triggered by double-space anywhere (see InputPrompt.tsx)
+  // or Ctrl+Space as a fallback combo.
+  [Command.VOICE_INPUT]: [{ key: 'space', ctrl: true }],
 };
 
 interface CommandCategory {
@@ -538,5 +539,5 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
 
   // Voice Input
   [Command.VOICE_INPUT]:
-    'Start voice input recording (double-space on empty input).',
+    'Toggle voice input recording (press space twice rapidly).',
 };

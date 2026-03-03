@@ -605,8 +605,11 @@ function* emitKeys(
       name = 'space';
       alt = escaped;
       insertable = true;
-    } else if (!escaped && ch <= '\x1a') {
-      // ctrl+letter
+    } else if (!escaped && ch === '\x00') {
+      // ctrl+space sends \x00 in many terminals
+      name = 'space';
+      ctrl = true;
+    } else if (!escaped && ch <= '\x1a') {      // ctrl+letter
       name = String.fromCharCode(ch.charCodeAt(0) + 'a'.charCodeAt(0) - 1);
       ctrl = true;
     } else if (/^[0-9A-Za-z]$/.exec(ch) !== null) {

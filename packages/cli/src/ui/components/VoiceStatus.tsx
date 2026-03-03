@@ -49,11 +49,14 @@ export const VoiceStatus: React.FC<Props> = ({ item }) => (
       <Text bold color={theme.text.accent}>
         Space Space
       </Text>
-      {' (empty input) to record · '}
+      {' or '}
+      <Text bold color={theme.text.accent}>
+        Ctrl+Space
+      </Text>
+      {' to record · '}
       <Text bold color={theme.text.accent}>
         /voice help
       </Text>
       {' for all commands'}
-    </Text>
-  </Box>
+    </Text>  </Box>
 );

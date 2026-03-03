@@ -900,17 +900,32 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
-      // Double-space on empty input triggers voice recording.
-      // Both taps are consumed so the buffer stays empty between them.
-      if (voiceEnabled && key.sequence === ' ' && buffer.text.length === 0) {
+      // Reset double-space timer on any non-space key
+      if (key.sequence !== ' ') {
+        lastSpacePressRef.current = 0;
+      }
+
+      // Double-space triggers voice recording.
+      if (voiceEnabled && key.sequence === ' ') {
         const now = Date.now();
-        if (now - lastSpacePressRef.current < 500) {
+        const delta = now - lastSpacePressRef.current;
+        if (delta > 0 && delta < 300) {
           lastSpacePressRef.current = 0;
           void toggleRecording();
-        } else {
-          lastSpacePressRef.current = now;
+          return true; // Consume the second space
         }
-        return true; // consume the space in both cases
+        lastSpacePressRef.current = now;
+
+        // Consume the first space only if the buffer is empty to avoid leading whitespace.
+        // If not empty, let it through so normal typing isn't delayed.
+        if (buffer.text.length === 0) {
+          return true;
+        }
+      }
+
+      if (voiceEnabled && keyMatchers[Command.VOICE_INPUT](key)) {
+        void toggleRecording();
+        return true;
       }
 
       if (shellModeActive && keyMatchers[Command.REVERSE_SEARCH](key)) {

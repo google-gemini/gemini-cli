@@ -52,9 +52,12 @@ export const VoiceHelp: React.FC = () => (
       <Text bold color={theme.text.accent}>
         Space Space
       </Text>
-      {' (on empty input) - Start recording'}
-    </Text>
-    <Text color={theme.text.primary}>
+      {' or '}
+      <Text bold color={theme.text.accent}>
+        Ctrl+Space
+      </Text>
+      {' - Start/stop recording'}
+    </Text>    <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
         Esc
       </Text>
