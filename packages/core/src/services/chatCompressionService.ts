@@ -374,17 +374,11 @@ export class ChatCompressionService {
       });
     } catch (error) {
       debugLogger.debug('Chat history compression (summarize) failed:', error);
-      return {
-        newHistory: null,
-        info: {
-          originalTokenCount,
-          newTokenCount: originalTokenCount,
-          compressionStatus: CompressionStatus.COMPRESSION_FAILED,
-          errorMessage: `Summarization failed: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        },
-      };
+      return this.createCompressionFailureResponse(
+        originalTokenCount,
+        'Summarization',
+        error,
+      );
     }
     const summary = getResponseText(summaryResponse) ?? '';
 
@@ -416,17 +410,11 @@ export class ChatCompressionService {
       });
     } catch (error) {
       debugLogger.debug('Chat history compression (verify) failed:', error);
-      return {
-        newHistory: null,
-        info: {
-          originalTokenCount,
-          newTokenCount: originalTokenCount,
-          compressionStatus: CompressionStatus.COMPRESSION_FAILED,
-          errorMessage: `Verification failed: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        },
-      };
+      return this.createCompressionFailureResponse(
+        originalTokenCount,
+        'Verification',
+        error,
+      );
     }
 
     const finalSummary = (
@@ -500,5 +488,26 @@ export class ChatCompressionService {
         },
       };
     }
+  }
+
+  private createCompressionFailureResponse(
+    originalTokenCount: number,
+    stage: 'Summarization' | 'Verification',
+    error: unknown,
+  ): {
+    newHistory: null;
+    info: ChatCompressionInfo;
+  } {
+    return {
+      newHistory: null,
+      info: {
+        originalTokenCount,
+        newTokenCount: originalTokenCount,
+        compressionStatus: CompressionStatus.COMPRESSION_FAILED,
+        errorMessage: `${stage} failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      },
+    };
   }
 }
