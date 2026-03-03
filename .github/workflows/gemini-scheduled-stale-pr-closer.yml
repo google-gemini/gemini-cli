@@ -23,10 +23,7 @@ jobs:
     steps:
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
-        env:
-          APP_ID: '${{ secrets.APP_ID }}'
-        if: |-
-          ${{ env.APP_ID != '' }}
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: 'actions/create-github-app-token@v2'
         with:
           app-id: '${{ secrets.APP_ID }}'
