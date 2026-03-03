@@ -27,7 +27,7 @@ const voiceHelpCommand: SlashCommand = {
 
 const voiceEnableCommand: SlashCommand = {
   name: 'enable',
-  description: 'Enable voice input (record with Alt+R or Ctrl+Q)',
+  description: 'Enable voice input (double-tap Space on empty input to record)',
   kind: CommandKind.BUILT_IN,
   action: async (context) => {
     context.services.settings.setValue(
@@ -38,7 +38,8 @@ const voiceEnableCommand: SlashCommand = {
     return {
       type: 'message',
       messageType: MessageType.INFO,
-      content: 'Voice input enabled. Press Alt+R or Ctrl+Q to start recording.',
+      content:
+        'Voice input enabled. Double-tap Space on an empty prompt to start recording.',
     };
   },
 };

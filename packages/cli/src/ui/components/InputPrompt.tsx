@@ -1533,7 +1533,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // (recording must always be visible regardless of approval mode)
   if (voiceState.isRecording) {
     statusColor = theme.status.error;
-    statusText = '🎤 Recording... (Alt+R/Ctrl+Q to stop, Esc to cancel)';
+    statusText = '🎤 Recording... (Space Space or Esc to stop)';
   } else if (voiceState.isTranscribing) {
     statusColor = theme.status.warning;
     statusText = 'Transcribing...';

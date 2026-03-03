@@ -343,9 +343,9 @@ their corresponding top-level category object in your `settings.json` file.
 #### `voice`
 
 - **`voice.enabled`** (boolean):
-  - **Description:** Enable voice input. When enabled, press **Alt+R** or
-    **Ctrl+Q** to start/stop recording. Use `/voice enable` or `/voice disable`
-    to toggle.
+  - **Description:** Enable voice input. When enabled, double-tap Space on an
+    empty prompt to start/stop recording. Use `/voice enable` or
+    `/voice disable` to toggle.
   - **Default:** `false`
 
 - **`voice.provider`** (string: `"gemini"` | `"whisper"`):
