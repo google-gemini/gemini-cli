@@ -355,7 +355,7 @@ describe('useSlashCommandProcessor', () => {
       }).toThrow(TypeError);
     });
 
-    it('should override built-in commands with file-based commands of the same name', async () => {
+    it('should prefix user-file commands that conflict with built-in commands', async () => {
       const builtinAction = vi.fn();
       const fileAction = vi.fn();
 
@@ -366,7 +366,7 @@ describe('useSlashCommandProcessor', () => {
       });
       const fileCommand = createTestCommand(
         { name: 'override', description: 'file', action: fileAction },
-        CommandKind.FILE,
+        CommandKind.USER_FILE,
       );
 
       const result = await setupProcessorHook({
@@ -375,17 +375,24 @@ describe('useSlashCommandProcessor', () => {
       });
 
       await waitFor(() => {
-        // The service should only return one command with the name 'override'
-        expect(result.current.slashCommands).toHaveLength(1);
+        // Both commands should be present: 'override' (builtin) and 'user:override' (file)
+        expect(result.current.slashCommands).toHaveLength(2);
       });
 
       await act(async () => {
         await result.current.handleSlashCommand('/override');
       });
 
-      // Only the file-based command's action should be called.
+      // The built-in command's action should be called because it kept the name.
+      expect(builtinAction).toHaveBeenCalledTimes(1);
+      expect(fileAction).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/user.override');
+      });
+
+      // The user-file command's action should be called using the prefix.
       expect(fileAction).toHaveBeenCalledTimes(1);
-      expect(builtinAction).not.toHaveBeenCalled();
     });
   });
 
@@ -731,7 +738,7 @@ describe('useSlashCommandProcessor', () => {
             content: [{ text: 'The actual prompt from the TOML file.' }],
           }),
         },
-        CommandKind.FILE,
+        CommandKind.USER_FILE,
       );
 
       const result = await setupProcessorHook({
@@ -866,7 +873,7 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Command Precedence', () => {
-    it('should override mcp-based commands with file-based commands of the same name', async () => {
+    it('should prefix user-file commands that conflict with MCP commands', async () => {
       const mcpAction = vi.fn();
       const fileAction = vi.fn();
 
@@ -880,7 +887,7 @@ describe('useSlashCommandProcessor', () => {
       );
       const fileCommand = createTestCommand(
         { name: 'override', description: 'file', action: fileAction },
-        CommandKind.FILE,
+        CommandKind.USER_FILE,
       );
 
       const result = await setupProcessorHook({
@@ -889,17 +896,24 @@ describe('useSlashCommandProcessor', () => {
       });
 
       await waitFor(() => {
-        // The service should only return one command with the name 'override'
-        expect(result.current.slashCommands).toHaveLength(1);
+        // Both commands should be present: 'override' (mcp) and 'user:override' (file)
+        expect(result.current.slashCommands).toHaveLength(2);
       });
 
       await act(async () => {
         await result.current.handleSlashCommand('/override');
       });
 
-      // Only the file-based command's action should be called.
+      // The MCP command's action should be called because it kept the name.
+      expect(mcpAction).toHaveBeenCalledTimes(1);
+      expect(fileAction).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/user.override');
+      });
+
+      // The user-file command's action should be called using the prefix.
       expect(fileAction).toHaveBeenCalledTimes(1);
-      expect(mcpAction).not.toHaveBeenCalled();
     });
 
     it('should prioritize a command with a primary name over a command with a matching alias', async () => {
@@ -917,7 +931,7 @@ describe('useSlashCommandProcessor', () => {
           name: 'exit',
           action: exitAction,
         },
-        CommandKind.FILE,
+        CommandKind.USER_FILE,
       );
 
       // The order of commands in the final loaded array is not guaranteed,
@@ -949,7 +963,7 @@ describe('useSlashCommandProcessor', () => {
       });
       const exitCommand = createTestCommand(
         { name: 'exit', action: vi.fn() },
-        CommandKind.FILE,
+        CommandKind.USER_FILE,
       );
 
       const result = await setupProcessorHook({
@@ -1115,7 +1129,7 @@ describe('useSlashCommandProcessor', () => {
           name: 'deploy',
           extensionName: 'firebase',
         },
-        CommandKind.FILE,
+        CommandKind.EXTENSION_FILE,
       );
 
       const result = await setupProcessorHook({
@@ -1125,23 +1139,17 @@ describe('useSlashCommandProcessor', () => {
 
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
 
-      expect(mockAddItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: expect.stringContaining('Command conflicts detected'),
-        }),
-        expect.any(Number),
-      );
-
-      expect(mockAddItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: expect.stringContaining(
-            "- Command '/deploy' from extension 'firebase' was renamed",
-          ),
-        }),
-        expect.any(Number),
-      );
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.INFO,
+            text: expect.stringContaining(
+              "Command '/deploy' from extension 'firebase' command was renamed to '/firebase.deploy' because it conflicts with built-in command.",
+            ),
+          }),
+          expect.any(Number),
+        );
+      });
     });
 
     it('should deduplicate conflict warnings across re-renders', async () => {
@@ -1151,7 +1159,7 @@ describe('useSlashCommandProcessor', () => {
           name: 'deploy',
           extensionName: 'firebase',
         },
-        CommandKind.FILE,
+        CommandKind.EXTENSION_FILE,
       );
 
       const result = await setupProcessorHook({
@@ -1162,13 +1170,17 @@ describe('useSlashCommandProcessor', () => {
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
 
       // First notification
-      expect(mockAddItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: expect.stringContaining('Command conflicts detected'),
-        }),
-        expect.any(Number),
-      );
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.INFO,
+            text: expect.stringContaining(
+              "Command '/deploy' from extension 'firebase' command was renamed to '/firebase.deploy' because it conflicts with built-in command.",
+            ),
+          }),
+          expect.any(Number),
+        );
+      });
 
       mockAddItem.mockClear();
 
@@ -1177,33 +1189,34 @@ describe('useSlashCommandProcessor', () => {
         result.current.commandContext.ui.reloadCommands();
       });
 
-      // Wait a bit for effect to run
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for debouncer (now 500ms trailing)
+      await new Promise((resolve) => setTimeout(resolve, 600));
 
       // Should NOT have notified again
       expect(mockAddItem).not.toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: expect.stringContaining('Command conflicts detected'),
+          text: expect.stringContaining("Command '/deploy'"),
         }),
         expect.any(Number),
       );
     });
 
     it('should correctly identify the winner extension in the message', async () => {
+      // extensions are sorted alphabetically by name
       const ext1Command = createTestCommand(
-        {
-          name: 'deploy',
-          extensionName: 'firebase',
-        },
-        CommandKind.FILE,
-      );
-      const ext2Command = createTestCommand(
         {
           name: 'deploy',
           extensionName: 'aws',
         },
-        CommandKind.FILE,
+        CommandKind.EXTENSION_FILE,
+      );
+      const ext2Command = createTestCommand(
+        {
+          name: 'deploy',
+          extensionName: 'firebase',
+        },
+        CommandKind.EXTENSION_FILE,
       );
 
       const result = await setupProcessorHook({
@@ -1212,13 +1225,46 @@ describe('useSlashCommandProcessor', () => {
 
       await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
 
-      expect(mockAddItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: expect.stringContaining("conflicts with extension 'firebase'"),
-        }),
-        expect.any(Number),
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.INFO,
+            text: expect.stringContaining(
+              "Command '/deploy' from extension 'firebase' command was renamed to '/firebase.deploy' because it conflicts with extension 'aws' command.",
+            ),
+          }),
+          expect.any(Number),
+        );
+      });
+    });
+
+    it('should group multiple conflicts for the same command', async () => {
+      const userCommand = createTestCommand(
+        { name: 'launch' },
+        CommandKind.USER_FILE,
       );
+      const workspaceCommand = createTestCommand(
+        { name: 'launch' },
+        CommandKind.WORKSPACE_FILE,
+      );
+
+      const result = await setupProcessorHook({
+        fileCommands: [userCommand, workspaceCommand],
+      });
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.INFO,
+            text: expect.stringContaining(
+              "Conflicts detected for command '/launch':\n- User command was renamed to '/user.launch'\n- Workspace command was renamed to '/workspace.launch'",
+            ),
+          }),
+          expect.any(Number),
+        );
+      });
     });
   });
 });

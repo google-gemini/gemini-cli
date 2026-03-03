@@ -177,7 +177,9 @@ export type SlashCommandActionReturn =
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
-  FILE = 'file',
+  USER_FILE = 'user-file',
+  WORKSPACE_FILE = 'workspace-file',
+  EXTENSION_FILE = 'extension-file',
   MCP_PROMPT = 'mcp-prompt',
   AGENT = 'agent',
 }

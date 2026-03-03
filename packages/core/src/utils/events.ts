@@ -149,6 +149,8 @@ export interface SlashCommandConflict {
   renamedTo: string;
   loserExtensionName?: string;
   winnerExtensionName?: string;
+  loserKind?: string;
+  winnerKind?: string;
 }
 
 export interface SlashCommandConflictsPayload {
