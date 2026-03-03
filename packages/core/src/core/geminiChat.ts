@@ -167,10 +167,29 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
       const modelOutput: Content[] = [];
       let isValid = true;
       while (i < length && comprehensiveHistory[i].role === 'model') {
-        modelOutput.push(comprehensiveHistory[i]);
-        if (isValid && !isValidContent(comprehensiveHistory[i])) {
+        const content = comprehensiveHistory[i];
+        if (isValid && !isValidContent(content)) {
           isValid = false;
         }
+
+        // Strip thought parts and thoughtSignature
+        const curatedParts = (content.parts ?? [])
+          .filter((part) => !part.thought)
+          .map((part) => {
+            if (
+              part &&
+              typeof part === 'object' &&
+              'thoughtSignature' in part
+            ) {
+              const newPart = { ...part };
+              delete (newPart as { thoughtSignature?: string })
+                .thoughtSignature;
+              return newPart;
+            }
+            return part;
+          });
+
+        modelOutput.push({ ...content, parts: curatedParts });
         i++;
       }
       if (isValid) {
