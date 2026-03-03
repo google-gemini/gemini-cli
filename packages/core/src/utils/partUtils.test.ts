@@ -131,6 +131,26 @@ describe('partUtils', () => {
       expect(partToString(part, verboseOptions)).toBe('');
     });
 
+    it('should return rich summary for audio inlineData part', () => {
+      // ~10s of 32kbps audio: 10 * 32000/8 = 40000 raw bytes -> base64 ~53333 chars
+      const audioBase64 = 'A'.repeat(53333);
+      const part = {
+        inlineData: { mimeType: 'audio/mp3', data: audioBase64 },
+      } as Part;
+      const result = partToString(part, verboseOptions);
+      expect(result).toMatch(/^\[Audio: audio\/mp3, \d+\.\d KB, ~\d+\.\d+s\]$/);
+    });
+
+    it('should return rich summary for video inlineData part', () => {
+      // ~5s of 1Mbps video: 5*1e6/8 = 625000 raw bytes -> base64 ~833333 chars
+      const videoBase64 = 'A'.repeat(833333);
+      const part = {
+        inlineData: { mimeType: 'video/mp4', data: videoBase64 },
+      } as Part;
+      const result = partToString(part, verboseOptions);
+      expect(result).toMatch(/^\[Video: video\/mp4, \d+\.\d KB, ~\d+\.\d+s\]$/);
+    });
+
     it('should handle complex nested arrays with various part types', () => {
       const parts = [
         'start ',
@@ -142,7 +162,7 @@ describe('partUtils', () => {
         ],
       ];
       expect(partToString(parts as Part, verboseOptions)).toBe(
-        'start middle[Function Call: func1] end<audio/mp3>',
+        'start middle[Function Call: func1] end[Audio: audio/mp3, 0.0 KB, ~0.0s]',
       );
     });
   });

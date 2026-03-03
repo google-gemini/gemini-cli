@@ -63,7 +63,18 @@ export function partToString(
       return `[Function Response: ${part.functionResponse.name}]`;
     }
     if (part.inlineData !== undefined) {
-      return `<${part.inlineData.mimeType}>`;
+      const mimeType = part.inlineData.mimeType ?? 'unknown';
+      const dataLen = part.inlineData.data?.length ?? 0;
+      if (mimeType.startsWith('audio/') || mimeType.startsWith('video/')) {
+        const isAudio = mimeType.startsWith('audio/');
+        const bitratesBps = isAudio ? 32_000 : 1_000_000;
+        const rawBytes = dataLen * 0.75;
+        const durationS = (rawBytes * 8) / bitratesBps;
+        const sizeKb = (rawBytes / 1024).toFixed(1);
+        const mediaType = isAudio ? 'Audio' : 'Video';
+        return `[${mediaType}: ${mimeType}, ${sizeKb} KB, ~${durationS.toFixed(1)}s]`;
+      }
+      return `<${mimeType}>`;
     }
   }
 
