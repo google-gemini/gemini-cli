@@ -49,6 +49,19 @@ export function useInputHistory({
     null,
   );
 
+  // Save current input as draft if it hasn't been saved yet and has content
+  const saveCurrentInputAsDraft = useCallback(() => {
+    if (
+      lastEditedBufferRef.current === null &&
+      currentQuery.trim().length > 0
+    ) {
+      lastEditedBufferRef.current = {
+        text: currentQuery,
+        offset: currentCursorOffset,
+      };
+    }
+  }, [currentQuery, currentCursorOffset]);
+
   const resetHistoryNav = useCallback(() => {
     setHistoryIndex(-1);
     previousHistoryIndexRef.current = undefined;
@@ -79,15 +92,8 @@ export function useInputHistory({
 
       // 2. Save to lastEditedBuffer when first navigating away from current compose (index -1)
       // This preserves the unsent draft for recovery
-      if (
-        prevIndexBeforeMove === -1 &&
-        lastEditedBufferRef.current === null &&
-        currentQuery.trim().length > 0
-      ) {
-        lastEditedBufferRef.current = {
-          text: currentQuery,
-          offset: currentCursorOffset,
-        };
+      if (prevIndexBeforeMove === -1) {
+        saveCurrentInputAsDraft();
       }
 
       // 3. Update index
@@ -135,7 +141,14 @@ export function useInputHistory({
       // Record the level we just came from for the next navigation
       previousHistoryIndexRef.current = prevIndexBeforeMove;
     },
-    [historyIndex, currentQuery, currentCursorOffset, userMessages, onChange],
+    [
+      historyIndex,
+      currentQuery,
+      currentCursorOffset,
+      userMessages,
+      onChange,
+      saveCurrentInputAsDraft,
+    ],
   );
 
   const navigateUp = useCallback(() => {
@@ -143,15 +156,8 @@ export function useInputHistory({
 
     // Even with no history, save the current draft to lastEditedBuffer
     if (userMessages.length === 0) {
-      if (
-        historyIndex === -1 &&
-        lastEditedBufferRef.current === null &&
-        currentQuery.trim().length > 0
-      ) {
-        lastEditedBufferRef.current = {
-          text: currentQuery,
-          offset: currentCursorOffset,
-        };
+      if (historyIndex === -1) {
+        saveCurrentInputAsDraft();
       }
       return false;
     }
@@ -166,8 +172,7 @@ export function useInputHistory({
     userMessages,
     isActive,
     navigateTo,
-    currentQuery,
-    currentCursorOffset,
+    saveCurrentInputAsDraft,
   ]);
 
   const navigateDown = useCallback(() => {
