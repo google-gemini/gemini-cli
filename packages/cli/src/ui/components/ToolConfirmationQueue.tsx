@@ -68,11 +68,12 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
   const borderColor = isRoutine ? theme.status.success : theme.status.warning;
   const hideToolIdentity = isRoutine;
 
-  // ToolConfirmationMessage needs to know the height available for its OWN content.
-  // We subtract the lines used by the Queue wrapper:
-  // - 2 lines for the rounded border
-  // - 1 line for the Header (text)
-  // - 2 lines for Tool Identity (text + margin)
+  // Calculate height available for ToolConfirmationMessage content.
+  // We subtract lines used by the wrapper:
+  // - 2 lines: top and bottom rounded borders
+  // - 1 line: header text ("Action Required" or similar)
+  // - 2 lines (optional): tool identity name/status + its margin-bottom
+  // Result: 3 lines (borders + header) or 5 lines (borders + header + identity + margin)
   const availableContentHeight = constrainHeight
     ? Math.max(maxHeight - (hideToolIdentity ? 3 : 5), 4)
     : undefined;

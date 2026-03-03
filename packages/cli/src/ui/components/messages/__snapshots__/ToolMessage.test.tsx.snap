@@ -86,7 +86,6 @@ exports[`<ToolMessage /> > renders McpProgressIndicator with percentage and mess
 │ MockRespondingSpinnertest-tool A tool for testing                            │
 │ ████████░░░░░░░░░░░░ 42%                                                     │
 │ Working on it...                                                             │
-│                                                                              │
 │ Test result                                                                  │
 "
 `;
@@ -116,7 +115,6 @@ exports[`<ToolMessage /> > renders indeterminate progress when total is missing 
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ MockRespondingSpinnertest-tool A tool for testing                            │
 │ ███████░░░░░░░░░░░░░ 7                                                       │
-│                                                                              │
 │ Test result                                                                  │
 "
 `;
@@ -125,7 +123,6 @@ exports[`<ToolMessage /> > renders only percentage when progressMessage is missi
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ MockRespondingSpinnertest-tool A tool for testing                            │
 │ ███████████████░░░░░ 75%                                                     │
-│                                                                              │
 │ Test result                                                                  │
 "
 `;

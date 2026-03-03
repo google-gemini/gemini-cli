@@ -37,7 +37,6 @@ export interface ToolResultDisplayProps {
   renderOutputAsMarkdown?: boolean;
   maxLines?: number;
   hasFocus?: boolean;
-  marginTop?: number;
 }
 
 interface FileDiffResult {
@@ -52,7 +51,6 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   renderOutputAsMarkdown = true,
   maxLines,
   hasFocus,
-  marginTop = 0,
 }) => {
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
@@ -233,7 +231,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   // 4. Final render based on session mode
   if (isAlternateBuffer) {
     return (
-      <Box width={childWidth} marginTop={marginTop}>
+      <Box width={childWidth}>
         <Scrollable
           width={childWidth}
           maxHeight={maxLines ?? availableHeight}
@@ -247,7 +245,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   }
 
   return (
-    <Box width={childWidth} flexDirection="column" marginTop={marginTop}>
+    <Box width={childWidth} flexDirection="column">
       <MaxSizedBox
         maxHeight={availableHeight}
         maxWidth={childWidth}
