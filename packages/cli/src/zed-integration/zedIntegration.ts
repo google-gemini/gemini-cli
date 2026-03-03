@@ -253,13 +253,21 @@ export class GeminiAgent {
     const session = new Session(sessionId, chat, config, this.connection);
     this.sessions.set(sessionId, session);
 
+    const { availableModels, currentModelId } = buildAvailableModels(
+      config,
+      loadedSettings,
+    );
+
     const response = {
       sessionId,
       modes: {
         availableModes: buildAvailableModes(config.isPlanEnabled()),
         currentModeId: config.getApprovalMode(),
       },
-      models: buildAvailableModels(config, loadedSettings),
+      models: {
+        availableModels,
+        currentModelId,
+      },
     };
     return response;
   }
@@ -310,12 +318,20 @@ export class GeminiAgent {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     session.streamHistory(sessionData.messages);
 
+    const { availableModels, currentModelId } = buildAvailableModels(
+      config,
+      this.settings,
+    );
+
     const response = {
       modes: {
         availableModes: buildAvailableModes(config.isPlanEnabled()),
         currentModeId: config.getApprovalMode(),
       },
-      models: buildAvailableModels(config, this.settings),
+      models: {
+        availableModels,
+        currentModelId,
+      },
     };
     return response;
   }
@@ -434,7 +450,7 @@ export class GeminiAgent {
   ): Promise<acp.SetSessionModelResponse> {
     const session = this.sessions.get(params.sessionId);
     if (!session) {
-      throw new Error(`Session not found: ${params.sessionId}`); 
+      throw new Error(`Session not found: ${params.sessionId}`);
     }
     return session.setModel(params.modelId);
   }
@@ -1410,12 +1426,14 @@ function buildAvailableModes(isPlanEnabled: boolean): acp.SessionMode[] {
 function buildAvailableModels(
   config: Config,
   settings: LoadedSettings,
-): { availableModels: { modelId: string; name: string; description?: string }[]; currentModelId: string } {
+): {
+  availableModels: Array<{ modelId: string; name: string; description?: string }>;
+  currentModelId: string;
+} {
   const preferredModel = config.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
   const shouldShowPreviewModels = config.getHasAccessToPreviewModel();
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
-  const selectedAuthType =
-    settings.merged.security.auth.selectedType;
+  const selectedAuthType = settings.merged.security.auth.selectedType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
 
@@ -1475,7 +1493,7 @@ function buildAvailableModels(
   }
 
   const scaleOptions = (
-    options: { value: string; title: string; description?: string }[],
+    options: Array<{ value: string; title: string; description?: string }>,
   ) =>
     options.map((o) => ({
       modelId: o.value,
@@ -1484,7 +1502,10 @@ function buildAvailableModels(
     }));
 
   return {
-    availableModels: [...scaleOptions(mainOptions), ...scaleOptions(manualOptions)],
+    availableModels: [
+      ...scaleOptions(mainOptions),
+      ...scaleOptions(manualOptions),
+    ],
     currentModelId: preferredModel,
   };
 }
