@@ -35,6 +35,9 @@ export function cleanupTerminalOnExit() {
   disableBracketedPasteMode();
 }
 
+/**
+ * Manages terminal capability detection.
+ */
 export class TerminalCapabilityManager {
   private static instance: TerminalCapabilityManager | undefined;
 
@@ -46,16 +49,6 @@ export class TerminalCapabilityManager {
   private static readonly HIDDEN_MODE = '\x1b[8m';
   private static readonly CLEAR_LINE_AND_RETURN = '\x1b[2K\r';
   private static readonly RESET_ATTRIBUTES = '\x1b[0m';
-
-  /**
-   * Triggers a terminal background color query.
-   * @param stdout The stdout stream to write to.
-   */
-  static queryBackgroundColor(stdout: {
-    write: (data: string) => void | boolean;
-  }): void {
-    stdout.write(TerminalCapabilityManager.OSC_11_QUERY);
-  }
 
   // Kitty keyboard flags: CSI ? flags u
   // eslint-disable-next-line no-control-regex
@@ -80,6 +73,7 @@ export class TerminalCapabilityManager {
   private kittyEnabled = false;
   private modifyOtherKeysSupported = false;
   private terminalName: string | undefined;
+  private sentinelReceived = false;
 
   private constructor() {}
 
@@ -212,6 +206,7 @@ export class TerminalCapabilityManager {
           );
           if (match) {
             deviceAttributesReceived = true;
+            this.sentinelReceived = true;
             cleanup();
           }
         }
@@ -270,15 +265,18 @@ export class TerminalCapabilityManager {
     return this.kittyEnabled;
   }
 
-  isKeyboardProtocolSupported(): boolean {
-    return this.kittySupported || this.modifyOtherKeysSupported;
+  /**
+   * Returns true if keyboard protocol support was explicitly detected.
+   * Returns false if detection finished and no support was found.
+   * Returns undefined if detection timed out or failed to receive the sentinel.
+   */
+  isKeyboardProtocolSupported(): boolean | undefined {
+    if (this.kittySupported || this.modifyOtherKeysSupported) return true;
+    if (this.sentinelReceived) return false;
+    return undefined;
   }
 
   supportsOsc9Notifications(env: NodeJS.ProcessEnv = process.env): boolean {
-    if (env['WT_SESSION']) {
-      return false;
-    }
-
     return (
       this.hasOsc9TerminalSignature(this.getTerminalName()) ||
       this.hasOsc9TerminalSignature(env['TERM_PROGRAM']) ||

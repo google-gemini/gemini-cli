@@ -7,7 +7,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import os from 'node:os';
 import {
-  isWindows10,
   isJetBrainsTerminal,
   supports256Colors,
   supportsTrueColor,
@@ -16,6 +15,7 @@ import {
   isTmux,
   supportsKeyboardProtocolHeuristic,
 } from './compatibility.js';
+import { isWindows10 } from './terminalEnvironment.js';
 
 vi.mock('node:os', () => ({
   default: {

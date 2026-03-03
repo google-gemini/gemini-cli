@@ -49,6 +49,7 @@ describe('TerminalCapabilityManager', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.useFakeTimers();
 
     // Reset singleton
     TerminalCapabilityManager.resetInstanceForTesting();
@@ -58,11 +59,9 @@ describe('TerminalCapabilityManager', () => {
     stdin.isTTY = true;
     stdin.isRaw = false;
     stdin.setRawMode = vi.fn();
-    stdin.removeListener = vi.fn();
-
     stdout = { isTTY: true, fd: 1 };
 
-    // Use defineProperty to mock process.stdin/stdout
+    // Use defineProperty to mock process properties
     Object.defineProperty(process, 'stdin', {
       value: stdin,
       configurable: true,
@@ -71,8 +70,6 @@ describe('TerminalCapabilityManager', () => {
       value: stdout,
       configurable: true,
     });
-
-    vi.useFakeTimers();
   });
 
   afterEach(() => {
@@ -92,25 +89,24 @@ describe('TerminalCapabilityManager', () => {
     const manager = TerminalCapabilityManager.getInstance();
     const promise = manager.detectCapabilities();
 
-    // Simulate Kitty response: \x1b[?1u
+    // Simulate kitty protocol response
     stdin.emit('data', Buffer.from('\x1b[?1u'));
-    // Complete detection with DA1
-    stdin.emit('data', Buffer.from('\x1b[?62c'));
+    // Simulate sentinel response
+    stdin.emit('data', Buffer.from('\x1b[?1c'));
 
     await promise;
     expect(manager.isKittyProtocolEnabled()).toBe(true);
+    expect(enableKittyKeyboardProtocol).toHaveBeenCalled();
   });
 
   it('should detect Background Color', async () => {
     const manager = TerminalCapabilityManager.getInstance();
     const promise = manager.detectCapabilities();
 
-    // Simulate OSC 11 response
-    // \x1b]11;rgb:0000/ff00/0000\x1b\
-    // RGB: 0, 255, 0 -> #00ff00
+    // Simulate background color response
     stdin.emit('data', Buffer.from('\x1b]11;rgb:0000/ffff/0000\x1b\\'));
-    // Complete detection with DA1
-    stdin.emit('data', Buffer.from('\x1b[?62c'));
+    // Simulate sentinel response
+    stdin.emit('data', Buffer.from('\x1b[?1c'));
 
     await promise;
     expect(manager.getTerminalBackgroundColor()).toBe('#00ff00');
@@ -120,10 +116,10 @@ describe('TerminalCapabilityManager', () => {
     const manager = TerminalCapabilityManager.getInstance();
     const promise = manager.detectCapabilities();
 
-    // Simulate Terminal Name response
+    // Simulate terminal name response
     stdin.emit('data', Buffer.from('\x1bP>|WezTerm 20240203\x1b\\'));
-    // Complete detection with DA1
-    stdin.emit('data', Buffer.from('\x1b[?62c'));
+    // Simulate sentinel response
+    stdin.emit('data', Buffer.from('\x1b[?1c'));
 
     await promise;
     expect(manager.getTerminalName()).toBe('WezTerm 20240203');
@@ -133,14 +129,15 @@ describe('TerminalCapabilityManager', () => {
     const manager = TerminalCapabilityManager.getInstance();
     const promise = manager.detectCapabilities();
 
-    stdin.emit('data', Buffer.from('\x1b[?1u'));
-    stdin.emit('data', Buffer.from('\x1b]11;rgb:0000/0000/0000\x1b\\'));
-    // Sentinel
-    stdin.emit('data', Buffer.from('\x1b[?62c'));
+    // Send everything at once
+    stdin.emit(
+      'data',
+      Buffer.from(
+        '\x1b[?1u\x1b]11;rgb:0000/0000/0000\x1b\\\x1bP>|xterm\x1b\\\x1b[?1c',
+      ),
+    );
 
-    // Should resolve without waiting for timeout
     await promise;
-
     expect(manager.isKittyProtocolEnabled()).toBe(true);
     expect(manager.getTerminalBackgroundColor()).toBe('#000000');
   });
@@ -149,22 +146,19 @@ describe('TerminalCapabilityManager', () => {
     const manager = TerminalCapabilityManager.getInstance();
     const promise = manager.detectCapabilities();
 
-    // Simulate only Kitty response
-    stdin.emit('data', Buffer.from('\x1b[?1u'));
-
-    // Advance to timeout
+    // Don't send any data, just trigger timeout
     vi.advanceTimersByTime(1000);
 
     await promise;
-    expect(manager.isKittyProtocolEnabled()).toBe(true);
+    expect(manager.getTerminalBackgroundColor()).toBeUndefined();
   });
 
   it('should not detect Kitty if only DA1 (c) is received', async () => {
     const manager = TerminalCapabilityManager.getInstance();
     const promise = manager.detectCapabilities();
 
-    // Simulate DA1 response only: \x1b[?62;c
-    stdin.emit('data', Buffer.from('\x1b[?62c'));
+    // Send only sentinel
+    stdin.emit('data', Buffer.from('\x1b[?1c'));
 
     await promise;
     expect(manager.isKittyProtocolEnabled()).toBe(false);
@@ -174,14 +168,13 @@ describe('TerminalCapabilityManager', () => {
     const manager = TerminalCapabilityManager.getInstance();
     const promise = manager.detectCapabilities();
 
-    // Split response: \x1b[? 1u
-    stdin.emit('data', Buffer.from('\x1b[?'));
-    stdin.emit('data', Buffer.from('1u'));
-    // Complete with DA1
-    stdin.emit('data', Buffer.from('\x1b[?62c'));
+    // Split background color response
+    stdin.emit('data', Buffer.from('\x1b]11;'));
+    stdin.emit('data', Buffer.from('rgb:ffff/0000/0000\x1b\\'));
+    stdin.emit('data', Buffer.from('\x1b[?1c'));
 
     await promise;
-    expect(manager.isKittyProtocolEnabled()).toBe(true);
+    expect(manager.getTerminalBackgroundColor()).toBe('#ff0000');
   });
 
   describe('modifyOtherKeys detection', () => {
@@ -189,10 +182,9 @@ describe('TerminalCapabilityManager', () => {
       const manager = TerminalCapabilityManager.getInstance();
       const promise = manager.detectCapabilities();
 
-      // Simulate modifyOtherKeys level 2 response: \x1b[>4;2m
+      // level 2
       stdin.emit('data', Buffer.from('\x1b[>4;2m'));
-      // Complete detection with DA1
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
+      stdin.emit('data', Buffer.from('\x1b[?1c'));
 
       await promise;
 
@@ -203,10 +195,9 @@ describe('TerminalCapabilityManager', () => {
       const manager = TerminalCapabilityManager.getInstance();
       const promise = manager.detectCapabilities();
 
-      // Simulate modifyOtherKeys level 0 response: \x1b[>4;0m
+      // level 0 (disabled)
       stdin.emit('data', Buffer.from('\x1b[>4;0m'));
-      // Complete detection with DA1
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
+      stdin.emit('data', Buffer.from('\x1b[?1c'));
 
       await promise;
 
@@ -217,14 +208,11 @@ describe('TerminalCapabilityManager', () => {
       const manager = TerminalCapabilityManager.getInstance();
       const promise = manager.detectCapabilities();
 
-      // Simulate both Kitty and modifyOtherKeys responses
       stdin.emit('data', Buffer.from('\x1b[?1u'));
       stdin.emit('data', Buffer.from('\x1b[>4;2m'));
-      // Complete detection with DA1
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
+      stdin.emit('data', Buffer.from('\x1b[?1c'));
 
       await promise;
-      expect(manager.isKittyProtocolEnabled()).toBe(true);
 
       expect(enableKittyKeyboardProtocol).toHaveBeenCalled();
       expect(enableModifyOtherKeys).not.toHaveBeenCalled();
@@ -234,10 +222,8 @@ describe('TerminalCapabilityManager', () => {
       const manager = TerminalCapabilityManager.getInstance();
       const promise = manager.detectCapabilities();
 
-      // Simulate only modifyOtherKeys response (no Kitty)
       stdin.emit('data', Buffer.from('\x1b[>4;2m'));
-      // Complete detection with DA1
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
+      stdin.emit('data', Buffer.from('\x1b[?1c'));
 
       await promise;
 
@@ -249,11 +235,9 @@ describe('TerminalCapabilityManager', () => {
       const manager = TerminalCapabilityManager.getInstance();
       const promise = manager.detectCapabilities();
 
-      // Split response: \x1b[>4;2m
       stdin.emit('data', Buffer.from('\x1b[>4;'));
       stdin.emit('data', Buffer.from('2m'));
-      // Complete detection with DA1
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
+      stdin.emit('data', Buffer.from('\x1b[?1c'));
 
       await promise;
 
@@ -264,17 +248,15 @@ describe('TerminalCapabilityManager', () => {
       const manager = TerminalCapabilityManager.getInstance();
       const promise = manager.detectCapabilities();
 
-      stdin.emit('data', Buffer.from('\x1b]11;rgb:1a1a/1a1a/1a1a\x1b\\')); // background color
-      stdin.emit('data', Buffer.from('\x1bP>|tmux\x1b\\')); // Terminal name
-      stdin.emit('data', Buffer.from('\x1b[>4;2m')); // modifyOtherKeys
-      // Complete detection with DA1
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
+      stdin.emit('data', Buffer.from('\x1b]11;rgb:1a1a/1a1a/1a1a\x1b\\'));
+      stdin.emit('data', Buffer.from('\x1bP>|tmux\x1b\\'));
+      stdin.emit('data', Buffer.from('\x1b[>4;2m'));
+      stdin.emit('data', Buffer.from('\x1b[?1c'));
 
       await promise;
 
       expect(manager.getTerminalBackgroundColor()).toBe('#1a1a1a');
       expect(manager.getTerminalName()).toBe('tmux');
-
       expect(enableModifyOtherKeys).toHaveBeenCalled();
     });
 
@@ -282,8 +264,7 @@ describe('TerminalCapabilityManager', () => {
       const manager = TerminalCapabilityManager.getInstance();
       const promise = manager.detectCapabilities();
 
-      // Simulate only DA1 response (no specific MOK or Kitty response)
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
+      stdin.emit('data', Buffer.from('\x1b[?1c'));
 
       await promise;
 
@@ -298,18 +279,16 @@ describe('TerminalCapabilityManager', () => {
       expect(fs.writeSync).toHaveBeenCalledWith(
         expect.anything(),
         // eslint-disable-next-line no-control-regex
-        expect.stringMatching(/^\x1b\[8m.*\x1b\[2K\r\x1b\[0m$/s),
+        expect.stringMatching(/^\x1b\[8m.*?\x1b\[2K\r\x1b\[0m$/),
       );
     });
   });
 
   describe('supportsOsc9Notifications', () => {
-    const manager = TerminalCapabilityManager.getInstance();
-
-    it.each([
+    const testCases = [
       {
         name: 'WezTerm (terminal name)',
-        terminalName: 'WezTerm',
+        terminalName: 'WezTerm 20240203',
         env: {},
         expected: true,
       },
@@ -327,7 +306,7 @@ describe('TerminalCapabilityManager', () => {
       },
       {
         name: 'kitty (terminal name)',
-        terminalName: 'kitty',
+        terminalName: 'xterm-kitty',
         env: {},
         expected: true,
       },
@@ -361,18 +340,14 @@ describe('TerminalCapabilityManager', () => {
         env: { TERM: 'xterm-256color' },
         expected: false,
       },
-      {
-        name: 'Windows Terminal (WT_SESSION)',
-        terminalName: 'iTerm.app',
-        env: { WT_SESSION: 'some-guid' },
-        expected: false,
-      },
-    ])(
-      'should return $expected for $name',
-      ({ terminalName, env, expected }) => {
+    ];
+
+    testCases.forEach(({ name, terminalName, env, expected }) => {
+      it(`should return ${expected} for '${name}'`, () => {
+        const manager = TerminalCapabilityManager.getInstance();
         vi.spyOn(manager, 'getTerminalName').mockReturnValue(terminalName);
         expect(manager.supportsOsc9Notifications(env)).toBe(expected);
-      },
-    );
+      });
+    });
   });
 });

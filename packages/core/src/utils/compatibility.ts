@@ -5,78 +5,67 @@
  */
 
 import os from 'node:os';
+import {
+  TerminalType,
+  detectTerminalType,
+  isWindows10 as detectIsWindows10,
+} from './terminalEnvironment.js';
+
+// Re-export these for backward compatibility
+export { TerminalType, detectTerminalType };
 
 /**
  * Detects if the current OS is Windows 10.
  */
-export function isWindows10(): boolean {
-  if (os.platform() !== 'win32') {
-    return false;
-  }
-  const release = os.release();
-  const parts = release.split('.');
-  if (parts.length >= 3 && parts[0] === '10' && parts[1] === '0') {
-    const build = parseInt(parts[2], 10);
-    return build < 22000;
-  }
-  return false;
-}
+// Removed duplicate export to avoid ambiguity in index.ts
 
 /**
  * Detects if the current terminal is a JetBrains-based IDE terminal.
  */
 export function isJetBrainsTerminal(): boolean {
-  return (
-    process.env['TERMINAL_EMULATOR'] === 'JetBrains-JediTerm' ||
-    process.env['TERM_PROGRAM'] === 'JetBrains-JediTerm' ||
-    !!process.env['IDEA_INITIAL_DIRECTORY'] ||
-    !!process.env['JETBRAINS_IDE']
-  );
+  return detectTerminalType() === TerminalType.JetBrains;
 }
 
 /**
  * Detects if the current terminal is the default Apple Terminal.app.
  */
 export function isAppleTerminal(): boolean {
-  return process.env['TERM_PROGRAM'] === 'Apple_Terminal';
+  return detectTerminalType() === TerminalType.AppleTerminal;
 }
 
 /**
  * Detects if the current terminal is VS Code.
  */
 export function isVSCode(): boolean {
-  return process.env['TERM_PROGRAM'] === 'vscode';
+  return detectTerminalType() === TerminalType.VSCode;
 }
 
 /**
  * Detects if the current terminal is iTerm2.
  */
 export function isITerm2(): boolean {
-  return process.env['TERM_PROGRAM'] === 'iTerm.app';
+  return detectTerminalType() === TerminalType.ITerm2;
 }
 
 /**
  * Detects if the current terminal is Ghostty.
  */
 export function isGhostty(): boolean {
-  return (
-    process.env['TERM_PROGRAM'] === 'ghostty' ||
-    !!process.env['GHOSTTY_BIN_DIR']
-  );
+  return detectTerminalType() === TerminalType.Ghostty;
 }
 
 /**
  * Detects if running inside tmux.
  */
 export function isTmux(): boolean {
-  return !!process.env['TMUX'] || (process.env['TERM'] || '').includes('tmux');
+  return detectTerminalType() === TerminalType.Tmux;
 }
 
 /**
  * Detects if the current terminal is Windows Terminal.
  */
 export function isWindowsTerminal(): boolean {
-  return !!process.env['WT_SESSION'];
+  return detectTerminalType() === TerminalType.WindowsTerminal;
 }
 
 /**
@@ -121,7 +110,13 @@ export function supportsTrueColor(): boolean {
  * Heuristic for keyboard protocol support based on terminal identity.
  */
 export function supportsKeyboardProtocolHeuristic(): boolean {
-  return isGhostty() || isITerm2() || isVSCode() || isWindowsTerminal();
+  const type = detectTerminalType();
+  return (
+    type === TerminalType.Ghostty ||
+    type === TerminalType.ITerm2 ||
+    type === TerminalType.VSCode ||
+    type === TerminalType.WindowsTerminal
+  );
 }
 
 export enum WarningPriority {
@@ -143,8 +138,9 @@ export function getCompatibilityWarnings(options?: {
   supportsKeyboardProtocol?: boolean;
 }): StartupWarning[] {
   const warnings: StartupWarning[] = [];
+  const type = detectTerminalType();
 
-  if (isWindows10()) {
+  if (detectIsWindows10()) {
     warnings.push({
       id: 'windows-10',
       message:
@@ -153,7 +149,7 @@ export function getCompatibilityWarnings(options?: {
     });
   }
 
-  if (isJetBrainsTerminal() && options?.isAlternateBuffer) {
+  if (type === TerminalType.JetBrains && options?.isAlternateBuffer) {
     const platformTerminals: Partial<Record<NodeJS.Platform, string>> = {
       win32: 'Windows Terminal',
       darwin: 'iTerm2 or Ghostty',
@@ -169,7 +165,7 @@ export function getCompatibilityWarnings(options?: {
     });
   }
 
-  if (isTmux()) {
+  if (type === TerminalType.Tmux) {
     warnings.push({
       id: 'tmux-mouse-support',
       message:
@@ -187,10 +183,10 @@ export function getCompatibilityWarnings(options?: {
     });
   } else if (
     !supportsTrueColor() &&
-    !isITerm2() &&
-    !isVSCode() &&
-    !isGhostty() &&
-    !isAppleTerminal()
+    type !== TerminalType.ITerm2 &&
+    type !== TerminalType.VSCode &&
+    type !== TerminalType.Ghostty &&
+    type !== TerminalType.AppleTerminal
   ) {
     warnings.push({
       id: 'true-color',
