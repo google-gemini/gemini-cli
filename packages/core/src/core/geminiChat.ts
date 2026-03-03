@@ -16,7 +16,7 @@ import type {
   GenerateContentConfig,
   GenerateContentParameters,
 } from '@google/genai';
-import { toParts } from '../code_assist/converter.js';
+import { toParts } from '../utils/partUtils.js';
 import { createUserContent, FinishReason } from '@google/genai';
 import { retryWithBackoff, isRetryableError } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';

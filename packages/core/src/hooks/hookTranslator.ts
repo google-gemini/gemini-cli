@@ -12,7 +12,12 @@ import type {
   FunctionCallingConfig,
 } from '@google/genai';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
-import { getResponseText } from '../utils/partUtils.js';
+import {
+  getResponseText,
+  isContent,
+  isTextPart,
+  toParts,
+} from '../utils/partUtils.js';
 
 /**
  * Decoupled LLM request format - stable across Gemini CLI versions
@@ -88,32 +93,6 @@ export abstract class HookTranslator {
 }
 
 /**
- * Type guard to check if a value has a text property
- */
-function hasTextProperty(value: unknown): value is { text: string } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'text' in value &&
-    typeof (value as { text: unknown }).text === 'string'
-  );
-}
-
-/**
- * Type guard to check if content has role and parts properties
- */
-function isContentWithParts(
-  content: unknown,
-): content is { role: string; parts: unknown } {
-  return (
-    typeof content === 'object' &&
-    content !== null &&
-    'role' in content &&
-    'parts' in content
-  );
-}
-
-/**
  * Helper to safely extract generation config from SDK request
  * The SDK uses a config field that contains generation parameters
  */
@@ -174,7 +153,7 @@ export class HookTranslatorGenAIv1 extends HookTranslator {
             role: 'user',
             content,
           });
-        } else if (isContentWithParts(content)) {
+        } else if (isContent(content)) {
           const role =
             content.role === 'model'
               ? ('model' as const)
@@ -182,13 +161,11 @@ export class HookTranslatorGenAIv1 extends HookTranslator {
                 ? ('system' as const)
                 : ('user' as const);
 
-          const parts = Array.isArray(content.parts)
-            ? content.parts
-            : [content.parts];
+          const parts = toParts(content.parts);
 
           // Extract only text parts - intentionally filtering out non-text content
           const textContent = parts
-            .filter(hasTextProperty)
+            .filter(isTextPart)
             .map((part) => part.text)
             .join('');
 
@@ -273,7 +250,7 @@ export class HookTranslatorGenAIv1 extends HookTranslator {
         // Extract text parts from the candidate
         const textParts =
           candidate.content?.parts
-            ?.filter(hasTextProperty)
+            ?.filter(isTextPart)
             .map((part) => part.text) || [];
 
         return {

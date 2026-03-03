@@ -740,6 +740,43 @@ describe('RipGrepTool', () => {
       expect(result.returnDisplay).toContain('Found 1 match');
     });
 
+    it('should truncate extremely long lines to prevent token limit errors', async () => {
+      const filePath = path.join(tempRootDir, 'longFile.txt');
+      await fs.writeFile(filePath, 'dummy content');
+
+      // Create a 20,000 character long line
+      const longPrefix = 'A'.repeat(10000);
+      const longSuffix = 'B'.repeat(10000);
+      const longLine = `${longPrefix} match ${longSuffix}\n`;
+
+      mockSpawn.mockImplementation(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'longFile.txt' },
+                line_number: 1,
+                lines: { text: longLine },
+                submatches: [
+                  { match: { text: 'match' }, start: 10001, end: 10006 },
+                ],
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'match', no_ignore: true };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('longFile.txt');
+      expect(result.llmContent).toContain('[Truncated: showing characters');
+      expect(result.llmContent).toContain('match');
+      expect(result.llmContent).toContain('of 20007');
+    });
+
     it('should handle regex special characters correctly', async () => {
       // Setup specific mock for this test - regex pattern 'foo.*bar' should match 'const foo = "bar";'
       mockSpawn.mockImplementation(

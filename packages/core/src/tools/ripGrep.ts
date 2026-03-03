@@ -25,6 +25,8 @@ import {
 } from '../utils/ignorePatterns.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { execStreaming } from '../utils/shell-utils.js';
+import { truncateLine } from '../utils/textUtils.js';
+import { DEFAULT_MAX_LINE_LENGTH } from '../utils/constants.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
@@ -32,6 +34,34 @@ import {
 import { RIP_GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { type GrepMatch, formatGrepResults } from './grep-utils.js';
+
+interface RipGrepJson {
+  type: string;
+  data: RipGrepData;
+}
+
+interface RipGrepData {
+  path: { text: string };
+  line_number: number;
+  lines: { text: string };
+  submatches?: Array<{
+    match: { text: string };
+    start: number;
+    end: number;
+  }>;
+}
+
+function isRipGrepJson(value: unknown): value is RipGrepJson {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'type' in value &&
+    typeof (value as { type: unknown }).type === 'string' &&
+    'data' in value &&
+    typeof (value as { data: unknown }).data === 'object' &&
+    (value as { data: unknown }).data !== null
+  );
+}
 
 function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
@@ -494,34 +524,51 @@ class GrepToolInvocation extends BaseToolInvocation<
     basePath: string,
   ): GrepMatch | null {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const json = JSON.parse(line);
-      if (json.type === 'match' || json.type === 'context') {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const data = json.data;
-        // Defensive check: ensure text properties exist (skips binary/invalid encoding)
-        if (data.path?.text && data.lines?.text) {
-          const absoluteFilePath = path.resolve(basePath, data.path.text);
-          const relativeCheck = path.relative(basePath, absoluteFilePath);
-          if (
-            relativeCheck === '..' ||
-            relativeCheck.startsWith(`..${path.sep}`) ||
-            path.isAbsolute(relativeCheck)
-          ) {
-            return null;
+      const json: unknown = JSON.parse(line);
+      if (isRipGrepJson(json)) {
+        if (json.type === 'match' || json.type === 'context') {
+          const data = json.data;
+          // Defensive check: ensure text properties exist (skips binary/invalid encoding)
+          if (data.path?.text && data.lines?.text) {
+            const absoluteFilePath = path.resolve(basePath, data.path.text);
+            const relativeCheck = path.relative(basePath, absoluteFilePath);
+            if (
+              relativeCheck === '..' ||
+              relativeCheck.startsWith(`..${path.sep}`) ||
+              path.isAbsolute(relativeCheck)
+            ) {
+              return null;
+            }
+
+            const relativeFilePath = path.relative(basePath, absoluteFilePath);
+
+            let lineText = data.lines.text.trimEnd();
+
+            if (lineText.length > DEFAULT_MAX_LINE_LENGTH) {
+              const centerIndex =
+                data.submatches &&
+                Array.isArray(data.submatches) &&
+                data.submatches.length > 0
+                  ? Math.floor(
+                      (data.submatches[0].start + data.submatches[0].end) / 2,
+                    )
+                  : undefined;
+
+              lineText = truncateLine(lineText, {
+                maxLength: DEFAULT_MAX_LINE_LENGTH,
+                centerIndex,
+                includeStats: true,
+              });
+            }
+
+            return {
+              absolutePath: absoluteFilePath,
+              filePath: relativeFilePath || path.basename(absoluteFilePath),
+              lineNumber: data.line_number,
+              line: lineText,
+              isContext: json.type === 'context',
+            };
           }
-
-          const relativeFilePath = path.relative(basePath, absoluteFilePath);
-
-          return {
-            absolutePath: absoluteFilePath,
-            filePath: relativeFilePath || path.basename(absoluteFilePath),
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            lineNumber: data.line_number,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            line: data.lines.text.trimEnd(),
-            isContext: json.type === 'context',
-          };
         }
       }
     } catch (error) {

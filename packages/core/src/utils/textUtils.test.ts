@@ -9,7 +9,80 @@ import {
   safeLiteralReplace,
   truncateString,
   safeTemplateReplace,
+  truncateLine,
+  truncateLongLines,
 } from './textUtils.js';
+
+describe('truncateLine', () => {
+  it('should not truncate when within maxLength', () => {
+    expect(truncateLine('hello', { maxLength: 10 })).toBe('hello');
+  });
+
+  it('should truncate and add ellipsis when exceeding maxLength', () => {
+    expect(truncateLine('hello world', { maxLength: 5 })).toBe('hello ...');
+  });
+
+  it('should include stats when requested', () => {
+    const result = truncateLine('hello world', {
+      maxLength: 5,
+      includeStats: true,
+    });
+    expect(result).toBe('hello [Truncated to 5 characters (total length: 11)]');
+  });
+
+  it('should center truncation around centerIndex', () => {
+    const text = 'abcdefghijklmnopqrstuvwxyz'; // 26 chars
+    const result = truncateLine(text, { maxLength: 10, centerIndex: 13 });
+    // Center is 13. Half length is 5.
+    // Start = 13 - 5 = 8.
+    // End = 8 + 10 = 18.
+    // substring(8, 18) = 'ijklmnopqr'
+    expect(result).toBe('... ijklmnopqr ...');
+  });
+
+  it('should handle centerIndex near start', () => {
+    const text = 'abcdefghijklmnopqrstuvwxyz';
+    const result = truncateLine(text, { maxLength: 10, centerIndex: 2 });
+    // Center is 2. Half length 5. Start = max(0, 2-5) = 0. End = 10.
+    expect(result).toBe('abcdefghij ...');
+  });
+
+  it('should handle centerIndex near end', () => {
+    const text = 'abcdefghijklmnopqrstuvwxyz';
+    const result = truncateLine(text, { maxLength: 10, centerIndex: 24 });
+    // Center is 24. Half length 5. Start = 24 - 5 = 19. End = 19 + 10 = 29.
+    // End > 26, so End = 26. Start = max(0, 26 - 10) = 16.
+    expect(result).toBe('... qrstuvwxyz');
+  });
+});
+
+describe('truncateLongLines', () => {
+  it('should truncate only long lines', () => {
+    const text = 'short\nthis is a very long line indeed\nanother short';
+    const result = truncateLongLines(text, 15, false);
+    expect(result).toBe('short\nthis is a very  ...\nanother short');
+  });
+
+  it('should preserve LF line endings', () => {
+    const text = 'line 1 is long\nline 2';
+    const result = truncateLongLines(text, 10, false);
+    expect(result).toBe('line 1 is  ...\nline 2');
+    expect(result).not.toContain('\r');
+  });
+
+  it('should preserve CRLF line endings', () => {
+    const text = 'line 1 is long\r\nline 2';
+    const result = truncateLongLines(text, 10, false);
+    expect(result).toBe('line 1 is  ...\r\nline 2');
+    expect(result).toContain('\r\n');
+  });
+
+  it('should handle empty or null input', () => {
+    expect(truncateLongLines('', 10)).toBe('');
+    // @ts-expect-error testing null
+    expect(truncateLongLines(null, 10)).toBe(null);
+  });
+});
 
 describe('safeLiteralReplace', () => {
   it('returns original string when oldString empty or not found', () => {

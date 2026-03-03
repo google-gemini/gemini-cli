@@ -7,6 +7,7 @@
 import type { PartListUnion, Part } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import { debugLogger } from './debugLogger.js';
+import { toParts } from './partUtils.js';
 
 // Token estimation constants
 // ASCII characters (0-127) are roughly 4 chars per token
@@ -140,11 +141,7 @@ export async function calculateRequestTokenCount(
   contentGenerator: ContentGenerator,
   model: string,
 ): Promise<number> {
-  const parts: Part[] = Array.isArray(request)
-    ? request.map((p) => (typeof p === 'string' ? { text: p } : p))
-    : typeof request === 'string'
-      ? [{ text: request }]
-      : [request];
+  const parts = toParts(request);
 
   // Use countTokens API only for heavy media parts that are hard to estimate.
   const hasMedia = parts.some((p) => {

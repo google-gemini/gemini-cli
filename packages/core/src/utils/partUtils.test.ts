@@ -10,6 +10,13 @@ import {
   getResponseText,
   flatMapTextParts,
   appendToLastTextPart,
+  isPart,
+  isTextPart,
+  isContent,
+  isFunctionCallPart,
+  isFunctionResponsePart,
+  isInlineDataPart,
+  isFileDataPart,
 } from './partUtils.js';
 import type { GenerateContentResponse, Part, PartUnion } from '@google/genai';
 
@@ -28,6 +35,61 @@ const mockResponse = (
 });
 
 describe('partUtils', () => {
+  describe('type guards', () => {
+    it('isPart', () => {
+      expect(isPart({ text: 'hi' })).toBe(true);
+      expect(isPart({ functionCall: { name: 'f' } })).toBe(true);
+      expect(isPart('string')).toBe(false);
+      expect(isPart(['array'])).toBe(false);
+      expect(isPart({ parts: [] })).toBe(false);
+      expect(isPart(null)).toBe(false);
+    });
+
+    it('isTextPart', () => {
+      expect(isTextPart({ text: 'hi' })).toBe(true);
+      expect(isTextPart({ text: '' })).toBe(true);
+      expect(isTextPart({ functionCall: { name: 'f' } })).toBe(false);
+      expect(isTextPart({ text: 123 })).toBe(false);
+    });
+
+    it('isContent', () => {
+      expect(isContent({ parts: [] })).toBe(true);
+      expect(isContent({ role: 'user', parts: [{ text: 'hi' }] })).toBe(true);
+      expect(isContent({ text: 'hi' })).toBe(false);
+    });
+
+    it('isFunctionCallPart', () => {
+      expect(isFunctionCallPart({ functionCall: { name: 'f' } })).toBe(true);
+      expect(
+        isFunctionCallPart({ functionCall: { name: 'f', args: {} } }),
+      ).toBe(true);
+      expect(isFunctionCallPart({ text: 'hi' })).toBe(false);
+    });
+
+    it('isFunctionResponsePart', () => {
+      expect(
+        isFunctionResponsePart({
+          functionResponse: { name: 'f', response: {} },
+        }),
+      ).toBe(true);
+      expect(isFunctionResponsePart({ text: 'hi' })).toBe(false);
+    });
+
+    it('isInlineDataPart', () => {
+      expect(
+        isInlineDataPart({ inlineData: { mimeType: 't', data: 'd' } }),
+      ).toBe(true);
+      expect(isInlineDataPart({ text: 'hi' })).toBe(false);
+    });
+
+    it('isFileDataPart', () => {
+      expect(
+        isFileDataPart({ fileData: { mimeType: 't', fileUri: 'u' } }),
+      ).toBe(true);
+      expect(isFileDataPart({ text: 'hi' })).toBe(false);
+    });
+  });
+
   describe('partToString (default behavior)', () => {
     it('should return empty string for undefined or null', () => {
       // @ts-expect-error Testing invalid input
@@ -81,7 +143,7 @@ describe('partUtils', () => {
     });
 
     it('should return descriptive string for videoMetadata part', () => {
-      const part = { videoMetadata: {} } as Part;
+      const part: Part = { videoMetadata: {} };
       expect(partToString(part, verboseOptions)).toBe('[Video Metadata]');
     });
 
@@ -91,38 +153,44 @@ describe('partUtils', () => {
     });
 
     it('should return descriptive string for codeExecutionResult part', () => {
-      const part = { codeExecutionResult: {} } as Part;
+      const part: Part = { codeExecutionResult: {} };
       expect(partToString(part, verboseOptions)).toBe(
         '[Code Execution Result]',
       );
     });
 
     it('should return descriptive string for executableCode part', () => {
-      const part = { executableCode: {} } as Part;
+      const part: Part = { executableCode: {} };
       expect(partToString(part, verboseOptions)).toBe('[Executable Code]');
     });
 
     it('should return descriptive string for fileData part', () => {
-      const part = { fileData: {} } as Part;
+      const part: Part = {
+        fileData: { mimeType: 'image/png', fileUri: 'u' },
+      };
       expect(partToString(part, verboseOptions)).toBe('[File Data]');
     });
 
-    it('should return descriptive string for functionCall part', () => {
-      const part = { functionCall: { name: 'myFunction' } } as Part;
+    it('should return descriptive string for functionCall }', () => {
+      const part: Part = { functionCall: { name: 'myFunction' } };
       expect(partToString(part, verboseOptions)).toBe(
         '[Function Call: myFunction]',
       );
     });
 
     it('should return descriptive string for functionResponse part', () => {
-      const part = { functionResponse: { name: 'myFunction' } } as Part;
+      const part: Part = {
+        functionResponse: { name: 'myFunction', response: {} },
+      };
       expect(partToString(part, verboseOptions)).toBe(
         '[Function Response: myFunction]',
       );
     });
 
     it('should return descriptive string for inlineData part', () => {
-      const part = { inlineData: { mimeType: 'image/png', data: '' } } as Part;
+      const part: Part = {
+        inlineData: { mimeType: 'image/png', data: '' },
+      };
       expect(partToString(part, verboseOptions)).toBe('<image/png>');
     });
 
