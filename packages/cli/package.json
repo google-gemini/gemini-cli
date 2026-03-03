@@ -38,7 +38,7 @@
     "ansi-regex": "^6.2.2",
     "chalk": "^4.1.2",
     "cli-spinners": "^2.9.2",
-    "clipboardy": "^5.0.0",
+    "clipboardy": "~5.2.0",
     "color-convert": "^2.0.1",
     "command-exists": "^1.2.9",
     "comment-json": "^4.2.5",
