@@ -143,10 +143,15 @@ describe('LoopDetectionService', () => {
         type: 'thought',
       } as unknown as ServerGeminiStreamEvent;
 
+      // Send events just below the threshold
       for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD - 1; i++) {
         expect(service.addAndCheck(toolCallEvent).count).toBe(0);
       }
+
+      // Send a different event type
       expect(service.addAndCheck(otherEvent).count).toBe(0);
+
+      // Send the tool call event again, which should now trigger the loop
       expect(service.addAndCheck(toolCallEvent).count).toBe(1);
       expect(loggers.logLoopDetected).toHaveBeenCalledWith(
         mockConfig,
@@ -176,6 +181,8 @@ describe('LoopDetectionService', () => {
       expect(service.addAndCheck(event).count).toBeGreaterThan(0);
 
       service.disableForSession();
+
+      // Should now return 0 even though a loop was previously detected
       expect(service.addAndCheck(event).count).toBe(0);
     });
 
@@ -236,11 +243,14 @@ describe('LoopDetectionService', () => {
       service.reset('test-prompt-id');
       const longPrefix =
         'projects/my-google-cloud-project-12345/locations/us-central1/services/';
+
       let listContent = '';
       for (let i = 0; i < 15; i++) {
         listContent += `- ${longPrefix}${i}\n`;
       }
+
       const result = service.addAndCheck(createContentEvent(listContent));
+
       expect(result.count).toBe(0);
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
@@ -280,6 +290,7 @@ describe('LoopDetectionService', () => {
   I will not do anything else.
   I will wait for the user's next command.
 `;
+
       let result = { count: 0 };
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 20; i++) {
         result = service.addAndCheck(createContentEvent(userPattern));
@@ -306,7 +317,7 @@ describe('LoopDetectionService', () => {
       const alternatingPattern = 'Thinking... Done. ';
 
       let result = { count: 0 };
-      for (let i = 0; i < CONTENT_LOOP_THRESHOLD * 5; i++) {
+      for (let i = 0; i < CONTENT_LOOP_THRESHOLD * 10; i++) {
         result = service.addAndCheck(createContentEvent(alternatingPattern));
         if (result.count > 0) break;
       }
@@ -331,69 +342,98 @@ describe('LoopDetectionService', () => {
     it('should not detect a loop when repetitive content is inside a code block', () => {
       service.reset('test-prompt-id');
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      // Start a code block
       service.addAndCheck(createContentEvent('```\n'));
+
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
-        expect(
-          service.addAndCheck(createContentEvent(repeatedContent)).count,
-        ).toBe(0);
+        const result = service.addAndCheck(createContentEvent(repeatedContent));
+        expect(result.count).toBe(0);
       }
-      expect(service.addAndCheck(createContentEvent('\n```')).count).toBe(0);
+
+      const result = service.addAndCheck(createContentEvent('\n```'));
+      expect(result.count).toBe(0);
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
 
     it('should not detect loops when content transitions into a code block', () => {
       service.reset('test-prompt-id');
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      // Add repeated content almost to the threshold
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 2; i++) {
         service.addAndCheck(createContentEvent(repeatedContent));
       }
+
+      // Enter a code block
       const codeBlockStart = '```javascript\n';
-      expect(
-        service.addAndCheck(createContentEvent(codeBlockStart)).count,
-      ).toBe(0);
+      const result = service.addAndCheck(createContentEvent(codeBlockStart));
+      expect(result.count).toBe(0);
+
+      // Add the same repeated content inside the code block - should not trigger a loop
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
-        expect(
-          service.addAndCheck(createContentEvent(repeatedContent)).count,
-        ).toBe(0);
+        const resultInside = service.addAndCheck(
+          createContentEvent(repeatedContent),
+        );
+        expect(resultInside.count).toBe(0);
       }
+
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
 
     it('should skip loop detection when already inside a code block', () => {
       service.reset('test-prompt-id');
       service.addAndCheck(createContentEvent('Here is some code:\n```\n'));
+
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 5; i++) {
-        expect(
-          service.addAndCheck(createContentEvent(repeatedContent)).count,
-        ).toBe(0);
+        const result = service.addAndCheck(createContentEvent(repeatedContent));
+        expect(result.count).toBe(0);
       }
+
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
 
     it('should correctly track inCodeBlock state with multiple fence transitions', () => {
       service.reset('test-prompt-id');
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
       service.addAndCheck(createContentEvent('Normal text '));
-      expect(service.addAndCheck(createContentEvent('```\n')).count).toBe(0);
+
+      // Enter code block
+      const enterResult = service.addAndCheck(createContentEvent('```\n'));
+      expect(enterResult.count).toBe(0);
+
       for (let i = 0; i < 5; i++) {
-        expect(
-          service.addAndCheck(createContentEvent(repeatedContent)).count,
-        ).toBe(0);
+        const insideResult = service.addAndCheck(
+          createContentEvent(repeatedContent),
+        );
+        expect(insideResult.count).toBe(0);
       }
-      expect(service.addAndCheck(createContentEvent('```\n')).count).toBe(0);
-      expect(service.addAndCheck(createContentEvent('```python\n')).count).toBe(
-        0,
+
+      // Exit code block
+      const exitResult = service.addAndCheck(createContentEvent('```\n'));
+      expect(exitResult.count).toBe(0);
+
+      // Re-enter code block
+      const reenterResult = service.addAndCheck(
+        createContentEvent('```python\n'),
       );
+      expect(reenterResult.count).toBe(0);
+
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
 
     it('should detect a loop when repetitive content is outside a code block', () => {
       service.reset('test-prompt-id');
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
+      // Content inside a code block
       service.addAndCheck(createContentEvent('```'));
       service.addAndCheck(createContentEvent('\nsome code\n'));
       service.addAndCheck(createContentEvent('```'));
+
+      // Now add repeated content outside the code block
       let result = { count: 0 };
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
         result = service.addAndCheck(createContentEvent(repeatedContent));
@@ -405,22 +445,25 @@ describe('LoopDetectionService', () => {
       service.reset('test-prompt-id');
       service.addAndCheck(createContentEvent('```\ncode1\n```'));
       service.addAndCheck(createContentEvent('\nsome text\n'));
-      expect(
-        service.addAndCheck(createContentEvent('```\ncode2\n```')).count,
-      ).toBe(0);
+      const result = service.addAndCheck(createContentEvent('```\ncode2\n```'));
+
+      expect(result.count).toBe(0);
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
 
     it('should handle content with mixed code blocks and looping text', () => {
       service.reset('test-prompt-id');
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
       service.addAndCheck(createContentEvent('```'));
       service.addAndCheck(createContentEvent('\ncode1\n'));
       service.addAndCheck(createContentEvent('```'));
+
       let result = { count: 0 };
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
         result = service.addAndCheck(createContentEvent(repeatedContent));
       }
+
       expect(result.count).toBe(1);
     });
 
@@ -428,96 +471,127 @@ describe('LoopDetectionService', () => {
       service.reset('test-prompt-id');
       const repeatingTokens =
         'for (let i = 0; i < 10; i++) { console.log(i); }';
+
       service.addAndCheck(createContentEvent('```\n'));
+
       for (let i = 0; i < 20; i++) {
-        expect(
-          service.addAndCheck(createContentEvent(repeatingTokens)).count,
-        ).toBe(0);
+        const result = service.addAndCheck(createContentEvent(repeatingTokens));
+        expect(result.count).toBe(0);
       }
-      expect(service.addAndCheck(createContentEvent('\n```')).count).toBe(0);
+
+      const result = service.addAndCheck(createContentEvent('\n```'));
+      expect(result.count).toBe(0);
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
 
     it('should reset tracking when a code fence is found', () => {
       service.reset('test-prompt-id');
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
         service.addAndCheck(createContentEvent(repeatedContent));
       }
+
+      // This should reset tracking and not trigger a loop
       service.addAndCheck(createContentEvent('```'));
+
+      // Add more repeated content after code fence - should not trigger loop
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
-        expect(
-          service.addAndCheck(createContentEvent(repeatedContent)).count,
-        ).toBe(0);
+        const result = service.addAndCheck(createContentEvent(repeatedContent));
+        expect(result.count).toBe(0);
       }
+
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
 
     it('should reset tracking when a table is detected', () => {
       service.reset('test-prompt-id');
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
         service.addAndCheck(createContentEvent(repeatedContent));
       }
+
+      // This should reset tracking and not trigger a loop
       service.addAndCheck(createContentEvent('| Column 1 | Column 2 |'));
+
+      // Add more repeated content after table - should not trigger loop
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
-        expect(
-          service.addAndCheck(createContentEvent(repeatedContent)).count,
-        ).toBe(0);
+        const result = service.addAndCheck(createContentEvent(repeatedContent));
+        expect(result.count).toBe(0);
       }
     });
 
     it('should reset tracking when a list item is detected', () => {
       service.reset('test-prompt-id');
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
         service.addAndCheck(createContentEvent(repeatedContent));
       }
+
+      // This should reset tracking and not trigger a loop
       service.addAndCheck(createContentEvent('* List item'));
+
+      // Add more repeated content after list - should not trigger loop
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
-        expect(
-          service.addAndCheck(createContentEvent(repeatedContent)).count,
-        ).toBe(0);
+        const result = service.addAndCheck(createContentEvent(repeatedContent));
+        expect(result.count).toBe(0);
       }
     });
 
     it('should reset tracking when a heading is detected', () => {
       service.reset('test-prompt-id');
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
         service.addAndCheck(createContentEvent(repeatedContent));
       }
+
+      // This should reset tracking and not trigger a loop
       service.addAndCheck(createContentEvent('## Heading'));
+
+      // Add more repeated content after heading - should not trigger loop
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
-        expect(
-          service.addAndCheck(createContentEvent(repeatedContent)).count,
-        ).toBe(0);
+        const result = service.addAndCheck(createContentEvent(repeatedContent));
+        expect(result.count).toBe(0);
       }
     });
 
     it('should reset tracking when a blockquote is detected', () => {
       service.reset('test-prompt-id');
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
+
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
         service.addAndCheck(createContentEvent(repeatedContent));
       }
+
+      // This should reset tracking and not trigger a loop
       service.addAndCheck(createContentEvent('> Quote text'));
+
+      // Add more repeated content after blockquote - should not trigger loop
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
-        expect(
-          service.addAndCheck(createContentEvent(repeatedContent)).count,
-        ).toBe(0);
+        const result = service.addAndCheck(createContentEvent(repeatedContent));
+        expect(result.count).toBe(0);
       }
     });
 
     it('should reset tracking for various list item formats', () => {
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
       const listFormats = ['* item', '- item', '+ item', '1. item', '42. item'];
+
       listFormats.forEach((listFormat, index) => {
         service.reset('test-prompt-id');
+
+        // Build up to near threshold
         for (let i = 0; i < CONTENT_LOOP_THRESHOLD - 1; i++) {
           service.addAndCheck(createContentEvent(repeatedContent));
         }
+
+        // Reset should occur with list item
         service.addAndCheck(createContentEvent('\n' + listFormat));
+
+        // Should not trigger loop after reset
         const newContent = createRepetitiveContent(
           index + 100,
           CONTENT_CHUNK_SIZE,
