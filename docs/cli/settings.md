@@ -32,8 +32,8 @@ they appear in the UI.
 | Plan Model Routing      | `general.plan.modelRouting`        | Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.                           | `true`      |
 | Max Chat Model Attempts | `general.maxAttempts`              | Maximum number of attempts for requests to the main chat model. Cannot exceed 10.                                                                                              | `10`        |
 | Debug Keystroke Logging | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.                                                                                                                             | `false`     |
-| Enable Session Cleanup  | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                               | `false`     |
-| Keep chat history       | `general.sessionRetention.maxAge`  | Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")                                                                                        | `undefined` |
+| Enable Session Cleanup  | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                               | `true`      |
+| Keep chat history       | `general.sessionRetention.maxAge`  | Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")                                                                                        | `"30d"`     |
 
 ### Output
 
@@ -60,7 +60,7 @@ they appear in the UI.
 | Hide CWD                             | `ui.footer.hideCWD`                    | Hide the current working directory path in the footer.                                                                                                            | `false`  |
 | Hide Sandbox Status                  | `ui.footer.hideSandboxStatus`          | Hide the sandbox status indicator in the footer.                                                                                                                  | `false`  |
 | Hide Model Info                      | `ui.footer.hideModelInfo`              | Hide the model name and context usage in the footer.                                                                                                              | `false`  |
-| Hide Context Window Percentage       | `ui.footer.hideContextPercentage`      | Hides the context window remaining percentage.                                                                                                                    | `true`   |
+| Hide Context Window Percentage       | `ui.footer.hideContextPercentage`      | Hides the context window usage percentage.                                                                                                                        | `true`   |
 | Hide Footer                          | `ui.hideFooter`                        | Hide the footer from the UI                                                                                                                                       | `false`  |
 | Show Memory Usage                    | `ui.showMemoryUsage`                   | Display memory usage information in the UI                                                                                                                        | `false`  |
 | Show Line Numbers                    | `ui.showLineNumbers`                   | Show line numbers in the chat.                                                                                                                                    | `true`   |
@@ -72,6 +72,7 @@ they appear in the UI.
 | Incremental Rendering                | `ui.incrementalRendering`              | Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled. | `true`   |
 | Show Spinner                         | `ui.showSpinner`                       | Show the spinner during operations.                                                                                                                               | `true`   |
 | Loading Phrases                      | `ui.loadingPhrases`                    | What to show while the model is working: tips, witty comments, both, or nothing.                                                                                  | `"tips"` |
+| Error Verbosity                      | `ui.errorVerbosity`                    | Controls whether recoverable errors are hidden (low) or fully shown (full).                                                                                       | `"low"`  |
 | Screen Reader Mode                   | `ui.accessibility.screenReader`        | Render output in plain-text to be more screen reader accessible                                                                                                   | `false`  |
 
 ### IDE
@@ -80,15 +81,21 @@ they appear in the UI.
 | -------- | ------------- | ---------------------------- | ------- |
 | IDE Mode | `ide.enabled` | Enable IDE integration mode. | `false` |
 
+### Billing
+
+| UI Label         | Setting                   | Description                                                                                                                                                | Default |
+| ---------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Overage Strategy | `billing.overageStrategy` | How to handle quota exhaustion when AI credits are available. 'ask' prompts each time, 'always' automatically uses credits, 'never' disables credit usage. | `"ask"` |
+
 ### Model
 
-| UI Label                | Setting                      | Description                                                                            | Default     |
-| ----------------------- | ---------------------------- | -------------------------------------------------------------------------------------- | ----------- |
-| Model                   | `model.name`                 | The Gemini model to use for conversations.                                             | `undefined` |
-| Max Session Turns       | `model.maxSessionTurns`      | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.      | `-1`        |
-| Compression Threshold   | `model.compressionThreshold` | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3). | `0.5`       |
-| Disable Loop Detection  | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false`     |
-| Skip Next Speaker Check | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`      |
+| UI Label                      | Setting                      | Description                                                                            | Default     |
+| ----------------------------- | ---------------------------- | -------------------------------------------------------------------------------------- | ----------- |
+| Model                         | `model.name`                 | The Gemini model to use for conversations.                                             | `undefined` |
+| Max Session Turns             | `model.maxSessionTurns`      | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.      | `-1`        |
+| Context Compression Threshold | `model.compressionThreshold` | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3). | `0.5`       |
+| Disable Loop Detection        | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false`     |
+| Skip Next Speaker Check       | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`      |
 
 ### Context
 

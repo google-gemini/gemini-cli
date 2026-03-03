@@ -4,15 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Config,
-  GeminiChat,
-  ToolResult,
-  ToolCallConfirmationDetails,
-  FilterFilesOptions,
-  ConversationRecord,
-} from '@google/gemini-cli-core';
 import {
+  type Config,
+  type GeminiChat,
+  type ToolResult,
+  type ToolCallConfirmationDetails,
+  type FilterFilesOptions,
+  type ConversationRecord,
   CoreToolCallStatus,
   AuthType,
   logToolCall,
@@ -39,6 +37,16 @@ import {
   ApprovalMode,
   getVersion,
   convertSessionToClientHistory,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  getDisplayString,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -61,11 +69,14 @@ import { loadCliConfig } from '../config/config.js';
 import { runExitCleanup } from '../utils/cleanup.js';
 import { SessionSelector } from '../utils/sessionUtils.js';
 
+import { CommandHandler } from './commandHandler.js';
 export async function runZedIntegration(
   config: Config,
   settings: LoadedSettings,
   argv: CliArgs,
 ) {
+  // ... (skip unchanged lines) ...
+
   const { stdout: workingStdout } = createWorkingStdio();
   const stdout = Writable.toWeb(workingStdout) as WritableStream;
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -240,16 +251,37 @@ export class GeminiAgent {
 
     const geminiClient = config.getGeminiClient();
     const chat = await geminiClient.startChat();
-    const session = new Session(sessionId, chat, config, this.connection);
+    const session = new Session(
+      sessionId,
+      chat,
+      config,
+      this.connection,
+      this.settings,
+    );
     this.sessions.set(sessionId, session);
 
-    return {
+    setTimeout(() => {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      session.sendAvailableCommands();
+    }, 0);
+
+    const { availableModels, currentModelId } = buildAvailableModels(
+      config,
+      loadedSettings,
+    );
+
+    const response = {
       sessionId,
       modes: {
         availableModes: buildAvailableModes(config.isPlanEnabled()),
         currentModeId: config.getApprovalMode(),
       },
+      models: {
+        availableModels,
+        currentModelId,
+      },
     };
+    return response;
   }
 
   async loadSession({
@@ -291,6 +323,7 @@ export class GeminiAgent {
       geminiClient.getChat(),
       config,
       this.connection,
+      this.settings,
     );
     this.sessions.set(sessionId, session);
 
@@ -298,12 +331,27 @@ export class GeminiAgent {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     session.streamHistory(sessionData.messages);
 
-    return {
+    setTimeout(() => {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      session.sendAvailableCommands();
+    }, 0);
+
+    const { availableModels, currentModelId } = buildAvailableModels(
+      config,
+      this.settings,
+    );
+
+    const response = {
       modes: {
         availableModes: buildAvailableModes(config.isPlanEnabled()),
         currentModeId: config.getApprovalMode(),
       },
+      models: {
+        availableModels,
+        currentModelId,
+      },
     };
+    return response;
   }
 
   private async initializeSessionConfig(
@@ -414,16 +462,28 @@ export class GeminiAgent {
     }
     return session.setMode(params.modeId);
   }
+
+  async unstable_setSessionModel(
+    params: acp.SetSessionModelRequest,
+  ): Promise<acp.SetSessionModelResponse> {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${params.sessionId}`);
+    }
+    return session.setModel(params.modelId);
+  }
 }
 
 export class Session {
   private pendingPrompt: AbortController | null = null;
+  private commandHandler = new CommandHandler();
 
   constructor(
     private readonly id: string,
     private readonly chat: GeminiChat,
     private readonly config: Config,
     private readonly connection: acp.AgentSideConnection,
+    private readonly settings: LoadedSettings,
   ) {}
 
   async cancelPendingPrompt(): Promise<void> {
@@ -443,6 +503,27 @@ export class Session {
     }
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     this.config.setApprovalMode(mode.id as ApprovalMode);
+    return {};
+  }
+
+  private getAvailableCommands() {
+    return this.commandHandler.getAvailableCommands();
+  }
+
+  async sendAvailableCommands(): Promise<void> {
+    const availableCommands = this.getAvailableCommands().map((command) => ({
+      name: command.name,
+      description: command.description,
+    }));
+
+    await this.sendUpdate({
+      sessionUpdate: 'available_commands_update',
+      availableCommands,
+    });
+  }
+
+  setModel(modelId: acp.ModelId): acp.SetSessionModelResponse {
+    this.config.setModel(modelId);
     return {};
   }
 
@@ -521,10 +602,47 @@ export class Session {
     const pendingSend = new AbortController();
     this.pendingPrompt = pendingSend;
 
+    await this.config.waitForMcpInit();
+
     const promptId = Math.random().toString(16).slice(2);
     const chat = this.chat;
 
     const parts = await this.#resolvePrompt(params.prompt, pendingSend.signal);
+
+    // Command interception
+    let commandText = '';
+
+    for (const part of parts) {
+      if (typeof part === 'object' && part !== null) {
+        if ('text' in part) {
+          // It is a text part
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion
+          const text = (part as any).text;
+          if (typeof text === 'string') {
+            commandText += text;
+          }
+        } else {
+          // Non-text part (image, embedded resource)
+          // Stop looking for command
+          break;
+        }
+      }
+    }
+
+    commandText = commandText.trim();
+
+    if (
+      commandText &&
+      (commandText.startsWith('/') || commandText.startsWith('$'))
+    ) {
+      // If we found a command, pass it to handleCommand
+      // Note: handleCommand currently expects `commandText` to be the command string
+      // It uses `parts` argument but effectively ignores it in current implementation
+      const handled = await this.handleCommand(commandText, parts);
+      if (handled) {
+        return { stopReason: 'end_turn' };
+      }
+    }
 
     let nextMessage: Content | null = { role: 'user', parts };
 
@@ -625,9 +743,28 @@ export class Session {
     return { stopReason: 'end_turn' };
   }
 
-  private async sendUpdate(
-    update: acp.SessionNotification['update'],
-  ): Promise<void> {
+  private async handleCommand(
+    commandText: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    parts: Part[],
+  ): Promise<boolean> {
+    const gitService = await this.config.getGitService();
+    const commandContext = {
+      config: this.config,
+      settings: this.settings,
+      git: gitService,
+      sendMessage: async (text: string) => {
+        await this.sendUpdate({
+          sessionUpdate: 'agent_message_chunk',
+          content: { type: 'text', text },
+        });
+      },
+    };
+
+    return this.commandHandler.handleCommand(commandText, commandContext);
+  }
+
+  private async sendUpdate(update: acp.SessionUpdate): Promise<void> {
     const params: acp.SessionNotification = {
       sessionId: this.id,
       update,
@@ -700,7 +837,7 @@ export class Session {
         if (confirmationDetails.type === 'edit') {
           content.push({
             type: 'diff',
-            path: confirmationDetails.fileName,
+            path: confirmationDetails.filePath,
             oldText: confirmationDetails.originalContent,
             newText: confirmationDetails.newContent,
             _meta: {
@@ -1228,7 +1365,9 @@ function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
       if ('fileName' in toolResult.returnDisplay) {
         return {
           type: 'diff',
-          path: toolResult.returnDisplay.fileName,
+          path:
+            toolResult.returnDisplay.filePath ??
+            toolResult.returnDisplay.fileName,
           oldText: toolResult.returnDisplay.originalContent,
           newText: toolResult.returnDisplay.newContent,
           _meta: {
@@ -1372,4 +1511,95 @@ function buildAvailableModes(isPlanEnabled: boolean): acp.SessionMode[] {
   }
 
   return modes;
+}
+
+function buildAvailableModels(
+  config: Config,
+  settings: LoadedSettings,
+): {
+  availableModels: Array<{
+    modelId: string;
+    name: string;
+    description?: string;
+  }>;
+  currentModelId: string;
+} {
+  const preferredModel = config.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
+  const shouldShowPreviewModels = config.getHasAccessToPreviewModel();
+  const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
+  const selectedAuthType = settings.merged.security.auth.selectedType;
+  const useCustomToolModel =
+    useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
+
+  const mainOptions = [
+    {
+      value: DEFAULT_GEMINI_MODEL_AUTO,
+      title: getDisplayString(DEFAULT_GEMINI_MODEL_AUTO),
+      description:
+        'Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash',
+    },
+  ];
+
+  if (shouldShowPreviewModels) {
+    mainOptions.unshift({
+      value: PREVIEW_GEMINI_MODEL_AUTO,
+      title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
+      description: useGemini31
+        ? 'Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash'
+        : 'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
+    });
+  }
+
+  const manualOptions = [
+    {
+      value: DEFAULT_GEMINI_MODEL,
+      title: getDisplayString(DEFAULT_GEMINI_MODEL),
+    },
+    {
+      value: DEFAULT_GEMINI_FLASH_MODEL,
+      title: getDisplayString(DEFAULT_GEMINI_FLASH_MODEL),
+    },
+    {
+      value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      title: getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL),
+    },
+  ];
+
+  if (shouldShowPreviewModels) {
+    const previewProModel = useGemini31
+      ? PREVIEW_GEMINI_3_1_MODEL
+      : PREVIEW_GEMINI_MODEL;
+
+    const previewProValue = useCustomToolModel
+      ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
+      : previewProModel;
+
+    manualOptions.unshift(
+      {
+        value: previewProValue,
+        title: getDisplayString(previewProModel),
+      },
+      {
+        value: PREVIEW_GEMINI_FLASH_MODEL,
+        title: getDisplayString(PREVIEW_GEMINI_FLASH_MODEL),
+      },
+    );
+  }
+
+  const scaleOptions = (
+    options: Array<{ value: string; title: string; description?: string }>,
+  ) =>
+    options.map((o) => ({
+      modelId: o.value,
+      name: o.title,
+      description: o.description,
+    }));
+
+  return {
+    availableModels: [
+      ...scaleOptions(mainOptions),
+      ...scaleOptions(manualOptions),
+    ],
+    currentModelId: preferredModel,
+  };
 }

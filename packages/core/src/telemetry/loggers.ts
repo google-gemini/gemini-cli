@@ -84,6 +84,7 @@ import type { UiEvent } from './uiTelemetry.js';
 import { uiTelemetryService } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { BillingTelemetryEvent } from './billingEvents.js';
 
 export function logCliConfiguration(
   config: Config,
@@ -825,5 +826,19 @@ export function logTokenStorageInitialization(
     logger.emit(logRecord);
 
     recordTokenStorageInitialization(config, event);
+  });
+}
+
+export function logBillingEvent(
+  config: Config,
+  event: BillingTelemetryEvent,
+): void {
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
   });
 }

@@ -158,14 +158,15 @@
             "enabled": {
               "title": "Enable Session Cleanup",
               "description": "Enable automatic session cleanup",
-              "markdownDescription": "Enable automatic session cleanup\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
+              "markdownDescription": "Enable automatic session cleanup\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             },
             "maxAge": {
               "title": "Keep chat history",
               "description": "Automatically delete chats older than this time period (e.g., \"30d\", \"7d\", \"24h\", \"1w\")",
-              "markdownDescription": "Automatically delete chats older than this time period (e.g., \"30d\", \"7d\", \"24h\", \"1w\")\n\n- Category: `General`\n- Requires restart: `no`",
+              "markdownDescription": "Automatically delete chats older than this time period (e.g., \"30d\", \"7d\", \"24h\", \"1w\")\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `30d`",
+              "default": "30d",
               "type": "string"
             },
             "maxCount": {
@@ -180,13 +181,6 @@
               "markdownDescription": "Minimum retention period (safety limit, defaults to \"1d\")\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `1d`",
               "default": "1d",
               "type": "string"
-            },
-            "warningAcknowledged": {
-              "title": "Warning Acknowledged",
-              "description": "INTERNAL: Whether the user has acknowledged the session retention warning",
-              "markdownDescription": "INTERNAL: Whether the user has acknowledged the session retention warning\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-              "default": false,
-              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -350,8 +344,8 @@
             },
             "hideContextPercentage": {
               "title": "Hide Context Window Percentage",
-              "description": "Hides the context window remaining percentage.",
-              "markdownDescription": "Hides the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "description": "Hides the context window usage percentage.",
+              "markdownDescription": "Hides the context window usage percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             }
@@ -435,6 +429,14 @@
           "default": "tips",
           "type": "string",
           "enum": ["tips", "witty", "all", "off"]
+        },
+        "errorVerbosity": {
+          "title": "Error Verbosity",
+          "description": "Controls whether recoverable errors are hidden (low) or fully shown (full).",
+          "markdownDescription": "Controls whether recoverable errors are hidden (low) or fully shown (full).\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `low`",
+          "default": "low",
+          "type": "string",
+          "enum": ["low", "full"]
         },
         "customWittyPhrases": {
           "title": "Custom Witty Phrases",
@@ -520,6 +522,24 @@
       "markdownDescription": "Telemetry configuration.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
       "$ref": "#/$defs/TelemetrySettings"
     },
+    "billing": {
+      "title": "Billing",
+      "description": "Billing and AI credits settings.",
+      "markdownDescription": "Billing and AI credits settings.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "overageStrategy": {
+          "title": "Overage Strategy",
+          "description": "How to handle quota exhaustion when AI credits are available. 'ask' prompts each time, 'always' automatically uses credits, 'never' disables credit usage.",
+          "markdownDescription": "How to handle quota exhaustion when AI credits are available. 'ask' prompts each time, 'always' automatically uses credits, 'never' disables credit usage.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `ask`",
+          "default": "ask",
+          "type": "string",
+          "enum": ["ask", "always", "never"]
+        }
+      },
+      "additionalProperties": false
+    },
     "model": {
       "title": "Model",
       "description": "Settings related to the generative model.",
@@ -550,7 +570,7 @@
           }
         },
         "compressionThreshold": {
-          "title": "Compression Threshold",
+          "title": "Context Compression Threshold",
           "description": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).",
           "markdownDescription": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `0.5`",
           "default": 0.5,

@@ -17,6 +17,7 @@ import type {
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
   PolicyUpdateOptions,
+  ToolLiveOutput,
 } from './tools.js';
 import {
   BaseDeclarativeTool,
@@ -149,7 +150,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
   async execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
     setPidCallback?: (pid: number) => void,
   ): Promise<ToolResult> {
@@ -387,16 +388,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
       } else {
         if (this.params.is_background || result.backgrounded) {
           returnDisplayMessage = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+        } else if (result.aborted) {
+          const cancelMsg = timeoutMessage || 'Command cancelled by user.';
+          if (result.output.trim()) {
+            returnDisplayMessage = `${cancelMsg}\n\nOutput before cancellation:\n${result.output}`;
+          } else {
+            returnDisplayMessage = cancelMsg;
+          }
         } else if (result.output.trim()) {
           returnDisplayMessage = result.output;
         } else {
-          if (result.aborted) {
-            if (timeoutMessage) {
-              returnDisplayMessage = timeoutMessage;
-            } else {
-              returnDisplayMessage = 'Command cancelled by user.';
-            }
-          } else if (result.signal) {
+          if (result.signal) {
             returnDisplayMessage = `Command terminated by signal: ${result.signal}`;
           } else if (result.error) {
             returnDisplayMessage = `Command failed: ${getErrorMessage(
