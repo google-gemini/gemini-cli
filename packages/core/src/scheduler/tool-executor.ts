@@ -9,7 +9,7 @@ import type {
   ToolCallResponseInfo,
   ToolResult,
   Config,
-  AnsiOutput,
+  ToolLiveOutput,
 } from '../index.js';
 import {
   ToolErrorType,
@@ -19,6 +19,7 @@ import {
 } from '../index.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { ShellToolInvocation } from '../tools/shell.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
   saveTruncatedToolOutput,
@@ -45,7 +46,7 @@ import {
 export interface ToolExecutionContext {
   call: ToolCall;
   signal: AbortSignal;
-  outputUpdateHandler?: (callId: string, output: string | AnsiOutput) => void;
+  outputUpdateHandler?: (callId: string, output: ToolLiveOutput) => void;
   onUpdateToolCall: (updatedCall: ToolCall) => void;
 }
 
@@ -68,7 +69,7 @@ export class ToolExecutor {
     // Setup live output handling
     const liveOutputCallback =
       tool.canUpdateOutput && outputUpdateHandler
-        ? (outputChunk: string | AnsiOutput) => {
+        ? (outputChunk: ToolLiveOutput) => {
             outputUpdateHandler(callId, outputChunk);
           }
         : undefined;
@@ -156,7 +157,12 @@ export class ToolExecutor {
           }
         } catch (executionError: unknown) {
           spanMetadata.error = executionError;
-          if (signal.aborted) {
+          const isAbortError =
+            executionError instanceof Error &&
+            (executionError.name === 'AbortError' ||
+              executionError.message.includes('Operation cancelled by user'));
+
+          if (signal.aborted || isAbortError) {
             completedToolCall = await this.createCancelledResult(
               call,
               'User cancelled tool execution.',
@@ -184,44 +190,88 @@ export class ToolExecutor {
     call: ToolCall,
     content: PartListUnion,
   ): Promise<{ truncatedContent: PartListUnion; outputFile?: string }> {
-    if (typeof content !== 'string' || call.request.name !== SHELL_TOOL_NAME) {
-      return { truncatedContent: content };
-    }
-
-    const threshold = this.config.getTruncateToolOutputThreshold();
-    if (threshold <= 0 || content.length <= threshold) {
-      return { truncatedContent: content };
-    }
-
     const toolName = call.request.name;
     const callId = call.request.callId;
-    const originalContentLength = content.length;
+    let outputFile: string | undefined;
 
-    const { outputFile } = await saveTruncatedToolOutput(
-      content,
-      toolName,
-      callId,
-      this.config.storage.getProjectTempDir(),
-      this.config.getSessionId(),
-    );
+    if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
+      const threshold = this.config.getTruncateToolOutputThreshold();
 
-    const truncatedContent = formatTruncatedToolOutput(
-      content,
-      outputFile,
-      threshold,
-    );
+      if (threshold > 0 && content.length > threshold) {
+        const originalContentLength = content.length;
+        const { outputFile: savedPath } = await saveTruncatedToolOutput(
+          content,
+          toolName,
+          callId,
+          this.config.storage.getProjectTempDir(),
+          this.config.getSessionId(),
+        );
+        outputFile = savedPath;
+        const truncatedContent = formatTruncatedToolOutput(
+          content,
+          outputFile,
+          threshold,
+        );
 
-    logToolOutputTruncated(
-      this.config,
-      new ToolOutputTruncatedEvent(call.request.prompt_id, {
-        toolName,
-        originalContentLength,
-        truncatedContentLength: truncatedContent.length,
-        threshold,
-      }),
-    );
+        logToolOutputTruncated(
+          this.config,
+          new ToolOutputTruncatedEvent(call.request.prompt_id, {
+            toolName,
+            originalContentLength,
+            truncatedContentLength: truncatedContent.length,
+            threshold,
+          }),
+        );
 
-    return { truncatedContent, outputFile };
+        return { truncatedContent, outputFile };
+      }
+    } else if (
+      Array.isArray(content) &&
+      content.length === 1 &&
+      'tool' in call &&
+      call.tool instanceof DiscoveredMCPTool
+    ) {
+      const firstPart = content[0];
+      if (typeof firstPart === 'object' && typeof firstPart.text === 'string') {
+        const textContent = firstPart.text;
+        const threshold = this.config.getTruncateToolOutputThreshold();
+
+        if (threshold > 0 && textContent.length > threshold) {
+          const originalContentLength = textContent.length;
+          const { outputFile: savedPath } = await saveTruncatedToolOutput(
+            textContent,
+            toolName,
+            callId,
+            this.config.storage.getProjectTempDir(),
+            this.config.getSessionId(),
+          );
+          outputFile = savedPath;
+          const truncatedText = formatTruncatedToolOutput(
+            textContent,
+            outputFile,
+            threshold,
+          );
+
+          // We need to return a NEW array to avoid mutating the original toolResult if it matters,
+          // though here we are creating the response so it's probably fine to mutate or return new.
+          const truncatedContent: Part[] = [{ ...firstPart, text: truncatedText }];
+
+          logToolOutputTruncated(
+            this.config,
+            new ToolOutputTruncatedEvent(call.request.prompt_id, {
+              toolName,
+              originalContentLength,
+              truncatedContentLength: truncatedText.length,
+              threshold,
+            }),
+          );
+
+          return { truncatedContent, outputFile };
+        }
+      }
+    }
+
+    return { truncatedContent: content, outputFile };
   }
 
   private async createCancelledResult(
