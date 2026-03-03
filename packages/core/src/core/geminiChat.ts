@@ -197,9 +197,7 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
               typeof part === 'object' &&
               'thoughtSignature' in part
             ) {
-              const newPart = { ...part };
-              delete (newPart as { thoughtSignature?: string })
-                .thoughtSignature;
+              const { thoughtSignature: _, ...newPart } = part;
               return newPart;
             }
             return part;
