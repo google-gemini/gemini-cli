@@ -22,6 +22,8 @@ interface LoadingIndicatorProps {
   wittyPhrase?: string;
   showWit?: boolean;
   showTips?: boolean;
+  loadingPhrases?: 'tips' | 'witty' | 'all' | 'off';
+  errorVerbosity?: 'low' | 'full';
   elapsedTime: number;
   inline?: boolean;
   rightContent?: React.ReactNode;
@@ -34,8 +36,10 @@ interface LoadingIndicatorProps {
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   currentLoadingPhrase,
   wittyPhrase,
-  showWit = true,
-  showTips: _showTips = true,
+  showWit: showWitProp,
+  showTips: _showTipsProp,
+  loadingPhrases = 'all',
+  errorVerbosity: _errorVerbosity = 'full',
   elapsedTime,
   inline = false,
   rightContent,
@@ -47,6 +51,9 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
+
+  const showWit =
+    showWitProp ?? (loadingPhrases === 'witty' || loadingPhrases === 'all');
 
   if (
     streamingState === StreamingState.Idle &&

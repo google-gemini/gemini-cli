@@ -259,7 +259,7 @@ const renderComposer = async (
       <SettingsContext.Provider value={settings as unknown as LoadedSettings}>
         <UIStateContext.Provider value={uiState}>
           <UIActionsContext.Provider value={uiActions}>
-            <Composer />
+            <Composer isFocused={true} />
           </UIActionsContext.Provider>
         </UIStateContext.Provider>
       </SettingsContext.Provider>
@@ -822,12 +822,16 @@ describe('Composer', () => {
 
   describe('Shortcuts Hint', () => {
     it('restores shortcuts hint after 200ms debounce when buffer is empty', async () => {
-      const { lastFrame } = await renderComposer(
-        createMockUIState({
-          buffer: { text: '' } as unknown as TextBuffer,
-          cleanUiDetailsVisible: false,
-        }),
-      );
+      const uiState = createMockUIState({
+        buffer: { text: '' } as unknown as TextBuffer,
+        cleanUiDetailsVisible: false,
+      });
+
+      const { lastFrame } = await renderComposer(uiState);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
 
       expect(lastFrame({ allowEmpty: true })).toContain('ShortcutsHint');
     });
@@ -880,6 +884,10 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+
       expect(lastFrame()).toContain('ShortcutsHint');
     });
 
@@ -889,6 +897,10 @@ describe('Composer', () => {
       });
 
       const { lastFrame } = await renderComposer(uiState);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
 
       expect(lastFrame()).toContain('ShortcutsHint');
     });
@@ -901,6 +913,12 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+
+      // In experimental layout, status row is visible during loading
+      expect(lastFrame()).toContain('LoadingIndicator');
       expect(lastFrame()).not.toContain('ShortcutsHint');
     });
 
@@ -911,6 +929,7 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
+      // In experimental layout, shortcuts hint is hidden when text is present
       expect(lastFrame()).not.toContain('ShortcutsHint');
     });
 
@@ -923,6 +942,12 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+
+      // In experimental layout, status row is visible in clean mode while busy
+      expect(lastFrame()).toContain('LoadingIndicator');
       expect(lastFrame()).not.toContain('ShortcutsHint');
     });
 
@@ -975,6 +1000,10 @@ describe('Composer', () => {
       });
 
       const { lastFrame } = await renderComposer(uiState);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
 
       expect(lastFrame()).toContain('ShortcutsHint');
     });

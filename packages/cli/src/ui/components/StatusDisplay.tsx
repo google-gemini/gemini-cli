@@ -11,6 +11,7 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
+import { HookStatusDisplay } from './HookStatusDisplay.js';
 
 interface StatusDisplayProps {
   hideContextSummary: boolean;
@@ -25,6 +26,20 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
 
   if (process.env['GEMINI_SYSTEM_MD']) {
     return <Text color={theme.status.error}>|⌐■_■|</Text>;
+  }
+
+  // In legacy layout, we show hooks here.
+  // In experimental layout, hooks are shown in the top row of the composer,
+  // but we still show them here if they are "system" hooks or if notifications are enabled.
+  const isLegacyLayout =
+    (settings.merged.ui as Record<string, unknown>)['useLegacyLayout'] === true;
+
+  if (
+    isLegacyLayout &&
+    uiState.activeHooks.length > 0 &&
+    settings.merged.hooksConfig.notifications
+  ) {
+    return <HookStatusDisplay activeHooks={uiState.activeHooks} />;
   }
 
   if (!settings.merged.ui.hideContextSummary && !hideContextSummary) {

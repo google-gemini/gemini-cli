@@ -1,20 +1,33 @@
 /**
  * @license
- * Copyright 2026 Google LLC
+ * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import {
   ApprovalMode,
   checkExhaustive,
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import type React from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useConfig } from '../contexts/ConfigContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
+import { useUIState } from '../contexts/UIStateContext.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
+import { useVimMode } from '../contexts/VimModeContext.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { isNarrowWidth } from '../utils/isNarrowWidth.js';
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
+import { isContextUsageHigh } from '../utils/contextUsage.js';
+import { theme } from '../semantic-colors.js';
+import { GENERIC_WORKING_LABEL } from '../textConstants.js';
+import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
+import { StreamingState, type HistoryItemToolGroup } from '../types.js';
 import { LoadingIndicator } from './LoadingIndicator.js';
-import { GeminiRespondingSpinner } from './GeminiRespondingSpinner.js';
 import { StatusDisplay } from './StatusDisplay.js';
-import { HookStatusDisplay } from './HookStatusDisplay.js';
 import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
 import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
@@ -29,31 +42,25 @@ import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { HorizontalLine } from './shared/HorizontalLine.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
-import { isNarrowWidth } from '../utils/isNarrowWidth.js';
-import { useUIState } from '../contexts/UIStateContext.js';
-import { useUIActions } from '../contexts/UIActionsContext.js';
-import { useVimMode } from '../contexts/VimModeContext.js';
-import { useConfig } from '../contexts/ConfigContext.js';
-import { useSettings } from '../contexts/SettingsContext.js';
-import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { StreamingState, type HistoryItemToolGroup } from '../types.js';
-import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
+import { GeminiRespondingSpinner } from './GeminiRespondingSpinner.js';
+import { HookStatusDisplay } from './HookStatusDisplay.js';
+import { ConfigInitDisplay } from './ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
-import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
-import { isContextUsageHigh } from '../utils/contextUsage.js';
-import { theme } from '../semantic-colors.js';
-import { GENERIC_WORKING_LABEL } from '../textConstants.js';
 
-export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
-  const config = useConfig();
-  const settings = useSettings();
-  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+interface ComposerProps {
+  isFocused: boolean;
+}
+
+export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
   const uiState = useUIState();
   const uiActions = useUIActions();
+  const settings = useSettings();
+  const config = useConfig();
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  const { columns: terminalWidth } = useTerminalSize();
+  const isNarrow = isNarrowWidth(terminalWidth);
   const { vimEnabled, vimMode } = useVimMode();
   const inlineThinkingMode = getInlineThinkingMode(settings);
-  const terminalWidth = uiState.terminalWidth;
-  const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
 
@@ -117,18 +124,51 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     uiState.shortcutsHelpVisible &&
     uiState.streamingState === StreamingState.Idle &&
     !hasPendingActionRequired;
-  const isInteractiveShellWaiting =
-    uiState.currentLoadingPhrase?.includes('Tab to focus');
-  const hasToast = shouldShowToast(uiState) || isInteractiveShellWaiting;
+
+  const [showShortcutsHintDebounced, setShowShortcutsHintDebounced] =
+    useState(false);
+  const canShowShortcutsHint =
+    uiState.isInputActive &&
+    uiState.streamingState === StreamingState.Idle &&
+    !hasPendingActionRequired &&
+    uiState.buffer.text.length === 0;
+
+  useEffect(() => {
+    if (!canShowShortcutsHint) {
+      setShowShortcutsHintDebounced(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setShowShortcutsHintDebounced(true);
+    }, 200);
+
+    return () => clearTimeout(timeout);
+  }, [canShowShortcutsHint]);
+
+  // Use the setting if provided, otherwise default to true for the new UX.
+  // This allows tests to override the collapse behavior.
+  const shouldCollapseDuringApproval =
+    (settings.merged.ui as Record<string, unknown>)[
+      'collapseDrawerDuringApproval'
+    ] !== false;
+
+  if (hasPendingActionRequired && shouldCollapseDuringApproval) {
+    return null;
+  }
+
+  const hasToast = shouldShowToast(uiState);
   const showLoadingIndicator =
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
     uiState.streamingState === StreamingState.Responding &&
     !hasPendingActionRequired;
+
   const hideUiDetailsForSuggestions =
     suggestionsVisible && suggestionsPosition === 'above';
   const showApprovalIndicator =
     !uiState.shellModeActive && !hideUiDetailsForSuggestions;
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
+
   let modeBleedThrough: { text: string; color: string } | null = null;
   switch (showApprovalModeIndicator) {
     case ApprovalMode.YOLO:
@@ -164,37 +204,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         ? uiState.currentModel
         : undefined,
     );
+
   const hideShortcutsHintForSuggestions = hideUiDetailsForSuggestions;
-  const isModelIdle = uiState.streamingState === StreamingState.Idle;
-  const isBufferEmpty = uiState.buffer.text.length === 0;
-  const canShowShortcutsHint =
-    isModelIdle && isBufferEmpty && !hasPendingActionRequired;
-  const [showShortcutsHintDebounced, setShowShortcutsHintDebounced] =
-    useState(canShowShortcutsHint);
-
-  useEffect(() => {
-    if (!canShowShortcutsHint) {
-      setShowShortcutsHintDebounced(false);
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      setShowShortcutsHintDebounced(true);
-    }, 200);
-
-    return () => clearTimeout(timeout);
-  }, [canShowShortcutsHint]);
-
-  // Use the setting if provided, otherwise default to true for the new UX.
-  // This allows tests to override the collapse behavior.
-  const shouldCollapseDuringApproval =
-    (settings.merged.ui as Record<string, unknown>)[
-      'collapseDrawerDuringApproval'
-    ] !== false;
-
-  if (hasPendingActionRequired && shouldCollapseDuringApproval) {
-    return null;
-  }
 
   const showShortcutsHint =
     settings.merged.ui.showShortcutsHint &&
@@ -203,6 +214,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const showMinimalModeBleedThrough =
     !hideUiDetailsForSuggestions && Boolean(minimalModeBleedThrough);
   const showMinimalInlineLoading = !showUiDetails && showLoadingIndicator;
+  const hasActiveHooks =
+    uiState.activeHooks.length > 0 && settings.merged.hooksConfig.notifications;
   const showMinimalBleedThroughRow =
     !showUiDetails &&
     (showMinimalModeBleedThrough ||
@@ -212,7 +225,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     !showUiDetails &&
     (showMinimalInlineLoading ||
       showMinimalBleedThroughRow ||
-      showShortcutsHint);
+      showShortcutsHint ||
+      hasActiveHooks);
 
   let estimatedStatusLength = 0;
   if (
@@ -240,6 +254,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   } else if (hasPendingActionRequired) {
     estimatedStatusLength = 20; // "↑ Action required"
   }
+
+  const isInteractiveShellWaiting = uiState.currentLoadingPhrase?.includes(
+    INTERACTIVE_SHELL_WAITING_PHRASE,
+  );
 
   const ambientText = (() => {
     if (isInteractiveShellWaiting) return undefined;
@@ -317,8 +335,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   };
 
   const renderStatusNode = () => {
-    if (!showUiDetails) return null;
-
+    // In experimental layout, hooks take priority
     if (
       isExperimentalLayout &&
       uiState.activeHooks.length > 0 &&
@@ -345,8 +362,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           </Text>
           {!hasUserHooks && showWit && uiState.currentWittyPhrase && (
             <Box marginLeft={1}>
-              <Text color={theme.text.secondary} italic>
-                {uiState.currentWittyPhrase}
+              <Text color={theme.text.secondary} dimColor italic>
+                {uiState.currentWittyPhrase} :)
               </Text>
             </Box>
           )}
@@ -397,6 +414,188 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const statusNode = renderStatusNode();
   const hasStatusMessage = Boolean(statusNode) || hasToast;
 
+  const renderExperimentalStatusNode = () => {
+    if (!showUiDetails && !showMinimalMetaRow) return null;
+
+    return (
+      <Box width="100%" flexDirection="column">
+        {!showUiDetails && showMinimalMetaRow && (
+          <Box
+            width="100%"
+            flexDirection="row"
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <Box flexDirection="row">
+              {showMinimalInlineLoading && (
+                <LoadingIndicator
+                  inline
+                  loadingPhrases={loadingPhrases}
+                  errorVerbosity={settings.merged.ui.errorVerbosity}
+                  elapsedTime={uiState.elapsedTime}
+                  forceRealStatusOnly={true}
+                  showCancelAndTimer={false}
+                />
+              )}
+              {hasActiveHooks && (
+                <Box marginLeft={showMinimalInlineLoading ? 1 : 0}>
+                  <Box marginRight={1}>
+                    <GeminiRespondingSpinner isHookActive={true} />
+                  </Box>
+                  <Text color={theme.text.primary} italic>
+                    <HookStatusDisplay activeHooks={uiState.activeHooks} />
+                  </Text>
+                </Box>
+              )}
+              {showMinimalBleedThroughRow && (
+                <Box
+                  marginLeft={
+                    showMinimalInlineLoading || hasActiveHooks ? 1 : 0
+                  }
+                >
+                  {showMinimalModeBleedThrough && minimalModeBleedThrough && (
+                    <Text color={minimalModeBleedThrough.color}>
+                      ● {minimalModeBleedThrough.text}
+                    </Text>
+                  )}
+                  {hasMinimalStatusBleedThrough && (
+                    <Box
+                      marginLeft={
+                        showMinimalInlineLoading ||
+                        showMinimalModeBleedThrough ||
+                        hasActiveHooks
+                          ? 1
+                          : 0
+                      }
+                    >
+                      <ToastDisplay />
+                    </Box>
+                  )}
+                  {showMinimalContextBleedThrough && (
+                    <Box
+                      marginLeft={
+                        showMinimalInlineLoading ||
+                        showMinimalModeBleedThrough ||
+                        hasMinimalStatusBleedThrough ||
+                        hasActiveHooks
+                          ? 1
+                          : 0
+                      }
+                    >
+                      <ContextUsageDisplay
+                        promptTokenCount={
+                          uiState.sessionStats.lastPromptTokenCount
+                        }
+                        model={uiState.currentModel}
+                        terminalWidth={uiState.terminalWidth}
+                      />
+                    </Box>
+                  )}
+                </Box>
+              )}
+            </Box>
+            {showShortcutsHint && (
+              <Box marginLeft={1}>
+                <ShortcutsHint />
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {showUiDetails && (
+          <Box
+            width="100%"
+            flexDirection="row"
+            justifyContent="space-between"
+            alignItems="flex-start"
+          >
+            <Box flexDirection="row" flexGrow={1} flexShrink={1}>
+              {hasToast ? (
+                <Box width="100%" marginLeft={1}>
+                  {isInteractiveShellWaiting && !shouldShowToast(uiState) ? (
+                    <Text color={theme.status.warning}>
+                      ! Shell awaiting input (Tab to focus)
+                    </Text>
+                  ) : (
+                    <ToastDisplay />
+                  )}
+                </Box>
+              ) : (
+                <Box
+                  flexDirection="row"
+                  alignItems={isNarrow ? 'flex-start' : 'center'}
+                  flexGrow={1}
+                  flexShrink={0}
+                  marginLeft={1}
+                >
+                  {statusNode}
+                </Box>
+              )}
+            </Box>
+
+            {!hasToast && (
+              <Box flexShrink={0} marginLeft={2}>
+                {renderAmbientNode()}
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {showUiDetails && (
+          <Box
+            width="100%"
+            flexDirection={isNarrow ? 'column' : 'row'}
+            alignItems={isNarrow ? 'flex-start' : 'center'}
+            justifyContent="space-between"
+          >
+            <Box flexDirection="row" alignItems="center" marginLeft={1}>
+              {showApprovalIndicator && (
+                <ApprovalModeIndicator
+                  approvalMode={showApprovalModeIndicator}
+                  allowPlanMode={uiState.allowPlanMode}
+                />
+              )}
+              {uiState.shellModeActive && (
+                <Box
+                  marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
+                  marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
+                >
+                  <ShellModeIndicator />
+                </Box>
+              )}
+              {showRawMarkdownIndicator && (
+                <Box
+                  marginLeft={
+                    (showApprovalIndicator || uiState.shellModeActive) &&
+                    !isNarrow
+                      ? 1
+                      : 0
+                  }
+                  marginTop={
+                    (showApprovalIndicator || uiState.shellModeActive) &&
+                    isNarrow
+                      ? 1
+                      : 0
+                  }
+                >
+                  <RawMarkdownIndicator />
+                </Box>
+              )}
+            </Box>
+            <Box
+              marginTop={isNarrow ? 1 : 0}
+              flexDirection="row"
+              alignItems="center"
+              marginLeft={isNarrow ? 1 : 0}
+            >
+              <StatusDisplay hideContextSummary={hideContextSummary} />
+            </Box>
+          </Box>
+        )}
+      </Box>
+    );
+  };
+
   return (
     <Box
       flexDirection="column"
@@ -420,7 +619,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
       <Box width="100%" flexDirection="column">
         {showUiDetails && hasStatusMessage && <HorizontalLine />}
-        {!isExperimentalLayout ? (
+        {isExperimentalLayout ? (
+          renderExperimentalStatusNode()
+        ) : (
           <Box width="100%" flexDirection="column">
             <Box
               width="100%"
@@ -438,21 +639,14 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                 {showUiDetails && showLoadingIndicator && (
                   <LoadingIndicator
                     inline
-                    thought={
-                      uiState.streamingState ===
-                      StreamingState.WaitingForConfirmation
-                        ? undefined
-                        : uiState.thought
-                    }
-                    currentLoadingPhrase={
-                      !showTips && !showWit
-                        ? undefined
-                        : uiState.currentLoadingPhrase
-                    }
+                    loadingPhrases={loadingPhrases}
+                    errorVerbosity={settings.merged.ui.errorVerbosity}
+                    thought={uiState.thought}
                     thoughtLabel={
                       inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
                     }
                     elapsedTime={uiState.elapsedTime}
+                    forceRealStatusOnly={false}
                   />
                 )}
               </Box>
@@ -481,39 +675,52 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                   {showMinimalInlineLoading && (
                     <LoadingIndicator
                       inline
-                      thought={
-                        uiState.streamingState ===
-                        StreamingState.WaitingForConfirmation
-                          ? undefined
-                          : uiState.thought
-                      }
-                      currentLoadingPhrase={
-                        !showTips && !showWit
-                          ? undefined
-                          : uiState.currentLoadingPhrase
-                      }
-                      thoughtLabel={
-                        inlineThinkingMode === 'full'
-                          ? 'Thinking ...'
-                          : undefined
-                      }
+                      loadingPhrases={loadingPhrases}
+                      errorVerbosity={settings.merged.ui.errorVerbosity}
                       elapsedTime={uiState.elapsedTime}
+                      forceRealStatusOnly={true}
+                      showCancelAndTimer={false}
                     />
                   )}
-                  {showMinimalModeBleedThrough && minimalModeBleedThrough && (
-                    <Text color={minimalModeBleedThrough.color}>
-                      ● {minimalModeBleedThrough.text}
-                    </Text>
+                  {hasActiveHooks && (
+                    <Box marginLeft={showMinimalInlineLoading ? 1 : 0}>
+                      <Box marginRight={1}>
+                        <GeminiRespondingSpinner isHookActive={true} />
+                      </Box>
+                      <Text color={theme.text.primary} italic>
+                        <HookStatusDisplay activeHooks={uiState.activeHooks} />
+                      </Text>
+                    </Box>
                   )}
-                  {hasMinimalStatusBleedThrough && (
+                  {showMinimalBleedThroughRow && (
                     <Box
                       marginLeft={
-                        showMinimalInlineLoading || showMinimalModeBleedThrough
+                        showMinimalInlineLoading ||
+                        showMinimalModeBleedThrough ||
+                        hasActiveHooks
                           ? 1
                           : 0
                       }
                     >
-                      <ToastDisplay />
+                      {showMinimalModeBleedThrough &&
+                        minimalModeBleedThrough && (
+                          <Text color={minimalModeBleedThrough.color}>
+                            ● {minimalModeBleedThrough.text}
+                          </Text>
+                        )}
+                      {hasMinimalStatusBleedThrough && (
+                        <Box
+                          marginLeft={
+                            showMinimalInlineLoading ||
+                            showMinimalModeBleedThrough ||
+                            hasActiveHooks
+                              ? 1
+                              : 0
+                          }
+                        >
+                          <ToastDisplay />
+                        </Box>
+                      )}
                     </Box>
                   )}
                 </Box>
@@ -572,7 +779,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                           allowPlanMode={uiState.allowPlanMode}
                         />
                       )}
-                      {!showLoadingIndicator && (
+                      {!showLoadingIndicator && !hasActiveHooks && (
                         <>
                           {uiState.shellModeActive && (
                             <Box marginLeft={1}>
@@ -587,7 +794,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                         </>
                       )}
                     </Box>
-                    {!showLoadingIndicator && (
+                    {!showLoadingIndicator && !hasActiveHooks && (
                       <>
                         <Box marginLeft={1}>
                           <Text color={theme.text.secondary}>·</Text>
@@ -599,96 +806,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                     )}
                   </>
                 )}
-              </Box>
-            )}
-          </Box>
-        ) : (
-          <Box width="100%" flexDirection="column">
-            {showUiDetails && (
-              <Box
-                width="100%"
-                flexDirection="row"
-                alignItems="center"
-                justifyContent="space-between"
-              >
-                {hasToast ? (
-                  <Box width="100%" marginLeft={1}>
-                    {isInteractiveShellWaiting && !shouldShowToast(uiState) ? (
-                      <Text color={theme.status.warning}>
-                        ! Shell awaiting input (Tab to focus)
-                      </Text>
-                    ) : (
-                      <ToastDisplay />
-                    )}
-                  </Box>
-                ) : (
-                  <>
-                    <Box
-                      flexDirection="row"
-                      alignItems={isNarrow ? 'flex-start' : 'center'}
-                      flexGrow={1}
-                      flexShrink={0}
-                      marginLeft={1}
-                    >
-                      {statusNode}
-                    </Box>
-                    <Box flexShrink={0} marginLeft={2}>
-                      {renderAmbientNode()}
-                    </Box>
-                  </>
-                )}
-              </Box>
-            )}
-
-            {showUiDetails && (
-              <Box
-                width="100%"
-                flexDirection={isNarrow ? 'column' : 'row'}
-                alignItems={isNarrow ? 'flex-start' : 'center'}
-                justifyContent="space-between"
-              >
-                <Box flexDirection="row" alignItems="center" marginLeft={1}>
-                  {showApprovalIndicator && (
-                    <ApprovalModeIndicator
-                      approvalMode={showApprovalModeIndicator}
-                      allowPlanMode={uiState.allowPlanMode}
-                    />
-                  )}
-                  {uiState.shellModeActive && (
-                    <Box
-                      marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
-                      marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
-                    >
-                      <ShellModeIndicator />
-                    </Box>
-                  )}
-                  {showRawMarkdownIndicator && (
-                    <Box
-                      marginLeft={
-                        (showApprovalIndicator || uiState.shellModeActive) &&
-                        !isNarrow
-                          ? 1
-                          : 0
-                      }
-                      marginTop={
-                        (showApprovalIndicator || uiState.shellModeActive) &&
-                        isNarrow
-                          ? 1
-                          : 0
-                      }
-                    >
-                      <RawMarkdownIndicator />
-                    </Box>
-                  )}
-                </Box>
-                <Box
-                  marginTop={isNarrow ? 1 : 0}
-                  flexDirection="row"
-                  alignItems="center"
-                  marginLeft={isNarrow ? 1 : 0}
-                >
-                  <StatusDisplay hideContextSummary={hideContextSummary} />
-                </Box>
               </Box>
             )}
           </Box>
@@ -713,7 +830,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
       {uiState.isInputActive && (
         <InputPrompt
-          disabled={hasPendingActionRequired}
           buffer={uiState.buffer}
           inputWidth={uiState.inputWidth}
           suggestionsWidth={uiState.suggestionsWidth}

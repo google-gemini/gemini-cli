@@ -38,7 +38,7 @@ export const ScreenReaderAppLayout: React.FC = () => {
           addItem={uiState.historyManager.addItem}
         />
       ) : (
-        <Composer />
+        <Composer isFocused={true} />
       )}
 
       <ExitWarning />
