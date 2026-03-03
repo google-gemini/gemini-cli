@@ -1583,8 +1583,10 @@ for that specific session.
     with screen readers.
 - **`--version`**:
   - Displays the version of the CLI.
-- **`--experimental-acp`**:
+- **`--acp`**:
   - Starts the agent in ACP mode.
+- **`--experimental-acp`**:
+  - **Deprecated.** Use `--acp` instead.
 - **`--allowed-mcp-server-names`**:
   - Allowed MCP server names.
 - **`--fake-responses`**:

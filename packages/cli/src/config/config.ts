@@ -81,6 +81,8 @@ export interface CliArgs {
   policy: string[] | undefined;
   allowedMcpServerNames: string[] | undefined;
   allowedTools: string[] | undefined;
+  acp: boolean | undefined;
+  /** @deprecated Use acp instead */
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
@@ -177,7 +179,8 @@ export async function parseArguments(
                 .filter(Boolean),
             ),
         })
-        .option('experimental-acp', {
+        .option('acp', {
+          alias: 'experimental-acp',
           type: 'boolean',
           description: 'Starts the agent in ACP mode',
         })
@@ -632,6 +635,7 @@ export async function loadCliConfig(
   // -i/--prompt-interactive forces interactive mode with an initial prompt
   const interactive =
     !!argv.promptInteractive ||
+    !!argv.acp ||
     !!argv.experimentalAcp ||
     (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
       !argv.isCommand);
@@ -821,7 +825,7 @@ export async function loadCliConfig(
     bugCommand: settings.advanced?.bugCommand,
     model: resolvedModel,
     maxSessionTurns: settings.model?.maxSessionTurns,
-    experimentalZedIntegration: argv.experimentalAcp || false,
+    acpMode: argv.acp || argv.experimentalAcp || false,
     listExtensions: argv.listExtensions || false,
     listSessions: argv.listSessions || false,
     deleteSession: argv.deleteSession,

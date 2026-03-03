@@ -672,7 +672,7 @@ export async function main() {
       await getOauthClient(settings.merged.security.auth.selectedType, config);
     }
 
-    if (config.getExperimentalZedIntegration()) {
+    if (config.getAcpMode()) {
       return runZedIntegration(config, settings, argv);
     }
 
