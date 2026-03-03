@@ -10,8 +10,14 @@ import { OAuth2Client } from 'google-auth-library';
 import { UserTierId, ActionStatus } from './types.js';
 import { FinishReason } from '@google/genai';
 import { LlmRole } from '../telemetry/types.js';
+import { logInvalidChunk } from '../telemetry/loggers.js';
+import { makeFakeConfig } from '../test-utils/config.js';
 
 vi.mock('google-auth-library');
+vi.mock('../telemetry/loggers.js', () => ({
+  logBillingEvent: vi.fn(),
+  logInvalidChunk: vi.fn(),
+}));
 
 function createTestServer(headers: Record<string, string> = {}) {
   const mockRequest = vi.fn();
@@ -807,6 +813,49 @@ data: ${jsonString}
       }
       expect(results).toHaveLength(1);
       expect(results[0]).toEqual(jsonObj);
+    });
+
+    it('should log InvalidChunkEvent when SSE chunk is not valid JSON', async () => {
+      const config = makeFakeConfig();
+      const mockRequest = vi.fn();
+      const client = { request: mockRequest } as unknown as OAuth2Client;
+      const server = new CodeAssistServer(
+        client,
+        'test-project',
+        {},
+        'test-session',
+        UserTierId.FREE,
+        undefined,
+        undefined,
+        config,
+      );
+
+      const { Readable } = await import('node:stream');
+      const mockStream = new Readable({
+        read() {},
+      });
+
+      mockRequest.mockResolvedValue({ data: mockStream });
+
+      const stream = await server.requestStreamingPost('testStream', {});
+
+      setTimeout(() => {
+        mockStream.push('data: { "invalid": json }\n\n');
+        mockStream.push(null);
+      }, 0);
+
+      const results = [];
+      for await (const res of stream) {
+        results.push(res);
+      }
+
+      expect(results).toHaveLength(0);
+      expect(logInvalidChunk).toHaveBeenCalledWith(
+        config,
+        expect.objectContaining({
+          error_message: expect.stringContaining('Unexpected token'),
+        }),
+      );
     });
 
     it('should safely process random response streams in generateContentStream (consumed/remaining credits)', async () => {

@@ -29,6 +29,7 @@ import {
   type ConversationFinishedEvent,
   type ChatCompressionEvent,
   type MalformedJsonResponseEvent,
+  type InvalidChunkEvent,
   type ContentRetryEvent,
   type ContentRetryFailureEvent,
   type RipgrepFallbackEvent,
@@ -457,6 +458,21 @@ export function logMalformedJsonResponse(
   event: MalformedJsonResponseEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logMalformedJsonResponseEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+  });
+}
+
+export function logInvalidChunk(
+  config: Config,
+  event: InvalidChunkEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logInvalidChunkEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {

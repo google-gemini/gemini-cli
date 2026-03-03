@@ -33,6 +33,7 @@ import {
   logFlashFallback,
   logChatCompression,
   logMalformedJsonResponse,
+  logInvalidChunk,
   logFileOperation,
   logRipgrepFallback,
   logToolOutputTruncated,
@@ -68,6 +69,7 @@ import {
   EVENT_AGENT_START,
   EVENT_AGENT_FINISH,
   EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
+  EVENT_INVALID_CHUNK,
   ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
@@ -77,6 +79,7 @@ import {
   FlashFallbackEvent,
   RipgrepFallbackEvent,
   MalformedJsonResponseEvent,
+  InvalidChunkEvent,
   makeChatCompressionEvent,
   FileOperationEvent,
   ToolOutputTruncatedEvent,
@@ -1731,6 +1734,36 @@ describe('loggers', () => {
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           interactive: false,
           model: 'test-model',
+        },
+      });
+    });
+  });
+
+  describe('logInvalidChunk', () => {
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logInvalidChunkEvent');
+    });
+
+    it('logs the event to Clearcut and OTEL', () => {
+      const mockConfig = makeFakeConfig();
+      const event = new InvalidChunkEvent('Unexpected token');
+
+      logInvalidChunk(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logInvalidChunkEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Invalid chunk received from stream.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          'event.name': EVENT_INVALID_CHUNK,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
+          'error.message': 'Unexpected token',
         },
       });
     });
