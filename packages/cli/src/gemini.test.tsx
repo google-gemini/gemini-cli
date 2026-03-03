@@ -731,6 +731,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       createMockConfig({
         isInteractive: () => true,
         getQuestion: () => '',
+        getAcpMode: () => false,
         getSandbox: () => undefined,
       }),
     );
@@ -782,6 +783,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       createMockConfig({
         isInteractive: () => false,
         getQuestion: () => 'test',
+        getAcpMode: () => false,
         getSandbox: () => undefined,
       }),
     );
