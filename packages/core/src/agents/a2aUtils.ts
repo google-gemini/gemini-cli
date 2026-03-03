@@ -16,6 +16,8 @@ import type {
 } from '@a2a-js/sdk';
 import type { SendMessageResult } from './a2a-client-manager.js';
 
+export const AUTH_REQUIRED_MSG = `[Authorization Required] The agent has indicated it requires authorization to proceed. Please follow the agent's instructions.`;
+
 /**
  * Reassembles incremental A2A streaming updates into a coherent result.
  * Shows sequential status/messages followed by all reassembled artifacts.
@@ -33,6 +35,7 @@ export class A2AResultReassembler {
 
     switch (chunk.kind) {
       case 'status-update':
+        this.appendStateInstructions(chunk.status?.state);
         this.pushMessage(chunk.status?.message);
         break;
 
@@ -65,6 +68,7 @@ export class A2AResultReassembler {
         break;
 
       case 'task':
+        this.appendStateInstructions(chunk.status?.state);
         this.pushMessage(chunk.status?.message);
         if (chunk.artifacts) {
           for (const art of chunk.artifacts) {
@@ -103,6 +107,17 @@ export class A2AResultReassembler {
 
       default:
         break;
+    }
+  }
+
+  private appendStateInstructions(state: TaskState | undefined) {
+    if (state !== 'auth-required') {
+      return;
+    }
+
+    // Prevent duplicate instructions if multiple chunks report auth-required
+    if (!this.messageLog.includes(AUTH_REQUIRED_MSG)) {
+      this.messageLog.push(AUTH_REQUIRED_MSG);
     }
   }
 
