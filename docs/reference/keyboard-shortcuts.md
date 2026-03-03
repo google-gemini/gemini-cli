@@ -96,9 +96,9 @@ available combinations.
 
 #### Voice Input
 
-| Action                                          | Keys                      |
-| ----------------------------------------------- | ------------------------- |
-| Toggle voice input recording (Alt+R or Ctrl+Q). | `Alt + R`<br />`Ctrl + Q` |
+| Action                                               | Keys          |
+| ---------------------------------------------------- | ------------- |
+| Start voice recording (double-space on empty input). | `Space Space` |
 
 #### App Controls
 

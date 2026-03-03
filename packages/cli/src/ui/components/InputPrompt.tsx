@@ -260,6 +260,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const innerBoxRef = useRef<DOMElement>(null);
   const hasUserNavigatedSuggestions = useRef(false);
+  // Double-space voice trigger: track last space press time (only fires on empty input)
+  const lastSpacePressRef = useRef<number>(0);
 
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
   const [commandSearchActive, setCommandSearchActive] = useState(false);
@@ -687,7 +689,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // Cancel active voice transcription if escape is hit
       if (key.name === 'escape') {
         if (voiceState.isRecording || voiceState.isTranscribing) {
-          cancelRecording();
+          void cancelRecording();
           resetEscapeState();
           return true;
         }
@@ -898,9 +900,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
-      if (voiceEnabled && keyMatchers[Command.VOICE_INPUT](key)) {
-        void toggleRecording();
-        return true;
+      // Double-space on empty input triggers voice recording.
+      // Both taps are consumed so the buffer stays empty between them.
+      if (voiceEnabled && key.sequence === ' ' && buffer.text.length === 0) {
+        const now = Date.now();
+        if (now - lastSpacePressRef.current < 500) {
+          lastSpacePressRef.current = 0;
+          void toggleRecording();
+        } else {
+          lastSpacePressRef.current = now;
+        }
+        return true; // consume the space in both cases
       }
 
       if (shellModeActive && keyMatchers[Command.REVERSE_SEARCH](key)) {
@@ -1319,6 +1329,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       toggleRecording,
       cancelRecording,
       voiceState.isRecording,
+      voiceState.isTranscribing,
     ],
   );
 

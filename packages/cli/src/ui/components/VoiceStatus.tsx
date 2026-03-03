@@ -47,13 +47,9 @@ export const VoiceStatus: React.FC<Props> = ({ item }) => (
     <Text color={theme.text.primary}>
       Shortcuts:{' '}
       <Text bold color={theme.text.accent}>
-        Alt+R
+        Space Space
       </Text>
-      {' or '}
-      <Text bold color={theme.text.accent}>
-        Ctrl+Q
-      </Text>
-      {' to record · '}
+      {' (empty input) to record · '}
       <Text bold color={theme.text.accent}>
         /voice help
       </Text>

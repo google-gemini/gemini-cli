@@ -301,11 +301,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.RESTART_APP]: [{ key: 'r' }],
   [Command.SUSPEND_APP]: [{ key: 'z', ctrl: true }],
 
-  // Voice Input
-  [Command.VOICE_INPUT]: [
-    { key: 'r', alt: true }, // Alt+R
-    { key: 'q', ctrl: true }, // Ctrl+Q
-  ],
+  // Voice Input — triggered by double-space on empty input (see InputPrompt.tsx)
+  [Command.VOICE_INPUT]: [],
 };
 
 interface CommandCategory {
@@ -540,5 +537,6 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUSPEND_APP]: 'Suspend the CLI and move it to the background.',
 
   // Voice Input
-  [Command.VOICE_INPUT]: 'Toggle voice input recording (Alt+R or Ctrl+Q).',
+  [Command.VOICE_INPUT]:
+    'Start voice input recording (double-space on empty input).',
 };
