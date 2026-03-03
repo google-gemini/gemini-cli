@@ -4,20 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ToolCall,
-  Status,
-  WaitingToolCall,
-  CompletedToolCall,
-  SuccessfulToolCall,
-  ErroredToolCall,
-  CancelledToolCall,
-  ScheduledToolCall,
-  ValidatingToolCall,
-  ExecutingToolCall,
-  ToolCallResponseInfo,
+import {
   CoreToolCallStatus,
   ROOT_SCHEDULER_ID,
+  type ToolCall,
+  type Status,
+  type WaitingToolCall,
+  type CompletedToolCall,
+  type SuccessfulToolCall,
+  type ErroredToolCall,
+  type CancelledToolCall,
+  type ScheduledToolCall,
+  type ValidatingToolCall,
+  type ExecutingToolCall,
+  type ToolCallResponseInfo,
 } from './types.js';
 import type {
   ToolConfirmationOutcome,

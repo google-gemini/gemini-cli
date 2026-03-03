@@ -4,13 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  AnyDeclarativeTool,
-  AnyToolInvocation,
-  CompletedToolCall,
-  ContentGeneratorConfig,
-  ErroredToolCall,
-  MessageBus,
+import {
   CoreToolCallStatus,
   AuthType,
   EditTool,
@@ -18,6 +12,12 @@ import type {
   ToolConfirmationOutcome,
   ToolErrorType,
   ToolRegistry,
+  type AnyDeclarativeTool,
+  type AnyToolInvocation,
+  type CompletedToolCall,
+  type ContentGeneratorConfig,
+  type ErroredToolCall,
+  type MessageBus,
 } from '../index.js';
 import { OutputFormat } from '../output/types.js';
 import { logs } from '@opentelemetry/api-logs';

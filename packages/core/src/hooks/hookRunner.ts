@@ -5,20 +5,20 @@
  */
 
 import { spawn, execSync } from 'node:child_process';
-import type {
-  HookConfig,
-  CommandHookConfig,
-  RuntimeHookConfig,
-  HookInput,
-  HookOutput,
-  HookExecutionResult,
-  BeforeAgentInput,
-  BeforeModelInput,
-  BeforeModelOutput,
-  BeforeToolInput,
+import {
   HookEventName,
   ConfigSource,
   HookType,
+  type HookConfig,
+  type CommandHookConfig,
+  type RuntimeHookConfig,
+  type HookInput,
+  type HookOutput,
+  type HookExecutionResult,
+  type BeforeAgentInput,
+  type BeforeModelInput,
+  type BeforeModelOutput,
+  type BeforeToolInput,
 } from './types.js';
 import type { Config } from '../config/config.js';
 import type { LLMRequest } from './hookTranslator.js';
