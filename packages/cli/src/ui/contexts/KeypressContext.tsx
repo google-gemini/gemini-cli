@@ -585,9 +585,11 @@ function* emitKeys(
       // carriage return
       name = 'return';
       alt = escaped;
-    } else if (escaped && ch === '\n') {
-      // Alt+Enter (linefeed), should be consistent with carriage return
+    } else if (ch === '\n') {
+      // line feed - treat as Shift+Enter for terminals that send \n or are mapped
+      // also handles Alt+Enter (linefeed) if escaped
       name = 'return';
+      shift = !escaped;
       alt = escaped;
     } else if (ch === '\t') {
       // tab
