@@ -669,6 +669,23 @@ describe('parseArguments', () => {
     const argv = await parseArguments(settings);
     expect(argv.isCommand).toBe(true);
   });
+  it('should parse --acp flag', async () => {
+    process.argv = ['node', 'script.js', '--acp'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.acp).toBe(true);
+  });
+
+  it('should parse --experimental-acp flag', async () => {
+    process.argv = ['node', 'script.js', '--experimental-acp'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.experimentalAcp).toBe(true);
+  });
+
+  it('should parse --experimental-zed-integration flag', async () => {
+    process.argv = ['node', 'script.js', '--experimental-zed-integration'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.experimentalZedIntegration).toBe(true);
+  });
 });
 
 describe('loadCliConfig', () => {
@@ -790,6 +807,30 @@ describe('loadCliConfig', () => {
     const config = await loadCliConfig(settings, 'test-session', argv);
 
     expect(config.isInteractive()).toBe(false);
+  });
+
+  it('should enable acp mode when --acp flag is present', async () => {
+    process.argv = ['node', 'script.js', '--acp'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getAcp()).toBe(true);
+  });
+
+  it('should enable acp mode when --experimental-acp flag is present', async () => {
+    process.argv = ['node', 'script.js', '--experimental-acp'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getAcp()).toBe(true);
+  });
+
+  it('should enable acp mode when --experimental-zed-integration flag is present', async () => {
+    process.argv = ['node', 'script.js', '--experimental-zed-integration'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getAcp()).toBe(true);
   });
 });
 

@@ -243,7 +243,7 @@ export async function startInteractiveUI(
               <ScrollProvider>
                 <OverflowProvider>
                   <SessionStatsProvider>
-                    <VimModeProvider>
+                    <VimModeProvider settings={settings}>
                       <AppContainer
                         config={config}
                         startupWarnings={startupWarnings}
