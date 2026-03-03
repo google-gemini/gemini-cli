@@ -200,7 +200,6 @@ describe('<ShellToolMessage />', () => {
       const { lastFrame, waitUntilReady } = renderShell(
         {
           resultDisplay: LONG_OUTPUT,
-          renderOutputAsMarkdown: false,
           availableTerminalHeight,
           ptyId: 1,
           status: CoreToolCallStatus.Executing,
@@ -224,7 +223,6 @@ describe('<ShellToolMessage />', () => {
       const { lastFrame } = renderShell(
         {
           resultDisplay: LONG_OUTPUT,
-          renderOutputAsMarkdown: false,
           availableTerminalHeight: undefined,
           status: CoreToolCallStatus.Executing,
         },
@@ -242,7 +240,6 @@ describe('<ShellToolMessage />', () => {
       const { lastFrame, waitUntilReady } = renderShell(
         {
           resultDisplay: LONG_OUTPUT,
-          renderOutputAsMarkdown: false,
           availableTerminalHeight: undefined,
           status: CoreToolCallStatus.Success,
           isExpandable: true,
@@ -268,7 +265,6 @@ describe('<ShellToolMessage />', () => {
       const { lastFrame, waitUntilReady } = renderShell(
         {
           resultDisplay: LONG_OUTPUT,
-          renderOutputAsMarkdown: false,
           availableTerminalHeight: undefined,
           status: CoreToolCallStatus.Success,
           isExpandable: false,
