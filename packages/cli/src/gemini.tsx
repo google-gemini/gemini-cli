@@ -594,12 +594,16 @@ export async function main() {
       try {
         await networkProxyManager.start();
         debugLogger.log('Network proxy started');
+        registerCleanup(async () => {
+          await networkProxyManager.stop();
+        });
       } catch (e) {
         debugLogger.error('Failed to start network proxy:', e);
+        writeToStderr(
+          'Warning: Network proxy failed to start — traffic filtering is NOT active. ' +
+            'Check debug logs for details.\n',
+        );
       }
-      registerCleanup(async () => {
-        await networkProxyManager.stop();
-      });
     }
 
     // Register SessionEnd hook to fire on graceful exit
