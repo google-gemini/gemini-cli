@@ -5,7 +5,6 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import stripAnsi from 'strip-ansi';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { type HistoryItem } from '../types.js';
 import { MessageType } from '../types.js';
@@ -307,9 +306,8 @@ describe('<HistoryItemDisplay />', () => {
       );
       await waitUntilReady();
 
-      const output = stripAnsi(lastFrame());
-      expect(output).toContain(' Thinking...');
-      expect(output).toContain('Thinking');
+      expect(lastFrame()).toContain(' Thinking...');
+      expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
     it('does not render thinking item when disabled', async () => {
