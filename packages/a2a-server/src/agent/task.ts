@@ -27,11 +27,15 @@ import {
   type ToolCallConfirmationDetails,
   type Config,
   type UserTierId,
-  type AnsiOutput,
+  type ToolLiveOutput,
+  isSubagentProgress,
   EDIT_TOOL_NAMES,
   processRestorableToolCalls,
 } from '@google/gemini-cli-core';
-import type { RequestContext, ExecutionEventBus } from '@a2a-js/sdk/server';
+import {
+  type ExecutionEventBus,
+  type RequestContext,
+} from '@a2a-js/sdk/server';
 import type {
   TaskStatusUpdateEvent,
   TaskArtifactUpdateEvent,
@@ -44,16 +48,16 @@ import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { CoderAgentEvent } from '../types.js';
-import type {
-  CoderAgentMessage,
-  StateChange,
-  ToolCallUpdate,
-  TextContent,
-  TaskMetadata,
-  Thought,
-  ThoughtSummary,
-  Citation,
+import {
+  CoderAgentEvent,
+  type CoderAgentMessage,
+  type StateChange,
+  type ToolCallUpdate,
+  type TextContent,
+  type TaskMetadata,
+  type Thought,
+  type ThoughtSummary,
+  type Citation,
 } from '../types.js';
 import type { PartUnion, Part as genAiPart } from '@google/genai';
 
@@ -333,11 +337,13 @@ export class Task {
 
   private _schedulerOutputUpdate(
     toolCallId: string,
-    outputChunk: string | AnsiOutput,
+    outputChunk: ToolLiveOutput,
   ): void {
     let outputAsText: string;
     if (typeof outputChunk === 'string') {
       outputAsText = outputChunk;
+    } else if (isSubagentProgress(outputChunk)) {
+      outputAsText = JSON.stringify(outputChunk);
     } else {
       outputAsText = outputChunk
         .map((line) => line.map((token) => token.text).join(''))

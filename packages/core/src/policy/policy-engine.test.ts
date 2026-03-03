@@ -406,6 +406,40 @@ describe('PolicyEngine', () => {
       expect(remainingRules.some((r) => r.toolName === 'tool2')).toBe(true);
     });
 
+    it('should remove rules for specific tool and source', () => {
+      engine.addRule({
+        toolName: 'tool1',
+        decision: PolicyDecision.ALLOW,
+        source: 'source1',
+      });
+      engine.addRule({
+        toolName: 'tool1',
+        decision: PolicyDecision.DENY,
+        source: 'source2',
+      });
+      engine.addRule({
+        toolName: 'tool2',
+        decision: PolicyDecision.ALLOW,
+        source: 'source1',
+      });
+
+      expect(engine.getRules()).toHaveLength(3);
+
+      engine.removeRulesForTool('tool1', 'source1');
+
+      const rules = engine.getRules();
+      expect(rules).toHaveLength(2);
+      expect(
+        rules.some((r) => r.toolName === 'tool1' && r.source === 'source2'),
+      ).toBe(true);
+      expect(
+        rules.some((r) => r.toolName === 'tool2' && r.source === 'source1'),
+      ).toBe(true);
+      expect(
+        rules.some((r) => r.toolName === 'tool1' && r.source === 'source1'),
+      ).toBe(false);
+    });
+
     it('should handle removing non-existent tool', () => {
       engine.addRule({ toolName: 'existing', decision: PolicyDecision.ALLOW });
 
@@ -2602,6 +2636,12 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.PLAN],
           },
           {
+            toolName: 'save_memory',
+            decision: PolicyDecision.ASK_USER,
+            priority: 70,
+            modes: [ApprovalMode.PLAN],
+          },
+          {
             toolName: 'exit_plan_mode',
             decision: PolicyDecision.ASK_USER,
             priority: 70,
@@ -2638,6 +2678,7 @@ describe('PolicyEngine', () => {
         'web_fetch',
         'write_todos',
         'memory',
+        'save_memory',
         'read_tool',
         'write_tool',
       ]);
@@ -2667,6 +2708,7 @@ describe('PolicyEngine', () => {
       expect(excluded.has('activate_skill')).toBe(false);
       expect(excluded.has('ask_user')).toBe(false);
       expect(excluded.has('exit_plan_mode')).toBe(false);
+      expect(excluded.has('save_memory')).toBe(false);
       // Read-only MCP tool allowed by annotation rule (matched via _serverName)
       expect(excluded.has('read_tool')).toBe(false);
     });
@@ -2766,6 +2808,82 @@ describe('PolicyEngine', () => {
         'Execution of scripts (including those from skills) is blocked',
       );
     });
+
+    it('should deny enter_plan_mode when already in PLAN mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'enter_plan_mode',
+          decision: PolicyDecision.DENY,
+          priority: 70,
+          modes: [ApprovalMode.PLAN],
+          denyMessage: 'You are already in Plan Mode.',
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.PLAN,
+      });
+
+      const result = await engine.check({ name: 'enter_plan_mode' }, undefined);
+      expect(result.decision).toBe(PolicyDecision.DENY);
+      expect(result.rule?.denyMessage).toBe('You are already in Plan Mode.');
+    });
+
+    it('should deny exit_plan_mode when in DEFAULT mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'exit_plan_mode',
+          decision: PolicyDecision.DENY,
+          priority: 10,
+          modes: [ApprovalMode.DEFAULT],
+          denyMessage: 'You are not in Plan Mode.',
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.DEFAULT,
+      });
+
+      const result = await engine.check({ name: 'exit_plan_mode' }, undefined);
+      expect(result.decision).toBe(PolicyDecision.DENY);
+      expect(result.rule?.denyMessage).toBe('You are not in Plan Mode.');
+    });
+
+    it('should deny both plan tools in YOLO mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'enter_plan_mode',
+          decision: PolicyDecision.DENY,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+        {
+          toolName: 'exit_plan_mode',
+          decision: PolicyDecision.DENY,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      const resultEnter = await engine.check(
+        { name: 'enter_plan_mode' },
+        undefined,
+      );
+      expect(resultEnter.decision).toBe(PolicyDecision.DENY);
+
+      const resultExit = await engine.check(
+        { name: 'exit_plan_mode' },
+        undefined,
+      );
+      expect(resultExit.decision).toBe(PolicyDecision.DENY);
+    });
   });
 
   describe('removeRulesByTier', () => {
@@ -2828,6 +2946,34 @@ describe('PolicyEngine', () => {
     });
   });
 
+  describe('removeRulesBySource', () => {
+    it('should remove rules matching a specific source', () => {
+      engine.addRule({
+        toolName: 'rule1',
+        decision: PolicyDecision.ALLOW,
+        source: 'source1',
+      });
+      engine.addRule({
+        toolName: 'rule2',
+        decision: PolicyDecision.ALLOW,
+        source: 'source2',
+      });
+      engine.addRule({
+        toolName: 'rule3',
+        decision: PolicyDecision.ALLOW,
+        source: 'source1',
+      });
+
+      expect(engine.getRules()).toHaveLength(3);
+
+      engine.removeRulesBySource('source1');
+
+      const rules = engine.getRules();
+      expect(rules).toHaveLength(1);
+      expect(rules[0].toolName).toBe('rule2');
+    });
+  });
+
   describe('removeCheckersByTier', () => {
     it('should remove checkers matching a specific tier', () => {
       engine.addChecker({
@@ -2850,6 +2996,31 @@ describe('PolicyEngine', () => {
       const checkers = engine.getCheckers();
       expect(checkers).toHaveLength(1);
       expect(checkers[0].priority).toBe(2.5);
+    });
+  });
+
+  describe('removeCheckersBySource', () => {
+    it('should remove checkers matching a specific source', () => {
+      engine.addChecker({
+        checker: { type: 'external', name: 'c1' },
+        source: 'sourceA',
+      });
+      engine.addChecker({
+        checker: { type: 'external', name: 'c2' },
+        source: 'sourceB',
+      });
+      engine.addChecker({
+        checker: { type: 'external', name: 'c3' },
+        source: 'sourceA',
+      });
+
+      expect(engine.getCheckers()).toHaveLength(3);
+
+      engine.removeCheckersBySource('sourceA');
+
+      const checkers = engine.getCheckers();
+      expect(checkers).toHaveLength(1);
+      expect(checkers[0].checker.name).toBe('c2');
     });
   });
 
@@ -2914,6 +3085,24 @@ describe('PolicyEngine', () => {
           })
         ).decision,
       ).toBe(PolicyDecision.ALLOW);
+    });
+  });
+
+  describe('hook checkers', () => {
+    it('should add and retrieve hook checkers in priority order', () => {
+      engine.addHookChecker({
+        checker: { type: 'external', name: 'h1' },
+        priority: 5,
+      });
+      engine.addHookChecker({
+        checker: { type: 'external', name: 'h2' },
+        priority: 10,
+      });
+
+      const hookCheckers = engine.getHookCheckers();
+      expect(hookCheckers).toHaveLength(2);
+      expect(hookCheckers[0].priority).toBe(10);
+      expect(hookCheckers[1].priority).toBe(5);
     });
   });
 });

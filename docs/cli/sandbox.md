@@ -55,12 +55,27 @@ from your organization's registry.
 ```bash
 # Enable sandboxing with command flag
 gemini -s -p "analyze the code structure"
+```
 
-# Use environment variable
+**Use environment variable**
+
+**macOS/Linux**
+
+```bash
 export GEMINI_SANDBOX=true
 gemini -p "run the test suite"
+```
 
-# Configure in settings.json
+**Windows (PowerShell)**
+
+```powershell
+$env:GEMINI_SANDBOX="true"
+gemini -p "run the test suite"
+```
+
+**Configure in settings.json**
+
+```json
 {
   "tools": {
     "sandbox": "docker"
@@ -99,14 +114,30 @@ use cases.
 
 To disable SELinux labeling for volume mounts, you can set the following:
 
+**macOS/Linux**
+
 ```bash
 export SANDBOX_FLAGS="--security-opt label=disable"
 ```
 
+**Windows (PowerShell)**
+
+```powershell
+$env:SANDBOX_FLAGS="--security-opt label=disable"
+```
+
 Multiple flags can be provided as a space-separated string:
+
+**macOS/Linux**
 
 ```bash
 export SANDBOX_FLAGS="--flag1 --flag2=value"
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:SANDBOX_FLAGS="--flag1 --flag2=value"
 ```
 
 ## Linux UID/GID handling
@@ -114,9 +145,18 @@ export SANDBOX_FLAGS="--flag1 --flag2=value"
 The sandbox automatically handles user permissions on Linux. Override these
 permissions with:
 
+**macOS/Linux**
+
 ```bash
 export SANDBOX_SET_UID_GID=true   # Force host UID/GID
 export SANDBOX_SET_UID_GID=false  # Disable UID/GID mapping
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:SANDBOX_SET_UID_GID="true"   # Force host UID/GID
+$env:SANDBOX_SET_UID_GID="false"  # Disable UID/GID mapping
 ```
 
 ## Troubleshooting
