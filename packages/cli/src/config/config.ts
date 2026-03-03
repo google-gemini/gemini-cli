@@ -82,6 +82,8 @@ export interface CliArgs {
   allowedMcpServerNames: string[] | undefined;
   allowedTools: string[] | undefined;
   experimentalAcp: boolean | undefined;
+  experimentalZedIntegration: boolean | undefined;
+  acp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
@@ -178,6 +180,16 @@ export async function parseArguments(
             ),
         })
         .option('experimental-acp', {
+          type: 'boolean',
+          description: 'Starts the agent in ACP mode',
+          hidden: true,
+        })
+        .option('experimental-zed-integration', {
+          type: 'boolean',
+          description: 'Run in Zed editor integration mode',
+          hidden: true,
+        })
+        .option('acp', {
           type: 'boolean',
           description: 'Starts the agent in ACP mode',
         })
@@ -633,6 +645,8 @@ export async function loadCliConfig(
   const interactive =
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
+    !!argv.experimentalZedIntegration ||
+    !!argv.acp ||
     (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
       !argv.isCommand);
 
@@ -821,7 +835,16 @@ export async function loadCliConfig(
     bugCommand: settings.advanced?.bugCommand,
     model: resolvedModel,
     maxSessionTurns: settings.model?.maxSessionTurns,
-    experimentalZedIntegration: argv.experimentalAcp || false,
+    acp:
+      argv.acp ||
+      argv.experimentalAcp ||
+      argv.experimentalZedIntegration ||
+      false,
+    experimentalZedIntegration:
+      argv.experimentalAcp ||
+      argv.acp ||
+      argv.experimentalZedIntegration ||
+      false,
     listExtensions: argv.listExtensions || false,
     listSessions: argv.listSessions || false,
     deleteSession: argv.deleteSession,

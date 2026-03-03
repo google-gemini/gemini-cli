@@ -61,7 +61,7 @@ import { loadCliConfig } from '../config/config.js';
 import { runExitCleanup } from '../utils/cleanup.js';
 import { SessionSelector } from '../utils/sessionUtils.js';
 
-export async function runZedIntegration(
+export async function runAcp(
   config: Config,
   settings: LoadedSettings,
   argv: CliArgs,

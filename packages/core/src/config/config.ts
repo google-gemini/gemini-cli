@@ -504,6 +504,7 @@ export interface ConfigParameters {
   disableLoopDetection?: boolean;
   maxSessionTurns?: number;
   experimentalZedIntegration?: boolean;
+  acp?: boolean;
   listSessions?: boolean;
   deleteSession?: string;
   listExtensions?: boolean;
@@ -699,6 +700,8 @@ export class Config implements McpContext {
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
+  private readonly acp: boolean = false;
+  /** @deprecated Use acp instead */
   private readonly experimentalZedIntegration: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly includeDirectoryTree: boolean = true;
@@ -894,8 +897,8 @@ export class Config implements McpContext {
         DEFAULT_PROTECT_LATEST_TURN,
     };
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
-    this.experimentalZedIntegration =
-      params.experimentalZedIntegration ?? false;
+    this.acp = !!(params.acp || params.experimentalZedIntegration);
+    this.experimentalZedIntegration = this.acp;
     this.listSessions = params.listSessions ?? false;
     this.deleteSession = params.deleteSession;
     this.listExtensions = params.listExtensions ?? false;
@@ -2205,8 +2208,13 @@ export class Config implements McpContext {
     return this.usageStatisticsEnabled;
   }
 
+  getAcp(): boolean {
+    return this.acp;
+  }
+
+  /** @deprecated Use getAcp() instead */
   getExperimentalZedIntegration(): boolean {
-    return this.experimentalZedIntegration;
+    return this.acp;
   }
 
   async waitForMcpInit(): Promise<void> {
