@@ -141,8 +141,8 @@ vi.mock('./utils/cleanup.js', async (importOriginal) => {
   };
 });
 
-vi.mock('./zed-integration/zedIntegration.js', () => ({
-  runZedIntegration: vi.fn().mockResolvedValue(undefined),
+vi.mock('./acp/acpClient.js', () => ({
+  runAcpClient: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('./utils/readStdin.js', () => ({

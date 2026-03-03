@@ -79,7 +79,7 @@ import {
   type InitializationResult,
 } from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
-import { runZedIntegration } from './zed-integration/zedIntegration.js';
+import { runAcpClient } from './acp/acpClient.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
@@ -673,7 +673,7 @@ export async function main() {
     }
 
     if (config.getAcpMode()) {
-      return runZedIntegration(config, settings, argv);
+      return runAcpClient(config, settings, argv);
     }
 
     let input = config.getQuestion();
