@@ -545,6 +545,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getQuestion: () => '',
       getSandbox: () => undefined,
       getListExtensions: () => flag === 'listExtensions',
+      getAcpMode: () => false,
       getListSessions: () => flag === 'listSessions',
       getDeleteSession: () => (flag === 'deleteSession' ? value : undefined),
       getExtensions: () => [
@@ -619,6 +620,7 @@ describe('gemini.tsx main function kitty protocol', () => {
     const mockConfig = createMockConfig({
       isInteractive: () => false,
       getQuestion: () => '',
+      getAcpMode: () => false,
       getSandbox: () => ({ command: 'docker', image: 'test-image' }),
     });
 
