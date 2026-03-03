@@ -207,8 +207,15 @@ export function classifyAgentError(
   // Collect messages from the entire cause chain for thorough matching.
   const fullErrorText = collectErrorMessages(error);
 
+  // Check for well-known connection error codes in the cause chain.
+  // NOTE: This must be checked BEFORE the 404 pattern because ENOTFOUND
+  // contains "NOTFOUND" which would otherwise match the 404 regex.
+  if (/ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ETIMEDOUT/i.test(fullErrorText)) {
+    return new AgentConnectionError(agentName, agentCardUrl, error);
+  }
+
   // Check for HTTP status code patterns across the full cause chain.
-  if (/\b404\b|not.?found/i.test(fullErrorText)) {
+  if (/\b404\b|(?<![A-Z])not.?found/i.test(fullErrorText)) {
     return new AgentCardNotFoundError(agentName, agentCardUrl);
   }
 
@@ -218,11 +225,6 @@ export function classifyAgentError(
 
   if (/\b403\b|forbidden/i.test(fullErrorText)) {
     return new AgentCardAuthError(agentName, agentCardUrl, 403);
-  }
-
-  // Check for well-known connection error codes in the cause chain.
-  if (/ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ETIMEDOUT/i.test(fullErrorText)) {
-    return new AgentConnectionError(agentName, agentCardUrl, error);
   }
 
   // Fallback to a generic connection error.

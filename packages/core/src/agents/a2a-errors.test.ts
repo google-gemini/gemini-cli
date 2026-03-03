@@ -277,6 +277,25 @@ describe('A2A Error Types', () => {
         expect(result).toBeInstanceOf(AgentCardAuthError);
         expect((result as AgentCardAuthError).statusCode).toBe(403);
       });
+
+      it('should classify ENOTFOUND as AgentConnectionError, not 404', () => {
+        // ENOTFOUND (DNS resolution failure) should NOT be misclassified
+        // as a 404 despite containing "NOTFOUND" in the error code.
+        const inner = Object.assign(
+          new Error('getaddrinfo ENOTFOUND example.invalid'),
+          {
+            code: 'ENOTFOUND',
+          },
+        );
+        const outer = new Error('fetch failed', { cause: inner });
+        const result = classifyAgentError(
+          'agent-dns',
+          'https://example.invalid/card',
+          outer,
+        );
+        expect(result).toBeInstanceOf(AgentConnectionError);
+        expect(result).not.toBeInstanceOf(AgentCardNotFoundError);
+      });
     });
   });
 });
