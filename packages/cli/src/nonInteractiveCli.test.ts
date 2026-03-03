@@ -137,7 +137,7 @@ describe('runNonInteractive', () => {
       getCommands: mockGetCommands,
     });
 
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     processStdoutSpy = vi
       .spyOn(process.stdout, 'write')
       .mockImplementation(() => true);
@@ -1787,7 +1787,7 @@ describe('runNonInteractive', () => {
     const { debugLogger } = await import('@google/gemini-cli-core');
     const debugLoggerErrorSpy = vi
       .spyOn(debugLogger, 'error')
-      .mockImplementation(() => { });
+      .mockImplementation(() => {});
 
     await runNonInteractive({
       config: mockConfig,
@@ -2070,10 +2070,59 @@ describe('runNonInteractive', () => {
       // Should contain the warning event for the block
       expect(output).toContain('"type":"error"');
       expect(output).toContain('"severity":"warning"');
-      expect(output).toContain('Agent execution blocked: Blocked by safety filter');
+      expect(output).toContain(
+        'Agent execution blocked: Blocked by safety filter',
+      );
       // Should also contain the final result event
       expect(output).toContain('"type":"result"');
       expect(output).toContain('"status":"success"');
+    });
+
+    it('should write warning to stderr for AgentExecutionBlocked in JSON mode', async () => {
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+      vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      const allEvents: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.AgentExecutionBlocked,
+          value: { reason: 'Blocked by policy' },
+        },
+        { type: GeminiEventType.Content, value: 'Recovered answer' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+        },
+      ];
+
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(allEvents),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test block json',
+        prompt_id: 'prompt-id-block-json',
+      });
+
+      // Should write warning to stderr
+      expect(processStderrSpy).toHaveBeenCalledWith(
+        '[WARNING] Agent execution blocked: Blocked by policy\n',
+      );
+      // Should still produce valid JSON output
+      expect(processStdoutSpy).toHaveBeenCalledWith(
+        JSON.stringify(
+          {
+            session_id: 'test-session-id',
+            response: 'Recovered answer',
+            stats: MOCK_SESSION_METRICS,
+          },
+          null,
+          2,
+        ),
+      );
     });
   });
 
