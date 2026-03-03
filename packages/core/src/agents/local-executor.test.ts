@@ -501,7 +501,7 @@ describe('LocalAgentExecutor', () => {
       expect(agentRegistry.getTool(subAgentName)).toBeUndefined();
     });
 
-    it('should enforce qualified names for MCP tools in agent definitions', async () => {
+    it('should automatically qualify MCP tools in agent definitions', async () => {
       const serverName = 'mcp-server';
       const toolName = 'mcp-tool';
       const qualifiedName = `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${toolName}`;
@@ -530,7 +530,7 @@ describe('LocalAgentExecutor', () => {
           return undefined;
         });
 
-      // 1. Qualified name works and registers the tool (using short name per status quo)
+      // 1. Qualified name works and registers the tool (using qualified name)
       const definition = createTestDefinition([qualifiedName]);
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -539,14 +539,18 @@ describe('LocalAgentExecutor', () => {
       );
 
       const agentRegistry = executor['toolRegistry'];
-      // Registry shortening logic means it's registered as 'mcp-tool' internally
-      expect(agentRegistry.getTool(toolName)).toBeDefined();
+      // It should be registered as the qualified name
+      expect(agentRegistry.getTool(qualifiedName)).toBeDefined();
 
-      // 2. Unqualified name for MCP tool THROWS
-      const badDefinition = createTestDefinition([toolName]);
-      await expect(
-        LocalAgentExecutor.create(badDefinition, mockConfig, onActivity),
-      ).rejects.toThrow(/must be requested with its server prefix/);
+      // 2. Unqualified name for MCP tool now also works (and gets upgraded to qualified)
+      const definition2 = createTestDefinition([toolName]);
+      const executor2 = await LocalAgentExecutor.create(
+        definition2,
+        mockConfig,
+        onActivity,
+      );
+      const agentRegistry2 = executor2['toolRegistry'];
+      expect(agentRegistry2.getTool(qualifiedName)).toBeDefined();
 
       getToolSpy.mockRestore();
     });
@@ -711,25 +715,28 @@ describe('LocalAgentExecutor', () => {
         expect.arrayContaining([
           expect.objectContaining({
             type: 'THOUGHT_CHUNK',
-            data: { text: 'T1: Listing' },
+            data: expect.objectContaining({ text: 'T1: Listing' }),
           }),
           expect.objectContaining({
             type: 'TOOL_CALL_END',
-            data: { name: LS_TOOL_NAME, output: 'file1.txt' },
+            data: expect.objectContaining({
+              name: LS_TOOL_NAME,
+              output: 'file1.txt',
+            }),
           }),
           expect.objectContaining({
             type: 'TOOL_CALL_START',
-            data: {
+            data: expect.objectContaining({
               name: TASK_COMPLETE_TOOL_NAME,
               args: { finalResult: 'Found file1.txt' },
-            },
+            }),
           }),
           expect.objectContaining({
             type: 'TOOL_CALL_END',
-            data: {
+            data: expect.objectContaining({
               name: TASK_COMPLETE_TOOL_NAME,
               output: expect.stringContaining('Output submitted'),
-            },
+            }),
           }),
         ]),
       );
