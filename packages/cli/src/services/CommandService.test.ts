@@ -229,7 +229,7 @@ describe('CommandService', () => {
         losers: [
           {
             renamedTo: 'firebase.deploy',
-            winner: builtin,
+            reason: builtin,
           },
         ],
       });
@@ -254,13 +254,13 @@ describe('CommandService', () => {
         expect.arrayContaining([
           expect.objectContaining({
             renamedTo: 'user.sync',
-            winner: expect.objectContaining({
+            reason: expect.objectContaining({
               kind: CommandKind.WORKSPACE_FILE,
             }),
           }),
           expect.objectContaining({
             renamedTo: 'workspace.sync',
-            winner: expect.objectContaining({ kind: CommandKind.USER_FILE }),
+            reason: expect.objectContaining({ kind: CommandKind.USER_FILE }),
           }),
         ]),
       );

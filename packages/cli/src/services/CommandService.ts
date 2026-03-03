@@ -14,7 +14,7 @@ export interface CommandConflict {
   losers: Array<{
     command: SlashCommand;
     renamedTo: string;
-    winner: SlashCommand;
+    reason: SlashCommand;
   }>;
 }
 
@@ -44,11 +44,11 @@ export class CommandService {
    * Asynchronously creates and initializes a new CommandService instance.
    *
    * This factory method orchestrates the entire command loading process. It
-   * runs all provided loaders in parallel, aggregates their results, handles
-   * name conflicts, and then returns a fully constructed `CommandService`
-   * instance.
+   * runs all provided loaders in parallel, aggregates their results, and
+   * resolves name conflicts.
    *
    * Conflict resolution:
+   * - Built-in and MCP commands always take precedence and are never renamed.
    * - Extension, user, and workspace commands that conflict with existing
    * commands are renamed to `extensionName.commandName`, `user.commandName` or
    * `workspace.commandName`.
@@ -87,6 +87,7 @@ export class CommandService {
         // 1. Extension commands get renamed to extension.name if the name was ever claimed
         if (cmd.extensionName) {
           finalName = this.getRenamedExtensionName(cmd, commandMap);
+          // In this conflict, the original claimant (first) is the reason the extension command (cmd) is renamed.
           this.trackConflict(conflictsMap, originalName, first, cmd, finalName);
         }
         // 2. User/Workspace commands get prefixed if they conflict
@@ -112,17 +113,18 @@ export class CommandService {
             const renamedExisting = { ...existing, name: renamedExistingName };
             commandMap.set(renamedExistingName, renamedExisting);
 
-            // Report the existing one being renamed due to the current one
+            // Report the existing one being renamed because of the current one.
+            // This ensures the UI correctly identifies the newcomer as the reason for displacement.
             this.trackConflict(
               conflictsMap,
               originalName,
-              cmd, // winner is current
-              existing, // loser is existing
+              cmd, // current is reason
+              existing, // existing is renamed
               renamedExistingName,
             );
           }
 
-          // Report the current one being renamed due to the first encountered one
+          // Report the current one being renamed because of the original claimant.
           this.trackConflict(conflictsMap, originalName, first, cmd, finalName);
         }
       } else {
@@ -144,9 +146,9 @@ export class CommandService {
             name: c.name,
             renamedTo: l.renamedTo,
             loserExtensionName: l.command.extensionName,
-            winnerExtensionName: l.winner.extensionName,
+            winnerExtensionName: l.reason.extensionName,
             loserKind: l.command.kind,
-            winnerKind: l.winner.kind,
+            winnerKind: l.reason.kind,
           })),
         ),
       );
@@ -190,12 +192,18 @@ export class CommandService {
 
   /**
    * Records a command conflict in the provided conflicts map.
+   *
+   * @param conflictsMap Map to store conflict data.
+   * @param originalName The base name that had a conflict.
+   * @param reason The command that caused the rename.
+   * @param renamedCommand The command that was renamed.
+   * @param renamedTo The new name assigned to the command.
    */
   private static trackConflict(
     conflictsMap: Map<string, CommandConflict>,
     originalName: string,
-    winner: SlashCommand,
-    loser: SlashCommand,
+    reason: SlashCommand,
+    renamedCommand: SlashCommand,
     renamedTo: string,
   ) {
     if (!conflictsMap.has(originalName)) {
@@ -206,9 +214,9 @@ export class CommandService {
     }
 
     conflictsMap.get(originalName)!.losers.push({
-      command: loser,
+      command: renamedCommand,
       renamedTo,
-      winner,
+      reason,
     });
   }
 
