@@ -160,9 +160,11 @@ export class TrackerService {
       updatedTask = { ...task, ...updates, id: task.id };
 
       if (updatedTask.parentId) {
-         if (!taskMap.has(updatedTask.parentId)) {
-            throw new Error(`Parent task with ID ${updatedTask.parentId} not found.`);
-         }
+        if (!taskMap.has(updatedTask.parentId)) {
+          throw new Error(
+            `Parent task with ID ${updatedTask.parentId} not found.`,
+          );
+        }
       }
 
       if (isClosing && task.status !== TaskStatus.CLOSED) {
@@ -179,12 +181,14 @@ export class TrackerService {
         throw new Error(`Task with ID ${id} not found.`);
       }
       updatedTask = { ...task, ...updates, id: task.id };
-      
+
       if (updatedTask.parentId) {
-         const parentTask = await this.getTask(updatedTask.parentId);
-         if (!parentTask) {
-             throw new Error(`Parent task with ID ${updatedTask.parentId} not found.`);
-         }
+        const parentTask = await this.getTask(updatedTask.parentId);
+        if (!parentTask) {
+          throw new Error(
+            `Parent task with ID ${updatedTask.parentId} not found.`,
+          );
+        }
       }
     }
 

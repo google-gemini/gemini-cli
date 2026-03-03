@@ -96,7 +96,7 @@ describe('Tracker Tools Integration', () => {
 
   it('adds dependencies and visualizes the graph', async () => {
     const createTool = new TrackerCreateTaskTool(config, messageBus);
-    
+
     // Create Parent
     await createTool.buildAndExecute(
       {
@@ -107,7 +107,7 @@ describe('Tracker Tools Integration', () => {
       getSignal(),
     );
 
-    // Create Child 
+    // Create Child
     await createTool.buildAndExecute(
       {
         title: 'Child Task',
@@ -118,15 +118,18 @@ describe('Tracker Tools Integration', () => {
     );
 
     const tasks = await config.getTrackerService().listTasks();
-    const parentId = tasks.find(t => t.title === 'Parent Task')!.id;
-    const childId = tasks.find(t => t.title === 'Child Task')!.id;
+    const parentId = tasks.find((t) => t.title === 'Parent Task')!.id;
+    const childId = tasks.find((t) => t.title === 'Child Task')!.id;
 
     // Add Dependency
     const addDepTool = new TrackerAddDependencyTool(config, messageBus);
-    await addDepTool.buildAndExecute({
+    await addDepTool.buildAndExecute(
+      {
         taskId: parentId,
         dependencyId: childId,
-    }, getSignal());
+      },
+      getSignal(),
+    );
 
     const updatedParent = await config.getTrackerService().getTask(parentId);
     expect(updatedParent?.dependencies).toContain(childId);
@@ -134,7 +137,7 @@ describe('Tracker Tools Integration', () => {
     // Visualize
     const vizTool = new TrackerVisualizeTool(config, messageBus);
     const vizResult = await vizTool.buildAndExecute({}, getSignal());
-    
+
     expect(vizResult.llmContent).toContain('Parent Task');
     expect(vizResult.llmContent).toContain('Child Task');
     expect(vizResult.llmContent).toContain(childId);
