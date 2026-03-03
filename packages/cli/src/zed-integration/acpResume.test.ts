@@ -206,6 +206,10 @@ describe('GeminiAgent Session Resume', () => {
         ],
         currentModeId: ApprovalMode.DEFAULT,
       },
+      models: {
+        availableModels: expect.any(Array),
+        currentModelId: 'gemini-pro',
+      },
     });
 
     // Verify resumeChat received the correct arguments
