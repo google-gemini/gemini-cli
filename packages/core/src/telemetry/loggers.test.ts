@@ -11,8 +11,6 @@ import type {
   ContentGeneratorConfig,
   ErroredToolCall,
   MessageBus,
-} from '../index.js';
-import {
   CoreToolCallStatus,
   AuthType,
   EditTool,
