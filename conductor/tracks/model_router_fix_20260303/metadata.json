@@ -1,8 +1,0 @@
-{
-  "track_id": "model_router_fix_20260303",
-  "type": "bug",
-  "status": "new",
-  "created_at": "2026-03-03T10:00:00Z",
-  "updated_at": "2026-03-03T10:00:00Z",
-  "description": "Investigate and fix model auto-router session persistence issue where it reverts to flash-lite after session restart."
-}
