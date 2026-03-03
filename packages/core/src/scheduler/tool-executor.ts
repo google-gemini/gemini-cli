@@ -254,7 +254,9 @@ export class ToolExecutor {
 
           // We need to return a NEW array to avoid mutating the original toolResult if it matters,
           // though here we are creating the response so it's probably fine to mutate or return new.
-          const truncatedContent: Part[] = [{ ...firstPart, text: truncatedText }];
+          const truncatedContent: Part[] = [
+            { ...firstPart, text: truncatedText },
+          ];
 
           logToolOutputTruncated(
             this.config,
