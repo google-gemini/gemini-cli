@@ -163,7 +163,6 @@ describe('commandUtils', () => {
     it('should return true when query starts with @', () => {
       expect(isAtCommand('@file')).toBe(true);
       expect(isAtCommand('@path/to/file')).toBe(true);
-      expect(isAtCommand('@')).toBe(true);
     });
 
     it('should return true when query contains @ preceded by whitespace', () => {
@@ -172,17 +171,36 @@ describe('commandUtils', () => {
       expect(isAtCommand('   @file')).toBe(true);
     });
 
-    it('should return false when query does not start with @ and has no spaced @', () => {
+    it('should return true when @ is preceded by non-whitespace (external editor scenario)', () => {
+      // When a user composes a prompt in an external editor, @-references may
+      // appear after punctuation characters such as ':' or '(' without a space.
+      // The processor must still recognise these as @-commands so that the
+      // referenced files are pre-loaded before the query is sent to the model.
+      expect(isAtCommand('check:@file.py')).toBe(true);
+      expect(isAtCommand('analyze(@file.py)')).toBe(true);
+      expect(isAtCommand('hello@file')).toBe(true);
+      expect(isAtCommand('text@path/to/file')).toBe(true);
+      expect(isAtCommand('user@host')).toBe(true);
+    });
+
+    it('should return false when query does not contain any @<path> pattern', () => {
       expect(isAtCommand('file')).toBe(false);
       expect(isAtCommand('hello')).toBe(false);
       expect(isAtCommand('')).toBe(false);
-      expect(isAtCommand('email@domain.com')).toBe(false);
-      expect(isAtCommand('user@host')).toBe(false);
+      // A bare '@' with no following path characters is not an @-command.
+      expect(isAtCommand('@')).toBe(false);
     });
 
-    it('should return false when @ is not preceded by whitespace', () => {
-      expect(isAtCommand('hello@file')).toBe(false);
-      expect(isAtCommand('text@path')).toBe(false);
+    it('should return false when @ is escaped with a backslash', () => {
+      expect(isAtCommand('\\@file')).toBe(false);
+    });
+
+    it('should return true for multi-line external editor prompts with @-references', () => {
+      expect(isAtCommand('Please review:\n@src/main.py\nand fix bugs.')).toBe(
+        true,
+      );
+      // @file after a colon on the same line.
+      expect(isAtCommand('Files:@src/a.py,@src/b.py')).toBe(true);
     });
   });
 

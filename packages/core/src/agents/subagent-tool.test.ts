@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SubagentTool } from './subagent-tool.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
+import { Kind } from '../tools/tools.js';
 import type {
   LocalAgentDefinition,
   RemoteAgentDefinition,
@@ -22,9 +23,29 @@ import type {
   ToolInvocation,
   ToolResult,
 } from '../tools/tools.js';
+import {
+  GeminiCliOperation,
+  GEN_AI_AGENT_DESCRIPTION,
+  GEN_AI_AGENT_NAME,
+} from '../telemetry/constants.js';
 import type { ToolRegistry } from 'src/tools/tool-registry.js';
 
 vi.mock('./subagent-tool-wrapper.js');
+
+// Mock runInDevTraceSpan
+const runInDevTraceSpan = vi.hoisted(() =>
+  vi.fn(async (opts, fn) => {
+    const metadata = { attributes: opts.attributes || {} };
+    return fn({
+      metadata,
+      endSpan: vi.fn(),
+    });
+  }),
+);
+
+vi.mock('../telemetry/trace.js', () => ({
+  runInDevTraceSpan,
+}));
 
 const MockSubagentToolWrapper = vi.mocked(SubagentToolWrapper);
 
@@ -70,6 +91,11 @@ describe('SubAgentInvocation', () => {
       .mockReturnValue(mockInnerInvocation);
   });
 
+  it('should have Kind.Agent', () => {
+    const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
+    expect(tool.kind).toBe(Kind.Agent);
+  });
+
   it('should delegate shouldConfirmExecute to the inner sub-invocation (local)', async () => {
     const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
     const params = {};
@@ -91,6 +117,16 @@ describe('SubAgentInvocation', () => {
       testDefinition,
       mockConfig,
       mockMessageBus,
+    );
+  });
+
+  it('should return the correct description', () => {
+    const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
+    const params = {};
+    // @ts-expect-error - accessing protected method for testing
+    const invocation = tool.createInvocation(params, mockMessageBus);
+    expect(invocation.getDescription()).toBe(
+      "Delegating to agent 'LocalAgent'",
     );
   });
 
@@ -149,6 +185,25 @@ describe('SubAgentInvocation', () => {
       abortSignal,
       updateOutput,
     );
+
+    expect(runInDevTraceSpan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: GeminiCliOperation.AgentCall,
+        attributes: expect.objectContaining({
+          [GEN_AI_AGENT_NAME]: testDefinition.name,
+          [GEN_AI_AGENT_DESCRIPTION]: testDefinition.description,
+        }),
+      }),
+      expect.any(Function),
+    );
+
+    // Verify metadata was set on the span
+    const spanCallback = vi.mocked(runInDevTraceSpan).mock.calls[0][1];
+    const mockMetadata = { input: undefined, output: undefined };
+    const mockSpan = { metadata: mockMetadata, endSpan: vi.fn() };
+    await spanCallback(mockSpan as Parameters<typeof spanCallback>[0]);
+    expect(mockMetadata.input).toBe(params);
+    expect(mockMetadata.output).toBe(mockResult);
   });
 
   describe('withUserHints', () => {

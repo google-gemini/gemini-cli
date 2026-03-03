@@ -52,6 +52,8 @@ const authCommand: SlashCommand = {
       };
     }
 
+    config.setUserInteractedWithMcp();
+
     const mcpServers = config.getMcpClientManager()?.getMcpServers() ?? {};
 
     if (!serverName) {
@@ -184,6 +186,8 @@ const listAction = async (
     };
   }
 
+  config.setUserInteractedWithMcp();
+
   const toolRegistry = config.getToolRegistry();
   if (!toolRegistry) {
     return {
@@ -250,6 +254,13 @@ const listAction = async (
     enablementState[serverName] =
       await enablementManager.getDisplayState(serverName);
   }
+  const errors: Record<string, string> = {};
+  for (const serverName of serverNames) {
+    const error = config.getMcpClientManager()?.getLastError(serverName);
+    if (error) {
+      errors[serverName] = error;
+    }
+  }
 
   const mcpStatusItem: HistoryItemMcpStatus = {
     type: MessageType.MCP_STATUS,
@@ -274,16 +285,19 @@ const listAction = async (
     })),
     authStatus,
     enablementState,
-    blockedServers: blockedMcpServers,
+    errors,
+    blockedServers: blockedMcpServers.map((s) => ({
+      name: s.name,
+      extensionName: s.extensionName,
+    })),
     discoveryInProgress,
     connectingServers,
-    showDescriptions,
-    showSchema,
+    showDescriptions: Boolean(showDescriptions),
+    showSchema: Boolean(showSchema),
   };
 
   context.ui.addItem(mcpStatusItem);
 };
-
 const listCommand: SlashCommand = {
   name: 'list',
   altNames: ['ls', 'nodesc', 'nodescription'],
@@ -371,6 +385,8 @@ async function handleEnableDisable(
       content: 'Config not loaded.',
     };
   }
+
+  config.setUserInteractedWithMcp();
 
   const parts = args.trim().split(/\s+/);
   const isSession = parts.includes('--session');

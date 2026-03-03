@@ -122,7 +122,10 @@ The manifest file defines the extension's behavior and configuration.
     }
   },
   "contextFileName": "GEMINI.md",
-  "excludeTools": ["run_shell_command"]
+  "excludeTools": ["run_shell_command"],
+  "plan": {
+    "directory": ".gemini/plans"
+  }
 }
 ```
 
@@ -157,6 +160,11 @@ The manifest file defines the extension's behavior and configuration.
   `"excludeTools": ["run_shell_command(rm -rf)"]` will block the `rm -rf`
   command. Note that this differs from the MCP server `excludeTools`
   functionality, which can be listed in the MCP server config.
+- `plan`: Planning features configuration.
+  - `directory`: The directory where planning artifacts are stored. This serves
+    as a fallback if the user hasn't specified a plan directory in their
+    settings. If not specified by either the extension or the user, the default
+    is `~/.gemini/tmp/<project>/<session-id>/plans/`.
 
 When Gemini CLI starts, it loads all the extensions and merges their
 configurations. If there are any conflicts, the workspace configuration takes
@@ -226,6 +234,42 @@ skill definitions in a `skills/` directory. For example,
 
 Provide [sub-agents](../core/subagents.md) that users can delegate tasks to. Add
 agent definition files (`.md`) to an `agents/` directory in your extension root.
+
+### <a id="policy-engine"></a>Policy Engine
+
+Extensions can contribute policy rules and safety checkers to the Gemini CLI
+[Policy Engine](../reference/policy-engine.md). These rules are defined in
+`.toml` files and take effect when the extension is activated.
+
+To add policies, create a `policies/` directory in your extension's root and
+place your `.toml` policy files inside it. Gemini CLI automatically loads all
+`.toml` files from this directory.
+
+Rules contributed by extensions run in their own tier (tier 2), alongside
+workspace-defined policies. This tier has higher priority than the default rules
+but lower priority than user or admin policies.
+
+> **Warning:** For security, Gemini CLI ignores any `allow` decisions or `yolo`
+> mode configurations in extension policies. This ensures that an extension
+> cannot automatically approve tool calls or bypass security measures without
+> your confirmation.
+
+**Example `policies.toml`**
+
+```toml
+[[rule]]
+toolName = "my_server__dangerous_tool"
+decision = "ask_user"
+priority = 100
+
+[[safety_checker]]
+toolName = "my_server__write_data"
+priority = 200
+[safety_checker.checker]
+type = "in-process"
+name = "allowed-path"
+required_context = ["environment"]
+```
 
 ### Themes
 

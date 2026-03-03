@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="207" viewBox="0 0 920 207">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="207" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="18" y="19" fill="#4796e4" textLength="9" lengthAdjust="spacingAndGlyphs">▝</text>
+    <text x="27" y="19" fill="#6688d9" textLength="9" lengthAdjust="spacingAndGlyphs">▜</text>
+    <text x="36" y="19" fill="#847ace" textLength="9" lengthAdjust="spacingAndGlyphs">▄</text>
+    <text x="63" y="19" fill="#ffffff" textLength="117" lengthAdjust="spacingAndGlyphs">   Gemini CLI</text>
+    <text x="180" y="19" fill="#6c7086" textLength="63" lengthAdjust="spacingAndGlyphs"> v1.2.3</text>
+    <text x="36" y="36" fill="#847ace" textLength="9" lengthAdjust="spacingAndGlyphs">▝</text>
+    <text x="45" y="36" fill="#a471a7" textLength="9" lengthAdjust="spacingAndGlyphs">▜</text>
+    <text x="54" y="36" fill="#c3677f" textLength="9" lengthAdjust="spacingAndGlyphs">▄</text>
+    <text x="27" y="53" fill="#6688d9" textLength="9" lengthAdjust="spacingAndGlyphs">▗</text>
+    <text x="36" y="53" fill="#847ace" textLength="9" lengthAdjust="spacingAndGlyphs">▟</text>
+    <text x="45" y="53" fill="#a471a7" textLength="9" lengthAdjust="spacingAndGlyphs">▀</text>
+    <text x="18" y="70" fill="#4796e4" textLength="9" lengthAdjust="spacingAndGlyphs">▝</text>
+    <text x="27" y="70" fill="#6688d9" textLength="9" lengthAdjust="spacingAndGlyphs">▀</text>
+    <text x="0" y="104" fill="#6c7086" textLength="864" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────╮</text>
+    <text x="0" y="121" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="121" fill="#ffffff" textLength="846" lengthAdjust="spacingAndGlyphs"> ⊷  run_shell_command                                                                         </text>
+    <text x="855" y="121" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="138" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="855" y="138" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="155" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="155" fill="#ffffff" textLength="846" lengthAdjust="spacingAndGlyphs"> Running command...                                                                           </text>
+    <text x="855" y="155" fill="#6c7086" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="172" fill="#6c7086" textLength="864" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────────────────────╯</text>
+  </g>
+</svg>

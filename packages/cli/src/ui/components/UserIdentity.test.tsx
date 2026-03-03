@@ -45,12 +45,12 @@ describe('<UserIdentity />', () => {
     await waitUntilReady();
 
     const output = lastFrame();
-    expect(output).toContain('Logged in with Google: test@example.com');
+    expect(output).toContain('test@example.com');
     expect(output).toContain('/auth');
     unmount();
   });
 
-  it('should render login message without colon if email is missing', async () => {
+  it('should render login message if email is missing', async () => {
     // Modify the mock for this specific test
     vi.mocked(UserAccountManager).mockImplementationOnce(
       () =>
@@ -73,12 +73,11 @@ describe('<UserIdentity />', () => {
 
     const output = lastFrame();
     expect(output).toContain('Logged in with Google');
-    expect(output).not.toContain('Logged in with Google:');
     expect(output).toContain('/auth');
     unmount();
   });
 
-  it('should render plan name on a separate line if provided', async () => {
+  it('should render plan name and upgrade indicator', async () => {
     const mockConfig = makeFakeConfig();
     vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
       authType: AuthType.LOGIN_WITH_GOOGLE,
@@ -92,18 +91,10 @@ describe('<UserIdentity />', () => {
     await waitUntilReady();
 
     const output = lastFrame();
-    expect(output).toContain('Logged in with Google: test@example.com');
+    expect(output).toContain('test@example.com');
     expect(output).toContain('/auth');
-    expect(output).toContain('Plan: Premium Plan');
-
-    // Check for two lines (or more if wrapped, but here it should be separate)
-    const lines = output?.split('\n').filter((line) => line.trim().length > 0);
-    expect(lines?.some((line) => line.includes('Logged in with Google'))).toBe(
-      true,
-    );
-    expect(lines?.some((line) => line.includes('Plan: Premium Plan'))).toBe(
-      true,
-    );
+    expect(output).toContain('Premium Plan');
+    expect(output).toContain('/upgrade');
 
     unmount();
   });
