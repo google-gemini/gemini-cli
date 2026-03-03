@@ -23,7 +23,19 @@ import {
   createAuthenticatingFetchWithRetry,
 } from '@a2a-js/sdk/client';
 import { v4 as uuidv4 } from 'uuid';
+import { Agent as UndiciAgent } from 'undici';
 import { debugLogger } from '../utils/debugLogger.js';
+
+// Remote agents can take 10+ minutes (e.g. Deep Research).
+// Use a dedicated dispatcher so the global 5-min timeout isn't affected.
+const A2A_TIMEOUT = 1800000; // 30 minutes
+const a2aDispatcher = new UndiciAgent({
+  headersTimeout: A2A_TIMEOUT,
+  bodyTimeout: A2A_TIMEOUT,
+});
+const a2aFetch: typeof fetch = (input, init) =>
+  // @ts-expect-error The `dispatcher` property is a Node.js extension to fetch not present in standard types.
+  fetch(input, { ...init, dispatcher: a2aDispatcher });
 
 export type SendMessageResult =
   | Message
@@ -79,9 +91,9 @@ export class A2AClientManager {
       throw new Error(`Agent with name '${name}' is already loaded.`);
     }
 
-    let fetchImpl: typeof fetch = fetch;
+    let fetchImpl: typeof fetch = a2aFetch;
     if (authHandler) {
-      fetchImpl = createAuthenticatingFetchWithRetry(fetch, authHandler);
+      fetchImpl = createAuthenticatingFetchWithRetry(a2aFetch, authHandler);
     }
 
     const resolver = new DefaultAgentCardResolver({ fetchImpl });
