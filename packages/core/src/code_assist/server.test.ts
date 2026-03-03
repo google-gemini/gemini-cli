@@ -83,6 +83,16 @@ describe('CodeAssistServer', () => {
       responseType: 'json',
       body: expect.any(String),
       signal: undefined,
+      retryConfig: {
+        retryDelay: 1000,
+        retry: 3,
+        noResponseRetries: 3,
+        statusCodesToRetry: [
+          [429, 429],
+          [499, 499],
+          [500, 599],
+        ],
+      },
     });
 
     const requestBody = JSON.parse(mockRequest.mock.calls[0][0].body);
@@ -401,11 +411,54 @@ describe('CodeAssistServer', () => {
         'Content-Type': 'application/json',
       },
       signal: undefined,
+      retry: false,
     });
 
     expect(results).toHaveLength(2);
     expect(results[0].candidates?.[0].content?.parts?.[0].text).toBe('Hello');
     expect(results[1].candidates?.[0].content?.parts?.[0].text).toBe(' World');
+  });
+
+  it('should handle Web ReadableStream in generateContentStream', async () => {
+    const { server, mockRequest } = createTestServer();
+
+    // Create a mock Web ReadableStream
+    const mockWebStream = new ReadableStream({
+      start(controller) {
+        const mockResponseData = {
+          response: {
+            candidates: [{ content: { parts: [{ text: 'Hello Web' }] } }],
+          },
+        };
+        controller.enqueue(
+          new TextEncoder().encode(
+            'data: ' + JSON.stringify(mockResponseData) + '\n\n',
+          ),
+        );
+        controller.close();
+      },
+    });
+
+    mockRequest.mockResolvedValue({ data: mockWebStream });
+
+    const stream = await server.generateContentStream(
+      {
+        model: 'test-model',
+        contents: [{ role: 'user', parts: [{ text: 'request' }] }],
+      },
+      'user-prompt-id',
+      LlmRole.MAIN,
+    );
+
+    const results = [];
+    for await (const res of stream) {
+      results.push(res);
+    }
+
+    expect(results).toHaveLength(1);
+    expect(results[0].candidates?.[0].content?.parts?.[0].text).toBe(
+      'Hello Web',
+    );
   });
 
   it('should ignore malformed SSE data', async () => {

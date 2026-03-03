@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render as inkRenderDirect, type Instance as InkInstance } from 'ink';
+import {
+  render as inkRenderDirect,
+  type Instance as InkInstance,
+  type RenderOptions,
+} from 'ink';
 import { EventEmitter } from 'node:events';
 import { Box } from 'ink';
 import type React from 'react';
@@ -31,6 +35,13 @@ import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
 import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
 import { AskUserActionsProvider } from '../ui/contexts/AskUserActionsContext.js';
 import { TerminalProvider } from '../ui/contexts/TerminalContext.js';
+import {
+  OverflowProvider,
+  useOverflowActions,
+  useOverflowState,
+  type OverflowActions,
+  type OverflowState,
+} from '../ui/contexts/OverflowContext.js';
 
 import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
@@ -40,6 +51,7 @@ import { SessionStatsProvider } from '../ui/contexts/SessionContext.js';
 import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
 import { DefaultLight } from '../ui/themes/default-light.js';
 import { pickDefaultThemeName } from '../ui/themes/theme.js';
+import { generateSvgForTerminal } from './svg.js';
 
 export const persistentStateMock = new FakePersistentState();
 
@@ -68,6 +80,25 @@ type TerminalState = {
   rows: number;
 };
 
+type RenderMetrics = Parameters<NonNullable<RenderOptions['onRender']>>[0];
+
+interface InkRenderMetrics extends RenderMetrics {
+  output: string;
+  staticOutput?: string;
+}
+
+function isInkRenderMetrics(
+  metrics: RenderMetrics,
+): metrics is InkRenderMetrics {
+  const m = metrics as Record<string, unknown>;
+  return (
+    typeof m === 'object' &&
+    m !== null &&
+    'output' in m &&
+    typeof m['output'] === 'string'
+  );
+}
+
 class XtermStdout extends EventEmitter {
   private state: TerminalState;
   private pendingWrites = 0;
@@ -75,7 +106,12 @@ class XtermStdout extends EventEmitter {
   private queue: { promise: Promise<void> };
   isTTY = true;
 
+  getColorDepth(): number {
+    return 24;
+  }
+
   private lastRenderOutput: string | undefined = undefined;
+  private lastRenderStaticContent: string | undefined = undefined;
 
   constructor(state: TerminalState, queue: { promise: Promise<void> }) {
     super();
@@ -108,6 +144,7 @@ class XtermStdout extends EventEmitter {
   clear = () => {
     this.state.terminal.reset();
     this.lastRenderOutput = undefined;
+    this.lastRenderStaticContent = undefined;
   };
 
   dispose = () => {
@@ -116,8 +153,30 @@ class XtermStdout extends EventEmitter {
 
   onRender = (staticContent: string, output: string) => {
     this.renderCount++;
+    this.lastRenderStaticContent = staticContent;
     this.lastRenderOutput = output;
     this.emit('render');
+  };
+
+  private normalizeFrame = (text: string): string =>
+    text.replace(/\r\n/g, '\n');
+
+  generateSvg = (): string => generateSvgForTerminal(this.state.terminal);
+
+  lastFrameRaw = (options: { allowEmpty?: boolean } = {}) => {
+    const result =
+      (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? '');
+
+    const normalized = this.normalizeFrame(result);
+
+    if (normalized === '' && !options.allowEmpty) {
+      throw new Error(
+        'lastFrameRaw() returned an empty string. If this is intentional, use lastFrameRaw({ allowEmpty: true }). ' +
+          'Otherwise, ensure you are calling await waitUntilReady() and that the component is rendering correctly.',
+      );
+    }
+
+    return normalized;
   };
 
   lastFrame = (options: { allowEmpty?: boolean } = {}) => {
@@ -133,9 +192,7 @@ class XtermStdout extends EventEmitter {
     }
     const result = trimmed.join('\n');
 
-    // Normalize for cross-platform snapshot stability:
-    // Normalize any \r\n to \n
-    const normalized = result.replace(/\r\n/g, '\n');
+    const normalized = this.normalizeFrame(result);
 
     if (normalized === '' && !options.allowEmpty) {
       throw new Error(
@@ -183,9 +240,11 @@ class XtermStdout extends EventEmitter {
       const currentFrame = stripAnsi(
         this.lastFrame({ allowEmpty: true }),
       ).trim();
-      const expectedFrame = stripAnsi(this.lastRenderOutput ?? '')
-        .trim()
-        .replace(/\r\n/g, '\n');
+      const expectedFrame = this.normalizeFrame(
+        stripAnsi(
+          (this.lastRenderStaticContent ?? '') + (this.lastRenderOutput ?? ''),
+        ),
+      ).trim();
 
       lastCurrent = currentFrame;
       lastExpected = expectedFrame;
@@ -310,8 +369,12 @@ export type RenderInstance = {
   stdin: XtermStdin;
   frames: string[];
   lastFrame: (options?: { allowEmpty?: boolean }) => string;
+  lastFrameRaw: (options?: { allowEmpty?: boolean }) => string;
+  generateSvg: () => string;
   terminal: Terminal;
   waitUntilReady: () => Promise<void>;
+  capturedOverflowState: OverflowState | undefined;
+  capturedOverflowActions: OverflowActions | undefined;
 };
 
 const instances: InkInstance[] = [];
@@ -320,7 +383,10 @@ const instances: InkInstance[] = [];
 export const render = (
   tree: React.ReactElement,
   terminalWidth?: number,
-): RenderInstance => {
+): Omit<
+  RenderInstance,
+  'capturedOverflowState' | 'capturedOverflowActions'
+> => {
   const cols = terminalWidth ?? 100;
   // We use 1000 rows to avoid windows with incorrect snapshots if a correct
   // value was used (e.g. 40 rows). The alternatives to make things worse are
@@ -357,8 +423,12 @@ export const render = (
       debug: false,
       exitOnCtrlC: false,
       patchConsole: false,
-      onRender: (metrics: { output: string; staticOutput?: string }) => {
-        stdout.onRender(metrics.staticOutput ?? '', metrics.output);
+      onRender: (metrics: RenderMetrics) => {
+        const output = isInkRenderMetrics(metrics) ? metrics.output : '...';
+        const staticOutput = isInkRenderMetrics(metrics)
+          ? (metrics.staticOutput ?? '')
+          : '';
+        stdout.onRender(staticOutput, output);
       },
     });
   });
@@ -385,6 +455,8 @@ export const render = (
     stdin,
     frames: stdout.frames,
     lastFrame: stdout.lastFrame,
+    lastFrameRaw: stdout.lastFrameRaw,
+    generateSvg: stdout.generateSvg,
     terminal: state.terminal,
     waitUntilReady: () => stdout.waitUntilReady(),
   };
@@ -456,12 +528,13 @@ export const mockSettings = new LoadedSettings(
 // A minimal mock UIState to satisfy the context provider.
 // Tests that need specific UIState values should provide their own.
 const baseMockUiState = {
+  history: [],
   renderMarkdown: true,
   streamingState: StreamingState.Idle,
   terminalWidth: 100,
   terminalHeight: 40,
   currentModel: 'gemini-pro',
-  terminalBackgroundColor: 'black',
+  terminalBackgroundColor: 'black' as const,
   cleanUiDetailsVisible: false,
   allowPlanMode: true,
   activePtyId: undefined,
@@ -475,6 +548,14 @@ const baseMockUiState = {
   },
   hintMode: false,
   hintBuffer: '',
+  bannerData: {
+    defaultText: '',
+    warningText: '',
+  },
+  bannerVisible: false,
+  nightly: false,
+  updateInfo: null,
+  pendingHistoryItems: [],
 };
 
 export const mockAppState: AppState = {
@@ -506,6 +587,7 @@ const mockUIActions: UIActions = {
   vimHandleInput: vi.fn(),
   handleIdePromptComplete: vi.fn(),
   handleFolderTrustSelect: vi.fn(),
+  setIsPolicyUpdateDialogOpen: vi.fn(),
   setConstrainHeight: vi.fn(),
   onEscapePromptChange: vi.fn(),
   refreshStatic: vi.fn(),
@@ -513,6 +595,8 @@ const mockUIActions: UIActions = {
   handleClearScreen: vi.fn(),
   handleProQuotaChoice: vi.fn(),
   handleValidationChoice: vi.fn(),
+  handleOverageMenuChoice: vi.fn(),
+  handleEmptyWalletChoice: vi.fn(),
   setQueueErrorMessage: vi.fn(),
   popAllMessages: vi.fn(),
   handleApiKeySubmit: vi.fn(),
@@ -534,6 +618,18 @@ const mockUIActions: UIActions = {
   onHintSubmit: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
+  getPreferredEditor: vi.fn(),
+  clearAccountSuspension: vi.fn(),
+};
+
+let capturedOverflowState: OverflowState | undefined;
+let capturedOverflowActions: OverflowActions | undefined;
+const ContextCapture: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  capturedOverflowState = useOverflowState();
+  capturedOverflowActions = useOverflowActions();
+  return <>{children}</>;
 };
 
 export const renderWithProviders = (
@@ -614,6 +710,21 @@ export const renderWithProviders = (
     });
   }
 
+  // Wrap config in a Proxy so useAlternateBuffer hook (which reads from Config) gets the correct value,
+  // without replacing the entire config object and its other values.
+  let finalConfig = config;
+  if (useAlternateBuffer !== undefined) {
+    finalConfig = new Proxy(config, {
+      get(target, prop, receiver) {
+        if (prop === 'getUseAlternateBuffer') {
+          return () => useAlternateBuffer;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+  }
+
   const mainAreaWidth = terminalWidth;
 
   const finalUiState = {
@@ -637,47 +748,54 @@ export const renderWithProviders = (
     .filter((item): item is HistoryItemToolGroup => item.type === 'tool_group')
     .flatMap((item) => item.tools);
 
+  capturedOverflowState = undefined;
+  capturedOverflowActions = undefined;
+
   const renderResult = render(
     <AppContext.Provider value={appState}>
-      <ConfigContext.Provider value={config}>
+      <ConfigContext.Provider value={finalConfig}>
         <SettingsContext.Provider value={finalSettings}>
           <UIStateContext.Provider value={finalUiState}>
-            <VimModeProvider settings={finalSettings}>
+            <VimModeProvider>
               <ShellFocusContext.Provider value={shellFocus}>
                 <SessionStatsProvider>
                   <StreamingContext.Provider
                     value={finalUiState.streamingState}
                   >
                     <UIActionsContext.Provider value={finalUIActions}>
-                      <ToolActionsProvider
-                        config={config}
-                        toolCalls={allToolCalls}
-                      >
-                        <AskUserActionsProvider
-                          request={null}
-                          onSubmit={vi.fn()}
-                          onCancel={vi.fn()}
+                      <OverflowProvider>
+                        <ToolActionsProvider
+                          config={finalConfig}
+                          toolCalls={allToolCalls}
                         >
-                          <KeypressProvider>
-                            <MouseProvider
-                              mouseEventsEnabled={mouseEventsEnabled}
-                            >
-                              <TerminalProvider>
-                                <ScrollProvider>
-                                  <Box
-                                    width={terminalWidth}
-                                    flexShrink={0}
-                                    flexGrow={0}
-                                    flexDirection="column"
-                                  >
-                                    {component}
-                                  </Box>
-                                </ScrollProvider>
-                              </TerminalProvider>
-                            </MouseProvider>
-                          </KeypressProvider>
-                        </AskUserActionsProvider>
-                      </ToolActionsProvider>
+                          <AskUserActionsProvider
+                            request={null}
+                            onSubmit={vi.fn()}
+                            onCancel={vi.fn()}
+                          >
+                            <KeypressProvider>
+                              <MouseProvider
+                                mouseEventsEnabled={mouseEventsEnabled}
+                              >
+                                <TerminalProvider>
+                                  <ScrollProvider>
+                                    <ContextCapture>
+                                      <Box
+                                        width={terminalWidth}
+                                        flexShrink={0}
+                                        flexGrow={0}
+                                        flexDirection="column"
+                                      >
+                                        {component}
+                                      </Box>
+                                    </ContextCapture>
+                                  </ScrollProvider>
+                                </TerminalProvider>
+                              </MouseProvider>
+                            </KeypressProvider>
+                          </AskUserActionsProvider>
+                        </ToolActionsProvider>
+                      </OverflowProvider>
                     </UIActionsContext.Provider>
                   </StreamingContext.Provider>
                 </SessionStatsProvider>
@@ -692,6 +810,8 @@ export const renderWithProviders = (
 
   return {
     ...renderResult,
+    capturedOverflowState,
+    capturedOverflowActions,
     simulateClick: (col: number, row: number, button?: 0 | 1 | 2) =>
       simulateClick(renderResult.stdin, col, row, button),
   };
@@ -708,6 +828,7 @@ export function renderHook<Result, Props>(
   rerender: (props?: Props) => void;
   unmount: () => void;
   waitUntilReady: () => Promise<void>;
+  generateSvg: () => string;
 } {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { current: undefined as unknown as Result };
@@ -730,6 +851,7 @@ export function renderHook<Result, Props>(
   let inkRerender: (tree: React.ReactElement) => void = () => {};
   let unmount: () => void = () => {};
   let waitUntilReady: () => Promise<void> = async () => {};
+  let generateSvg: () => string = () => '';
 
   act(() => {
     const renderResult = render(
@@ -740,6 +862,7 @@ export function renderHook<Result, Props>(
     inkRerender = renderResult.rerender;
     unmount = renderResult.unmount;
     waitUntilReady = renderResult.waitUntilReady;
+    generateSvg = renderResult.generateSvg;
   });
 
   function rerender(props?: Props) {
@@ -756,7 +879,7 @@ export function renderHook<Result, Props>(
     });
   }
 
-  return { result, rerender, unmount, waitUntilReady };
+  return { result, rerender, unmount, waitUntilReady, generateSvg };
 }
 
 export function renderHookWithProviders<Result, Props>(
@@ -778,6 +901,7 @@ export function renderHookWithProviders<Result, Props>(
   rerender: (props?: Props) => void;
   unmount: () => void;
   waitUntilReady: () => Promise<void>;
+  generateSvg: () => string;
 } {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { current: undefined as unknown as Result };
@@ -828,5 +952,6 @@ export function renderHookWithProviders<Result, Props>(
       });
     },
     waitUntilReady: () => renderResult.waitUntilReady(),
+    generateSvg: () => renderResult.generateSvg(),
   };
 }

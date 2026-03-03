@@ -265,6 +265,7 @@ describe('RipGrepTool', () => {
     downloadRipGrepMock.mockReset();
     downloadRipGrepMock.mockResolvedValue(undefined);
     mockSpawn.mockReset();
+    mockSpawn.mockImplementation(createMockSpawn());
     tempBinRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'ripgrep-bin-'));
     binDir = path.join(tempBinRoot, 'bin');
     await fs.mkdir(binDir, { recursive: true });
@@ -349,7 +350,7 @@ describe('RipGrepTool', () => {
       },
       {
         name: 'pattern, path, and include',
-        params: { pattern: 'hello', dir_path: '.', include: '*.txt' },
+        params: { pattern: 'hello', dir_path: '.', include_pattern: '*.txt' },
         expected: null,
       },
     ])(
@@ -396,7 +397,7 @@ describe('RipGrepTool', () => {
 
   describe('execute', () => {
     it('should find matches for a simple pattern in all files', async () => {
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -447,7 +448,7 @@ describe('RipGrepTool', () => {
     });
 
     it('should ignore matches that escape the base path', async () => {
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -482,7 +483,7 @@ describe('RipGrepTool', () => {
 
     it('should find matches in a specific path', async () => {
       // Setup specific mock for this test - searching in 'sub' should only return matches from that directory
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -510,7 +511,7 @@ describe('RipGrepTool', () => {
 
     it('should find matches with an include glob', async () => {
       // Setup specific mock for this test
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -525,7 +526,10 @@ describe('RipGrepTool', () => {
         }),
       );
 
-      const params: RipGrepToolParams = { pattern: 'hello', include: '*.js' };
+      const params: RipGrepToolParams = {
+        pattern: 'hello',
+        include_pattern: '*.js',
+      };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toContain(
@@ -545,7 +549,7 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - searching for 'hello' in 'sub' with '*.js' filter
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -563,7 +567,7 @@ describe('RipGrepTool', () => {
       const params: RipGrepToolParams = {
         pattern: 'hello',
         dir_path: 'sub',
-        include: '*.js',
+        include_pattern: '*.js',
       };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
@@ -577,7 +581,7 @@ describe('RipGrepTool', () => {
 
     it('should return "No matches found" when pattern does not exist', async () => {
       // Setup specific mock for no matches
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           exitCode: 1, // No matches found
         }),
@@ -699,7 +703,7 @@ describe('RipGrepTool', () => {
       );
 
       // Mock ripgrep returning both an ignored file and an allowed file
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -738,7 +742,7 @@ describe('RipGrepTool', () => {
 
     it('should handle regex special characters correctly', async () => {
       // Setup specific mock for this test - regex pattern 'foo.*bar' should match 'const foo = "bar";'
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -765,7 +769,7 @@ describe('RipGrepTool', () => {
 
     it('should be case-insensitive by default (JS fallback)', async () => {
       // Setup specific mock for this test - case insensitive search for 'HELLO'
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -878,7 +882,7 @@ describe('RipGrepTool', () => {
       // Setup specific mock for this test - multi-directory search for 'world'
       // Mock will be called twice - once for each directory
 
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -989,7 +993,7 @@ describe('RipGrepTool', () => {
       } as unknown as Config;
 
       // Setup specific mock for this test - searching in 'sub' should only return matches from that directory
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1042,7 +1046,7 @@ describe('RipGrepTool', () => {
 
     it('should abort streaming search when signal is triggered', async () => {
       // Setup specific mock for this test - simulate process being killed due to abort
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           exitCode: null,
           signal: 'SIGTERM',
@@ -1087,7 +1091,7 @@ describe('RipGrepTool', () => {
         },
       },
     ])('should handle $name gracefully', async ({ setup }) => {
-      mockSpawn.mockImplementationOnce(createMockSpawn({ exitCode: 1 }));
+      mockSpawn.mockImplementation(createMockSpawn({ exitCode: 1 }));
 
       const params = await setup();
       const invocation = grepTool.build(params);
@@ -1104,7 +1108,7 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - searching for 'world' should find the file with special characters
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1135,7 +1139,7 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - searching for 'deep' should find the deeply nested file
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1166,7 +1170,7 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - regex pattern should match function declarations
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1180,7 +1184,10 @@ describe('RipGrepTool', () => {
         }),
       );
 
-      const params: RipGrepToolParams = { pattern: 'function\\s+\\w+\\s*\\(' };
+      const params: RipGrepToolParams = {
+        pattern: 'function\\s+\\w+\\s*\\(',
+        context: 0,
+      };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
 
@@ -1195,7 +1202,7 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - case insensitive search should match all variants
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1244,7 +1251,7 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - escaped regex pattern should match price format
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1258,7 +1265,10 @@ describe('RipGrepTool', () => {
         }),
       );
 
-      const params: RipGrepToolParams = { pattern: '\\$\\d+\\.\\d+' };
+      const params: RipGrepToolParams = {
+        pattern: '\\$\\d+\\.\\d+',
+        context: 0,
+      };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
 
@@ -1281,7 +1291,7 @@ describe('RipGrepTool', () => {
       await fs.writeFile(path.join(tempRootDir, 'test.txt'), 'text content');
 
       // Setup specific mock for this test - include pattern should filter to only ts/tsx files
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1307,7 +1317,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = {
         pattern: 'content',
-        include: '*.{ts,tsx}',
+        include_pattern: '*.{ts,tsx}',
       };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
@@ -1327,7 +1337,7 @@ describe('RipGrepTool', () => {
       await fs.writeFile(path.join(tempRootDir, 'other.ts'), 'other code');
 
       // Setup specific mock for this test - include pattern should filter to only src/** files
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1343,7 +1353,7 @@ describe('RipGrepTool', () => {
 
       const params: RipGrepToolParams = {
         pattern: 'code',
-        include: 'src/**',
+        include_pattern: 'src/**',
       };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
@@ -1356,7 +1366,7 @@ describe('RipGrepTool', () => {
   describe('advanced search options', () => {
     it('should handle case_sensitive parameter', async () => {
       // Case-insensitive search (default)
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1370,7 +1380,7 @@ describe('RipGrepTool', () => {
           exitCode: 0,
         }),
       );
-      let params: RipGrepToolParams = { pattern: 'HELLO' };
+      let params: RipGrepToolParams = { pattern: 'HELLO', context: 0 };
       let invocation = grepTool.build(params);
       let result = await invocation.execute(abortSignal);
       expect(mockSpawn).toHaveBeenLastCalledWith(
@@ -1382,7 +1392,7 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain('L1: hello world');
 
       // Case-sensitive search
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1396,7 +1406,7 @@ describe('RipGrepTool', () => {
           exitCode: 0,
         }),
       );
-      params = { pattern: 'HELLO', case_sensitive: true };
+      params = { pattern: 'HELLO', case_sensitive: true, context: 0 };
       invocation = grepTool.build(params);
       result = await invocation.execute(abortSignal);
       expect(mockSpawn).toHaveBeenLastCalledWith(
@@ -1409,7 +1419,7 @@ describe('RipGrepTool', () => {
     });
 
     it('should handle fixed_strings parameter', async () => {
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1453,7 +1463,7 @@ describe('RipGrepTool', () => {
     });
 
     it('should handle no_ignore parameter', async () => {
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1526,7 +1536,7 @@ describe('RipGrepTool', () => {
         createMockMessageBus(),
       );
 
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1592,7 +1602,7 @@ describe('RipGrepTool', () => {
         createMockMessageBus(),
       );
 
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1658,7 +1668,7 @@ describe('RipGrepTool', () => {
         createMockMessageBus(),
       );
 
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1685,7 +1695,7 @@ describe('RipGrepTool', () => {
     });
 
     it('should handle context parameters', async () => {
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1767,7 +1777,7 @@ describe('RipGrepTool', () => {
       },
       {
         name: 'pattern and include',
-        params: { pattern: 'testPattern', include: '*.ts' },
+        params: { pattern: 'testPattern', include_pattern: '*.ts' },
         expected: "'testPattern' in *.ts within ./",
       },
       {
@@ -1842,7 +1852,7 @@ describe('RipGrepTool', () => {
       await fs.mkdir(dirPath, { recursive: true });
       const params: RipGrepToolParams = {
         pattern: 'testPattern',
-        include: '*.ts',
+        include_pattern: '*.ts',
         dir_path: path.join('src', 'app'),
       };
       const invocation = grepTool.build(params);
@@ -1855,7 +1865,7 @@ describe('RipGrepTool', () => {
 
   describe('new parameters', () => {
     it('should pass --max-count when max_matches_per_file is provided', async () => {
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1884,7 +1894,7 @@ describe('RipGrepTool', () => {
 
     it('should respect total_max_matches and truncate results', async () => {
       // Return 3 matches, but set total_max_matches to 2
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1921,6 +1931,7 @@ describe('RipGrepTool', () => {
       const params: RipGrepToolParams = {
         pattern: 'match',
         total_max_matches: 2,
+        context: 0,
       };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);
@@ -1936,7 +1947,7 @@ describe('RipGrepTool', () => {
     });
 
     it('should return only file paths when names_only is true', async () => {
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -1976,7 +1987,7 @@ describe('RipGrepTool', () => {
     });
 
     it('should filter out matches based on exclude_pattern', async () => {
-      mockSpawn.mockImplementationOnce(
+      mockSpawn.mockImplementation(
         createMockSpawn({
           outputData:
             JSON.stringify({
@@ -2004,6 +2015,7 @@ describe('RipGrepTool', () => {
       const params: RipGrepToolParams = {
         pattern: 'Copyright .* Google LLC',
         exclude_pattern: '2026',
+        context: 0,
       };
       const invocation = grepTool.build(params);
       const result = await invocation.execute(abortSignal);

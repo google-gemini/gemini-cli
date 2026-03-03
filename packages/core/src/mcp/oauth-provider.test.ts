@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 // Mock dependencies AT THE TOP
 const mockOpenBrowserSecurely = vi.hoisted(() => vi.fn());
@@ -36,8 +36,24 @@ vi.mock('../utils/events.js', () => ({
 vi.mock('../utils/authConsent.js', () => ({
   getConsentForOauth: vi.fn(() => Promise.resolve(true)),
 }));
+vi.mock('../utils/headless.js', () => ({
+  isHeadlessMode: vi.fn(() => false),
+}));
+vi.mock('node:readline', () => ({
+  default: {
+    createInterface: vi.fn(() => ({
+      question: vi.fn((_query, callback) => callback('')),
+      close: vi.fn(),
+      on: vi.fn(),
+    })),
+  },
+  createInterface: vi.fn(() => ({
+    question: vi.fn((_query, callback) => callback('')),
+    close: vi.fn(),
+    on: vi.fn(),
+  })),
+}));
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
 import type {

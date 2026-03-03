@@ -84,6 +84,7 @@ import type { UiEvent } from './uiTelemetry.js';
 import { uiTelemetryService } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { BillingTelemetryEvent } from './billingEvents.js';
 
 export function logCliConfiguration(
   config: Config,
@@ -145,12 +146,14 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     });
 
     if (event.metadata) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const added = event.metadata['model_added_lines'];
       if (typeof added === 'number' && added > 0) {
         recordLinesChanged(config, added, 'added', {
           function_name: event.function_name,
         });
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const removed = event.metadata['model_removed_lines'];
       if (typeof removed === 'number' && removed > 0) {
         recordLinesChanged(config, removed, 'removed', {
@@ -823,5 +826,19 @@ export function logTokenStorageInitialization(
     logger.emit(logRecord);
 
     recordTokenStorageInitialization(config, event);
+  });
+}
+
+export function logBillingEvent(
+  config: Config,
+  event: BillingTelemetryEvent,
+): void {
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
   });
 }

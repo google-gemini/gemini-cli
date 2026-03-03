@@ -56,7 +56,10 @@ import { resolvePath } from '../utils/resolvePath.js';
 import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import { createPolicyEngineConfig } from './policy.js';
+import {
+  createPolicyEngineConfig,
+  resolveWorkspacePolicyState,
+} from './policy.js';
 import { ExtensionManager } from './extension-manager.js';
 import { McpServerEnablementManager } from './mcp/mcpServerEnablement.js';
 import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
@@ -692,9 +695,17 @@ export async function loadCliConfig(
     policyPaths: argv.policy,
   };
 
+  const { workspacePoliciesDir, policyUpdateConfirmationRequest } =
+    await resolveWorkspacePolicyState({
+      cwd,
+      trustedFolder,
+      interactive,
+    });
+
   const policyEngineConfig = await createPolicyEngineConfig(
     effectiveSettings,
     approvalMode,
+    workspacePoliciesDir,
   );
   policyEngineConfig.nonInteractive = !interactive;
 
@@ -758,6 +769,7 @@ export async function loadCliConfig(
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
+    policyUpdateConfirmationRequest,
     excludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
@@ -814,7 +826,8 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
-    planSettings: settings.general.plan,
+    directWebFetch: settings.experimental?.directWebFetch,
+    planSettings: settings.general?.plan,
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
@@ -830,13 +843,13 @@ export async function loadCliConfig(
     interactive,
     trustedFolder,
     useBackgroundColor: settings.ui?.useBackgroundColor,
+    useAlternateBuffer: settings.ui?.useAlternateBuffer,
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
-    enablePromptCompletion: settings.general?.enablePromptCompletion,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
@@ -844,9 +857,11 @@ export async function loadCliConfig(
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
+    gemmaModelRouter: settings.experimental?.gemmaModelRouter,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
+    maxAttempts: settings.general?.maxAttempts,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     rawOutput: argv.rawOutput,
@@ -866,6 +881,7 @@ export async function loadCliConfig(
         agents: refreshedSettings.merged.agents,
       };
     },
+    enableConseca: settings.security?.enableConseca,
   });
 }
 

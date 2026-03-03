@@ -16,13 +16,14 @@ import type {
   ToolResult,
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
+  PolicyUpdateOptions,
+  ToolLiveOutput,
 } from './tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
-  type PolicyUpdateOptions,
 } from './tools.js';
 
 import { getErrorMessage } from '../utils/errors.js';
@@ -149,7 +150,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
   async execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
     setPidCallback?: (pid: number) => void,
   ): Promise<ToolResult> {

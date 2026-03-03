@@ -568,6 +568,7 @@ export class ShellExecutionService {
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const args = [...argsPrefix, guardedCommand];
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(executable, args, {
         cwd,
         name: 'xterm-256color',
@@ -598,6 +599,7 @@ export class ShellExecutionService {
         headlessTerminal.scrollToTop();
 
         this.activePtys.set(ptyProcess.pid, {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           ptyProcess,
           headlessTerminal,
           maxSerializedLines: shellExecutionConfig.maxSerializedLines,
@@ -831,6 +833,7 @@ export class ShellExecutionService {
                 signal: signal ?? null,
                 error,
                 aborted: abortSignal.aborted,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 pid: ptyProcess.pid,
                 executionMethod: ptyInfo?.name ?? 'node-pty',
               });
@@ -862,9 +865,11 @@ export class ShellExecutionService {
         const abortHandler = async () => {
           if (ptyProcess.pid && !exited) {
             await killProcessGroup({
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               pid: ptyProcess.pid,
               escalate: true,
               isExited: () => exited,
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               pty: ptyProcess,
             });
           }
@@ -873,6 +878,7 @@ export class ShellExecutionService {
         abortSignal.addEventListener('abort', abortHandler, { once: true });
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       return { pid: ptyProcess.pid, result };
     } catch (e) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

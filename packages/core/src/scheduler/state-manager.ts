@@ -17,8 +17,7 @@ import type {
   ExecutingToolCall,
   ToolCallResponseInfo,
 } from './types.js';
-import { CoreToolCallStatus } from './types.js';
-import { ROOT_SCHEDULER_ID } from './types.js';
+import { CoreToolCallStatus, ROOT_SCHEDULER_ID } from './types.js';
 import type {
   ToolConfirmationOutcome,
   ToolResultDisplay,
@@ -78,8 +77,16 @@ export class SchedulerStateManager {
     return next;
   }
 
+  peekQueue(): ToolCall | undefined {
+    return this.queue[0];
+  }
+
   get isActive(): boolean {
     return this.activeCalls.size > 0;
+  }
+
+  get allActiveCalls(): ToolCall[] {
+    return Array.from(this.activeCalls.values());
   }
 
   get activeCallCount(): number {
@@ -178,6 +185,19 @@ export class SchedulerStateManager {
 
     this.activeCalls.set(callId, this.patchCall(call, { outcome }));
     this.emitUpdate();
+  }
+
+  /**
+   * Replaces the currently active call with a new call, placing the new call
+   * at the front of the queue to be processed immediately in the next tick.
+   * Used for Tail Calls to chain execution without finalizing the original call.
+   */
+  replaceActiveCallWithTailCall(callId: string, nextCall: ToolCall): void {
+    if (this.activeCalls.has(callId)) {
+      this.activeCalls.delete(callId);
+      this.queue.unshift(nextCall);
+      this.emitUpdate();
+    }
   }
 
   cancelAllQueued(reason: string): void {
@@ -523,6 +543,11 @@ export class SchedulerStateManager {
     const progressPercent =
       execData?.progressPercent ??
       ('progressPercent' in call ? call.progressPercent : undefined);
+    const progress =
+      execData?.progress ?? ('progress' in call ? call.progress : undefined);
+    const progressTotal =
+      execData?.progressTotal ??
+      ('progressTotal' in call ? call.progressTotal : undefined);
 
     return {
       request: call.request,
@@ -535,6 +560,8 @@ export class SchedulerStateManager {
       pid,
       progressMessage,
       progressPercent,
+      progress,
+      progressTotal,
       schedulerId: call.schedulerId,
       approvalMode: call.approvalMode,
     };

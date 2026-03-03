@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.30.0-nightly.20260210.a2174751d",
+  "version": "0.33.0-nightly.20260228.1ca5c05d0",
   "description": "Gemini CLI",
   "license": "Apache-2.0",
   "repository": {
@@ -26,12 +26,12 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.30.0-nightly.20260210.a2174751d"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.33.0-nightly.20260228.1ca5c05d0"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.12.0",
     "@google/gemini-cli-core": "file:../core",
-    "@google/genai": "1.30.0",
+    "@google/genai": "1.41.0",
     "@iarna/toml": "^2.2.5",
     "@modelcontextprotocol/sdk": "^1.23.0",
     "ansi-escapes": "^7.3.0",

@@ -32,7 +32,6 @@ import { SkillsList } from './views/SkillsList.js';
 import { AgentsStatus } from './views/AgentsStatus.js';
 import { McpStatus } from './views/McpStatus.js';
 import { ChatList } from './views/ChatList.js';
-import { HooksList } from './views/HooksList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
 import { ThinkingMessage } from './messages/ThinkingMessage.js';
 import { HintMessage } from './messages/HintMessage.js';
@@ -46,6 +45,7 @@ interface HistoryItemDisplayProps {
   isPending: boolean;
   commands?: readonly SlashCommand[];
   availableTerminalHeightGemini?: number;
+  isExpandable?: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -55,6 +55,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   isPending,
   commands,
   availableTerminalHeightGemini,
+  isExpandable,
 }) => {
   const settings = useSettings();
   const inlineThinkingMode = getInlineThinkingMode(settings);
@@ -98,6 +99,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {itemForDisplay.type === 'info' && (
         <InfoMessage
           text={itemForDisplay.text}
+          secondaryText={itemForDisplay.secondaryText}
           icon={itemForDisplay.icon}
           color={itemForDisplay.color}
           marginBottom={itemForDisplay.marginBottom}
@@ -144,6 +146,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
                 }
               : undefined
           }
+          creditBalance={itemForDisplay.creditBalance}
         />
       )}
       {itemForDisplay.type === 'model_stats' && (
@@ -180,6 +183,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           terminalWidth={terminalWidth}
           borderTop={itemForDisplay.borderTop}
           borderBottom={itemForDisplay.borderBottom}
+          isExpandable={isExpandable}
         />
       )}
       {itemForDisplay.type === 'compression' && (
@@ -212,9 +216,6 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'chat_list' && (
         <ChatList chats={itemForDisplay.chats} />
-      )}
-      {itemForDisplay.type === 'hooks_list' && (
-        <HooksList hooks={itemForDisplay.hooks} />
       )}
     </Box>
   );

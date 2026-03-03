@@ -39,8 +39,10 @@ describe('Circular Reference Handling', () => {
       sockets: {},
       agent: null,
     };
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     circularObject.agent = circularObject; // Create circular reference
     circularObject.sockets['test-host'] = [
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       { _httpMessage: { agent: circularObject } },
     ];
 
@@ -48,6 +50,7 @@ describe('Circular Reference Handling', () => {
     const mockRequest: ToolCallRequestInfo = {
       callId: 'test-call-id',
       name: 'ReadFile',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       args: circularObject, // This would cause the original error
       isClientInitiated: false,
       prompt_id: 'test-prompt-id',

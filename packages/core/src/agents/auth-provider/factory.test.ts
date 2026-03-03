@@ -478,5 +478,19 @@ describe('A2AAuthProviderFactory', () => {
       // Returns undefined - caller should prompt user to configure auth
       expect(result).toBeUndefined();
     });
+
+    it('should create an ApiKeyAuthProvider for apiKey config', async () => {
+      const provider = await A2AAuthProviderFactory.create({
+        authConfig: {
+          type: 'apiKey',
+          key: 'factory-test-key',
+        },
+      });
+
+      expect(provider).toBeDefined();
+      expect(provider!.type).toBe('apiKey');
+      const headers = await provider!.headers();
+      expect(headers).toEqual({ 'X-API-Key': 'factory-test-key' });
+    });
   });
 });

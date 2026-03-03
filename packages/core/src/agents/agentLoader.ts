@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import yaml from 'js-yaml';
+import { load } from 'js-yaml';
 import * as fs from 'node:fs/promises';
 import { type Dirent } from 'node:fs';
 import * as path from 'node:path';
@@ -48,13 +48,13 @@ interface FrontmatterAuthConfig {
   agent_card_requires_auth?: boolean;
   // API Key
   key?: string;
-  in?: 'header' | 'query' | 'cookie';
   name?: string;
   // HTTP
-  scheme?: 'Bearer' | 'Basic';
+  scheme?: string;
   token?: string;
   username?: string;
   password?: string;
+  value?: string;
 }
 
 interface FrontmatterRemoteAgentDefinition
@@ -129,7 +129,6 @@ const apiKeyAuthSchema = z.object({
   ...baseAuthFields,
   type: z.literal('apiKey'),
   key: z.string().min(1, 'API key is required'),
-  in: z.enum(['header', 'query', 'cookie']).optional(),
   name: z.string().optional(),
 });
 
@@ -138,25 +137,24 @@ const apiKeyAuthSchema = z.object({
  * Note: Validation for scheme-specific fields is applied in authConfigSchema
  * since discriminatedUnion doesn't support refined schemas directly.
  */
-const httpAuthSchemaBase = z.object({
+const httpAuthSchema = z.object({
   ...baseAuthFields,
   type: z.literal('http'),
-  scheme: z.enum(['Bearer', 'Basic']),
-  token: z.string().optional(),
-  username: z.string().optional(),
-  password: z.string().optional(),
+  scheme: z.string().min(1),
+  token: z.string().min(1).optional(),
+  username: z.string().min(1).optional(),
+  password: z.string().min(1).optional(),
+  value: z.string().min(1).optional(),
 });
 
-/**
- * Combined auth schema - discriminated union of all auth types.
- * Note: We use the base schema for discriminatedUnion, then apply refinements
- * via superRefine since discriminatedUnion doesn't support refined schemas directly.
- */
 const authConfigSchema = z
-  .discriminatedUnion('type', [apiKeyAuthSchema, httpAuthSchemaBase])
+  .discriminatedUnion('type', [apiKeyAuthSchema, httpAuthSchema])
   .superRefine((data, ctx) => {
-    // Apply HTTP auth validation after union parsing
     if (data.type === 'http') {
+      if (data.value) {
+        // Raw mode - only scheme and value are needed
+        return;
+      }
       if (data.scheme === 'Bearer' && !data.token) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -164,12 +162,21 @@ const authConfigSchema = z
           path: ['token'],
         });
       }
-      if (data.scheme === 'Basic' && (!data.username || !data.password)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Basic scheme requires "username" and "password"',
-          path: data.username ? ['password'] : ['username'],
-        });
+      if (data.scheme === 'Basic') {
+        if (!data.username) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Basic authentication requires "username"',
+            path: ['username'],
+          });
+        }
+        if (!data.password) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Basic authentication requires "password"',
+            path: ['password'],
+          });
+        }
       }
     }
   });
@@ -261,7 +268,7 @@ export async function parseAgentMarkdown(
 
   let rawFrontmatter: unknown;
   try {
-    rawFrontmatter = yaml.load(frontmatterStr);
+    rawFrontmatter = load(frontmatterStr);
   } catch (error) {
     throw new AgentLoadError(
       filePath,
@@ -338,7 +345,6 @@ function convertFrontmatterAuthToConfig(
         ...base,
         type: 'apiKey',
         key: frontmatter.key,
-        location: frontmatter.in,
         name: frontmatter.name,
       };
 
@@ -347,6 +353,14 @@ function convertFrontmatterAuthToConfig(
         throw new Error(
           'Internal error: HTTP scheme missing after validation.',
         );
+      }
+      if (frontmatter.value) {
+        return {
+          ...base,
+          type: 'http',
+          scheme: frontmatter.scheme,
+          value: frontmatter.value,
+        };
       }
       switch (frontmatter.scheme) {
         case 'Bearer':
@@ -375,8 +389,8 @@ function convertFrontmatterAuthToConfig(
             password: frontmatter.password,
           };
         default: {
-          const exhaustive: never = frontmatter.scheme;
-          throw new Error(`Unknown HTTP scheme: ${exhaustive}`);
+          // Other IANA schemes without a value should not reach here after validation
+          throw new Error(`Unknown HTTP scheme: ${frontmatter.scheme}`);
         }
       }
     }
@@ -417,7 +431,7 @@ export function markdownToAgentDefinition(
     return {
       kind: 'remote',
       name: markdown.name,
-      description: markdown.description || '(Loading description...)',
+      description: markdown.description || '',
       displayName: markdown.display_name,
       agentCardUrl: markdown.agent_card_url,
       auth: markdown.auth

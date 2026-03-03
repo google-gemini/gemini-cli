@@ -373,7 +373,6 @@ agent_card_url: https://example.com/card
 auth:
   type: apiKey
   key: $MY_API_KEY
-  in: header
   name: X-Custom-Key
 ---
 `);
@@ -385,7 +384,6 @@ auth:
         auth: {
           type: 'apiKey',
           key: '$MY_API_KEY',
-          in: 'header',
           name: 'X-Custom-Key',
         },
       });
@@ -441,6 +439,54 @@ auth:
       });
     });
 
+    it('should parse remote agent with Digest via raw value', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: digest-agent
+agent_card_url: https://example.com/card
+auth:
+  type: http
+  scheme: Digest
+  value: username="admin", response="abc123"
+---
+`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'digest-agent',
+        auth: {
+          type: 'http',
+          scheme: 'Digest',
+          value: 'username="admin", response="abc123"',
+        },
+      });
+    });
+
+    it('should parse remote agent with generic raw auth value', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: raw-agent
+agent_card_url: https://example.com/card
+auth:
+  type: http
+  scheme: CustomScheme
+  value: raw-token-value
+---
+`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'raw-agent',
+        auth: {
+          type: 'http',
+          scheme: 'CustomScheme',
+          value: 'raw-token-value',
+        },
+      });
+    });
+
     it('should throw error for Bearer auth without token', async () => {
       const filePath = await writeAgentMarkdown(`---
 kind: remote
@@ -468,7 +514,7 @@ auth:
 ---
 `);
       await expect(parseAgentMarkdown(filePath)).rejects.toThrow(
-        /Basic scheme requires "username" and "password"/,
+        /Basic authentication requires "password"/,
       );
     });
 
@@ -494,7 +540,6 @@ auth:
         auth: {
           type: 'apiKey' as const,
           key: '$API_KEY',
-          in: 'header' as const,
         },
       };
 
@@ -505,7 +550,6 @@ auth:
         auth: {
           type: 'apiKey',
           key: '$API_KEY',
-          location: 'header',
         },
       });
     });

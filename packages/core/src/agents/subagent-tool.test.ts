@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SubagentTool } from './subagent-tool.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
+import { Kind } from '../tools/tools.js';
 import type {
   LocalAgentDefinition,
   RemoteAgentDefinition,
@@ -17,12 +18,34 @@ import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type {
+  DeclarativeTool,
   ToolCallConfirmationDetails,
   ToolInvocation,
   ToolResult,
 } from '../tools/tools.js';
+import {
+  GeminiCliOperation,
+  GEN_AI_AGENT_DESCRIPTION,
+  GEN_AI_AGENT_NAME,
+} from '../telemetry/constants.js';
+import type { ToolRegistry } from 'src/tools/tool-registry.js';
 
 vi.mock('./subagent-tool-wrapper.js');
+
+// Mock runInDevTraceSpan
+const runInDevTraceSpan = vi.hoisted(() =>
+  vi.fn(async (opts, fn) => {
+    const metadata = { attributes: opts.attributes || {} };
+    return fn({
+      metadata,
+      endSpan: vi.fn(),
+    });
+  }),
+);
+
+vi.mock('../telemetry/trace.js', () => ({
+  runInDevTraceSpan,
+}));
 
 const MockSubagentToolWrapper = vi.mocked(SubagentToolWrapper);
 
@@ -68,6 +91,11 @@ describe('SubAgentInvocation', () => {
       .mockReturnValue(mockInnerInvocation);
   });
 
+  it('should have Kind.Agent', () => {
+    const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
+    expect(tool.kind).toBe(Kind.Agent);
+  });
+
   it('should delegate shouldConfirmExecute to the inner sub-invocation (local)', async () => {
     const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
     const params = {};
@@ -89,6 +117,16 @@ describe('SubAgentInvocation', () => {
       testDefinition,
       mockConfig,
       mockMessageBus,
+    );
+  });
+
+  it('should return the correct description', () => {
+    const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
+    const params = {};
+    // @ts-expect-error - accessing protected method for testing
+    const invocation = tool.createInvocation(params, mockMessageBus);
+    expect(invocation.getDescription()).toBe(
+      "Delegating to agent 'LocalAgent'",
     );
   });
 
@@ -147,6 +185,25 @@ describe('SubAgentInvocation', () => {
       abortSignal,
       updateOutput,
     );
+
+    expect(runInDevTraceSpan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: GeminiCliOperation.AgentCall,
+        attributes: expect.objectContaining({
+          [GEN_AI_AGENT_NAME]: testDefinition.name,
+          [GEN_AI_AGENT_DESCRIPTION]: testDefinition.description,
+        }),
+      }),
+      expect.any(Function),
+    );
+
+    // Verify metadata was set on the span
+    const spanCallback = vi.mocked(runInDevTraceSpan).mock.calls[0][1];
+    const mockMetadata = { input: undefined, output: undefined };
+    const mockSpan = { metadata: mockMetadata, endSpan: vi.fn() };
+    await spanCallback(mockSpan as Parameters<typeof spanCallback>[0]);
+    expect(mockMetadata.input).toBe(params);
+    expect(mockMetadata.output).toBe(mockResult);
   });
 
   describe('withUserHints', () => {
@@ -272,5 +329,87 @@ describe('SubAgentInvocation', () => {
 
       expect(hintedParams).toEqual(params);
     });
+  });
+});
+
+describe('SubagentTool Read-Only logic', () => {
+  let mockConfig: Config;
+  let mockMessageBus: MessageBus;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockConfig = makeFakeConfig();
+    mockMessageBus = createMockMessageBus();
+  });
+
+  it('should be false for remote agents', () => {
+    const tool = new SubagentTool(
+      testRemoteDefinition,
+      mockConfig,
+      mockMessageBus,
+    );
+    expect(tool.isReadOnly).toBe(false);
+  });
+
+  it('should be true for local agent with only read-only tools', () => {
+    const readOnlyTool = {
+      name: 'read',
+      isReadOnly: true,
+    } as unknown as DeclarativeTool<object, ToolResult>;
+    const registry = {
+      getTool: (name: string) => (name === 'read' ? readOnlyTool : undefined),
+    };
+    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+      registry as unknown as ToolRegistry,
+    );
+
+    const defWithTools: LocalAgentDefinition = {
+      ...testDefinition,
+      toolConfig: { tools: ['read'] },
+    };
+    const tool = new SubagentTool(defWithTools, mockConfig, mockMessageBus);
+    expect(tool.isReadOnly).toBe(true);
+  });
+
+  it('should be false for local agent with at least one non-read-only tool', () => {
+    const readOnlyTool = {
+      name: 'read',
+      isReadOnly: true,
+    } as unknown as DeclarativeTool<object, ToolResult>;
+    const mutatorTool = {
+      name: 'write',
+      isReadOnly: false,
+    } as unknown as DeclarativeTool<object, ToolResult>;
+    const registry = {
+      getTool: (name: string) => {
+        if (name === 'read') return readOnlyTool;
+        if (name === 'write') return mutatorTool;
+        return undefined;
+      },
+    };
+    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+      registry as unknown as ToolRegistry,
+    );
+
+    const defWithTools: LocalAgentDefinition = {
+      ...testDefinition,
+      toolConfig: { tools: ['read', 'write'] },
+    };
+    const tool = new SubagentTool(defWithTools, mockConfig, mockMessageBus);
+    expect(tool.isReadOnly).toBe(false);
+  });
+
+  it('should be true for local agent with no tools', () => {
+    const registry = { getTool: () => undefined };
+    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+      registry as unknown as ToolRegistry,
+    );
+
+    const defNoTools: LocalAgentDefinition = {
+      ...testDefinition,
+      toolConfig: { tools: [] },
+    };
+    const tool = new SubagentTool(defNoTools, mockConfig, mockMessageBus);
+    expect(tool.isReadOnly).toBe(true);
   });
 });
