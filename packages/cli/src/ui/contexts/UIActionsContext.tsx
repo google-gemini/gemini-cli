@@ -21,6 +21,7 @@ import { type NewAgentsChoice } from '../components/NewAgentsNotification.js';
 import type { OverageMenuIntent, EmptyWalletIntent } from './UIStateContext.js';
 
 export interface UIActions {
+  setIsOnboardingForeverMode: (value: boolean) => void;
   handleThemeSelect: (
     themeName: string,
     scope: LoadableSettingScope,

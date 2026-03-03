@@ -183,12 +183,16 @@ export enum CompressionStatus {
 
   /** The compression was skipped due to previous failure, but content was truncated to budget */
   CONTENT_TRUNCATED,
+
+  /** The compression was successful by archiving history to a file */
+  ARCHIVED,
 }
 
 export interface ChatCompressionInfo {
   originalTokenCount: number;
   newTokenCount: number;
   compressionStatus: CompressionStatus;
+  archivePath?: string;
 }
 
 export type ServerGeminiChatCompressedEvent = {

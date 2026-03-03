@@ -214,6 +214,7 @@ describe('Gemini Client (client.ts)', () => {
       getGlobalMemory: vi.fn().mockReturnValue(''),
       getEnvironmentMemory: vi.fn().mockReturnValue(''),
       isJitContextEnabled: vi.fn().mockReturnValue(false),
+      getIsForeverMode: vi.fn().mockReturnValue(false),
       getToolOutputMaskingEnabled: vi.fn().mockReturnValue(false),
       getDisableLoopDetection: vi.fn().mockReturnValue(false),
 

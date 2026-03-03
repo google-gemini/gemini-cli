@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { MemoryConsolidationService } from '../services/memoryConsolidationService.js';
+import { SCHEDULE_WORK_TOOL_NAME } from '../tools/tool-names.js';
 import type {
   GenerateContentConfig,
   PartListUnion,
@@ -91,6 +93,7 @@ export class GeminiClient {
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
   private forceFullIdeContext = true;
+  private promptStartIndexMap = new Map<string, number>();
 
   /**
    * At any point in this conversation, was compression triggered without
@@ -98,7 +101,9 @@ export class GeminiClient {
    */
   private hasFailedCompressionAttempt = false;
 
+  private readonly memoryConsolidationService: MemoryConsolidationService;
   constructor(private readonly config: Config) {
+    this.memoryConsolidationService = new MemoryConsolidationService(config);
     this.loopDetector = new LoopDetectionService(config);
     this.compressionService = new ChatCompressionService();
     this.toolOutputMaskingService = new ToolOutputMaskingService();
@@ -808,8 +813,46 @@ export class GeminiClient {
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id, partListUnionToString(request));
       this.hookStateMap.delete(this.lastPromptId);
+      this.promptStartIndexMap.delete(this.lastPromptId);
       this.lastPromptId = prompt_id;
       this.currentSequenceModel = null;
+
+      // In Forever Mode, refresh the system instruction so new hippocampus
+      // entries (added asynchronously by MemoryConsolidationService) are
+      // included in the next API call.
+      if (this.config.getIsForeverMode()) {
+        this.updateSystemInstruction();
+      }
+
+      const parts = Array.isArray(request) ? request : [request];
+      const isToolResult = parts.some(
+        (p) => typeof p === 'object' && 'functionResponse' in p,
+      );
+      const requestText = parts
+        .map((p) => (typeof p === 'string' ? p : 'text' in p ? p.text : ''))
+        .join('');
+      const isAutomated = requestText.includes('Please continue.');
+
+      if (this.config.getIsForeverMode() && !isToolResult && !isAutomated) {
+        const additionalContext = `
+[BICAMERAL VOICE: PROACTIVE KNOWLEDGE ALIGNMENT]
+Carefully evaluate the user's instruction. Does it imply a new technical fact, a correction to your previous understanding, or a project-specific constraint that should be remembered?
+If so, you MUST prioritize updating your long-term knowledge (e.g., updating files in .gemini/knowledge/) IMMEDIATELY before or as part of fulfilling the request.
+Do not wait for a reflection cycle if the information is critical for future turns.`.trim();
+        request = [
+          ...parts,
+          {
+            text: `\n\n--- Proactive Knowledge Alignment ---\n${additionalContext}\n-------------------------------------`,
+          },
+        ];
+      }
+    }
+
+    if (!this.promptStartIndexMap.has(prompt_id)) {
+      this.promptStartIndexMap.set(
+        prompt_id,
+        this.getChat().getHistory().length,
+      );
     }
 
     if (hooksEnabled && messageBus) {
@@ -843,6 +886,7 @@ export class GeminiClient {
     }
 
     const boundedTurns = Math.min(turns, MAX_TURNS);
+    const historyBeforeLength = this.getChat().getHistory().length;
     let turn = new Turn(this.getChat(), prompt_id);
 
     try {
@@ -911,6 +955,7 @@ export class GeminiClient {
       }
     } finally {
       const hookState = this.hookStateMap.get(prompt_id);
+      let isOutermost = false;
       if (hookState) {
         hookState.activeCalls--;
         const isPendingTools =
@@ -918,9 +963,38 @@ export class GeminiClient {
         const isAborted = signal?.aborted;
 
         if (hookState.activeCalls <= 0) {
+          isOutermost = true;
           if (!isPendingTools || isAborted) {
             this.hookStateMap.delete(prompt_id);
           }
+        }
+      }
+
+      const isPendingTools =
+        turn?.pendingToolCalls && turn.pendingToolCalls.length > 0;
+      const isOnlySchedulingWork =
+        isPendingTools &&
+        turn?.pendingToolCalls?.every(
+          (call) => call.name === SCHEDULE_WORK_TOOL_NAME,
+        );
+
+      // Trigger consolidation at Event Boundaries:
+      // - The macro-turn has finished (isOutermost)
+      // - AND (no pending tools OR it intentionally paused via schedule_work OR an error/abort occurred causing a premature exit)
+      if (
+        isOutermost &&
+        (!isPendingTools || isOnlySchedulingWork || signal?.aborted || !turn)
+      ) {
+        if (this.promptStartIndexMap.has(prompt_id)) {
+          const startIndex =
+            this.promptStartIndexMap.get(prompt_id) ?? historyBeforeLength;
+          const recentTurnContents = this.getChat()
+            .getHistory()
+            .slice(startIndex);
+          this.memoryConsolidationService.triggerMicroConsolidation(
+            recentTurnContents,
+          );
+          this.promptStartIndexMap.delete(prompt_id);
         }
       }
     }
@@ -1074,7 +1148,14 @@ export class GeminiClient {
     ) {
       this.hasFailedCompressionAttempt =
         this.hasFailedCompressionAttempt || !force;
-    } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
+    } else if (
+      info.compressionStatus === CompressionStatus.COMPRESSED ||
+      info.compressionStatus === CompressionStatus.ARCHIVED
+    ) {
+      // Hippocampus is NOT flushed on compression. It lives in the system
+      // prompt (not chat history), so it survives compression naturally
+      // and self-limits via a ring buffer (max 50 entries).
+
       if (newHistory) {
         // capture current session data before resetting
         const currentRecordingService =

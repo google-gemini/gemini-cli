@@ -208,6 +208,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
       proQuotaRequest: null,
       validationRequest: null,
     },
+    sisyphusSecondsRemaining: null,
     ...overrides,
   }) as UIState;
 

@@ -104,6 +104,9 @@ export interface AccountSuspensionInfo {
 }
 
 export interface UIState {
+  isOnboardingForeverMode: boolean;
+  shouldShowRetentionWarning: boolean;
+  sessionsToDeleteCount: number;
   history: HistoryItem[];
   historyManager: UseHistoryManagerReturn;
   isThemeDialogOpen: boolean;
@@ -227,6 +230,7 @@ export interface UIState {
     text: string;
     type: TransientMessageType;
   } | null;
+  sisyphusSecondsRemaining: number | null;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

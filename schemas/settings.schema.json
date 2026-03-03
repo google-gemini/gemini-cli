@@ -181,6 +181,13 @@
               "markdownDescription": "Minimum retention period (safety limit, defaults to \"1d\")\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `1d`",
               "default": "1d",
               "type": "string"
+            },
+            "warningAcknowledged": {
+              "title": "Warning Acknowledged",
+              "description": "Whether the user has acknowledged the session retention warning",
+              "markdownDescription": "Whether the user has acknowledged the session retention warning\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
             }
           },
           "additionalProperties": false

@@ -56,6 +56,12 @@ describe('PromptProvider', () => {
       }),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn(),
+      getSisyphusMode: vi.fn().mockReturnValue({ enabled: false }),
+      getIsForeverMode: vi.fn().mockReturnValue(false),
+      getHippocampusContent: vi.fn().mockReturnValue(''),
+      getConfuciusMode: vi.fn().mockReturnValue({ intervalHours: 8 }),
+      getCompressionMode: vi.fn().mockReturnValue('summarize'),
+      getContextFilename: vi.fn().mockReturnValue('GEMINI.md'),
     } as unknown as Config;
   });
 

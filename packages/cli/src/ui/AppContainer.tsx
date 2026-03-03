@@ -146,6 +146,7 @@ import { requestConsentInteractive } from '../config/extensions/consent.js';
 import { useSessionBrowser } from './hooks/useSessionBrowser.js';
 import { useSessionResume } from './hooks/useSessionResume.js';
 import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
+import { useSessionRetentionCheck } from './hooks/useSessionRetentionCheck.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
@@ -231,6 +232,9 @@ export const AppContainer = (props: AppContainerProps) => {
   useMemoryMonitor(historyManager);
   const isAlternateBuffer = config.getUseAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
+  const [isOnboardingForeverMode, setIsOnboardingForeverMode] = useState(
+    () => config.getIsForeverMode() && !config.getIsForeverModeConfigured(),
+  );
   const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [quittingMessages, setQuittingMessages] = useState<
@@ -1108,6 +1112,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     backgroundShells,
     dismissBackgroundShell,
     retryStatus,
+    sisyphusSecondsRemaining,
   } = useGeminiStream(
     config.getGeminiClient(),
     historyManager.history,
@@ -1417,32 +1422,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const geminiClient = config.getGeminiClient();
 
   useEffect(() => {
-    if (activePtyId) {
-      try {
-        ShellExecutionService.resizePty(
-          activePtyId,
-          Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
-          Math.max(
-            Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
-            1,
-          ),
-        );
-      } catch (e) {
-        // This can happen in a race condition where the pty exits
-        // right before we try to resize it.
-        if (
-          !(
-            e instanceof Error &&
-            e.message.includes('Cannot resize a pty that has already exited')
-          )
-        ) {
-          throw e;
-        }
-      }
-    }
-  }, [terminalWidth, availableTerminalHeight, activePtyId]);
-
-  useEffect(() => {
     if (
       initialPrompt &&
       isConfigInitialized &&
@@ -1452,7 +1431,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       !isThemeDialogOpen &&
       !isEditorDialogOpen &&
       !showPrivacyNotice &&
-      geminiClient?.isInitialized?.()
+      !isOnboardingForeverMode &&
+      geminiClient?.isInitialized?.() &&
+      isMcpReady
     ) {
       void handleFinalSubmit(initialPrompt);
       initialPromptSubmitted.current = true;
@@ -1466,7 +1447,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isThemeDialogOpen,
     isEditorDialogOpen,
     showPrivacyNotice,
+    isOnboardingForeverMode,
     geminiClient,
+    isMcpReady,
   ]);
 
   const [idePromptAnswered, setIdePromptAnswered] = useState(false);
@@ -1546,6 +1529,28 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const isInitialMount = useRef(true);
 
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
+
+  const handleAutoEnableRetention = useCallback(() => {
+    const userSettings = settings.forScope(SettingScope.User).settings;
+    const currentRetention = userSettings.general?.sessionRetention ?? {};
+
+    settings.setValue(SettingScope.User, 'general.sessionRetention', {
+      ...currentRetention,
+      enabled: true,
+      maxAge: '30d',
+      warningAcknowledged: true,
+    });
+  }, [settings]);
+
+  const {
+    shouldShowWarning: shouldShowRetentionWarning,
+    checkComplete: retentionCheckComplete,
+    sessionsToDeleteCount,
+  } = useSessionRetentionCheck(
+    config,
+    settings.merged,
+    handleAutoEnableRetention,
+  );
 
   const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -1992,9 +1997,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const nightly = props.version.includes('nightly');
 
   const dialogsVisible =
+    (shouldShowRetentionWarning && retentionCheckComplete) ||
+    isOnboardingForeverMode ||
     shouldShowIdePrompt ||
-    shouldShowIdePrompt ||
-    isFolderTrustDialogOpen ||
+    (!isOnboardingForeverMode && isFolderTrustDialogOpen) ||
     isPolicyUpdateDialogOpen ||
     adminSettingsChanged ||
     !!commandConfirmationRequest ||
@@ -2176,6 +2182,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const uiState: UIState = useMemo(
     () => ({
+      isOnboardingForeverMode,
+      shouldShowRetentionWarning:
+        shouldShowRetentionWarning && retentionCheckComplete,
+      sessionsToDeleteCount: sessionsToDeleteCount ?? 0,
       history: historyManager.history,
       historyManager,
       isThemeDialogOpen,
@@ -2306,10 +2316,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
           ...pendingGeminiHistoryItems,
         ]),
       hintBuffer: '',
+      sisyphusSecondsRemaining,
     }),
     [
       isThemeDialogOpen,
-
+      shouldShowRetentionWarning,
+      retentionCheckComplete,
+      sessionsToDeleteCount,
       themeError,
       isAuthenticating,
       isConfigInitialized,
@@ -2427,6 +2440,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,
+      sisyphusSecondsRemaining,
+      isOnboardingForeverMode,
     ],
   );
 
@@ -2437,6 +2452,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const uiActions: UIActions = useMemo(
     () => ({
+      setIsOnboardingForeverMode,
       handleThemeSelect,
       closeThemeDialog,
       handleThemeHighlight,
@@ -2551,6 +2567,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleFolderTrustSelect,
       setIsPolicyUpdateDialogOpen,
       setConstrainHeight,
+      setIsOnboardingForeverMode,
       handleEscapePromptChange,
       refreshStatic,
       handleFinalSubmit,
