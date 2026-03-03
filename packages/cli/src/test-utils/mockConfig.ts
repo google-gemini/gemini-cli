@@ -45,6 +45,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getExperimentalZedIntegration: vi.fn(() => false),
     isBrowserLaunchSuppressed: vi.fn(() => false),
     setRemoteAdminSettings: vi.fn(),
+    getAcpMode: vi.fn(() => false),
     isYoloModeDisabled: vi.fn(() => false),
     isPlanEnabled: vi.fn(() => false),
     getPlanModeRoutingEnabled: vi.fn().mockResolvedValue(true),
