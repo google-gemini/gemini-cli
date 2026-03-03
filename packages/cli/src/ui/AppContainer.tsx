@@ -136,6 +136,7 @@ import { useMcpStatus } from './hooks/useMcpStatus.js';
 import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
+import { useExtensionStatusBadges } from './hooks/useExtensionStatusBadges.js';
 import {
   useConfirmUpdateRequests,
   useExtensionUpdates,
@@ -412,6 +413,7 @@ export const AppContainer = (props: AppContainerProps) => {
   // Additional hooks moved from App.tsx
   const { stats: sessionStats } = useSessionStats();
   const branchName = useGitBranchName(config.getTargetDir());
+  const statusBadges = useExtensionStatusBadges(config);
 
   // Layout measurements
   const mainControlsRef = useRef<DOMElement>(null);
@@ -2306,6 +2308,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           ...pendingGeminiHistoryItems,
         ]),
       hintBuffer: '',
+      statusBadges,
     }),
     [
       isThemeDialogOpen,
@@ -2427,6 +2430,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,
+      statusBadges,
     ],
   );
 

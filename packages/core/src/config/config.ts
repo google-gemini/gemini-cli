@@ -306,6 +306,53 @@ export interface BrowserAgentCustomConfig {
 }
 
 /**
+ * A dynamic status badge contributed by an extension.
+ */
+export interface ExtensionUIBadge {
+  /**
+   * The type of badge to render.
+   * 'command' executes a shell command. 'env' reads an environment variable.
+   */
+  type: 'command' | 'env';
+  /**
+   * The command to execute (Required if type === 'command').
+   */
+  command?: string;
+  /**
+   * Optional arguments for the command.
+   */
+  args?: string[];
+  /**
+   * The environment variable to read (Required if type === 'env').
+   */
+  envVar?: string;
+  /**
+   * Optional formatting to apply to the result.
+   * 'basename': Returns the last portion of a path.
+   */
+  format?: 'basename';
+  /**
+   * Optional icon to display before the text.
+   */
+  icon?: string;
+  /**
+   * Optional polling interval in milliseconds for commands. Defaults to 30000.
+   */
+  intervalMs?: number;
+  /**
+   * Optional semantic color for the badge.
+   */
+  color?: string;
+}
+
+export interface ExtensionUIContributions {
+  /**
+   * Badges to display in the footer.
+   */
+  badges?: ExtensionUIBadge[];
+}
+
+/**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
  * around on the config object though Core does not use this information
@@ -339,6 +386,10 @@ export interface GeminiCLIExtension {
    * Safety checkers contributed by this extension.
    */
   checkers?: SafetyCheckerRule[];
+  /**
+   * UI contributions provided by this extension.
+   */
+  ui?: ExtensionUIContributions;
 }
 
 export interface ExtensionInstallMetadata {

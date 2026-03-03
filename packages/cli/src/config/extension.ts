@@ -8,6 +8,7 @@ import type {
   MCPServerConfig,
   ExtensionInstallMetadata,
   CustomTheme,
+  ExtensionUIContributions,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -33,6 +34,10 @@ export interface ExtensionConfig {
    * These themes will be registered when the extension is activated.
    */
   themes?: CustomTheme[];
+  /**
+   * UI contributions provided by this extension.
+   */
+  ui?: ExtensionUIContributions;
 }
 
 export interface ExtensionUpdateInfo {
