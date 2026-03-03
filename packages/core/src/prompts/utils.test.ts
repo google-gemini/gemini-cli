@@ -24,6 +24,11 @@ vi.mock('../utils/debugLogger.js', () => ({
 describe('resolvePathFromEnv', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.stubEnv('GEMINI_CLI_HOME', ''); // Prevent local env from bypassing os.homedir() mock
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   describe('when envVar is undefined, empty, or whitespace', () => {
