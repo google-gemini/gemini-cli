@@ -647,6 +647,10 @@ export class GeminiClient {
       yield { type: GeminiEventType.LoopDetected };
       return turn;
     } else if (loopResult.count === 1) {
+      if (boundedTurns <= 1) {
+        yield { type: GeminiEventType.MaxSessionTurns };
+        return turn;
+      }
       return yield* this._recoverFromLoop(
         loopResult,
         signal,
@@ -711,6 +715,11 @@ export class GeminiClient {
         controller.abort();
         return turn;
       } else if (loopResult.count === 1) {
+        if (boundedTurns <= 1) {
+          yield { type: GeminiEventType.MaxSessionTurns };
+          controller.abort();
+          return turn;
+        }
         return yield* this._recoverFromLoop(
           loopResult,
           signal,

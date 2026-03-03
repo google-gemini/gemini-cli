@@ -557,6 +557,36 @@ describe('LoopDetectionService', () => {
     });
   });
 
+  describe('Iterative Loop State', () => {
+    it('should correctly transition from Strike 1 to Strike 2', () => {
+      const event = createToolCallRequestEvent('testTool', { param: 'value' });
+
+      // Trigger Strike 1
+      for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD - 1; i++) {
+        service.addAndCheck(event);
+      }
+      const strike1 = service.addAndCheck(event);
+      expect(strike1.count).toBe(1);
+      expect(loggers.logLoopDetected).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({ count: 1 }),
+      );
+
+      // Simulate recovery (clearDetection)
+      service.clearDetection();
+
+      // Trigger Strike 2
+      // For tool calls, the internal counter for that specific key remains,
+      // so the VERY NEXT call of the same tool should trigger Strike 2.
+      const strike2 = service.addAndCheck(event);
+      expect(strike2.count).toBe(2);
+      expect(loggers.logLoopDetected).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({ count: 2 }),
+      );
+    });
+  });
+
   describe('LoopDetectionService LLM Checks', () => {
     let mockGeminiClient: GeminiClient;
     let mockBaseLlmClient: BaseLlmClient;

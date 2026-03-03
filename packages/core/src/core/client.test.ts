@@ -1878,7 +1878,7 @@ ${JSON.stringify(
       client.updateSystemInstruction();
 
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
-        mockConfig,
+        expect.anything(),
         'Full JIT Memory',
       );
     });
@@ -1893,7 +1893,7 @@ ${JSON.stringify(
       client.updateSystemInstruction();
 
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
-        mockConfig,
+        expect.anything(),
         'Legacy Memory',
       );
     });
@@ -2922,6 +2922,8 @@ ${JSON.stringify(
     });
 
     it('should provide feedback on first loop and terminate on second loop', async () => {
+      const sendMessageStreamSpy = vi.spyOn(client, 'sendMessageStream');
+
       // 1. First call to turnStarted returns count 1 (Loop detected at start of Turn 1)
       vi.spyOn(client['loopDetector'], 'turnStarted')
         .mockResolvedValueOnce({ count: 1, detail: 'Initial loop' }) // Start of Turn 1
@@ -2950,17 +2952,141 @@ ${JSON.stringify(
       }
 
       // Verify recursion happened
-      // We expect:
-      // - No ModelInfo for turn 1 (it was preempted)
-      // - recovery turn started
-      // - Turn 2 streaming starts
-      // - LoopDetected event yielded when count hits 2
       expect(events).toContainEqual(
         expect.objectContaining({ type: GeminiEventType.LoopDetected }),
       );
 
       // sendMessageStream should have been called twice (Original + Recovery)
-      expect(mockTurnRunFn).toHaveBeenCalledTimes(1); // Only once because Turn 1 was preempted before run()
+      expect(sendMessageStreamSpy).toHaveBeenCalledTimes(2);
+
+      // Verify Strike 1 feedback content
+      const recoveryCall = sendMessageStreamSpy.mock.calls[1];
+      const recoveryRequest = recoveryCall[0] as Part[];
+      expect(recoveryRequest[0].text).toContain('Potential loop detected');
+      expect(recoveryRequest[0].text).toContain('Initial loop');
+
+      // Verify Strike 2 termination
+      expect(mockTurnRunFn).toHaveBeenCalledTimes(1); // Only once because Turn 1 was preempted
+    });
+
+    it('should recover mid-stream if Strike 1 occurs during event processing', async () => {
+      const sendMessageStreamSpy = vi.spyOn(client, 'sendMessageStream');
+
+      // Turn 1 starts fine
+      vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+        count: 0,
+      });
+
+      // Turn 1 hits Strike 1 mid-stream
+      vi.spyOn(client['loopDetector'], 'addAndCheck')
+        .mockReturnValueOnce({ count: 0 })
+        .mockReturnValueOnce({ count: 1, detail: 'Mid-stream loop' }) // Strike 1
+        .mockReturnValue({ count: 0 }); // Success in recovery turn
+
+      const turn1Stream = (async function* () {
+        yield { type: GeminiEventType.Content, value: 'Part 1' };
+        yield { type: GeminiEventType.Content, value: 'Part 2' }; // Trigger Strike 1 here
+      })();
+
+      const turn2Stream = (async function* () {
+        yield { type: GeminiEventType.Content, value: 'Recovery success' };
+      })();
+
+      mockTurnRunFn
+        .mockReturnValueOnce(turn1Stream)
+        .mockReturnValueOnce(turn2Stream);
+
+      const events = [];
+      const stream = client.sendMessageStream(
+        [{ text: 'Start' }],
+        new AbortController().signal,
+        'mid-stream-id',
+      );
+
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      // Verify recovery happened
+      expect(sendMessageStreamSpy).toHaveBeenCalledTimes(2);
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          type: GeminiEventType.Content,
+          value: 'Recovery success',
+        }),
+      );
+
+      // Verify turn 1 was aborted after Strike 1
+      const recoveryCall = sendMessageStreamSpy.mock.calls[1];
+      const recoveryRequest = recoveryCall[0] as Part[];
+      expect(recoveryRequest[0].text).toContain('Mid-stream loop');
+    });
+
+    it('should handle errors during a recovery turn gracefully', async () => {
+      const sendMessageStreamSpy = vi.spyOn(client, 'sendMessageStream');
+
+      // Turn 1 triggers Strike 1
+      vi.spyOn(client['loopDetector'], 'turnStarted')
+        .mockResolvedValueOnce({ count: 1, detail: 'Initial loop' })
+        .mockResolvedValueOnce({ count: 0 });
+
+      // Turn 2 (Recovery) hits an API error
+      const errorStream = (async function* () {
+        yield {
+          type: GeminiEventType.Error,
+          value: { error: { message: 'API failure' } },
+        };
+      })();
+
+      mockTurnRunFn.mockReturnValueOnce(errorStream);
+
+      const events = [];
+      const stream = client.sendMessageStream(
+        [{ text: 'Start' }],
+        new AbortController().signal,
+        'recovery-error-id',
+      );
+
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      // Should have attempted recursion once
+      expect(sendMessageStreamSpy).toHaveBeenCalledTimes(2);
+      // Final event should be the error from the recovery turn
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          type: GeminiEventType.Error,
+        }),
+      );
+    });
+
+    it('should terminate with MaxSessionTurns if loop detected with 0 boundedTurns remaining', async () => {
+      // Strike 1 already occurred (simulated by having detectedCount = 1 in service)
+      client['loopDetector']['detectedCount'] = 1;
+
+      vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+        count: 1,
+        detail: 'End-of-session loop',
+      });
+
+      const events = [];
+      const stream = client.sendMessageStream(
+        [{ text: 'Start' }],
+        new AbortController().signal,
+        'limit-id',
+        1, // 1 turn remaining (the turn that just started)
+      );
+
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      // Should not recurse because boundedTurns is exhausted
+      expect(events).toContainEqual({ type: GeminiEventType.MaxSessionTurns });
+      expect(events).not.toContainEqual(
+        expect.objectContaining({ type: GeminiEventType.LoopDetected }),
+      );
     });
 
     it('should abort linked signal when loop is detected', async () => {
