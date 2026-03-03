@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
+import { createMockConfig } from '../../test-utils/mockConfig.js';
 import { useVoiceInput, onVoiceTranscript } from './useVoiceInput.js';
 import type { VoiceBackendOptions } from '@google/gemini-cli-core';
 import { coreEvents } from '@google/gemini-cli-core';
@@ -61,9 +62,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 // Minimal mock Config with a working ContentGenerator stub
-const mockConfig = {
+const mockConfig = createMockConfig({
   getContentGenerator: vi.fn().mockReturnValue({}),
-} as unknown as import('@google/gemini-cli-core').Config;
+});
 
 describe('useVoiceInput', () => {
   beforeEach(() => {

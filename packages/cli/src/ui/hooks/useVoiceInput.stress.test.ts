@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
+import { createMockConfig } from '../../test-utils/mockConfig.js';
 import { useVoiceInput } from './useVoiceInput.js';
 import type { VoiceBackendOptions } from '@google/gemini-cli-core';
 
@@ -41,9 +42,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-const mockConfig = {
+const mockConfig = createMockConfig({
   getContentGenerator: vi.fn().mockReturnValue({}),
-} as unknown as import('@google/gemini-cli-core').Config;
+});
 
 describe('useVoiceInput Stress Tests', () => {
   beforeEach(() => {

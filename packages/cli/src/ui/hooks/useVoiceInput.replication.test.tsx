@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, useContext, useEffect } from 'react';
 import { renderHook } from '../../test-utils/render.js';
+import { createMockConfig } from '../../test-utils/mockConfig.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useVoiceInput, onVoiceTranscript } from './useVoiceInput.js';
 import { VoiceContext } from '../contexts/VoiceContext.js';
@@ -63,9 +64,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-const mockConfig = {
+const mockConfig = createMockConfig({
   getContentGenerator: vi.fn().mockReturnValue({}),
-} as unknown as import('@google/gemini-cli-core').Config;
+});
 
 describe('Voice Input Full Cycle Replication', () => {
   beforeEach(() => {
