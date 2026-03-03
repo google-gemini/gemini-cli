@@ -21,6 +21,7 @@ implementation. It allows you to:
   - [Entering Plan Mode](#entering-plan-mode)
   - [Planning Workflow](#planning-workflow)
   - [Exiting Plan Mode](#exiting-plan-mode)
+  - [Commands](#commands)
 - [Tool Restrictions](#tool-restrictions)
   - [Customizing Planning with Skills](#customizing-planning-with-skills)
   - [Customizing Policies](#customizing-policies)
@@ -125,6 +126,10 @@ To exit Plan Mode, you can:
 
 - **Tool:** Gemini CLI calls the [`exit_plan_mode`] tool to present the
   finalized plan for your approval.
+
+### Commands
+
+- **`/plan copy`**: Copy the currently approved plan to your clipboard.
 
 ## Tool Restrictions
 
