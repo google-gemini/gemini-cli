@@ -309,23 +309,33 @@ describe('ChatRecordingService', () => {
   });
 
   describe('deleteSession', () => {
-    it('should delete the session file and tool outputs if they exist', () => {
+    it('should delete the session file, tool outputs, session directory, and logs if they exist', () => {
+      const sessionId = 'test-session-id';
       const chatsDir = path.join(testTempDir, 'chats');
+      const logsDir = path.join(testTempDir, 'logs');
+      const toolOutputsDir = path.join(testTempDir, 'tool-outputs');
+      const sessionDir = path.join(testTempDir, sessionId);
+
       fs.mkdirSync(chatsDir, { recursive: true });
-      const sessionFile = path.join(chatsDir, 'test-session-id.json');
+      fs.mkdirSync(logsDir, { recursive: true });
+      fs.mkdirSync(toolOutputsDir, { recursive: true });
+      fs.mkdirSync(sessionDir, { recursive: true });
+
+      const sessionFile = path.join(chatsDir, `${sessionId}.json`);
       fs.writeFileSync(sessionFile, '{}');
 
-      const toolOutputDir = path.join(
-        testTempDir,
-        'tool-outputs',
-        'session-test-session-id',
-      );
+      const logFile = path.join(logsDir, `session-${sessionId}.jsonl`);
+      fs.writeFileSync(logFile, '{}');
+
+      const toolOutputDir = path.join(toolOutputsDir, `session-${sessionId}`);
       fs.mkdirSync(toolOutputDir, { recursive: true });
 
-      chatRecordingService.deleteSession('test-session-id');
+      chatRecordingService.deleteSession(sessionId);
 
       expect(fs.existsSync(sessionFile)).toBe(false);
+      expect(fs.existsSync(logFile)).toBe(false);
       expect(fs.existsSync(toolOutputDir)).toBe(false);
+      expect(fs.existsSync(sessionDir)).toBe(false);
     });
 
     it('should not throw if session file does not exist', () => {
