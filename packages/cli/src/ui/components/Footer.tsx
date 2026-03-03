@@ -62,7 +62,9 @@ export const Footer: React.FC = () => {
     config.getDebugMode() || settings.merged.ui.showMemoryUsage;
   const isFullErrorVerbosity = settings.merged.ui.errorVerbosity === 'full';
   const showErrorSummary =
-    !showErrorDetails && errorCount > 0 && (isFullErrorVerbosity || debugMode);
+    !showErrorDetails &&
+    errorCount > 0 &&
+    (isFullErrorVerbosity || debugMode || isDevelopment);
   const hideCWD = settings.merged.ui.footer.hideCWD;
   const hideSandboxStatus = settings.merged.ui.footer.hideSandboxStatus;
   const hideModelInfo = settings.merged.ui.footer.hideModelInfo;

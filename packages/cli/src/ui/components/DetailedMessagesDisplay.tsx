@@ -13,8 +13,6 @@ import {
   ScrollableList,
   type ScrollableListRef,
 } from './shared/ScrollableList.js';
-import { useConfig } from '../contexts/ConfigContext.js';
-import { useSettings } from '../contexts/SettingsContext.js';
 
 interface DetailedMessagesDisplayProps {
   messages: ConsoleMessageItem[];
@@ -29,10 +27,6 @@ export const DetailedMessagesDisplay: React.FC<
   DetailedMessagesDisplayProps
 > = ({ messages, maxHeight, width, hasFocus }) => {
   const scrollableListRef = useRef<ScrollableListRef<ConsoleMessageItem>>(null);
-  const config = useConfig();
-  const settings = useSettings();
-  const showHotkeyHint =
-    settings.merged.ui.errorVerbosity === 'full' || config.getDebugMode();
 
   const borderAndPadding = 3;
 
@@ -71,10 +65,7 @@ export const DetailedMessagesDisplay: React.FC<
     >
       <Box marginBottom={1}>
         <Text bold color={theme.text.primary}>
-          Debug Console{' '}
-          {showHotkeyHint && (
-            <Text color={theme.text.secondary}>(F12 to close)</Text>
-          )}
+          Debug Console <Text color={theme.text.secondary}>(F12 to close)</Text>
         </Text>
       </Box>
       <Box height={maxHeight} width={width - borderAndPadding}>
