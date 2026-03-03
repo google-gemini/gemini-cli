@@ -15,6 +15,7 @@ import { SettingScope } from '../../config/settings.js';
 
 const authLoginCommand: SlashCommand = {
   name: 'signin',
+  altNames: ['login'],
   description: 'Sign in or change the authentication method',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
@@ -26,6 +27,7 @@ const authLoginCommand: SlashCommand = {
 
 const authLogoutCommand: SlashCommand = {
   name: 'signout',
+  altNames: ['logout'],
   description: 'Sign out and clear all cached credentials',
   kind: CommandKind.BUILT_IN,
   action: async (context, _args): Promise<LogoutActionReturn> => {
