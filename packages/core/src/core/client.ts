@@ -4,27 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  GenerateContentConfig,
-  PartListUnion,
-  Content,
-  Tool,
-  GenerateContentResponse,
+import {
+  createUserContent,
+  type GenerateContentConfig,
+  type PartListUnion,
+  type Content,
+  type Tool,
+  type GenerateContentResponse,
 } from '@google/genai';
-import { createUserContent } from '@google/genai';
 import { partListUnionToString } from './geminiRequest.js';
 import {
   getDirectoryContextString,
   getInitialChatHistory,
 } from '../utils/environmentContext.js';
-import type { ServerGeminiStreamEvent, ChatCompressionInfo } from './turn.js';
-import { CompressionStatus, Turn, GeminiEventType } from './turn.js';
+import {
+  CompressionStatus,
+  Turn,
+  GeminiEventType,
+  type ServerGeminiStreamEvent,
+  type ChatCompressionInfo,
+} from './turn.js';
 import type { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
-import { retryWithBackoff } from '../utils/retry.js';
+import {
+  retryWithBackoff,
+  type RetryAvailabilityContext,
+} from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
@@ -47,6 +55,7 @@ import type {
 import {
   ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
+  type LlmRole,
 } from '../telemetry/types.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import type { IdeContext, File } from '../ide/types.js';
@@ -61,10 +70,8 @@ import {
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
 import { resolveModel, isGemini2Model } from '../config/models.js';
-import type { RetryAvailabilityContext } from '../utils/retry.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
-import type { LlmRole } from '../telemetry/types.js';
 
 const MAX_TURNS = 100;
 

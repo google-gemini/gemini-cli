@@ -21,10 +21,13 @@ import { ToolCallEvent } from '../telemetry/types.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { ToolModificationHandler } from '../scheduler/tool-modifier.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
-import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
-import { MessageBusType } from '../confirmation-bus/types.js';
+import {
+  MessageBusType,
+  type ToolConfirmationRequest,
+} from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
+  CoreToolCallStatus,
   type ToolCall,
   type ValidatingToolCall,
   type ScheduledToolCall,
@@ -42,7 +45,6 @@ import {
   type ToolCallRequestInfo,
   type ToolCallResponseInfo,
 } from '../scheduler/types.js';
-import { CoreToolCallStatus } from '../scheduler/types.js';
 import { ToolExecutor } from '../scheduler/tool-executor.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getPolicyDenialError } from '../scheduler/policy.js';
