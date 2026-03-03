@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { Box, type DOMElement } from 'ink';
+import { theme } from '../semantic-colors.js';
 
 export interface StickyHeaderProps {
   children: React.ReactNode;
@@ -24,6 +25,7 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
   borderColor,
   borderDimColor,
   containerRef,
+  showSeparator = false,
 }) => (
   <Box
     ref={containerRef}
@@ -44,6 +46,18 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
         paddingTop={isFirst ? 0 : 1}
       >
         <Box paddingX={1}>{children}</Box>
+        {/* Dark border to separate header from content. */}
+        {showSeparator && (
+          <Box
+            width={width - 2}
+            borderColor={theme.ui.dark}
+            borderStyle="single"
+            borderTop={false}
+            borderBottom={true}
+            borderLeft={false}
+            borderRight={false}
+          ></Box>
+        )}
       </Box>
     }
   >

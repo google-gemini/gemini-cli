@@ -47,7 +47,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
 
   emphasis = 'medium',
 
-  renderOutputAsMarkdown = true,
+  renderOutputAsMarkdown: _renderOutputAsMarkdown = true,
 
   ptyId,
 
@@ -161,8 +161,9 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           resultDisplay={resultDisplay}
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
-          renderOutputAsMarkdown={renderOutputAsMarkdown}
+          renderOutputAsMarkdown={false}
           hasFocus={isThisShellFocused}
+          marginTop={1}
           maxLines={calculateShellMaxLines({
             status,
             isAlternateBuffer,

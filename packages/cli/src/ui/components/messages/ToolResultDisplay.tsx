@@ -37,6 +37,7 @@ export interface ToolResultDisplayProps {
   renderOutputAsMarkdown?: boolean;
   maxLines?: number;
   hasFocus?: boolean;
+  marginTop?: number;
 }
 
 interface FileDiffResult {
@@ -50,7 +51,8 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   terminalWidth,
   renderOutputAsMarkdown = true,
   maxLines,
-  hasFocus = false,
+  hasFocus,
+  marginTop = 0,
 }) => {
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
@@ -149,7 +151,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           estimatedItemHeight={() => 1}
           keyExtractor={keyExtractor}
           initialScrollIndex={SCROLL_TO_ITEM_END}
-          hasFocus={hasFocus}
+          hasFocus={hasFocus ?? false}
         />
       </Box>
     );
@@ -231,11 +233,11 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   // 4. Final render based on session mode
   if (isAlternateBuffer) {
     return (
-      <Box width={childWidth} marginTop={1}>
+      <Box width={childWidth} marginTop={marginTop}>
         <Scrollable
           width={childWidth}
           maxHeight={maxLines ?? availableHeight}
-          hasFocus={hasFocus} // Allow scrolling via keyboard (Shift+Up/Down)
+          hasFocus={hasFocus ?? false} // Allow scrolling via keyboard (Shift+Up/Down)
           scrollToBottom={true}
         >
           {content}
@@ -245,7 +247,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   }
 
   return (
-    <Box width={childWidth} flexDirection="column" marginTop={1}>
+    <Box width={childWidth} flexDirection="column" marginTop={marginTop}>
       <MaxSizedBox
         maxHeight={availableHeight}
         maxWidth={childWidth}

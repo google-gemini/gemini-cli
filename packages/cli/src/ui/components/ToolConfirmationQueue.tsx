@@ -71,10 +71,10 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
   // ToolConfirmationMessage needs to know the height available for its OWN content.
   // We subtract the lines used by the Queue wrapper:
   // - 2 lines for the rounded border
-  // - 2 lines for the Header (text + margin)
+  // - 1 line for the Header (text)
   // - 2 lines for Tool Identity (text + margin)
   const availableContentHeight = constrainHeight
-    ? Math.max(maxHeight - (hideToolIdentity ? 4 : 6), 4)
+    ? Math.max(maxHeight - (hideToolIdentity ? 3 : 5), 4)
     : undefined;
 
   const content = (

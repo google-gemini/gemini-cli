@@ -129,6 +129,11 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           terminalWidth={terminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}
           hasFocus={isThisShellFocused}
+          marginTop={
+            status === CoreToolCallStatus.Executing && progress !== undefined
+              ? 1
+              : 0
+          }
         />
         {isThisShellFocused && config && (
           <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
