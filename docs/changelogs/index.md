@@ -464,8 +464,9 @@ on GitHub.
   page in their default browser directly from the CLI using the `/extension`
   explore command. ([pr](https://github.com/google-gemini/gemini-cli/pull/11846)
   by [@JayadityaGit](https://github.com/JayadityaGit)).
-- **Configurable compression:** Users can modify the compression threshold in
-  `/settings`. The default has been made more proactive
+- **Configurable compression:** Users can modify the context compression
+  threshold in `/settings` (decimal with percentage display). The default has
+  been made more proactive
   ([pr](https://github.com/google-gemini/gemini-cli/pull/12317) by
   [@scidomino](https://github.com/scidomino)).
 - **API key authentication:** Users can now securely enter and store their
