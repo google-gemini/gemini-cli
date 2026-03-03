@@ -413,7 +413,8 @@ export async function parseArguments(
     result['a2aPort'] === undefined &&
     result['a2a-port'] === undefined
   ) {
-    (result as Record<string, unknown>)['a2aPort'] = 0;
+    (result as Record<string, unknown>)['a2aPort'] =
+      parseInt(process.env['A2A_PORT'] ?? '0', 10) || 3100;
   }
   // The import format is now only controlled by settings.memoryImportFormat  // We no longer accept it as a CLI argument
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

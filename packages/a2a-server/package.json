@@ -29,6 +29,7 @@
     "@google-cloud/storage": "^7.16.0",
     "@google/gemini-cli-core": "file:../core",
     "express": "^5.1.0",
+    "google-auth-library": "^9.15.1",
     "fs-extra": "^11.3.0",
     "strip-json-comments": "^3.1.1",
     "tar": "^7.5.8",

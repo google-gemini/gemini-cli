@@ -33,7 +33,7 @@ interface A2ATask {
 const tasks = new Map<string, A2ATask>();
 
 const TASK_CLEANUP_DELAY_MS = 10 * 60 * 1000; // 10 minutes
-const DEFAULT_BLOCKING_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_BLOCKING_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes (forever mode tasks can run long)
 
 interface ResponseWaiter {
   taskId: string;
