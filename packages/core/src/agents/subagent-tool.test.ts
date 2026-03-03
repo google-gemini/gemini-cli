@@ -120,6 +120,16 @@ describe('SubAgentInvocation', () => {
     );
   });
 
+  it('should return the correct description', () => {
+    const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
+    const params = {};
+    // @ts-expect-error - accessing protected method for testing
+    const invocation = tool.createInvocation(params, mockMessageBus);
+    expect(invocation.getDescription()).toBe(
+      "Delegating to agent 'LocalAgent'",
+    );
+  });
+
   it('should delegate shouldConfirmExecute to the inner sub-invocation (remote)', async () => {
     const tool = new SubagentTool(
       testRemoteDefinition,
