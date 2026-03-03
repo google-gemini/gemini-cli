@@ -498,13 +498,19 @@ export class TestRig {
     command: string;
     initialArgs: string[];
   } {
+    const binaryPath = env['INTEGRATION_TEST_GEMINI_BINARY_PATH'];
     const isNpmReleaseTest =
       env['INTEGRATION_TEST_USE_INSTALLED_GEMINI'] === 'true';
     const geminiCommand = os.platform() === 'win32' ? 'gemini.cmd' : 'gemini';
-    const command = isNpmReleaseTest ? geminiCommand : 'node';
-    const initialArgs = isNpmReleaseTest
-      ? extraInitialArgs
-      : [BUNDLE_PATH, ...extraInitialArgs];
+    let command = 'node';
+    let initialArgs = [BUNDLE_PATH, ...extraInitialArgs];
+    if (binaryPath) {
+      command = binaryPath;
+      initialArgs = extraInitialArgs;
+    } else if (isNpmReleaseTest) {
+      command = geminiCommand;
+      initialArgs = extraInitialArgs;
+    }
     if (this.fakeResponsesPath) {
       if (process.env['REGENERATE_MODEL_GOLDENS'] === 'true') {
         initialArgs.push('--record-responses', this.fakeResponsesPath);
