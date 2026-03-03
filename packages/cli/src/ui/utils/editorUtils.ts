@@ -97,6 +97,17 @@ export async function openFileInEditor(
     args.unshift('-nw');
   }
 
+  function handleEditorError(err: Error, context: string): void {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      coreEvents.emitFeedback(
+        'error',
+        `Could not find editor '${executable}'. Check your $VISUAL/$EDITOR setting.`,
+      );
+    } else {
+      coreEvents.emitFeedback('error', context, err);
+    }
+  }
+
   const wasRaw = stdin?.isRaw ?? false;
   setRawMode?.(false);
 
@@ -107,18 +118,10 @@ export async function openFileInEditor(
         shell: process.platform === 'win32',
       });
       if (result.error) {
-        if ((result.error as NodeJS.ErrnoException).code === 'ENOENT') {
-          coreEvents.emitFeedback(
-            'error',
-            `Could not find editor '${executable}'. Check your $VISUAL/$EDITOR setting.`,
-          );
-        } else {
-          coreEvents.emitFeedback(
-            'error',
-            '[editorUtils] external terminal editor error',
-            result.error,
-          );
-        }
+        handleEditorError(
+          result.error,
+          '[editorUtils] external terminal editor error',
+        );
         throw result.error;
       }
       if (typeof result.status === 'number' && result.status !== 0) {
@@ -140,18 +143,7 @@ export async function openFileInEditor(
         });
 
         child.on('error', (err) => {
-          if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-            coreEvents.emitFeedback(
-              'error',
-              `Could not find editor '${executable}'. Check your $VISUAL/$EDITOR setting.`,
-            );
-          } else {
-            coreEvents.emitFeedback(
-              'error',
-              '[editorUtils] external editor spawn error',
-              err,
-            );
-          }
+          handleEditorError(err, '[editorUtils] external editor spawn error');
           reject(err);
         });
 
