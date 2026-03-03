@@ -251,7 +251,8 @@ export function useCommandCompletion({
     if (
       completionMode === CompletionMode.SHELL &&
       suggestions.length > 0 &&
-      query != null
+      query != null &&
+      shellCompletionRange.completionStart === shellCompletionRange.activeStart
     ) {
       const commonPrefix = getCommonPrefix(suggestions.map((s) => s.value));
       if (commonPrefix && commonPrefix.length > query.length) {

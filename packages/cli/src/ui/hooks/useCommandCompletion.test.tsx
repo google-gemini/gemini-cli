@@ -46,6 +46,7 @@ vi.mock('./useShellCompletion', () => ({
     completionStart: 0,
     completionEnd: 0,
     query: '',
+    activeStart: 0,
   })),
 }));
 
@@ -57,7 +58,12 @@ const setupMocks = ({
   isLoading = false,
   isPerfectMatch = false,
   slashCompletionRange = { completionStart: 0, completionEnd: 0 },
-  shellCompletionRange = { completionStart: 0, completionEnd: 0, query: '' },
+  shellCompletionRange = {
+    completionStart: 0,
+    completionEnd: 0,
+    query: '',
+    activeStart: 0,
+  },
 }: {
   atSuggestions?: Suggestion[];
   slashSuggestions?: Suggestion[];
@@ -69,6 +75,7 @@ const setupMocks = ({
     completionStart: number;
     completionEnd: number;
     query: string;
+    activeStart?: number;
   };
 }) => {
   // Mock for @-completions
@@ -116,7 +123,10 @@ const setupMocks = ({
           setSuggestions(shellSuggestions);
         }
       }, [enabled, setSuggestions, setIsLoadingSuggestions]);
-      return shellCompletionRange;
+      return {
+        ...shellCompletionRange,
+        activeStart: shellCompletionRange.activeStart ?? 0,
+      };
     },
   );
 };
@@ -541,6 +551,57 @@ describe('useCommandCompletion', () => {
         expect(result.current.isLoadingSuggestions).toBe(false);
       });
 
+      expect(result.current.promptCompletion.text).toBe('');
+    });
+
+    it('should clear ghost text after user types a space when exact match ghost text was showing', async () => {
+      const textWithoutSpace = 'ls';
+
+      setupMocks({
+        shellSuggestions: [{ label: 'ls', value: 'ls' }],
+        shellCompletionRange: {
+          completionStart: 0,
+          completionEnd: 2,
+          query: 'ls',
+          activeStart: 0,
+        },
+      });
+
+      const { result } = renderCommandCompletionHook(
+        textWithoutSpace,
+        textWithoutSpace.length,
+        true, // shellModeActive
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      // Initially no ghost text because "ls" perfectly matches "ls"
+      expect(result.current.promptCompletion.text).toBe('');
+
+      // Now simulate typing a space.
+      // In the real app, shellCompletionRange.completionStart would change immediately to 3,
+      // but suggestions (and activeStart) would still be from the previous token for a few ms.
+      setupMocks({
+        shellSuggestions: [{ label: 'ls', value: 'ls' }], // Stale suggestions
+        shellCompletionRange: {
+          completionStart: 3, // New token position
+          completionEnd: 3,
+          query: '',
+          activeStart: 0, // Stale active start
+        },
+      });
+
+      act(() => {
+        result.current.textBuffer.setText('ls ', 'end');
+      });
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      // Should STILL be empty because completionStart (3) !== activeStart (0)
       expect(result.current.promptCompletion.text).toBe('');
     });
   });
