@@ -6,6 +6,8 @@
 
 import type React from 'react';
 import { StatsDisplay } from './StatsDisplay.js';
+import { useSessionStats } from '../contexts/SessionContext.js';
+import { escapeShellArg, getShellConfiguration } from '@google/gemini-cli-core';
 
 interface SessionSummaryDisplayProps {
   duration: string;
@@ -13,10 +15,16 @@ interface SessionSummaryDisplayProps {
 
 export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
   duration,
-}) => (
-  <StatsDisplay
-    title="Agent powering down. Goodbye!"
-    duration={duration}
-    footer="Tip: Resume a previous session using gemini --resume or /resume"
-  />
-);
+}) => {
+  const { stats } = useSessionStats();
+  const { shell } = getShellConfiguration();
+  const footer = `To resume this session: gemini --resume ${escapeShellArg(stats.sessionId, shell)}`;
+
+  return (
+    <StatsDisplay
+      title="Agent powering down. Goodbye!"
+      duration={duration}
+      footer={footer}
+    />
+  );
+};
