@@ -198,7 +198,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       modelConfig: {},
     },
     'loop-detection': {
-      extends: 'gemini-3-flash-base',
+      extends: 'gemini-2.5-flash-base',
       modelConfig: {},
     },
     'loop-detection-double-check': {
@@ -208,11 +208,11 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'llm-edit-fixer': {
-      extends: 'gemini-3-flash-base',
+      extends: 'gemini-2.5-flash-base',
       modelConfig: {},
     },
     'next-speaker-checker': {
-      extends: 'gemini-3-flash-base',
+      extends: 'gemini-2.5-flash-base',
       modelConfig: {},
     },
     'chat-compression-3-pro': {
