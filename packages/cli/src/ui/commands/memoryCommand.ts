@@ -72,7 +72,7 @@ export const memoryCommand: SlashCommand = {
         context.ui.addItem(
           {
             type: MessageType.INFO,
-            text: 'Refreshing memory from source files...',
+            text: 'Reloading memory from source files...',
           },
           Date.now(),
         );
@@ -95,7 +95,7 @@ export const memoryCommand: SlashCommand = {
             {
               type: MessageType.ERROR,
               // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-              text: `Error refreshing memory: ${(error as Error).message}`,
+              text: `Error reloading memory: ${(error as Error).message}`,
             },
             Date.now(),
           );

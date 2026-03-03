@@ -340,7 +340,7 @@ const agentsRefreshCommand: SlashCommand = {
 
     context.ui.addItem({
       type: MessageType.INFO,
-      text: 'Refreshing agent registry...',
+      text: 'Reloading agent registry...',
     });
 
     await agentRegistry.reload();

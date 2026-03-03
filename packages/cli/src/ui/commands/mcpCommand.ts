@@ -133,7 +133,7 @@ const authCommand: SlashCommand = {
       if (mcpClientManager) {
         context.ui.addItem({
           type: 'info',
-          text: `Restarting MCP server '${serverName}'...`,
+          text: `Reloading MCP server '${serverName}'...`,
         });
         await mcpClientManager.restartServer(serverName);
       }
@@ -354,7 +354,7 @@ const refreshCommand: SlashCommand = {
 
     context.ui.addItem({
       type: 'info',
-      text: 'Restarting MCP servers...',
+      text: 'Reloading MCP servers...',
     });
 
     await mcpClientManager.restart();
@@ -460,7 +460,7 @@ async function handleEnableDisable(
   const mcpClientManager = config.getMcpClientManager();
   if (mcpClientManager) {
     context.ui.addItem(
-      { type: 'info', text: 'Restarting MCP servers...' },
+      { type: 'info', text: 'Reloading MCP servers...' },
       Date.now(),
     );
     await mcpClientManager.restart();
