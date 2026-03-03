@@ -157,10 +157,10 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
     return [];
   }
 
-  // Find the start of the active loop by finding the last user turn
+  // Find the start of the active loop by finding the FIRST user turn
   // with a text message, i.e. that is not a function response.
   let activeLoopStartIndex = -1;
-  for (let i = comprehensiveHistory.length - 1; i >= 0; i--) {
+  for (let i = 0; i < comprehensiveHistory.length; i++) {
     const content = comprehensiveHistory[i];
     if (content.role === 'user' && content.parts?.some((part) => part.text)) {
       activeLoopStartIndex = i;
@@ -771,10 +771,10 @@ export class GeminiChat {
   // turn within the active loop must have a `thoughtSignature` property.
   // If we do not do this, we will get back 400 errors from the API.
   ensureActiveLoopHasThoughtSignatures(requestContents: Content[]): Content[] {
-    // First, find the start of the active loop by finding the last user turn
+    // First, find the start of the active loop by finding the FIRST user turn
     // with a text message, i.e. that is not a function response.
     let activeLoopStartIndex = -1;
-    for (let i = requestContents.length - 1; i >= 0; i--) {
+    for (let i = 0; i < requestContents.length; i++) {
       const content = requestContents[i];
       if (content.role === 'user' && content.parts?.some((part) => part.text)) {
         activeLoopStartIndex = i;

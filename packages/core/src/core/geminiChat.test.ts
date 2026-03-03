@@ -2081,10 +2081,12 @@ describe('GeminiChat', () => {
 
       const newContents = chat.ensureActiveLoopHasThoughtSignatures(history);
 
-      // Outside active loop - unchanged
-      expect(newContents[1]?.parts?.[0]).not.toHaveProperty('thoughtSignature');
+      // Inside active loop (which now starts at index 0 because it's the first user text message)
+      expect(newContents[1]?.parts?.[0]?.thoughtSignature).toBe(
+        SYNTHETIC_THOUGHT_SIGNATURE,
+      );
 
-      // Inside active loop, first model turn
+      // Inside active loop, first model turn after the second user text message
       // First function call gets a signature
       expect(newContents[3]?.parts?.[0]?.thoughtSignature).toBe(
         SYNTHETIC_THOUGHT_SIGNATURE,
