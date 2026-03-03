@@ -129,7 +129,7 @@ describe('resolvePathFromEnv', () => {
       const result = resolvePathFromEnv('/absolute/path');
       expect(result).toEqual({
         isSwitch: false,
-        value: '/absolute/path',
+        value: path.resolve('/absolute/path'),
         isDisabled: false,
       });
     });
@@ -170,7 +170,7 @@ describe('resolvePathFromEnv', () => {
       const result = resolvePathFromEnv('  /some/path  ');
       expect(result).toEqual({
         isSwitch: false,
-        value: '/some/path',
+        value: path.resolve('/some/path'),
         isDisabled: false,
       });
     });
