@@ -1427,7 +1427,11 @@ function buildAvailableModels(
   config: Config,
   settings: LoadedSettings,
 ): {
-  availableModels: Array<{ modelId: string; name: string; description?: string }>;
+  availableModels: Array<{
+    modelId: string;
+    name: string;
+    description?: string;
+  }>;
   currentModelId: string;
 } {
   const preferredModel = config.getModel() || DEFAULT_GEMINI_MODEL_AUTO;

@@ -207,7 +207,7 @@ describe('GeminiAgent Session Resume', () => {
         currentModeId: ApprovalMode.DEFAULT,
       },
       models: {
-        availableModels: expect.any(Array),
+        availableModels: expect.any(Array) as unknown,
         currentModelId: 'gemini-pro',
       },
     });
