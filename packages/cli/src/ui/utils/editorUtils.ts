@@ -81,6 +81,11 @@ export async function openFileInEditor(
     args.unshift('-i', 'NONE');
   }
 
+  if (isTerminal && executable === 'emacsclient') {
+    // Pass -nw to force terminal (no-window) mode.
+    args.unshift('-nw');
+  }
+
   const wasRaw = stdin?.isRaw ?? false;
   setRawMode?.(false);
 
