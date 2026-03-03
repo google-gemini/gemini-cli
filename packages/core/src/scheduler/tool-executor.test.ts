@@ -5,7 +5,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import fsPromises from 'node:fs/promises';
 import { ToolExecutor } from './tool-executor.js';
 import {
   type Config,
@@ -326,8 +325,7 @@ describe('ToolExecutor', () => {
     vi.spyOn(fileUtils, 'moveToolOutputToFile').mockResolvedValue({
       outputFile: '/tmp/moved_output.txt',
     });
-      
-    const mockTool = new MockTool({ name: SHELL_TOOL_NAME });
+
     const mcpToolName = 'get_big_text';
     const messageBus = createMockMessageBus();
     const mcpTool = new DiscoveredMCPTool(
@@ -345,7 +343,7 @@ describe('ToolExecutor', () => {
     vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
       llmContent: [{ text: longText }],
       returnDisplay: longText,
-      fullOutputFilePath: '/tmp/temp_full_output.txt'
+      fullOutputFilePath: '/tmp/temp_full_output.txt',
     });
 
     const scheduledCall: ScheduledToolCall = {
