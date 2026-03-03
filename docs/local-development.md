@@ -1,23 +1,21 @@
 # Local development guide
 
 This guide provides instructions for setting up and using local development
-features, such as development tracing.
+features, such as tracing.
 
-## Development tracing
+## Tracing
 
-Development traces (dev traces) are OpenTelemetry (OTel) traces that help you
-debug your code by instrumenting interesting events like model calls, tool
-scheduler, tool calls, etc.
+Traces are OpenTelemetry (OTel) records that help you debug your code by
+instrumenting key events like model calls, tool scheduler operations, and tool
+calls.
 
-Dev traces are verbose and are specifically meant for understanding agent
-behavior and debugging issues. They are disabled by default.
+Traces provide deep visibility into agent behavior and are invaluable for
+debugging complex issues. They are captured automatically when telemetry is
+enabled.
 
-To enable dev traces, set the `GEMINI_DEV_TRACING=true` environment variable
-when running Gemini CLI.
+### Viewing traces
 
-### Viewing dev traces
-
-You can view dev traces using either Jaeger or the Genkit Developer UI.
+You can view traces using either Jaeger or the Genkit Developer UI.
 
 #### Using Genkit
 
@@ -37,13 +35,12 @@ Genkit provides a web-based UI for viewing traces and other telemetry data.
     Genkit Developer UI: http://localhost:4000
     ```
 
-2.  **Run Gemini CLI with dev tracing:**
+2.  **Run Gemini CLI:**
 
-    In a separate terminal, run your Gemini CLI command with the
-    `GEMINI_DEV_TRACING` environment variable:
+    In a separate terminal, run your Gemini CLI command:
 
     ```bash
-    GEMINI_DEV_TRACING=true gemini
+    gemini
     ```
 
 3.  **View the traces:**
@@ -53,7 +50,7 @@ Genkit provides a web-based UI for viewing traces and other telemetry data.
 
 #### Using Jaeger
 
-You can view dev traces in the Jaeger UI. To get started, follow these steps:
+You can view traces in the Jaeger UI. To get started, follow these steps:
 
 1.  **Start the telemetry collector:**
 
@@ -67,13 +64,12 @@ You can view dev traces in the Jaeger UI. To get started, follow these steps:
     This command also configures your workspace for local telemetry and provides
     a link to the Jaeger UI (usually `http://localhost:16686`).
 
-2.  **Run Gemini CLI with dev tracing:**
+2.  **Run Gemini CLI:**
 
-    In a separate terminal, run your Gemini CLI command with the
-    `GEMINI_DEV_TRACING` environment variable:
+    In a separate terminal, run your Gemini CLI command:
 
     ```bash
-    GEMINI_DEV_TRACING=true gemini
+    gemini
     ```
 
 3.  **View the traces:**
@@ -84,10 +80,10 @@ You can view dev traces in the Jaeger UI. To get started, follow these steps:
 For more detailed information on telemetry, see the
 [telemetry documentation](./cli/telemetry.md).
 
-### Instrumenting code with dev traces
+### Instrumenting code with traces
 
-You can add dev traces to your own code for more detailed instrumentation. This
-is useful for debugging and understanding the flow of execution.
+You can add traces to your own code for more detailed instrumentation. This is
+useful for debugging and understanding the flow of execution.
 
 Use the `runInDevTraceSpan` function to wrap any section of code in a trace
 span.
@@ -96,29 +92,39 @@ Here is a basic example:
 
 ```typescript
 import { runInDevTraceSpan } from '@google/gemini-cli-core';
+import { GeminiCliOperation } from '@google/gemini-cli-core/lib/telemetry/constants.js';
 
-await runInDevTraceSpan({ name: 'my-custom-span' }, async ({ metadata }) => {
-  // The `metadata` object allows you to record the input and output of the
-  // operation as well as other attributes.
-  metadata.input = { key: 'value' };
-  // Set custom attributes.
-  metadata.attributes['gen_ai.request.model'] = 'gemini-4.0-mega';
+await runInDevTraceSpan(
+  {
+    operation: GeminiCliOperation.ToolCall,
+    attributes: {
+      [GEN_AI_AGENT_NAME]: 'gemini-cli',
+    },
+  },
+  async ({ metadata }) => {
+    // The `metadata` object allows you to record the input and output of the
+    // operation as well as other attributes.
+    metadata.input = { key: 'value' };
+    // Set custom attributes.
+    metadata.attributes['custom.attribute'] = 'custom.value';
 
-  // Your code to be traced goes here
-  try {
-    const output = await somethingRisky();
-    metadata.output = output;
-    return output;
-  } catch (e) {
-    metadata.error = e;
-    throw e;
-  }
-});
+    // Your code to be traced goes here
+    try {
+      const output = await somethingRisky();
+      metadata.output = output;
+      return output;
+    } catch (e) {
+      metadata.error = e;
+      throw e;
+    }
+  },
+);
 ```
 
 In this example:
 
-- `name`: The name of the span, which will be displayed in the trace.
+- `operation`: The operation type of the span, represented by the
+  `GeminiCliOperation` enum.
 - `metadata.input`: (Optional) An object containing the input data for the
   traced operation.
 - `metadata.output`: (Optional) An object containing the output data from the
