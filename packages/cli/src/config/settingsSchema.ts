@@ -924,6 +924,7 @@ const SETTINGS_SCHEMA = {
         description:
           'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
         showInDialog: true,
+        unit: '%',
       },
       disableLoopDetection: {
         type: 'boolean',

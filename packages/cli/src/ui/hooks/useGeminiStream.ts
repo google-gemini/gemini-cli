@@ -1077,8 +1077,8 @@ export const useGeminiStream = (
       addItem(
         {
           type: MessageType.INFO,
-          text: `Context compressed from ${originalPercentage}% to ${newPercentage}%`,
-          secondaryText: `. Change threshold in /settings.`,
+          text: `Context compressed from ${originalPercentage}% to ${newPercentage}%.`,
+          secondaryText: `Change threshold in /settings.`,
           color: theme.status.warning,
           marginBottom: 1,
         } as HistoryItemInfo,

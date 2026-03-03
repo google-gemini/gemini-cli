@@ -289,6 +289,11 @@ export function getDisplayValue(
     valueString = option?.label ?? `${value}`;
   }
 
+  if (definition?.unit === '%' && typeof value === 'number') {
+    valueString = `${value} (${Math.round(value * 100)}%)`;
+  } else if (definition?.unit) {
+    valueString = `${valueString}${definition.unit}`;
+  }
   if (existsInScope) {
     return `${valueString}*`;
   }
