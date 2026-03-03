@@ -17,6 +17,7 @@ const GUI_EDITORS = [
   'cursor',
   'zed',
   'antigravity',
+  'sublime',
 ] as const;
 const TERMINAL_EDITORS = ['vim', 'neovim', 'emacs', 'hx'] as const;
 const EDITORS = [...GUI_EDITORS, ...TERMINAL_EDITORS] as const;
@@ -55,6 +56,7 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   emacs: 'Emacs',
   antigravity: 'Antigravity',
   hx: 'Helix',
+  sublime: 'Sublime Text',
 };
 
 export function getEditorDisplayName(editor: EditorType): string {
@@ -125,6 +127,7 @@ const editorCommands: Record<
     default: ['agy', 'antigravity'],
   },
   hx: { win32: ['hx'], default: ['hx'] },
+  sublime: { win32: ['subl'], default: ['subl'] },
 };
 
 function getEditorCommands(editor: EditorType): string[] {
@@ -237,6 +240,8 @@ export function getDiffCommand(
     case 'zed':
     case 'antigravity':
       return { command, args: ['--wait', '--diff', oldPath, newPath] };
+    case 'sublime':
+      return { command, args: ['--wait', oldPath] };
     case 'vim':
     case 'neovim':
       return {

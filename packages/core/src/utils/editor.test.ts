@@ -84,6 +84,7 @@ describe('editor utils', () => {
         win32Commands: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
       },
       { editor: 'hx', commands: ['hx'], win32Commands: ['hx'] },
+      { editor: 'sublime', commands: ['subl'], win32Commands: ['subl'] },
     ];
 
     for (const { editor, commands, win32Commands } of testCases) {
@@ -339,6 +340,16 @@ describe('editor utils', () => {
       });
     });
 
+    it('should return the correct command for sublime', () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/subl'));
+      const command = getDiffCommand('old.txt', 'new.txt', 'sublime');
+      expect(command).toEqual({
+        command: 'subl',
+        args: ['--wait', 'old.txt'],
+      });
+    });
+
     it('should return null for an unsupported editor', () => {
       // @ts-expect-error Testing unsupported editor
       const command = getDiffCommand('old.txt', 'new.txt', 'foobar');
@@ -353,6 +364,7 @@ describe('editor utils', () => {
       'windsurf',
       'cursor',
       'zed',
+      'sublime',
     ];
 
     for (const editor of guiEditors) {
@@ -544,6 +556,7 @@ describe('editor utils', () => {
       'windsurf',
       'cursor',
       'zed',
+      'sublime',
     ];
     for (const editor of guiEditors) {
       it(`should not allow ${editor} in sandbox mode`, () => {
