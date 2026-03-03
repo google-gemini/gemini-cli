@@ -156,6 +156,18 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
   if (comprehensiveHistory === undefined || comprehensiveHistory.length === 0) {
     return [];
   }
+
+  // Find the start of the active loop by finding the last user turn
+  // with a text message, i.e. that is not a function response.
+  let activeLoopStartIndex = -1;
+  for (let i = comprehensiveHistory.length - 1; i >= 0; i--) {
+    const content = comprehensiveHistory[i];
+    if (content.role === 'user' && content.parts?.some((part) => part.text)) {
+      activeLoopStartIndex = i;
+      break;
+    }
+  }
+
   const curatedHistory: Content[] = [];
   const length = comprehensiveHistory.length;
   let i = 0;
@@ -172,11 +184,15 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
           isValid = false;
         }
 
-        // Strip thought parts and thoughtSignature
+        const isBeforeActiveLoop =
+          activeLoopStartIndex === -1 || i < activeLoopStartIndex;
+
+        // Strip thought parts (always) and thoughtSignature (only if before active loop)
         const curatedParts = (content.parts ?? [])
           .filter((part) => !part.thought)
           .map((part) => {
             if (
+              isBeforeActiveLoop &&
               part &&
               typeof part === 'object' &&
               'thoughtSignature' in part
