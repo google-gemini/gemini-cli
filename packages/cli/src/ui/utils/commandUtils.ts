@@ -10,18 +10,29 @@ import type { SlashCommand } from '../commands/types.js';
 import fs from 'node:fs';
 import type { Writable } from 'node:stream';
 import type { Settings } from '../../config/settingsSchema.js';
+import { AT_COMMAND_PATH_REGEX_SOURCE } from '../hooks/atCommandProcessor.js';
+
+// Pre-compiled regex for detecting @<path> patterns consistent with parseAllAtCommands.
+// Uses the same AT_COMMAND_PATH_REGEX_SOURCE so that isAtCommand is true whenever
+// parseAllAtCommands would find at least one atPath part.
+const AT_COMMAND_DETECT_REGEX = new RegExp(
+  `(?<!\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}`,
+);
 
 /**
  * Checks if a query string potentially represents an '@' command.
- * It triggers if the query starts with '@' or contains '@' preceded by whitespace
- * and followed by a non-whitespace character.
+ * Returns true if the query contains any '@<path>' pattern that would be
+ * recognised by the @ command processor, regardless of what character
+ * precedes the '@' sign. This ensures that prompts written in an external
+ * editor (where '@' may follow punctuation like ':' or '(') are correctly
+ * identified and their referenced files pre-loaded before the query is sent
+ * to the model.
  *
  * @param query The input query string.
  * @returns True if the query looks like an '@' command, false otherwise.
  */
 export const isAtCommand = (query: string): boolean =>
-  // Check if starts with @ OR has a space, then @
-  query.startsWith('@') || /\s@/.test(query);
+  AT_COMMAND_DETECT_REGEX.test(query);
 
 /**
  * Checks if a query string potentially represents an '/' command.
