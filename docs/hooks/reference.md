@@ -82,8 +82,8 @@ For `BeforeTool` and `AfterTool` events, the `matcher` field in your settings is
 compared against the name of the tool being executed.
 
 - **Built-in Tools**: You can match any built-in tool (e.g., `read_file`,
-  `run_shell_command`). See the [Tools Reference](/docs/tools) for a full list
-  of available tool names.
+  `run_shell_command`). See the [Tools Reference](../tools/index.md) for a full
+  list of available tool names.
 - **MCP Tools**: Tools from MCP servers follow the naming pattern
   `mcp__<server_name>__<tool_name>`.
 - **Regex Support**: Matchers support regular expressions (e.g.,
