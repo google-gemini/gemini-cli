@@ -5,19 +5,17 @@
  */
 
 import type {
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
   ToolResult,
-  Config,
   ToolResultDisplay,
   ToolLiveOutput,
-} from '../index.js';
-import {
-  ToolErrorType,
-  ToolOutputTruncatedEvent,
-  logToolOutputTruncated,
-  runInDevTraceSpan,
-} from '../index.js';
+} from '../tools/tools.js';
+import type { Config } from '../config/config.js';
+import { ToolErrorType } from '../tools/tool-error.js';
+import { logToolOutputTruncated } from '../telemetry/loggers.js';
+import { ToolOutputTruncatedEvent } from '../telemetry/types.js';
+import { runInDevTraceSpan } from '../telemetry/trace.js';
+import { truncateLongLines } from '../utils/textUtils.js';
+import { DEFAULT_MAX_LINE_LENGTH } from '../utils/constants.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { ShellToolInvocation } from '../tools/shell.js';
@@ -34,6 +32,8 @@ import type {
   ErroredToolCall,
   SuccessfulToolCall,
   CancelledToolCall,
+  ToolCallRequestInfo,
+  ToolCallResponseInfo,
 } from './types.js';
 import { CoreToolCallStatus } from './types.js';
 import {
@@ -236,6 +236,10 @@ export class ToolExecutor {
     let outputFile: string | undefined;
     const toolName = call.request.originalRequestName || call.request.name;
     const callId = call.request.callId;
+
+    if (typeof content === 'string') {
+      content = truncateLongLines(content, DEFAULT_MAX_LINE_LENGTH);
+    }
 
     if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
       const threshold = this.config.getTruncateToolOutputThreshold();

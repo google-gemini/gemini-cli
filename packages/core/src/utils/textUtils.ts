@@ -84,6 +84,92 @@ export function truncateString(
 }
 
 /**
+ * Options for line truncation.
+ */
+export interface TruncateLineOptions {
+  maxLength: number;
+  centerIndex?: number;
+  includeStats?: boolean;
+}
+
+/**
+ * Truncates a single line, optionally centering around a specific index.
+ */
+export function truncateLine(
+  line: string,
+  options: TruncateLineOptions,
+): string {
+  const { maxLength, centerIndex, includeStats } = options;
+  const originalLength = line.length;
+
+  if (originalLength <= maxLength) {
+    return line;
+  }
+
+  let truncated: string;
+  let start = 0;
+  let end = maxLength;
+
+  if (centerIndex !== undefined) {
+    const halfLength = Math.floor(maxLength / 2);
+    start = Math.max(0, centerIndex - halfLength);
+    end = start + maxLength;
+
+    if (end > originalLength) {
+      end = originalLength;
+      start = Math.max(0, end - maxLength);
+    }
+
+    const prefix = start > 0 ? '... ' : '';
+    const suffix = end < originalLength ? ' ...' : '';
+    truncated = prefix + line.substring(start, end) + suffix;
+  } else {
+    truncated = line.substring(0, maxLength) + ' ...';
+  }
+
+  if (includeStats) {
+    const stats =
+      centerIndex !== undefined
+        ? `[Truncated: showing characters ${start} to ${end} of ${originalLength}]`
+        : `[Truncated to ${maxLength} characters (total length: ${originalLength})]`;
+
+    if (centerIndex !== undefined) {
+      // For centered, we put stats at both ends if they are truncated
+      const prefix = start > 0 ? `${stats} ... ` : '';
+      const suffix = end < originalLength ? ` ... ${stats}` : '';
+      truncated = prefix + line.substring(start, end) + suffix;
+    } else {
+      truncated = line.substring(0, maxLength) + ` ${stats}`;
+    }
+  }
+
+  return truncated;
+}
+
+/**
+ * Truncates all lines in a string that exceed the maximum length.
+ */
+export function truncateLongLines(
+  text: string,
+  maxLength: number,
+  includeStats = true,
+): string {
+  if (!text) return text;
+  const lines = text.split('\n');
+  let modified = false;
+
+  const processed = lines.map((line) => {
+    if (line.length > maxLength) {
+      modified = true;
+      return truncateLine(line, { maxLength, includeStats });
+    }
+    return line;
+  });
+
+  return modified ? processed.join('\n') : text;
+}
+
+/**
  * Safely replaces placeholders in a template string with values from a replacements object.
  * This performs a single-pass replacement to prevent double-interpolation attacks.
  *

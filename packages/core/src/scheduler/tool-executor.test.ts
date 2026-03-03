@@ -40,23 +40,17 @@ vi.mock('../core/coreToolHookTriggers.js', () => ({
   executeToolWithHooks: vi.fn(),
 }));
 // Mock runInDevTraceSpan
-const runInDevTraceSpan = vi.hoisted(() =>
-  vi.fn(async (opts, fn) => {
+vi.mock('../telemetry/trace.js', () => ({
+  runInDevTraceSpan: vi.fn(async (opts, fn) => {
     const metadata = { attributes: opts.attributes || {} };
     return fn({
       metadata,
       endSpan: vi.fn(),
     });
   }),
-);
+}));
 
-vi.mock('../index.js', async (importOriginal) => {
-  const actual = await importOriginal<Record<string, unknown>>();
-  return {
-    ...actual,
-    runInDevTraceSpan,
-  };
-});
+import { runInDevTraceSpan } from '../telemetry/trace.js';
 
 describe('ToolExecutor', () => {
   let config: Config;
