@@ -25,7 +25,7 @@ implementation. It allows you to:
   - [Customizing Planning with Skills](#customizing-planning-with-skills)
   - [Customizing Policies](#customizing-policies)
     - [Example: Allow git commands in Plan Mode](#example-allow-git-commands-in-plan-mode)
-    - [Example: Enable research subagents in Plan Mode](#example-enable-research-subagents-in-plan-mode)
+    - [Example: Enable custom subagents in Plan Mode](#example-enable-custom-subagents-in-plan-mode)
   - [Custom Plan Directory and Policies](#custom-plan-directory-and-policies)
 - [Automatic Model Routing](#automatic-model-routing)
 - [Cleanup](#cleanup)
@@ -207,9 +207,9 @@ modes = ["plan"]
 
 #### Example: Enable custom subagents in Plan Mode
 
-Built-in research [subagents] like `codebase_investigator` and `cli_help` are
-enabled by default in Plan Mode. You can enable additional [custom subagents] by
-adding a rule to your policy.
+Built-in research [subagents] like [`codebase_investigator`] and [`cli_help`]
+are enabled by default in Plan Mode. You can enable additional [custom
+subagents] by adding a rule to your policy.
 
 `~/.gemini/policies/research-subagents.toml`
 
