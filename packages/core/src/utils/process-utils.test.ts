@@ -42,14 +42,22 @@ describe('process-utils', () => {
       expect(mockProcessKill).not.toHaveBeenCalled();
     });
 
-    it('should use pty.kill() on Windows if pty is provided', async () => {
+    it('should use pty.kill() AND taskkill on Windows if pty is provided', async () => {
       vi.mocked(os.platform).mockReturnValue('win32');
       const mockPty = { kill: vi.fn() };
 
       await killProcessGroup({ pid: 1234, pty: mockPty });
 
+      // pty.kill() gracefully signals the session leader
       expect(mockPty.kill).toHaveBeenCalled();
-      expect(mockSpawn).not.toHaveBeenCalled();
+      // taskkill /f /t must also run to reap the full process tree, including
+      // any nested background processes that pty.kill() cannot reach.
+      expect(mockSpawn).toHaveBeenCalledWith('taskkill', [
+        '/pid',
+        '1234',
+        '/f',
+        '/t',
+      ]);
     });
 
     it('should kill the process group on Unix with SIGKILL by default', async () => {

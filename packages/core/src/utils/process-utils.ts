@@ -27,8 +27,11 @@ export interface KillOptions {
 /**
  * Robustly terminates a process or process group across platforms.
  *
- * On Windows, it uses `taskkill /f /t` to ensure the entire tree is terminated,
- * or the PTY's built-in kill method.
+ * On Windows, it calls `pty.kill()` first (if a PTY is provided) to cleanly
+ * signal the session leader, then always runs `taskkill /f /t` on the PID to
+ * terminate the entire process tree. Relying on `pty.kill()` alone leaves
+ * background child processes (e.g. `node server &`) as orphans, because
+ * Windows has no equivalent of the POSIX process-group signal.
  *
  * On Unix, it attempts to kill the process group (using -pid) with escalation
  * from SIGTERM to SIGKILL if requested.
@@ -44,9 +47,11 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
       } catch {
         // Ignore errors for dead processes
       }
-    } else {
-      cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
     }
+    // Always use taskkill /f /t to reap the complete process tree on Windows.
+    // pty.kill() only signals the PTY session leader; nested background
+    // processes survive without this tree-wide forced termination.
+    cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
     return;
   }
 
