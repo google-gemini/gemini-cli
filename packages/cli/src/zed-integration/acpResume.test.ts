@@ -48,6 +48,24 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
+    CoreToolCallStatus: {
+      Validating: 'validating',
+      Scheduled: 'scheduled',
+      Error: 'error',
+      Success: 'success',
+      Executing: 'executing',
+      Cancelled: 'cancelled',
+      AwaitingApproval: 'awaiting_approval',
+    },
+    LlmRole: {
+      MAIN: 'main',
+      SUBAGENT: 'subagent',
+      UTILITY_TOOL: 'utility_tool',
+      USER: 'user',
+      MODEL: 'model',
+      SYSTEM: 'system',
+      TOOL: 'tool',
+    },
     convertSessionToClientHistory: vi.fn(),
   };
 });
@@ -256,6 +274,7 @@ describe('GeminiAgent Session Resume', () => {
             toolCallId: 'call-2',
             status: 'failed',
             title: 'Write File',
+            kind: 'read',
           }),
         }),
       );

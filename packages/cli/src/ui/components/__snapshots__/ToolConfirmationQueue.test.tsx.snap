@@ -6,7 +6,7 @@ exports[`ToolConfirmationQueue > calculates availableContentHeight based on avai
 │                                                                              │
 │ ?  replace edit file                                                         │
 │                                                                              │
-│ ... first 49 lines hidden ...                                                │
+│ ... 49 hidden (Ctrl+O) ...                                                   │
 │ 50 line                                                                      │
 │ Apply this change?                                                           │
 │                                                                              │
@@ -85,7 +85,7 @@ exports[`ToolConfirmationQueue > renders ExitPlanMode tool confirmation with Suc
 │       Approves plan but requires confirmation for each tool                  │
 │   3.  Type your feedback...                                                  │
 │                                                                              │
-│ Enter to select · ↑/↓ to navigate · Esc to cancel                            │
+│ Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel      │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 "
 `;
@@ -96,7 +96,7 @@ exports[`ToolConfirmationQueue > renders expansion hint when content is long and
 │                                                                              │
 │ ?  replace edit file                                                         │
 │                                                                              │
-│ ... first 49 lines hidden ...                                                │
+│ ... 49 hidden (Ctrl+O) ...                                                   │
 │ 50 line                                                                      │
 │ Apply this change?                                                           │
 │                                                                              │

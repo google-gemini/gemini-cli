@@ -15,7 +15,7 @@ exports[`AuthDialog > Snapshots > renders correctly with auth error 1`] = `
 │                                                                                                  │
 │   Terms of Services and Privacy Notice for Gemini CLI                                            │
 │                                                                                                  │
-│   https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md                      │
+│   https://geminicli.com/docs/resources/tos-privacy/                                              │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
@@ -34,7 +34,7 @@ exports[`AuthDialog > Snapshots > renders correctly with default props 1`] = `
 │                                                                                                  │
 │   Terms of Services and Privacy Notice for Gemini CLI                                            │
 │                                                                                                  │
-│   https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md                      │
+│   https://geminicli.com/docs/resources/tos-privacy/                                              │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "
@@ -53,7 +53,7 @@ exports[`AuthDialog > Snapshots > renders correctly with enforced auth type 1`] 
 │                                                                                                  │
 │   Terms of Services and Privacy Notice for Gemini CLI                                            │
 │                                                                                                  │
-│   https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md                      │
+│   https://geminicli.com/docs/resources/tos-privacy/                                              │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
 "

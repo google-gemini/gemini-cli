@@ -29,6 +29,7 @@ import {
   createContentGenerator,
   IdeClient,
   debugLogger,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import {
   type MockShellCommand,
@@ -36,7 +37,47 @@ import {
 } from './MockShellExecutionService.js';
 import { createMockSettings } from './settings.js';
 import { type LoadedSettings } from '../config/settings.js';
-import { AuthState } from '../ui/types.js';
+import { AuthState, StreamingState } from '../ui/types.js';
+import { randomUUID } from 'node:crypto';
+import type {
+  TrackedCancelledToolCall,
+  TrackedCompletedToolCall,
+  TrackedToolCall,
+} from '../ui/hooks/useToolScheduler.js';
+
+// Global state observer for React-based signals
+const sessionStateMap = new Map<string, StreamingState>();
+const activeRigs = new Map<string, AppRig>();
+
+// Mock StreamingContext to report state changes back to the observer
+vi.mock('../ui/contexts/StreamingContext.js', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('../ui/contexts/StreamingContext.js')>();
+  const { useConfig } = await import('../ui/contexts/ConfigContext.js');
+  const React = await import('react');
+
+  return {
+    ...original,
+    useStreamingContext: () => {
+      const state = original.useStreamingContext();
+      const config = useConfig();
+      const sessionId = config.getSessionId();
+
+      React.useEffect(() => {
+        sessionStateMap.set(sessionId, state);
+        // If we see activity, we are no longer "awaiting" the start of a response
+        if (state !== StreamingState.Idle) {
+          const rig = activeRigs.get(sessionId);
+          if (rig) {
+            rig.awaitingResponse = false;
+          }
+        }
+      }, [sessionId, state]);
+
+      return state;
+    },
+  };
+});
 
 // Mock core functions globally for tests using AppRig.
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -63,6 +104,8 @@ vi.mock('../ui/auth/useAuth.js', () => ({
     onAuthError: vi.fn(),
     apiKeyDefaultValue: 'test-api-key',
     reloadApiKey: vi.fn().mockResolvedValue('test-api-key'),
+    accountSuspensionInfo: null,
+    setAccountSuspensionInfo: vi.fn(),
   }),
   validateAuthMethodWithSettings: () => null,
 }));
@@ -112,9 +155,18 @@ export class AppRig {
   private breakpointTools = new Set<string | undefined>();
   private lastAwaitedConfirmation: PendingConfirmation | undefined;
 
+  /**
+   * True if a message was just sent but React hasn't yet reported a non-idle state.
+   */
+  awaitingResponse = false;
+
   constructor(private options: AppRigOptions = {}) {
-    this.testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-app-rig-'));
-    this.sessionId = `test-session-${Math.random().toString(36).slice(2, 9)}`;
+    const uniqueId = randomUUID();
+    this.testDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), `gemini-app-rig-${uniqueId.slice(0, 8)}-`),
+    );
+    this.sessionId = `test-session-${uniqueId}`;
+    activeRigs.set(this.sessionId, this);
   }
 
   async initialize() {
@@ -245,6 +297,8 @@ export class AppRig {
     };
   }
 
+  private toolCalls: TrackedToolCall[] = [];
+
   private setupMessageBusListeners() {
     if (!this.config) return;
     const messageBus = this.config.getMessageBus();
@@ -252,6 +306,7 @@ export class AppRig {
     messageBus.subscribe(
       MessageBusType.TOOL_CALLS_UPDATE,
       (message: ToolCallsUpdateMessage) => {
+        this.toolCalls = message.toolCalls;
         for (const call of message.toolCalls) {
           if (call.status === 'awaiting_approval' && call.correlationId) {
             const details = call.confirmationDetails;
@@ -281,6 +336,48 @@ export class AppRig {
     );
   }
 
+  /**
+   * Returns true if the agent is currently busy (responding or executing tools).
+   */
+  isBusy(): boolean {
+    if (this.awaitingResponse) {
+      return true;
+    }
+
+    const reactState = sessionStateMap.get(this.sessionId);
+    // If we have a React-based state, use it as the definitive signal.
+    // 'responding' and 'waiting-for-confirmation' both count as busy for the overall task.
+    if (reactState !== undefined) {
+      return reactState !== StreamingState.Idle;
+    }
+
+    // Fallback to tool tracking if React hasn't reported yet
+    const isAnyToolActive = this.toolCalls.some((tc) => {
+      if (
+        tc.status === CoreToolCallStatus.Executing ||
+        tc.status === CoreToolCallStatus.Scheduled ||
+        tc.status === CoreToolCallStatus.Validating
+      ) {
+        return true;
+      }
+      if (
+        tc.status === CoreToolCallStatus.Success ||
+        tc.status === CoreToolCallStatus.Error ||
+        tc.status === CoreToolCallStatus.Cancelled
+      ) {
+        return !(tc as TrackedCompletedToolCall | TrackedCancelledToolCall)
+          .responseSubmittedToGemini;
+      }
+      return false;
+    });
+
+    const isAwaitingConfirmation = this.toolCalls.some(
+      (tc) => tc.status === CoreToolCallStatus.AwaitingApproval,
+    );
+
+    return isAnyToolActive || isAwaitingConfirmation;
+  }
+
   render() {
     if (!this.config || !this.settings)
       throw new Error('AppRig not initialized');
@@ -292,6 +389,7 @@ export class AppRig {
           version="test-version"
           initializationResult={{
             authError: null,
+            accountSuspensionInfo: null,
             themeError: null,
             shouldOpenAuthDialog: false,
             geminiMdFileCount: 0,
@@ -334,17 +432,21 @@ export class AppRig {
         this.setBreakpoint(name);
       }
     } else {
-      this.setToolPolicy(toolName, PolicyDecision.ASK_USER, 100);
+      // Use undefined toolName to create a global rule if '*' is provided
+      const actualToolName = toolName === '*' ? undefined : toolName;
+      this.setToolPolicy(actualToolName, PolicyDecision.ASK_USER, 100);
       this.breakpointTools.add(toolName);
     }
   }
 
   removeToolPolicy(toolName?: string, source = 'AppRig Override') {
     if (!this.config) throw new Error('AppRig not initialized');
+    // Map '*' back to undefined for policy removal
+    const actualToolName = toolName === '*' ? undefined : toolName;
     this.config
       .getPolicyEngine()
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      .removeRulesForTool(toolName as string, source);
+      .removeRulesForTool(actualToolName as string, source);
     this.breakpointTools.delete(toolName);
   }
 
@@ -416,6 +518,44 @@ export class AppRig {
     return matched!;
   }
 
+  /**
+   * Waits for either a tool confirmation request OR for the agent to go idle.
+   */
+  async waitForNextEvent(
+    timeout = 60000,
+  ): Promise<
+    | { type: 'confirmation'; confirmation: PendingConfirmation }
+    | { type: 'idle' }
+  > {
+    let confirmation: PendingConfirmation | undefined;
+    let isIdle = false;
+
+    await this.waitUntil(
+      async () => {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+        confirmation = this.getPendingConfirmations()[0];
+        // Now that we have a code-powered signal, this should be perfectly deterministic.
+        isIdle = !this.isBusy();
+        return !!confirmation || isIdle;
+      },
+      {
+        timeout,
+        message: 'Timed out waiting for next event (confirmation or idle).',
+      },
+    );
+
+    if (confirmation) {
+      this.lastAwaitedConfirmation = confirmation;
+      return { type: 'confirmation', confirmation };
+    }
+
+    // Ensure all renders are flushed before returning 'idle'
+    await this.renderResult?.waitUntilReady();
+    return { type: 'idle' };
+  }
+
   async resolveTool(
     toolNameOrDisplayName: string | RegExp | PendingConfirmation,
     outcome: ToolConfirmationOutcome = ToolConfirmationOutcome.ProceedOnce,
@@ -469,6 +609,32 @@ export class AppRig {
     await act(async () => {
       this.config!.userHintService.addUserHint(hint);
     });
+  }
+
+  /**
+   * Drains all pending tool calls that hit a breakpoint until the agent is idle.
+   * Useful for negative tests to ensure no unwanted tools (like generalist) are called.
+   *
+   * @param onConfirmation Optional callback to inspect each confirmation before resolving.
+   *                       Return true to skip the default resolveTool call (e.g. if you handled it).
+   */
+  async drainBreakpointsUntilIdle(
+    onConfirmation?: (confirmation: PendingConfirmation) => void | boolean,
+    timeout = 60000,
+  ) {
+    while (true) {
+      const event = await this.waitForNextEvent(timeout);
+      if (event.type === 'idle') {
+        break;
+      }
+
+      const confirmation = event.confirmation;
+      const handled = onConfirmation?.(confirmation);
+
+      if (!handled) {
+        await this.resolveTool(confirmation);
+      }
+    }
   }
 
   getConfig(): Config {
@@ -530,11 +696,16 @@ export class AppRig {
   }
 
   async sendMessage(text: string) {
+    this.awaitingResponse = true;
     await this.type(text);
     await this.pressEnter();
   }
 
   async unmount() {
+    // Clean up global state for this session
+    sessionStateMap.delete(this.sessionId);
+    activeRigs.delete(this.sessionId);
+
     // Poison the chat recording service to prevent late writes to the test directory
     if (this.config) {
       const recordingService = this.config

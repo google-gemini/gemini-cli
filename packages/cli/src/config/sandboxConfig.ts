@@ -100,6 +100,7 @@ async function getSandboxImage(
   const packageJson = await getPackageJson(__dirname);
   const image =
     process.env['GEMINI_SANDBOX_IMAGE'] ??
+    process.env['GEMINI_SANDBOX_IMAGE_DEFAULT'] ??
     settings.tools?.sandboxImage ??
     packageJson?.config?.sandboxImageUri;
 

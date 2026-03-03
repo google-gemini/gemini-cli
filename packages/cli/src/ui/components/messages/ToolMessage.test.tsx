@@ -375,20 +375,25 @@ describe('<ToolMessage />', () => {
     unmount();
   });
 
-  it('renders progress information appended to description for executing tools', async () => {
+  it('renders McpProgressIndicator with percentage and message for executing tools', async () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithContext(
       <ToolMessage
         {...baseProps}
         status={CoreToolCallStatus.Executing}
+        progress={42}
+        progressTotal={100}
         progressMessage="Working on it..."
-        progressPercent={42}
       />,
       StreamingState.Responding,
     );
     await waitUntilReady();
-    expect(lastFrame()).toContain(
-      'A tool for testing (Working on it... - 42%)',
-    );
+    const output = lastFrame();
+    expect(output).toContain('42%');
+    expect(output).toContain('Working on it...');
+    expect(output).toContain('\u2588');
+    expect(output).toContain('\u2591');
+    expect(output).not.toContain('A tool for testing (Working on it... - 42%)');
+    expect(output).toMatchSnapshot();
     unmount();
   });
 
@@ -397,12 +402,37 @@ describe('<ToolMessage />', () => {
       <ToolMessage
         {...baseProps}
         status={CoreToolCallStatus.Executing}
-        progressPercent={75}
+        progress={75}
+        progressTotal={100}
       />,
       StreamingState.Responding,
     );
     await waitUntilReady();
-    expect(lastFrame()).toContain('A tool for testing (75%)');
+    const output = lastFrame();
+    expect(output).toContain('75%');
+    expect(output).toContain('\u2588');
+    expect(output).toContain('\u2591');
+    expect(output).not.toContain('A tool for testing (75%)');
+    expect(output).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders indeterminate progress when total is missing', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      <ToolMessage
+        {...baseProps}
+        status={CoreToolCallStatus.Executing}
+        progress={7}
+      />,
+      StreamingState.Responding,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('7');
+    expect(output).toContain('\u2588');
+    expect(output).toContain('\u2591');
+    expect(output).not.toContain('%');
+    expect(output).toMatchSnapshot();
     unmount();
   });
 });

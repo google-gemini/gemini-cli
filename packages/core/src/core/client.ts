@@ -12,6 +12,7 @@ import type {
   GenerateContentResponse,
 } from '@google/genai';
 import { createUserContent } from '@google/genai';
+import { partListUnionToString } from './geminiRequest.js';
 import {
   getDirectoryContextString,
   getInitialChatHistory,
@@ -59,7 +60,7 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
-import { resolveModel } from '../config/models.js';
+import { resolveModel, isGemini2Model } from '../config/models.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
@@ -724,7 +725,10 @@ export class GeminiClient {
     }
 
     if (isInvalidStream) {
-      if (this.config.getContinueOnFailedApiCall()) {
+      if (
+        this.config.getContinueOnFailedApiCall() &&
+        isGemini2Model(modelToUse)
+      ) {
         if (isInvalidStreamRetry) {
           logContentRetryFailure(
             this.config,
@@ -802,7 +806,7 @@ export class GeminiClient {
     const messageBus = this.config.getMessageBus();
 
     if (this.lastPromptId !== prompt_id) {
-      this.loopDetector.reset(prompt_id);
+      this.loopDetector.reset(prompt_id, partListUnionToString(request));
       this.hookStateMap.delete(this.lastPromptId);
       this.lastPromptId = prompt_id;
       this.currentSequenceModel = null;
@@ -957,17 +961,21 @@ export class GeminiClient {
           () => currentAttemptModel,
         );
 
+      let initialActiveModel = this.config.getActiveModel();
+
       const apiCall = () => {
         // AvailabilityService
         const active = this.config.getActiveModel();
-        if (active !== currentAttemptModel) {
-          currentAttemptModel = active;
+        if (active !== initialActiveModel) {
+          initialActiveModel = active;
           // Re-resolve config if model changed
-          const newConfig = this.config.modelConfigService.getResolvedConfig({
-            ...modelConfigKey,
-            model: currentAttemptModel,
-          });
-          currentAttemptGenerateContentConfig = newConfig.generateContentConfig;
+          const { model: resolvedModel, generateContentConfig } =
+            this.config.modelConfigService.getResolvedConfig({
+              ...modelConfigKey,
+              model: active,
+            });
+          currentAttemptModel = resolvedModel;
+          currentAttemptGenerateContentConfig = generateContentConfig;
         }
 
         const requestConfig: GenerateContentConfig = {

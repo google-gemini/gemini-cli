@@ -6,17 +6,28 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ToolExecutor } from './tool-executor.js';
-import type { Config, AnyToolInvocation } from '../index.js';
-import type { ToolResult } from '../tools/tools.js';
+import {
+  type Config,
+  type ToolResult,
+  type AnyToolInvocation,
+} from '../index.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import type { ScheduledToolCall } from './types.js';
 import { CoreToolCallStatus } from './types.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import type { CallableTool } from '@google/genai';
 import * as fileUtils from '../utils/fileUtils.js';
 import * as coreToolHookTriggers from '../core/coreToolHookTriggers.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import {
+  GeminiCliOperation,
+  GEN_AI_TOOL_CALL_ID,
+  GEN_AI_TOOL_DESCRIPTION,
+  GEN_AI_TOOL_NAME,
+} from '../telemetry/constants.js';
 
 // Mock file utils
 vi.mock('../utils/fileUtils.js', () => ({
@@ -28,6 +39,24 @@ vi.mock('../utils/fileUtils.js', () => ({
 vi.mock('../core/coreToolHookTriggers.js', () => ({
   executeToolWithHooks: vi.fn(),
 }));
+// Mock runInDevTraceSpan
+const runInDevTraceSpan = vi.hoisted(() =>
+  vi.fn(async (opts, fn) => {
+    const metadata = { attributes: opts.attributes || {} };
+    return fn({
+      metadata,
+      endSpan: vi.fn(),
+    });
+  }),
+);
+
+vi.mock('../index.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    runInDevTraceSpan,
+  };
+});
 
 describe('ToolExecutor', () => {
   let config: Config;
@@ -57,6 +86,7 @@ describe('ToolExecutor', () => {
   it('should execute a tool successfully', async () => {
     const mockTool = new MockTool({
       name: 'testTool',
+      description: 'Mock description',
       execute: async () => ({
         llmContent: 'Tool output',
         returnDisplay: 'Tool output',
@@ -97,11 +127,37 @@ describe('ToolExecutor', () => {
         ?.response as Record<string, unknown>;
       expect(response).toEqual({ output: 'Tool output' });
     }
+
+    expect(runInDevTraceSpan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: GeminiCliOperation.ToolCall,
+        attributes: expect.objectContaining({
+          [GEN_AI_TOOL_NAME]: 'testTool',
+          [GEN_AI_TOOL_CALL_ID]: 'call-1',
+          [GEN_AI_TOOL_DESCRIPTION]: 'Mock description',
+        }),
+      }),
+      expect.any(Function),
+    );
+
+    const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
+    const fn = spanArgs[1];
+    const metadata = { attributes: {} };
+    await fn({ metadata, endSpan: vi.fn() });
+    expect(metadata).toMatchObject({
+      input: scheduledCall.request,
+      output: {
+        ...result,
+        durationMs: expect.any(Number),
+        endTime: expect.any(Number),
+      },
+    });
   });
 
   it('should handle execution errors', async () => {
     const mockTool = new MockTool({
       name: 'failTool',
+      description: 'Mock description',
     });
     const invocation = mockTool.build({});
 
@@ -134,6 +190,26 @@ describe('ToolExecutor', () => {
     if (result.status === CoreToolCallStatus.Error) {
       expect(result.response.error?.message).toBe('Tool Failed');
     }
+
+    expect(runInDevTraceSpan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: GeminiCliOperation.ToolCall,
+        attributes: expect.objectContaining({
+          [GEN_AI_TOOL_NAME]: 'failTool',
+          [GEN_AI_TOOL_CALL_ID]: 'call-2',
+          [GEN_AI_TOOL_DESCRIPTION]: 'Mock description',
+        }),
+      }),
+      expect.any(Function),
+    );
+
+    const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
+    const fn = spanArgs[1];
+    const metadata = { attributes: {} };
+    await fn({ metadata, endSpan: vi.fn() });
+    expect(metadata).toMatchObject({
+      error: new Error('Tool Failed'),
+    });
   });
 
   it('should return cancelled result when signal is aborted', async () => {
@@ -238,6 +314,162 @@ describe('ToolExecutor', () => {
     }
   });
 
+  it('should truncate large MCP tool output with single text Part', async () => {
+    // 1. Setup Config for Truncation
+    vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10);
+    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
+
+    const mcpToolName = 'get_big_text';
+    const messageBus = createMockMessageBus();
+    const mcpTool = new DiscoveredMCPTool(
+      {} as CallableTool,
+      'my-server',
+      'get_big_text',
+      'A test MCP tool',
+      {},
+      messageBus,
+    );
+    const invocation = mcpTool.build({});
+    const longText = 'This is a very long MCP output that should be truncated.';
+
+    // 2. Mock execution returning Part[] with single text Part
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+      llmContent: [{ text: longText }],
+      returnDisplay: longText,
+    });
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-mcp-trunc',
+        name: mcpToolName,
+        args: { query: 'test' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-mcp-trunc',
+      },
+      tool: mcpTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    // 3. Execute
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    // 4. Verify Truncation Logic
+    expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
+      longText,
+      mcpToolName,
+      'call-mcp-trunc',
+      expect.any(String),
+      'test-session-id',
+    );
+
+    expect(fileUtils.formatTruncatedToolOutput).toHaveBeenCalledWith(
+      longText,
+      '/tmp/truncated_output.txt',
+      10,
+    );
+
+    expect(result.status).toBe(CoreToolCallStatus.Success);
+    if (result.status === CoreToolCallStatus.Success) {
+      expect(result.response.outputFile).toBe('/tmp/truncated_output.txt');
+    }
+  });
+
+  it('should not truncate MCP tool output with multiple Parts', async () => {
+    vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10);
+
+    const messageBus = createMockMessageBus();
+    const mcpTool = new DiscoveredMCPTool(
+      {} as CallableTool,
+      'my-server',
+      'get_big_text',
+      'A test MCP tool',
+      {},
+      messageBus,
+    );
+    const invocation = mcpTool.build({});
+    const longText = 'This is long text that exceeds the threshold.';
+
+    // Part[] with multiple parts — should NOT be truncated
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+      llmContent: [{ text: longText }, { text: 'second part' }],
+      returnDisplay: longText,
+    });
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-mcp-multi',
+        name: 'get_big_text',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-mcp-multi',
+      },
+      tool: mcpTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    // Should NOT have been truncated
+    expect(fileUtils.saveTruncatedToolOutput).not.toHaveBeenCalled();
+    expect(fileUtils.formatTruncatedToolOutput).not.toHaveBeenCalled();
+    expect(result.status).toBe(CoreToolCallStatus.Success);
+  });
+
+  it('should not truncate MCP tool output when text is below threshold', async () => {
+    vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10000);
+
+    const messageBus = createMockMessageBus();
+    const mcpTool = new DiscoveredMCPTool(
+      {} as CallableTool,
+      'my-server',
+      'get_big_text',
+      'A test MCP tool',
+      {},
+      messageBus,
+    );
+    const invocation = mcpTool.build({});
+
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+      llmContent: [{ text: 'short' }],
+      returnDisplay: 'short',
+    });
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-mcp-short',
+        name: 'get_big_text',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-mcp-short',
+      },
+      tool: mcpTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(fileUtils.saveTruncatedToolOutput).not.toHaveBeenCalled();
+    expect(result.status).toBe(CoreToolCallStatus.Success);
+  });
+
   it('should report PID updates for shell tools', async () => {
     // 1. Setup ShellToolInvocation
     const messageBus = createMockMessageBus();
@@ -252,7 +484,17 @@ describe('ToolExecutor', () => {
     // 2. Mock executeToolWithHooks to trigger the PID callback
     const testPid = 12345;
     vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockImplementation(
-      async (_inv, _name, _sig, _tool, _liveCb, _shellCfg, setPidCallback) => {
+      async (
+        _inv,
+        _name,
+        _sig,
+        _tool,
+        _liveCb,
+        _shellCfg,
+        setPidCallback,
+        _config,
+        _originalRequestName,
+      ) => {
         // Simulate the shell tool reporting a PID
         if (setPidCallback) {
           setPidCallback(testPid);

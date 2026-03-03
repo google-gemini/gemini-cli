@@ -14,12 +14,25 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { loadPoliciesFromToml } from './toml-loader.js';
+import {
+  loadPoliciesFromToml,
+  validateMcpPolicyToolNames,
+} from './toml-loader.js';
 import type { PolicyLoadResult } from './toml-loader.js';
 import { PolicyEngine } from './policy-engine.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/** Returns only errors (severity !== 'warning') from a PolicyLoadResult. */
+function getErrors(result: PolicyLoadResult): PolicyLoadResult['errors'] {
+  return result.errors.filter((e) => e.severity !== 'warning');
+}
+
+/** Returns only warnings (severity === 'warning') from a PolicyLoadResult. */
+function getWarnings(result: PolicyLoadResult): PolicyLoadResult['errors'] {
+  return result.errors.filter((e) => e.severity === 'warning');
+}
 
 describe('policy-toml-loader', () => {
   let tempDir: string;
@@ -89,6 +102,52 @@ priority = 100
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should parse toolAnnotations from TOML', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "annotated-tool"
+toolAnnotations = { readOnlyHint = true, custom = "value" }
+decision = "allow"
+priority = 70
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('annotated-tool');
+      expect(result.rules[0].toolAnnotations).toEqual({
+        readOnlyHint: true,
+        custom: 'value',
+      });
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should transform mcpName = "*" to wildcard toolName', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+mcpName = "*"
+decision = "ask_user"
+priority = 10
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('*__*');
+      expect(result.rules[0].decision).toBe(PolicyDecision.ASK_USER);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should transform mcpName = "*" and specific toolName to wildcard prefix', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+mcpName = "*"
+toolName = "search"
+decision = "allow"
+priority = 10
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('*__search');
+      expect(result.errors).toHaveLength(0);
+    });
+
     it('should transform commandRegex to argsPattern', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
@@ -143,7 +202,7 @@ priority = 100
         'grep',
         'read',
       ]);
-      expect(result.errors).toHaveLength(0);
+      expect(getErrors(result)).toHaveLength(0);
     });
 
     it('should transform mcpName to composite toolName', async () => {
@@ -182,7 +241,7 @@ modes = ["yolo"]
       expect(result.rules[0].modes).toEqual(['default', 'yolo']);
       expect(result.rules[1].toolName).toBe('grep');
       expect(result.rules[1].modes).toEqual(['yolo']);
-      expect(result.errors).toHaveLength(0);
+      expect(getErrors(result)).toHaveLength(0);
     });
 
     it('should parse and transform allow_redirection property', async () => {
@@ -213,33 +272,37 @@ deny_message = "Deletion is permanent"
       expect(result.rules[0].toolName).toBe('rm');
       expect(result.rules[0].decision).toBe(PolicyDecision.DENY);
       expect(result.rules[0].denyMessage).toBe('Deletion is permanent');
-      expect(result.errors).toHaveLength(0);
+      expect(getErrors(result)).toHaveLength(0);
     });
 
-    it('should support modes property for Tier 2 and Tier 3 policies', async () => {
+    it('should support modes property for Tier 4 and Tier 5 policies', async () => {
       await fs.writeFile(
-        path.join(tempDir, 'tier2.toml'),
+        path.join(tempDir, 'tier4.toml'),
         `
 [[rule]]
-toolName = "tier2-tool"
+toolName = "tier4-tool"
 decision = "allow"
 priority = 100
 modes = ["autoEdit"]
 `,
       );
 
-      const getPolicyTier2 = (_dir: string) => 2; // Tier 2
+      const getPolicyTier4 = (_dir: string) => 4; // Tier 4 (User)
+      const result4 = await loadPoliciesFromToml([tempDir], getPolicyTier4);
+
+      expect(result4.rules).toHaveLength(1);
+      expect(result4.rules[0].toolName).toBe('tier4-tool');
+      expect(result4.rules[0].modes).toEqual(['autoEdit']);
+      expect(result4.rules[0].source).toBe('User: tier4.toml');
+
+      const getPolicyTier2 = (_dir: string) => 2; // Tier 2 (Extension)
       const result2 = await loadPoliciesFromToml([tempDir], getPolicyTier2);
+      expect(result2.rules[0].source).toBe('Extension: tier4.toml');
 
-      expect(result2.rules).toHaveLength(1);
-      expect(result2.rules[0].toolName).toBe('tier2-tool');
-      expect(result2.rules[0].modes).toEqual(['autoEdit']);
-      expect(result2.rules[0].source).toBe('Workspace: tier2.toml');
-
-      const getPolicyTier3 = (_dir: string) => 3; // Tier 3
-      const result3 = await loadPoliciesFromToml([tempDir], getPolicyTier3);
-      expect(result3.rules[0].source).toBe('User: tier2.toml');
-      expect(result3.errors).toHaveLength(0);
+      const getPolicyTier5 = (_dir: string) => 5; // Tier 5 (Admin)
+      const result5 = await loadPoliciesFromToml([tempDir], getPolicyTier5);
+      expect(result5.rules[0].source).toBe('Admin: tier4.toml');
+      expect(result5.errors).toHaveLength(0);
     });
 
     it('should handle TOML parse errors', async () => {
@@ -497,8 +560,8 @@ commandRegex = ".*"
 decision = "allow"
 priority = 100
 `);
-      expect(result.errors).toHaveLength(1);
-      const error = result.errors[0];
+      expect(getErrors(result)).toHaveLength(1);
+      const error = getErrors(result)[0];
       expect(error.errorType).toBe('rule_validation');
       expect(error.details).toContain('run_shell_command');
     });
@@ -526,8 +589,8 @@ argsPattern = "([a-z)"
 decision = "allow"
 priority = 100
 `);
-      expect(result.errors).toHaveLength(1);
-      const error = result.errors[0];
+      expect(getErrors(result)).toHaveLength(1);
+      const error = getErrors(result)[0];
       expect(error.errorType).toBe('regex_compilation');
       expect(error.message).toBe('Invalid regex pattern');
     });
@@ -542,7 +605,7 @@ priority = 100
       const getPolicyTier = (_dir: string) => 1;
       const result = await loadPoliciesFromToml([filePath], getPolicyTier);
 
-      expect(result.errors).toHaveLength(0);
+      expect(getErrors(result)).toHaveLength(0);
       expect(result.rules).toHaveLength(1);
       expect(result.rules[0].toolName).toBe('test-tool');
       expect(result.rules[0].decision).toBe(PolicyDecision.ALLOW);
@@ -562,7 +625,290 @@ priority = 100
     });
   });
 
+  describe('Tool name validation', () => {
+    it('should warn for unrecognized tool names with suggestions', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "grob"
+decision = "allow"
+priority = 100
+`);
+
+      const warnings = getWarnings(result);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].errorType).toBe('tool_name_warning');
+      expect(warnings[0].severity).toBe('warning');
+      expect(warnings[0].details).toContain('Unrecognized tool name "grob"');
+      expect(warnings[0].details).toContain('glob');
+      // Rules should still load despite warnings
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('grob');
+    });
+
+    it('should not warn for valid built-in tool names', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "glob"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "read_file"
+decision = "allow"
+priority = 100
+`);
+
+      expect(getWarnings(result)).toHaveLength(0);
+      expect(getErrors(result)).toHaveLength(0);
+      expect(result.rules).toHaveLength(2);
+    });
+
+    it('should not warn for wildcard "*"', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "*"
+decision = "allow"
+priority = 100
+`);
+
+      expect(getWarnings(result)).toHaveLength(0);
+      expect(getErrors(result)).toHaveLength(0);
+    });
+
+    it('should not warn for MCP format tool names', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "my-server__my-tool"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "my-server__*"
+decision = "allow"
+priority = 100
+`);
+
+      expect(getWarnings(result)).toHaveLength(0);
+      expect(getErrors(result)).toHaveLength(0);
+    });
+
+    it('should not warn when mcpName is present (skips validation)', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+mcpName = "my-server"
+toolName = "nonexistent"
+decision = "allow"
+priority = 100
+`);
+
+      expect(getWarnings(result)).toHaveLength(0);
+      expect(getErrors(result)).toHaveLength(0);
+    });
+
+    it('should not warn for legacy aliases', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "search_file_content"
+decision = "allow"
+priority = 100
+`);
+
+      expect(getWarnings(result)).toHaveLength(0);
+      expect(getErrors(result)).toHaveLength(0);
+    });
+
+    it('should not warn for discovered tool prefix', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "discovered_tool_my_custom_tool"
+decision = "allow"
+priority = 100
+`);
+
+      expect(getWarnings(result)).toHaveLength(0);
+      expect(getErrors(result)).toHaveLength(0);
+    });
+
+    it('should warn for each invalid name in a toolName array', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = ["grob", "glob", "replce"]
+decision = "allow"
+priority = 100
+`);
+
+      const warnings = getWarnings(result);
+      expect(warnings).toHaveLength(2);
+      expect(warnings[0].details).toContain('"grob"');
+      expect(warnings[1].details).toContain('"replce"');
+      // All rules still load
+      expect(result.rules).toHaveLength(3);
+    });
+
+    it('should not warn for names far from any built-in (dynamic/agent tools)', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "delegate_to_agent"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "my_custom_tool"
+decision = "allow"
+priority = 100
+`);
+
+      expect(getWarnings(result)).toHaveLength(0);
+      expect(getErrors(result)).toHaveLength(0);
+      expect(result.rules).toHaveLength(2);
+    });
+
+    it('should not warn for catch-all rules (no toolName)', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+decision = "deny"
+priority = 100
+`);
+
+      expect(getWarnings(result)).toHaveLength(0);
+      expect(getErrors(result)).toHaveLength(0);
+      expect(result.rules).toHaveLength(1);
+    });
+
+    it('should still load rules even with warnings', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "wrte_file"
+decision = "deny"
+priority = 50
+
+[[rule]]
+toolName = "glob"
+decision = "allow"
+priority = 100
+`);
+
+      expect(getWarnings(result)).toHaveLength(1);
+      expect(getErrors(result)).toHaveLength(0);
+      expect(result.rules).toHaveLength(2);
+      expect(result.rules[0].toolName).toBe('wrte_file');
+      expect(result.rules[1].toolName).toBe('glob');
+    });
+  });
+
   describe('Built-in Plan Mode Policy', () => {
+    it('should allow MCP tools with readOnlyHint annotation in Plan Mode (ASK_USER, not DENY)', async () => {
+      const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
+      const fileContent = await fs.readFile(planTomlPath, 'utf-8');
+      const tempPolicyDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'plan-annotation-test-'),
+      );
+      try {
+        await fs.writeFile(path.join(tempPolicyDir, 'plan.toml'), fileContent);
+        const getPolicyTier = () => 1; // Default tier
+
+        // 1. Load the actual Plan Mode policies
+        const result = await loadPoliciesFromToml(
+          [tempPolicyDir],
+          getPolicyTier,
+        );
+        expect(result.errors).toHaveLength(0);
+
+        // Verify annotation rule was loaded correctly
+        const annotationRule = result.rules.find(
+          (r) => r.toolAnnotations !== undefined,
+        );
+        expect(
+          annotationRule,
+          'Should have loaded a rule with toolAnnotations',
+        ).toBeDefined();
+        expect(annotationRule!.toolName).toBe('*__*');
+        expect(annotationRule!.toolAnnotations).toEqual({
+          readOnlyHint: true,
+        });
+        expect(annotationRule!.decision).toBe(PolicyDecision.ASK_USER);
+        // Priority 70 in tier 1 => 1.070
+        expect(annotationRule!.priority).toBe(1.07);
+
+        // Verify deny rule was loaded correctly
+        const denyRule = result.rules.find(
+          (r) =>
+            r.decision === PolicyDecision.DENY &&
+            r.toolName === undefined &&
+            r.denyMessage?.includes('Plan Mode'),
+        );
+        expect(
+          denyRule,
+          'Should have loaded the catch-all deny rule',
+        ).toBeDefined();
+        // Priority 60 in tier 1 => 1.060
+        expect(denyRule!.priority).toBe(1.06);
+
+        // 2. Initialize Policy Engine in Plan Mode
+        const engine = new PolicyEngine({
+          rules: result.rules,
+          approvalMode: ApprovalMode.PLAN,
+        });
+
+        // 3. MCP tool with readOnlyHint=true and serverName should get ASK_USER
+        const askResult = await engine.check(
+          { name: 'github__list_issues' },
+          'github',
+          { readOnlyHint: true },
+        );
+        expect(
+          askResult.decision,
+          'MCP tool with readOnlyHint=true should be ASK_USER, not DENY',
+        ).toBe(PolicyDecision.ASK_USER);
+
+        // 4. MCP tool WITHOUT annotations should be DENIED
+        const denyResult = await engine.check(
+          { name: 'github__create_issue' },
+          'github',
+          undefined,
+        );
+        expect(
+          denyResult.decision,
+          'MCP tool without annotations should be DENIED in Plan Mode',
+        ).toBe(PolicyDecision.DENY);
+
+        // 5. MCP tool with readOnlyHint=false should also be DENIED
+        const denyResult2 = await engine.check(
+          { name: 'github__delete_issue' },
+          'github',
+          { readOnlyHint: false },
+        );
+        expect(
+          denyResult2.decision,
+          'MCP tool with readOnlyHint=false should be DENIED in Plan Mode',
+        ).toBe(PolicyDecision.DENY);
+
+        // 6. Test with qualified tool name format (server__tool) but no separate serverName
+        const qualifiedResult = await engine.check(
+          { name: 'github__list_repos' },
+          undefined,
+          { readOnlyHint: true },
+        );
+        expect(
+          qualifiedResult.decision,
+          'Qualified MCP tool name with readOnlyHint=true should be ASK_USER even without separate serverName',
+        ).toBe(PolicyDecision.ASK_USER);
+
+        // 7. Non-MCP tool (no server context) should be DENIED despite having annotations
+        const builtinResult = await engine.check(
+          { name: 'some_random_tool' },
+          undefined,
+          { readOnlyHint: true },
+        );
+        expect(
+          builtinResult.decision,
+          'Non-MCP tool should be DENIED even with readOnlyHint (no server context for *__* match)',
+        ).toBe(PolicyDecision.DENY);
+      } finally {
+        await fs.rm(tempPolicyDir, { recursive: true, force: true });
+      }
+    });
+
     it('should override default subagent rules when in Plan Mode', async () => {
       const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
       const fileContent = await fs.readFile(planTomlPath, 'utf-8');
@@ -615,6 +961,90 @@ priority = 100
       } finally {
         await fs.rm(tempPolicyDir, { recursive: true, force: true });
       }
+    });
+  });
+
+  describe('validateMcpPolicyToolNames', () => {
+    it('should warn for MCP tool names that are likely typos', () => {
+      const warnings = validateMcpPolicyToolNames(
+        'google-workspace',
+        ['people.getMe', 'calendar.list', 'calendar.get'],
+        [
+          {
+            toolName: 'google-workspace__people.getxMe',
+            source: 'User: workspace.toml',
+          },
+        ],
+      );
+
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('people.getxMe');
+      expect(warnings[0]).toContain('google-workspace');
+      expect(warnings[0]).toContain('people.getMe');
+    });
+
+    it('should not warn for matching MCP tool names', () => {
+      const warnings = validateMcpPolicyToolNames(
+        'google-workspace',
+        ['people.getMe', 'calendar.list'],
+        [
+          { toolName: 'google-workspace__people.getMe' },
+          { toolName: 'google-workspace__calendar.list' },
+        ],
+      );
+
+      expect(warnings).toHaveLength(0);
+    });
+
+    it('should not warn for wildcard MCP rules', () => {
+      const warnings = validateMcpPolicyToolNames(
+        'my-server',
+        ['tool1', 'tool2'],
+        [{ toolName: 'my-server__*' }],
+      );
+
+      expect(warnings).toHaveLength(0);
+    });
+
+    it('should not warn for rules targeting other servers', () => {
+      const warnings = validateMcpPolicyToolNames(
+        'server-a',
+        ['tool1'],
+        [{ toolName: 'server-b__toolx' }],
+      );
+
+      expect(warnings).toHaveLength(0);
+    });
+
+    it('should not warn for tool names far from any discovered tool', () => {
+      const warnings = validateMcpPolicyToolNames(
+        'my-server',
+        ['tool1', 'tool2'],
+        [{ toolName: 'my-server__completely_different_name' }],
+      );
+
+      expect(warnings).toHaveLength(0);
+    });
+
+    it('should skip rules without toolName', () => {
+      const warnings = validateMcpPolicyToolNames(
+        'my-server',
+        ['tool1'],
+        [{ toolName: undefined }],
+      );
+
+      expect(warnings).toHaveLength(0);
+    });
+
+    it('should include source in warning when available', () => {
+      const warnings = validateMcpPolicyToolNames(
+        'my-server',
+        ['tool1'],
+        [{ toolName: 'my-server__tol1', source: 'User: custom.toml' }],
+      );
+
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('User: custom.toml');
     });
   });
 });
