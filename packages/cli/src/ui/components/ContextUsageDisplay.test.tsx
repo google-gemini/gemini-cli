@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { describe, it, expect, vi } from 'vitest';
 
@@ -17,18 +17,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-vi.mock('../../config/settings.js', () => ({
-  DEFAULT_MODEL_CONFIGS: {},
-  LoadedSettings: class {
-    constructor() {
-      // this.merged = {};
-    }
-  },
-}));
-
 describe('ContextUsageDisplay', () => {
-  it('renders correct percentage left', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+  it('renders correct percentage used', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ContextUsageDisplay
         promptTokenCount={5000}
         model="gemini-pro"
@@ -37,27 +28,56 @@ describe('ContextUsageDisplay', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('50% context left');
+    expect(output).toContain('50% context used');
     unmount();
   });
 
-  it('renders short label when terminal width is small', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+  it('renders correctly when usage is 0%', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <ContextUsageDisplay
+        promptTokenCount={0}
+        model="gemini-pro"
+        terminalWidth={120}
+      />,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('0% context used');
+    unmount();
+  });
+
+  it('renders abbreviated label when terminal width is small', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ContextUsageDisplay
         promptTokenCount={2000}
         model="gemini-pro"
         terminalWidth={80}
       />,
+      { width: 80 },
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('80%');
-    expect(output).not.toContain('context left');
+    expect(output).toContain('20%');
+    expect(output).not.toContain('context used');
     unmount();
   });
 
-  it('renders 0% when full', async () => {
-    const { lastFrame, waitUntilReady, unmount } = render(
+  it('renders 80% correctly', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <ContextUsageDisplay
+        promptTokenCount={8000}
+        model="gemini-pro"
+        terminalWidth={120}
+      />,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('80% context used');
+    unmount();
+  });
+
+  it('renders 100% when full', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ContextUsageDisplay
         promptTokenCount={10000}
         model="gemini-pro"
@@ -66,7 +86,7 @@ describe('ContextUsageDisplay', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('0% context left');
+    expect(output).toContain('100% context used');
     unmount();
   });
 });
