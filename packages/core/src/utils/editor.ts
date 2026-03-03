@@ -19,7 +19,13 @@ const GUI_EDITORS = [
   'antigravity',
   'sublime',
 ] as const;
-const TERMINAL_EDITORS = ['vim', 'neovim', 'emacs', 'hx'] as const;
+const TERMINAL_EDITORS = [
+  'vim',
+  'neovim',
+  'emacs',
+  'emacsclient',
+  'hx',
+] as const;
 const EDITORS = [...GUI_EDITORS, ...TERMINAL_EDITORS] as const;
 
 const GUI_EDITORS_SET = new Set<string>(GUI_EDITORS);
@@ -54,6 +60,7 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   neovim: 'Neovim',
   zed: 'Zed',
   emacs: 'Emacs',
+  emacsclient: 'Emacs Client',
   antigravity: 'Antigravity',
   hx: 'Helix',
   sublime: 'Sublime Text',
@@ -122,6 +129,7 @@ const editorCommands: Record<
   neovim: { win32: ['nvim'], default: ['nvim'] },
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
   emacs: { win32: ['emacs.exe'], default: ['emacs'] },
+  emacsclient: { win32: ['emacsclient'], default: ['emacsclient'] },
   antigravity: {
     win32: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
     default: ['agy', 'antigravity'],
@@ -275,6 +283,15 @@ export function getDiffCommand(
       return {
         command: 'emacs',
         args: [
+          '--eval',
+          `(ediff ${escapeELispString(oldPath)} ${escapeELispString(newPath)})`,
+        ],
+      };
+    case 'emacsclient':
+      return {
+        command: 'emacsclient',
+        args: [
+          '-nw',
           '--eval',
           `(ediff ${escapeELispString(oldPath)} ${escapeELispString(newPath)})`,
         ],
