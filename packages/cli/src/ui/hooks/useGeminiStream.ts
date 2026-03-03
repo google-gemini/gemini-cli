@@ -1415,7 +1415,6 @@ export const useGeminiStream = (
               startNewPrompt();
               setThought(null); // Reset thought when starting a new prompt
               fullAiResponseBufferRef.current = '';
-              setLastOutput?.(undefined);
             }
 
             setIsResponding(true);
@@ -1534,7 +1533,6 @@ export const useGeminiStream = (
       startNewPrompt,
       getPromptCount,
       setThought,
-      setLastOutput,
       fullAiResponseBufferRef,
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,
