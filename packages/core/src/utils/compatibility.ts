@@ -8,7 +8,6 @@ import os from 'node:os';
 
 /**
  * Detects if the current OS is Windows 10.
- * Windows 11 also reports as version 10.0, but with build numbers >= 22000.
  */
 export function isWindows10(): boolean {
   if (os.platform() !== 'win32') {
@@ -27,7 +26,12 @@ export function isWindows10(): boolean {
  * Detects if the current terminal is a JetBrains-based IDE terminal.
  */
 export function isJetBrainsTerminal(): boolean {
-  return process.env['TERMINAL_EMULATOR'] === 'JetBrains-JediTerm';
+  return (
+    process.env['TERMINAL_EMULATOR'] === 'JetBrains-JediTerm' ||
+    process.env['TERM_PROGRAM'] === 'JetBrains-JediTerm' ||
+    !!process.env['IDEA_INITIAL_DIRECTORY'] ||
+    !!process.env['JETBRAINS_IDE']
+  );
 }
 
 /**
@@ -35,6 +39,44 @@ export function isJetBrainsTerminal(): boolean {
  */
 export function isAppleTerminal(): boolean {
   return process.env['TERM_PROGRAM'] === 'Apple_Terminal';
+}
+
+/**
+ * Detects if the current terminal is VS Code.
+ */
+export function isVSCode(): boolean {
+  return process.env['TERM_PROGRAM'] === 'vscode';
+}
+
+/**
+ * Detects if the current terminal is iTerm2.
+ */
+export function isITerm2(): boolean {
+  return process.env['TERM_PROGRAM'] === 'iTerm.app';
+}
+
+/**
+ * Detects if the current terminal is Ghostty.
+ */
+export function isGhostty(): boolean {
+  return (
+    process.env['TERM_PROGRAM'] === 'ghostty' ||
+    !!process.env['GHOSTTY_BIN_DIR']
+  );
+}
+
+/**
+ * Detects if running inside tmux.
+ */
+export function isTmux(): boolean {
+  return !!process.env['TMUX'] || (process.env['TERM'] || '').includes('tmux');
+}
+
+/**
+ * Detects if the current terminal is Windows Terminal.
+ */
+export function isWindowsTerminal(): boolean {
+  return !!process.env['WT_SESSION'];
 }
 
 /**
@@ -75,6 +117,13 @@ export function supportsTrueColor(): boolean {
   return false;
 }
 
+/**
+ * Heuristic for keyboard protocol support based on terminal identity.
+ */
+export function supportsKeyboardProtocolHeuristic(): boolean {
+  return isGhostty() || isITerm2() || isVSCode() || isWindowsTerminal();
+}
+
 export enum WarningPriority {
   Low = 'low',
   High = 'high',
@@ -91,6 +140,7 @@ export interface StartupWarning {
  */
 export function getCompatibilityWarnings(options?: {
   isAlternateBuffer?: boolean;
+  supportsKeyboardProtocol?: boolean;
 }): StartupWarning[] {
   const warnings: StartupWarning[] = [];
 
@@ -114,8 +164,17 @@ export function getCompatibilityWarnings(options?: {
 
     warnings.push({
       id: 'jetbrains-terminal',
-      message: `Warning: JetBrains mouse scrolling is unreliable. Disabling alternate buffer mode in settings or using an external terminal${suggestedTerminals} is recommended.`,
+      message: `Warning: JetBrains mouse scrolling is unreliable with alternate buffer enabled. Using an external terminal${suggestedTerminals} or disabling alternate buffer in settings is recommended.`,
       priority: WarningPriority.High,
+    });
+  }
+
+  if (isTmux()) {
+    warnings.push({
+      id: 'tmux-mouse-support',
+      message:
+        'Warning: Running inside tmux. For the best experience (including mouse scrolling), ensure "set -g mouse on" is enabled in your tmux configuration.',
+      priority: WarningPriority.Low,
     });
   }
 
@@ -126,11 +185,35 @@ export function getCompatibilityWarnings(options?: {
         'Warning: 256-color support not detected. Using a terminal with at least 256-color support is recommended for a better visual experience.',
       priority: WarningPriority.High,
     });
-  } else if (!supportsTrueColor() && !isAppleTerminal()) {
+  } else if (
+    !supportsTrueColor() &&
+    !isITerm2() &&
+    !isVSCode() &&
+    !isGhostty() &&
+    !isAppleTerminal()
+  ) {
     warnings.push({
       id: 'true-color',
       message:
         'Warning: True color (24-bit) support not detected. Using a terminal with true color enabled will result in a better visual experience.',
+      priority: WarningPriority.Low,
+    });
+  }
+
+  const hasKeyboardProtocol =
+    options?.supportsKeyboardProtocol ?? supportsKeyboardProtocolHeuristic();
+
+  if (!hasKeyboardProtocol) {
+    const suggestion =
+      os.platform() === 'darwin'
+        ? 'iTerm2 or Ghostty'
+        : os.platform() === 'win32'
+          ? 'Windows Terminal'
+          : 'Ghostty';
+
+    warnings.push({
+      id: 'keyboard-protocol',
+      message: `Warning: Advanced keyboard features (like Shift+Enter for newlines) are not supported in this terminal. Consider using ${suggestion} for a better experience.`,
       priority: WarningPriority.Low,
     });
   }

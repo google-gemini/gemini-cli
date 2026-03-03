@@ -15,6 +15,7 @@ import { createHash } from 'node:crypto';
 import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
+import { terminalCapabilityManager } from './ui/utils/terminalCapabilityManager.js';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
 import {
@@ -690,6 +691,8 @@ export async function main() {
       })),
       ...(await getUserStartupWarnings(settings.merged, undefined, {
         isAlternateBuffer: useAlternateBuffer,
+        supportsKeyboardProtocol:
+          terminalCapabilityManager.isKeyboardProtocolSupported(),
       })),
     ];
 

@@ -270,6 +270,10 @@ export class TerminalCapabilityManager {
     return this.kittyEnabled;
   }
 
+  isKeyboardProtocolSupported(): boolean {
+    return this.kittySupported || this.modifyOtherKeysSupported;
+  }
+
   supportsOsc9Notifications(env: NodeJS.ProcessEnv = process.env): boolean {
     if (env['WT_SESSION']) {
       return false;

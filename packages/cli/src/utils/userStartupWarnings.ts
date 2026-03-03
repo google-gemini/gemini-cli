@@ -88,7 +88,10 @@ const WARNING_CHECKS: readonly WarningCheck[] = [
 export async function getUserStartupWarnings(
   settings: Settings,
   workspaceRoot: string = process.cwd(),
-  options?: { isAlternateBuffer?: boolean },
+  options?: {
+    isAlternateBuffer?: boolean;
+    supportsKeyboardProtocol?: boolean;
+  },
 ): Promise<StartupWarning[]> {
   const results = await Promise.all(
     WARNING_CHECKS.map(async (check) => {
@@ -109,6 +112,7 @@ export async function getUserStartupWarnings(
     warnings.push(
       ...getCompatibilityWarnings({
         isAlternateBuffer: options?.isAlternateBuffer,
+        supportsKeyboardProtocol: options?.supportsKeyboardProtocol,
       }),
     );
   }

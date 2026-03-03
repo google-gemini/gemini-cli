@@ -174,5 +174,20 @@ describe('getUserStartupWarnings', () => {
       );
       expect(warnings).not.toContainEqual(compWarning);
     });
+
+    it('should pass options to getCompatibilityWarnings', async () => {
+      const projectDir = path.join(testRootDir, 'project');
+      await fs.mkdir(projectDir);
+
+      await getUserStartupWarnings({}, projectDir, {
+        isAlternateBuffer: true,
+        supportsKeyboardProtocol: true,
+      });
+
+      expect(getCompatibilityWarnings).toHaveBeenCalledWith({
+        isAlternateBuffer: true,
+        supportsKeyboardProtocol: true,
+      });
+    });
   });
 });

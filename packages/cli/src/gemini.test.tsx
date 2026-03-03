@@ -106,6 +106,30 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     enterAlternateScreen: vi.fn(),
     disableLineWrapping: vi.fn(),
     getVersion: vi.fn(() => Promise.resolve('1.0.0')),
+    detectTerminalEnvironment: vi.fn().mockReturnValue({
+      isTmux: false,
+      isJetBrains: false,
+      isWindowsTerminal: false,
+      isVSCode: false,
+      isITerm2: false,
+      isGhostty: false,
+      isAppleTerminal: false,
+      isWindows10: false,
+      supports256Colors: true,
+      supportsTrueColor: true,
+      supportsKeyboardProtocol: true,
+    }),
+    getTerminalCapabilities: vi.fn().mockReturnValue({
+      capabilities: {
+        supportsAltBuffer: true,
+        supportsMouse: true,
+        supportsReliableBackbufferClear: true,
+        supportsKeyboardProtocol: true,
+      },
+      warnings: [],
+      reasons: {},
+    }),
+    supportsKeyboardProtocolHeuristic: vi.fn().mockReturnValue(true),
     startupProfiler: {
       start: vi.fn(() => ({
         end: vi.fn(),
@@ -184,6 +208,7 @@ vi.mock('./ui/utils/terminalCapabilityManager.js', () => ({
   terminalCapabilityManager: {
     detectCapabilities: vi.fn(),
     getTerminalBackgroundColor: vi.fn(),
+    isKeyboardProtocolSupported: vi.fn().mockReturnValue(false),
   },
 }));
 
