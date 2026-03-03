@@ -592,7 +592,8 @@ export class ShellExecutionService {
             process.env,
             shellExecutionConfig.sanitizationConfig,
           ),
-          GEMINI_CLI: '1',
+          [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
+            GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
           [AGENT_IDENTIFICATION_ENV_VAR]: AGENT_IDENTIFICATION_ENV_VAR_VALUE,
           TERM: 'xterm-256color',
           PAGER: shellExecutionConfig.pager ?? 'cat',
