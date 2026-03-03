@@ -25,7 +25,7 @@ implementation. It allows you to:
   - [Customizing Planning with Skills](#customizing-planning-with-skills)
   - [Customizing Policies](#customizing-policies)
     - [Example: Allow git commands in Plan Mode](#example-allow-git-commands-in-plan-mode)
-    - [Example: Enable research subagents in Plan Mode](#example-enable-research-subagents-in-plan-mode)
+    - [Example: Enable custom subagents in Plan Mode](#example-enable-custom-subagents-in-plan-mode)
   - [Custom Plan Directory and Policies](#custom-plan-directory-and-policies)
 - [Automatic Model Routing](#automatic-model-routing)
 - [Cleanup](#cleanup)
@@ -134,6 +134,7 @@ These are the only allowed tools:
 
 - **FileSystem (Read):** [`read_file`], [`list_directory`], [`glob`]
 - **Search:** [`grep_search`], [`google_web_search`]
+- **Research Subagents:** [`codebase_investigator`], [`cli_help`]
 - **Interaction:** [`ask_user`]
 - **MCP Tools (Read):** Read-only [MCP tools] (e.g., `github_read_issue`,
   `postgres_read_schema`) are allowed.
@@ -204,16 +205,17 @@ priority = 100
 modes = ["plan"]
 ```
 
-#### Example: Enable research subagents in Plan Mode
+#### Example: Enable custom subagents in Plan Mode
 
-You can enable experimental research [subagents] like `codebase_investigator` to
-help gather architecture details during the planning phase.
+Built-in research [subagents] like [`codebase_investigator`] and [`cli_help`]
+are enabled by default in Plan Mode. You can enable additional [custom
+subagents] by adding a rule to your policy.
 
 `~/.gemini/policies/research-subagents.toml`
 
 ```toml
 [[rule]]
-toolName = "codebase_investigator"
+toolName = "my_custom_subagent"
 decision = "allow"
 priority = 100
 modes = ["plan"]
@@ -319,7 +321,10 @@ those files are not automatically deleted and must be managed manually.
 [MCP tools]: /docs/tools/mcp-server.md
 [`save_memory`]: /docs/tools/memory.md
 [`activate_skill`]: /docs/cli/skills.md
+[`codebase_investigator`]: /docs/core/subagents.md#codebase_investigator
+[`cli_help`]: /docs/core/subagents.md#cli_help
 [subagents]: /docs/core/subagents.md
+[custom subagents]: /docs/core/subagents.md#creating-custom-subagents
 [policy engine]: /docs/reference/policy-engine.md
 [`enter_plan_mode`]: /docs/tools/planning.md#1-enter_plan_mode-enterplanmode
 [`exit_plan_mode`]: /docs/tools/planning.md#2-exit_plan_mode-exitplanmode

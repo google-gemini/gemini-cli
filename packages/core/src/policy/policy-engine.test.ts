@@ -1593,7 +1593,7 @@ describe('PolicyEngine', () => {
           modes: [ApprovalMode.PLAN],
         },
         {
-          toolName: 'codebase_investigator',
+          toolName: 'unknown_subagent',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
         },
@@ -1605,7 +1605,7 @@ describe('PolicyEngine', () => {
       });
 
       const fixedResult = await fixedEngine.check(
-        { name: 'codebase_investigator' },
+        { name: 'unknown_subagent' },
         undefined,
       );
 
