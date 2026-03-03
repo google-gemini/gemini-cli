@@ -40,59 +40,12 @@ describe('useSessionRetentionCheck', () => {
     vi.restoreAllMocks();
   });
 
-  it('should show warning if enabled is true but maxAge is undefined', async () => {
-    const settings = {
-      general: {
-        sessionRetention: {
-          enabled: true,
-          maxAge: undefined,
-          warningAcknowledged: false,
-        },
-      },
-    } as unknown as Settings;
-
-    mockGetAllSessionFiles.mockResolvedValue(['session1.json']);
-    mockIdentifySessionsToDelete.mockResolvedValue(['session1.json']);
-
-    const { result } = renderHook(() =>
-      useSessionRetentionCheck(mockConfig, settings),
-    );
-
-    await waitFor(() => {
-      expect(result.current.checkComplete).toBe(true);
-      expect(result.current.shouldShowWarning).toBe(true);
-      expect(mockGetAllSessionFiles).toHaveBeenCalled();
-      expect(mockIdentifySessionsToDelete).toHaveBeenCalled();
-    });
-  });
-
-  it('should not show warning if warningAcknowledged is true', async () => {
-    const settings = {
-      general: {
-        sessionRetention: {
-          warningAcknowledged: true,
-        },
-      },
-    } as unknown as Settings;
-
-    const { result } = renderHook(() =>
-      useSessionRetentionCheck(mockConfig, settings),
-    );
-
-    await waitFor(() => {
-      expect(result.current.checkComplete).toBe(true);
-      expect(result.current.shouldShowWarning).toBe(false);
-      expect(mockGetAllSessionFiles).not.toHaveBeenCalled();
-      expect(mockIdentifySessionsToDelete).not.toHaveBeenCalled();
-    });
-  });
-
   it('should not show warning if retention is already enabled', async () => {
     const settings = {
       general: {
         sessionRetention: {
           enabled: true,
-          maxAge: '30d', // Explicitly enabled with non-default
+          maxAge: '30d', // Explicitly enabled
         },
       },
     } as unknown as Settings;
@@ -114,7 +67,6 @@ describe('useSessionRetentionCheck', () => {
       general: {
         sessionRetention: {
           enabled: false,
-          warningAcknowledged: false,
         },
       },
     } as unknown as Settings;
@@ -143,7 +95,6 @@ describe('useSessionRetentionCheck', () => {
       general: {
         sessionRetention: {
           enabled: false,
-          warningAcknowledged: false,
         },
       },
     } as unknown as Settings;
@@ -169,7 +120,6 @@ describe('useSessionRetentionCheck', () => {
       general: {
         sessionRetention: {
           enabled: false,
-          warningAcknowledged: false,
         },
       },
     } as unknown as Settings;
@@ -198,7 +148,6 @@ describe('useSessionRetentionCheck', () => {
       general: {
         sessionRetention: {
           enabled: false,
-          warningAcknowledged: false,
         },
       },
     } as unknown as Settings;

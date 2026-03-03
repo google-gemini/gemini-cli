@@ -264,9 +264,6 @@ export class AppRig {
           enabled: false,
           hasSeenNudge: true,
         },
-        ui: {
-          collapseDrawerDuringApproval: false,
-        },
       },
     });
   }

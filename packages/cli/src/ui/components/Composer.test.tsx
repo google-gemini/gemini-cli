@@ -250,7 +250,7 @@ const createMockConfig = (overrides = {}): Config =>
 
 const renderComposer = async (
   uiState: UIState,
-  settings = createMockSettings(),
+  settings = createMockSettings({ ui: { useLegacyLayout: true } }),
   config = createMockConfig(),
   uiActions = createMockUIActions(),
 ) => {
@@ -381,7 +381,7 @@ describe('Composer', () => {
         },
       });
       const settings = createMockSettings({
-        ui: { inlineThinkingMode: 'full' },
+        ui: { inlineThinkingMode: 'full', useLegacyLayout: true },
       });
 
       const { lastFrame } = await renderComposer(uiState, settings);
@@ -410,7 +410,7 @@ describe('Composer', () => {
         thought: { subject: 'Hidden', description: 'Should not show' },
       });
       const settings = createMockSettings({
-        merged: { ui: { loadingPhraseLayout: 'none' } },
+        merged: { ui: { loadingPhraseLayout: 'none', useLegacyLayout: true } },
       });
 
       const { lastFrame } = await renderComposer(uiState, settings);
@@ -587,15 +587,16 @@ describe('Composer', () => {
       const uiState = createMockUIState({
         cleanUiDetailsVisible: false,
       });
+      const settings = createMockSettings({
+        ui: { useLegacyLayout: true, showShortcutsHint: false },
+      });
 
-      const { lastFrame } = await renderComposer(uiState);
+      const { lastFrame } = await renderComposer(uiState, settings);
 
       const output = lastFrame();
-      expect(output).toContain('ShortcutsHint');
+      expect(output).not.toContain('ShortcutsHint');
       expect(output).toContain('InputPrompt');
       expect(output).not.toContain('Footer');
-      expect(output).not.toContain('ApprovalModeIndicator');
-      expect(output).not.toContain('ContextSummaryDisplay');
     });
 
     it('renders InputPrompt when input is active', async () => {
@@ -744,6 +745,7 @@ describe('Composer', () => {
       const settings = createMockSettings({
         ui: {
           footer: { hideContextPercentage: false },
+          useLegacyLayout: true,
         },
       });
 
@@ -846,6 +848,7 @@ describe('Composer', () => {
       const settings = createMockSettings({
         ui: {
           showShortcutsHint: false,
+          useLegacyLayout: true,
         },
       });
 

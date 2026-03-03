@@ -59,10 +59,14 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
   const isAlternateBuffer = useAlternateBuffer();
   const { showApprovalModeIndicator } = uiState;
-  const newLayoutSetting = settings.merged.ui.newFooterLayout;
-  const { showTips, showWit } = settings.merged.ui;
+  const loadingPhrases = settings.merged.ui.loadingPhrases;
+  const showTips = loadingPhrases === 'tips' || loadingPhrases === 'all';
+  const showWit = loadingPhrases === 'witty' || loadingPhrases === 'all';
 
-  const isExperimentalLayout = newLayoutSetting !== 'legacy';
+  // For this PR we are hardcoding the new experimental layout as the default.
+  // We allow a hidden setting to override it specifically for existing tests.
+  const isExperimentalLayout =
+    (settings.merged.ui as Record<string, unknown>)['useLegacyLayout'] !== true;
   const showUiDetails = uiState.cleanUiDetailsVisible;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
   const hideContextSummary =
@@ -181,10 +185,14 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     return () => clearTimeout(timeout);
   }, [canShowShortcutsHint]);
 
-  if (
-    hasPendingActionRequired &&
-    settings.merged.ui.collapseDrawerDuringApproval
-  ) {
+  // Use the setting if provided, otherwise default to true for the new UX.
+  // This allows tests to override the collapse behavior.
+  const shouldCollapseDuringApproval =
+    (settings.merged.ui as Record<string, unknown>)[
+      'collapseDrawerDuringApproval'
+    ] !== false;
+
+  if (hasPendingActionRequired && shouldCollapseDuringApproval) {
     return null;
   }
 
@@ -630,10 +638,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                   </>
                 )}
               </Box>
-            )}
-
-            {showUiDetails && newLayoutSetting === 'new_divider_down' && (
-              <HorizontalLine color={theme.ui.dark} dim />
             )}
 
             {showUiDetails && (

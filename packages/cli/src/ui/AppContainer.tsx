@@ -2063,8 +2063,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!emptyWalletRequest ||
     !!customDialog;
 
-  const newLayoutSetting = settings.merged.ui.newFooterLayout;
-  const isExperimentalLayout = newLayoutSetting !== 'legacy';
+  const loadingPhrases = settings.merged.ui.loadingPhrases;
+
+  const isExperimentalLayout = true;
   const showLoadingIndicator =
     (!embeddedShellFocused || isBackgroundShellVisible) &&
     streamingState === StreamingState.Responding &&
@@ -2102,8 +2103,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       streamingState,
       shouldShowFocusHint,
       retryStatus,
-      showTips: settings.merged.ui.showTips,
-      showWit: settings.merged.ui.showWit,
+      loadingPhrases,
       customWittyPhrases: settings.merged.ui.customWittyPhrases,
       errorVerbosity: settings.merged.ui.errorVerbosity,
       maxLength,

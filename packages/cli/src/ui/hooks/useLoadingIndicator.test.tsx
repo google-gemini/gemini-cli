@@ -33,8 +33,7 @@ describe('useLoadingIndicator', () => {
     initialStreamingState: StreamingState,
     initialShouldShowFocusHint: boolean = false,
     initialRetryStatus: RetryAttemptPayload | null = null,
-    showTips: boolean = true,
-    showWit: boolean = true,
+    loadingPhrases: 'tips' | 'witty' | 'all' | 'off' = 'all',
     initialErrorVerbosity: 'low' | 'full' = 'full',
   ) => {
     let hookResult: ReturnType<typeof useLoadingIndicator>;
@@ -42,23 +41,20 @@ describe('useLoadingIndicator', () => {
       streamingState,
       shouldShowFocusHint,
       retryStatus,
-      showTips,
-      showWit,
+      loadingPhrases,
       errorVerbosity,
     }: {
       streamingState: StreamingState;
       shouldShowFocusHint?: boolean;
       retryStatus?: RetryAttemptPayload | null;
-      showTips?: boolean;
-      showWit?: boolean;
+      loadingPhrases?: 'tips' | 'witty' | 'all' | 'off';
       errorVerbosity?: 'low' | 'full';
     }) {
       hookResult = useLoadingIndicator({
         streamingState,
         shouldShowFocusHint: !!shouldShowFocusHint,
         retryStatus: retryStatus || null,
-        showTips,
-        showWit,
+        loadingPhrases,
         errorVerbosity,
       });
       return null;
@@ -68,8 +64,7 @@ describe('useLoadingIndicator', () => {
         streamingState={initialStreamingState}
         shouldShowFocusHint={initialShouldShowFocusHint}
         retryStatus={initialRetryStatus}
-        showTips={showTips}
-        showWit={showWit}
+        loadingPhrases={loadingPhrases}
         errorVerbosity={initialErrorVerbosity}
       />,
     );
@@ -83,14 +78,12 @@ describe('useLoadingIndicator', () => {
         streamingState: StreamingState;
         shouldShowFocusHint?: boolean;
         retryStatus?: RetryAttemptPayload | null;
-        showTips?: boolean;
-        showWit?: boolean;
+        loadingPhrases?: 'tips' | 'witty' | 'all' | 'off';
         errorVerbosity?: 'low' | 'full';
       }) =>
         rerender(
           <TestComponent
-            showTips={showTips}
-            showWit={showWit}
+            loadingPhrases={loadingPhrases}
             errorVerbosity={initialErrorVerbosity}
             {...newProps}
           />,

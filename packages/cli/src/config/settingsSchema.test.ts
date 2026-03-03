@@ -83,19 +83,6 @@ describe('SettingsSchema', () => {
       ).toBe('boolean');
     });
 
-    it('should have showTips property', () => {
-      const showTips = getSettingsSchema().ui?.properties?.showTips;
-      expect(showTips).toBeDefined();
-      expect(showTips?.type).toBe('boolean');
-    });
-
-    it('should have showWit property', () => {
-      const showWit = getSettingsSchema().ui?.properties?.showWit;
-      expect(showWit).toBeDefined();
-      expect(showWit?.type).toBe('boolean');
-      expect(showWit?.default).toBe(true);
-    });
-
     it('should have errorVerbosity enum property', () => {
       const definition = getSettingsSchema().ui?.properties?.errorVerbosity;
       expect(definition).toBeDefined();

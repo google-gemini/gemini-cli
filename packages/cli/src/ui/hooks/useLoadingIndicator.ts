@@ -19,8 +19,7 @@ export interface UseLoadingIndicatorProps {
   streamingState: StreamingState;
   shouldShowFocusHint: boolean;
   retryStatus: RetryAttemptPayload | null;
-  showTips?: boolean;
-  showWit?: boolean;
+  loadingPhrases?: 'tips' | 'witty' | 'all' | 'off';
   customWittyPhrases?: string[];
   errorVerbosity?: 'low' | 'full';
   maxLength?: number;
@@ -30,8 +29,7 @@ export const useLoadingIndicator = ({
   streamingState,
   shouldShowFocusHint,
   retryStatus,
-  showTips = true,
-  showWit = true,
+  loadingPhrases = 'tips',
   customWittyPhrases,
   errorVerbosity = 'full',
   maxLength,
@@ -43,6 +41,10 @@ export const useLoadingIndicator = ({
 
   const isPhraseCyclingActive = streamingState === StreamingState.Responding;
   const isWaiting = streamingState === StreamingState.WaitingForConfirmation;
+
+  const showTips = loadingPhrases === 'tips' || loadingPhrases === 'all';
+  const showWit = loadingPhrases === 'witty' || loadingPhrases === 'all';
+
   const { currentTip, currentWittyPhrase } = usePhraseCycler(
     isPhraseCyclingActive,
     isWaiting,

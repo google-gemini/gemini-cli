@@ -339,7 +339,7 @@ const SETTINGS_SCHEMA = {
             label: 'Enable Session Cleanup',
             category: 'General',
             requiresRestart: false,
-            default: false,
+            default: true as boolean,
             description: 'Enable automatic session cleanup',
             showInDialog: true,
           },
@@ -348,7 +348,7 @@ const SETTINGS_SCHEMA = {
             label: 'Keep chat history',
             category: 'General',
             requiresRestart: false,
-            default: undefined as string | undefined,
+            default: '30d' as string,
             description:
               'Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")',
             showInDialog: true,
@@ -371,16 +371,6 @@ const SETTINGS_SCHEMA = {
             default: DEFAULT_MIN_RETENTION,
             description: `Minimum retention period (safety limit, defaults to "${DEFAULT_MIN_RETENTION}")`,
             showInDialog: false,
-          },
-          warningAcknowledged: {
-            type: 'boolean',
-            label: 'Warning Acknowledged',
-            category: 'General',
-            requiresRestart: false,
-            default: false,
-            showInDialog: false,
-            description:
-              'INTERNAL: Whether the user has acknowledged the session retention warning',
           },
         },
         description: 'Settings for automatic session cleanup.',
@@ -619,50 +609,6 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the footer from the UI',
         showInDialog: true,
       },
-      collapseDrawerDuringApproval: {
-        type: 'boolean',
-        label: 'Collapse Drawer During Approval',
-        category: 'UI',
-        requiresRestart: false,
-        default: true,
-        description:
-          'Collapse the entire drawer (status, context, input, footer) when a tool approval request is displayed.',
-        showInDialog: true,
-      },
-      newFooterLayout: {
-        type: 'enum',
-        label: 'New Footer Layout',
-        category: 'UI',
-        requiresRestart: false,
-        default: 'legacy',
-        description: 'Use the new 2-row layout with inline tips.',
-        showInDialog: true,
-        options: [
-          { value: 'legacy', label: 'Legacy' },
-          { value: 'new', label: 'New Layout' },
-          { value: 'new_divider_down', label: 'New Layout (Divider Down)' },
-        ],
-      },
-      showTips: {
-        type: 'boolean',
-        label: 'Show Tips',
-        category: 'UI',
-        requiresRestart: false,
-        default: true,
-        description:
-          'Show informative tips on the right side of the status line.',
-        showInDialog: true,
-      },
-      showWit: {
-        type: 'boolean',
-        label: 'Show Witty Phrases',
-        category: 'UI',
-        requiresRestart: false,
-        default: true,
-        description: 'Show witty phrases while waiting.',
-        showInDialog: true,
-      },
-
       showMemoryUsage: {
         type: 'boolean',
         label: 'Show Memory Usage',
@@ -746,6 +692,22 @@ const SETTINGS_SCHEMA = {
         default: true,
         description: 'Show the spinner during operations.',
         showInDialog: true,
+      },
+      loadingPhrases: {
+        type: 'enum',
+        label: 'Loading Phrases',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'tips',
+        description:
+          'What to show while the model is working: tips, witty comments, both, or nothing.',
+        showInDialog: true,
+        options: [
+          { value: 'tips', label: 'Tips' },
+          { value: 'witty', label: 'Witty' },
+          { value: 'all', label: 'All' },
+          { value: 'off', label: 'Off' },
+        ],
       },
       errorVerbosity: {
         type: 'enum',

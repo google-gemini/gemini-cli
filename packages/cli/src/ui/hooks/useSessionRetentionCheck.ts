@@ -10,7 +10,6 @@ import { type Settings } from '../../config/settings.js';
 import { getAllSessionFiles } from '../../utils/sessionUtils.js';
 import { identifySessionsToDelete } from '../../utils/sessionCleanup.js';
 import path from 'node:path';
-
 export function useSessionRetentionCheck(
   config: Config,
   settings: Settings,
@@ -21,11 +20,10 @@ export function useSessionRetentionCheck(
   const [checkComplete, setCheckComplete] = useState(false);
 
   useEffect(() => {
-    // If warning already acknowledged or retention already enabled, skip check
+    // If retention already enabled, skip check
     if (
-      settings.general?.sessionRetention?.warningAcknowledged ||
-      (settings.general?.sessionRetention?.enabled &&
-        settings.general?.sessionRetention?.maxAge !== undefined)
+      settings.general?.sessionRetention?.enabled &&
+      settings.general?.sessionRetention?.maxAge !== undefined
     ) {
       setShouldShowWarning(false);
       setCheckComplete(true);
