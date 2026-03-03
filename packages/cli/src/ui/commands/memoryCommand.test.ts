@@ -306,7 +306,7 @@ describe('memoryCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'Refreshing memory from source files...',
+          text: 'Reloading memory from source files...',
         },
         expect.any(Number),
       );
@@ -361,7 +361,7 @@ describe('memoryCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.ERROR,
-          text: `Error refreshing memory: ${error.message}`,
+          text: `Error reloading memory: ${error.message}`,
         },
         expect.any(Number),
       );
@@ -381,7 +381,7 @@ describe('memoryCommand', () => {
       expect(nullConfigContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'Refreshing memory from source files...',
+          text: 'Reloading memory from source files...',
         },
         expect.any(Number),
       );

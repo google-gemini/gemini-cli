@@ -884,7 +884,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Restarting 2 extensions...',
+          text: 'Reloading 2 extensions...',
         }),
       );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(

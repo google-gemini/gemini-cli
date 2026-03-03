@@ -210,7 +210,7 @@ async function restartAction(
 
   const restartingMessage = {
     type: MessageType.INFO,
-    text: `Restarting ${extensionsToRestart.length} extension${s}...`,
+    text: `Reloading ${extensionsToRestart.length} extension${s}...`,
     color: theme.text.primary,
   };
   context.ui.addItem(restartingMessage);
