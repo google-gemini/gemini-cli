@@ -93,6 +93,7 @@ describe('GeminiAgent Session Resume', () => {
       },
       getApprovalMode: vi.fn().mockReturnValue('default'),
       isPlanEnabled: vi.fn().mockReturnValue(false),
+      getCheckpointingEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
     mockSettings = {
       merged: {
