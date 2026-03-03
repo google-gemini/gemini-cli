@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   // Schema utilities
   getSettingsByCategory,
@@ -22,18 +22,10 @@ import {
   getDialogSettingsByCategory,
   getDialogSettingsByType,
   getDialogSettingKeys,
-  // Business logic utilities
-  getSettingValue,
-  isSettingModified,
+  // Business logic utilities,
   TEST_ONLY,
-  settingExistsInScope,
-  setPendingSettingValue,
-  hasRestartRequiredSettings,
-  getRestartRequiredFromModified,
+  isInSettingsScope,
   getDisplayValue,
-  isDefaultValue,
-  isValueInherited,
-  getEffectiveDisplayValue,
 } from './settingsUtils.js';
 import {
   getSettingsSchema,
@@ -255,41 +247,15 @@ describe('SettingsUtils', () => {
     describe('getEffectiveValue', () => {
       it('should return value from settings when set', () => {
         const settings = makeMockSettings({ ui: { requiresRestart: true } });
-        const mergedSettings = makeMockSettings({
-          ui: { requiresRestart: false },
-        });
 
-        const value = getEffectiveValue(
-          'ui.requiresRestart',
-          settings,
-          mergedSettings,
-        );
-        expect(value).toBe(true);
-      });
-
-      it('should return value from merged settings when not set in current scope', () => {
-        const settings = makeMockSettings({});
-        const mergedSettings = makeMockSettings({
-          ui: { requiresRestart: true },
-        });
-
-        const value = getEffectiveValue(
-          'ui.requiresRestart',
-          settings,
-          mergedSettings,
-        );
+        const value = getEffectiveValue('ui.requiresRestart', settings);
         expect(value).toBe(true);
       });
 
       it('should return default value when not set anywhere', () => {
         const settings = makeMockSettings({});
-        const mergedSettings = makeMockSettings({});
 
-        const value = getEffectiveValue(
-          'ui.requiresRestart',
-          settings,
-          mergedSettings,
-        );
+        const value = getEffectiveValue('ui.requiresRestart', settings);
         expect(value).toBe(false); // default value
       });
 
@@ -297,27 +263,18 @@ describe('SettingsUtils', () => {
         const settings = makeMockSettings({
           ui: { accessibility: { enableLoadingPhrases: false } },
         });
-        const mergedSettings = makeMockSettings({
-          ui: { accessibility: { enableLoadingPhrases: true } },
-        });
 
         const value = getEffectiveValue(
           'ui.accessibility.enableLoadingPhrases',
           settings,
-          mergedSettings,
         );
         expect(value).toBe(false);
       });
 
       it('should return undefined for invalid settings', () => {
         const settings = makeMockSettings({});
-        const mergedSettings = makeMockSettings({});
 
-        const value = getEffectiveValue(
-          'invalidSetting',
-          settings,
-          mergedSettings,
-        );
+        const value = getEffectiveValue('invalidSetting', settings);
         expect(value).toBeUndefined();
       });
     });
@@ -483,7 +440,9 @@ describe('SettingsUtils', () => {
         expect(dialogKeys.length).toBeGreaterThan(0);
       });
 
-      it('should handle nested settings display correctly', () => {
+      const nestedDialogKey = 'context.fileFiltering.respectGitIgnore';
+
+      function mockNestedDialogSchema() {
         vi.mocked(getSettingsSchema).mockReturnValue({
           context: {
             type: 'object',
@@ -517,128 +476,27 @@ describe('SettingsUtils', () => {
             },
           },
         } as unknown as SettingsSchemaType);
+      }
 
-        // Test the specific issue with fileFiltering.respectGitIgnore
-        const key = 'context.fileFiltering.respectGitIgnore';
-        const initialSettings = makeMockSettings({});
-        const pendingSettings = makeMockSettings({});
+      it('should include nested file filtering setting in dialog keys', () => {
+        mockNestedDialogSchema();
 
-        // Set the nested setting to true
-        const updatedPendingSettings = setPendingSettingValue(
-          key,
-          true,
-          pendingSettings,
-        );
-
-        // Check if the setting exists in pending settings
-        const existsInPending = settingExistsInScope(
-          key,
-          updatedPendingSettings,
-        );
-        expect(existsInPending).toBe(true);
-
-        // Get the value from pending settings
-        const valueFromPending = getSettingValue(
-          key,
-          updatedPendingSettings,
-          {},
-        );
-        expect(valueFromPending).toBe(true);
-
-        // Test getDisplayValue should show the pending change
-        const displayValue = getDisplayValue(
-          key,
-          initialSettings,
-          {},
-          new Set(),
-          updatedPendingSettings,
-        );
-        expect(displayValue).toBe('true'); // Should show true (no * since value matches default)
-
-        // Test that modified settings also show the * indicator
-        const modifiedSettings = new Set([key]);
-        const displayValueWithModified = getDisplayValue(
-          key,
-          initialSettings,
-          {},
-          modifiedSettings,
-          {},
-        );
-        expect(displayValueWithModified).toBe('true*'); // Should show true* because it's in modified settings and default is true
+        const dialogKeys = getDialogSettingKeys();
+        expect(dialogKeys).toContain(nestedDialogKey);
       });
     });
   });
 
   describe('Business Logic Utilities', () => {
-    describe('getSettingValue', () => {
-      it('should return value from settings when set', () => {
-        const settings = makeMockSettings({ ui: { requiresRestart: true } });
-        const mergedSettings = makeMockSettings({
-          ui: { requiresRestart: false },
-        });
-
-        const value = getSettingValue(
-          'ui.requiresRestart',
-          settings,
-          mergedSettings,
-        );
-        expect(value).toBe(true);
-      });
-
-      it('should return value from merged settings when not set in current scope', () => {
-        const settings = makeMockSettings({});
-        const mergedSettings = makeMockSettings({
-          ui: { requiresRestart: true },
-        });
-
-        const value = getSettingValue(
-          'ui.requiresRestart',
-          settings,
-          mergedSettings,
-        );
-        expect(value).toBe(true);
-      });
-
-      it('should return default value for invalid setting', () => {
-        const settings = makeMockSettings({});
-        const mergedSettings = makeMockSettings({});
-
-        const value = getSettingValue(
-          'invalidSetting',
-          settings,
-          mergedSettings,
-        );
-        expect(value).toBe(false); // Default fallback
-      });
-    });
-
-    describe('isSettingModified', () => {
-      it('should return true when value differs from default', () => {
-        expect(isSettingModified('ui.requiresRestart', true)).toBe(true);
-        expect(
-          isSettingModified('ui.accessibility.enableLoadingPhrases', false),
-        ).toBe(true);
-      });
-
-      it('should return false when value matches default', () => {
-        expect(isSettingModified('ui.requiresRestart', false)).toBe(false);
-        expect(
-          isSettingModified('ui.accessibility.enableLoadingPhrases', true),
-        ).toBe(false);
-      });
-    });
-
-    describe('settingExistsInScope', () => {
+    describe('isInSettingsScope', () => {
       it('should return true for top-level settings that exist', () => {
         const settings = makeMockSettings({ ui: { requiresRestart: true } });
-        expect(settingExistsInScope('ui.requiresRestart', settings)).toBe(true);
+        expect(isInSettingsScope('ui.requiresRestart', settings)).toBe(true);
       });
 
       it('should return false for top-level settings that do not exist', () => {
         const settings = makeMockSettings({});
-        expect(settingExistsInScope('ui.requiresRestart', settings)).toBe(
-          false,
-        );
+        expect(isInSettingsScope('ui.requiresRestart', settings)).toBe(false);
       });
 
       it('should return true for nested settings that exist', () => {
@@ -646,118 +504,22 @@ describe('SettingsUtils', () => {
           ui: { accessibility: { enableLoadingPhrases: true } },
         });
         expect(
-          settingExistsInScope(
-            'ui.accessibility.enableLoadingPhrases',
-            settings,
-          ),
+          isInSettingsScope('ui.accessibility.enableLoadingPhrases', settings),
         ).toBe(true);
       });
 
       it('should return false for nested settings that do not exist', () => {
         const settings = makeMockSettings({});
         expect(
-          settingExistsInScope(
-            'ui.accessibility.enableLoadingPhrases',
-            settings,
-          ),
+          isInSettingsScope('ui.accessibility.enableLoadingPhrases', settings),
         ).toBe(false);
       });
 
       it('should return false when parent exists but child does not', () => {
         const settings = makeMockSettings({ ui: { accessibility: {} } });
         expect(
-          settingExistsInScope(
-            'ui.accessibility.enableLoadingPhrases',
-            settings,
-          ),
+          isInSettingsScope('ui.accessibility.enableLoadingPhrases', settings),
         ).toBe(false);
-      });
-    });
-
-    describe('setPendingSettingValue', () => {
-      it('should set top-level setting value', () => {
-        const pendingSettings = makeMockSettings({});
-        const result = setPendingSettingValue(
-          'ui.hideWindowTitle',
-          true,
-          pendingSettings,
-        );
-
-        expect(result.ui?.hideWindowTitle).toBe(true);
-      });
-
-      it('should set nested setting value', () => {
-        const pendingSettings = makeMockSettings({});
-        const result = setPendingSettingValue(
-          'ui.accessibility.enableLoadingPhrases',
-          true,
-          pendingSettings,
-        );
-
-        expect(result.ui?.accessibility?.enableLoadingPhrases).toBe(true);
-      });
-
-      it('should preserve existing nested settings', () => {
-        const pendingSettings = makeMockSettings({
-          ui: { accessibility: { enableLoadingPhrases: false } },
-        });
-        const result = setPendingSettingValue(
-          'ui.accessibility.enableLoadingPhrases',
-          true,
-          pendingSettings,
-        );
-
-        expect(result.ui?.accessibility?.enableLoadingPhrases).toBe(true);
-      });
-
-      it('should not mutate original settings', () => {
-        const pendingSettings = makeMockSettings({});
-        setPendingSettingValue('ui.requiresRestart', true, pendingSettings);
-
-        expect(pendingSettings).toEqual({});
-      });
-    });
-
-    describe('hasRestartRequiredSettings', () => {
-      it('should return true when modified settings require restart', () => {
-        const modifiedSettings = new Set<string>([
-          'advanced.autoConfigureMemory',
-          'ui.requiresRestart',
-        ]);
-        expect(hasRestartRequiredSettings(modifiedSettings)).toBe(true);
-      });
-
-      it('should return false when no modified settings require restart', () => {
-        const modifiedSettings = new Set<string>(['test']);
-        expect(hasRestartRequiredSettings(modifiedSettings)).toBe(false);
-      });
-
-      it('should return false for empty set', () => {
-        const modifiedSettings = new Set<string>();
-        expect(hasRestartRequiredSettings(modifiedSettings)).toBe(false);
-      });
-    });
-
-    describe('getRestartRequiredFromModified', () => {
-      it('should return only settings that require restart', () => {
-        const modifiedSettings = new Set<string>([
-          'ui.requiresRestart',
-          'test',
-        ]);
-        const result = getRestartRequiredFromModified(modifiedSettings);
-
-        expect(result).toContain('ui.requiresRestart');
-        expect(result).not.toContain('test');
-      });
-
-      it('should return empty array when no settings require restart', () => {
-        const modifiedSettings = new Set<string>([
-          'requiresRestart',
-          'hideTips',
-        ]);
-        const result = getRestartRequiredFromModified(modifiedSettings);
-
-        expect(result).toEqual([]);
       });
     });
 
@@ -830,14 +592,8 @@ describe('SettingsUtils', () => {
           const mergedSettings = makeMockSettings({
             ui: { theme: NumberEnum.THREE },
           });
-          const modifiedSettings = new Set<string>();
 
-          const result = getDisplayValue(
-            'ui.theme',
-            settings,
-            mergedSettings,
-            modifiedSettings,
-          );
+          const result = getDisplayValue('ui.theme', settings, mergedSettings);
 
           expect(result).toBe('Three*');
         });
@@ -867,13 +623,11 @@ describe('SettingsUtils', () => {
               },
             },
           } as unknown as SettingsSchemaType);
-          const modifiedSettings = new Set<string>();
 
           const result = getDisplayValue(
             'ui.theme',
             makeMockSettings({}),
             makeMockSettings({}),
-            modifiedSettings,
           );
           expect(result).toBe('Three');
         });
@@ -886,14 +640,8 @@ describe('SettingsUtils', () => {
           const mergedSettings = makeMockSettings({
             ui: { theme: StringEnum.BAR },
           });
-          const modifiedSettings = new Set<string>();
 
-          const result = getDisplayValue(
-            'ui.theme',
-            settings,
-            mergedSettings,
-            modifiedSettings,
-          );
+          const result = getDisplayValue('ui.theme', settings, mergedSettings);
           expect(result).toBe('Bar*');
         });
 
@@ -907,14 +655,8 @@ describe('SettingsUtils', () => {
           } as unknown as SettingsSchemaType);
           const settings = makeMockSettings({ ui: { theme: 'xyz' } });
           const mergedSettings = makeMockSettings({ ui: { theme: 'xyz' } });
-          const modifiedSettings = new Set<string>();
 
-          const result = getDisplayValue(
-            'ui.theme',
-            settings,
-            mergedSettings,
-            modifiedSettings,
-          );
+          const result = getDisplayValue('ui.theme', settings, mergedSettings);
           expect(result).toBe('xyz*');
         });
 
@@ -926,242 +668,71 @@ describe('SettingsUtils', () => {
               },
             },
           } as unknown as SettingsSchemaType);
-          const modifiedSettings = new Set<string>();
 
           const result = getDisplayValue(
             'ui.theme',
             makeMockSettings({}),
             makeMockSettings({}),
-            modifiedSettings,
           );
           expect(result).toBe('Bar');
         });
       });
 
-      it('should show value without * when setting matches default', () => {
-        const settings = makeMockSettings({
-          ui: { requiresRestart: false },
-        }); // false matches default, so no *
+      it('should show value with * when setting exists in scope', () => {
+        const settings = makeMockSettings({ ui: { requiresRestart: true } });
         const mergedSettings = makeMockSettings({
-          ui: { requiresRestart: false },
+          ui: { requiresRestart: true },
         });
-        const modifiedSettings = new Set<string>();
 
         const result = getDisplayValue(
           'ui.requiresRestart',
           settings,
           mergedSettings,
-          modifiedSettings,
         );
-        expect(result).toBe('false*');
+        expect(result).toBe('true*');
       });
-
-      it('should show default value when setting is not in scope', () => {
+      it('should not show * when key is not in scope', () => {
         const settings = makeMockSettings({}); // no setting in scope
         const mergedSettings = makeMockSettings({
           ui: { requiresRestart: false },
         });
-        const modifiedSettings = new Set<string>();
 
         const result = getDisplayValue(
           'ui.requiresRestart',
           settings,
           mergedSettings,
-          modifiedSettings,
         );
         expect(result).toBe('false'); // shows default value
       });
 
-      it('should show value with * when changed from default', () => {
-        const settings = makeMockSettings({ ui: { requiresRestart: true } }); // true is different from default (false)
-        const mergedSettings = makeMockSettings({
-          ui: { requiresRestart: true },
-        });
-        const modifiedSettings = new Set<string>();
-
-        const result = getDisplayValue(
-          'ui.requiresRestart',
-          settings,
-          mergedSettings,
-          modifiedSettings,
-        );
-        expect(result).toBe('true*');
-      });
-
-      it('should show default value without * when setting does not exist in scope', () => {
-        const settings = makeMockSettings({}); // setting doesn't exist in scope, show default
-        const mergedSettings = makeMockSettings({
-          ui: { requiresRestart: false },
-        });
-        const modifiedSettings = new Set<string>();
-
-        const result = getDisplayValue(
-          'ui.requiresRestart',
-          settings,
-          mergedSettings,
-          modifiedSettings,
-        );
-        expect(result).toBe('false'); // default value (false) without *
-      });
-
-      it('should show value with * when user changes from default', () => {
-        const settings = makeMockSettings({}); // setting doesn't exist in scope originally
-        const mergedSettings = makeMockSettings({
-          ui: { requiresRestart: false },
-        });
-        const modifiedSettings = new Set<string>(['ui.requiresRestart']);
-        const pendingSettings = makeMockSettings({
-          ui: { requiresRestart: true },
-        }); // user changed to true
-
-        const result = getDisplayValue(
-          'ui.requiresRestart',
-          settings,
-          mergedSettings,
-          modifiedSettings,
-          pendingSettings,
-        );
-        expect(result).toBe('true*'); // changed from default (false) to true
-      });
-    });
-
-    describe('isDefaultValue', () => {
-      it('should return true when setting does not exist in scope', () => {
-        const settings = makeMockSettings({}); // setting doesn't exist
-
-        const result = isDefaultValue('ui.requiresRestart', settings);
-        expect(result).toBe(true);
-      });
-
-      it('should return false when setting exists in scope', () => {
-        const settings = makeMockSettings({ ui: { requiresRestart: true } }); // setting exists
-
-        const result = isDefaultValue('ui.requiresRestart', settings);
-        expect(result).toBe(false);
-      });
-
-      it('should return true when nested setting does not exist in scope', () => {
-        const settings = makeMockSettings({}); // nested setting doesn't exist
-
-        const result = isDefaultValue(
-          'ui.accessibility.enableLoadingPhrases',
-          settings,
-        );
-        expect(result).toBe(true);
-      });
-
-      it('should return false when nested setting exists in scope', () => {
+      it('should show value with * when setting exists in scope, even when it matches default', () => {
         const settings = makeMockSettings({
-          ui: { accessibility: { enableLoadingPhrases: true } },
-        }); // nested setting exists
-
-        const result = isDefaultValue(
-          'ui.accessibility.enableLoadingPhrases',
-          settings,
-        );
-        expect(result).toBe(false);
-      });
-    });
-
-    describe('isValueInherited', () => {
-      it('should return false for top-level settings that exist in scope', () => {
-        const settings = makeMockSettings({ ui: { requiresRestart: true } });
-        const mergedSettings = makeMockSettings({
-          ui: { requiresRestart: true },
-        });
-
-        const result = isValueInherited(
-          'ui.requiresRestart',
-          settings,
-          mergedSettings,
-        );
-        expect(result).toBe(false);
-      });
-
-      it('should return true for top-level settings that do not exist in scope', () => {
-        const settings = makeMockSettings({});
-        const mergedSettings = makeMockSettings({
-          ui: { requiresRestart: true },
-        });
-
-        const result = isValueInherited(
-          'ui.requiresRestart',
-          settings,
-          mergedSettings,
-        );
-        expect(result).toBe(true);
-      });
-
-      it('should return false for nested settings that exist in scope', () => {
-        const settings = makeMockSettings({
-          ui: { accessibility: { enableLoadingPhrases: true } },
-        });
-        const mergedSettings = makeMockSettings({
-          ui: { accessibility: { enableLoadingPhrases: true } },
-        });
-
-        const result = isValueInherited(
-          'ui.accessibility.enableLoadingPhrases',
-          settings,
-          mergedSettings,
-        );
-        expect(result).toBe(false);
-      });
-
-      it('should return true for nested settings that do not exist in scope', () => {
-        const settings = makeMockSettings({});
-        const mergedSettings = makeMockSettings({
-          ui: { accessibility: { enableLoadingPhrases: true } },
-        });
-
-        const result = isValueInherited(
-          'ui.accessibility.enableLoadingPhrases',
-          settings,
-          mergedSettings,
-        );
-        expect(result).toBe(true);
-      });
-    });
-
-    describe('getEffectiveDisplayValue', () => {
-      it('should return value from settings when available', () => {
-        const settings = makeMockSettings({ ui: { requiresRestart: true } });
+          ui: { requiresRestart: false },
+        }); // false matches default, but key is explicitly set in scope
         const mergedSettings = makeMockSettings({
           ui: { requiresRestart: false },
         });
 
-        const result = getEffectiveDisplayValue(
+        const result = getDisplayValue(
           'ui.requiresRestart',
           settings,
           mergedSettings,
         );
-        expect(result).toBe(true);
+        expect(result).toBe('false*');
       });
 
-      it('should return value from merged settings when not in scope', () => {
-        const settings = makeMockSettings({});
+      it('should show schema default (not inherited merged value) when key is not in scope', () => {
+        const settings = makeMockSettings({}); // no setting in current scope
         const mergedSettings = makeMockSettings({
           ui: { requiresRestart: true },
-        });
+        }); // inherited merged value differs from schema default (false)
 
-        const result = getEffectiveDisplayValue(
+        const result = getDisplayValue(
           'ui.requiresRestart',
           settings,
           mergedSettings,
         );
-        expect(result).toBe(true);
-      });
-
-      it('should return default value for undefined values', () => {
-        const settings = makeMockSettings({});
-        const mergedSettings = makeMockSettings({});
-
-        const result = getEffectiveDisplayValue(
-          'ui.requiresRestart',
-          settings,
-          mergedSettings,
-        );
-        expect(result).toBe(false); // Default value
+        expect(result).toBe('false');
       });
     });
   });
