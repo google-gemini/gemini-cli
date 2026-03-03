@@ -535,7 +535,7 @@ export class LoopDetectionService {
 
     const trimmedHistory = this.trimRecentHistory(recentHistory);
 
-    const taskPrompt = `Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state. Provide your response in the requested JSON format.`;
+    const taskPrompt = `Please analyze the conversation history to determine the possibility that the conversation is stuck in a repetitive, non-productive state. Consider the original user request when evaluating whether repeated tool calls represent legitimate batch work or an actual loop. Provide your response in the requested JSON format.`;
 
     const contents = [
       ...(this.userPrompt

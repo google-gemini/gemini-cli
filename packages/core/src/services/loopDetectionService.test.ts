@@ -747,6 +747,16 @@ describe('LoopDetectionService', () => {
           c.parts!.some((p) => p.text?.includes('User prompt')),
       );
       expect(hasUserPrompt).toBe(true);
+
+      // Verify the task prompt itself is correct
+      const hasTaskPrompt = calledArg.contents.some(
+        (c) =>
+          c.role === 'user' &&
+          c.parts!.some((p) =>
+            p.text?.includes('Consider the original user request'),
+          ),
+      );
+      expect(hasTaskPrompt).toBe(true);
     });
 
     it('should not include user prompt in contents when not provided', async () => {
