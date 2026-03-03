@@ -55,6 +55,7 @@ const createMockUIState = (overrides: UIStateOverrides = {}): UIState =>
     buffer: { text: '' },
     history: [{ id: 1, type: 'user', text: 'test' }],
     sisyphusSecondsRemaining: null,
+    a2aListenerPort: null,
     ...overrides,
   }) as UIState;
 
@@ -181,6 +182,32 @@ describe('StatusDisplay', () => {
       uiState,
     );
     expect(lastFrame()).toContain('✦ Resuming work in 01:05');
+    unmount();
+  });
+
+  it('renders A2A listener port when active', async () => {
+    const uiState = createMockUIState({
+      a2aListenerPort: 8080,
+    });
+    const { lastFrame, unmount } = await renderStatusDisplay(
+      { hideContextSummary: false },
+      uiState,
+    );
+    expect(lastFrame()).toContain('⚡ A2A :8080');
+    unmount();
+  });
+
+  it('renders both A2A port and Sisyphus timer together', async () => {
+    const uiState = createMockUIState({
+      a2aListenerPort: 3000,
+      sisyphusSecondsRemaining: 120, // 02:00
+    });
+    const { lastFrame, unmount } = await renderStatusDisplay(
+      { hideContextSummary: false },
+      uiState,
+    );
+    expect(lastFrame()).toContain('⚡ A2A :3000');
+    expect(lastFrame()).toContain('✦ Resuming work in 02:00');
     unmount();
   });
 });

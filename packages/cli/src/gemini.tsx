@@ -84,6 +84,7 @@ import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
+import { startExternalListener } from './external-listener.js';
 import { SessionSelector } from './utils/sessionUtils.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { MouseProvider } from './ui/contexts/MouseContext.js';
@@ -323,6 +324,26 @@ export async function startInteractiveUI(
   registerCleanup(() => instance.unmount());
 
   registerCleanup(setupTtyCheck());
+
+  // Auto-start A2A HTTP listener in Forever Mode
+  const sisyphusMode = config.getSisyphusMode();
+  if (config.getIsForeverMode() && sisyphusMode.enabled) {
+    const a2aPort = sisyphusMode.a2aPort ?? 0;
+    try {
+      const listener = await startExternalListener({ port: a2aPort });
+      registerCleanup(listener.cleanup);
+      appEvents.emit(AppEvent.A2AListenerStarted, listener.port);
+      coreEvents.emitFeedback(
+        'info',
+        `A2A endpoint listening on port ${listener.port}`,
+      );
+    } catch (err) {
+      coreEvents.emitFeedback(
+        'warning',
+        `Failed to start A2A listener: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
 }
 
 export async function main() {

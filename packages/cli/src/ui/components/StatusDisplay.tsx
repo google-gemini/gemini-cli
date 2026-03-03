@@ -37,6 +37,12 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     items.push(<HookStatusDisplay activeHooks={uiState.activeHooks} />);
   }
 
+  if (uiState.a2aListenerPort !== null) {
+    items.push(
+      <Text color={theme.text.accent}>⚡ A2A :{uiState.a2aListenerPort}</Text>,
+    );
+  }
+
   if (uiState.sisyphusSecondsRemaining !== null) {
     const mins = Math.floor(uiState.sisyphusSecondsRemaining / 60);
     const secs = uiState.sisyphusSecondsRemaining % 60;

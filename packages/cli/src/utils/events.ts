@@ -23,6 +23,8 @@ export enum AppEvent {
   PasteTimeout = 'paste-timeout',
   TerminalBackground = 'terminal-background',
   TransientMessage = 'transient-message',
+  ExternalMessage = 'external-message',
+  A2AListenerStarted = 'a2a-listener-started',
 }
 
 export interface AppEvents {
@@ -32,6 +34,8 @@ export interface AppEvents {
   [AppEvent.PasteTimeout]: never[];
   [AppEvent.TerminalBackground]: [string];
   [AppEvent.TransientMessage]: [TransientMessagePayload];
+  [AppEvent.ExternalMessage]: [string];
+  [AppEvent.A2AListenerStarted]: [number];
 }
 
 export const appEvents = new EventEmitter<AppEvents>();

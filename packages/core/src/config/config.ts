@@ -239,6 +239,7 @@ export interface SisyphusModeSettings {
   enabled: boolean;
   idleTimeout?: number;
   prompt?: string;
+  a2aPort?: number;
 }
 
 export interface CustomTheme {

@@ -126,6 +126,11 @@ import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
+import {
+  notifyResponse,
+  hasPendingTasks,
+  markTasksWorking,
+} from '../external-listener.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
@@ -235,6 +240,19 @@ export const AppContainer = (props: AppContainerProps) => {
   const [isOnboardingForeverMode, setIsOnboardingForeverMode] = useState(
     () => config.getIsForeverMode() && !config.getIsForeverModeConfigured(),
   );
+  const [a2aListenerPort, setA2aListenerPort] = useState<number | null>(null);
+
+  // Listen for A2A listener startup to display port in status bar
+  useEffect(() => {
+    const handler = (port: number) => {
+      setA2aListenerPort(port);
+    };
+    appEvents.on(AppEvent.A2AListenerStarted, handler);
+    return () => {
+      appEvents.off(AppEvent.A2AListenerStarted, handler);
+    };
+  }, []);
+
   const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
   const [quittingMessages, setQuittingMessages] = useState<
@@ -1203,6 +1221,49 @@ Logging in with Google... Restarting Gemini CLI to continue.
     submitQuery,
     isMcpReady,
   });
+
+  // Bridge external messages from A2A HTTP listener to message queue
+  useEffect(() => {
+    const handler = (text: string) => {
+      addMessage(text);
+    };
+    appEvents.on(AppEvent.ExternalMessage, handler);
+    return () => {
+      appEvents.off(AppEvent.ExternalMessage, handler);
+    };
+  }, [addMessage]);
+
+  // Track streaming state transitions for A2A response capture
+  const prevStreamingStateRef = useRef(streamingState);
+
+  useEffect(() => {
+    const prev = prevStreamingStateRef.current;
+    prevStreamingStateRef.current = streamingState;
+
+    // Mark tasks as "working" when streaming starts
+    if (
+      prev === StreamingState.Idle &&
+      streamingState !== StreamingState.Idle
+    ) {
+      markTasksWorking();
+    }
+
+    // Capture response when streaming ends
+    if (
+      prev !== StreamingState.Idle &&
+      streamingState === StreamingState.Idle &&
+      hasPendingTasks()
+    ) {
+      const lastResponse = historyManager.history
+        .slice()
+        .reverse()
+        .find((item) => item.type === 'gemini');
+      notifyResponse(
+        typeof lastResponse?.text === 'string' ? lastResponse.text : '',
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streamingState]);
 
   cancelHandlerRef.current = useCallback(
     (shouldRestorePrompt: boolean = true) => {
@@ -2317,6 +2378,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         ]),
       hintBuffer: '',
       sisyphusSecondsRemaining,
+      a2aListenerPort,
     }),
     [
       isThemeDialogOpen,
@@ -2441,6 +2503,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       newAgents,
       showIsExpandableHint,
       sisyphusSecondsRemaining,
+      a2aListenerPort,
       isOnboardingForeverMode,
     ],
   );

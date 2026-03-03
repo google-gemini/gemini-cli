@@ -575,6 +575,10 @@ export async function loadCliConfig(
                 typeof sisyphusSettings['prompt'] === 'string'
                   ? sisyphusSettings['prompt']
                   : undefined,
+              a2aPort:
+                typeof sisyphusSettings['a2aPort'] === 'number'
+                  ? sisyphusSettings['a2aPort']
+                  : undefined,
             };
           }
         }
