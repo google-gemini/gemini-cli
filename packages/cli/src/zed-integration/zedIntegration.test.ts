@@ -265,7 +265,7 @@ describe('GeminiAgent', () => {
       ],
       currentModeId: 'default',
     });
-    expect((response as any).models).toEqual({
+    expect(response.models).toEqual({
       availableModels: expect.arrayContaining([
         expect.objectContaining({
           modelId: 'auto-gemini-2.5',
@@ -285,7 +285,7 @@ describe('GeminiAgent', () => {
       mcpServers: [],
     });
 
-    expect((response as any).models.availableModels).toEqual(
+    expect(response.models?.availableModels).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           modelId: 'auto-gemini-3',
@@ -324,7 +324,7 @@ describe('GeminiAgent', () => {
       ],
       currentModeId: 'plan',
     });
-    expect((response as any).models).toEqual({
+    expect(response.models).toEqual({
       availableModels: expect.arrayContaining([
         expect.objectContaining({
           modelId: 'auto-gemini-2.5',
