@@ -11,6 +11,7 @@ import {
   CoreEvent,
   type EditorType,
   getEditorCommand,
+  isEditorAvailable,
   isGuiEditor,
   isTerminalEditor,
 } from '@google/gemini-cli-core';
@@ -34,9 +35,19 @@ export async function openFileInEditor(
   const args = [filePath];
 
   if (preferredEditorType) {
-    command = getEditorCommand(preferredEditorType);
-    if (isGuiEditor(preferredEditorType)) {
-      args.unshift('--wait');
+    if (isEditorAvailable(preferredEditorType)) {
+      command = getEditorCommand(preferredEditorType);
+      if (isGuiEditor(preferredEditorType)) {
+        args.unshift('--wait');
+      }
+    } else {
+      coreEvents.emitFeedback(
+        'error',
+        `Editor '${preferredEditorType}' is not recognized or not installed. ` +
+          `Run /editor to pick a supported editor, or set $VISUAL/$EDITOR in your shell ` +
+          `to your preferred editor.`,
+      );
+      return;
     }
   }
 
@@ -96,11 +107,18 @@ export async function openFileInEditor(
         shell: process.platform === 'win32',
       });
       if (result.error) {
-        coreEvents.emitFeedback(
-          'error',
-          '[editorUtils] external terminal editor error',
-          result.error,
-        );
+        if ((result.error as NodeJS.ErrnoException).code === 'ENOENT') {
+          coreEvents.emitFeedback(
+            'error',
+            `Could not find editor '${executable}'. Check your $VISUAL/$EDITOR setting.`,
+          );
+        } else {
+          coreEvents.emitFeedback(
+            'error',
+            '[editorUtils] external terminal editor error',
+            result.error,
+          );
+        }
         throw result.error;
       }
       if (typeof result.status === 'number' && result.status !== 0) {
@@ -122,11 +140,18 @@ export async function openFileInEditor(
         });
 
         child.on('error', (err) => {
-          coreEvents.emitFeedback(
-            'error',
-            '[editorUtils] external editor spawn error',
-            err,
-          );
+          if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+            coreEvents.emitFeedback(
+              'error',
+              `Could not find editor '${executable}'. Check your $VISUAL/$EDITOR setting.`,
+            );
+          } else {
+            coreEvents.emitFeedback(
+              'error',
+              '[editorUtils] external editor spawn error',
+              err,
+            );
+          }
           reject(err);
         });
 
