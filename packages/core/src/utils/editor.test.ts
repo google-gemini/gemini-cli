@@ -85,6 +85,11 @@ describe('editor utils', () => {
       },
       { editor: 'hx', commands: ['hx'], win32Commands: ['hx'] },
       { editor: 'sublime', commands: ['subl'], win32Commands: ['subl'] },
+      {
+        editor: 'emacsclient',
+        commands: ['emacsclient'],
+        win32Commands: ['emacsclient'],
+      },
     ];
 
     for (const { editor, commands, win32Commands } of testCases) {
@@ -340,6 +345,22 @@ describe('editor utils', () => {
       });
     });
 
+    it('should return the correct command for emacsclient with escaped paths', () => {
+      const command = getDiffCommand(
+        'old file "quote".txt',
+        'new file \\back\\slash.txt',
+        'emacsclient',
+      );
+      expect(command).toEqual({
+        command: 'emacsclient',
+        args: [
+          '-nw',
+          '--eval',
+          '(ediff "old file \\"quote\\".txt" "new file \\\\back\\\\slash.txt")',
+        ],
+      });
+    });
+
     it('should return the correct command for sublime', () => {
       Object.defineProperty(process, 'platform', { value: 'linux' });
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/subl'));
@@ -485,7 +506,13 @@ describe('editor utils', () => {
       });
     }
 
-    const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs', 'hx'];
+    const terminalEditors: EditorType[] = [
+      'vim',
+      'neovim',
+      'emacs',
+      'emacsclient',
+      'hx',
+    ];
 
     for (const editor of terminalEditors) {
       it(`should call spawnSync for ${editor}`, async () => {
@@ -530,6 +557,15 @@ describe('editor utils', () => {
 
     it('should allow emacs when not in sandbox mode', () => {
       expect(allowEditorTypeInSandbox('emacs')).toBe(true);
+    });
+
+    it('should allow emacsclient in sandbox mode', () => {
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(allowEditorTypeInSandbox('emacsclient')).toBe(true);
+    });
+
+    it('should allow emacsclient when not in sandbox mode', () => {
+      expect(allowEditorTypeInSandbox('emacsclient')).toBe(true);
     });
 
     it('should allow neovim in sandbox mode', () => {
