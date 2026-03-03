@@ -12,6 +12,8 @@ import {
   TrackerCreateTaskTool,
   TrackerListTasksTool,
   TrackerUpdateTaskTool,
+  TrackerVisualizeTool,
+  TrackerAddDependencyTool,
 } from './trackerTools.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -30,7 +32,7 @@ describe('Tracker Tools Integration', () => {
       sessionId: 'test-session',
       targetDir: tempDir,
       cwd: tempDir,
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3-flash',
       debugMode: false,
     });
     messageBus = new MessageBus(null as unknown as PolicyEngine, false);
@@ -90,5 +92,51 @@ describe('Tracker Tools Integration', () => {
 
     const task = await config.getTrackerService().getTask(taskId);
     expect(task?.status).toBe(TaskStatus.IN_PROGRESS);
+  });
+
+  it('adds dependencies and visualizes the graph', async () => {
+    const createTool = new TrackerCreateTaskTool(config, messageBus);
+    
+    // Create Parent
+    await createTool.buildAndExecute(
+      {
+        title: 'Parent Task',
+        description: '...',
+        type: TaskType.TASK,
+      },
+      getSignal(),
+    );
+
+    // Create Child 
+    await createTool.buildAndExecute(
+      {
+        title: 'Child Task',
+        description: '...',
+        type: TaskType.TASK,
+      },
+      getSignal(),
+    );
+
+    const tasks = await config.getTrackerService().listTasks();
+    const parentId = tasks.find(t => t.title === 'Parent Task')!.id;
+    const childId = tasks.find(t => t.title === 'Child Task')!.id;
+
+    // Add Dependency
+    const addDepTool = new TrackerAddDependencyTool(config, messageBus);
+    await addDepTool.buildAndExecute({
+        taskId: parentId,
+        dependencyId: childId,
+    }, getSignal());
+
+    const updatedParent = await config.getTrackerService().getTask(parentId);
+    expect(updatedParent?.dependencies).toContain(childId);
+
+    // Visualize
+    const vizTool = new TrackerVisualizeTool(config, messageBus);
+    const vizResult = await vizTool.buildAndExecute({}, getSignal());
+    
+    expect(vizResult.llmContent).toContain('Parent Task');
+    expect(vizResult.llmContent).toContain('Child Task');
+    expect(vizResult.llmContent).toContain(childId);
   });
 });

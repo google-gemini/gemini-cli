@@ -31,6 +31,7 @@ export class TrackerService {
       this.initialized = true;
     }
   }
+
   /**
    * Generates a 6-character hex ID.
    */
@@ -48,6 +49,13 @@ export class TrackerService {
       ...taskData,
       id,
     };
+
+    if (task.parentId) {
+      const parentList = await this.listTasks();
+      if (!parentList.find((t) => t.id === task.parentId)) {
+        throw new Error(`Parent task with ID ${task.parentId} not found.`);
+      }
+    }
 
     TrackerTaskSchema.parse(task);
 
@@ -149,7 +157,13 @@ export class TrackerService {
         throw new Error(`Task with ID ${id} not found.`);
       }
 
-      updatedTask = { ...task, ...updates };
+      updatedTask = { ...task, ...updates, id: task.id };
+
+      if (updatedTask.parentId) {
+         if (!taskMap.has(updatedTask.parentId)) {
+            throw new Error(`Parent task with ID ${updatedTask.parentId} not found.`);
+         }
+      }
 
       if (isClosing && task.status !== TaskStatus.CLOSED) {
         this.validateCanClose(updatedTask, taskMap);
@@ -164,7 +178,14 @@ export class TrackerService {
       if (!task) {
         throw new Error(`Task with ID ${id} not found.`);
       }
-      updatedTask = { ...task, ...updates };
+      updatedTask = { ...task, ...updates, id: task.id };
+      
+      if (updatedTask.parentId) {
+         const parentTask = await this.getTask(updatedTask.parentId);
+         if (!parentTask) {
+             throw new Error(`Parent task with ID ${updatedTask.parentId} not found.`);
+         }
+      }
     }
 
     TrackerTaskSchema.parse(updatedTask);
@@ -225,10 +246,11 @@ export class TrackerService {
       stack.add(currentId);
 
       const currentTask = taskMap.get(currentId);
-      if (currentTask) {
-        for (const depId of currentTask.dependencies) {
-          check(depId);
-        }
+      if (!currentTask) {
+        throw new Error(`Dependency ${currentId} not found.`);
+      }
+      for (const depId of currentTask.dependencies) {
+        check(depId);
       }
 
       stack.delete(currentId);

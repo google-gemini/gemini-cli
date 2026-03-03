@@ -1818,7 +1818,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable task tracker tools.',
-        showInDialog: true,
+        showInDialog: false,
       },
       modelSteering: {
         type: 'boolean',
