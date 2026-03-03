@@ -909,7 +909,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (voiceEnabled && key.sequence === ' ') {
         const now = Date.now();
         const delta = now - lastSpacePressRef.current;
-        if (delta > 0 && delta < 300) {
+
+        // If they are just holding down the spacebar, the OS will send repeated keys
+        // very quickly (e.g. every 30ms). We don't want to trigger voice on continuous hold.
+        if (delta > 50 && delta < 300) {
           lastSpacePressRef.current = 0;
 
           // The first space was already inserted into the buffer on the previous keypress
@@ -922,6 +925,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           void toggleRecording();
           return true; // Consume the second space
         }
+
         lastSpacePressRef.current = now;
 
         // Consume the first space only if the buffer is empty to avoid leading whitespace.
@@ -930,7 +934,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return true;
         }
       }
-
       if (voiceEnabled && keyMatchers[Command.VOICE_INPUT](key)) {
         void toggleRecording();
         return true;
