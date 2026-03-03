@@ -2808,6 +2808,82 @@ describe('PolicyEngine', () => {
         'Execution of scripts (including those from skills) is blocked',
       );
     });
+
+    it('should deny enter_plan_mode when already in PLAN mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'enter_plan_mode',
+          decision: PolicyDecision.DENY,
+          priority: 70,
+          modes: [ApprovalMode.PLAN],
+          denyMessage: 'You are already in Plan Mode.',
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.PLAN,
+      });
+
+      const result = await engine.check({ name: 'enter_plan_mode' }, undefined);
+      expect(result.decision).toBe(PolicyDecision.DENY);
+      expect(result.rule?.denyMessage).toBe('You are already in Plan Mode.');
+    });
+
+    it('should deny exit_plan_mode when in DEFAULT mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'exit_plan_mode',
+          decision: PolicyDecision.DENY,
+          priority: 10,
+          modes: [ApprovalMode.DEFAULT],
+          denyMessage: 'You are not in Plan Mode.',
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.DEFAULT,
+      });
+
+      const result = await engine.check({ name: 'exit_plan_mode' }, undefined);
+      expect(result.decision).toBe(PolicyDecision.DENY);
+      expect(result.rule?.denyMessage).toBe('You are not in Plan Mode.');
+    });
+
+    it('should deny both plan tools in YOLO mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'enter_plan_mode',
+          decision: PolicyDecision.DENY,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+        {
+          toolName: 'exit_plan_mode',
+          decision: PolicyDecision.DENY,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      const resultEnter = await engine.check(
+        { name: 'enter_plan_mode' },
+        undefined,
+      );
+      expect(resultEnter.decision).toBe(PolicyDecision.DENY);
+
+      const resultExit = await engine.check(
+        { name: 'exit_plan_mode' },
+        undefined,
+      );
+      expect(resultExit.decision).toBe(PolicyDecision.DENY);
+    });
   });
 
   describe('removeRulesByTier', () => {

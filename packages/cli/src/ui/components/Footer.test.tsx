@@ -15,6 +15,19 @@ import {
 } from '@google/gemini-cli-core';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 
+let mockIsDevelopment = false;
+
+vi.mock('../../utils/installationInfo.js', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('../../utils/installationInfo.js')>();
+  return {
+    ...original,
+    get isDevelopment() {
+      return mockIsDevelopment;
+    },
+  };
+});
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -509,7 +522,15 @@ describe('<Footer />', () => {
   });
 
   describe('error summary visibility', () => {
-    it('hides error summary in low verbosity mode', async () => {
+    beforeEach(() => {
+      mockIsDevelopment = false;
+    });
+
+    afterEach(() => {
+      mockIsDevelopment = false;
+    });
+
+    it('hides error summary in low verbosity mode out of dev mode', async () => {
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <Footer />,
         {
@@ -527,6 +548,28 @@ describe('<Footer />', () => {
       await waitUntilReady();
       expect(lastFrame()).not.toContain('F12 for details');
       expect(lastFrame()).not.toContain('2 errors');
+      unmount();
+    });
+
+    it('shows error summary in low verbosity mode in dev mode', async () => {
+      mockIsDevelopment = true;
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            errorCount: 2,
+            showErrorDetails: false,
+          },
+          settings: createMockSettings({
+            merged: { ui: { errorVerbosity: 'low' } },
+          }),
+        },
+      );
+      await waitUntilReady();
+      expect(lastFrame()).toContain('F12 for details');
+      expect(lastFrame()).toContain('2 errors');
       unmount();
     });
 
