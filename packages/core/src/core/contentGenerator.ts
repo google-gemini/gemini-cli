@@ -171,6 +171,7 @@ export async function createContentGenerator(
     const apiKeyAuthMechanism =
       process.env['GEMINI_API_KEY_AUTH_MECHANISM'] || 'x-goog-api-key';
     const apiVersionEnv = process.env['GOOGLE_GENAI_API_VERSION'];
+    const customBaseUrlEnv = process.env['GEMINI_BASE_URL'];
 
     const baseHeaders: Record<string, string> = {
       ...customHeadersMap,
@@ -214,7 +215,10 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
-      const httpOptions = { headers };
+      const httpOptions = {
+        headers,
+        ...(customBaseUrlEnv && { baseUrl: customBaseUrlEnv }),
+      };
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
