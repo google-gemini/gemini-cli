@@ -62,9 +62,12 @@ gemini-debug.log
 .gemini-clipboard/
 .eslintcache
 evals/logs/
+Fix/19773-headless-policy-ignored
 
 # Generated output and declaration files
 *.txt
 !NOTICES.txt
 !LICENSE.txt
 packages/*/src/**/*.d.ts
+
+ main
