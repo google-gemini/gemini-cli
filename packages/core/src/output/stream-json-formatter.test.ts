@@ -473,6 +473,68 @@ describe('StreamJsonFormatter', () => {
 
       expect(result.duration_ms).toBe(5000);
     });
+
+    it('should include diagnostic stats when enabled', () => {
+      const metrics = createMockMetrics();
+      metrics.models['gemini-pro'] = {
+        api: { totalRequests: 2, totalErrors: 1, totalLatencyMs: 1000 },
+        tokens: {
+          input: 10,
+          prompt: 10,
+          candidates: 5,
+          total: 15,
+          cached: 0,
+          thoughts: 0,
+          tool: 0,
+        },
+        roles: {},
+      };
+      metrics.models['gemini-flash'] = {
+        api: { totalRequests: 3, totalErrors: 0, totalLatencyMs: 2000 },
+        tokens: {
+          input: 20,
+          prompt: 20,
+          candidates: 10,
+          total: 30,
+          cached: 0,
+          thoughts: 0,
+          tool: 0,
+        },
+        roles: {},
+      };
+
+      const result = formatter.convertToStreamStats(metrics, 750, {
+        includeDiagnostics: true,
+        retryCount: 0,
+      });
+
+      expect(result.api_requests).toBe(5);
+      expect(result.api_errors).toBe(1);
+      expect(result.retry_count).toBe(0);
+    });
+
+    it('should not include diagnostic stats when disabled', () => {
+      const metrics = createMockMetrics();
+      metrics.models['gemini-pro'] = {
+        api: { totalRequests: 2, totalErrors: 1, totalLatencyMs: 1000 },
+        tokens: {
+          input: 10,
+          prompt: 10,
+          candidates: 5,
+          total: 15,
+          cached: 0,
+          thoughts: 0,
+          tool: 0,
+        },
+        roles: {},
+      };
+
+      const result = formatter.convertToStreamStats(metrics, 750);
+
+      expect(result.api_requests).toBeUndefined();
+      expect(result.api_errors).toBeUndefined();
+      expect(result.retry_count).toBeUndefined();
+    });
   });
 
   describe('JSON validity', () => {

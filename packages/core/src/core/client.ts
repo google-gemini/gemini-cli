@@ -637,7 +637,11 @@ export class GeminiClient {
 
     const loopDetected = await this.loopDetector.turnStarted(signal);
     if (loopDetected) {
-      yield { type: GeminiEventType.LoopDetected };
+      const loopType = this.loopDetector.getDetectedLoopType();
+      yield {
+        type: GeminiEventType.LoopDetected,
+        value: loopType ? { loopType } : undefined,
+      };
       return turn;
     }
 
@@ -690,7 +694,11 @@ export class GeminiClient {
 
     for await (const event of resultStream) {
       if (this.loopDetector.addAndCheck(event)) {
-        yield { type: GeminiEventType.LoopDetected };
+        const loopType = this.loopDetector.getDetectedLoopType();
+        yield {
+          type: GeminiEventType.LoopDetected,
+          value: loopType ? { loopType } : undefined,
+        };
         controller.abort();
         return turn;
       }
