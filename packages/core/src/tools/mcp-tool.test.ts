@@ -54,7 +54,7 @@ describe('generateValidName', () => {
 
   it('should truncate long names', () => {
     expect(generateValidName('x'.repeat(80))).toBe(
-      'xxxxxxxxxxxxxxxxxxxxxxxxxxxx___xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
     );
   });
 
@@ -954,7 +954,7 @@ describe('MCP Tool Naming Regression Fixes', () => {
       const longName = 'a'.repeat(40) + '__' + 'b'.repeat(40);
       const result = generateValidName(longName);
       expect(result.length).toBeLessThanOrEqual(63);
-      expect(result).toMatch(/^a{28}___b{32}$/);
+      expect(result).toMatch(/^a{30}\.\.\.b{30}$/);
     });
 
     it('should handle very long names starting with a digit', () => {
@@ -994,7 +994,7 @@ describe('MCP Tool Naming Regression Fixes', () => {
 
       const qn = tool.getFullyQualifiedName();
       expect(qn.length).toBeLessThanOrEqual(63);
-      expect(qn).toContain('___');
+      expect(qn).toContain('...');
     });
 
     it('should handle server names starting with digits', () => {
