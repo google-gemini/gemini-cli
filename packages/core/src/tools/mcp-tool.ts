@@ -96,14 +96,17 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   ) {
     // Use composite format for policy checks: serverName__toolName
     // This enables server wildcards (e.g., "google-workspace__*")
-    // while still allowing specific tool rules
+    // while still allowing specific tool rules.
+    // We use the same sanitized names as the registry to ensure policy matches.
 
     super(
       params,
       messageBus,
-      `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${serverToolName}`,
+      generateValidName(
+        `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${serverToolName}`,
+      ),
       displayName,
-      serverName,
+      generateValidName(serverName),
       toolAnnotationsData,
     );
   }
@@ -273,7 +276,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     private readonly _toolAnnotations?: Record<string, unknown>,
   ) {
     super(
-      nameOverride ?? generateValidName(serverToolName),
+      generateValidName(nameOverride ?? serverToolName),
       `${serverToolName} (${serverName} MCP Server)`,
       description,
       Kind.Other,
@@ -305,7 +308,9 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
   }
 
   getFullyQualifiedName(): string {
-    return `${this.getFullyQualifiedPrefix()}${generateValidName(this.serverToolName)}`;
+    return generateValidName(
+      `${this.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${this.serverToolName}`,
+    );
   }
 
   asFullyQualifiedTool(): DiscoveredMCPTool {
@@ -482,16 +487,29 @@ function getStringifiedResultForDisplay(rawResponse: Part[]): string {
   return displayParts.join('\n');
 }
 
+/**
+ * Maximum length for a function name in the Gemini API.
+ * @see https://docs.cloud.google.com/vertex-ai/generative-ai/docs/model-reference/function-calling#functiondeclaration
+ */
+const MAX_FUNCTION_NAME_LENGTH = 64;
+
 /** Visible for testing */
 export function generateValidName(name: string) {
   // Replace invalid characters (based on 400 error message from Gemini API) with underscores
-  let validToolname = name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+  let validToolname = name.replace(/[^a-zA-Z0-9_.:-]/g, '_');
 
-  // If longer than 63 characters, replace middle with '___'
-  // (Gemini API says max length 64, but actual limit seems to be 63)
-  if (validToolname.length > 63) {
-    validToolname =
-      validToolname.slice(0, 28) + '___' + validToolname.slice(-32);
+  // Ensure it starts with a letter or underscore
+  if (/^[^a-zA-Z_]/.test(validToolname)) {
+    validToolname = `_${validToolname}`;
   }
+
+  // If longer than the API limit, replace middle with '...'
+  // Note: We use 63 instead of 64 to be safe, as some environments have off-by-one behaviors.
+  const safeLimit = MAX_FUNCTION_NAME_LENGTH - 1;
+  if (validToolname.length > safeLimit) {
+    validToolname =
+      validToolname.slice(0, 30) + '...' + validToolname.slice(-30);
+  }
+
   return validToolname;
 }

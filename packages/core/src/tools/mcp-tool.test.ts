@@ -54,7 +54,7 @@ describe('generateValidName', () => {
 
   it('should truncate long names', () => {
     expect(generateValidName('x'.repeat(80))).toBe(
-      'xxxxxxxxxxxxxxxxxxxxxxxxxxxx___xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
     );
   });
 
@@ -930,6 +930,85 @@ describe('DiscoveredMCPTool', () => {
       const invocation = tool.build(params);
       const description = invocation.getDescription();
       expect(description).toBe('{"param":"testValue","param2":"anotherOne"}');
+    });
+  });
+});
+
+describe('MCP Tool Naming Regression Fixes', () => {
+  describe('generateValidName', () => {
+    it('should replace spaces with underscores', () => {
+      expect(generateValidName('My Tool')).toBe('My_Tool');
+    });
+
+    it('should allow colons', () => {
+      expect(generateValidName('namespace:tool')).toBe('namespace:tool');
+    });
+
+    it('should ensure name starts with a letter or underscore', () => {
+      expect(generateValidName('123-tool')).toBe('_123-tool');
+      expect(generateValidName('-tool')).toBe('_-tool');
+      expect(generateValidName('.tool')).toBe('_.tool');
+    });
+
+    it('should handle very long names by truncating in the middle', () => {
+      const longName = 'a'.repeat(40) + '__' + 'b'.repeat(40);
+      const result = generateValidName(longName);
+      expect(result.length).toBeLessThanOrEqual(63);
+      expect(result).toMatch(/^a{30}\.\.\.b{30}$/);
+    });
+
+    it('should handle very long names starting with a digit', () => {
+      const longName = '1' + 'a'.repeat(80);
+      const result = generateValidName(longName);
+      expect(result.length).toBeLessThanOrEqual(63);
+      expect(result.startsWith('_1')).toBe(true);
+    });
+  });
+
+  describe('DiscoveredMCPTool qualified names', () => {
+    it('should generate a valid qualified name even with spaces in server name', () => {
+      const tool = new DiscoveredMCPTool(
+        {} as any,
+        'My Server',
+        'my-tool',
+        'desc',
+        {},
+        {} as any,
+      );
+
+      const qn = tool.getFullyQualifiedName();
+      expect(qn).toBe('My_Server__my-tool');
+    });
+
+    it('should handle long server and tool names in qualified name', () => {
+      const serverName = 'a'.repeat(40);
+      const toolName = 'b'.repeat(40);
+      const tool = new DiscoveredMCPTool(
+        {} as any,
+        serverName,
+        toolName,
+        'desc',
+        {},
+        {} as any,
+      );
+
+      const qn = tool.getFullyQualifiedName();
+      expect(qn.length).toBeLessThanOrEqual(63);
+      expect(qn).toContain('...');
+    });
+
+    it('should handle server names starting with digits', () => {
+      const tool = new DiscoveredMCPTool(
+        {} as any,
+        '123-server',
+        'tool',
+        'desc',
+        {},
+        {} as any,
+      );
+
+      const qn = tool.getFullyQualifiedName();
+      expect(qn).toBe('_123-server__tool');
     });
   });
 });
