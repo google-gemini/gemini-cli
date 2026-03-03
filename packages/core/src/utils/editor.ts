@@ -249,7 +249,7 @@ export function getDiffCommand(
     case 'antigravity':
       return { command, args: ['--wait', '--diff', oldPath, newPath] };
     case 'sublime':
-      return { command, args: ['--wait', oldPath] };
+      return { command, args: ['--wait', newPath] };
     case 'vim':
     case 'neovim':
       return {
@@ -280,22 +280,17 @@ export function getDiffCommand(
         ],
       };
     case 'emacs':
+    case 'emacsclient': {
+      const extraArgs = editor === 'emacsclient' ? ['-nw'] : [];
       return {
-        command: 'emacs',
+        command,
         args: [
+          ...extraArgs,
           '--eval',
           `(ediff ${escapeELispString(oldPath)} ${escapeELispString(newPath)})`,
         ],
       };
-    case 'emacsclient':
-      return {
-        command: 'emacsclient',
-        args: [
-          '-nw',
-          '--eval',
-          `(ediff ${escapeELispString(oldPath)} ${escapeELispString(newPath)})`,
-        ],
-      };
+    }
     case 'hx':
       return {
         command: 'hx',
