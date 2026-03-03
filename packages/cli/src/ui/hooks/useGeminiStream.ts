@@ -1308,11 +1308,9 @@ export const useGeminiStream = (
           }
         }
       }
-      if (fullAiResponseBufferRef.current.length > 0) {
-        setLastOutput?.({
-          content: fullAiResponseBufferRef.current.trim(),
-        });
-      }
+      setLastOutput?.({
+        content: fullAiResponseBufferRef.current,
+      });
 
       if (toolCallRequests.length > 0) {
         if (pendingHistoryItemRef.current) {
