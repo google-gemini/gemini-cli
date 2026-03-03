@@ -56,10 +56,10 @@ export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
   const uiActions = useUIActions();
   const settings = useSettings();
   const config = useConfig();
+  const { vimEnabled, vimMode } = useVimMode();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const { columns: terminalWidth } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
-  const { vimEnabled, vimMode } = useVimMode();
   const inlineThinkingMode = getInlineThinkingMode(settings);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
@@ -211,11 +211,17 @@ export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
     settings.merged.ui.showShortcutsHint &&
     !hideShortcutsHintForSuggestions &&
     showShortcutsHintDebounced;
+
+  const USER_HOOK_SOURCES = ['user', 'project', 'runtime'];
+  const userHooks = uiState.activeHooks.filter(
+    (h) => !h.source || USER_HOOK_SOURCES.includes(h.source),
+  );
+  const hasUserHooks =
+    userHooks.length > 0 && settings.merged.hooksConfig.notifications;
+
   const showMinimalModeBleedThrough =
     !hideUiDetailsForSuggestions && Boolean(minimalModeBleedThrough);
   const showMinimalInlineLoading = !showUiDetails && showLoadingIndicator;
-  const hasActiveHooks =
-    uiState.activeHooks.length > 0 && settings.merged.hooksConfig.notifications;
   const showMinimalBleedThroughRow =
     !showUiDetails &&
     (showMinimalModeBleedThrough ||
@@ -226,17 +232,13 @@ export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
     (showMinimalInlineLoading ||
       showMinimalBleedThroughRow ||
       showShortcutsHint ||
-      hasActiveHooks);
+      hasUserHooks);
 
   let estimatedStatusLength = 0;
-  if (
-    isExperimentalLayout &&
-    uiState.activeHooks.length > 0 &&
-    settings.merged.hooksConfig.notifications
-  ) {
+  if (isExperimentalLayout && hasUserHooks) {
     const hookLabel =
-      uiState.activeHooks.length > 1 ? 'Executing Hooks' : 'Executing Hook';
-    const hookNames = uiState.activeHooks
+      userHooks.length > 1 ? 'Executing Hooks' : 'Executing Hook';
+    const hookNames = userHooks
       .map(
         (h) =>
           h.name +
@@ -336,31 +338,22 @@ export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
 
   const renderStatusNode = () => {
     // In experimental layout, hooks take priority
-    if (
-      isExperimentalLayout &&
-      uiState.activeHooks.length > 0 &&
-      settings.merged.hooksConfig.notifications
-    ) {
-      const activeHook = uiState.activeHooks[0];
+    if (isExperimentalLayout && hasUserHooks) {
+      const activeHook = userHooks[0];
       const hookIcon = activeHook?.eventName?.startsWith('After') ? '↩' : '↪';
-
-      const USER_HOOK_SOURCES = ['user', 'project', 'runtime'];
-      const hasUserHooks = uiState.activeHooks.some(
-        (h) => !h.source || USER_HOOK_SOURCES.includes(h.source),
-      );
 
       return (
         <Box flexDirection="row" alignItems="center">
           <Box marginRight={1}>
             <GeminiRespondingSpinner
-              nonRespondingDisplay={hasUserHooks ? hookIcon : undefined}
-              isHookActive={hasUserHooks}
+              nonRespondingDisplay={hookIcon}
+              isHookActive={true}
             />
           </Box>
           <Text color={theme.text.primary} italic wrap="truncate-end">
-            <HookStatusDisplay activeHooks={uiState.activeHooks} />
+            <HookStatusDisplay activeHooks={userHooks} />
           </Text>
-          {!hasUserHooks && showWit && uiState.currentWittyPhrase && (
+          {showWit && uiState.currentWittyPhrase && (
             <Box marginLeft={1}>
               <Text color={theme.text.secondary} dimColor italic>
                 {uiState.currentWittyPhrase} :)
@@ -375,22 +368,9 @@ export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
       return (
         <LoadingIndicator
           inline
-          thought={
-            uiState.streamingState === StreamingState.WaitingForConfirmation
-              ? undefined
-              : uiState.thought
-          }
-          currentLoadingPhrase={
-            uiState.currentLoadingPhrase?.includes('Tab to focus')
-              ? uiState.currentLoadingPhrase
-              : !isExperimentalLayout && (showTips || showWit)
-                ? uiState.currentLoadingPhrase
-                : isExperimentalLayout &&
-                    uiState.streamingState === StreamingState.Responding &&
-                    !uiState.thought
-                  ? GENERIC_WORKING_LABEL
-                  : undefined
-          }
+          loadingPhrases={loadingPhrases}
+          errorVerbosity={settings.merged.ui.errorVerbosity}
+          thought={uiState.thought}
           thoughtLabel={
             !isExperimentalLayout && inlineThinkingMode === 'full'
               ? 'Thinking ...'
@@ -399,8 +379,6 @@ export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
           elapsedTime={uiState.elapsedTime}
           forceRealStatusOnly={isExperimentalLayout}
           showCancelAndTimer={!isExperimentalLayout}
-          showTips={showTips}
-          showWit={showWit}
           wittyPhrase={uiState.currentWittyPhrase}
         />
       );
@@ -437,21 +415,19 @@ export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
                   showCancelAndTimer={false}
                 />
               )}
-              {hasActiveHooks && (
+              {hasUserHooks && (
                 <Box marginLeft={showMinimalInlineLoading ? 1 : 0}>
                   <Box marginRight={1}>
                     <GeminiRespondingSpinner isHookActive={true} />
                   </Box>
                   <Text color={theme.text.primary} italic>
-                    <HookStatusDisplay activeHooks={uiState.activeHooks} />
+                    <HookStatusDisplay activeHooks={userHooks} />
                   </Text>
                 </Box>
               )}
               {showMinimalBleedThroughRow && (
                 <Box
-                  marginLeft={
-                    showMinimalInlineLoading || hasActiveHooks ? 1 : 0
-                  }
+                  marginLeft={showMinimalInlineLoading || hasUserHooks ? 1 : 0}
                 >
                   {showMinimalModeBleedThrough && minimalModeBleedThrough && (
                     <Text color={minimalModeBleedThrough.color}>
@@ -463,7 +439,7 @@ export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
                       marginLeft={
                         showMinimalInlineLoading ||
                         showMinimalModeBleedThrough ||
-                        hasActiveHooks
+                        hasUserHooks
                           ? 1
                           : 0
                       }
@@ -477,7 +453,7 @@ export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
                         showMinimalInlineLoading ||
                         showMinimalModeBleedThrough ||
                         hasMinimalStatusBleedThrough ||
-                        hasActiveHooks
+                        hasUserHooks
                           ? 1
                           : 0
                       }
@@ -506,8 +482,8 @@ export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
           <Box
             width="100%"
             flexDirection="row"
+            alignItems="center"
             justifyContent="space-between"
-            alignItems="flex-start"
           >
             <Box flexDirection="row" flexGrow={1} flexShrink={1}>
               {hasToast ? (
@@ -682,13 +658,13 @@ export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
                       showCancelAndTimer={false}
                     />
                   )}
-                  {hasActiveHooks && (
+                  {hasUserHooks && (
                     <Box marginLeft={showMinimalInlineLoading ? 1 : 0}>
                       <Box marginRight={1}>
                         <GeminiRespondingSpinner isHookActive={true} />
                       </Box>
                       <Text color={theme.text.primary} italic>
-                        <HookStatusDisplay activeHooks={uiState.activeHooks} />
+                        <HookStatusDisplay activeHooks={userHooks} />
                       </Text>
                     </Box>
                   )}
@@ -697,7 +673,7 @@ export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
                       marginLeft={
                         showMinimalInlineLoading ||
                         showMinimalModeBleedThrough ||
-                        hasActiveHooks
+                        hasUserHooks
                           ? 1
                           : 0
                       }
@@ -713,7 +689,7 @@ export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
                           marginLeft={
                             showMinimalInlineLoading ||
                             showMinimalModeBleedThrough ||
-                            hasActiveHooks
+                            hasUserHooks
                               ? 1
                               : 0
                           }
@@ -779,7 +755,7 @@ export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
                           allowPlanMode={uiState.allowPlanMode}
                         />
                       )}
-                      {!showLoadingIndicator && !hasActiveHooks && (
+                      {!showLoadingIndicator && !hasUserHooks && (
                         <>
                           {uiState.shellModeActive && (
                             <Box marginLeft={1}>
@@ -794,7 +770,7 @@ export const Composer: React.FC<ComposerProps> = ({ isFocused }) => {
                         </>
                       )}
                     </Box>
-                    {!showLoadingIndicator && !hasActiveHooks && (
+                    {!showLoadingIndicator && !hasUserHooks && (
                       <>
                         <Box marginLeft={1}>
                           <Text color={theme.text.secondary}>·</Text>
