@@ -270,6 +270,9 @@ Slash commands provide meta-level control over the CLI itself.
   one has been generated.
   - **Note:** This feature requires the `experimental.plan` setting to be
     enabled in your configuration.
+- **Sub-commands:**
+  - **`copy`**:
+    - **Description:** Copy the currently approved plan to your clipboard.
 
 ### `/policies`
 
