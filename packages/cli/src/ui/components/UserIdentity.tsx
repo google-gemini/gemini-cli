@@ -53,12 +53,14 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
       </Box>
 
       {/* Tier Name /upgrade */}
-      <Box>
-        <Text color={theme.text.primary} wrap="truncate-end">
-          {tierName ?? 'Gemini Code Assist for individuals'}
-        </Text>
-        <Text color={theme.text.secondary}> /upgrade</Text>
-      </Box>
+      {tierName && (
+        <Box>
+          <Text color={theme.text.primary} wrap="truncate-end">
+            {tierName}
+          </Text>
+          <Text color={theme.text.secondary}> /upgrade</Text>
+        </Box>
+      )}
     </Box>
   );
 };
