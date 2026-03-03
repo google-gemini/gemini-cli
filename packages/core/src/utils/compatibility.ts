@@ -11,9 +11,6 @@ import {
   isWindows10 as detectIsWindows10,
 } from './terminalEnvironment.js';
 
-// Re-export these for backward compatibility
-export { TerminalType, detectTerminalType };
-
 /**
  * Detects if the current OS is Windows 10.
  */
