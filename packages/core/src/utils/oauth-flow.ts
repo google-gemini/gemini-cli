@@ -356,34 +356,57 @@ async function parseTokenEndpointResponse(
 
   // Try to parse as JSON first, fall back to form-urlencoded
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return JSON.parse(responseText) as OAuthTokenResponse;
-  } catch {
-    // Parse form-urlencoded response
-    const tokenParams = new URLSearchParams(responseText);
-    const accessToken = tokenParams.get('access_token');
-    const tokenType = tokenParams.get('token_type') || 'Bearer';
-    const expiresIn = tokenParams.get('expires_in');
-    const refreshToken = tokenParams.get('refresh_token');
-    const scope = tokenParams.get('scope');
-
-    if (!accessToken) {
-      // Check for error in response
-      const error = tokenParams.get('error');
-      const errorDescription = tokenParams.get('error_description');
-      throw new Error(
-        `${operationName} failed: ${error || defaultErrorCode} - ${errorDescription || responseText}`,
-      );
+    const data: unknown = JSON.parse(responseText);
+    if (
+      data &&
+      typeof data === 'object' &&
+      'access_token' in data &&
+      typeof (data as Record<string, unknown>)['access_token'] === 'string'
+    ) {
+      const obj = data as Record<string, unknown>;
+      const result: OAuthTokenResponse = {
+        access_token: String(obj['access_token']),
+        token_type:
+          typeof obj['token_type'] === 'string' ? obj['token_type'] : 'Bearer',
+        expires_in:
+          typeof obj['expires_in'] === 'number' ? obj['expires_in'] : undefined,
+        refresh_token:
+          typeof obj['refresh_token'] === 'string'
+            ? obj['refresh_token']
+            : undefined,
+        scope: typeof obj['scope'] === 'string' ? obj['scope'] : undefined,
+      };
+      return result;
     }
-
-    return {
-      access_token: accessToken,
-      token_type: tokenType,
-      expires_in: expiresIn ? parseInt(expiresIn, 10) : undefined,
-      refresh_token: refreshToken || undefined,
-      scope: scope || undefined,
-    } as OAuthTokenResponse;
+    // JSON parsed but doesn't look like a token response — fall through
+  } catch {
+    // Not JSON — fall through to form-urlencoded parsing
   }
+
+  // Parse form-urlencoded response
+  const tokenParams = new URLSearchParams(responseText);
+  const accessToken = tokenParams.get('access_token');
+  const tokenType = tokenParams.get('token_type') || 'Bearer';
+  const expiresIn = tokenParams.get('expires_in');
+  const refreshToken = tokenParams.get('refresh_token');
+  const scope = tokenParams.get('scope');
+
+  if (!accessToken) {
+    // Check for error in response
+    const error = tokenParams.get('error');
+    const errorDescription = tokenParams.get('error_description');
+    throw new Error(
+      `${operationName} failed: ${error || defaultErrorCode} - ${errorDescription || responseText}`,
+    );
+  }
+
+  return {
+    access_token: accessToken,
+    token_type: tokenType,
+    expires_in: expiresIn ? parseInt(expiresIn, 10) : undefined,
+    refresh_token: refreshToken || undefined,
+    scope: scope || undefined,
+  } as OAuthTokenResponse;
 }
 
 /**
