@@ -170,7 +170,11 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'web-search': {
-      extends: 'gemini-3-flash-base',
+      // Use gemini-2.5-flash-base so the googleSearch grounding tool works on
+      // both AI Studio and Vertex AI. gemini-3-flash-preview is a preview model
+      // that requires specific project-level access on Vertex AI and is not
+      // universally available, causing "model not found" errors for many users.
+      extends: 'gemini-2.5-flash-base',
       modelConfig: {
         generateContentConfig: {
           tools: [{ googleSearch: {} }],
@@ -178,7 +182,10 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
     'web-fetch': {
-      extends: 'gemini-3-flash-base',
+      // Same rationale as web-search: use a model available across all auth
+      // providers. gemini-2.5-flash supports the urlContext tool on both
+      // AI Studio and Vertex AI.
+      extends: 'gemini-2.5-flash-base',
       modelConfig: {
         generateContentConfig: {
           tools: [{ urlContext: {} }],
@@ -187,7 +194,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     },
     // TODO(joshualitt): During cleanup, make modelConfig optional.
     'web-fetch-fallback': {
-      extends: 'gemini-3-flash-base',
+      extends: 'gemini-2.5-flash-base',
       modelConfig: {},
     },
     'loop-detection': {
