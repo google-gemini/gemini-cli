@@ -19,8 +19,7 @@ concurrency:
 
 jobs:
   build:
-    if: |-
-      ${{ !contains(github.ref_name, 'nightly') }}
+    if: "github.repository == 'google-gemini/gemini-cli' && !contains(github.ref_name, 'nightly')"
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Checkout'
@@ -39,6 +38,7 @@ jobs:
         uses: 'actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa' # ratchet:actions/upload-pages-artifact@v3
 
   deploy:
+    if: "github.repository == 'google-gemini/gemini-cli'"
     environment:
       name: 'github-pages'
       url: '${{ steps.deployment.outputs.page_url }}'

@@ -32,6 +32,7 @@ function createMockConfig(logPromptsEnabled: boolean): Config {
     getModel: () => 'gemini-1.5-flash',
     isInteractive: () => true,
     getUserEmail: () => undefined,
+    getContentGeneratorConfig: () => undefined,
   } as unknown as Config;
 }
 
