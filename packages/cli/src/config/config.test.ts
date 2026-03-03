@@ -19,6 +19,8 @@ import {
   debugLogger,
   ApprovalMode,
   type MCPServerConfig,
+  type GeminiCLIExtension,
+  Storage,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import {
@@ -2765,6 +2767,66 @@ describe('loadCliConfig approval mode', () => {
   });
 });
 
+describe('loadCliConfig gemmaModelRouter', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should have gemmaModelRouter disabled by default', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getGemmaModelRouterEnabled()).toBe(false);
+  });
+
+  it('should load gemmaModelRouter settings from merged settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      experimental: {
+        gemmaModelRouter: {
+          enabled: true,
+          classifier: {
+            host: 'http://custom:1234',
+            model: 'custom-gemma',
+          },
+        },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getGemmaModelRouterEnabled()).toBe(true);
+    const gemmaSettings = config.getGemmaModelRouterSettings();
+    expect(gemmaSettings.classifier?.host).toBe('http://custom:1234');
+    expect(gemmaSettings.classifier?.model).toBe('custom-gemma');
+  });
+
+  it('should handle partial gemmaModelRouter settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      experimental: {
+        gemmaModelRouter: {
+          enabled: true,
+        },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getGemmaModelRouterEnabled()).toBe(true);
+    const gemmaSettings = config.getGemmaModelRouterSettings();
+    expect(gemmaSettings.classifier?.host).toBe('http://localhost:9379');
+    expect(gemmaSettings.classifier?.model).toBe('gemma3-1b-gpu-custom');
+  });
+});
+
 describe('loadCliConfig fileFiltering', () => {
   const originalArgv = process.argv;
 
@@ -3463,5 +3525,102 @@ describe('loadCliConfig mcpEnabled', () => {
     expect(config.getMcpServers()).toEqual({ serverA: { url: 'http://a' } });
     expect(config.getAllowedMcpServers()).toEqual(['serverA']);
     expect(config.getBlockedMcpServers()).toEqual(['serverB']);
+  });
+
+  describe('extension plan settings', () => {
+    beforeEach(() => {
+      vi.spyOn(Storage.prototype, 'getProjectTempDir').mockReturnValue(
+        '/mock/home/user/.gemini/tmp/test-project',
+      );
+    });
+
+    it('should use plan directory from active extension when user has not specified one', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        experimental: { plan: true },
+      });
+      const argv = await parseArguments(settings);
+
+      vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
+        {
+          name: 'ext-plan',
+          isActive: true,
+          plan: { directory: 'ext-plans-dir' },
+        } as unknown as GeminiCLIExtension,
+      ]);
+
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.storage.getPlansDir()).toContain('ext-plans-dir');
+    });
+
+    it('should NOT use plan directory from active extension when user has specified one', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        experimental: { plan: true },
+        general: {
+          plan: { directory: 'user-plans-dir' },
+        },
+      });
+      const argv = await parseArguments(settings);
+
+      vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
+        {
+          name: 'ext-plan',
+          isActive: true,
+          plan: { directory: 'ext-plans-dir' },
+        } as unknown as GeminiCLIExtension,
+      ]);
+
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.storage.getPlansDir()).toContain('user-plans-dir');
+      expect(config.storage.getPlansDir()).not.toContain('ext-plans-dir');
+    });
+
+    it('should NOT use plan directory from inactive extension', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        experimental: { plan: true },
+      });
+      const argv = await parseArguments(settings);
+
+      vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
+        {
+          name: 'ext-plan',
+          isActive: false,
+          plan: { directory: 'ext-plans-dir-inactive' },
+        } as unknown as GeminiCLIExtension,
+      ]);
+
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.storage.getPlansDir()).not.toContain(
+        'ext-plans-dir-inactive',
+      );
+    });
+
+    it('should use default path if neither user nor extension settings provide a plan directory', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        experimental: { plan: true },
+      });
+      const argv = await parseArguments(settings);
+
+      // No extensions providing plan directory
+      vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      // Should return the default managed temp directory path
+      expect(config.storage.getPlansDir()).toBe(
+        path.join(
+          '/mock',
+          'home',
+          'user',
+          '.gemini',
+          'tmp',
+          'test-project',
+          'test-session',
+          'plans',
+        ),
+      );
+    });
   });
 });

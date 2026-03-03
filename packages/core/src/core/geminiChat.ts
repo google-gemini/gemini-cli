@@ -189,11 +189,16 @@ export class InvalidStreamError extends Error {
   readonly type:
     | 'NO_FINISH_REASON'
     | 'NO_RESPONSE_TEXT'
-    | 'MALFORMED_FUNCTION_CALL';
+    | 'MALFORMED_FUNCTION_CALL'
+    | 'UNEXPECTED_TOOL_CALL';
 
   constructor(
     message: string,
-    type: 'NO_FINISH_REASON' | 'NO_RESPONSE_TEXT' | 'MALFORMED_FUNCTION_CALL',
+    type:
+      | 'NO_FINISH_REASON'
+      | 'NO_RESPONSE_TEXT'
+      | 'MALFORMED_FUNCTION_CALL'
+      | 'UNEXPECTED_TOOL_CALL',
   ) {
     super(message);
     this.name = 'InvalidStreamError';
@@ -818,6 +823,7 @@ export class GeminiChat {
     const modelResponseParts: Part[] = [];
 
     let hasToolCall = false;
+    let hasThoughts = false;
     let finishReason: FinishReason | undefined;
 
     for await (const chunk of streamResponse) {
@@ -834,6 +840,7 @@ export class GeminiChat {
         if (content?.parts) {
           if (content.parts.some((part) => part.thought)) {
             // Record thoughts
+            hasThoughts = true;
             this.recordThoughtFromContent(content);
           }
           if (content.parts.some((part) => part.functionCall)) {
@@ -901,8 +908,10 @@ export class GeminiChat {
       .join('')
       .trim();
 
-    // Record model response text from the collected parts
-    if (responseText) {
+    // Record model response text from the collected parts.
+    // Also flush when there are thoughts or a tool call (even with no text)
+    // so that BeforeTool hooks always see the latest transcript state.
+    if (responseText || hasThoughts || hasToolCall) {
       this.chatRecordingService.recordMessage({
         model,
         type: 'gemini',
@@ -929,6 +938,12 @@ export class GeminiChat {
         throw new InvalidStreamError(
           'Model stream ended with malformed function call.',
           'MALFORMED_FUNCTION_CALL',
+        );
+      }
+      if (finishReason === FinishReason.UNEXPECTED_TOOL_CALL) {
+        throw new InvalidStreamError(
+          'Model stream ended with unexpected tool call.',
+          'UNEXPECTED_TOOL_CALL',
         );
       }
       if (!responseText) {
