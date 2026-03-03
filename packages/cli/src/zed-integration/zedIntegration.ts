@@ -336,11 +336,6 @@ export class GeminiAgent {
       session.sendAvailableCommands();
     }, 0);
 
-    setTimeout(() => {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      session.sendAvailableCommands();
-    }, 0);
-
     const { availableModels, currentModelId } = buildAvailableModels(
       config,
       this.settings,
