@@ -84,7 +84,7 @@ export function getDefaultValue(key: string): SettingsValue {
 
 /**
  * Get the effective default value for a setting, checking experiment values when available.
- * For settings like compressionThreshold, this will return the experiment value if set,
+ * For settings like Context Compression Threshold, this will return the experiment value if set,
  * otherwise falls back to the schema default.
  */
 export function getEffectiveDefaultValue(
@@ -289,6 +289,11 @@ export function getDisplayValue(
     valueString = option?.label ?? `${value}`;
   }
 
+  if (definition?.unit === '%' && typeof value === 'number') {
+    valueString = `${value} (${Math.round(value * 100)}%)`;
+  } else if (definition?.unit) {
+    valueString = `${valueString}${definition.unit}`;
+  }
   if (existsInScope) {
     return `${valueString}*`;
   }
