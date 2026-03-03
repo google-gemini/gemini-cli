@@ -47,6 +47,7 @@ describe('<UserIdentity />', () => {
     const output = lastFrame();
     expect(output).toContain('test@example.com');
     expect(output).toContain('/auth');
+    expect(output).not.toContain('/upgrade');
     unmount();
   });
 
@@ -74,6 +75,7 @@ describe('<UserIdentity />', () => {
     const output = lastFrame();
     expect(output).toContain('Logged in with Google');
     expect(output).toContain('/auth');
+    expect(output).not.toContain('/upgrade');
     unmount();
   });
 
@@ -130,6 +132,26 @@ describe('<UserIdentity />', () => {
     const output = lastFrame();
     expect(output).toContain(`Authenticated with ${AuthType.USE_GEMINI}`);
     expect(output).toContain('/auth');
+    expect(output).not.toContain('/upgrade');
+    unmount();
+  });
+
+  it('should render specific tier name when provided', async () => {
+    const mockConfig = makeFakeConfig();
+    vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+      model: 'gemini-pro',
+    } as unknown as ContentGeneratorConfig);
+    vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue('Enterprise Tier');
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <UserIdentity config={mockConfig} />,
+    );
+    await waitUntilReady();
+
+    const output = lastFrame();
+    expect(output).toContain('Enterprise Tier');
+    expect(output).toContain('/upgrade');
     unmount();
   });
 });
