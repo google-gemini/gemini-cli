@@ -25,6 +25,7 @@ import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -86,6 +87,33 @@ export function getAuthTypeFromEnv(): AuthType | undefined {
     return AuthType.COMPUTE_ADC;
   }
   return undefined;
+}
+
+/**
+ * Resolves the custom base URL from environment variables.
+ * Supports GOOGLE_GEMINI_BASE_URL (primary) and GEMINI_API_BASE_URL (alias).
+ * Returns undefined if neither is set or if the value is not a valid URL.
+ */
+export function resolveCustomBaseUrl(): string | undefined {
+  const rawUrl =
+    process.env['GOOGLE_GEMINI_BASE_URL'] ||
+    process.env['GEMINI_API_BASE_URL'] ||
+    undefined;
+
+  if (!rawUrl) {
+    return undefined;
+  }
+
+  try {
+    new URL(rawUrl); // Validate — throws if malformed
+    return rawUrl;
+  } catch {
+    debugLogger.warn(
+      `[gemini-cli] Invalid URL in GOOGLE_GEMINI_BASE_URL / GEMINI_API_BASE_URL: "${rawUrl}". ` +
+        `Falling back to default Gemini API endpoint.`,
+    );
+    return undefined;
+  }
 }
 
 export type ContentGeneratorConfig = {
@@ -214,7 +242,11 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
-      const httpOptions = { headers };
+      const customBaseUrl = resolveCustomBaseUrl();
+      const httpOptions = {
+        headers,
+        ...(customBaseUrl && { baseUrl: customBaseUrl }),
+      };
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
