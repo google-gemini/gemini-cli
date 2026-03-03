@@ -317,13 +317,29 @@ const CliFeatureSettingSchema = z.object({
   unmanagedCapabilitiesEnabled: z.boolean().optional(),
 });
 
-const McpServerConfigSchema = z.object({
-  url: z.string().optional(),
-  type: z.enum(['sse', 'http']).optional(),
-  trust: z.boolean().optional(),
-  includeTools: z.array(z.string()).optional(),
-  excludeTools: z.array(z.string()).optional(),
-});
+const McpServerConfigSchema = z
+  .object({
+    command: z.string().optional(),
+    args: z.array(z.string()).optional(),
+    env: z.record(z.string()).optional(),
+    cwd: z.string().optional(),
+    url: z.string().optional(),
+    httpUrl: z.string().optional(),
+    headers: z.record(z.string()).optional(),
+    tcp: z.string().optional(),
+    type: z.enum(['stdio', 'sse', 'http']).optional(),
+    timeout: z.number().optional(),
+    trust: z.boolean().optional(),
+    description: z.string().optional(),
+    includeTools: z.array(z.string()).optional(),
+    excludeTools: z.array(z.string()).optional(),
+    extension: z.any().optional(),
+    oauth: z.any().optional(),
+    authProviderType: z.string().optional(),
+    targetAudience: z.string().optional(),
+    targetServiceAccount: z.string().optional(),
+  })
+  .passthrough();
 
 export const McpConfigDefinitionSchema = z.object({
   mcpServers: z.record(McpServerConfigSchema).optional(),

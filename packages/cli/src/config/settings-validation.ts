@@ -55,9 +55,9 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
         }
         shape[key] = propSchema;
       }
-      schema = z.object(shape).passthrough();
+      schema = z.object(shape);
     } else {
-      schema = z.object({}).passthrough();
+      schema = z.object({});
     }
 
     if (def.additionalProperties === false) {
@@ -66,6 +66,8 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
       schema = schema.catchall(
         buildZodSchemaFromJsonSchema(def.additionalProperties),
       );
+    } else {
+      schema = schema.passthrough();
     }
 
     return schema;

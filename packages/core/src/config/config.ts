@@ -338,7 +338,7 @@ export class MCPServerConfig {
     // When set to 'sse', uses SSEClientTransport
     // When omitted, auto-detects transport type
     // Note: 'httpUrl' is deprecated in favor of 'url' + 'type'
-    readonly type?: 'sse' | 'http',
+    readonly type?: 'stdio' | 'sse' | 'http',
     // Common
     readonly timeout?: number,
     readonly trust?: boolean,
