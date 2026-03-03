@@ -290,21 +290,16 @@ describe('ReadFileTool', () => {
         'File size exceeds the 20MB limit',
       );
     });
-
-    it('should handle text file with lines exceeding maximum length', async () => {
+    it('should return full lines regardless of length, relying on central truncation in ToolExecutor', async () => {
       const filePath = path.join(tempRootDir, 'longlines.txt');
-      const longLine = 'a'.repeat(2500); // Exceeds MAX_LINE_LENGTH_TEXT_FILE (2000)
+      const longLine = 'a'.repeat(2500); // Exceeds DEFAULT_MAX_LINE_LENGTH (2000)
       const fileContent = `Short line\n${longLine}\nAnother short line`;
       await fsp.writeFile(filePath, fileContent, 'utf-8');
       const params: ReadFileToolParams = { file_path: filePath };
       const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain(
-        'IMPORTANT: The file content has been truncated',
-      );
-      expect(result.llmContent).toContain('--- FILE CONTENT (truncated) ---');
-      expect(result.returnDisplay).toContain('some lines were shortened');
+      expect(result.llmContent).toContain(longLine);
     });
 
     it('should handle image file and return appropriate content', async () => {

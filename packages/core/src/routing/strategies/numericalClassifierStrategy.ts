@@ -16,6 +16,7 @@ import { resolveClassifierModel, isGemini3Model } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { toParts } from '../../utils/partUtils.js';
 import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 import { LlmRole } from '../../telemetry/types.js';
 import { AuthType } from '../../core/contentGenerator.js';
@@ -152,14 +153,9 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
       const finalHistory = context.history.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
       // Wrap the user's request in tags to prevent prompt injection
-      const requestParts = Array.isArray(context.request)
-        ? context.request
-        : [context.request];
+      const requestParts = toParts(context.request);
 
       const sanitizedRequest = requestParts.map((part) => {
-        if (typeof part === 'string') {
-          return { text: part };
-        }
         if (part.text) {
           return { text: part.text };
         }

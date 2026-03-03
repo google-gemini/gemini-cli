@@ -20,6 +20,7 @@ import type {
   PartUnion,
 } from '@google/genai';
 import { truncateString } from '../utils/textUtils.js';
+import { isPart } from '../utils/partUtils.js';
 
 // 160KB limit for the total size of string content in a log entry.
 // The total log entry size limit is 256KB. We leave ~96KB (approx 37%) for JSON overhead (escaping, structure) and other fields.
@@ -129,15 +130,6 @@ export function toInputMessages(contents: Content[]): InputMessages {
   const allParts = messages.flatMap((m) => m.parts);
   limitTotalLength(allParts);
   return messages;
-}
-
-function isPart(value: unknown): value is Part {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    !('parts' in value)
-  );
 }
 
 function toPart(part: PartUnion): Part {

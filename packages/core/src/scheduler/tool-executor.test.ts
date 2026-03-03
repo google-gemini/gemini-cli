@@ -10,10 +10,15 @@ import {
   type Config,
   type ToolResult,
   type AnyToolInvocation,
+  type AnyDeclarativeTool,
 } from '../index.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
-import type { ScheduledToolCall } from './types.js';
+import type {
+  ScheduledToolCall,
+  SuccessfulToolCall,
+  ToolCall,
+} from './types.js';
 import { CoreToolCallStatus } from './types.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
@@ -28,6 +33,7 @@ import {
   GEN_AI_TOOL_DESCRIPTION,
   GEN_AI_TOOL_NAME,
 } from '../telemetry/constants.js';
+import { DEFAULT_MAX_LINE_LENGTH } from '../utils/constants.js';
 
 // Mock file utils
 vi.mock('../utils/fileUtils.js', () => ({
@@ -136,7 +142,7 @@ describe('ToolExecutor', () => {
 
     const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
     const fn = spanArgs[1];
-    const metadata = { attributes: {} };
+    const metadata = { name: 'test-span', attributes: {} };
     await fn({ metadata, endSpan: vi.fn() });
     expect(metadata).toMatchObject({
       input: scheduledCall.request,
@@ -199,7 +205,7 @@ describe('ToolExecutor', () => {
 
     const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
     const fn = spanArgs[1];
-    const metadata = { attributes: {} };
+    const metadata = { name: 'test-span', attributes: {} };
     await fn({ metadata, endSpan: vi.fn() });
     expect(metadata).toMatchObject({
       error: new Error('Tool Failed'),
@@ -527,5 +533,57 @@ describe('ToolExecutor', () => {
         pid: testPid,
       }),
     );
+  });
+
+  it('should truncate excessively long lines in multi-part tool results (subagent/MCP style)', async () => {
+    const longLine = 'a'.repeat(DEFAULT_MAX_LINE_LENGTH + 100);
+    const multiPartCall: ToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-multipart',
+        name: 'testTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: {
+        name: 'testTool',
+        description: 'desc',
+        parametersJsonSchema: {},
+        isReadOnly: true,
+      } as unknown as AnyDeclarativeTool,
+      invocation: {
+        execute: vi.fn(),
+      } as unknown as AnyToolInvocation,
+    };
+
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValueOnce({
+      llmContent: [
+        { text: 'short line' },
+        { text: `prefix ${longLine} suffix` },
+      ],
+      returnDisplay: 'done',
+    });
+
+    const result = await executor.execute({
+      call: multiPartCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(result.status).toBe(CoreToolCallStatus.Success);
+    const response = (result as SuccessfulToolCall).response;
+    expect(response.responseParts).toHaveLength(1);
+    const firstPart = response.responseParts[0];
+    const functionResponse =
+      'functionResponse' in firstPart ? firstPart.functionResponse : undefined;
+    if (!functionResponse) {
+      throw new Error('Expected functionResponse part');
+    }
+    const outputText = (functionResponse.response as { output: string }).output;
+
+    expect(outputText).toContain('short line');
+    expect(outputText).toContain('[Truncated');
+    expect(outputText.length).toBeLessThan(longLine.length + 100);
   });
 });

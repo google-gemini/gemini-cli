@@ -10,7 +10,14 @@ import type {
   FunctionCall,
   PartListUnion,
 } from '@google/genai';
-import { getResponseText } from './partUtils.js';
+import {
+  isTextPart,
+  isInlineDataPart,
+  isFileDataPart,
+  isFunctionResponsePart,
+  getResponseText,
+  toParts,
+} from './partUtils.js';
 import { supportsMultimodalFunctionResponse } from '../config/models.js';
 import { debugLogger } from './debugLogger.js';
 
@@ -31,18 +38,6 @@ function createFunctionResponsePart(
   };
 }
 
-function toParts(input: PartListUnion): Part[] {
-  const parts: Part[] = [];
-  for (const part of Array.isArray(input) ? input : [input]) {
-    if (typeof part === 'string') {
-      parts.push({ text: part });
-    } else if (part) {
-      parts.push(part);
-    }
-  }
-  return parts;
-}
-
 export function convertToFunctionResponse(
   toolName: string,
   callId: string,
@@ -61,13 +56,13 @@ export function convertToFunctionResponse(
   const fileDataParts: Part[] = [];
 
   for (const part of parts) {
-    if (part.text !== undefined) {
+    if (isTextPart(part)) {
       textParts.push(part.text);
-    } else if (part.inlineData) {
+    } else if (isInlineDataPart(part)) {
       inlineDataParts.push(part);
-    } else if (part.fileData) {
+    } else if (isFileDataPart(part)) {
       fileDataParts.push(part);
-    } else if (part.functionResponse) {
+    } else if (isFunctionResponsePart(part)) {
       if (parts.length > 1) {
         debugLogger.warn(
           'convertToFunctionResponse received multiple parts with a functionResponse. Only the functionResponse will be used, other parts will be ignored',

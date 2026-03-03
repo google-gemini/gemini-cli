@@ -155,7 +155,9 @@ export function truncateLongLines(
   includeStats = true,
 ): string {
   if (!text) return text;
-  const lines = text.split('\n');
+
+  const lineEnding = detectLineEnding(text);
+  const lines = text.split(/\r?\n/);
   let modified = false;
 
   const processed = lines.map((line) => {
@@ -166,7 +168,7 @@ export function truncateLongLines(
     return line;
   });
 
-  return modified ? processed.join('\n') : text;
+  return modified ? processed.join(lineEnding) : text;
 }
 
 /**

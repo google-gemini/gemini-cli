@@ -15,11 +15,7 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
-import {
-  DEFAULT_MAX_LINES_TEXT_FILE,
-  MAX_LINE_LENGTH_TEXT_FILE,
-  MAX_FILE_SIZE_MB,
-} from './constants.js';
+import { DEFAULT_MAX_LINES_TEXT_FILE, MAX_FILE_SIZE_MB } from './constants.js';
 
 const requireModule = createModuleRequire(import.meta.url);
 
@@ -495,22 +491,8 @@ export async function processSingleFileContent(
         const actualStart = Math.min(sliceStart, originalLineCount);
         const selectedLines = lines.slice(actualStart, sliceEnd);
 
-        let linesWereTruncatedInLength = false;
-        const formattedLines = selectedLines.map((line) => {
-          if (line.length > MAX_LINE_LENGTH_TEXT_FILE) {
-            linesWereTruncatedInLength = true;
-            return (
-              line.substring(0, MAX_LINE_LENGTH_TEXT_FILE) + '... [truncated]'
-            );
-          }
-          return line;
-        });
-
-        const isTruncated =
-          actualStart > 0 ||
-          sliceEnd < originalLineCount ||
-          linesWereTruncatedInLength;
-        const llmContent = formattedLines.join('\n');
+        const isTruncated = actualStart > 0 || sliceEnd < originalLineCount;
+        const llmContent = selectedLines.join('\n');
 
         // By default, return nothing to streamline the common case of a successful read_file.
         let returnDisplay = '';
@@ -518,11 +500,6 @@ export async function processSingleFileContent(
           returnDisplay = `Read lines ${
             actualStart + 1
           }-${sliceEnd} of ${originalLineCount} from ${relativePathForDisplay}`;
-          if (linesWereTruncatedInLength) {
-            returnDisplay += ' (some lines were shortened)';
-          }
-        } else if (linesWereTruncatedInLength) {
-          returnDisplay = `Read all ${originalLineCount} lines from ${relativePathForDisplay} (some lines were shortened)`;
         }
 
         return {

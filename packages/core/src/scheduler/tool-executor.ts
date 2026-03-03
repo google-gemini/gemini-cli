@@ -16,7 +16,6 @@ import { ToolOutputTruncatedEvent } from '../telemetry/types.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { truncateLongLines } from '../utils/textUtils.js';
 import { DEFAULT_MAX_LINE_LENGTH } from '../utils/constants.js';
-import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
@@ -24,6 +23,7 @@ import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
 } from '../utils/fileUtils.js';
+import { isTextPart } from '../utils/partUtils.js';
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
 import type {
   CompletedToolCall,
@@ -232,16 +232,12 @@ export class ToolExecutor {
     call: ToolCall,
     toolResult: ToolResult,
   ): Promise<SuccessfulToolCall> {
-    let content = toolResult.llmContent;
-    let outputFile: string | undefined;
     const toolName = call.request.originalRequestName || call.request.name;
     const callId = call.request.callId;
+    let content = toolResult.llmContent;
+    let outputFile: string | undefined;
 
     if (typeof content === 'string') {
-      content = truncateLongLines(content, DEFAULT_MAX_LINE_LENGTH);
-    }
-
-    if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
       const threshold = this.config.getTruncateToolOutputThreshold();
 
       if (threshold > 0 && content.length > threshold) {
@@ -273,7 +269,7 @@ export class ToolExecutor {
       call.tool instanceof DiscoveredMCPTool
     ) {
       const firstPart = content[0];
-      if (typeof firstPart === 'object' && typeof firstPart.text === 'string') {
+      if (isTextPart(firstPart)) {
         const textContent = firstPart.text;
         const threshold = this.config.getTruncateToolOutputThreshold();
 
@@ -306,6 +302,43 @@ export class ToolExecutor {
         }
       }
     }
+
+    // Final safety pass: truncate excessively long lines in every tool result (including subagents and MCP tools).
+    // This acts as a universal guardrail to prevent token-limit errors.
+    /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
+    if (typeof content === 'string') {
+      content = truncateLongLines(content, DEFAULT_MAX_LINE_LENGTH);
+    } else if (Array.isArray(content)) {
+      content = Array.from(content as unknown[]).map((part: any) => {
+        if (typeof part?.text === 'string') {
+          return {
+            ...part,
+            text: truncateLongLines(part.text, DEFAULT_MAX_LINE_LENGTH),
+          };
+        }
+        if (typeof part?.thought === 'string') {
+          return {
+            ...part,
+            thought: truncateLongLines(part.thought, DEFAULT_MAX_LINE_LENGTH),
+          };
+        }
+        return part;
+      });
+    } else {
+      const p: any = content;
+      if (typeof p?.text === 'string') {
+        content = {
+          ...p,
+          text: truncateLongLines(p.text, DEFAULT_MAX_LINE_LENGTH),
+        };
+      } else if (typeof p?.thought === 'string') {
+        content = {
+          ...p,
+          thought: truncateLongLines(p.thought, DEFAULT_MAX_LINE_LENGTH),
+        };
+      }
+    }
+    /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
 
     const response = convertToFunctionResponse(
       toolName,
