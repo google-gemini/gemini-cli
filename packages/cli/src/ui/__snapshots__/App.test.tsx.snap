@@ -38,6 +38,7 @@ Tips for getting started:
 
 
 
+
 Notifications
 Composer
 "
@@ -100,6 +101,7 @@ exports[`App > Snapshots > renders with dialogs visible 1`] = `
 
 
 
+
 Notifications
 DialogManager
 "
@@ -128,10 +130,11 @@ HistoryItemDisplay
 │ Allow execution of: 'ls'?                                                                        │
 │                                                                                                  │
 │ ● 1. Allow once                                                                                  │
-│   2. Allow for this session                                                                      │
+│   2. Allow for this session   Enter to select · ↑/↓ to navigate · Esc to cancel                  │
 │   3. No, suggest changes (esc)                                                                   │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+
 
 
 

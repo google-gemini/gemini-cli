@@ -18,3 +18,5 @@ export const REDIRECTION_WARNING_NOTE_TEXT =
 export const REDIRECTION_WARNING_TIP_LABEL = 'Tip:  '; // Padded to align with "Note: "
 export const REDIRECTION_WARNING_TIP_TEXT =
   'Toggle auto-edit (Shift+Tab) to allow redirection in the future.';
+
+export const GENERIC_WORKING_LABEL = 'Working...';

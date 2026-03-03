@@ -62,7 +62,12 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
 
   return (
-    <Box flexDirection="column" key={itemForDisplay.id} width={terminalWidth}>
+    <Box
+      flexDirection="column"
+      key={itemForDisplay.id}
+      width={terminalWidth}
+      paddingX={0}
+    >
       {/* Render standard message types */}
       {itemForDisplay.type === 'thinking' && inlineThinkingMode !== 'off' && (
         <ThinkingMessage thought={itemForDisplay.thought} />

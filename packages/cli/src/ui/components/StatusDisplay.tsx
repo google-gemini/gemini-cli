@@ -28,7 +28,14 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     return <Text color={theme.status.error}>|⌐■_■|</Text>;
   }
 
+  // In legacy layout, we show hooks here.
+  // In experimental layout, hooks are shown in the top row of the composer,
+  // but we still show them here if they are "system" hooks or if notifications are enabled.
+  const isLegacyLayout =
+    (settings.merged.ui as Record<string, unknown>)['useLegacyLayout'] === true;
+
   if (
+    isLegacyLayout &&
     uiState.activeHooks.length > 0 &&
     settings.merged.hooksConfig.notifications
   ) {

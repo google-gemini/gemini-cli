@@ -40,6 +40,7 @@ import {
 import { AskUserDialog } from '../AskUserDialog.js';
 import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
 import { WarningMessage } from './WarningMessage.js';
+import { DialogFooter } from '../shared/DialogFooter.js';
 import {
   getDeceptiveUrlDetails,
   toUnicodeUrl,
@@ -603,17 +604,8 @@ export const ToolConfirmationMessage: React.FC<
           {hasMcpToolDetails && (
             <Box flexDirection="column" marginTop={1}>
               <Text color={theme.text.primary}>MCP Tool Details:</Text>
-              {isMcpToolDetailsExpanded ? (
-                <>
-                  <Text color={theme.text.secondary}>
-                    (press {expandDetailsHintKey} to collapse MCP tool details)
-                  </Text>
-                  <Text color={theme.text.link}>{mcpToolDetailsText}</Text>
-                </>
-              ) : (
-                <Text color={theme.text.secondary}>
-                  (press {expandDetailsHintKey} to expand MCP tool details)
-                </Text>
+              {isMcpToolDetailsExpanded && (
+                <Text color={theme.text.link}>{mcpToolDetailsText}</Text>
               )}
             </Box>
           )}
@@ -632,7 +624,6 @@ export const ToolConfirmationMessage: React.FC<
     isMcpToolDetailsExpanded,
     hasMcpToolDetails,
     mcpToolDetailsText,
-    expandDetailsHintKey,
     getPreferredEditor,
   ]);
 
@@ -697,6 +688,17 @@ export const ToolConfirmationMessage: React.FC<
               items={options}
               onSelect={handleSelect}
               isFocused={isFocused}
+            />
+            <DialogFooter
+              primaryAction="Enter to select"
+              navigationActions="↑/↓ to navigate"
+              extraParts={
+                hasMcpToolDetails
+                  ? [
+                      `${expandDetailsHintKey} to ${isMcpToolDetailsExpanded ? 'collapse' : 'expand'} details`,
+                    ]
+                  : []
+              }
             />
           </Box>
         </>

@@ -174,6 +174,8 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     isFocused: true,
     thought: '',
     currentLoadingPhrase: '',
+    currentTip: '',
+    currentWittyPhrase: '',
     elapsedTime: 0,
     ctrlCPressedOnce: false,
     ctrlDPressedOnce: false,
@@ -248,7 +250,7 @@ const createMockConfig = (overrides = {}): Config =>
 
 const renderComposer = async (
   uiState: UIState,
-  settings = createMockSettings(),
+  settings = createMockSettings({ ui: { useLegacyLayout: true } }),
   config = createMockConfig(),
   uiActions = createMockUIActions(),
 ) => {
@@ -257,7 +259,7 @@ const renderComposer = async (
       <SettingsContext.Provider value={settings as unknown as LoadedSettings}>
         <UIStateContext.Provider value={uiState}>
           <UIActionsContext.Provider value={uiActions}>
-            <Composer />
+            <Composer isFocused={true} />
           </UIActionsContext.Provider>
         </UIStateContext.Provider>
       </SettingsContext.Provider>
@@ -379,7 +381,7 @@ describe('Composer', () => {
         },
       });
       const settings = createMockSettings({
-        ui: { inlineThinkingMode: 'full' },
+        ui: { inlineThinkingMode: 'full', useLegacyLayout: true },
       });
 
       const { lastFrame } = await renderComposer(uiState, settings);
@@ -402,13 +404,13 @@ describe('Composer', () => {
       expect(output).not.toContain('ShortcutsHint');
     });
 
-    it('renders LoadingIndicator with thought when loadingPhrases is off', async () => {
+    it('renders LoadingIndicator with thought when loadingPhraseLayout is none', async () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         thought: { subject: 'Hidden', description: 'Should not show' },
       });
       const settings = createMockSettings({
-        merged: { ui: { loadingPhrases: 'off' } },
+        merged: { ui: { loadingPhraseLayout: 'none', useLegacyLayout: true } },
       });
 
       const { lastFrame } = await renderComposer(uiState, settings);
@@ -455,9 +457,8 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
-      const output = lastFrame();
-      expect(output).not.toContain('LoadingIndicator');
-      expect(output).not.toContain('esc to cancel');
+      const output = lastFrame({ allowEmpty: true });
+      expect(output).toBe('');
     });
 
     it('renders LoadingIndicator when embedded shell is focused but background shell is visible', async () => {
@@ -562,7 +563,7 @@ describe('Composer', () => {
       const output = lastFrame();
       expect(output).toContain('ToastDisplay');
       expect(output).not.toContain('ApprovalModeIndicator');
-      expect(output).toContain('StatusDisplay');
+      expect(output).not.toContain('StatusDisplay');
     });
 
     it('shows ToastDisplay for other toast types', async () => {
@@ -586,15 +587,16 @@ describe('Composer', () => {
       const uiState = createMockUIState({
         cleanUiDetailsVisible: false,
       });
+      const settings = createMockSettings({
+        ui: { useLegacyLayout: true, showShortcutsHint: false },
+      });
 
-      const { lastFrame } = await renderComposer(uiState);
+      const { lastFrame } = await renderComposer(uiState, settings);
 
       const output = lastFrame();
-      expect(output).toContain('ShortcutsHint');
+      expect(output).not.toContain('ShortcutsHint');
       expect(output).toContain('InputPrompt');
       expect(output).not.toContain('Footer');
-      expect(output).not.toContain('ApprovalModeIndicator');
-      expect(output).not.toContain('ContextSummaryDisplay');
     });
 
     it('renders InputPrompt when input is active', async () => {
@@ -710,9 +712,7 @@ describe('Composer', () => {
       });
 
       const { lastFrame } = await renderComposer(uiState);
-      const output = lastFrame();
-      expect(output).not.toContain('plan');
-      expect(output).not.toContain('ShortcutsHint');
+      expect(lastFrame({ allowEmpty: true })).toBe('');
     });
 
     it('shows Esc rewind prompt in minimal mode without showing full UI', async () => {
@@ -745,6 +745,7 @@ describe('Composer', () => {
       const settings = createMockSettings({
         ui: {
           footer: { hideContextPercentage: false },
+          useLegacyLayout: true,
         },
       });
 
@@ -821,12 +822,16 @@ describe('Composer', () => {
 
   describe('Shortcuts Hint', () => {
     it('restores shortcuts hint after 200ms debounce when buffer is empty', async () => {
-      const { lastFrame } = await renderComposer(
-        createMockUIState({
-          buffer: { text: '' } as unknown as TextBuffer,
-          cleanUiDetailsVisible: false,
-        }),
-      );
+      const uiState = createMockUIState({
+        buffer: { text: '' } as unknown as TextBuffer,
+        cleanUiDetailsVisible: false,
+      });
+
+      const { lastFrame } = await renderComposer(uiState);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
 
       expect(lastFrame({ allowEmpty: true })).toContain('ShortcutsHint');
     });
@@ -847,6 +852,7 @@ describe('Composer', () => {
       const settings = createMockSettings({
         ui: {
           showShortcutsHint: false,
+          useLegacyLayout: true,
         },
       });
 
@@ -865,9 +871,10 @@ describe('Composer', () => {
         ),
       });
 
-      const { lastFrame } = await renderComposer(uiState);
+      const { lastFrame, unmount } = await renderComposer(uiState);
 
-      expect(lastFrame()).not.toContain('ShortcutsHint');
+      expect(lastFrame({ allowEmpty: true })).toBe('');
+      unmount();
     });
 
     it('keeps shortcuts hint visible when no action is required', async () => {
@@ -876,6 +883,10 @@ describe('Composer', () => {
       });
 
       const { lastFrame } = await renderComposer(uiState);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
 
       expect(lastFrame()).toContain('ShortcutsHint');
     });
@@ -886,6 +897,10 @@ describe('Composer', () => {
       });
 
       const { lastFrame } = await renderComposer(uiState);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
 
       expect(lastFrame()).toContain('ShortcutsHint');
     });
@@ -898,6 +913,12 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+
+      // In experimental layout, status row is visible during loading
+      expect(lastFrame()).toContain('LoadingIndicator');
       expect(lastFrame()).not.toContain('ShortcutsHint');
     });
 
@@ -908,6 +929,7 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
+      // In experimental layout, shortcuts hint is hidden when text is present
       expect(lastFrame()).not.toContain('ShortcutsHint');
     });
 
@@ -920,6 +942,12 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+
+      // In experimental layout, status row is visible in clean mode while busy
+      expect(lastFrame()).toContain('LoadingIndicator');
       expect(lastFrame()).not.toContain('ShortcutsHint');
     });
 
@@ -973,6 +1001,10 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+
       expect(lastFrame()).toContain('ShortcutsHint');
     });
   });
@@ -1001,24 +1033,22 @@ describe('Composer', () => {
       expect(lastFrame()).not.toContain('ShortcutsHelp');
       unmount();
     });
-
     it('hides shortcuts help when action is required', async () => {
       const uiState = createMockUIState({
         shortcutsHelpVisible: true,
         customDialog: (
           <Box>
-            <Text>Dialog content</Text>
+            <Text>Test Dialog</Text>
           </Box>
         ),
       });
 
       const { lastFrame, unmount } = await renderComposer(uiState);
 
-      expect(lastFrame()).not.toContain('ShortcutsHelp');
+      expect(lastFrame({ allowEmpty: true })).toBe('');
       unmount();
     });
   });
-
   describe('Snapshots', () => {
     it('matches snapshot in idle state', async () => {
       const uiState = createMockUIState();

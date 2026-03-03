@@ -15,29 +15,45 @@ import { formatDuration } from '../utils/formatters.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
+import { GENERIC_WORKING_LABEL } from '../textConstants.js';
 
 interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
+  wittyPhrase?: string;
+  showWit?: boolean;
+  showTips?: boolean;
+  loadingPhrases?: 'tips' | 'witty' | 'all' | 'off';
+  errorVerbosity?: 'low' | 'full';
   elapsedTime: number;
   inline?: boolean;
   rightContent?: React.ReactNode;
   thought?: ThoughtSummary | null;
   thoughtLabel?: string;
   showCancelAndTimer?: boolean;
+  forceRealStatusOnly?: boolean;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   currentLoadingPhrase,
+  wittyPhrase,
+  showWit: showWitProp,
+  showTips: _showTipsProp,
+  loadingPhrases = 'all',
+  errorVerbosity: _errorVerbosity = 'full',
   elapsedTime,
   inline = false,
   rightContent,
   thought,
   thoughtLabel,
   showCancelAndTimer = true,
+  forceRealStatusOnly = false,
 }) => {
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
+
+  const showWit =
+    showWitProp ?? (loadingPhrases === 'witty' || loadingPhrases === 'all');
 
   if (
     streamingState === StreamingState.Idle &&
@@ -54,17 +70,29 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       ? currentLoadingPhrase
       : thought?.subject
         ? (thoughtLabel ?? thought.subject)
-        : currentLoadingPhrase;
-  const hasThoughtIndicator =
-    currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
-    Boolean(thought?.subject?.trim());
-  const thinkingIndicator = hasThoughtIndicator ? '💬 ' : '';
+        : currentLoadingPhrase ||
+          (streamingState === StreamingState.Responding
+            ? GENERIC_WORKING_LABEL
+            : undefined);
+  const thinkingIndicator = '';
 
   const cancelAndTimerContent =
     showCancelAndTimer &&
     streamingState !== StreamingState.WaitingForConfirmation
-      ? `(esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)})`
+      ? `esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)}`
       : null;
+
+  const wittyPhraseNode =
+    !forceRealStatusOnly &&
+    showWit &&
+    wittyPhrase &&
+    primaryText === GENERIC_WORKING_LABEL ? (
+      <Box marginLeft={1}>
+        <Text color={theme.text.secondary} dimColor italic>
+          {wittyPhrase} :)
+        </Text>
+      </Box>
+    ) : null;
 
   if (inline) {
     return (
@@ -84,6 +112,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
             {primaryText}
           </Text>
         )}
+        {wittyPhraseNode}
         {cancelAndTimerContent && (
           <>
             <Box flexShrink={0} width={1} />
@@ -118,6 +147,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
               {primaryText}
             </Text>
           )}
+          {wittyPhraseNode}
           {!isNarrow && cancelAndTimerContent && (
             <>
               <Box flexShrink={0} width={1} />
