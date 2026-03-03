@@ -143,30 +143,33 @@ export class TrackerService {
     const isClosing = updates.status === TaskStatus.CLOSED;
     const changingDependencies = updates.dependencies !== undefined;
 
-    let task: TrackerTask | null | undefined;
-    let updatedTask: TrackerTask;
+    let taskMap: Map<string, TrackerTask> | undefined;
 
     if (isClosing || changingDependencies) {
       const allTasks = await this.listTasks();
-      const taskMap = new Map<string, TrackerTask>(
-        allTasks.map((t) => [t.id, t]),
-      );
-      task = taskMap.get(id);
+      taskMap = new Map<string, TrackerTask>(allTasks.map((t) => [t.id, t]));
+    }
 
-      if (!task) {
-        throw new Error(`Task with ID ${id} not found.`);
+    const task = taskMap ? taskMap.get(id) : await this.getTask(id);
+
+    if (!task) {
+      throw new Error(`Task with ID ${id} not found.`);
+    }
+
+    const updatedTask = { ...task, ...updates, id: task.id };
+
+    if (updatedTask.parentId) {
+      const parentExists = taskMap
+        ? taskMap.has(updatedTask.parentId)
+        : !!(await this.getTask(updatedTask.parentId));
+      if (!parentExists) {
+        throw new Error(
+          `Parent task with ID ${updatedTask.parentId} not found.`,
+        );
       }
+    }
 
-      updatedTask = { ...task, ...updates, id: task.id };
-
-      if (updatedTask.parentId) {
-        if (!taskMap.has(updatedTask.parentId)) {
-          throw new Error(
-            `Parent task with ID ${updatedTask.parentId} not found.`,
-          );
-        }
-      }
-
+    if (taskMap) {
       if (isClosing && task.status !== TaskStatus.CLOSED) {
         this.validateCanClose(updatedTask, taskMap);
       }
@@ -174,21 +177,6 @@ export class TrackerService {
       if (changingDependencies) {
         taskMap.set(updatedTask.id, updatedTask);
         this.validateNoCircularDependencies(updatedTask, taskMap);
-      }
-    } else {
-      task = await this.getTask(id);
-      if (!task) {
-        throw new Error(`Task with ID ${id} not found.`);
-      }
-      updatedTask = { ...task, ...updates, id: task.id };
-
-      if (updatedTask.parentId) {
-        const parentTask = await this.getTask(updatedTask.parentId);
-        if (!parentTask) {
-          throw new Error(
-            `Parent task with ID ${updatedTask.parentId} not found.`,
-          );
-        }
       }
     }
 
