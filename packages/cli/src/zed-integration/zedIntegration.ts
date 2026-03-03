@@ -39,6 +39,16 @@ import {
   ApprovalMode,
   getVersion,
   convertSessionToClientHistory,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  getDisplayString,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -243,13 +253,15 @@ export class GeminiAgent {
     const session = new Session(sessionId, chat, config, this.connection);
     this.sessions.set(sessionId, session);
 
-    return {
+    const response = {
       sessionId,
       modes: {
         availableModes: buildAvailableModes(config.isPlanEnabled()),
         currentModeId: config.getApprovalMode(),
       },
+      models: buildAvailableModels(config, loadedSettings),
     };
+    return response;
   }
 
   async loadSession({
@@ -298,12 +310,14 @@ export class GeminiAgent {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     session.streamHistory(sessionData.messages);
 
-    return {
+    const response = {
       modes: {
         availableModes: buildAvailableModes(config.isPlanEnabled()),
         currentModeId: config.getApprovalMode(),
       },
+      models: buildAvailableModels(config, this.settings),
     };
+    return response;
   }
 
   private async initializeSessionConfig(
@@ -414,6 +428,16 @@ export class GeminiAgent {
     }
     return session.setMode(params.modeId);
   }
+
+  async unstable_setSessionModel(
+    params: acp.SetSessionModelRequest,
+  ): Promise<acp.SetSessionModelResponse> {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${params.sessionId}`); 
+    }
+    return session.setModel(params.modelId);
+  }
 }
 
 export class Session {
@@ -443,6 +467,11 @@ export class Session {
     }
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     this.config.setApprovalMode(mode.id as ApprovalMode);
+    return {};
+  }
+
+  setModel(modelId: acp.ModelId): acp.SetSessionModelResponse {
+    this.config.setModel(modelId);
     return {};
   }
 
@@ -1376,4 +1405,86 @@ function buildAvailableModes(isPlanEnabled: boolean): acp.SessionMode[] {
   }
 
   return modes;
+}
+
+function buildAvailableModels(
+  config: Config,
+  settings: LoadedSettings,
+): { availableModels: { modelId: string; name: string; description?: string }[]; currentModelId: string } {
+  const preferredModel = config.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
+  const shouldShowPreviewModels = config.getHasAccessToPreviewModel();
+  const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
+  const selectedAuthType =
+    settings.merged.security.auth.selectedType;
+  const useCustomToolModel =
+    useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
+
+  const mainOptions = [
+    {
+      value: DEFAULT_GEMINI_MODEL_AUTO,
+      title: getDisplayString(DEFAULT_GEMINI_MODEL_AUTO),
+      description:
+        'Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash',
+    },
+  ];
+
+  if (shouldShowPreviewModels) {
+    mainOptions.unshift({
+      value: PREVIEW_GEMINI_MODEL_AUTO,
+      title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
+      description: useGemini31
+        ? 'Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash'
+        : 'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
+    });
+  }
+
+  const manualOptions = [
+    {
+      value: DEFAULT_GEMINI_MODEL,
+      title: getDisplayString(DEFAULT_GEMINI_MODEL),
+    },
+    {
+      value: DEFAULT_GEMINI_FLASH_MODEL,
+      title: getDisplayString(DEFAULT_GEMINI_FLASH_MODEL),
+    },
+    {
+      value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      title: getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL),
+    },
+  ];
+
+  if (shouldShowPreviewModels) {
+    const previewProModel = useGemini31
+      ? PREVIEW_GEMINI_3_1_MODEL
+      : PREVIEW_GEMINI_MODEL;
+
+    const previewProValue = useCustomToolModel
+      ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
+      : previewProModel;
+
+    manualOptions.unshift(
+      {
+        value: previewProValue,
+        title: getDisplayString(previewProModel),
+      },
+      {
+        value: PREVIEW_GEMINI_FLASH_MODEL,
+        title: getDisplayString(PREVIEW_GEMINI_FLASH_MODEL),
+      },
+    );
+  }
+
+  const scaleOptions = (
+    options: { value: string; title: string; description?: string }[],
+  ) =>
+    options.map((o) => ({
+      modelId: o.value,
+      name: o.title,
+      description: o.description,
+    }));
+
+  return {
+    availableModels: [...scaleOptions(mainOptions), ...scaleOptions(manualOptions)],
+    currentModelId: preferredModel,
+  };
 }
