@@ -173,7 +173,11 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <ModelMessage model={itemForDisplay.model} />
       )}
       {itemForDisplay.type === 'quit' && (
-        <SessionSummaryDisplay duration={itemForDisplay.duration} />
+        <SessionSummaryDisplay
+          duration={itemForDisplay.duration}
+          wallTimeMs={itemForDisplay.wallTimeMs}
+          startupPhases={itemForDisplay.startupPhases}
+        />
       )}
       {itemForDisplay.type === 'tool_group' && (
         <ToolGroupMessage

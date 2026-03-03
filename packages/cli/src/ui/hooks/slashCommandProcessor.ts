@@ -189,6 +189,8 @@ export const useSlashCommandProcessor = (
         historyItemContent = {
           type: 'quit',
           duration: message.duration,
+          wallTimeMs: message.wallTimeMs,
+          startupPhases: message.startupPhases,
         };
       } else if (message.type === MessageType.COMPRESSION) {
         historyItemContent = {

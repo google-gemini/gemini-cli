@@ -5,6 +5,7 @@
  */
 
 import { formatDuration } from '../utils/formatters.js';
+import { startupProfiler } from '@google/gemini-cli-core';
 import { CommandKind, type SlashCommand } from './types.js';
 
 export const quitCommand: SlashCommand = {
@@ -17,6 +18,12 @@ export const quitCommand: SlashCommand = {
     const now = Date.now();
     const { sessionStartTime } = context.session.stats;
     const wallDuration = now - sessionStartTime.getTime();
+    const startupPhases = startupProfiler
+      .getLastStartupStats()
+      .map((phase) => ({
+        name: phase.name,
+        durationMs: phase.duration_ms,
+      }));
 
     return {
       type: 'quit',
@@ -29,6 +36,8 @@ export const quitCommand: SlashCommand = {
         {
           type: 'quit',
           duration: formatDuration(wallDuration),
+          wallTimeMs: wallDuration,
+          startupPhases: startupPhases.length > 0 ? startupPhases : undefined,
           id: now,
         },
       ],

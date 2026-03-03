@@ -8,6 +8,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { quitCommand } from './quitCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { formatDuration } from '../utils/formatters.js';
+import { startupProfiler } from '@google/gemini-cli-core';
 
 vi.mock('../utils/formatters.js');
 
@@ -16,11 +17,12 @@ describe('quitCommand', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-01-01T01:00:00Z'));
     vi.mocked(formatDuration).mockReturnValue('1h 0m 0s');
+    vi.spyOn(startupProfiler, 'getLastStartupStats').mockReturnValue([]);
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('returns a QuitActionReturn object with the correct messages', () => {
@@ -47,6 +49,8 @@ describe('quitCommand', () => {
         {
           type: 'quit',
           duration: '1h 0m 0s',
+          wallTimeMs: 3600000,
+          startupPhases: undefined,
           id: expect.any(Number),
         },
       ],

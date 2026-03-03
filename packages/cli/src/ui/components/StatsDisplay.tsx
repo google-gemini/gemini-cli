@@ -27,10 +27,11 @@ import {
   getDisplayString,
   isAutoModel,
   AuthType,
+  DiscoveredMCPTool,
 } from '@google/gemini-cli-core';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
-import type { QuotaStats } from '../types.js';
+import type { QuotaStats, StartupPhaseMetric } from '../types.js';
 import { QuotaStatsInfo } from './QuotaStatsInfo.js';
 
 // A more flexible and powerful StatRow component
@@ -385,8 +386,55 @@ const ModelUsageTable: React.FC<{
   );
 };
 
+interface ToolProfileSummary {
+  name: string;
+  category: string;
+  toolCall: string;
+  calls: number;
+  avgDurationMs: number;
+  totalDurationMs: number;
+  successRate: number;
+}
+
+const getPerMinuteRate = (count: number, wallTimeMs: number): number => {
+  if (wallTimeMs <= 0) {
+    return 0;
+  }
+  return count / (wallTimeMs / 60000);
+};
+
+const formatPhaseName = (phaseName: string): string =>
+  phaseName.replaceAll('_', ' ');
+
+const splitToolName = (
+  name: string,
+): { category: string; toolCall: string } => {
+  const firstDot = name.indexOf('.');
+  if (firstDot <= 0) {
+    return { category: 'core', toolCall: name };
+  }
+
+  return {
+    category: name.slice(0, firstDot),
+    toolCall: name.slice(firstDot + 1),
+  };
+};
+
+const getToolCategorization = (
+  toolName: string,
+  config: ReturnType<typeof useConfig>,
+): { category: string; toolCall: string } => {
+  const tool = config.getToolRegistry()?.getTool(toolName);
+  if (tool instanceof DiscoveredMCPTool) {
+    return { category: tool.serverName, toolCall: toolName };
+  }
+
+  return splitToolName(toolName);
+};
+
 interface StatsDisplayProps {
   duration: string;
+  wallTimeMs?: number;
   title?: string;
   quotas?: RetrieveUserQuotaResponse;
   footer?: string;
@@ -396,10 +444,13 @@ interface StatsDisplayProps {
   currentModel?: string;
   quotaStats?: QuotaStats;
   creditBalance?: number;
+  startupPhases?: StartupPhaseMetric[];
+  showPerformanceProfile?: boolean;
 }
 
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   duration,
+  wallTimeMs,
   title,
   quotas,
   footer,
@@ -409,6 +460,8 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   currentModel,
   quotaStats,
   creditBalance,
+  startupPhases,
+  showPerformanceProfile = false,
 }) => {
   const { stats } = useSessionStats();
   const { metrics } = stats;
@@ -439,6 +492,75 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
     computed.agreementRate,
     agreementThresholds,
   );
+  const effectiveWallTimeMs =
+    wallTimeMs ?? Math.max(0, Date.now() - stats.sessionStartTime.getTime());
+  const totalApiRequests = Object.values(models).reduce(
+    (acc, model) => acc + model.api.totalRequests,
+    0,
+  );
+  const promptsPerMinute = getPerMinuteRate(
+    stats.promptCount,
+    effectiveWallTimeMs,
+  );
+  const toolsPerMinute = getPerMinuteRate(
+    tools.totalCalls,
+    effectiveWallTimeMs,
+  );
+  const apiRequestsPerMinute = getPerMinuteRate(
+    totalApiRequests,
+    effectiveWallTimeMs,
+  );
+
+  const sortedStartupPhases = [...(startupPhases ?? [])]
+    .filter((phase) => phase.durationMs > 0)
+    .sort((a, b) => b.durationMs - a.durationMs);
+  const totalStartupMs = sortedStartupPhases.reduce(
+    (acc, phase) => acc + phase.durationMs,
+    0,
+  );
+  const topStartupPhases = sortedStartupPhases.slice(0, 3);
+  const slowestStartupPhase = topStartupPhases[0];
+
+  const toolProfiles: ToolProfileSummary[] = Object.entries(tools.byName)
+    .filter(([, toolStats]) => toolStats.count > 0)
+    .map(([name, toolStats]) => {
+      const { category, toolCall } = getToolCategorization(name, config);
+      return {
+        name,
+        category,
+        toolCall,
+        calls: toolStats.count,
+        avgDurationMs: toolStats.durationMs / toolStats.count,
+        totalDurationMs: toolStats.durationMs,
+        successRate: (toolStats.success / toolStats.count) * 100,
+      };
+    })
+    .sort((a, b) => {
+      const byCategory = a.category.localeCompare(b.category);
+      if (byCategory !== 0) {
+        return byCategory;
+      }
+      return b.totalDurationMs - a.totalDurationMs;
+    });
+
+  const modelPerformanceRows = Object.entries(models)
+    .filter(([, modelMetrics]) => modelMetrics.api.totalRequests > 0)
+    .map(([modelName, modelMetrics]) => {
+      const requests = modelMetrics.api.totalRequests;
+      const errors = modelMetrics.api.totalErrors;
+      const errorRate = requests > 0 ? (errors / requests) * 100 : 0;
+      const avgLatencyMs =
+        requests > 0 ? modelMetrics.api.totalLatencyMs / requests : 0;
+
+      return {
+        modelKey: modelName,
+        modelName: getDisplayString(modelName.replace('-001', '')),
+        requests,
+        errors,
+        errorRate,
+        avgLatencyMs,
+      };
+    });
 
   const renderTitle = () => {
     if (title) {
@@ -562,6 +684,160 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
           </Text>
         </SubStatRow>
       </Section>
+      {showPerformanceProfile && (
+        <Section title="Throughput">
+          <StatRow title="Prompts:">
+            <Text color={theme.text.primary}>
+              {stats.promptCount.toLocaleString()}
+            </Text>
+          </StatRow>
+          <StatRow title="API Requests:">
+            <Text color={theme.text.primary}>
+              {totalApiRequests.toLocaleString()}
+            </Text>
+          </StatRow>
+          <SubStatRow title="Prompts / min:">
+            <Text color={theme.text.primary}>
+              {promptsPerMinute.toFixed(2)}
+            </Text>
+          </SubStatRow>
+          <SubStatRow title="Tool Calls / min:">
+            <Text color={theme.text.primary}>{toolsPerMinute.toFixed(2)}</Text>
+          </SubStatRow>
+          <SubStatRow title="API Reqs / min:">
+            <Text color={theme.text.primary}>
+              {apiRequestsPerMinute.toFixed(2)}
+            </Text>
+          </SubStatRow>
+        </Section>
+      )}
+      {showPerformanceProfile && sortedStartupPhases.length > 0 && (
+        <Section title="Startup">
+          <StatRow title="Startup Total:">
+            <Text color={theme.text.primary}>
+              {formatDuration(totalStartupMs)}
+            </Text>
+          </StatRow>
+          {topStartupPhases.map((phase) => {
+            const phasePercent =
+              totalStartupMs > 0
+                ? (phase.durationMs / totalStartupMs) * 100
+                : 0;
+            return (
+              <SubStatRow
+                key={phase.name}
+                title={`${formatPhaseName(phase.name)}:`}
+              >
+                <Text color={theme.text.primary}>
+                  {formatDuration(phase.durationMs)}{' '}
+                  <Text color={theme.text.secondary}>
+                    ({phasePercent.toFixed(1)}%)
+                  </Text>
+                </Text>
+              </SubStatRow>
+            );
+          })}
+          {slowestStartupPhase && (
+            <SubStatRow title="Slowest Phase:">
+              <Text color={theme.text.primary}>
+                {formatPhaseName(slowestStartupPhase.name)}
+              </Text>
+            </SubStatRow>
+          )}
+        </Section>
+      )}
+      {showPerformanceProfile && toolProfiles.length > 0 && (
+        <Section title="Tool Profiling">
+          <Box>
+            <Box width={18}>
+              <Text bold color={theme.text.link}>
+                Category
+              </Text>
+            </Box>
+            <Box width={20}>
+              <Text bold color={theme.text.link}>
+                Tool Call
+              </Text>
+            </Box>
+            <Box width={9} justifyContent="flex-end">
+              <Text bold color={theme.text.link}>
+                Avg
+              </Text>
+            </Box>
+            <Box width={9} justifyContent="flex-end">
+              <Text bold color={theme.text.link}>
+                Total
+              </Text>
+            </Box>
+            <Box width={7} justifyContent="flex-end">
+              <Text bold color={theme.text.link}>
+                Calls
+              </Text>
+            </Box>
+            <Box width={9} justifyContent="flex-end">
+              <Text bold color={theme.text.link}>
+                Success
+              </Text>
+            </Box>
+          </Box>
+          <Box
+            borderStyle="single"
+            borderBottom={true}
+            borderTop={false}
+            borderLeft={false}
+            borderRight={false}
+            borderColor={theme.border.default}
+            width={74}
+          />
+          {toolProfiles.slice(0, 8).map((tool) => (
+            <Box key={tool.name}>
+              <Box width={18}>
+                <Text color={theme.text.link} wrap="truncate-end">
+                  {tool.category}
+                </Text>
+              </Box>
+              <Box width={20}>
+                <Text color={theme.text.primary} wrap="truncate-end">
+                  {tool.toolCall}
+                </Text>
+              </Box>
+              <Box width={9} justifyContent="flex-end">
+                <Text color={theme.text.primary}>
+                  {formatDuration(tool.avgDurationMs)}
+                </Text>
+              </Box>
+              <Box width={9} justifyContent="flex-end">
+                <Text color={theme.text.primary}>
+                  {formatDuration(tool.totalDurationMs)}
+                </Text>
+              </Box>
+              <Box width={7} justifyContent="flex-end">
+                <Text color={theme.text.primary}>
+                  {tool.calls.toLocaleString()}
+                </Text>
+              </Box>
+              <Box width={9} justifyContent="flex-end">
+                <Text color={theme.text.primary}>
+                  {tool.successRate.toFixed(1)}%
+                </Text>
+              </Box>
+            </Box>
+          ))}
+        </Section>
+      )}
+      {showPerformanceProfile && modelPerformanceRows.length > 0 && (
+        <Section title="Model API Performance">
+          {modelPerformanceRows.map((row) => (
+            <StatRow key={row.modelKey} title={`${row.modelName}:`}>
+              <Text color={theme.text.primary}>
+                {row.requests.toLocaleString()} reqs,{' '}
+                {row.errors.toLocaleString()} errs ({row.errorRate.toFixed(1)}
+                %), {formatDuration(row.avgLatencyMs)} avg
+              </Text>
+            </StatRow>
+          ))}
+        </Section>
+      )}
       <ModelUsageTable
         models={models}
         quotas={quotas}

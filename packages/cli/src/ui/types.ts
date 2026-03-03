@@ -199,6 +199,11 @@ export interface QuotaStats {
   resetTime?: string;
 }
 
+export interface StartupPhaseMetric {
+  name: string;
+  durationMs: number;
+}
+
 export type HistoryItemStats = HistoryItemQuotaBase & {
   type: 'stats';
   duration: string;
@@ -222,6 +227,8 @@ export type HistoryItemModel = HistoryItemBase & {
 export type HistoryItemQuit = HistoryItemBase & {
   type: 'quit';
   duration: string;
+  wallTimeMs?: number;
+  startupPhases?: StartupPhaseMetric[];
 };
 
 export type HistoryItemToolGroup = HistoryItemBase & {
@@ -462,6 +469,8 @@ export type Message =
       type: MessageType.QUIT;
       timestamp: Date;
       duration: string;
+      wallTimeMs?: number;
+      startupPhases?: StartupPhaseMetric[];
       content?: string;
     }
   | {

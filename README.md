@@ -128,6 +128,8 @@ npm install -g @google/gemini-cli@nightly
   information
 - Conversation checkpointing to save and resume complex sessions
 - Custom context files (GEMINI.md) to tailor behavior for your projects
+- Session shutdown performance insights, including throughput, startup timing,
+  tool profiling (grouped by MCP server), and model API performance
 
 ### GitHub Integration
 
