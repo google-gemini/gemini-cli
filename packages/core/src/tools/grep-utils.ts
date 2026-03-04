@@ -200,9 +200,10 @@ export async function formatGrepResults(
       const separator = match.isContext ? '-' : ':';
       // trimEnd to avoid double newlines if line has them, but we want to preserve indentation
       let lineContent = match.line.trimEnd();
-      if (lineContent.length > MAX_LINE_LENGTH_TEXT_FILE) {
+      const graphemes = Array.from(lineContent);
+      if (graphemes.length > MAX_LINE_LENGTH_TEXT_FILE) {
         lineContent =
-          lineContent.substring(0, MAX_LINE_LENGTH_TEXT_FILE) +
+          graphemes.slice(0, MAX_LINE_LENGTH_TEXT_FILE).join('') +
           '... [truncated]';
       }
       llmContent += `L${match.lineNumber}${separator} ${lineContent}\n`;
