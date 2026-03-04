@@ -7,7 +7,7 @@
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { ToolResultDisplay } from './ToolResultDisplay.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { AnsiOutput } from '@google/gemini-cli-core';
+import type { AnsiOutput, SubagentProgress } from '@google/gemini-cli-core';
 
 // Mock UIStateContext partially
 const mockUseUIState = vi.fn();
@@ -20,6 +20,20 @@ vi.mock('../../contexts/UIStateContext.js', async (importOriginal) => {
   };
 });
 
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    isSubagentProgress: vi.fn(
+      (obj: unknown): obj is SubagentProgress =>
+        typeof obj === 'object' &&
+        obj !== null &&
+        'isSubagentProgress' in obj &&
+        (obj as Record<string, unknown>)['isSubagentProgress'] === true,
+    ),
+  };
+});
 // Mock useAlternateBuffer
 const mockUseAlternateBuffer = vi.fn();
 vi.mock('../../hooks/useAlternateBuffer.js', () => ({

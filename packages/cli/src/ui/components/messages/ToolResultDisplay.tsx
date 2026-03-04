@@ -30,6 +30,19 @@ import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
 // outputs that will get truncated further MaxSizedBox anyway.
 const MAXIMUM_RESULT_DISPLAY_CHARACTERS = 20000;
 
+function isAnsiOutput(value: unknown): value is AnsiOutput {
+  return Array.isArray(value) && value.every(Array.isArray);
+}
+
+function isFileDiffResult(value: unknown): value is FileDiffResult {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'fileDiff' in value &&
+    'fileName' in value
+  );
+}
+
 export interface ToolResultDisplayProps {
   resultDisplay: string | object | undefined;
   availableTerminalHeight?: number;
@@ -129,22 +142,17 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   }
 
   // 2. High-performance path: Virtualized ANSI in interactive mode
-  if (isAlternateBuffer && Array.isArray(truncatedResultDisplay)) {
+  if (isAlternateBuffer && isAnsiOutput(truncatedResultDisplay)) {
     // If availableHeight is undefined, fallback to a safe default to prevents infinite loop
     // where Container grows -> List renders more -> Container grows.
     const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
-    const listHeight = Math.min(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      (truncatedResultDisplay as AnsiOutput).length,
-      limit,
-    );
+    const listHeight = Math.min(truncatedResultDisplay.length, limit);
 
     return (
       <Box width={childWidth} flexDirection="column" maxHeight={listHeight}>
         <ScrollableList
           width={childWidth}
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          data={truncatedResultDisplay as AnsiOutput}
+          data={truncatedResultDisplay}
           renderItem={renderVirtualizedAnsiLine}
           estimatedItemHeight={() => 1}
           keyExtractor={keyExtractor}
@@ -195,16 +203,11 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         {truncatedResultDisplay}
       </Text>
     );
-  } else if (
-    typeof truncatedResultDisplay === 'object' &&
-    'fileDiff' in truncatedResultDisplay
-  ) {
+  } else if (isFileDiffResult(truncatedResultDisplay)) {
     content = (
       <DiffRenderer
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        diffContent={(truncatedResultDisplay as FileDiffResult).fileDiff}
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        filename={(truncatedResultDisplay as FileDiffResult).fileName}
+        diffContent={truncatedResultDisplay.fileDiff}
+        filename={truncatedResultDisplay.fileName}
         availableTerminalHeight={availableHeight}
         terminalWidth={childWidth}
       />
@@ -213,11 +216,12 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     const shouldDisableTruncation =
       isAlternateBuffer ||
       (availableTerminalHeight === undefined && maxLines === undefined);
-
+    const data = isAnsiOutput(truncatedResultDisplay)
+      ? truncatedResultDisplay
+      : [];
     content = (
       <AnsiOutputText
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        data={truncatedResultDisplay as AnsiOutput}
+        data={data}
         availableTerminalHeight={
           isAlternateBuffer ? undefined : availableHeight
         }

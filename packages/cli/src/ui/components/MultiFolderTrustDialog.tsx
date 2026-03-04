@@ -13,6 +13,7 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { loadTrustedFolders, TrustLevel } from '../../config/trustedFolders.js';
 import { expandHomeDir } from '../utils/directoryUtils.js';
+import { toErrorMessage } from '../utils/errorUtils.js';
 import * as path from 'node:path';
 import { MessageType, type HistoryItem } from '../types.js';
 import type { Config } from '@google/gemini-cli-core';
@@ -133,9 +134,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
           workspaceContext.addDirectory(expandedPath);
           added.push(dir);
         } catch (e) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const error = e as Error;
-          errors.push(`Error adding '${dir}': ${error.message}`);
+          errors.push(`Error adding '${dir}': ${toErrorMessage(e)}`);
         }
       }
     }

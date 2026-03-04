@@ -18,6 +18,7 @@ import {
   getDirectorySuggestions,
   batchAddDirectories,
 } from '../utils/directoryUtils.js';
+import { toErrorMessage } from '../utils/errorUtils.js';
 import type { Config } from '@google/gemini-cli-core';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -49,8 +50,7 @@ async function finishAddingDirectories(
         text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join('\n- ')}`,
       });
     } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      errors.push(`Error refreshing memory: ${(error as Error).message}`);
+      errors.push(`Error refreshing memory: ${toErrorMessage(error)}`);
     }
   }
 
