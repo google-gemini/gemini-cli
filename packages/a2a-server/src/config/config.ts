@@ -275,7 +275,12 @@ async function refreshAuthentication(
           logger.error(
             `[${logPrefix}] COMPUTE_ADC fallback failed: ${adcError}`,
           );
-          throw e; // throw the original error
+          const originalMessage = e instanceof Error ? e.message : String(e);
+          const adcMessage =
+            adcError instanceof Error ? adcError.message : String(adcError);
+          throw new FatalAuthenticationError(
+            `${originalMessage}. Fallback to COMPUTE_ADC also failed: ${adcMessage}`,
+          );
         }
       } else {
         throw e;
