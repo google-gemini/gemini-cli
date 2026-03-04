@@ -28,6 +28,8 @@ import {
   type PolicyUpdateOptions,
 } from '../../tools/tools.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
+import type { Config } from '../../config/config.js';
+import { injectAutomationOverlay } from './automationOverlay.js';
 import type { BrowserManager, McpToolCallResult } from './browserManager.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
@@ -384,6 +386,7 @@ class TypeTextDeclarativeTool extends DeclarativeTool<
 export async function createMcpDeclarativeTools(
   browserManager: BrowserManager,
   messageBus: MessageBus,
+  config: Config,
 ): Promise<Array<McpDeclarativeTool | TypeTextDeclarativeTool>> {
   // Get dynamically discovered tools from the MCP server
   const mcpTools = await browserManager.getDiscoveredTools();
@@ -411,6 +414,43 @@ export async function createMcpDeclarativeTools(
 
   // Add custom composite tools
   tools.push(new TypeTextDeclarativeTool(browserManager, messageBus));
+
+  // Wrap navigation tools to re-inject overlay after page changes
+  const navigationTools = ['navigate_page', 'new_page'];
+  const browserConfig = config.getBrowserAgentConfig();
+  const shouldInjectOverlay = !browserConfig?.customConfig?.headless;
+
+  for (const tool of tools) {
+    if (navigationTools.includes(tool.name) && shouldInjectOverlay) {
+      // Wrap the original build method
+      const originalBuild = tool.build.bind(tool);
+      tool.build = function (params: Record<string, unknown>) {
+        const originalInvocation = originalBuild(params);
+        const originalExecute =
+          originalInvocation.execute.bind(originalInvocation);
+
+        originalInvocation.execute = async function (signal: AbortSignal) {
+          const result = await originalExecute(signal);
+
+          // Re-inject overlay after navigation if successful
+          if (!result.error) {
+            try {
+              await injectAutomationOverlay(browserManager, signal);
+            } catch (error) {
+              debugLogger.warn(
+                'Failed to re-inject overlay after navigation:',
+                error,
+              );
+            }
+          }
+
+          return result;
+        };
+
+        return originalInvocation;
+      };
+    }
+  }
 
   debugLogger.log(
     `Total tools registered: ${tools.length} (${mcpTools.length} MCP + 1 custom)`,

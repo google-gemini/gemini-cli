@@ -24,6 +24,7 @@ import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
 import * as path from 'node:path';
+import { removeAutomationOverlay } from './automationOverlay.js';
 
 // Pin chrome-devtools-mcp version for reproducibility.
 const CHROME_DEVTOOLS_MCP_VERSION = '0.17.1';
@@ -187,6 +188,17 @@ export class BrowserManager {
    * the transport will terminate the browser.
    */
   async close(): Promise<void> {
+    // Remove automation overlay before closing
+    if (this.rawMcpClient) {
+      try {
+        await removeAutomationOverlay(this);
+      } catch (error) {
+        debugLogger.error(
+          `Error removing automation overlay: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
     // Close MCP client first
     if (this.rawMcpClient) {
       try {

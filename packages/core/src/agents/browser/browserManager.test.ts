@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BrowserManager } from './browserManager.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
+import { removeAutomationOverlay } from './automationOverlay.js';
 
 // Mock the MCP SDK
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
@@ -42,6 +43,10 @@ vi.mock('../../utils/debugLogger.js', () => ({
   },
 }));
 
+vi.mock('./automationOverlay.js', () => ({
+  removeAutomationOverlay: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -50,6 +55,7 @@ describe('BrowserManager', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(removeAutomationOverlay).mockClear();
 
     // Setup mock config
     mockConfig = makeFakeConfig({
@@ -409,6 +415,15 @@ describe('BrowserManager', () => {
       await manager.close();
 
       expect(client.close).toHaveBeenCalled();
+    });
+
+    it('should remove automation overlay during cleanup', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.getRawMcpClient(); // Ensure connected
+
+      await manager.close();
+
+      expect(removeAutomationOverlay).toHaveBeenCalledWith(manager);
     });
   });
 });
