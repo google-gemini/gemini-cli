@@ -57,7 +57,9 @@ export const QuotaDisplay: React.FC<QuotaDisplayProps> = ({
       {terse
         ? `${usedPercentage.toFixed(0)}%`
         : `${usedPercentage.toFixed(0)}% used${
-            resetTime ? ` (Limit resets in ${formatResetTime(resetTime)})` : ''
+            resetTime
+              ? ` (Limit resets in ${formatResetTime(resetTime, true)})`
+              : ''
           }`}
     </Text>
   );

@@ -466,8 +466,8 @@ describe('<StatsDisplay />', () => {
       const output = lastFrame();
 
       expect(output).toContain('Model usage');
-      expect(output).toContain('25% used');
-      expect(output).toContain('Limit resets in');
+      expect(output).toContain('25%');
+      expect(output).toContain('Usage resets');
       expect(output).toMatchSnapshot();
 
       vi.useRealTimers();
@@ -522,7 +522,7 @@ describe('<StatsDisplay />', () => {
       const output = lastFrame();
 
       // (1 - 710/1100) * 100 = 35.5%
-      expect(output).toContain('35% used');
+      expect(output).toContain('35%');
       expect(output).toContain('Usage limit: 1,100');
       expect(output).toMatchSnapshot();
 
@@ -571,8 +571,8 @@ describe('<StatsDisplay />', () => {
 
       expect(output).toContain('gemini-2.5-flash');
       expect(output).toContain('-'); // for requests
-      expect(output).toContain('50% used');
-      expect(output).toContain('Limit resets in');
+      expect(output).toContain('50%');
+      expect(output).toContain('Usage resets');
       expect(output).toMatchSnapshot();
 
       vi.useRealTimers();

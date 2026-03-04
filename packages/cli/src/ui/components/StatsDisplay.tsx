@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useStdout } from 'ink';
 import { ThemedGradient } from './ThemedGradient.js';
 import { theme } from '../semantic-colors.js';
 import { formatDuration, formatResetTime } from '../utils/formatters.js';
@@ -158,6 +158,8 @@ const ModelUsageTable: React.FC<{
   useGemini3_1,
   useCustomToolModel,
 }) => {
+  const { stdout } = useStdout();
+  const terminalWidth = stdout?.columns ?? 84;
   const rows = buildModelRows(models, quotas, useGemini3_1, useCustomToolModel);
 
   if (rows.length === 0) {
@@ -166,15 +168,29 @@ const ModelUsageTable: React.FC<{
 
   const showQuotaColumn = !!quotas && rows.some((row) => !!row.bucket);
 
-  const nameWidth = 25;
-  const requestsWidth = 7;
+  const nameWidth = 23;
+  const requestsWidth = 5;
   const uncachedWidth = 15;
   const cachedWidth = 14;
   const outputTokensWidth = 15;
-  const usageLimitWidth = showQuotaColumn ? 85 : 0;
+  const percentageWidth = showQuotaColumn ? 6 : 0;
+  const resetWidth = 22;
 
-  const renderProgressBar = (usedFraction: number, color: string) => {
-    const totalSteps = 20;
+  // Total width of other columns (including parent box paddingX={2})
+  const fixedWidth = nameWidth + requestsWidth + percentageWidth + resetWidth;
+  const outerPadding = 4;
+  const availableForUsage = terminalWidth - outerPadding - fixedWidth;
+
+  const usageLimitWidth = showQuotaColumn
+    ? Math.max(10, Math.min(24, availableForUsage))
+    : 0;
+  const progressBarWidth = Math.max(2, usageLimitWidth - 4);
+
+  const renderProgressBar = (
+    usedFraction: number,
+    color: string,
+    totalSteps = 20,
+  ) => {
     let filledSteps = Math.round(usedFraction * totalSteps);
 
     // If something is used (fraction > 0) but rounds to 0, show 1 tick.
@@ -183,11 +199,13 @@ const ModelUsageTable: React.FC<{
       filledSteps = Math.min(Math.max(filledSteps, 1), totalSteps - 1);
     }
 
-    const emptySteps = totalSteps - filledSteps;
+    const emptySteps = Math.max(0, totalSteps - filledSteps);
     return (
-      <Box flexDirection="row">
-        <Text color={color}>{'▬'.repeat(filledSteps)}</Text>
-        <Text color={theme.border.default}>{'▬'.repeat(emptySteps)}</Text>
+      <Box flexDirection="row" flexShrink={0}>
+        <Text wrap="truncate-end">
+          <Text color={color}>{'▬'.repeat(filledSteps)}</Text>
+          <Text color={theme.border.default}>{'▬'.repeat(emptySteps)}</Text>
+        </Text>
       </Box>
     );
   };
@@ -201,27 +219,13 @@ const ModelUsageTable: React.FC<{
     nameWidth +
     requestsWidth +
     (showQuotaColumn
-      ? usageLimitWidth
+      ? usageLimitWidth + percentageWidth + resetWidth
       : uncachedWidth + cachedWidth + outputTokensWidth);
 
   const isAuto = currentModel && isAutoModel(currentModel);
-  const modelUsageTitle = isAuto ? (
-    <Text color={theme.text.primary} wrap="truncate-end">
-      <Text bold>Model Usage:</Text> {getDisplayString(currentModel)}
-    </Text>
-  ) : (
-    <Text bold color={theme.text.primary} wrap="truncate-end">
-      Model Usage
-    </Text>
-  );
 
   return (
     <Box flexDirection="column" marginBottom={1}>
-      {/* Header */}
-      <Box alignItems="flex-end">
-        <Box width={totalWidth}>{modelUsageTitle}</Box>
-      </Box>
-
       {isAuto &&
         showQuotaColumn &&
         pooledRemaining !== undefined &&
@@ -240,7 +244,7 @@ const ModelUsageTable: React.FC<{
         )}
 
       <Box alignItems="flex-end">
-        <Box width={nameWidth}>
+        <Box width={nameWidth} flexShrink={0}>
           <Text bold color={theme.text.primary}>
             Model
           </Text>
@@ -291,16 +295,31 @@ const ModelUsageTable: React.FC<{
           </>
         )}
         {showQuotaColumn && (
-          <Box
-            width={usageLimitWidth}
-            flexDirection="column"
-            alignItems="flex-start"
-            paddingLeft={4}
-          >
-            <Text bold color={theme.text.primary}>
-              Model usage
-            </Text>
-          </Box>
+          <>
+            <Box
+              width={usageLimitWidth}
+              flexDirection="column"
+              alignItems="flex-start"
+              paddingLeft={4}
+              flexShrink={0}
+            >
+              <Text bold color={theme.text.primary}>
+                Model usage
+              </Text>
+            </Box>
+            <Box width={percentageWidth} flexShrink={0} />
+            <Box
+              width={resetWidth}
+              flexDirection="column"
+              alignItems="flex-start"
+              paddingLeft={2}
+              flexShrink={0}
+            >
+              <Text bold color={theme.text.primary} wrap="truncate-end">
+                Usage resets
+              </Text>
+            </Box>
+          </>
         )}
       </Box>
 
@@ -317,7 +336,7 @@ const ModelUsageTable: React.FC<{
 
       {rows.map((row) => (
         <Box key={row.key}>
-          <Box width={nameWidth}>
+          <Box width={nameWidth} flexShrink={0}>
             <Text
               color={row.isActive ? theme.text.primary : theme.text.secondary}
               wrap="truncate-end"
@@ -377,66 +396,100 @@ const ModelUsageTable: React.FC<{
               </Box>
             </>
           )}
-          <Box
-            width={usageLimitWidth}
-            flexDirection="column"
-            alignItems="flex-start"
-            paddingLeft={4}
-          >
-            {row.bucket && row.bucket.remainingFraction != null && (
-              <Box flexDirection="row">
-                {(() => {
-                  const actualUsedFraction = 1 - row.bucket.remainingFraction;
-                  // If we have session activity but 0% server usage, show 0.1% as a hint.
-                  const effectiveUsedFraction =
-                    actualUsedFraction === 0 && row.isActive
-                      ? 0.001
-                      : actualUsedFraction;
+          {showQuotaColumn && (
+            <>
+              <Box
+                width={usageLimitWidth}
+                flexDirection="column"
+                alignItems="flex-start"
+                paddingLeft={4}
+                flexShrink={0}
+              >
+                {row.bucket && row.bucket.remainingFraction != null && (
+                  <Box flexDirection="row" flexShrink={0}>
+                    {(() => {
+                      const actualUsedFraction =
+                        1 - row.bucket.remainingFraction;
+                      const effectiveUsedFraction =
+                        actualUsedFraction === 0 && row.isActive
+                          ? 0.001
+                          : actualUsedFraction;
+                      const usedPercentage = effectiveUsedFraction * 100;
 
-                  const usedPercentage = effectiveUsedFraction * 100;
+                      const statusColor =
+                        getUsedStatusColor(usedPercentage, {
+                          warning: QUOTA_USED_WARNING_THRESHOLD,
+                          critical: QUOTA_USED_CRITICAL_THRESHOLD,
+                        }) ??
+                        (row.isActive ? theme.text.primary : theme.ui.comment);
 
-                  const statusColor =
-                    getUsedStatusColor(usedPercentage, {
-                      warning: QUOTA_USED_WARNING_THRESHOLD,
-                      critical: QUOTA_USED_CRITICAL_THRESHOLD,
-                    }) ??
-                    (row.isActive ? theme.text.primary : theme.ui.comment);
-
-                  const percentageText =
-                    usedPercentage > 0 && usedPercentage < 1
-                      ? `${usedPercentage.toFixed(1)}% used`
-                      : `${usedPercentage.toFixed(0)}% used`;
-
-                  return (
-                    <>
-                      {renderProgressBar(effectiveUsedFraction, statusColor)}
-                      <Box marginLeft={1}>
-                        <Text wrap="truncate-end">
-                          {row.bucket.remainingFraction === 0 ? (
-                            <Text color={theme.status.error}>
-                              Limit reached
-                              {row.bucket.resetTime &&
-                                `, resets in ${formatResetTime(row.bucket.resetTime, true)}`}
-                            </Text>
-                          ) : (
-                            <>
-                              <Text color={statusColor}>{percentageText}</Text>
-                              <Text color={theme.text.secondary}>
-                                {row.bucket.resetTime &&
-                                formatResetTime(row.bucket.resetTime)
-                                  ? ` (Limit resets in ${formatResetTime(row.bucket.resetTime)})`
-                                  : ''}
-                              </Text>
-                            </>
-                          )}
-                        </Text>
-                      </Box>
-                    </>
-                  );
-                })()}
+                      return renderProgressBar(
+                        effectiveUsedFraction,
+                        statusColor,
+                        progressBarWidth,
+                      );
+                    })()}
+                  </Box>
+                )}
               </Box>
-            )}
-          </Box>
+              <Box
+                width={percentageWidth}
+                flexDirection="column"
+                alignItems="flex-end"
+                flexShrink={0}
+              >
+                {row.bucket && row.bucket.remainingFraction != null && (
+                  <Box>
+                    {(() => {
+                      const actualUsedFraction =
+                        1 - row.bucket.remainingFraction;
+                      const effectiveUsedFraction =
+                        actualUsedFraction === 0 && row.isActive
+                          ? 0.001
+                          : actualUsedFraction;
+                      const usedPercentage = effectiveUsedFraction * 100;
+
+                      const statusColor =
+                        getUsedStatusColor(usedPercentage, {
+                          warning: QUOTA_USED_WARNING_THRESHOLD,
+                          critical: QUOTA_USED_CRITICAL_THRESHOLD,
+                        }) ??
+                        (row.isActive ? theme.text.primary : theme.ui.comment);
+
+                      const percentageText =
+                        usedPercentage > 0 && usedPercentage < 1
+                          ? `${usedPercentage.toFixed(1)}%`
+                          : `${usedPercentage.toFixed(0)}%`;
+
+                      return row.bucket.remainingFraction === 0 ? (
+                        <Text color={theme.status.error} wrap="truncate-end">
+                          Limit
+                        </Text>
+                      ) : (
+                        <Text color={statusColor} wrap="truncate-end">
+                          {percentageText}
+                        </Text>
+                      );
+                    })()}
+                  </Box>
+                )}
+              </Box>
+              <Box
+                width={resetWidth}
+                flexDirection="column"
+                alignItems="flex-start"
+                paddingLeft={2}
+                flexShrink={0}
+              >
+                <Text color={theme.text.secondary} wrap="truncate-end">
+                  {row.bucket?.resetTime &&
+                  formatResetTime(row.bucket.resetTime, 'column')
+                    ? formatResetTime(row.bucket.resetTime, 'column')
+                    : ''}
+                </Text>
+              </Box>
+            </>
+          )}
         </Box>
       ))}
 

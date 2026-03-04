@@ -46,7 +46,7 @@ export const QuotaStatsInfo: React.FC<QuotaStatsInfoProps> = ({
             }`
           : `${usedPercentage.toFixed(0)}% used${
               resetTime
-                ? ` (Limit resets in ${formatResetTime(resetTime)})`
+                ? ` (Limit resets in ${formatResetTime(resetTime, true)})`
                 : ''
             }`}
       </Text>

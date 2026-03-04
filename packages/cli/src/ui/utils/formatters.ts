@@ -100,7 +100,7 @@ export function stripReferenceContent(text: string): string {
 
 export const formatResetTime = (
   resetTime: string | undefined,
-  terse = false,
+  format: 'terse' | 'column' | 'full' | boolean = false,
 ): string => {
   if (!resetTime) return '';
   const resetDate = new Date(resetTime);
@@ -113,12 +113,26 @@ export const formatResetTime = (
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
 
-  if (terse) {
-    const hoursStr = hours > 0 ? `${hours}hr` : '';
+  const isTerse = format === 'terse' || format === true;
+  const isColumn = format === 'column';
+
+  if (isTerse || isColumn) {
+    const hoursStr = hours > 0 ? `${hours}h` : '';
     const minutesStr = minutes > 0 ? `${minutes}m` : '';
-    return hoursStr && minutesStr
-      ? `${hoursStr} ${minutesStr}`
-      : hoursStr || minutesStr;
+    const duration =
+      hoursStr && minutesStr
+        ? `${hoursStr} ${minutesStr}`
+        : hoursStr || minutesStr;
+
+    if (isColumn) {
+      const timeStr = new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        minute: 'numeric',
+      }).format(resetDate);
+      return duration ? `${timeStr} (${duration})` : timeStr;
+    }
+
+    return duration;
   }
 
   let duration = '';

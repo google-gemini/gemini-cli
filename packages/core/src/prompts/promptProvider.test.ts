@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PromptProvider } from './promptProvider.js';
 import type { Config } from '../config/config.js';
 import {
@@ -30,6 +30,7 @@ describe('PromptProvider', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('GEMINI_SYSTEM_MD', '');
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),
@@ -52,6 +53,10 @@ describe('PromptProvider', () => {
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn(),
     } as unknown as Config;
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('should handle multiple context filenames in the system prompt', () => {
