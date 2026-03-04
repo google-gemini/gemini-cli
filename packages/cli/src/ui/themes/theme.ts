@@ -48,59 +48,43 @@ export interface ColorsTheme {
 
 export const lightTheme: ColorsTheme = {
   type: 'light',
-  Background: '#FAFAFA',
-  Foreground: '',
-  LightBlue: '#89BDCD',
-  AccentBlue: '#3B82F6',
-  AccentPurple: '#8B5CF6',
-  AccentCyan: '#06B6D4',
-  AccentGreen: '#3CA84B',
-  AccentYellow: '#D5A40A',
-  AccentRed: '#DD4C4C',
-  DiffAdded: '#C6EAD8',
-  DiffRemoved: '#FFCCCC',
-  Comment: '#008000',
-  Gray: '#97a0b0',
-  DarkGray: interpolateColor('#FAFAFA', '#97a0b0', DEFAULT_BORDER_OPACITY),
-  InputBackground: interpolateColor(
-    '#FAFAFA',
-    '#97a0b0',
-    DEFAULT_INPUT_BACKGROUND_OPACITY,
-  ),
-  MessageBackground: interpolateColor(
-    '#FAFAFA',
-    '#97a0b0',
-    DEFAULT_BACKGROUND_OPACITY,
-  ),
+  Foreground: '#262626', // Google Gray 900
+  Background: '#FFFFFF', // White
+  LightBlue: '#0087ff', // Google Blue 600
+  AccentBlue: '#005fdf', // Google Blue 800
+  AccentPurple: '#8700ff', // Google Purple 600
+  AccentCyan: '#005faf', // Google Cyan 900
+  AccentGreen: '#008700', // Google Green 700
+  AccentYellow: '#b06000', // Google Orange 900
+  AccentRed: '#df0000', // Google Red 600
+  DiffAdded: '#d7ffd7', // Google Green 100
+  DiffRemoved: '#ffd7d7', // Google Red 100
+  Comment: '#008700', // Google Green 700
+  Gray: '#626262', // Google Gray 700
+  DarkGray: '#444444', // Google Gray 800
+  InputBackground: '#eeeeee', // Google Gray 100
+  MessageBackground: '#eeeeee', // Google Gray 100
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
 export const darkTheme: ColorsTheme = {
   type: 'dark',
-  Background: '#1E1E2E',
-  Foreground: '',
-  LightBlue: '#ADD8E6',
-  AccentBlue: '#89B4FA',
-  AccentPurple: '#CBA6F7',
-  AccentCyan: '#89DCEB',
-  AccentGreen: '#A6E3A1',
-  AccentYellow: '#F9E2AF',
-  AccentRed: '#F38BA8',
-  DiffAdded: '#28350B',
-  DiffRemoved: '#430000',
-  Comment: '#6C7086',
-  Gray: '#6C7086',
-  DarkGray: interpolateColor('#1E1E2E', '#6C7086', DEFAULT_BORDER_OPACITY),
-  InputBackground: interpolateColor(
-    '#1E1E2E',
-    '#6C7086',
-    DEFAULT_INPUT_BACKGROUND_OPACITY,
-  ),
-  MessageBackground: interpolateColor(
-    '#1E1E2E',
-    '#6C7086',
-    DEFAULT_BACKGROUND_OPACITY,
-  ),
+  Background: '#000000', // Black
+  Foreground: '#F8F9FA', // Google Gray 50
+  LightBlue: '#AECBFA', // Google Blue 200
+  AccentBlue: '#8AB4F8', // Google Blue 300
+  AccentPurple: '#C58AF9', // Google Purple 300
+  AccentCyan: '#78D9EC', // Google Cyan 300
+  AccentGreen: '#81C995', // Google Green 300
+  AccentYellow: '#FDD663', // Google Yellow 300
+  AccentRed: '#F28B82', // Google Red 300
+  DiffAdded: '#0D652D', // Google Green 900
+  DiffRemoved: '#A50E0E', // Google Red 900
+  Comment: '#DADCE0', //  Google Gray 300
+  Gray: '#DADCE0', // Google Gray 300
+  DarkGray: '#80868B', // Google Gray 600
+  InputBackground: '#202124', // Google Gray 900
+  MessageBackground: '#202124', // Google Gray 900
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
