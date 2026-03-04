@@ -108,7 +108,7 @@ export function AudioWaveform({
 
   const label = STATE_LABEL[state];
   // Reserve columns for the label so the total stays within `width`.
-  const barCount = Math.max(1, width - label.length);
+  const barCount = Math.max(0, width - label.length);
 
   let bars: number[];
   if (amplitudes && amplitudes.length > 0) {
