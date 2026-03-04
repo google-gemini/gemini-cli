@@ -9,6 +9,7 @@ import {
   Kind,
   type ToolInvocation,
   type ToolResult,
+  type ForcedToolDecision,
   BaseToolInvocation,
   type ToolCallConfirmationDetails,
   isTool,
@@ -145,12 +146,13 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
 
   override async shouldConfirmExecute(
     abortSignal: AbortSignal,
+    forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
     const invocation = this.buildSubInvocation(
       this.definition,
       this.withUserHints(this.params),
     );
-    return invocation.shouldConfirmExecute(abortSignal);
+    return invocation.shouldConfirmExecute(abortSignal, forcedDecision);
   }
 
   async execute(

@@ -451,7 +451,11 @@ export class Task {
           'Auto-approving all tool calls.',
       );
       toolCalls.forEach((tc: ToolCall) => {
-        if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
+        if (
+          tc.status === 'awaiting_approval' &&
+          tc.confirmationDetails &&
+          !tc.request.forcedAsk
+        ) {
           const details = tc.confirmationDetails;
           if (isToolCallConfirmationDetails(details)) {
             // eslint-disable-next-line @typescript-eslint/no-floating-promises

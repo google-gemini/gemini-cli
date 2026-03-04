@@ -163,7 +163,7 @@ describe('Tool Confirmation Policy Updates', () => {
 
         // Mock getMessageBusDecision to trigger ASK_USER flow
         vi.spyOn(invocation as any, 'getMessageBusDecision').mockResolvedValue(
-          'ASK_USER',
+          'ask_user',
         );
 
         const confirmation = await invocation.shouldConfirmExecute(

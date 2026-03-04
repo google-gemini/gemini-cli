@@ -11,6 +11,7 @@ import {
   BaseToolInvocation,
   Kind,
   ToolConfirmationOutcome,
+  type ForcedToolDecision,
   type ToolCallConfirmationDetails,
   type ToolInvocation,
   type ToolMcpConfirmationDetails,
@@ -192,6 +193,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
 
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
+    _forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
     const serverAllowListKey = this.serverName;
     const toolAllowListKey = `${this.serverName}.${this.serverToolName}`;

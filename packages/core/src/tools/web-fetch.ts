@@ -8,6 +8,7 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+  type ForcedToolDecision,
   type ToolCallConfirmationDetails,
   type ToolInvocation,
   type ToolResult,
@@ -293,6 +294,7 @@ ${textContent}
 
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
+    _forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
     // Check for AUTO_EDIT approval mode. This tool has a specific behavior
     // where ProceedAlways switches the entire session to AUTO_EDIT.

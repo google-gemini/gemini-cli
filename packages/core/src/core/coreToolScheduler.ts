@@ -50,6 +50,8 @@ import { ToolExecutor } from '../scheduler/tool-executor.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getPolicyDenialError } from '../scheduler/policy.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
+import { extractMcpContext } from './coreToolHookTriggers.js';
+import { BeforeToolHookOutput } from '../hooks/types.js';
 
 export type {
   ToolCall,
@@ -604,7 +606,7 @@ export class CoreToolScheduler {
       return;
     }
 
-    const toolCall = this.toolCallQueue.shift()!;
+    let toolCall = this.toolCallQueue.shift()!;
 
     // This is now the single active tool call.
     this.toolCalls = [toolCall];
@@ -620,7 +622,8 @@ export class CoreToolScheduler {
 
     // This logic is moved from the old `for` loop in `_schedule`.
     if (toolCall.status === CoreToolCallStatus.Validating) {
-      const { request: reqInfo, invocation } = toolCall;
+      const { request: reqInfo } = toolCall;
+      let { invocation } = toolCall;
 
       try {
         if (signal.aborted) {
@@ -635,6 +638,90 @@ export class CoreToolScheduler {
           return;
         }
 
+        // 1. Hook Check (BeforeTool)
+        let hookDecision: 'ask' | 'block' | undefined;
+        let hookSystemMessage: string | undefined;
+
+        const hookSystem = this.config.getHookSystem();
+        if (hookSystem) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const toolInput = (invocation.params || {}) as Record<
+            string,
+            unknown
+          >;
+          const mcpContext = extractMcpContext(invocation, this.config);
+
+          const beforeOutput = await hookSystem.fireBeforeToolEvent(
+            toolCall.request.name,
+            toolInput,
+            mcpContext,
+            toolCall.request.originalRequestName,
+          );
+
+          if (beforeOutput) {
+            // Check if hook requested to stop entire agent execution
+            if (beforeOutput.shouldStopExecution()) {
+              const reason = beforeOutput.getEffectiveReason();
+              this.setStatusInternal(
+                reqInfo.callId,
+                CoreToolCallStatus.Error,
+                signal,
+                createErrorResponse(
+                  reqInfo,
+                  new Error(`Agent execution stopped by hook: ${reason}`),
+                  ToolErrorType.STOP_EXECUTION,
+                ),
+              );
+              await this.checkAndNotifyCompletion(signal);
+              return;
+            }
+
+            // Check if hook blocked the tool execution
+            const blockingError = beforeOutput.getBlockingError();
+            if (blockingError?.blocked) {
+              this.setStatusInternal(
+                reqInfo.callId,
+                CoreToolCallStatus.Error,
+                signal,
+                createErrorResponse(
+                  reqInfo,
+                  new Error(`Tool execution blocked: ${blockingError.reason}`),
+                  ToolErrorType.POLICY_VIOLATION,
+                ),
+              );
+              await this.checkAndNotifyCompletion(signal);
+              return;
+            }
+
+            if (beforeOutput.isAskDecision()) {
+              hookDecision = 'ask';
+              hookSystemMessage = beforeOutput.systemMessage;
+              // Mark the request so UI knows not to auto-approve it
+              toolCall.request.forcedAsk = true;
+            }
+
+            // Check if hook requested to update tool input
+            if (beforeOutput instanceof BeforeToolHookOutput) {
+              const modifiedInput = beforeOutput.getModifiedToolInput();
+              if (modifiedInput) {
+                this.setArgsInternal(reqInfo.callId, modifiedInput);
+
+                // IMPORTANT: toolCall and invocation must be updated because setArgsInternal created a new one
+                const updatedCall = this.toolCalls.find(
+                  (c) => c.request.callId === reqInfo.callId,
+                );
+                if (updatedCall) {
+                  toolCall = updatedCall;
+                  toolCall.request.inputModifiedByHook = true;
+                  if ('invocation' in updatedCall) {
+                    invocation = updatedCall.invocation;
+                  }
+                }
+              }
+            }
+          }
+        }
+
         // Policy Check using PolicyEngine
         // We must reconstruct the FunctionCall format expected by PolicyEngine
         const toolCallForPolicy = {
@@ -645,13 +732,18 @@ export class CoreToolScheduler {
           toolCall.tool instanceof DiscoveredMCPTool
             ? toolCall.tool.serverName
             : undefined;
-        const toolAnnotations = toolCall.tool.toolAnnotations;
+        const toolAnnotations = toolCall.tool?.toolAnnotations;
 
-        const { decision, rule } = await this.config
+        const { decision: policyDecision, rule } = await this.config
           .getPolicyEngine()
           .check(toolCallForPolicy, serverName, toolAnnotations);
 
-        if (decision === PolicyDecision.DENY) {
+        let finalDecision = policyDecision;
+        if (hookDecision === 'ask') {
+          finalDecision = PolicyDecision.ASK_USER;
+        }
+
+        if (finalDecision === PolicyDecision.DENY) {
           const { errorMessage, errorType } = getPolicyDenialError(
             this.config,
             rule,
@@ -666,7 +758,7 @@ export class CoreToolScheduler {
           return;
         }
 
-        if (decision === PolicyDecision.ALLOW) {
+        if (finalDecision === PolicyDecision.ALLOW) {
           this.setToolCallOutcome(
             reqInfo.callId,
             ToolConfirmationOutcome.ProceedAlways,
@@ -677,11 +769,13 @@ export class CoreToolScheduler {
             signal,
           );
         } else {
-          // PolicyDecision.ASK_USER
+          // PolicyDecision.ASK_USER or forced 'ask' by hook
 
           // We need confirmation details to show to the user
-          const confirmationDetails =
-            await invocation.shouldConfirmExecute(signal);
+          const confirmationDetails = await invocation.shouldConfirmExecute(
+            signal,
+            hookDecision === 'ask' ? 'ask_user' : undefined,
+          );
 
           if (!confirmationDetails) {
             this.setToolCallOutcome(
@@ -697,9 +791,15 @@ export class CoreToolScheduler {
             if (!this.config.isInteractive()) {
               throw new Error(
                 `Tool execution for "${
-                  toolCall.tool.displayName || toolCall.tool.name
+                  toolCall.tool?.displayName ||
+                  toolCall.tool?.name ||
+                  toolCall.request.name
                 }" requires user confirmation, which is not supported in non-interactive mode.`,
               );
+            }
+
+            if (hookSystemMessage) {
+              confirmationDetails.systemMessage = hookSystemMessage;
             }
 
             // Fire Notification hook before showing confirmation to user

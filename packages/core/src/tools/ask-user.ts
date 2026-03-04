@@ -7,6 +7,7 @@
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
+  type ForcedToolDecision,
   type ToolResult,
   Kind,
   type ToolAskUserConfirmationDetails,
@@ -126,6 +127,7 @@ export class AskUserInvocation extends BaseToolInvocation<
 
   override async shouldConfirmExecute(
     _abortSignal: AbortSignal,
+    _forcedDecision?: ForcedToolDecision,
   ): Promise<ToolAskUserConfirmationDetails | false> {
     const normalizedQuestions = this.params.questions.map((q) => ({
       ...q,

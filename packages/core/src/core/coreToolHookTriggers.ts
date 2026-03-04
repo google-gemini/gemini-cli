@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type McpToolContext, BeforeToolHookOutput } from '../hooks/types.js';
+import { type McpToolContext } from '../hooks/types.js';
 import type { Config } from '../config/config.js';
 import type {
   ToolResult,
@@ -13,7 +13,6 @@ import type {
   ToolLiveOutput,
 } from '../tools/tools.js';
 import { ToolErrorType } from '../tools/tool-error.js';
-import { debugLogger } from '../utils/debugLogger.js';
 import type { ShellExecutionConfig } from '../index.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
@@ -25,7 +24,7 @@ import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
  * @param config Config to look up server details
  * @returns MCP context if this is an MCP tool, undefined otherwise
  */
-function extractMcpContext(
+export function extractMcpContext(
   invocation: ShellToolInvocation | AnyToolInvocation,
   config: Config,
 ): McpToolContext | undefined {
@@ -78,81 +77,12 @@ export async function executeToolWithHooks(
   config?: Config,
   originalRequestName?: string,
 ): Promise<ToolResult> {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const toolInput = (invocation.params || {}) as Record<string, unknown>;
-  let inputWasModified = false;
-  let modifiedKeys: string[] = [];
-
   // Extract MCP context if this is an MCP tool (only if config is provided)
   const mcpContext = config ? extractMcpContext(invocation, config) : undefined;
-
   const hookSystem = config?.getHookSystem();
-  if (hookSystem) {
-    const beforeOutput = await hookSystem.fireBeforeToolEvent(
-      toolName,
-      toolInput,
-      mcpContext,
-      originalRequestName,
-    );
 
-    // Check if hook requested to stop entire agent execution
-    if (beforeOutput?.shouldStopExecution()) {
-      const reason = beforeOutput.getEffectiveReason();
-      return {
-        llmContent: `Agent execution stopped by hook: ${reason}`,
-        returnDisplay: `Agent execution stopped by hook: ${reason}`,
-        error: {
-          type: ToolErrorType.STOP_EXECUTION,
-          message: reason,
-        },
-      };
-    }
-
-    // Check if hook blocked the tool execution
-    const blockingError = beforeOutput?.getBlockingError();
-    if (blockingError?.blocked) {
-      return {
-        llmContent: `Tool execution blocked: ${blockingError.reason}`,
-        returnDisplay: `Tool execution blocked: ${blockingError.reason}`,
-        error: {
-          type: ToolErrorType.EXECUTION_FAILED,
-          message: blockingError.reason,
-        },
-      };
-    }
-
-    // Check if hook requested to update tool input
-    if (beforeOutput instanceof BeforeToolHookOutput) {
-      const modifiedInput = beforeOutput.getModifiedToolInput();
-      if (modifiedInput) {
-        // We modify the toolInput object in-place, which should be the same reference as invocation.params
-        // We use Object.assign to update properties
-        Object.assign(invocation.params, modifiedInput);
-        debugLogger.debug(`Tool input modified by hook for ${toolName}`);
-        inputWasModified = true;
-        modifiedKeys = Object.keys(modifiedInput);
-
-        // Recreate the invocation with the new parameters
-        // to ensure any derived state (like resolvedPath in ReadFileTool) is updated.
-        try {
-          // We use the tool's build method to validate and create the invocation
-          // This ensures consistent behavior with the initial creation
-          invocation = tool.build(invocation.params);
-        } catch (error) {
-          return {
-            llmContent: `Tool parameter modification by hook failed validation: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-            returnDisplay: `Tool parameter modification by hook failed validation.`,
-            error: {
-              type: ToolErrorType.INVALID_TOOL_PARAMS,
-              message: String(error),
-            },
-          };
-        }
-      }
-    }
-  }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const toolInput = (invocation.params || {}) as Record<string, unknown>;
 
   // Execute the actual tool
   let toolResult: ToolResult;
@@ -169,24 +99,6 @@ export async function executeToolWithHooks(
       liveOutputCallback,
       shellExecutionConfig,
     );
-  }
-
-  // Append notification if parameters were modified
-  if (inputWasModified) {
-    const modificationMsg = `\n\n[System] Tool input parameters (${modifiedKeys.join(
-      ', ',
-    )}) were modified by a hook before execution.`;
-    if (typeof toolResult.llmContent === 'string') {
-      toolResult.llmContent += modificationMsg;
-    } else if (Array.isArray(toolResult.llmContent)) {
-      toolResult.llmContent.push({ text: modificationMsg });
-    } else if (toolResult.llmContent) {
-      // Handle single Part case by converting to an array
-      toolResult.llmContent = [
-        toolResult.llmContent,
-        { text: modificationMsg },
-      ];
-    }
   }
 
   if (hookSystem) {

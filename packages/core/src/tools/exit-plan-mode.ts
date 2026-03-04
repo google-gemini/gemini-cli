@@ -7,6 +7,7 @@
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
+  type ForcedToolDecision,
   type ToolResult,
   Kind,
   type ToolExitPlanModeConfirmationDetails,
@@ -118,6 +119,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
 
   override async shouldConfirmExecute(
     abortSignal: AbortSignal,
+    forcedDecision?: ForcedToolDecision,
   ): Promise<ToolExitPlanModeConfirmationDetails | false> {
     const resolvedPlanPath = this.getResolvedPlanPath();
 
@@ -137,8 +139,9 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       return false;
     }
 
-    const decision = await this.getMessageBusDecision(abortSignal);
-    if (decision === 'DENY') {
+    const decision =
+      forcedDecision ?? (await this.getMessageBusDecision(abortSignal));
+    if (decision === 'deny') {
       throw new Error(
         `Tool execution for "${
           this._toolDisplayName || this._toolName
@@ -146,7 +149,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       );
     }
 
-    if (decision === 'ALLOW') {
+    if (decision === 'allow') {
       // If policy is allow, auto-approve with default settings and execute.
       this.confirmationOutcome = ToolConfirmationOutcome.ProceedOnce;
       this.approvalPayload = {
@@ -156,7 +159,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       return false;
     }
 
-    // decision is 'ASK_USER'
+    // decision is 'ask_user'
     return {
       type: 'exit_plan_mode',
       title: 'Plan Approval',

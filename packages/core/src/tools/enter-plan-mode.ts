@@ -7,6 +7,7 @@
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
+  type ForcedToolDecision,
   type ToolResult,
   Kind,
   type ToolInfoConfirmationDetails,
@@ -85,13 +86,15 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
 
   override async shouldConfirmExecute(
     abortSignal: AbortSignal,
+    forcedDecision?: ForcedToolDecision,
   ): Promise<ToolInfoConfirmationDetails | false> {
-    const decision = await this.getMessageBusDecision(abortSignal);
-    if (decision === 'ALLOW') {
+    const decision =
+      forcedDecision ?? (await this.getMessageBusDecision(abortSignal));
+    if (decision === 'allow') {
       return false;
     }
 
-    if (decision === 'DENY') {
+    if (decision === 'deny') {
       throw new Error(
         `Tool execution for "${
           this._toolDisplayName || this._toolName
@@ -99,7 +102,7 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
       );
     }
 
-    // ASK_USER
+    // ask_user
     return {
       type: 'info',
       title: 'Enter Plan Mode',

@@ -112,6 +112,7 @@ describe('SubAgentInvocation', () => {
     expect(result).toBe(false);
     expect(mockInnerInvocation.shouldConfirmExecute).toHaveBeenCalledWith(
       abortSignal,
+      undefined,
     );
     expect(MockSubagentToolWrapper).toHaveBeenCalledWith(
       testDefinition,
@@ -156,6 +157,7 @@ describe('SubAgentInvocation', () => {
     expect(result).toBe(confirmationDetails);
     expect(mockInnerInvocation.shouldConfirmExecute).toHaveBeenCalledWith(
       abortSignal,
+      undefined,
     );
     expect(MockSubagentToolWrapper).toHaveBeenCalledWith(
       testRemoteDefinition,

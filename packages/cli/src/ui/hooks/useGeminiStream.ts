@@ -1577,7 +1577,7 @@ export const useGeminiStream = (
       ) {
         let awaitingApprovalCalls = toolCalls.filter(
           (call): call is TrackedWaitingToolCall =>
-            call.status === 'awaiting_approval',
+            call.status === 'awaiting_approval' && !call.request.forcedAsk,
         );
 
         // For AUTO_EDIT mode, only approve edit tools (replace, write_file)

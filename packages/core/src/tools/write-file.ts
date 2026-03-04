@@ -17,6 +17,7 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+  type ForcedToolDecision,
   type FileDiff,
   type ToolCallConfirmationDetails,
   type ToolEditConfirmationDetails,
@@ -174,8 +175,12 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
   protected override async getConfirmationDetails(
     abortSignal: AbortSignal,
+    forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
+    if (
+      this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT &&
+      forcedDecision !== 'ask_user'
+    ) {
       return false;
     }
 

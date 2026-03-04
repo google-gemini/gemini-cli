@@ -13,6 +13,7 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+  type ForcedToolDecision,
   type ToolCallConfirmationDetails,
   type ToolConfirmationOutcome,
   type ToolEditConfirmationDetails,
@@ -705,8 +706,12 @@ class EditToolInvocation
    */
   protected override async getConfirmationDetails(
     abortSignal: AbortSignal,
+    forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
+    if (
+      this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT &&
+      forcedDecision !== 'ask_user'
+    ) {
       return false;
     }
 

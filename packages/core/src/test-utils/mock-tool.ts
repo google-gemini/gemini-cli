@@ -12,12 +12,15 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+  type ForcedToolDecision,
   type ToolCallConfirmationDetails,
   type ToolInvocation,
+  type ToolLiveOutput,
   type ToolResult,
 } from '../tools/tools.js';
 import { createMockMessageBus } from './mock-message-bus.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { ShellExecutionConfig } from 'src/services/shellExecutionService.js';
 
 interface MockToolOptions {
   name: string;
@@ -28,11 +31,13 @@ interface MockToolOptions {
   shouldConfirmExecute?: (
     params: { [key: string]: unknown },
     signal: AbortSignal,
+    forcedDecision?: ForcedToolDecision,
   ) => Promise<ToolCallConfirmationDetails | false>;
   execute?: (
     params: { [key: string]: unknown },
     signal?: AbortSignal,
     updateOutput?: (output: string) => void,
+    shellExecutionConfig?: ShellExecutionConfig,
   ) => Promise<ToolResult>;
   params?: object;
   messageBus?: MessageBus;
@@ -52,19 +57,26 @@ class MockToolInvocation extends BaseToolInvocation<
 
   execute(
     signal: AbortSignal,
-    updateOutput?: (output: string) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
+    shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<ToolResult> {
-    if (updateOutput) {
-      return this.tool.execute(this.params, signal, updateOutput);
-    } else {
-      return this.tool.execute(this.params);
-    }
+    return this.tool.execute(
+      this.params,
+      signal,
+      updateOutput as ((output: string) => void) | undefined,
+      shellExecutionConfig,
+    );
   }
 
   override shouldConfirmExecute(
     abortSignal: AbortSignal,
+    forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
-    return this.tool.shouldConfirmExecute(this.params, abortSignal);
+    return this.tool.shouldConfirmExecute(
+      this.params,
+      abortSignal,
+      forcedDecision,
+    );
   }
 
   getDescription(): string {
@@ -79,14 +91,17 @@ export class MockTool extends BaseDeclarativeTool<
   { [key: string]: unknown },
   ToolResult
 > {
-  shouldConfirmExecute: (
+  readonly shouldConfirmExecute: (
     params: { [key: string]: unknown },
     signal: AbortSignal,
+    forcedDecision?: ForcedToolDecision,
   ) => Promise<ToolCallConfirmationDetails | false>;
-  execute: (
+
+  readonly execute: (
     params: { [key: string]: unknown },
     signal?: AbortSignal,
     updateOutput?: (output: string) => void,
+    shellExecutionConfig?: ShellExecutionConfig,
   ) => Promise<ToolResult>;
 
   constructor(options: MockToolOptions) {
@@ -162,6 +177,7 @@ export class MockModifiableToolInvocation extends BaseToolInvocation<
 
   override async shouldConfirmExecute(
     _abortSignal: AbortSignal,
+    _forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (this.tool.shouldConfirm) {
       return {

@@ -25,6 +25,8 @@ import {
   type ScheduledToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
+import { extractMcpContext } from '../core/coreToolHookTriggers.js';
+import { BeforeToolHookOutput } from '../hooks/types.js';
 import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
@@ -562,8 +564,95 @@ export class Scheduler {
   ): Promise<void> {
     const callId = toolCall.request.callId;
 
+    let hookDecision: 'ask' | 'block' | undefined;
+    let hookSystemMessage: string | undefined;
+
+    const hookSystem = this.config.getHookSystem();
+    if (hookSystem) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const toolInput = (toolCall.invocation.params || {}) as Record<
+        string,
+        unknown
+      >;
+      const mcpContext = extractMcpContext(toolCall.invocation, this.config);
+
+      const beforeOutput = await hookSystem.fireBeforeToolEvent(
+        toolCall.request.name,
+        toolInput,
+        mcpContext,
+        toolCall.request.originalRequestName,
+      );
+
+      if (beforeOutput) {
+        if (beforeOutput.shouldStopExecution()) {
+          this.state.updateStatus(
+            callId,
+            CoreToolCallStatus.Error,
+            createErrorResponse(
+              toolCall.request,
+              new Error(
+                `Agent execution stopped by hook: ${beforeOutput.getEffectiveReason()}`,
+              ),
+              ToolErrorType.STOP_EXECUTION,
+            ),
+          );
+          return;
+        }
+
+        const blockingError = beforeOutput.getBlockingError();
+        if (blockingError?.blocked) {
+          this.state.updateStatus(
+            callId,
+            CoreToolCallStatus.Error,
+            createErrorResponse(
+              toolCall.request,
+              new Error(`Tool execution blocked: ${blockingError.reason}`),
+              ToolErrorType.POLICY_VIOLATION,
+            ),
+          );
+          return;
+        }
+
+        if (beforeOutput.isAskDecision()) {
+          hookDecision = 'ask';
+          hookSystemMessage = beforeOutput.systemMessage;
+        }
+
+        if (beforeOutput instanceof BeforeToolHookOutput) {
+          const modifiedInput = beforeOutput.getModifiedToolInput();
+          if (modifiedInput) {
+            toolCall.request.args = modifiedInput;
+            toolCall.request.inputModifiedByHook = true;
+            try {
+              toolCall.invocation = toolCall.tool.build(modifiedInput);
+            } catch (error) {
+              this.state.updateStatus(
+                callId,
+                CoreToolCallStatus.Error,
+                createErrorResponse(
+                  toolCall.request,
+                  new Error(
+                    `Tool parameter modification by hook failed validation: ${error instanceof Error ? error.message : String(error)}`,
+                  ),
+                  ToolErrorType.INVALID_TOOL_PARAMS,
+                ),
+              );
+              return;
+            }
+          }
+        }
+      }
+    }
+
     // Policy & Security
-    const { decision, rule } = await checkPolicy(toolCall, this.config);
+    const { decision: policyDecision, rule } = await checkPolicy(
+      toolCall,
+      this.config,
+    );
+    let decision = policyDecision;
+    if (hookDecision === 'ask') {
+      decision = PolicyDecision.ASK_USER;
+    }
 
     if (decision === PolicyDecision.DENY) {
       const { errorMessage, errorType } = getPolicyDenialError(
@@ -596,6 +685,8 @@ export class Scheduler {
         getPreferredEditor: this.getPreferredEditor,
         schedulerId: this.schedulerId,
         onWaitingForConfirmation: this.onWaitingForConfirmation,
+        systemMessage: hookSystemMessage,
+        forcedDecision: hookDecision === 'ask' ? 'ask_user' : undefined,
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;
