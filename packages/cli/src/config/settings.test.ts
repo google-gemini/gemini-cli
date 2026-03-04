@@ -2162,7 +2162,7 @@ describe('Settings Loading and Merging', () => {
       }
     });
 
-    it('should prioritize new settings over deprecated ones and respect removeDeprecated flag', () => {
+    it('should remove deprecated settings by default and prioritize new ones', () => {
       const userSettingsContent = {
         general: {
           disableAutoUpdate: true,
@@ -2177,26 +2177,10 @@ describe('Settings Loading and Merging', () => {
       };
 
       const loadedSettings = createMockSettings(userSettingsContent);
-
       const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
 
-      // 1. removeDeprecated = false (default)
+      // Default is now removeDeprecated = true
       migrateDeprecatedSettings(loadedSettings);
-
-      // Should still have old settings
-      expect(
-        loadedSettings.forScope(SettingScope.User).settings.general,
-      ).toHaveProperty('disableAutoUpdate');
-      expect(
-        (
-          loadedSettings.forScope(SettingScope.User).settings.context as {
-            fileFiltering: { disableFuzzySearch: boolean };
-          }
-        ).fileFiltering,
-      ).toHaveProperty('disableFuzzySearch');
-
-      // 2. removeDeprecated = true
-      migrateDeprecatedSettings(loadedSettings, true);
 
       // Should remove disableAutoUpdate and trust enableAutoUpdate: true
       expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'general', {
@@ -2207,6 +2191,37 @@ describe('Settings Loading and Merging', () => {
       expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'context', {
         fileFiltering: { enableFuzzySearch: false },
       });
+    });
+
+    it('should preserve deprecated settings when removeDeprecated is explicitly false', () => {
+      const userSettingsContent = {
+        general: {
+          disableAutoUpdate: true,
+          enableAutoUpdate: true,
+        },
+        context: {
+          fileFiltering: {
+            disableFuzzySearch: false,
+            enableFuzzySearch: false,
+          },
+        },
+      };
+
+      const loadedSettings = createMockSettings(userSettingsContent);
+
+      migrateDeprecatedSettings(loadedSettings, false);
+
+      // Should still have old settings since removeDeprecated = false
+      expect(
+        loadedSettings.forScope(SettingScope.User).settings.general,
+      ).toHaveProperty('disableAutoUpdate');
+      expect(
+        (
+          loadedSettings.forScope(SettingScope.User).settings.context as {
+            fileFiltering: { disableFuzzySearch: boolean };
+          }
+        ).fileFiltering,
+      ).toHaveProperty('disableFuzzySearch');
     });
 
     it('should trigger migration automatically during loadSettings', () => {
