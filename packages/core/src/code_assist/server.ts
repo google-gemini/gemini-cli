@@ -47,7 +47,7 @@ import {
   isOverageEligibleModel,
   shouldAutoUseCredits,
 } from '../billing/billing.js';
-import { logBillingEvent } from '../telemetry/loggers.js';
+import { logBillingEvent, logInvalidChunk } from '../telemetry/loggers.js';
 import { CreditsUsedEvent } from '../telemetry/billingEvents.js';
 import {
   fromCountTokenResponse,
@@ -62,7 +62,7 @@ import {
   recordConversationOffered,
 } from './telemetry.js';
 import { getClientMetadata } from './experiments/client_metadata.js';
-import type { LlmRole } from '../telemetry/types.js';
+import { InvalidChunkEvent, type LlmRole } from '../telemetry/types.js';
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
   /** Additional HTTP headers to be sent with the request. */
@@ -466,7 +466,7 @@ export class CodeAssistServer implements ContentGenerator {
       retry: false,
     });
 
-    return (async function* (): AsyncGenerator<T> {
+    return (async function* (server: CodeAssistServer): AsyncGenerator<T> {
       const rl = readline.createInterface({
         input: Readable.from(res.data),
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks
@@ -480,12 +480,23 @@ export class CodeAssistServer implements ContentGenerator {
           if (bufferedLines.length === 0) {
             continue; // no data to yield
           }
-          yield JSON.parse(bufferedLines.join('\n'));
+          const chunk = bufferedLines.join('\n');
+          try {
+            yield JSON.parse(chunk);
+          } catch (_e) {
+            if (server.config) {
+              logInvalidChunk(
+                server.config,
+                // Don't include the chunk content in the log for security/privacy reasons.
+                new InvalidChunkEvent('Malformed JSON chunk'),
+              );
+            }
+          }
           bufferedLines = []; // Reset the buffer after yielding
         }
         // Ignore other lines like comments or id fields
       }
-    })();
+    })(this);
   }
 
   private getBaseUrl(): string {
