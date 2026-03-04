@@ -71,6 +71,8 @@ runs:
       env:
         INPUTS_GITHUB_REF_NAME: '${{ inputs.github-ref-name }}'
         INPUTS_GITHUB_SHA: '${{ inputs.github-sha }}'
+    # We build amd64 just so we can verify it.
+    # We build and push both amd64 and arm64 in the publish step.
     - name: 'build'
       id: 'docker_build'
       shell: 'bash'
