@@ -492,7 +492,7 @@ export class McpClient implements McpProgressReporter {
             debugLogger.log(
               `No resource changes detected for '${this.serverName}'. Retrying once in 500ms...`,
             );
-            const retryDelay = process.env['NODE_ENV'] === 'test' ? 10 : 500;
+            const retryDelay = 500;
             await new Promise((resolve) => setTimeout(resolve, retryDelay));
             newResources = await this.discoverResources();
           }
@@ -585,7 +585,7 @@ export class McpClient implements McpProgressReporter {
             debugLogger.log(
               `No prompt changes detected for '${this.serverName}'. Retrying once in 500ms...`,
             );
-            const retryDelay = process.env['NODE_ENV'] === 'test' ? 10 : 500;
+            const retryDelay = 500;
             await new Promise((resolve) => setTimeout(resolve, retryDelay));
             newPrompts = await this.fetchPrompts({
               signal: abortController.signal,
@@ -690,7 +690,7 @@ export class McpClient implements McpProgressReporter {
             debugLogger.log(
               `No tool changes detected for '${this.serverName}'. Retrying once in 500ms...`,
             );
-            const retryDelay = process.env['NODE_ENV'] === 'test' ? 10 : 500;
+            const retryDelay = 500;
             await new Promise((resolve) => setTimeout(resolve, retryDelay));
             newTools = await this.discoverTools(this.cliConfig, {
               signal: abortController.signal,

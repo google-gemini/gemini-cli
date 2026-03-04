@@ -537,11 +537,8 @@ export class McpClientManager {
       return this.pendingRefreshPromise;
     }
 
-    debugLogger.log('Scheduling MCP context refresh (300ms debounce)...');
+    debugLogger.log('Scheduling MCP context refresh...');
     this.pendingRefreshPromise = (async () => {
-      // Debounce to coalesce multiple rapid updates
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
       this.isRefreshingMcpContext = true;
       try {
         do {
@@ -549,6 +546,15 @@ export class McpClientManager {
           debugLogger.log('Executing MCP context refresh...');
           await this.cliConfig.refreshMcpContext();
           debugLogger.log('MCP context refresh complete.');
+
+          // If more refresh requests came in during the execution, wait a bit
+          // to coalesce them before the next iteration.
+          if (this.pendingMcpContextRefresh) {
+            debugLogger.log(
+              'Coalescing burst refresh requests (300ms delay)...',
+            );
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          }
         } while (this.pendingMcpContextRefresh);
       } catch (error) {
         debugLogger.error(

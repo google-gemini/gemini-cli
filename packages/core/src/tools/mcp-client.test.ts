@@ -1518,6 +1518,7 @@ describe('mcp-client', () => {
     });
 
     it('should abort discovery and log error if timeout is exceeded during refresh', async () => {
+      vi.useFakeTimers();
       const mockedClient = {
         connect: vi.fn(),
         getServerCapabilities: vi
@@ -1592,8 +1593,11 @@ describe('mcp-client', () => {
         );
       const notificationCallback = toolUpdateCall![1];
 
-      // Use real timers for this test
-      await notificationCallback();
+      const refreshPromise = notificationCallback();
+
+      // Advance timers to trigger the timeout (11 minutes to cover even the default timeout)
+      await vi.advanceTimersByTimeAsync(11 * 60 * 1000);
+      await refreshPromise;
 
       expect(mockedClient.listTools).toHaveBeenCalledWith(
         expect.anything(),
@@ -1666,7 +1670,10 @@ describe('mcp-client', () => {
         );
       const notificationCallback = toolUpdateCall![1];
 
-      await notificationCallback();
+      vi.useFakeTimers();
+      const refreshPromise = notificationCallback();
+      await vi.advanceTimersByTimeAsync(500);
+      await refreshPromise;
 
       expect(onContextUpdatedSpy).toHaveBeenCalledWith(expect.any(AbortSignal));
 
