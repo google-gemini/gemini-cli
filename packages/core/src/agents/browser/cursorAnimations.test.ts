@@ -24,13 +24,10 @@ describe('cursorAnimations', () => {
       expect(script).toContain('aria-hidden');
     });
 
-    it('should use a get-or-create pattern for keyframes', () => {
+    it('should use a shared style injection pattern', () => {
       const script = generateClickAnimationScript(10, 20);
-      expect(script).toContain(
-        "const keyframesId = '__gemini_click_keyframes'",
-      );
-      expect(script).toContain('document.getElementById(keyframesId)');
-      expect(script).toContain('style.textContent = `');
+      expect(script).toContain("const styleId = '__gemini_animations'");
+      expect(script).toContain('document.getElementById(styleId)');
     });
   });
 
@@ -45,9 +42,9 @@ describe('cursorAnimations', () => {
       expect(script).toContain('__gemini_scroll_up');
     });
 
-    it('should use a static ID for scroll keyframes', () => {
+    it('should use the same shared style ID', () => {
       const script = generateScrollAnimationScript('down');
-      expect(script).toContain("const styleId = '__gemini_scroll_keyframes'");
+      expect(script).toContain("const styleId = '__gemini_animations'");
       expect(script).toContain('__gemini_scroll_up');
       expect(script).toContain('__gemini_scroll_down');
     });
