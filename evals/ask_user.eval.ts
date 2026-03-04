@@ -10,6 +10,15 @@ import { evalTest } from './test-helper.js';
 describe('ask_user', () => {
   evalTest('USUALLY_PASSES', {
     name: 'Agent uses AskUser tool to present multiple choice options',
+    files: {
+      '.gemini/policies/allow_ask_user.toml': `
+[[rule]]
+toolName = "ask_user"
+decision = "allow"
+priority = 70
+modes = ["yolo"]
+`,
+    },
     prompt: `Use the ask_user tool to ask me what my favorite color is. Provide 3 options: red, green, or blue.`,
     assert: async (rig) => {
       const wasToolCalled = await rig.waitForToolCall('ask_user');
@@ -21,6 +30,13 @@ describe('ask_user', () => {
     name: 'Agent uses AskUser tool to clarify ambiguous requirements',
     files: {
       'package.json': JSON.stringify({ name: 'my-app', version: '1.0.0' }),
+      '.gemini/policies/allow_ask_user.toml': `
+[[rule]]
+toolName = "ask_user"
+decision = "allow"
+priority = 70
+modes = ["yolo"]
+`,
     },
     prompt: `I want to build a new feature in this app. Ask me questions to clarify the requirements before proceeding.`,
     assert: async (rig) => {
@@ -38,6 +54,13 @@ describe('ask_user', () => {
         name: '@google/gemini-cli-core',
       }),
       'README.md': '# Gemini CLI',
+      '.gemini/policies/allow_tools.toml': `
+[[rule]]
+toolName = ["ask_user", "enter_plan_mode", "exit_plan_mode"]
+decision = "allow"
+priority = 70
+modes = ["yolo"]
+`,
     },
     prompt: `Refactor the entire core package to be better.`,
     assert: async (rig) => {
@@ -66,6 +89,13 @@ describe('ask_user', () => {
       'package.json': JSON.stringify({
         scripts: { build: 'echo building' },
       }),
+      '.gemini/policies/allow_ask_user.toml': `
+[[rule]]
+toolName = "ask_user"
+decision = "allow"
+priority = 70
+modes = ["yolo"]
+`,
     },
     prompt: `Run 'npm run build' in the current directory.`,
     assert: async (rig) => {
