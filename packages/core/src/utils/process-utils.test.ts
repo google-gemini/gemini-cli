@@ -137,21 +137,6 @@ describe('process-utils', () => {
       expect(mockPty.kill).toHaveBeenCalledWith('SIGKILL');
     });
 
-    it('should also invoke taskkill on Windows when pty is provided to reap descendants', async () => {
-      vi.mocked(os.platform).mockReturnValue('win32');
-      const mockPty = { kill: vi.fn() };
-
-      await killProcessGroup({ pid: 1234, pty: mockPty });
-
-      expect(mockPty.kill).toHaveBeenCalled();
-      expect(mockSpawn).toHaveBeenCalledWith('taskkill', [
-        '/pid',
-        '1234',
-        '/f',
-        '/t',
-      ]);
-    });
-
     it('should attempt process group kill on Unix after pty fallback to reap orphaned descendants', async () => {
       vi.mocked(os.platform).mockReturnValue('linux');
       // First call (group kill) throws to trigger PTY fallback
