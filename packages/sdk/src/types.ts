@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content } from '@google/gemini-cli-core';
+import type { Content, ToolCallRequestInfo } from '@google/gemini-cli-core';
 import type { Tool } from './tool.js';
 import type { SkillReference } from './skills.js';
 import type { GeminiCliAgent } from './agent.js';
@@ -24,6 +24,14 @@ export interface GeminiCliAgentOptions {
   debug?: boolean;
   recordResponses?: string;
   fakeResponses?: string;
+  /**
+   * Called whenever the policy engine reaches an ASK_USER decision for a tool
+   * call. Return 'allow' to let the tool proceed or 'deny' to block it.
+   *
+   * When omitted, ASK_USER decisions are treated as denials so that SDK
+   * consumers do not accidentally run destructive tools without consent.
+   */
+  onToolApproval?: (call: ToolCallRequestInfo) => Promise<'allow' | 'deny'>;
 }
 
 export interface AgentFilesystem {

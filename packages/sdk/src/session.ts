@@ -21,6 +21,10 @@ import {
   ActivateSkillTool,
   type ResumedSessionData,
   PolicyDecision,
+  type MessageBus,
+  MessageBusType,
+  type ToolConfirmationRequest,
+  type ToolConfirmationResponse,
 } from '@google/gemini-cli-core';
 
 import { type Tool, SdkTool } from './tool.js';
@@ -44,7 +48,7 @@ export class GeminiCliSession {
   private initialized = false;
 
   constructor(
-    options: GeminiCliAgentOptions,
+    private readonly options: GeminiCliAgentOptions,
     private readonly sessionId: string,
     private readonly agent: GeminiCliAgent,
     private readonly resumedData?: ResumedSessionData,
@@ -77,8 +81,11 @@ export class GeminiCliSession {
       skillsSupport: true,
       adminSkillsEnabled: true,
       policyEngineConfig: {
-        // TODO: Revisit this default when we have a mechanism for wiring up approvals
-        defaultDecision: PolicyDecision.ALLOW,
+        // Default to ASK_USER so tool calls require explicit approval.
+        // Embedders that supply onToolApproval handle the ASK_USER outcome
+        // programmatically; without that callback the message bus falls back
+        // to its own safe default (deny with requiresUserConfirmation).
+        defaultDecision: PolicyDecision.ASK_USER,
       },
     };
 
@@ -249,18 +256,29 @@ export class GeminiCliSession {
         return tool;
       };
 
-      const completedCalls = await scheduleAgentTools(
-        this.config,
-        toolCallsToSchedule,
-        {
-          schedulerId: sessionId,
-          toolRegistry: scopedRegistry,
-          signal: abortSignal,
-        },
-      );
+      const messageBus = this.config.getMessageBus();
+      const removeApprovalListener = this.options.onToolApproval
+        ? this.attachApprovalListener(messageBus, this.options.onToolApproval)
+        : undefined;
+
+      let completedCalls;
+      try {
+        completedCalls = await scheduleAgentTools(
+          this.config,
+          toolCallsToSchedule,
+          {
+            schedulerId: sessionId,
+            toolRegistry: scopedRegistry,
+            signal: abortSignal,
+          },
+        );
+      } finally {
+        removeApprovalListener?.();
+      }
 
       const functionResponses = completedCalls.flatMap(
-        (call) => call.response.responseParts,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return
+        (call: any) => call.response.responseParts,
       );
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -268,5 +286,48 @@ export class GeminiCliSession {
         GeminiClient['sendMessageStream']
       >[0];
     }
+  }
+
+  /**
+   * Registers a TOOL_CONFIRMATION_REQUEST listener on the message bus that
+   * forwards ASK_USER decisions to the embedder's onToolApproval callback.
+   * Returns a cleanup function that removes the listener when called.
+   */
+  private attachApprovalListener(
+    bus: MessageBus,
+    onApproval: (call: ToolCallRequestInfo) => Promise<'allow' | 'deny'>,
+  ): () => void {
+    const handler = async (msg: ToolConfirmationRequest): Promise<void> => {
+      const { toolCall, correlationId } = msg;
+
+      const requestInfo: ToolCallRequestInfo = {
+        callId: correlationId,
+        name: toolCall.name ?? '',
+         
+        args: (toolCall.args ?? {}),
+        isClientInitiated: false,
+        prompt_id: this.config.getSessionId(),
+      };
+
+      let decision: 'allow' | 'deny';
+      try {
+        decision = await onApproval(requestInfo);
+      } catch {
+        // If the callback itself throws, default to deny to stay safe.
+        decision = 'deny';
+      }
+
+      const response: ToolConfirmationResponse = {
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId,
+        confirmed: decision === 'allow',
+      };
+
+      await bus.publish(response);
+    };
+
+    bus.subscribe(MessageBusType.TOOL_CONFIRMATION_REQUEST, handler);
+    return () =>
+      bus.unsubscribe(MessageBusType.TOOL_CONFIRMATION_REQUEST, handler);
   }
 }
