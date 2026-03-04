@@ -258,8 +258,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
   const [commandSearchActive, setCommandSearchActive] = useState(false);
-  const [forceShowShellSuggestions, setForceShowShellSuggestions] =
-    useState(false);
   const [textBeforeReverseSearch, setTextBeforeReverseSearch] = useState('');
   const [cursorPosition, setCursorPosition] = useState<[number, number]>([
     0, 0,
@@ -316,12 +314,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   ]);
 
   const activeCompletion = getActiveCompletion();
-  const isShellSuggestionsVisible =
-    completion.completionMode !== CompletionMode.SHELL ||
-    forceShowShellSuggestions;
-  const shouldShowSuggestions =
-    activeCompletion.showSuggestions &&
-    (activeCompletion !== completion || isShellSuggestionsVisible);
+  const shouldShowSuggestions = activeCompletion.showSuggestions;
+
+  const {
+    forceShowShellSuggestions,
+    setForceShowShellSuggestions,
+    isShellSuggestionsVisible,
+  } = completion;
 
   const showCursor = focus && isShellFocused && !isEmbeddedShellFocused;
 
@@ -1225,6 +1224,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       focus,
       buffer,
       completion,
+      setForceShowShellSuggestions,
       shellModeActive,
       setShellModeActive,
       onClearScreen,

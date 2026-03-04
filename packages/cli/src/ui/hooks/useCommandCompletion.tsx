@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo, useEffect } from 'react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
@@ -22,18 +22,6 @@ import {
 import type { Config } from '@google/gemini-cli-core';
 import { useCompletion } from './useCompletion.js';
 
-function getCommonPrefix(words: string[]): string {
-  if (!words || words.length === 0) return '';
-  let prefix = words[0];
-  for (let i = 1; i < words.length; i++) {
-    while (!words[i].startsWith(prefix)) {
-      prefix = prefix.substring(0, prefix.length - 1);
-      if (!prefix) return '';
-    }
-  }
-  return prefix;
-}
-
 export enum CompletionMode {
   IDLE = 'IDLE',
   AT = 'AT',
@@ -49,6 +37,9 @@ export interface UseCommandCompletionReturn {
   showSuggestions: boolean;
   isLoadingSuggestions: boolean;
   isPerfectMatch: boolean;
+  forceShowShellSuggestions: boolean;
+  setForceShowShellSuggestions: (value: boolean) => void;
+  isShellSuggestionsVisible: boolean;
   setActiveSuggestionIndex: React.Dispatch<React.SetStateAction<number>>;
   resetCompletionState: () => void;
   navigateUp: () => void;
@@ -92,6 +83,9 @@ export function useCommandCompletion({
   config,
   active,
 }: UseCommandCompletionOptions): UseCommandCompletionReturn {
+  const [forceShowShellSuggestions, setForceShowShellSuggestions] =
+    useState(false);
+
   const {
     suggestions,
     activeSuggestionIndex,
@@ -105,10 +99,15 @@ export function useCommandCompletion({
     setIsPerfectMatch,
     setVisibleStartIndex,
 
-    resetCompletionState,
+    resetCompletionState: baseResetCompletionState,
     navigateUp,
     navigateDown,
   } = useCompletion();
+
+  const resetCompletionState = useCallback(() => {
+    baseResetCompletionState();
+    setForceShowShellSuggestions(false);
+  }, [baseResetCompletionState]);
 
   const cursorRow = buffer.cursor[0];
   const cursorCol = buffer.cursor[1];
@@ -247,34 +246,35 @@ export function useCommandCompletion({
     buffer,
   });
 
+  const isShellSuggestionsVisible =
+    completionMode !== CompletionMode.SHELL || forceShowShellSuggestions;
+
   const promptCompletion = useMemo(() => {
     if (
       completionMode === CompletionMode.SHELL &&
-      suggestions.length > 0 &&
+      suggestions.length === 1 &&
       query != null &&
       shellCompletionRange.completionStart === shellCompletionRange.activeStart
     ) {
-      const commonPrefix = getCommonPrefix(suggestions.map((s) => s.value));
-      if (commonPrefix && commonPrefix.length > query.length) {
+      const suggestion = suggestions[0];
+      const textToInsertBase = suggestion.value;
+
+      if (
+        textToInsertBase.startsWith(query) &&
+        textToInsertBase.length > query.length
+      ) {
         const currentLine = buffer.lines[cursorRow] || '';
         const start = shellCompletionRange.completionStart;
         const end = shellCompletionRange.completionEnd;
 
-        let textToInsert = commonPrefix;
-        if (suggestions.length === 1) {
-          const charAfterCompletion = currentLine[end];
-          if (
-            charAfterCompletion !== ' ' &&
-            !textToInsert.endsWith('/') &&
-            !textToInsert.endsWith('\\')
-          ) {
-            textToInsert += ' ';
-          }
-        }
-
-        // Prevent showing ghost text if the text to insert exactly matches what the user typed
-        if (textToInsert === query) {
-          return basePromptCompletion;
+        let textToInsert = textToInsertBase;
+        const charAfterCompletion = currentLine[end];
+        if (
+          charAfterCompletion !== ' ' &&
+          !textToInsert.endsWith('/') &&
+          !textToInsert.endsWith('\\')
+        ) {
+          textToInsert += ' ';
         }
 
         const newText =
@@ -345,6 +345,7 @@ export function useCommandCompletion({
     active &&
     completionMode !== CompletionMode.IDLE &&
     !reverseSearchActive &&
+    isShellSuggestionsVisible &&
     (isLoadingSuggestions || suggestions.length > 0);
 
   /**
@@ -469,6 +470,9 @@ export function useCommandCompletion({
     showSuggestions,
     isLoadingSuggestions,
     isPerfectMatch,
+    forceShowShellSuggestions,
+    setForceShowShellSuggestions,
+    isShellSuggestionsVisible,
     setActiveSuggestionIndex,
     resetCompletionState,
     navigateUp,

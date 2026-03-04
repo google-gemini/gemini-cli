@@ -149,38 +149,57 @@ describe('useCommandCompletion', () => {
     });
   }
 
+  let hookResult: ReturnType<typeof useCommandCompletion> & {
+    textBuffer: ReturnType<typeof useTextBuffer>;
+  };
+
+  function TestComponent({
+    initialText,
+    cursorOffset,
+    shellModeActive,
+    active,
+  }: {
+    initialText: string;
+    cursorOffset?: number;
+    shellModeActive: boolean;
+    active: boolean;
+  }) {
+    const textBuffer = useTextBufferForTest(initialText, cursorOffset);
+    const completion = useCommandCompletion({
+      buffer: textBuffer,
+      cwd: testRootDir,
+      slashCommands: [],
+      commandContext: mockCommandContext,
+      reverseSearchActive: false,
+      shellModeActive,
+      config: mockConfig,
+      active,
+    });
+    hookResult = { ...completion, textBuffer };
+    return null;
+  }
+
   const renderCommandCompletionHook = (
     initialText: string,
     cursorOffset?: number,
     shellModeActive = false,
     active = true,
   ) => {
-    let hookResult: ReturnType<typeof useCommandCompletion> & {
-      textBuffer: ReturnType<typeof useTextBuffer>;
-    };
-
-    function TestComponent() {
-      const textBuffer = useTextBufferForTest(initialText, cursorOffset);
-      const completion = useCommandCompletion({
-        buffer: textBuffer,
-        cwd: testRootDir,
-        slashCommands: [],
-        commandContext: mockCommandContext,
-        reverseSearchActive: false,
-        shellModeActive,
-        config: mockConfig,
-        active,
-      });
-      hookResult = { ...completion, textBuffer };
-      return null;
-    }
-    renderWithProviders(<TestComponent />);
+    const renderResult = renderWithProviders(
+      <TestComponent
+        initialText={initialText}
+        cursorOffset={cursorOffset}
+        shellModeActive={shellModeActive}
+        active={active}
+      />,
+    );
     return {
       result: {
         get current() {
           return hookResult;
         },
       },
+      ...renderResult,
     };
   };
 
@@ -535,9 +554,62 @@ describe('useCommandCompletion', () => {
       expect(result.current.textBuffer.text).toBe('@src\\components\\');
     });
 
-    it('should not show ghost text if the typed text extends past the common prefix', async () => {
-      // "ls " is already typed. The common prefix is "ls".
-      // Since "ls" length <= "ls " length, no ghost text should be shown.
+    it('should show ghost text for a single shell completion', async () => {
+      const text = 'l';
+      setupMocks({
+        shellSuggestions: [{ label: 'ls', value: 'ls' }],
+        shellCompletionRange: {
+          completionStart: 0,
+          completionEnd: 1,
+          query: 'l',
+          activeStart: 0,
+        },
+      });
+
+      const { result } = renderCommandCompletionHook(
+        text,
+        text.length,
+        true, // shellModeActive
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      // Should show "ls " as ghost text (including trailing space)
+      expect(result.current.promptCompletion.text).toBe('ls ');
+    });
+
+    it('should not show ghost text if there are multiple completions', async () => {
+      const text = 'l';
+      setupMocks({
+        shellSuggestions: [
+          { label: 'ls', value: 'ls' },
+          { label: 'ln', value: 'ln' },
+        ],
+        shellCompletionRange: {
+          completionStart: 0,
+          completionEnd: 1,
+          query: 'l',
+          activeStart: 0,
+        },
+      });
+
+      const { result } = renderCommandCompletionHook(
+        text,
+        text.length,
+        true, // shellModeActive
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      expect(result.current.promptCompletion.text).toBe('');
+    });
+
+    it('should not show ghost text if the typed text extends past the completion', async () => {
+      // "ls " is already typed.
       const text = 'ls ';
       const cursorOffset = text.length;
 
