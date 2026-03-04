@@ -9,16 +9,14 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { inspect } from 'node:util';
 import process from 'node:process';
-import type {
-  ContentGenerator,
-  ContentGeneratorConfig,
-} from '../core/contentGenerator.js';
-import type { OverageStrategy } from '../billing/billing.js';
 import {
   AuthType,
   createContentGenerator,
   createContentGeneratorConfig,
+  type ContentGenerator,
+  type ContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import type { OverageStrategy } from '../billing/billing.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
@@ -43,12 +41,12 @@ import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
-import type { TelemetryTarget } from '../telemetry/index.js';
 import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
+  type TelemetryTarget,
 } from '../telemetry/index.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
@@ -68,8 +66,18 @@ import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
-import type { FileSystemService } from '../services/fileSystemService.js';
-import { StandardFileSystemService } from '../services/fileSystemService.js';
+import {
+  StandardFileSystemService,
+  type FileSystemService,
+} from '../services/fileSystemService.js';
+import {
+  TrackerCreateTaskTool,
+  TrackerUpdateTaskTool,
+  TrackerGetTaskTool,
+  TrackerListTasksTool,
+  TrackerAddDependencyTool,
+  TrackerVisualizeTool,
+} from '../tools/trackerTools.js';
 import {
   logRipgrepFallback,
   logFlashFallback,
@@ -89,13 +97,14 @@ import type {
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
-import type {
-  ModelConfig,
-  ModelConfigServiceConfig,
+import {
+  ModelConfigService,
+  type ModelConfig,
+  type ModelConfigServiceConfig,
 } from '../services/modelConfigService.js';
-import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
+import { TrackerService } from '../services/trackerService.js';
 import type { GenerateContentParameters } from '@google/genai';
 
 // Re-export OAuth config type
@@ -123,12 +132,14 @@ import type {
 } from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
-import type { Experiments } from '../code_assist/experiments/experiments.js';
+import {
+  getExperiments,
+  type Experiments,
+} from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentTool } from '../agents/subagent-tool.js';
-import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
@@ -250,11 +261,12 @@ export interface CustomTheme {
   };
   border?: {
     default?: string;
-    focused?: string;
   };
   ui?: {
     comment?: string;
     symbol?: string;
+    active?: string;
+    focus?: string;
     gradient?: string[];
   };
   status?: {
@@ -360,10 +372,10 @@ export interface ExtensionInstallMetadata {
 }
 
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
-import type { FileFilteringOptions } from './constants.js';
 import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+  type FileFilteringOptions,
 } from './constants.js';
 import {
   DEFAULT_TOOL_PROTECTION_THRESHOLD,
@@ -569,6 +581,7 @@ export interface ConfigParameters {
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
+  tracker?: boolean;
   planSettings?: PlanSettings;
   modelSteering?: boolean;
   onModelChange?: (model: string) => void;
@@ -602,6 +615,7 @@ export class Config implements McpContext {
   private sessionId: string;
   private clientVersion: string;
   private fileSystemService: FileSystemService;
+  private trackerService?: TrackerService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
   readonly modelConfigService: ModelConfigService;
@@ -780,6 +794,7 @@ export class Config implements McpContext {
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private readonly trackerEnabled: boolean;
   private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
@@ -870,6 +885,7 @@ export class Config implements McpContext {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
+    this.trackerEnabled = params.tracker ?? false;
     this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
@@ -1387,9 +1403,9 @@ export class Config implements McpContext {
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
-      if (this.onModelChange && !isTemporary) {
-        this.onModelChange(newModel);
-      }
+    }
+    if (this.onModelChange && !isTemporary) {
+      this.onModelChange(newModel);
     }
     this.modelAvailabilityService.reset();
   }
@@ -2190,6 +2206,15 @@ export class Config implements McpContext {
     return this.bugCommand;
   }
 
+  getTrackerService(): TrackerService {
+    if (!this.trackerService) {
+      this.trackerService = new TrackerService(
+        this.storage.getProjectTempTrackerDir(),
+      );
+    }
+    return this.trackerService;
+  }
+
   getFileService(): FileDiscoveryService {
     if (!this.fileDiscoveryService) {
       this.fileDiscoveryService = new FileDiscoveryService(this.targetDir, {
@@ -2255,6 +2280,10 @@ export class Config implements McpContext {
 
   isPlanEnabled(): boolean {
     return this.planEnabled;
+  }
+
+  isTrackerEnabled(): boolean {
+    return this.trackerEnabled;
   }
 
   getApprovedPlanPath(): string | undefined {
@@ -2819,6 +2848,29 @@ export class Config implements McpContext {
       );
       maybeRegister(EnterPlanModeTool, () =>
         registry.registerTool(new EnterPlanModeTool(this, this.messageBus)),
+      );
+    }
+
+    if (this.isTrackerEnabled()) {
+      maybeRegister(TrackerCreateTaskTool, () =>
+        registry.registerTool(new TrackerCreateTaskTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerUpdateTaskTool, () =>
+        registry.registerTool(new TrackerUpdateTaskTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerGetTaskTool, () =>
+        registry.registerTool(new TrackerGetTaskTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerListTasksTool, () =>
+        registry.registerTool(new TrackerListTasksTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerAddDependencyTool, () =>
+        registry.registerTool(
+          new TrackerAddDependencyTool(this, this.messageBus),
+        ),
+      );
+      maybeRegister(TrackerVisualizeTool, () =>
+        registry.registerTool(new TrackerVisualizeTool(this, this.messageBus)),
       );
     }
 

@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import type { Mock } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import type { CallableTool } from '@google/genai';
 import { CoreToolScheduler } from './coreToolScheduler.js';
 import {
