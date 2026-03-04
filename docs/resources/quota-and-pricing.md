@@ -1,14 +1,16 @@
 # Gemini CLI: Quotas and pricing
 
 Gemini CLI offers a generous free tier that covers many individual developers'
-use cases. For enterprise or professional usage, or if you need higher limits,
+use cases. For enterprise or professional usage, or if you need increased,
 several options are available depending on your authentication account type.
+
+For a high-level comparison of available subscriptions and to find the right
+quota for your needs, see the [Plans page](../../plans/).
 
 See [privacy and terms](./tos-privacy.md) for details on the Privacy Policy and
 Terms of Service.
 
-> **Note:** Published prices are list price; additional negotiated commercial
-> discounting may apply.
+## Overview
 
 This article outlines the specific quotas and pricing applicable to Gemini CLI
 when using different authentication methods.
@@ -26,7 +28,8 @@ Generally, there are three categories to choose from:
 Your journey begins with a generous free tier, perfect for experimentation and
 light use.
 
-Your free usage limits depend on your authorization type.
+Your free usage is governed by the following limits, which depend on your
+authorization type.
 
 ### Log in with Google (Gemini Code Assist for individuals)
 
@@ -78,14 +81,12 @@ Gemini CLI by upgrading to one of the following subscriptions:
   Learn more at
   [Gemini Code Assist Quotas and Limits](https://developers.google.com/gemini-code-assist/resources/quotas)
 
-- [Purchase a Gemini Code Assist Subscription through Google Cloud ](https://cloud.google.com/gemini/docs/codeassist/overview)
-  by signing up in the Google Cloud console. Learn more at
-  [Set up Gemini Code Assist](https://cloud.google.com/gemini/docs/discover/set-up-gemini).
+- [Purchase a Gemini Code Assist Subscription through Google Cloud](https://cloud.google.com/gemini/docs/codeassist/overview).
 
   Quotas and pricing are based on a fixed price subscription with assigned
   license seats. For predictable costs, you can sign in with Google.
 
-  This includes:
+  This includes the following request limits:
   - Gemini Code Assist Standard edition:
     - 1500 model requests / user / day
     - 120 model requests / user / minute
@@ -125,7 +126,8 @@ Learn more at
 
 It’s important to highlight that when using an API key, you pay per token/call.
 This can be more expensive for many small calls with few tokens, but it's the
-only way to ensure your workflow isn't interrupted by quota limits.
+only way to ensure your workflow isn't interrupted by reaching a limit on your
+quota.
 
 ## Gemini for workspace plans
 
@@ -135,12 +137,12 @@ Flow video editor). These plans do not apply to the API usage which powers the
 Gemini CLI. Supporting these plans is under active consideration for future
 support.
 
-## Check usage and quota
+## Check usage and limits
 
-You can check your current token usage and quota information using the
+You can check your current token usage and applicable limits using the
 `/stats model` command. This command provides a snapshot of your current
-session's token usage, as well as your overall quota and usage for the supported
-models.
+session's token usage, as well as information about the limits associated with
+your current quota.
 
 For more information on the `/stats` command and its subcommands, see the
 [Command Reference](../../reference/commands.md#stats).
@@ -149,17 +151,24 @@ A summary of model usage is also presented on exit at the end of a session.
 
 ## Tips to avoid high costs
 
-When using a Pay as you Go API key, be mindful of your usage to avoid unexpected
+When using a pay-as-you-go plan, be mindful of your usage to avoid unexpected
 costs.
 
-- Don't blindly accept every suggestion, especially for computationally
-  intensive tasks like refactoring large codebases.
-- Be intentional with your prompts and commands. You are paying per call, so
-  think about the most efficient way to get the job done.
+- **Be selective with suggestions**: Before accepting a suggestion, especially
+  for a computationally intensive task like refactoring a large codebase,
+  consider if it's the most cost-effective approach.
+- **Use precise prompts**: You are paying per call, so think about the most
+  efficient way to get your desired result. A well-crafted prompt can often get
+  you the answer you need in a single call, rather than multiple back-and-forth
+  interactions.
+- **Monitor your usage**: Use the `/stats model` command to track your token
+  usage during a session. This can help you stay aware of your spending in real
+  time.
 
-## Gemini API vs. Vertex
+## Gemini API vs. Vertex AI
 
-- Gemini API (gemini developer api): This is the fastest way to use the Gemini
-  models directly.
-- Vertex AI: This is the enterprise-grade platform for building, deploying, and
-  managing Gemini models with specific security and control requirements.
+- **Gemini API**: Ideal for developers who want to quickly build applications
+  with the Gemini models. This is the most direct way to use the models.
+- **Vertex AI**: An enterprise-grade platform for building, deploying, and
+  managing AI models, including Gemini. It offers enhanced security, data
+  governance, and integration with other Google Cloud services.
