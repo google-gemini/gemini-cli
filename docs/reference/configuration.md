@@ -263,7 +263,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`ui.footer.hideContextPercentage`** (boolean):
-  - **Description:** Hides the context window remaining percentage.
+  - **Description:** Hides the context window usage percentage.
   - **Default:** `true`
 
 - **`ui.hideFooter`** (boolean):
@@ -1011,6 +1011,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.plan`** (boolean):
   - **Description:** Enable planning features (Plan Mode and tools).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.taskTracker`** (boolean):
+  - **Description:** Enable task tracker tools.
   - **Default:** `false`
   - **Requires restart:** Yes
 

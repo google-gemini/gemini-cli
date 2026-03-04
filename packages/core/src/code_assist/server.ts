@@ -5,26 +5,26 @@
  */
 
 import type { AuthClient } from 'google-auth-library';
-import type {
-  CodeAssistGlobalUserSettingResponse,
-  LoadCodeAssistRequest,
-  LoadCodeAssistResponse,
-  LongRunningOperationResponse,
-  OnboardUserRequest,
-  SetCodeAssistGlobalUserSettingRequest,
-  ClientMetadata,
-  RetrieveUserQuotaRequest,
-  RetrieveUserQuotaResponse,
-  FetchAdminControlsRequest,
-  FetchAdminControlsResponse,
-  ConversationOffered,
-  ConversationInteraction,
-  StreamingLatency,
-  RecordCodeAssistMetricsRequest,
-  GeminiUserTier,
-  Credits,
+import {
+  UserTierId,
+  type CodeAssistGlobalUserSettingResponse,
+  type LoadCodeAssistRequest,
+  type LoadCodeAssistResponse,
+  type LongRunningOperationResponse,
+  type OnboardUserRequest,
+  type SetCodeAssistGlobalUserSettingRequest,
+  type ClientMetadata,
+  type RetrieveUserQuotaRequest,
+  type RetrieveUserQuotaResponse,
+  type FetchAdminControlsRequest,
+  type FetchAdminControlsResponse,
+  type ConversationOffered,
+  type ConversationInteraction,
+  type StreamingLatency,
+  type RecordCodeAssistMetricsRequest,
+  type GeminiUserTier,
+  type Credits,
 } from './types.js';
-import { UserTierId } from './types.js';
 import type {
   ListExperimentsRequest,
   ListExperimentsResponse,
@@ -49,15 +49,13 @@ import {
 } from '../billing/billing.js';
 import { logBillingEvent } from '../telemetry/loggers.js';
 import { CreditsUsedEvent } from '../telemetry/billingEvents.js';
-import type {
-  CaCountTokenResponse,
-  CaGenerateContentResponse,
-} from './converter.js';
 import {
   fromCountTokenResponse,
   fromGenerateContentResponse,
   toCountTokenRequest,
   toGenerateContentRequest,
+  type CaCountTokenResponse,
+  type CaGenerateContentResponse,
 } from './converter.js';
 import {
   formatProtoJsonDuration,
@@ -508,6 +506,16 @@ export class CodeAssistServer implements ContentGenerator {
 }
 
 interface VpcScErrorResponse {
+  response?: {
+    data?: {
+      error?: {
+        details?: unknown[];
+      };
+    };
+  };
+}
+
+function isVpcScErrorResponse(error: unknown): error is VpcScErrorResponse & {
   response: {
     data: {
       error: {
@@ -515,9 +523,7 @@ interface VpcScErrorResponse {
       };
     };
   };
-}
-
-function isVpcScErrorResponse(error: unknown): error is VpcScErrorResponse {
+} {
   return (
     !!error &&
     typeof error === 'object' &&

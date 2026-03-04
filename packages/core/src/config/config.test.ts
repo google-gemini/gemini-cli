@@ -4,16 +4,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Mock } from 'vitest';
-import type { ConfigParameters, SandboxConfig } from './config.js';
-import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
+import {
+  Config,
+  DEFAULT_FILE_FILTERING_OPTIONS,
+  type ConfigParameters,
+  type SandboxConfig,
+} from './config.js';
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
-import type { HookDefinition } from '../hooks/types.js';
-import { HookType, HookEventName } from '../hooks/types.js';
+import {
+  HookType,
+  HookEventName,
+  type HookDefinition,
+} from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -23,14 +37,12 @@ import {
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
 } from '../telemetry/index.js';
-import type {
-  ContentGeneratorConfig,
-  ContentGenerator,
-} from '../core/contentGenerator.js';
 import {
   AuthType,
   createContentGenerator,
   createContentGeneratorConfig,
+  type ContentGeneratorConfig,
+  type ContentGenerator,
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
@@ -2950,9 +2962,11 @@ describe('Plans Directory Initialization', () => {
 
   afterEach(() => {
     vi.mocked(fs.promises.mkdir).mockRestore();
+    vi.mocked(fs.promises.access).mockRestore?.();
   });
 
-  it('should create plans directory and add it to workspace context when plan is enabled', async () => {
+  it('should add plans directory to workspace context if it exists', async () => {
+    vi.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
     const config = new Config({
       ...baseParams,
       plan: true,
@@ -2961,12 +2975,30 @@ describe('Plans Directory Initialization', () => {
     await config.initialize();
 
     const plansDir = config.storage.getPlansDir();
-    expect(fs.promises.mkdir).toHaveBeenCalledWith(plansDir, {
-      recursive: true,
-    });
+    // Should NOT create the directory eagerly
+    expect(fs.promises.mkdir).not.toHaveBeenCalled();
+    // Should check if it exists
+    expect(fs.promises.access).toHaveBeenCalledWith(plansDir);
 
     const context = config.getWorkspaceContext();
     expect(context.getDirectories()).toContain(plansDir);
+  });
+
+  it('should NOT add plans directory to workspace context if it does not exist', async () => {
+    vi.spyOn(fs.promises, 'access').mockRejectedValue({ code: 'ENOENT' });
+    const config = new Config({
+      ...baseParams,
+      plan: true,
+    });
+
+    await config.initialize();
+
+    const plansDir = config.storage.getPlansDir();
+    expect(fs.promises.mkdir).not.toHaveBeenCalled();
+    expect(fs.promises.access).toHaveBeenCalledWith(plansDir);
+
+    const context = config.getWorkspaceContext();
+    expect(context.getDirectories()).not.toContain(plansDir);
   });
 
   it('should NOT create plans directory or add it to workspace context when plan is disabled', async () => {
