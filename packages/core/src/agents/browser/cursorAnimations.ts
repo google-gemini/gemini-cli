@@ -24,28 +24,19 @@ export function generateClickAnimationScript(x: number, y: number): string {
       dot.addEventListener('animationend', () => dot.remove());
 
       // Inject keyframes if not present
-      if (!document.getElementById('__gemini_click_keyframes')) {
-        const style = document.createElement('style');
-        style.id = '__gemini_click_keyframes';
-        style.textContent = \`
-          @keyframes __gemini_click {
-            0% { width: 8px; height: 8px; left: ${x - 4}px; top: ${y - 4}px; opacity: 1; }
-            100% { width: 24px; height: 24px; left: ${x - 12}px; top: ${y - 12}px; opacity: 0; }
-          }
-        \`;
+      const keyframesId = '__gemini_click_keyframes';
+      let style = document.getElementById(keyframesId);
+      if (!style) {
+        style = document.createElement('style');
+        style.id = keyframesId;
         document.head.appendChild(style);
-      } else {
-        // Update keyframes with new coordinates
-        const style = document.getElementById('__gemini_click_keyframes');
-        if (style) {
-          style.textContent = \`
-            @keyframes __gemini_click {
-              0% { width: 8px; height: 8px; left: ${x - 4}px; top: ${y - 4}px; opacity: 1; }
-              100% { width: 24px; height: 24px; left: ${x - 12}px; top: ${y - 12}px; opacity: 0; }
-            }
-          \`;
-        }
       }
+      style.textContent = \`
+        @keyframes __gemini_click {
+          0% { width: 8px; height: 8px; left: \${${x} - 4}px; top: \${${y} - 4}px; opacity: 1; }
+          100% { width: 24px; height: 24px; left: \${${x} - 12}px; top: \${${y} - 12}px; opacity: 0; }
+        }
+      \`;
     })();
   `;
 }
@@ -72,7 +63,7 @@ export function generateScrollAnimationScript(
       indicator.addEventListener('animationend', () => indicator.remove());
 
       // Inject keyframes if not present
-      const styleId = '__gemini_scroll_${direction}_keyframes';
+      const styleId = '__gemini_scroll_keyframes';
       if (!document.getElementById(styleId)) {
         const style = document.createElement('style');
         style.id = styleId;

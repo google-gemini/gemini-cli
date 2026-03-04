@@ -155,15 +155,17 @@ class McpToolInvocation extends BaseToolInvocation<
     try {
       if (this.toolName === 'click_at' || this.toolName === 'click') {
         const x =
-          Number(this.params['x']) ||
-          (Array.isArray(this.params['coordinate'])
-            ? Number(this.params['coordinate'][0])
-            : undefined);
+          this.params['x'] != null
+            ? Number(this.params['x'])
+            : Array.isArray(this.params['coordinate'])
+              ? Number(this.params['coordinate'][0])
+              : undefined;
         const y =
-          Number(this.params['y']) ||
-          (Array.isArray(this.params['coordinate'])
-            ? Number(this.params['coordinate'][1])
-            : undefined);
+          this.params['y'] != null
+            ? Number(this.params['y'])
+            : Array.isArray(this.params['coordinate'])
+              ? Number(this.params['coordinate'][1])
+              : undefined;
 
         if (x !== undefined && y !== undefined && !isNaN(x) && !isNaN(y)) {
           await this.injectClickAnimation(x, y, signal);

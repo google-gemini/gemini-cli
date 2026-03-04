@@ -201,6 +201,24 @@ describe('mcpToolWrapper', () => {
       );
     });
 
+    it('should inject animation for click_at with zero coordinates', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+      );
+
+      const invocation = tools[2].build({ coordinate: [0, 0] });
+      await invocation.execute(new AbortController().signal);
+
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'evaluate_script',
+        expect.objectContaining({
+          script: expect.stringContaining('__gemini_click'),
+        }),
+        expect.any(AbortSignal),
+      );
+    });
+
     it('should inject animation for press_key with scroll key', async () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
