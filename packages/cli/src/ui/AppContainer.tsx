@@ -1873,10 +1873,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
-  useKeypress(handleGlobalKeypress, {
-    isActive: true,
-    priority: KeypressPriority.Low,
-  });
+  useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
 
   useKeypress(
     () => {
