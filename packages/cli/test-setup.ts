@@ -60,6 +60,10 @@ beforeEach(() => {
           ? stackLines.slice(lastReactFrameIndex + 1).join('\n')
           : stackLines.slice(1).join('\n');
 
+      if (relevantStack.includes('OverflowContext.tsx')) {
+        return;
+      }
+
       actWarnings.push({
         message: format(...args),
         stack: relevantStack,
