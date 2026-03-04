@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { maskVariables } from './lib/masking.js';
+import { maskVariables } from './masking.js';
 
 export interface OptimizationTarget {
   id: string;
