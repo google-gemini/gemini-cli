@@ -11,8 +11,10 @@ import { bfsFileSearch } from './bfsFileSearch.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { processImports } from './memoryImportProcessor.js';
-import type { FileFilteringOptions } from '../config/constants.js';
-import { DEFAULT_MEMORY_FILE_FILTERING_OPTIONS } from '../config/constants.js';
+import {
+  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+  type FileFilteringOptions,
+} from '../config/constants.js';
 import { GEMINI_DIR, homedir, normalizePath } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
@@ -46,14 +48,20 @@ export interface GeminiFileContent {
  *
  * @param filePaths Array of file paths to deduplicate
  * @param debugMode Whether to log debug information
- * @returns Array of deduplicated file paths, keeping the first occurrence of each unique file
+ * @returns Object containing deduplicated file paths and a map of path to identity key
  */
 export async function deduplicatePathsByFileIdentity(
   filePaths: string[],
   debugMode: boolean,
-): Promise<string[]> {
+): Promise<{
+  paths: string[];
+  identityMap: Map<string, string>;
+}> {
   if (filePaths.length === 0) {
-    return [];
+    return {
+      paths: [],
+      identityMap: new Map<string, string>(),
+    };
   }
 
   // first deduplicate by string path to avoid redundant stat calls
@@ -113,9 +121,11 @@ export async function deduplicatePathsByFileIdentity(
     }
   }
 
+  const pathToIdentityMap = new Map<string, string>();
   for (const { path, dev, ino } of results) {
     if (dev !== null && ino !== null) {
       const identityKey = `${dev.toString()}:${ino.toString()}`;
+      pathToIdentityMap.set(path, identityKey);
       if (!fileIdentityMap.has(identityKey)) {
         fileIdentityMap.set(identityKey, path);
         deduplicatedPaths.push(path);
@@ -137,7 +147,10 @@ export async function deduplicatePathsByFileIdentity(
     }
   }
 
-  return deduplicatedPaths;
+  return {
+    paths: deduplicatedPaths,
+    identityMap: pathToIdentityMap,
+  };
 }
 
 async function findProjectRoot(startDir: string): Promise<string | null> {
@@ -646,7 +659,7 @@ export async function loadServerHierarchicalMemory(
   }
 
   // deduplicate by file identity to handle case-insensitive filesystems
-  const allFilePaths = await deduplicatePathsByFileIdentity(
+  const { paths: allFilePaths } = await deduplicatePathsByFileIdentity(
     allFilePathsStringDeduped,
     debugMode,
   );
@@ -778,10 +791,8 @@ export async function loadJitSubdirectoryMemory(
 
   // deduplicate by file identity to handle case-insensitive filesystems
   // this deduplicates within the current batch
-  const deduplicatedNewPaths = await deduplicatePathsByFileIdentity(
-    potentialPaths,
-    debugMode,
-  );
+  const { paths: deduplicatedNewPaths, identityMap: newPathsIdentityMap } =
+    await deduplicatePathsByFileIdentity(potentialPaths, debugMode);
 
   // get file identities of already loaded paths to compare against
   const alreadyLoadedIdentities = new Set<string>();
@@ -807,30 +818,20 @@ export async function loadJitSubdirectoryMemory(
   }
 
   // filter out paths that match already loaded files by identity
+  // reuse the identities from deduplicatePathsByFileIdentity to avoid redundant stat calls
   const newPaths: string[] = [];
-  const CONCURRENT_LIMIT = 20;
-  for (let i = 0; i < deduplicatedNewPaths.length; i += CONCURRENT_LIMIT) {
-    const batch = deduplicatedNewPaths.slice(i, i + CONCURRENT_LIMIT);
-    const batchPromises = batch.map(async (filePath) => {
-      try {
-        const stats = await fs.stat(filePath);
-        const identityKey = `${stats.dev.toString()}:${stats.ino.toString()}`;
-        if (!alreadyLoadedIdentities.has(identityKey)) {
-          return filePath;
-        }
-        if (debugMode) {
-          logger.debug(
-            `jit memory: skipping ${filePath} (already loaded with different case)`,
-          );
-        }
-        return null;
-      } catch {
-        // if we can't stat it, include it to be safe
-        return filePath;
+  for (const filePath of deduplicatedNewPaths) {
+    const identityKey = newPathsIdentityMap.get(filePath);
+    if (identityKey && alreadyLoadedIdentities.has(identityKey)) {
+      if (debugMode) {
+        logger.debug(
+          `jit memory: skipping ${filePath} (already loaded with different case)`,
+        );
       }
-    });
-    const batchResults = await Promise.all(batchPromises);
-    newPaths.push(...batchResults.filter((p): p is string => p !== null));
+      continue;
+    }
+    // if we don't have an identity (stat failed), include it to be safe
+    newPaths.push(filePath);
   }
 
   if (newPaths.length === 0) {

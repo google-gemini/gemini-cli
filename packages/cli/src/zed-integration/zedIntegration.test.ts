@@ -15,6 +15,7 @@ import {
   type Mocked,
 } from 'vitest';
 import { GeminiAgent, Session } from './zedIntegration.js';
+import type { CommandHandler } from './commandHandler.js';
 import * as acp from '@agentclientprotocol/sdk';
 import {
   AuthType,
@@ -26,6 +27,7 @@ import {
   type Config,
   type MessageBus,
   LlmRole,
+  type GitService,
 } from '@google/gemini-cli-core';
 import {
   SettingScope,
@@ -62,7 +64,33 @@ vi.mock('node:path', async (importOriginal) => {
   };
 });
 
-// Mock ReadManyFilesTool
+vi.mock('../ui/commands/memoryCommand.js', () => ({
+  memoryCommand: {
+    name: 'memory',
+    action: vi.fn(),
+  },
+}));
+
+vi.mock('../ui/commands/extensionsCommand.js', () => ({
+  extensionsCommand: vi.fn().mockReturnValue({
+    name: 'extensions',
+    action: vi.fn(),
+  }),
+}));
+
+vi.mock('../ui/commands/restoreCommand.js', () => ({
+  restoreCommand: vi.fn().mockReturnValue({
+    name: 'restore',
+    action: vi.fn(),
+  }),
+}));
+
+vi.mock('../ui/commands/initCommand.js', () => ({
+  initCommand: {
+    name: 'init',
+    action: vi.fn(),
+  },
+}));
 vi.mock(
   '@google/gemini-cli-core',
   async (
@@ -73,7 +101,7 @@ vi.mock(
       ...actual,
       ReadManyFilesTool: vi.fn().mockImplementation(() => ({
         name: 'read_many_files',
-        kind: 'native',
+        kind: 'read',
         build: vi.fn().mockReturnValue({
           getDescription: () => 'Read files',
           toolLocations: () => [],
@@ -84,6 +112,28 @@ vi.mock(
       })),
       logToolCall: vi.fn(),
       isWithinRoot: vi.fn().mockReturnValue(true),
+      LlmRole: {
+        MAIN: 'main',
+        SUBAGENT: 'subagent',
+        UTILITY_TOOL: 'utility_tool',
+        UTILITY_COMPRESSOR: 'utility_compressor',
+        UTILITY_SUMMARIZER: 'utility_summarizer',
+        UTILITY_ROUTER: 'utility_router',
+        UTILITY_LOOP_DETECTOR: 'utility_loop_detector',
+        UTILITY_NEXT_SPEAKER: 'utility_next_speaker',
+        UTILITY_EDIT_CORRECTOR: 'utility_edit_corrector',
+        UTILITY_AUTOCOMPLETE: 'utility_autocomplete',
+        UTILITY_FAST_ACK_HELPER: 'utility_fast_ack_helper',
+      },
+      CoreToolCallStatus: {
+        Validating: 'validating',
+        Scheduled: 'scheduled',
+        Error: 'error',
+        Success: 'success',
+        Executing: 'executing',
+        Cancelled: 'cancelled',
+        AwaitingApproval: 'awaiting_approval',
+      },
     };
   },
 );
@@ -107,6 +157,7 @@ describe('GeminiAgent', () => {
     mockConfig = {
       refreshAuth: vi.fn(),
       initialize: vi.fn(),
+      waitForMcpInit: vi.fn(),
       getFileSystemService: vi.fn(),
       setFileSystemService: vi.fn(),
       getContentGeneratorConfig: vi.fn(),
@@ -122,6 +173,9 @@ describe('GeminiAgent', () => {
       }),
       getApprovalMode: vi.fn().mockReturnValue('default'),
       isPlanEnabled: vi.fn().mockReturnValue(false),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
+      getCheckpointingEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Awaited<ReturnType<typeof loadCliConfig>>>;
     mockSettings = {
       merged: {
@@ -155,6 +209,14 @@ describe('GeminiAgent', () => {
 
     expect(response.protocolVersion).toBe(acp.PROTOCOL_VERSION);
     expect(response.authMethods).toHaveLength(3);
+    const geminiAuth = response.authMethods?.find(
+      (m) => m.id === AuthType.USE_GEMINI,
+    );
+    expect(geminiAuth?._meta).toEqual({
+      'api-key': {
+        provider: 'google',
+      },
+    });
     expect(response.agentCapabilities?.loadSession).toBe(true);
   });
 
@@ -165,6 +227,7 @@ describe('GeminiAgent', () => {
 
     expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
       AuthType.LOGIN_WITH_GOOGLE,
+      undefined,
     );
     expect(mockSettings.setValue).toHaveBeenCalledWith(
       SettingScope.User,
@@ -173,7 +236,27 @@ describe('GeminiAgent', () => {
     );
   });
 
+  it('should authenticate correctly with api-key in _meta', async () => {
+    await agent.authenticate({
+      methodId: AuthType.USE_GEMINI,
+      _meta: {
+        'api-key': 'test-api-key',
+      },
+    } as unknown as acp.AuthenticateRequest);
+
+    expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
+      AuthType.USE_GEMINI,
+      'test-api-key',
+    );
+    expect(mockSettings.setValue).toHaveBeenCalledWith(
+      SettingScope.User,
+      'security.auth.selectedType',
+      AuthType.USE_GEMINI,
+    );
+  });
+
   it('should create a new session', async () => {
+    vi.useFakeTimers();
     mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
       apiKey: 'test-key',
     });
@@ -186,6 +269,17 @@ describe('GeminiAgent', () => {
     expect(loadCliConfig).toHaveBeenCalled();
     expect(mockConfig.initialize).toHaveBeenCalled();
     expect(mockConfig.getGeminiClient).toHaveBeenCalled();
+
+    // Verify deferred call
+    await vi.runAllTimersAsync();
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'available_commands_update',
+        }),
+      }),
+    );
+    vi.useRealTimers();
   });
 
   it('should return modes without plan mode when plan is disabled', async () => {
@@ -212,6 +306,38 @@ describe('GeminiAgent', () => {
       ],
       currentModeId: 'default',
     });
+    expect(response.models).toEqual({
+      availableModels: expect.arrayContaining([
+        expect.objectContaining({
+          modelId: 'auto-gemini-2.5',
+          name: 'Auto (Gemini 2.5)',
+        }),
+      ]),
+      currentModelId: 'gemini-pro',
+    });
+  });
+
+  it('should include preview models when user has access', async () => {
+    mockConfig.getHasAccessToPreviewModel = vi.fn().mockReturnValue(true);
+    mockConfig.getGemini31LaunchedSync = vi.fn().mockReturnValue(true);
+
+    const response = await agent.newSession({
+      cwd: '/tmp',
+      mcpServers: [],
+    });
+
+    expect(response.models?.availableModels).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          modelId: 'auto-gemini-3',
+          name: expect.stringContaining('Auto'),
+        }),
+        expect.objectContaining({
+          modelId: 'gemini-3.1-pro-preview',
+          name: 'gemini-3.1-pro-preview',
+        }),
+      ]),
+    );
   });
 
   it('should return modes with plan mode when plan is enabled', async () => {
@@ -238,6 +364,15 @@ describe('GeminiAgent', () => {
         { id: 'plan', name: 'Plan', description: 'Read-only mode' },
       ],
       currentModeId: 'plan',
+    });
+    expect(response.models).toEqual({
+      availableModels: expect.arrayContaining([
+        expect.objectContaining({
+          modelId: 'auto-gemini-2.5',
+          name: 'Auto (Gemini 2.5)',
+        }),
+      ]),
+      currentModelId: 'gemini-pro',
     });
   });
 
@@ -388,6 +523,32 @@ describe('GeminiAgent', () => {
       }),
     ).rejects.toThrow('Session not found: unknown');
   });
+
+  it('should delegate setModel to session (unstable)', async () => {
+    await agent.newSession({ cwd: '/tmp', mcpServers: [] });
+    const session = (
+      agent as unknown as { sessions: Map<string, Session> }
+    ).sessions.get('test-session-id');
+    if (!session) throw new Error('Session not found');
+    session.setModel = vi.fn().mockReturnValue({});
+
+    const result = await agent.unstable_setSessionModel({
+      sessionId: 'test-session-id',
+      modelId: 'gemini-2.0-pro-exp',
+    });
+
+    expect(session.setModel).toHaveBeenCalledWith('gemini-2.0-pro-exp');
+    expect(result).toEqual({});
+  });
+
+  it('should throw error when setting model on non-existent session (unstable)', async () => {
+    await expect(
+      agent.unstable_setSessionModel({
+        sessionId: 'unknown',
+        modelId: 'gemini-2.0-pro-exp',
+      }),
+    ).rejects.toThrow('Session not found: unknown');
+  });
 });
 
 describe('Session', () => {
@@ -406,7 +567,7 @@ describe('Session', () => {
       recordCompletedToolCalls: vi.fn(),
     } as unknown as Mocked<GeminiChat>;
     mockTool = {
-      kind: 'native',
+      kind: 'read',
       build: vi.fn().mockReturnValue({
         getDescription: () => 'Test Tool',
         toolLocations: () => [],
@@ -426,6 +587,7 @@ describe('Session', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getMcpServers: vi.fn(),
       getFileService: vi.fn().mockReturnValue({
         shouldIgnoreFile: vi.fn().mockReturnValue(false),
       }),
@@ -435,7 +597,11 @@ describe('Session', () => {
       getDebugMode: vi.fn().mockReturnValue(false),
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
       setApprovalMode: vi.fn(),
+      setModel: vi.fn(),
       isPlanEnabled: vi.fn().mockReturnValue(false),
+      getCheckpointingEnabled: vi.fn().mockReturnValue(false),
+      getGitService: vi.fn().mockResolvedValue({} as GitService),
+      waitForMcpInit: vi.fn(),
     } as unknown as Mocked<Config>;
     mockConnection = {
       sessionUpdate: vi.fn(),
@@ -443,11 +609,58 @@ describe('Session', () => {
       sendNotification: vi.fn(),
     } as unknown as Mocked<acp.AgentSideConnection>;
 
-    session = new Session('session-1', mockChat, mockConfig, mockConnection);
+    session = new Session('session-1', mockChat, mockConfig, mockConnection, {
+      system: { settings: {} },
+      systemDefaults: { settings: {} },
+      user: { settings: {} },
+      workspace: { settings: {} },
+      merged: { settings: {} },
+      errors: [],
+    } as unknown as LoadedSettings);
   });
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('should send available commands', async () => {
+    await session.sendAvailableCommands();
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'available_commands_update',
+          availableCommands: expect.arrayContaining([
+            expect.objectContaining({ name: 'memory' }),
+            expect.objectContaining({ name: 'extensions' }),
+            expect.objectContaining({ name: 'restore' }),
+            expect.objectContaining({ name: 'init' }),
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('should await MCP initialization before processing a prompt', async () => {
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [{ content: { parts: [{ text: 'Hi' }] } }] },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'test' }],
+    });
+
+    expect(mockConfig.waitForMcpInit).toHaveBeenCalledOnce();
+    const waitOrder = (mockConfig.waitForMcpInit as Mock).mock
+      .invocationCallOrder[0];
+    const sendOrder = (mockChat.sendMessageStream as Mock).mock
+      .invocationCallOrder[0];
+    expect(waitOrder).toBeLessThan(sendOrder);
   });
 
   it('should handle prompt with text response', async () => {
@@ -475,6 +688,113 @@ describe('Session', () => {
       },
     });
     expect(result).toEqual({ stopReason: 'end_turn' });
+  });
+
+  it('should handle /memory command', async () => {
+    const handleCommandSpy = vi
+      .spyOn(
+        (session as unknown as { commandHandler: CommandHandler })
+          .commandHandler,
+        'handleCommand',
+      )
+      .mockResolvedValue(true);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: '/memory view' }],
+    });
+
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(handleCommandSpy).toHaveBeenCalledWith(
+      '/memory view',
+      expect.any(Object),
+    );
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
+  });
+
+  it('should handle /extensions command', async () => {
+    const handleCommandSpy = vi
+      .spyOn(
+        (session as unknown as { commandHandler: CommandHandler })
+          .commandHandler,
+        'handleCommand',
+      )
+      .mockResolvedValue(true);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: '/extensions list' }],
+    });
+
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(handleCommandSpy).toHaveBeenCalledWith(
+      '/extensions list',
+      expect.any(Object),
+    );
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
+  });
+
+  it('should handle /extensions explore command', async () => {
+    const handleCommandSpy = vi
+      .spyOn(
+        (session as unknown as { commandHandler: CommandHandler })
+          .commandHandler,
+        'handleCommand',
+      )
+      .mockResolvedValue(true);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: '/extensions explore' }],
+    });
+
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(handleCommandSpy).toHaveBeenCalledWith(
+      '/extensions explore',
+      expect.any(Object),
+    );
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
+  });
+
+  it('should handle /restore command', async () => {
+    const handleCommandSpy = vi
+      .spyOn(
+        (session as unknown as { commandHandler: CommandHandler })
+          .commandHandler,
+        'handleCommand',
+      )
+      .mockResolvedValue(true);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: '/restore' }],
+    });
+
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(handleCommandSpy).toHaveBeenCalledWith(
+      '/restore',
+      expect.any(Object),
+    );
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
+  });
+
+  it('should handle /init command', async () => {
+    const handleCommandSpy = vi
+      .spyOn(
+        (session as unknown as { commandHandler: CommandHandler })
+          .commandHandler,
+        'handleCommand',
+      )
+      .mockResolvedValue(true);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: '/init' }],
+    });
+
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(handleCommandSpy).toHaveBeenCalledWith('/init', expect.any(Object));
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
   });
 
   it('should handle tool calls', async () => {
@@ -511,6 +831,7 @@ describe('Session', () => {
         update: expect.objectContaining({
           sessionUpdate: 'tool_call',
           status: 'in_progress',
+          kind: 'read',
         }),
       }),
     );
@@ -574,6 +895,133 @@ describe('Session', () => {
     );
   });
 
+  it('should use filePath for ACP diff content in permission request', async () => {
+    const confirmationDetails = {
+      type: 'edit',
+      title: 'Confirm Write: test.txt',
+      fileName: 'test.txt',
+      filePath: '/tmp/test.txt',
+      originalContent: 'old',
+      newContent: 'new',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedOnce,
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCall: expect.objectContaining({
+          content: expect.arrayContaining([
+            expect.objectContaining({
+              type: 'diff',
+              path: '/tmp/test.txt',
+              oldText: 'old',
+              newText: 'new',
+            }),
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it('should use filePath for ACP diff content in tool result', async () => {
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(null),
+      execute: vi.fn().mockResolvedValue({
+        llmContent: 'Tool Result',
+        returnDisplay: {
+          fileName: 'test.txt',
+          filePath: '/tmp/test.txt',
+          originalContent: 'old',
+          newContent: 'new',
+        },
+      }),
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    const updateCalls = mockConnection.sessionUpdate.mock.calls.map(
+      (call) => call[0],
+    );
+    const toolCallUpdate = updateCalls.find(
+      (call) => call.update?.sessionUpdate === 'tool_call_update',
+    );
+
+    expect(toolCallUpdate).toEqual(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          content: expect.arrayContaining([
+            expect.objectContaining({
+              type: 'diff',
+              path: '/tmp/test.txt',
+              oldText: 'old',
+              newText: 'new',
+            }),
+          ]),
+        }),
+      }),
+    );
+  });
+
   it('should handle tool call cancellation by user', async () => {
     const confirmationDetails = {
       type: 'info',
@@ -630,6 +1078,92 @@ describe('Session', () => {
         }),
       ]),
     );
+  });
+
+  it('should include _meta.kind in diff tool calls', async () => {
+    // Test 'add' (no original content)
+    const addConfirmation = {
+      type: 'edit',
+      fileName: 'new.txt',
+      originalContent: null,
+      newContent: 'New content',
+      onConfirm: vi.fn(),
+    };
+
+    // Test 'modify' (original and new content)
+    const modifyConfirmation = {
+      type: 'edit',
+      fileName: 'existing.txt',
+      originalContent: 'Old content',
+      newContent: 'New content',
+      onConfirm: vi.fn(),
+    };
+
+    // Test 'delete' (original content, no new content)
+    const deleteConfirmation = {
+      type: 'edit',
+      fileName: 'deleted.txt',
+      originalContent: 'Old content',
+      newContent: '',
+      onConfirm: vi.fn(),
+    };
+
+    const mockBuild = vi.fn();
+    mockTool.build = mockBuild;
+
+    // Helper to simulate tool call and check permission request
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const checkDiffKind = async (confirmation: any, expectedKind: string) => {
+      mockBuild.mockReturnValueOnce({
+        getDescription: () => 'Test Tool',
+        toolLocations: () => [],
+        shouldConfirmExecute: vi.fn().mockResolvedValue(confirmation),
+        execute: vi.fn().mockResolvedValue({ llmContent: 'Result' }),
+      });
+
+      mockConnection.requestPermission.mockResolvedValueOnce({
+        outcome: {
+          outcome: 'selected',
+          optionId: ToolConfirmationOutcome.ProceedOnce,
+        },
+      });
+
+      const stream = createMockStream([
+        {
+          type: StreamEventType.CHUNK,
+          value: {
+            functionCalls: [{ name: 'test_tool', args: {} }],
+          },
+        },
+      ]);
+      const emptyStream = createMockStream([]);
+
+      mockChat.sendMessageStream
+        .mockResolvedValueOnce(stream)
+        .mockResolvedValueOnce(emptyStream);
+
+      await session.prompt({
+        sessionId: 'session-1',
+        prompt: [{ type: 'text', text: 'Call tool' }],
+      });
+
+      expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolCall: expect.objectContaining({
+            content: expect.arrayContaining([
+              expect.objectContaining({
+                type: 'diff',
+                _meta: { kind: expectedKind },
+              }),
+            ]),
+          }),
+        }),
+      );
+    };
+
+    await checkDiffKind(addConfirmation, 'add');
+    await checkDiffKind(modifyConfirmation, 'modify');
+    await checkDiffKind(deleteConfirmation, 'delete');
   });
 
   it('should handle @path resolution', async () => {
@@ -918,5 +1452,31 @@ describe('Session', () => {
     expect(() => session.setMode('invalid-mode')).toThrow(
       'Invalid or unavailable mode: invalid-mode',
     );
+  });
+
+  it('should set model on config', () => {
+    session.setModel('gemini-2.0-flash-exp');
+    expect(mockConfig.setModel).toHaveBeenCalledWith('gemini-2.0-flash-exp');
+  });
+
+  it('should handle unquoted commands from autocomplete (with empty leading parts)', async () => {
+    // Mock handleCommand to verify it gets called
+    const handleCommandSpy = vi
+      .spyOn(
+        (session as unknown as { commandHandler: CommandHandler })
+          .commandHandler,
+        'handleCommand',
+      )
+      .mockResolvedValue(true);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [
+        { type: 'text', text: '' },
+        { type: 'text', text: '/memory' },
+      ],
+    });
+
+    expect(handleCommandSpy).toHaveBeenCalledWith('/memory', expect.anything());
   });
 });
