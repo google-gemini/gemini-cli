@@ -113,6 +113,8 @@ WorkingDirectory=${REPO_DIR}
 ExecStart=/usr/bin/node ${REPO_DIR}/packages/a2a-server/dist/src/chat-bridge/bridge.js
 Restart=always
 RestartSec=5
+StandardOutput=inherit
+StandardError=inherit
 
 [Install]
 WantedBy=multi-user.target
@@ -157,8 +159,8 @@ WorkingDirectory=${WORK_DIR}
 ExecStart=/usr/local/bin/start-forever-agent.sh
 Restart=on-failure
 RestartSec=10
-StandardOutput=journal
-StandardError=inherit
+StandardOutput=null
+StandardError=null
 
 [Install]
 WantedBy=multi-user.target
