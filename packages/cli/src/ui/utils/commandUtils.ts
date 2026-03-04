@@ -31,7 +31,7 @@ const AT_COMMAND_DETECT_REGEX = new RegExp(
  * @param query The input query string.
  * @returns True if the query looks like an '@' command, false otherwise.
  */
-export const isAtCommand = (query: string): boolean =>
+export const isAtCommand = (query: unknown): boolean =>
   AT_COMMAND_DETECT_REGEX.test(String(query));
 
 /**
