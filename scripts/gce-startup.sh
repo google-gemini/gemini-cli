@@ -93,19 +93,17 @@ You are a forever-running autonomous agent accessible via Google Chat.
 Process incoming tasks, answer questions, and proactively work on improvements.
 GEMINIEOF
 
-# Create systemd service for the chat bridge
+# Create systemd service for the chat bridge (Pub/Sub mode)
 cat > /etc/systemd/system/chat-bridge.service << EOF
 [Unit]
-Description=Google Chat Bridge
+Description=Google Chat Bridge (Pub/Sub)
 After=network.target
 
 [Service]
 Type=simple
-Environment=GOOGLE_API_KEY=${GEMINI_API_KEY}
-Environment=CHAT_PROJECT_NUMBER=${CHAT_PROJECT_NUMBER}
-Environment=A2A_PORT=3100
-Environment=BRIDGE_PORT=8081
 Environment=A2A_URL=http://127.0.0.1:3100
+Environment=GOOGLE_CLOUD_PROJECT=adamfweidman-test
+Environment=PUBSUB_SUBSCRIPTION=forever-agent-chat-sub
 Environment=GIT_TERMINAL_PROMPT=0
 WorkingDirectory=${REPO_DIR}
 ExecStart=/usr/bin/node ${REPO_DIR}/packages/a2a-server/dist/src/chat-bridge/bridge.js
