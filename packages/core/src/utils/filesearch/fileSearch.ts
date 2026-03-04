@@ -241,8 +241,8 @@ class RecursiveFileSearch implements FileSearch {
         fuzzy: this.allFiles.length > 20000 ? 'v1' : 'v2',
         forward: false,
         tiebreakers: [
-          byDirVsFile,
           byBasenamePrefix,
+          byDirVsFile,
           byMatchPosFromEnd,
           byLengthAsc,
         ],

@@ -458,12 +458,11 @@ describe('FileSearch', () => {
     // Files are prioritized over directories.
     expect(results[0]).toBe('src/hooks.ts');
     expect(results[1]).toBe('src/utils/hooks.tsx');
-    expect(results[2]).toBe('src/hooks/index.ts');
-    expect(results[3]).toBe('src/hooks-dev/test.ts');
-    expect(results[4]).toBe('src/hooks/');
-    expect(results[5]).toBe('src/hooks-dev/');
+    expect(results[2]).toBe('src/hooks/');
+    expect(results[3]).toBe('src/hooks-dev/');
+    expect(results[4]).toBe('src/hooks/index.ts');
+    expect(results[5]).toBe('src/hooks-dev/test.ts');
   });
-
   it('should return empty array when no matches are found', async () => {
     tmpDir = await createTmpDir({
       src: ['file1.js'],
