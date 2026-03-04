@@ -19,7 +19,6 @@ import type { A2AAuthConfig } from './auth-provider/types.js';
 import { isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { isSubpath } from '../utils/paths.js';
 
 /**
  * DTO for Markdown parsing - represents the structure from frontmatter.
@@ -504,21 +503,43 @@ export async function loadAgentsFromDirectory(
       entry.name.endsWith('.md'),
   );
 
+  const resolvedDir = path.resolve(dir);
+  const seenPaths = new Set<string>();
+
   for (const entry of files) {
     const filePath = path.join(dir, entry.name);
     try {
-      // Resolve symlinks to their real path to prevent path traversal
-      const resolvedPath = await fs.realpath(filePath);
-      if (!isSubpath(dir, resolvedPath)) {
+      let realPath: string;
+      try {
+        realPath = await fs.realpath(filePath);
+      } catch (e) {
+        if (entry.isSymbolicLink()) {
+          result.errors.push(
+            new AgentLoadError(filePath, 'Symlink target does not exist'),
+          );
+          continue;
+        }
+        throw e;
+      }
+
+      // Security: reject symlinks pointing outside the agents directory
+      if (entry.isSymbolicLink() && !realPath.startsWith(resolvedDir)) {
         result.errors.push(
           new AgentLoadError(
             filePath,
-            `Symbolic link points outside the agents directory`,
+            `Symlink points outside agents directory: ${realPath}`,
           ),
         );
         continue;
       }
-      const content = await fs.readFile(resolvedPath, 'utf-8');
+
+      // Dedup: skip if we already loaded this resolved path
+      if (seenPaths.has(realPath)) {
+        continue;
+      }
+      seenPaths.add(realPath);
+
+      const content = await fs.readFile(filePath, 'utf-8');
       const hash = crypto.createHash('sha256').update(content).digest('hex');
       const agentDefs = await parseAgentMarkdown(filePath, content);
       for (const def of agentDefs) {

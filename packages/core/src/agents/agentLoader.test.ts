@@ -354,64 +354,65 @@ Hidden`,
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should load agents from symbolic links to .md files', async () => {
-      await writeAgentMarkdown(
+    it('should load agents from symlinked .md files', async () => {
+      const realFile = path.join(tempDir, 'real-agent.md');
+      await fs.writeFile(
+        realFile,
         `---
-name: original-agent
-description: Original agent
+name: symlinked-agent
+description: Agent via symlink
 ---
-Original prompt`,
-        'original.md',
+Prompt`,
       );
 
-      await fs.symlink(
-        path.join(tempDir, 'original.md'),
-        path.join(tempDir, 'symlinked.md'),
-      );
+      const linkPath = path.join(tempDir, 'linked-agent.md');
+      await fs.symlink(realFile, linkPath);
 
       const result = await loadAgentsFromDirectory(tempDir);
+      // Should load only once (deduplication by resolved path)
+      expect(result.agents).toHaveLength(1);
+      expect(result.agents[0].name).toBe('symlinked-agent');
       expect(result.errors).toHaveLength(0);
-      expect(result.agents).toHaveLength(2);
-      const names = result.agents.map((a) => a.name);
-      expect(names).toContain('original-agent');
     });
 
-    it('should reject symbolic links pointing outside the agents directory', async () => {
+    it('should reject symlinks pointing outside agents directory', async () => {
+      // Create a file outside the agents directory
       const outsideDir = await fs.mkdtemp(
         path.join(os.tmpdir(), 'agent-outside-'),
       );
-      try {
-        const outsideFile = path.join(outsideDir, 'evil.md');
-        await fs.writeFile(
-          outsideFile,
-          `---
+      const outsideFile = path.join(outsideDir, 'evil.md');
+      await fs.writeFile(
+        outsideFile,
+        `---
 name: evil-agent
-description: Evil agent
+description: Should not load
 ---
 Evil prompt`,
-        );
-
-        await fs.symlink(outsideFile, path.join(tempDir, 'evil-link.md'));
-
-        const result = await loadAgentsFromDirectory(tempDir);
-        expect(result.errors).toHaveLength(1);
-        expect(result.errors[0].message).toContain(
-          'Symbolic link points outside the agents directory',
-        );
-      } finally {
-        await fs.rm(outsideDir, { recursive: true, force: true });
-      }
-    });
-
-    it('should report error for dangling symbolic links', async () => {
-      await fs.symlink(
-        path.join(tempDir, 'nonexistent.md'),
-        path.join(tempDir, 'dangling.md'),
       );
 
+      const linkPath = path.join(tempDir, 'evil-link.md');
+      await fs.symlink(outsideFile, linkPath);
+
       const result = await loadAgentsFromDirectory(tempDir);
-      expect(result.errors).toHaveLength(1);
       expect(result.agents).toHaveLength(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].message).toContain(
+        'Symlink points outside agents directory',
+      );
+
+      await fs.rm(outsideDir, { recursive: true, force: true });
+    });
+
+    it('should report error for broken symlinks', async () => {
+      const linkPath = path.join(tempDir, 'broken-link.md');
+      await fs.symlink('/nonexistent/file.md', linkPath);
+
+      const result = await loadAgentsFromDirectory(tempDir);
+      expect(result.agents).toHaveLength(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].message).toContain(
+        'Symlink target does not exist',
+      );
     });
 
     it('should capture errors for malformed individual files', async () => {
