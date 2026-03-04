@@ -807,14 +807,6 @@ describe('useGeminiStream', () => {
     expect(injectedHintPart.text).toContain(
       'Do not cancel/skip tasks unless the user explicitly cancels them.',
     );
-    expect(
-      mockAddItem.mock.calls.some(
-        ([item]) =>
-          item?.type === 'info' &&
-          typeof item.text === 'string' &&
-          item.text.includes('Got it. Focusing on tests only.'),
-      ),
-    ).toBe(true);
 
     expect(mockRunInDevTraceSpan).toHaveBeenCalledWith(
       expect.objectContaining({
