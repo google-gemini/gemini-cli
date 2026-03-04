@@ -9,9 +9,19 @@ import { OverflowProvider } from '../../contexts/OverflowContext.js';
 import { MaxSizedBox } from './MaxSizedBox.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { Box, Text } from 'ink';
-import { describe, it, expect } from 'vitest';
+import { act } from 'react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 describe('<MaxSizedBox />', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
   it('renders children without truncation when they fit', async () => {
     const { lastFrame, waitUntilReady, unmount } = render(
       <OverflowProvider>
@@ -22,6 +32,9 @@ describe('<MaxSizedBox />', () => {
         </MaxSizedBox>
       </OverflowProvider>,
     );
+    await act(async () => {
+      vi.runAllTimers();
+    });
     await waitUntilReady();
     expect(lastFrame()).toContain('Hello, World!');
     expect(lastFrame()).toMatchSnapshot();
@@ -40,6 +53,9 @@ describe('<MaxSizedBox />', () => {
         </MaxSizedBox>
       </OverflowProvider>,
     );
+    await act(async () => {
+      vi.runAllTimers();
+    });
     await waitUntilReady();
     expect(lastFrame()).toContain(
       '... first 2 lines hidden (Ctrl+O to show) ...',
@@ -60,6 +76,9 @@ describe('<MaxSizedBox />', () => {
         </MaxSizedBox>
       </OverflowProvider>,
     );
+    await act(async () => {
+      vi.runAllTimers();
+    });
     await waitUntilReady();
     expect(lastFrame()).toContain(
       '... last 2 lines hidden (Ctrl+O to show) ...',
@@ -80,6 +99,9 @@ describe('<MaxSizedBox />', () => {
         </MaxSizedBox>
       </OverflowProvider>,
     );
+    await act(async () => {
+      vi.runAllTimers();
+    });
     await waitUntilReady();
     expect(lastFrame()).toContain(
       '... first 2 lines hidden (Ctrl+O to show) ...',
@@ -98,6 +120,9 @@ describe('<MaxSizedBox />', () => {
         </MaxSizedBox>
       </OverflowProvider>,
     );
+    await act(async () => {
+      vi.runAllTimers();
+    });
     await waitUntilReady();
     expect(lastFrame()).toContain(
       '... first 1 line hidden (Ctrl+O to show) ...',
@@ -118,6 +143,9 @@ describe('<MaxSizedBox />', () => {
         </MaxSizedBox>
       </OverflowProvider>,
     );
+    await act(async () => {
+      vi.runAllTimers();
+    });
     await waitUntilReady();
     expect(lastFrame()).toContain(
       '... first 7 lines hidden (Ctrl+O to show) ...',
@@ -137,6 +165,9 @@ describe('<MaxSizedBox />', () => {
       </OverflowProvider>,
     );
 
+    await act(async () => {
+      vi.runAllTimers();
+    });
     await waitUntilReady();
     expect(lastFrame()).toContain('This is a');
     expect(lastFrame()).toMatchSnapshot();
@@ -154,6 +185,9 @@ describe('<MaxSizedBox />', () => {
         </MaxSizedBox>
       </OverflowProvider>,
     );
+    await act(async () => {
+      vi.runAllTimers();
+    });
     await waitUntilReady();
     expect(lastFrame()).toContain('Line 1');
     expect(lastFrame()).toMatchSnapshot();
@@ -166,6 +200,9 @@ describe('<MaxSizedBox />', () => {
         <MaxSizedBox maxWidth={80} maxHeight={10}></MaxSizedBox>
       </OverflowProvider>,
     );
+    await act(async () => {
+      vi.runAllTimers();
+    });
     await waitUntilReady();
     expect(lastFrame({ allowEmpty: true })?.trim()).equals('');
     unmount();
@@ -185,6 +222,9 @@ describe('<MaxSizedBox />', () => {
         </MaxSizedBox>
       </OverflowProvider>,
     );
+    await act(async () => {
+      vi.runAllTimers();
+    });
     await waitUntilReady();
     expect(lastFrame()).toContain('Line 1 from Fragment');
     expect(lastFrame()).toMatchSnapshot();
@@ -206,6 +246,9 @@ describe('<MaxSizedBox />', () => {
       </OverflowProvider>,
     );
 
+    await act(async () => {
+      vi.runAllTimers();
+    });
     await waitUntilReady();
     expect(lastFrame()).toContain(
       '... first 21 lines hidden (Ctrl+O to show) ...',
@@ -229,6 +272,9 @@ describe('<MaxSizedBox />', () => {
       </OverflowProvider>,
     );
 
+    await act(async () => {
+      vi.runAllTimers();
+    });
     await waitUntilReady();
     expect(lastFrame()).toContain(
       '... last 21 lines hidden (Ctrl+O to show) ...',
@@ -253,6 +299,9 @@ describe('<MaxSizedBox />', () => {
       { width: 80 },
     );
 
+    await act(async () => {
+      vi.runAllTimers();
+    });
     await waitUntilReady();
     expect(lastFrame()).toContain('... last');
 
