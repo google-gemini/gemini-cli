@@ -13,15 +13,15 @@ import {
   afterEach,
   type Mocked,
 } from 'vitest';
-import type {
-  LocalAgentDefinition,
-  SubagentActivityEvent,
-  AgentInputs,
-  SubagentProgress,
+import {
+  AgentTerminateMode,
+  type LocalAgentDefinition,
+  type SubagentActivityEvent,
+  type AgentInputs,
+  type SubagentProgress,
 } from './types.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { LocalAgentExecutor } from './local-executor.js';
-import { AgentTerminateMode } from './types.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';

@@ -13,8 +13,7 @@ import {
 } from '../index.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
-import type { ScheduledToolCall } from './types.js';
-import { CoreToolCallStatus } from './types.js';
+import { CoreToolCallStatus, type ScheduledToolCall } from './types.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import type { CallableTool } from '@google/genai';
