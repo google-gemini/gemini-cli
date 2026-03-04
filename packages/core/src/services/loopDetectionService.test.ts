@@ -212,6 +212,7 @@ describe('LoopDetectionService', () => {
 
     it('should not detect a loop for a list with a long shared prefix', () => {
       service.reset('');
+      let result = { count: 0 };
       const longPrefix =
         'projects/my-google-cloud-project-12345/locations/us-central1/services/';
 
@@ -222,7 +223,7 @@ describe('LoopDetectionService', () => {
 
       // Simulate receiving the list in a single large chunk or a few chunks
       // This is the specific case where the issue occurs, as list boundaries might not reset tracking properly
-      const result = service.addAndCheck(createContentEvent(listContent));
+      result = service.addAndCheck(createContentEvent(listContent));
 
       expect(result.count).toBe(0);
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
@@ -235,7 +236,7 @@ describe('LoopDetectionService', () => {
 
       let result = { count: 0 };
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
-        service.addAndCheck(createContentEvent(repeatedContent));
+        result = service.addAndCheck(createContentEvent(repeatedContent));
         result = service.addAndCheck(createContentEvent(fillerContent));
       }
       expect(result.count).toBe(0);
@@ -414,12 +415,10 @@ describe('LoopDetectionService', () => {
       service.reset('');
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
 
-      // Content inside a code block
       service.addAndCheck(createContentEvent('```'));
       service.addAndCheck(createContentEvent('\nsome code\n'));
       service.addAndCheck(createContentEvent('```'));
 
-      // Now add repeated content outside the code block
       let result = { count: 0 };
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
         result = service.addAndCheck(createContentEvent(repeatedContent));
@@ -485,14 +484,14 @@ describe('LoopDetectionService', () => {
 
       // We are now in a code block, so loop detection should be off.
       // Let's add the repeated content again, it should not trigger a loop.
+      let result = { count: 0 };
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD; i++) {
-        const result = service.addAndCheck(createContentEvent(repeatedContent));
+        result = service.addAndCheck(createContentEvent(repeatedContent));
         expect(result.count).toBe(0);
       }
 
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
-
     it('should reset tracking when a table is detected', () => {
       service.reset('');
       const repeatedContent = createRepetitiveContent(1, CONTENT_CHUNK_SIZE);
@@ -700,8 +699,9 @@ describe('LoopDetectionService', () => {
     it('should not detect a loop for repeating divider-like content', () => {
       service.reset('');
       const dividerContent = '-'.repeat(CONTENT_CHUNK_SIZE);
+      let result = { count: 0 };
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 5; i++) {
-        const result = service.addAndCheck(createContentEvent(dividerContent));
+        result = service.addAndCheck(createContentEvent(dividerContent));
         expect(result.count).toBe(0);
       }
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
@@ -710,11 +710,49 @@ describe('LoopDetectionService', () => {
     it('should not detect a loop for repeating complex box-drawing dividers', () => {
       service.reset('');
       const dividerContent = '╭─'.repeat(CONTENT_CHUNK_SIZE / 2);
+      let result = { count: 0 };
       for (let i = 0; i < CONTENT_LOOP_THRESHOLD + 5; i++) {
-        const result = service.addAndCheck(createContentEvent(dividerContent));
+        result = service.addAndCheck(createContentEvent(dividerContent));
         expect(result.count).toBe(0);
       }
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Strike Management', () => {
+    it('should increment strike count for repeated detections', () => {
+      const event = createToolCallRequestEvent('testTool', { param: 'value' });
+
+      // First strike
+      for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD; i++) {
+        service.addAndCheck(event);
+      }
+      expect(service.addAndCheck(event).count).toBe(1);
+
+      // Recovery simulated by caller calling clearDetection()
+      service.clearDetection();
+
+      // Second strike
+      expect(service.addAndCheck(event).count).toBe(2);
+    });
+
+    it('should allow recovery turn to proceed after clearDetection', () => {
+      const event = createToolCallRequestEvent('testTool', { param: 'value' });
+
+      // Trigger loop
+      for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD; i++) {
+        service.addAndCheck(event);
+      }
+      expect(service.addAndCheck(event).count).toBe(1);
+
+      // Caller clears detection to allow recovery
+      service.clearDetection();
+
+      // Subsequent call in the same turn (or next turn before it repeats) should be 0
+      // In reality, addAndCheck is called per event.
+      // If the model sends a NEW event, it should not immediately trigger.
+      const newEvent = createContentEvent('Recovery text');
+      expect(service.addAndCheck(newEvent).count).toBe(0);
     });
   });
 
@@ -738,7 +776,7 @@ describe('LoopDetectionService', () => {
   });
 
   describe('General Behavior', () => {
-    it('should return 0 for unhandled event types', () => {
+    it('should return 0 count for unhandled event types', () => {
       const otherEvent = {
         type: 'unhandled_event',
       } as unknown as ServerGeminiStreamEvent;
@@ -746,388 +784,357 @@ describe('LoopDetectionService', () => {
       expect(service.addAndCheck(otherEvent).count).toBe(0);
     });
   });
+});
 
-  describe('Iterative Loop State', () => {
-    it('should correctly transition from Strike 1 to Strike 2', () => {
-      const event = createToolCallRequestEvent('testTool', { param: 'value' });
+describe('LoopDetectionService LLM Checks', () => {
+  let service: LoopDetectionService;
+  let mockConfig: Config;
+  let mockGeminiClient: GeminiClient;
+  let mockBaseLlmClient: BaseLlmClient;
+  let abortController: AbortController;
 
-      // Trigger Strike 1
-      for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD - 1; i++) {
-        service.addAndCheck(event);
-      }
-      const strike1 = service.addAndCheck(event);
-      expect(strike1.count).toBe(1);
-      expect(loggers.logLoopDetected).toHaveBeenCalledWith(
-        mockConfig,
-        expect.objectContaining({ count: 1 }),
-      );
+  beforeEach(() => {
+    mockGeminiClient = {
+      getHistory: vi.fn().mockReturnValue([]),
+    } as unknown as GeminiClient;
 
-      // Simulate recovery (clearDetection)
-      service.clearDetection();
+    mockBaseLlmClient = {
+      generateJson: vi.fn(),
+    } as unknown as BaseLlmClient;
 
-      // Trigger Strike 2
-      // For tool calls, the internal counter for that specific key remains,
-      // so the VERY NEXT call of the same tool should trigger Strike 2.
-      const strike2 = service.addAndCheck(event);
-      expect(strike2.count).toBe(2);
-      expect(loggers.logLoopDetected).toHaveBeenCalledWith(
-        mockConfig,
-        expect.objectContaining({ count: 2 }),
-      );
+    const mockAvailability = createAvailabilityServiceMock();
+    vi.mocked(mockAvailability.snapshot).mockReturnValue({ available: true });
+
+    mockConfig = {
+      getGeminiClient: () => mockGeminiClient,
+      getBaseLlmClient: () => mockBaseLlmClient,
+      getDisableLoopDetection: () => false,
+      getDebugMode: () => false,
+      getTelemetryEnabled: () => true,
+      getModel: vi.fn().mockReturnValue('cognitive-loop-v1'),
+      modelConfigService: {
+        getResolvedConfig: vi.fn().mockImplementation((key) => {
+          if (key.model === 'loop-detection') {
+            return { model: 'gemini-2.5-flash', generateContentConfig: {} };
+          }
+          return {
+            model: 'cognitive-loop-v1',
+            generateContentConfig: {},
+          };
+        }),
+      },
+      isInteractive: () => false,
+      getModelAvailabilityService: vi.fn().mockReturnValue(mockAvailability),
+    } as unknown as Config;
+
+    service = new LoopDetectionService(mockConfig);
+    abortController = new AbortController();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const advanceTurns = async (count: number) => {
+    for (let i = 0; i < count; i++) {
+      await service.turnStarted(abortController.signal);
+    }
+  };
+
+  it('should not trigger LLM check before LLM_CHECK_AFTER_TURNS (30)', async () => {
+    await advanceTurns(29);
+    expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
+  });
+
+  it('should trigger LLM check on the 30th turn', async () => {
+    mockBaseLlmClient.generateJson = vi
+      .fn()
+      .mockResolvedValue({ unproductive_state_confidence: 0.1 });
+    await advanceTurns(30);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection' },
+        systemInstruction: expect.any(String),
+        contents: expect.any(Array),
+        schema: expect.any(Object),
+        promptId: expect.any(String),
+      }),
+    );
+  });
+
+  it('should detect a cognitive loop when confidence is high', async () => {
+    // First check at turn 30
+    mockBaseLlmClient.generateJson = vi.fn().mockResolvedValue({
+      unproductive_state_confidence: 0.85,
+      unproductive_state_analysis: 'Repetitive actions',
+    });
+    await advanceTurns(30);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection' },
+      }),
+    );
+
+    // The confidence of 0.85 will result in a low interval.
+    // The interval will be: 5 + (15 - 5) * (1 - 0.85) = 5 + 10 * 0.15 = 6.5 -> rounded to 7
+    await advanceTurns(6); // advance to turn 36
+
+    mockBaseLlmClient.generateJson = vi.fn().mockResolvedValue({
+      unproductive_state_confidence: 0.95,
+      unproductive_state_analysis: 'Repetitive actions',
+    });
+    const finalResult = await service.turnStarted(abortController.signal); // This is turn 37
+
+    expect(finalResult.count).toBe(1);
+    expect(loggers.logLoopDetected).toHaveBeenCalledWith(
+      mockConfig,
+      expect.objectContaining({
+        'event.name': 'loop_detected',
+        loop_type: LoopType.LLM_DETECTED_LOOP,
+        confirmed_by_model: 'cognitive-loop-v1',
+      }),
+    );
+  });
+
+  it('should not detect a loop when confidence is low', async () => {
+    mockBaseLlmClient.generateJson = vi.fn().mockResolvedValue({
+      unproductive_state_confidence: 0.5,
+      unproductive_state_analysis: 'Looks okay',
+    });
+    await advanceTurns(30);
+    const result = await service.turnStarted(abortController.signal);
+    expect(result.count).toBe(0);
+    expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+  });
+
+  it('should adjust the check interval based on confidence', async () => {
+    // Confidence is 0.0, so interval should be MAX_LLM_CHECK_INTERVAL (15)
+    // Interval = 5 + (15 - 5) * (1 - 0.0) = 15
+    mockBaseLlmClient.generateJson = vi
+      .fn()
+      .mockResolvedValue({ unproductive_state_confidence: 0.0 });
+    await advanceTurns(30); // First check at turn 30
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+
+    await advanceTurns(14); // Advance to turn 44
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+
+    await service.turnStarted(abortController.signal); // Turn 45
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
+  });
+
+  it('should handle errors from generateJson gracefully', async () => {
+    mockBaseLlmClient.generateJson = vi
+      .fn()
+      .mockRejectedValue(new Error('API error'));
+    await advanceTurns(30);
+    const result = await service.turnStarted(abortController.signal);
+    expect(result.count).toBe(0);
+    expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+  });
+
+  it('should not trigger LLM check when disabled for session', async () => {
+    service.disableForSession();
+    expect(loggers.logLoopDetectionDisabled).toHaveBeenCalledTimes(1);
+    await advanceTurns(30);
+    const result = await service.turnStarted(abortController.signal);
+    expect(result.count).toBe(0);
+    expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
+  });
+
+  it('should prepend user message if history starts with a function call', async () => {
+    const functionCallHistory: Content[] = [
+      {
+        role: 'model',
+        parts: [{ functionCall: { name: 'someTool', args: {} } }],
+      },
+      {
+        role: 'model',
+        parts: [{ text: 'Some follow up text' }],
+      },
+    ];
+    vi.mocked(mockGeminiClient.getHistory).mockReturnValue(functionCallHistory);
+
+    mockBaseLlmClient.generateJson = vi
+      .fn()
+      .mockResolvedValue({ unproductive_state_confidence: 0.1 });
+
+    await advanceTurns(30);
+
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+    const calledArg = vi.mocked(mockBaseLlmClient.generateJson).mock
+      .calls[0][0];
+    expect(calledArg.contents[0]).toEqual({
+      role: 'user',
+      parts: [{ text: 'Recent conversation history:' }],
+    });
+    // Verify the original history follows
+    expect(calledArg.contents[1]).toEqual(functionCallHistory[0]);
+  });
+
+  it('should detect a loop when confidence is exactly equal to the threshold (0.9)', async () => {
+    mockBaseLlmClient.generateJson = vi
+      .fn()
+      .mockResolvedValueOnce({
+        unproductive_state_confidence: 0.9,
+        unproductive_state_analysis: 'Flash says loop',
+      })
+      .mockResolvedValueOnce({
+        unproductive_state_confidence: 0.9,
+        unproductive_state_analysis: 'Main says loop',
+      });
+
+    await advanceTurns(30);
+
+    // It should have called generateJson twice
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection' },
+      }),
+    );
+    expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection-double-check' },
+      }),
+    );
+
+    // And it should have detected a loop
+    expect(loggers.logLoopDetected).toHaveBeenCalledWith(
+      mockConfig,
+      expect.objectContaining({
+        'event.name': 'loop_detected',
+        loop_type: LoopType.LLM_DETECTED_LOOP,
+        confirmed_by_model: 'cognitive-loop-v1',
+      }),
+    );
+  });
+
+  it('should not detect a loop when Flash is confident (0.9) but Main model is not (0.89)', async () => {
+    mockBaseLlmClient.generateJson = vi
+      .fn()
+      .mockResolvedValueOnce({
+        unproductive_state_confidence: 0.9,
+        unproductive_state_analysis: 'Flash says loop',
+      })
+      .mockResolvedValueOnce({
+        unproductive_state_confidence: 0.89,
+        unproductive_state_analysis: 'Main says no loop',
+      });
+
+    await advanceTurns(30);
+
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection' },
+      }),
+    );
+    expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection-double-check' },
+      }),
+    );
+
+    // Should NOT have detected a loop
+    expect(loggers.logLoopDetected).not.toHaveBeenCalled();
+
+    // But should have updated the interval based on the main model's confidence (0.89)
+    // Interval = 5 + (15-5) * (1 - 0.89) = 5 + 10 * 0.11 = 5 + 1.1 = 6.1 -> 6
+
+    // Advance by 5 turns
+    await advanceTurns(5);
+
+    // Next turn (36) should trigger another check
+    await service.turnStarted(abortController.signal);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(3);
+  });
+
+  it('should only call Flash model if main model is unavailable', async () => {
+    // Mock availability to return unavailable for the main model
+    const availability = mockConfig.getModelAvailabilityService();
+    vi.mocked(availability.snapshot).mockReturnValue({
+      available: false,
+      reason: 'quota',
+    });
+
+    mockBaseLlmClient.generateJson = vi.fn().mockResolvedValueOnce({
+      unproductive_state_confidence: 0.9,
+      unproductive_state_analysis: 'Flash says loop',
+    });
+
+    await advanceTurns(30);
+
+    // It should have called generateJson only once
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelConfigKey: { model: 'loop-detection' },
+      }),
+    );
+
+    // And it should have detected a loop
+    expect(loggers.logLoopDetected).toHaveBeenCalledWith(
+      mockConfig,
+      expect.objectContaining({
+        confirmed_by_model: 'gemini-2.5-flash',
+      }),
+    );
+  });
+
+  it('should include user prompt in LLM check contents when provided', async () => {
+    service.reset('test-prompt-id', 'Add license headers to all files');
+
+    mockBaseLlmClient.generateJson = vi
+      .fn()
+      .mockResolvedValue({ unproductive_state_confidence: 0.1 });
+
+    await advanceTurns(30);
+
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+    const calledArg = vi.mocked(mockBaseLlmClient.generateJson).mock
+      .calls[0][0];
+    // First content should be the user prompt context wrapped in XML
+    expect(calledArg.contents[0]).toEqual({
+      role: 'user',
+      parts: [
+        {
+          text: '<original_user_request>\nAdd license headers to all files\n</original_user_request>',
+        },
+      ],
     });
   });
 
-  describe('LoopDetectionService LLM Checks', () => {
-    let mockGeminiClient: GeminiClient;
-    let mockBaseLlmClient: BaseLlmClient;
-    let abortController: AbortController;
+  it('should not include user prompt in contents when not provided', async () => {
+    service.reset('test-prompt-id');
 
-    beforeEach(() => {
-      mockGeminiClient = {
-        getHistory: vi.fn().mockReturnValue([]),
-      } as unknown as GeminiClient;
-
-      mockBaseLlmClient = {
-        generateJson: vi.fn(),
-      } as unknown as BaseLlmClient;
-
-      const mockAvailability = createAvailabilityServiceMock();
-      vi.mocked(mockAvailability.snapshot).mockReturnValue({ available: true });
-
-      mockConfig = {
-        getGeminiClient: () => mockGeminiClient,
-        getBaseLlmClient: () => mockBaseLlmClient,
-        getDisableLoopDetection: () => false,
-        getDebugMode: () => false,
-        getTelemetryEnabled: () => true,
-        getModel: vi.fn().mockReturnValue('cognitive-loop-v1'),
-        modelConfigService: {
-          getResolvedConfig: vi.fn().mockImplementation((key) => {
-            if (key.model === 'loop-detection') {
-              return { model: 'gemini-2.5-flash', generateContentConfig: {} };
-            }
-            return {
-              model: 'cognitive-loop-v1',
-              generateContentConfig: {},
-            };
-          }),
-        },
-        isInteractive: () => false,
-        getModelAvailabilityService: vi.fn().mockReturnValue(mockAvailability),
-      } as unknown as Config;
-
-      service = new LoopDetectionService(mockConfig);
-      abortController = new AbortController();
-      vi.clearAllMocks();
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
-    const advanceTurns = async (count: number) => {
-      for (let i = 0; i < count; i++) {
-        await service.turnStarted(abortController.signal);
-      }
-    };
-
-    it('should not trigger LLM check before LLM_CHECK_AFTER_TURNS', async () => {
-      await advanceTurns(29);
-      expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
-    });
-
-    it('should trigger LLM check on the 30th turn', async () => {
-      mockBaseLlmClient.generateJson = vi
-        .fn()
-        .mockResolvedValue({ unproductive_state_confidence: 0.1 });
-      await advanceTurns(30);
-      expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
-      expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
-        expect.objectContaining({
-          modelConfigKey: { model: 'loop-detection' },
-          systemInstruction: expect.any(String),
-          contents: expect.any(Array),
-          schema: expect.any(Object),
-          promptId: expect.any(String),
-        }),
-      );
-    });
-
-    it('should detect a cognitive loop when confidence is high', async () => {
-      // First check at turn 30
-      mockBaseLlmClient.generateJson = vi.fn().mockResolvedValue({
-        unproductive_state_confidence: 0.85,
-        unproductive_state_analysis: 'Repetitive actions',
-      });
-      await advanceTurns(30);
-      expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
-      expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
-        expect.objectContaining({
-          modelConfigKey: { model: 'loop-detection' },
-        }),
-      );
-
-      // The confidence of 0.85 will result in a low interval.
-      // Interval = 5 + (15 - 5) * (1 - 0.85) = 5 + 10 * 0.15 = 5 + 1.5 = 6.5 -> rounded to 7
-      await advanceTurns(6);
-
-      mockBaseLlmClient.generateJson = vi.fn().mockResolvedValue({
-        unproductive_state_confidence: 0.95,
-        unproductive_state_analysis: 'Repetitive actions',
-      });
-      const finalResult = await service.turnStarted(abortController.signal);
-
-      expect(finalResult.count).toBe(1);
-      expect(loggers.logLoopDetected).toHaveBeenCalledWith(
-        mockConfig,
-        expect.objectContaining({
-          'event.name': 'loop_detected',
-          loop_type: LoopType.LLM_DETECTED_LOOP,
-          confirmed_by_model: 'cognitive-loop-v1',
-        }),
-      );
-    });
-
-    it('should not detect a loop when confidence is low', async () => {
-      mockBaseLlmClient.generateJson = vi.fn().mockResolvedValue({
-        unproductive_state_confidence: 0.5,
-        unproductive_state_analysis: 'Looks okay',
-      });
-      await advanceTurns(30);
-      const result = await service.turnStarted(abortController.signal);
-      expect(result.count).toBe(0);
-      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
-    });
-
-    it('should adjust the check interval based on confidence', async () => {
-      // Confidence is 0.0, so interval should be MAX_LLM_CHECK_INTERVAL (15)
-      // Interval = 7 + (15 - 7) * (1 - 0.0) = 15
-      mockBaseLlmClient.generateJson = vi
-        .fn()
-        .mockResolvedValue({ unproductive_state_confidence: 0.0 });
-      await advanceTurns(30);
-      expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
-
-      await advanceTurns(14);
-      expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
-
-      await service.turnStarted(abortController.signal);
-      expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
-    });
-
-    it('should handle errors from generateJson gracefully', async () => {
-      mockBaseLlmClient.generateJson = vi
-        .fn()
-        .mockRejectedValue(new Error('API error'));
-      await advanceTurns(30);
-      const result = await service.turnStarted(abortController.signal);
-      expect(result.count).toBe(0);
-      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
-    });
-
-    it('should not trigger LLM check when disabled for session', async () => {
-      service.disableForSession();
-      expect(loggers.logLoopDetectionDisabled).toHaveBeenCalledTimes(1);
-      await advanceTurns(30);
-      const result = await service.turnStarted(abortController.signal);
-      expect(result.count).toBe(0);
-      expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
-    });
-
-    it('should prepend user message if history starts with a function call', async () => {
-      const functionCallHistory: Content[] = [
-        {
-          role: 'model',
-          parts: [{ functionCall: { name: 'someTool', args: {} } }],
-        },
-        {
-          role: 'model',
-          parts: [{ text: 'Some follow up text' }],
-        },
-      ];
-      vi.mocked(mockGeminiClient.getHistory).mockReturnValue(
-        functionCallHistory,
-      );
-
-      mockBaseLlmClient.generateJson = vi
-        .fn()
-        .mockResolvedValue({ unproductive_state_confidence: 0.1 });
-
-      await advanceTurns(30);
-
-      expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
-      const calledArg = vi.mocked(mockBaseLlmClient.generateJson).mock
-        .calls[0][0];
-      expect(calledArg.contents[0]).toEqual({
-        role: 'user',
-        parts: [{ text: 'Recent conversation history:' }],
-      });
-      // Verify the original history follows
-      expect(calledArg.contents[1]).toEqual(functionCallHistory[0]);
-    });
-
-    it('should detect a loop when confidence is exactly equal to the threshold (0.9)', async () => {
-      mockBaseLlmClient.generateJson = vi
-        .fn()
-        .mockResolvedValueOnce({
-          unproductive_state_confidence: 0.9,
-          unproductive_state_analysis: 'Flash says loop',
-        })
-        .mockResolvedValueOnce({
-          unproductive_state_confidence: 0.9,
-          unproductive_state_analysis: 'Main says loop',
-        });
-
-      await advanceTurns(30);
-
-      // It should have called generateJson twice
-      expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
-      expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
-        1,
-        expect.objectContaining({
-          modelConfigKey: { model: 'loop-detection' },
-        }),
-      );
-      expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          modelConfigKey: { model: 'loop-detection-double-check' },
-        }),
-      );
-
-      // And it should have detected a loop
-      expect(loggers.logLoopDetected).toHaveBeenCalledWith(
-        mockConfig,
-        expect.objectContaining({
-          'event.name': 'loop_detected',
-          loop_type: LoopType.LLM_DETECTED_LOOP,
-          confirmed_by_model: 'cognitive-loop-v1',
-        }),
-      );
-    });
-
-    it('should not detect a loop when Flash is confident (0.9) but Main model is not (0.89)', async () => {
-      mockBaseLlmClient.generateJson = vi
-        .fn()
-        .mockResolvedValueOnce({
-          unproductive_state_confidence: 0.9,
-          unproductive_state_analysis: 'Flash says loop',
-        })
-        .mockResolvedValueOnce({
-          unproductive_state_confidence: 0.89,
-          unproductive_state_analysis: 'Main says no loop',
-        });
-
-      await advanceTurns(30);
-
-      expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(2);
-      expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
-        1,
-        expect.objectContaining({
-          modelConfigKey: { model: 'loop-detection' },
-        }),
-      );
-      expect(mockBaseLlmClient.generateJson).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          modelConfigKey: { model: 'loop-detection-double-check' },
-        }),
-      );
-
-      // Should NOT have detected a loop
-      expect(loggers.logLoopDetected).not.toHaveBeenCalled();
-
-      // But should have updated the interval based on the main model's confidence (0.89)
-      // Interval = 7 + (15-7) * (1 - 0.89) = 7 + 8 * 0.11 = 7 + 0.88 = 7.88 -> 8
-
-      // Advance by 7 turns
-      await advanceTurns(7);
-
-      // Next turn (38) should trigger another check
-      await service.turnStarted(abortController.signal);
-      expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(3);
-    });
-
-    it('should only call Flash model if main model is unavailable', async () => {
-      // Mock availability to return unavailable for the main model
-      const availability = mockConfig.getModelAvailabilityService();
-      vi.mocked(availability.snapshot).mockReturnValue({
-        available: false,
-        reason: 'quota',
-      });
-
-      mockBaseLlmClient.generateJson = vi.fn().mockResolvedValueOnce({
-        unproductive_state_confidence: 0.9,
-        unproductive_state_analysis: 'Flash says loop',
-      });
-
-      await advanceTurns(30);
-
-      // It should have called generateJson only once
-      expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
-      expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
-        expect.objectContaining({
-          modelConfigKey: { model: 'loop-detection' },
-        }),
-      );
-
-      expect(loggers.logLoopDetected).toHaveBeenCalledWith(
-        mockConfig,
-        expect.objectContaining({
-          'event.name': 'loop_detected',
-          loop_type: LoopType.LLM_DETECTED_LOOP,
-          confirmed_by_model: 'cognitive-loop-v1',
-        }),
-      );
-    });
-
-    it('should include user prompt in LLM check contents when provided', async () => {
-      service.reset('test-prompt-id', 'Add license headers to all files');
-
-      mockBaseLlmClient.generateJson = vi
-        .fn()
-        .mockResolvedValue({ unproductive_state_confidence: 0.1 });
-
-      await advanceTurns(30);
-
-      expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
-      const calledArg = vi.mocked(mockBaseLlmClient.generateJson).mock
-        .calls[0][0];
-      // First content should be the user prompt context wrapped in XML
-      expect(calledArg.contents[0]).toEqual({
-        role: 'user',
-        parts: [
-          {
-            text: '<original_user_request>\nAdd license headers to all files\n</original_user_request>',
-          },
-        ],
-      });
-    });
-
-    it('should not include user prompt in contents when not provided', async () => {
-      service.reset('test-prompt-id');
-
-      vi.mocked(mockGeminiClient.getHistory).mockReturnValue([
-        {
-          role: 'model',
-          parts: [{ text: 'Some response' }],
-        },
-      ]);
-
-      mockBaseLlmClient.generateJson = vi
-        .fn()
-        .mockResolvedValue({ unproductive_state_confidence: 0.1 });
-
-      await advanceTurns(30);
-
-      expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
-      const calledArg = vi.mocked(mockBaseLlmClient.generateJson).mock
-        .calls[0][0];
-      // First content should be the history, not a user prompt message
-      expect(calledArg.contents[0]).toEqual({
+    vi.mocked(mockGeminiClient.getHistory).mockReturnValue([
+      {
         role: 'model',
         parts: [{ text: 'Some response' }],
-      });
+      },
+    ]);
+
+    mockBaseLlmClient.generateJson = vi
+      .fn()
+      .mockResolvedValue({ unproductive_state_confidence: 0.1 });
+
+    await advanceTurns(30);
+
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledTimes(1);
+    const calledArg = vi.mocked(mockBaseLlmClient.generateJson).mock
+      .calls[0][0];
+    // First content should be the history, not a user prompt message
+    expect(calledArg.contents[0]).toEqual({
+      role: 'model',
+      parts: [{ text: 'Some response' }],
     });
   });
 });

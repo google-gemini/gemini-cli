@@ -123,6 +123,7 @@ const LOOP_DETECTION_SCHEMA: Record<string, unknown> = {
 export interface LoopDetectionResult {
   count: number;
   detail?: string;
+  confirmedByModel?: string;
 }
 
 /**
@@ -260,17 +261,12 @@ export class LoopDetectionService {
       this.turnsInCurrentPrompt - this.lastCheckTurn >= this.llmCheckInterval
     ) {
       this.lastCheckTurn = this.turnsInCurrentPrompt;
-      const { isLoop, analysis } = await this.checkForLoopWithLLM(signal);
+      const { isLoop, analysis, confirmedByModel } =
+        await this.checkForLoopWithLLM(signal);
       if (isLoop) {
         this.loopDetected = true;
         this.detectedCount++;
         this.lastLoopDetail = analysis;
-
-        const resolvedConfig = this.config.modelConfigService.getResolvedConfig(
-          {
-            model: DOUBLE_CHECK_MODEL_ALIAS,
-          },
-        );
 
         logLoopDetected(
           this.config,
@@ -278,13 +274,17 @@ export class LoopDetectionService {
             LoopType.LLM_DETECTED_LOOP,
             this.promptId,
             this.detectedCount,
-            resolvedConfig.model,
+            confirmedByModel,
             analysis,
             LLM_CONFIDENCE_THRESHOLD,
           ),
         );
 
-        return { count: this.detectedCount, detail: this.lastLoopDetail };
+        return {
+          count: this.detectedCount,
+          detail: this.lastLoopDetail,
+          confirmedByModel,
+        };
       }
     }
 
@@ -519,7 +519,11 @@ export class LoopDetectionService {
 
   private async checkForLoopWithLLM(
     signal: AbortSignal,
-  ): Promise<{ isLoop: boolean; analysis?: string }> {
+  ): Promise<{
+    isLoop: boolean;
+    analysis?: string;
+    confirmedByModel?: string;
+  }> {
     const recentHistory = this.config
       .getGeminiClient()
       .getHistory()
@@ -593,7 +597,14 @@ export class LoopDetectionService {
     const availability = this.config.getModelAvailabilityService();
 
     if (!availability.snapshot(doubleCheckModelName).available) {
-      return { isLoop: true, analysis: flashAnalysis };
+      const flashModelName = this.config.modelConfigService.getResolvedConfig({
+        model: 'loop-detection',
+      }).model;
+      return {
+        isLoop: true,
+        analysis: flashAnalysis,
+        confirmedByModel: flashModelName,
+      };
     }
 
     // Double check with configured model
@@ -626,7 +637,11 @@ export class LoopDetectionService {
 
     if (mainModelResult) {
       if (mainModelConfidence >= LLM_CONFIDENCE_THRESHOLD) {
-        return { isLoop: true, analysis: mainModelAnalysis };
+        return {
+          isLoop: true,
+          analysis: mainModelAnalysis,
+          confirmedByModel: doubleCheckModelName,
+        };
       } else {
         this.updateCheckInterval(mainModelConfidence);
       }
