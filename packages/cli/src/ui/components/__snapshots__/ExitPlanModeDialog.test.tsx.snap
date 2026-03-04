@@ -11,7 +11,10 @@ Implementation Steps
  2. Add session storage in src/storage/SessionStore.ts
  3. Update src/commands/index.ts to check auth status
  4. Add tests in src/auth/__tests__/
-... last 5 lines hidden (Ctrl+O to show) ...
+
+Files to Modify
+
+... last 2 lines hidden (Ctrl+O to show) ...
 
   1.  Yes, automatically accept edits
       Approves plan and allows tools to run automatically
@@ -34,7 +37,10 @@ Implementation Steps
  2. Add session storage in src/storage/SessionStore.ts
  3. Update src/commands/index.ts to check auth status
  4. Add tests in src/auth/__tests__/
-... last 5 lines hidden (Ctrl+O to show) ...
+
+Files to Modify
+
+... last 2 lines hidden (Ctrl+O to show) ...
 
 ● 1.  Yes, automatically accept edits                                           
       Approves plan and allows tools to run automatically                       
@@ -62,7 +68,10 @@ Implementation Steps
  2. Add session storage in src/storage/SessionStore.ts
  3. Update src/commands/index.ts to check auth status
  4. Add OAuth2 provider support in src/auth/providers/OAuth2Provider.ts
-... last 26 lines hidden (Ctrl+O to show) ...
+ 5. Add SAML provider support in src/auth/providers/SAMLProvider.ts
+ 6. Add LDAP provider support in src/auth/providers/LDAPProvider.ts
+ 7. Create token refresh mechanism in src/auth/TokenManager.ts
+... last 23 lines hidden (Ctrl+O to show) ...
 
 ● 1.  Yes, automatically accept edits                                           
       Approves plan and allows tools to run automatically                       
@@ -85,7 +94,10 @@ Implementation Steps
  2. Add session storage in src/storage/SessionStore.ts
  3. Update src/commands/index.ts to check auth status
  4. Add tests in src/auth/__tests__/
-... last 5 lines hidden (Ctrl+O to show) ...
+
+Files to Modify
+
+... last 2 lines hidden (Ctrl+O to show) ...
 
 ● 1.  Yes, automatically accept edits                                           
       Approves plan and allows tools to run automatically                       

@@ -791,7 +791,11 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     : undefined;
   const maxQuestionHeight =
     question.unconstrainedHeight && listHeight
-      ? Math.max(1, listHeight - DIALOG_PADDING - selectionItems.length * 2)
+      ? // When unconstrained, give the question a majority of the vertical space (e.g., 70%).
+        // The options list will take the remaining space and scroll if necessary.
+        // This is more robust than calculating based on `selectionItems.length`,
+        // which can incorrectly shrink the question if there are many options.
+        Math.max(1, Math.floor(listHeight * 0.7))
       : 15;
   const questionHeight =
     listHeight && !isAlternateBuffer
