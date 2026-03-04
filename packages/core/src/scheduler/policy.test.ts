@@ -553,6 +553,7 @@ describe('policy.ts', () => {
       const mockConfig = {
         isTrustedFolder: vi.fn().mockReturnValue(false),
         getWorkspacePoliciesDir: vi.fn().mockReturnValue(undefined),
+        getTargetDir: vi.fn().mockReturnValue('/mock/dir'),
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
       const mockMessageBus = {

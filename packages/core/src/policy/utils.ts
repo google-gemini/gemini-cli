@@ -11,17 +11,6 @@
 export const ALWAYS_ALLOW_PRIORITY = 3.95;
 
 /**
- * Calculates a unique priority within the ALWAYS_ALLOW_PRIORITY tier.
- * It uses the fractional part as a base and adds a small offset.
- */
-export function getAlwaysAllowPriority(offset: number): number {
-  const base = Math.floor(ALWAYS_ALLOW_PRIORITY);
-  const fraction = ALWAYS_ALLOW_PRIORITY - base;
-  // Use a precision of 3 decimal places for the offset
-  return base + fraction + offset / 1000;
-}
-
-/**
  * Returns the fractional priority of ALWAYS_ALLOW_PRIORITY scaled to 1000.
  */
 export function getAlwaysAllowPriorityFraction(): number {
@@ -119,4 +108,16 @@ export function buildArgsPatterns(
 export function buildFilePathArgsPattern(filePath: string): string {
   const jsonPath = JSON.stringify(filePath).slice(1, -1);
   return `"file_path":"${escapeRegex(jsonPath)}"`;
+}
+
+/**
+ * Builds a regex pattern to match a specific "pattern" in tool arguments.
+ * This is used to narrow tool approvals for search tools like glob/grep to specific patterns.
+ *
+ * @param pattern The pattern to match.
+ * @returns A regex string that matches "pattern":"<pattern>" in a JSON string.
+ */
+export function buildPatternArgsPattern(pattern: string): string {
+  const jsonPattern = JSON.stringify(pattern).slice(1, -1);
+  return `"pattern":"${escapeRegex(jsonPattern)}"`;
 }

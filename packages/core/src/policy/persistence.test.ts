@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as path from 'node:path';
 import { createPolicyUpdater } from './config.js';
-import { ALWAYS_ALLOW_PRIORITY } from './utils.js';
+import { getAlwaysAllowPriorityFraction } from './utils.js';
 import { PolicyEngine } from './policy-engine.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
@@ -62,9 +62,7 @@ describe('createPolicyUpdater', () => {
     const content = memfs.readFileSync(policyFile, 'utf-8') as string;
     expect(content).toContain('toolName = "test_tool"');
     expect(content).toContain('decision = "allow"');
-    const expectedPriority = Math.round(
-      (ALWAYS_ALLOW_PRIORITY - Math.floor(ALWAYS_ALLOW_PRIORITY)) * 1000,
-    );
+    const expectedPriority = getAlwaysAllowPriorityFraction();
     expect(content).toContain(`priority = ${expectedPriority}`);
   });
 

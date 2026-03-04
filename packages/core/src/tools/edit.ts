@@ -27,6 +27,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
+import { correctPath } from '../utils/pathCorrector.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
@@ -453,10 +454,19 @@ class EditToolInvocation
     displayName?: string,
   ) {
     super(params, messageBus, toolName, displayName);
-    this.resolvedPath = path.resolve(
-      this.config.getTargetDir(),
-      this.params.file_path,
-    );
+    if (!path.isAbsolute(this.params.file_path)) {
+      const result = correctPath(this.params.file_path, this.config);
+      if (result.success) {
+        this.resolvedPath = result.correctedPath;
+      } else {
+        this.resolvedPath = path.resolve(
+          this.config.getTargetDir(),
+          this.params.file_path,
+        );
+      }
+    } else {
+      this.resolvedPath = this.params.file_path;
+    }
   }
 
   override toolLocations(): ToolLocation[] {
@@ -996,10 +1006,20 @@ export class EditTool
       return "The 'file_path' parameter must be non-empty.";
     }
 
-    const resolvedPath = path.resolve(
-      this.config.getTargetDir(),
-      params.file_path,
-    );
+    let resolvedPath: string;
+    if (!path.isAbsolute(params.file_path)) {
+      const result = correctPath(params.file_path, this.config);
+      if (result.success) {
+        resolvedPath = result.correctedPath;
+      } else {
+        resolvedPath = path.resolve(
+          this.config.getTargetDir(),
+          params.file_path,
+        );
+      }
+    } else {
+      resolvedPath = params.file_path;
+    }
 
     const newPlaceholders = detectOmissionPlaceholders(params.new_string);
     if (newPlaceholders.length > 0) {

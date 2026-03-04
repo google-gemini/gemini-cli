@@ -24,6 +24,7 @@ import {
   type PolicyUpdateOptions,
 } from '../tools/tools.js';
 import { buildFilePathArgsPattern } from '../policy/utils.js';
+import { makeRelative } from '../utils/paths.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
 import type { ValidatingToolCall } from './types.js';
@@ -114,7 +115,7 @@ export async function updatePolicy(
     // If folder is trusted and workspace policies are enabled, we prefer workspace scope.
     if (
       deps.config.isTrustedFolder() &&
-      deps.config.getWorkspacePoliciesDir()
+      deps.config.getWorkspacePoliciesDir() !== undefined
     ) {
       persistScope = 'workspace';
     } else {
@@ -142,6 +143,7 @@ export async function updatePolicy(
     deps.messageBus,
     persistScope,
     deps.toolInvocation,
+    deps.config,
   );
 }
 
@@ -173,6 +175,7 @@ async function handleStandardPolicyUpdate(
   messageBus: MessageBus,
   persistScope?: 'workspace' | 'user',
   toolInvocation?: AnyToolInvocation,
+  config?: Config,
 ): Promise<void> {
   if (
     outcome === ToolConfirmationOutcome.ProceedAlways ||
@@ -184,9 +187,10 @@ async function handleStandardPolicyUpdate(
     if (!options.commandPrefix && confirmationDetails?.type === 'exec') {
       options.commandPrefix = confirmationDetails.rootCommands;
     } else if (!options.argsPattern && confirmationDetails?.type === 'edit') {
-      options.argsPattern = buildFilePathArgsPattern(
-        confirmationDetails.filePath,
-      );
+      const filePath = config
+        ? makeRelative(confirmationDetails.filePath, config.getTargetDir())
+        : confirmationDetails.filePath;
+      options.argsPattern = buildFilePathArgsPattern(filePath);
     }
 
     await messageBus.publish({
