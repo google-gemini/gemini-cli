@@ -234,6 +234,7 @@ export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
   enabled?: boolean;
+  approvalMode?: ApprovalMode;
 }
 
 export interface AgentSettings {

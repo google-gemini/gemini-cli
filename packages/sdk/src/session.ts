@@ -254,6 +254,7 @@ export class GeminiCliSession {
         toolCallsToSchedule,
         {
           schedulerId: sessionId,
+          agentName: 'sdk-agent',
           toolRegistry: scopedRegistry,
           signal: abortSignal,
         },

@@ -2225,6 +2225,11 @@
         "enabled": {
           "type": "boolean",
           "description": "Whether to enable the agent."
+        },
+        "approvalMode": {
+          "type": "string",
+          "description": "Approval mode for this subagent's internal tool calls.",
+          "enum": ["default", "yolo", "plan", "autoEdit"]
         }
       }
     },

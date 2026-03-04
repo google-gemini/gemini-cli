@@ -31,6 +31,7 @@ describe('agent-scheduler', () => {
     mockConfig = {
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      getAgentsSettings: vi.fn().mockReturnValue({}),
     } as unknown as Mocked<Config>;
   });
 
@@ -47,6 +48,7 @@ describe('agent-scheduler', () => {
 
     const options = {
       schedulerId: 'subagent-1',
+      agentName: 'mock-agent',
       parentCallId: 'parent-1',
       toolRegistry: mockToolRegistry as unknown as ToolRegistry,
       signal: new AbortController().signal,

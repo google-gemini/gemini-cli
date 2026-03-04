@@ -12,6 +12,7 @@ import type {
 } from '../scheduler/types.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { EditorType } from '../utils/editor.js';
+import { ApprovalMode } from '../policy/types.js';
 
 /**
  * Options for scheduling agent tools.
@@ -19,6 +20,8 @@ import type { EditorType } from '../utils/editor.js';
 export interface AgentSchedulingOptions {
   /** The unique ID for this agent's scheduler. */
   schedulerId: string;
+  /** The name of the agent executing the tools. */
+  agentName: string;
   /** The ID of the tool call that invoked this agent. */
   parentCallId?: string;
   /** The tool registry specific to this agent. */
@@ -46,6 +49,7 @@ export async function scheduleAgentTools(
 ): Promise<CompletedToolCall[]> {
   const {
     schedulerId,
+    agentName,
     parentCallId,
     toolRegistry,
     signal,
@@ -57,6 +61,16 @@ export async function scheduleAgentTools(
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const agentConfig: Config = Object.create(config);
   agentConfig.getToolRegistry = () => toolRegistry;
+  
+  // Apply any subagent-specific approval mode override, fallback to the main config mode.
+  const override = config.getAgentsSettings()?.overrides?.[agentName];
+  if (override?.approvalMode) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    agentConfig.getApprovalMode = () => override.approvalMode as ApprovalMode;
+  } else {
+    // Subagents operate in YOLO mode by default, unless overridden.
+    agentConfig.getApprovalMode = () => ApprovalMode.YOLO;
+  }
 
   const scheduler = new Scheduler({
     config: agentConfig,
