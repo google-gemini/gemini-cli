@@ -888,6 +888,7 @@ Would you like to attempt to install via "git clone" instead?`,
         themes: config.themes,
         rules,
         checkers,
+        plan: config.plan,
       };
     } catch (e) {
       debugLogger.error(

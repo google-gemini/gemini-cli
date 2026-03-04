@@ -159,12 +159,12 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`general.sessionRetention.enabled`** (boolean):
   - **Description:** Enable automatic session cleanup
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`general.sessionRetention.maxAge`** (string):
   - **Description:** Automatically delete chats older than this time period
     (e.g., "30d", "7d", "24h", "1w")
-  - **Default:** `undefined`
+  - **Default:** `"30d"`
 
 - **`general.sessionRetention.maxCount`** (number):
   - **Description:** Alternative: Maximum number of sessions to keep (most
@@ -174,11 +174,6 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.sessionRetention.minRetention`** (string):
   - **Description:** Minimum retention period (safety limit, defaults to "1d")
   - **Default:** `"1d"`
-
-- **`general.sessionRetention.warningAcknowledged`** (boolean):
-  - **Description:** INTERNAL: Whether the user has acknowledged the session
-    retention warning
-  - **Default:** `false`
 
 #### `output`
 
@@ -268,7 +263,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`ui.footer.hideContextPercentage`** (boolean):
-  - **Description:** Hides the context window remaining percentage.
+  - **Description:** Hides the context window usage percentage.
   - **Default:** `true`
 
 - **`ui.hideFooter`** (boolean):
@@ -752,7 +747,8 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`tools.sandbox`** (boolean | string):
   - **Description:** Sandbox execution environment. Set to a boolean to enable
-    or disable the sandbox, or provide a string path to a sandbox profile.
+    or disable the sandbox, provide a string path to a sandbox profile, or
+    specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -1016,6 +1012,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.plan`** (boolean):
   - **Description:** Enable planning features (Plan Mode and tools).
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.taskTracker`** (boolean):
+  - **Description:** Enable task tracker tools.
   - **Default:** `false`
   - **Requires restart:** Yes
 
