@@ -203,9 +203,12 @@ class TerminalRenderer {
 
       // Clear leftover lines if new frame is shorter than previous
       const extra = this.lineCount - lines.length;
-      for (let i = 0; i < extra; i++) {
-        readline.clearLine(process.stdout, 0);
-        process.stdout.write('\n');
+      if (extra > 0) {
+        for (let i = 0; i < extra; i++) {
+          readline.clearLine(process.stdout, 0);
+          process.stdout.write('\n');
+        }
+        readline.moveCursor(process.stdout, 0, -extra);
       }
 
       this.lineCount = lines.length;
