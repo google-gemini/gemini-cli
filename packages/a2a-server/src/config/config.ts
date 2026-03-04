@@ -25,6 +25,7 @@ import {
   ExperimentFlags,
   isHeadlessMode,
   FatalAuthenticationError,
+  isCloudShell,
   type TelemetryTarget,
   type ConfigParameters,
   type ExtensionLoader,
@@ -262,8 +263,7 @@ async function refreshAuthentication(
     } catch (e) {
       if (
         e instanceof FatalAuthenticationError &&
-        (isCloudEnvironment() ||
-          process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true')
+        (isCloudShell() || process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true')
       ) {
         logger.warn(
           `[${logPrefix}] LOGIN_WITH_GOOGLE failed in non-interactive mode. Attempting COMPUTE_ADC fallback.`,
@@ -297,8 +297,4 @@ async function refreshAuthentication(
     logger.error(errorMessage);
     throw new Error(errorMessage);
   }
-}
-
-function isCloudEnvironment(): boolean {
-  return !!(process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']);
 }
