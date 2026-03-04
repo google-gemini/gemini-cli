@@ -22,10 +22,13 @@ import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { CodeAssistServer } from './server.js';
 import { ToolConfirmationOutcome } from '../tools/tools.js';
+import { getLanguageFromFilePath } from '../utils/language-detection.js';
 import {
   computeModelAddedAndRemovedLines,
   getFileDiffFromResultDisplay,
 } from '../utils/fileDiffUtils.js';
+import { isEditToolParams } from '../tools/edit.js';
+import { isWriteFileToolParams } from '../tools/write-file.js';
 
 export async function recordConversationOffered(
   server: CodeAssistServer,
@@ -85,10 +88,12 @@ export function createConversationOffered(
   signal: AbortSignal | undefined,
   streamingLatency: StreamingLatency,
 ): ConversationOffered | undefined {
-  // Only send conversation offered events for responses that contain function
-  // calls. Non-function call events don't represent user actionable
-  // 'suggestions'.
-  if ((response.functionCalls?.length || 0) === 0) {
+  // Only send conversation offered events for responses that contain edit
+  // function calls. Non-edit function calls don't represent file modifications.
+  if (
+    !response.functionCalls ||
+    !response.functionCalls.some((call) => EDIT_TOOL_NAMES.has(call.name || ''))
+  ) {
     return;
   }
 
@@ -116,6 +121,7 @@ function summarizeToolCalls(
   let isEdit = false;
   let acceptedLines = 0;
   let removedLines = 0;
+  let language = undefined;
 
   // Iterate the tool calls and summarize them into a single conversation
   // interaction so that the ConversationOffered and ConversationInteraction
@@ -144,13 +150,23 @@ function summarizeToolCalls(
       if (EDIT_TOOL_NAMES.has(toolCall.request.name)) {
         isEdit = true;
 
+        if (
+          !language &&
+          (isEditToolParams(toolCall.request.args) ||
+            isWriteFileToolParams(toolCall.request.args))
+        ) {
+          language = getLanguageFromFilePath(toolCall.request.args.file_path);
+        }
+
         if (toolCall.status === 'success') {
           const fileDiff = getFileDiffFromResultDisplay(
             toolCall.response.resultDisplay,
           );
           if (fileDiff?.diffStat) {
             const lines = computeModelAddedAndRemovedLines(fileDiff.diffStat);
-            acceptedLines += lines.addedLines;
+
+            // The API expects acceptedLines to be addedLines + removedLines.
+            acceptedLines += lines.addedLines + lines.removedLines;
             removedLines += lines.removedLines;
           }
         }
@@ -158,16 +174,16 @@ function summarizeToolCalls(
     }
   }
 
-  // Only file interaction telemetry if 100% of the tool calls were accepted.
-  return traceId && acceptedToolCalls / toolCalls.length >= 1
+  // Only file interaction telemetry if 100% of the tool calls were accepted
+  // and at least one of them was an edit.
+  return traceId && acceptedToolCalls / toolCalls.length >= 1 && isEdit
     ? createConversationInteraction(
         traceId,
         actionStatus || ActionStatus.ACTION_STATUS_NO_ERROR,
-        isEdit
-          ? ConversationInteractionInteraction.ACCEPT_FILE
-          : ConversationInteractionInteraction.UNKNOWN,
-        isEdit ? String(acceptedLines) : undefined,
-        isEdit ? String(removedLines) : undefined,
+        ConversationInteractionInteraction.ACCEPT_FILE,
+        String(acceptedLines),
+        String(removedLines),
+        language,
       )
     : undefined;
 }
@@ -178,6 +194,7 @@ function createConversationInteraction(
   interaction: ConversationInteractionInteraction,
   acceptedLines?: string,
   removedLines?: string,
+  language?: string,
 ): ConversationInteraction {
   return {
     traceId,
@@ -185,9 +202,11 @@ function createConversationInteraction(
     interaction,
     acceptedLines,
     removedLines,
+    language,
     isAgentic: true,
   };
 }
+
 function includesCode(resp: GenerateContentResponse): boolean {
   if (!resp.candidates) {
     return false;
