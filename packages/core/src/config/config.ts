@@ -1403,9 +1403,9 @@ export class Config implements McpContext {
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
-      if (this.onModelChange && !isTemporary) {
-        this.onModelChange(newModel);
-      }
+    }
+    if (this.onModelChange && !isTemporary) {
+      this.onModelChange(newModel);
     }
     this.modelAvailabilityService.reset();
   }
