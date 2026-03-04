@@ -736,8 +736,8 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`context.fileFiltering.maxFileCount`** (number):
   - **Description:** Maximum number of files to index for autocomplete and
-    search. Defaults to 100,000.
-  - **Default:** `100000`
+    search. Defaults to 20,000.
+  - **Default:** `20000`
   - **Requires restart:** Yes
 
 - **`context.fileFiltering.enableRecursiveFileSearch`** (boolean):
