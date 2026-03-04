@@ -11,19 +11,16 @@ import type {
   JsonSchemaType,
   JsonSchemaValidator,
 } from '@modelcontextprotocol/sdk/validation/types.js';
-import type { SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import {
+  SSEClientTransport,
+  type SSEClientTransportOptions,
+} from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import type { StreamableHTTPClientTransportOptions } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {
+  StreamableHTTPClientTransport,
+  type StreamableHTTPClientTransportOptions,
+} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type {
-  GetPromptResult,
-  Prompt,
-  ReadResourceResult,
-  Resource,
-  Tool as McpTool,
-} from '@modelcontextprotocol/sdk/types.js';
 import {
   ListResourcesResultSchema,
   ListRootsRequestSchema,
@@ -32,14 +29,19 @@ import {
   ToolListChangedNotificationSchema,
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
+  type GetPromptResult,
+  type Prompt,
+  type ReadResourceResult,
+  type Resource,
+  type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
-import type {
-  Config,
-  MCPServerConfig,
-  GeminiCLIExtension,
+import {
+  AuthProviderType,
+  type Config,
+  type MCPServerConfig,
+  type GeminiCLIExtension,
 } from '../config/config.js';
-import { AuthProviderType } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
@@ -69,6 +71,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
+import { validateMcpPolicyToolNames } from '../policy/toml-loader.js';
 import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
@@ -221,6 +224,23 @@ export class McpClient implements McpProgressReporter {
       this.toolRegistry.registerTool(tool);
     }
     this.toolRegistry.sortTools();
+
+    // Validate MCP tool names in policy rules against discovered tools
+    try {
+      const discoveredToolNames = tools.map((t) => t.serverToolName);
+      const policyRules = cliConfig.getPolicyEngine?.()?.getRules() ?? [];
+      const warnings = validateMcpPolicyToolNames(
+        this.serverName,
+        discoveredToolNames,
+        policyRules,
+      );
+      for (const warning of warnings) {
+        coreEvents.emitFeedback('warning', warning);
+      }
+    } catch {
+      // Policy engine may not be available in all contexts (e.g. tests).
+      // Validation is best-effort; skip silently if unavailable.
+    }
   }
 
   /**
@@ -1577,6 +1597,9 @@ export interface McpContext {
   ): void;
   setUserInteractedWithMcp?(): void;
   isTrustedFolder(): boolean;
+  getPolicyEngine?(): {
+    getRules(): ReadonlyArray<{ toolName?: string; source?: string }>;
+  };
 }
 
 /**

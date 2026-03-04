@@ -279,6 +279,9 @@ describe('InputPrompt', () => {
       },
       getCompletedText: vi.fn().mockReturnValue(null),
       completionMode: CompletionMode.IDLE,
+      forceShowShellSuggestions: false,
+      setForceShowShellSuggestions: vi.fn(),
+      isShellSuggestionsVisible: true,
     };
     mockedUseCommandCompletion.mockReturnValue(mockCommandCompletion);
 
