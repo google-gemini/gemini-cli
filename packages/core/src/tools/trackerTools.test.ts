@@ -9,14 +9,17 @@ import { Config } from '../config/config.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
 import {
-  TrackerInitTool,
   TrackerCreateTaskTool,
   TrackerListTasksTool,
   TrackerUpdateTaskTool,
+  TrackerVisualizeTool,
+  TrackerAddDependencyTool,
 } from './trackerTools.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
+
+import { TaskStatus, TaskType } from '../services/trackerTypes.js';
 
 describe('Tracker Tools Integration', () => {
   let tempDir: string;
@@ -29,7 +32,7 @@ describe('Tracker Tools Integration', () => {
       sessionId: 'test-session',
       targetDir: tempDir,
       cwd: tempDir,
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3-flash',
       debugMode: false,
     });
     messageBus = new MessageBus(null as unknown as PolicyEngine, false);
@@ -41,32 +44,13 @@ describe('Tracker Tools Integration', () => {
 
   const getSignal = () => new AbortController().signal;
 
-  it('runs tracker_init and creates the directory', async () => {
-    const tool = new TrackerInitTool(config, messageBus);
-    const result = await tool.buildAndExecute({}, getSignal());
-
-    expect(result.llmContent).toContain('Task tracker initialized');
-    const trackerDir = config.getTrackerService().trackerDir;
-    const tasksDir = trackerDir;
-    const stats = await fs.stat(tasksDir);
-    expect(stats.isDirectory()).toBe(true);
-    // Verify it is NOT in the tempDir root (which was the old behavior)
-    expect(trackerDir).not.toBe(path.join(tempDir, '.tracker'));
-  });
-
   it('creates and lists tasks', async () => {
-    // Init first
-    await new TrackerInitTool(config, messageBus).buildAndExecute(
-      {},
-      getSignal(),
-    );
-
     const createTool = new TrackerCreateTaskTool(config, messageBus);
     const createResult = await createTool.buildAndExecute(
       {
         title: 'Test Task',
         description: 'Test Description',
-        type: 'task',
+        type: TaskType.TASK,
       },
       getSignal(),
     );
@@ -76,21 +60,16 @@ describe('Tracker Tools Integration', () => {
     const listTool = new TrackerListTasksTool(config, messageBus);
     const listResult = await listTool.buildAndExecute({}, getSignal());
     expect(listResult.llmContent).toContain('Test Task');
-    expect(listResult.llmContent).toContain('(open)');
+    expect(listResult.llmContent).toContain(`(${TaskStatus.OPEN})`);
   });
 
   it('updates task status', async () => {
-    await new TrackerInitTool(config, messageBus).buildAndExecute(
-      {},
-      getSignal(),
-    );
-
     const createTool = new TrackerCreateTaskTool(config, messageBus);
     await createTool.buildAndExecute(
       {
         title: 'Update Me',
         description: '...',
-        type: 'task',
+        type: TaskType.TASK,
       },
       getSignal(),
     );
@@ -102,14 +81,65 @@ describe('Tracker Tools Integration', () => {
     const updateResult = await updateTool.buildAndExecute(
       {
         id: taskId,
-        status: 'in_progress',
+        status: TaskStatus.IN_PROGRESS,
       },
       getSignal(),
     );
 
-    expect(updateResult.llmContent).toContain('Status: in_progress');
+    expect(updateResult.llmContent).toContain(
+      `Status: ${TaskStatus.IN_PROGRESS}`,
+    );
 
     const task = await config.getTrackerService().getTask(taskId);
-    expect(task?.status).toBe('in_progress');
+    expect(task?.status).toBe(TaskStatus.IN_PROGRESS);
+  });
+
+  it('adds dependencies and visualizes the graph', async () => {
+    const createTool = new TrackerCreateTaskTool(config, messageBus);
+
+    // Create Parent
+    await createTool.buildAndExecute(
+      {
+        title: 'Parent Task',
+        description: '...',
+        type: TaskType.TASK,
+      },
+      getSignal(),
+    );
+
+    // Create Child
+    await createTool.buildAndExecute(
+      {
+        title: 'Child Task',
+        description: '...',
+        type: TaskType.TASK,
+      },
+      getSignal(),
+    );
+
+    const tasks = await config.getTrackerService().listTasks();
+    const parentId = tasks.find((t) => t.title === 'Parent Task')!.id;
+    const childId = tasks.find((t) => t.title === 'Child Task')!.id;
+
+    // Add Dependency
+    const addDepTool = new TrackerAddDependencyTool(config, messageBus);
+    await addDepTool.buildAndExecute(
+      {
+        taskId: parentId,
+        dependencyId: childId,
+      },
+      getSignal(),
+    );
+
+    const updatedParent = await config.getTrackerService().getTask(parentId);
+    expect(updatedParent?.dependencies).toContain(childId);
+
+    // Visualize
+    const vizTool = new TrackerVisualizeTool(config, messageBus);
+    const vizResult = await vizTool.buildAndExecute({}, getSignal());
+
+    expect(vizResult.llmContent).toContain('Parent Task');
+    expect(vizResult.llmContent).toContain('Child Task');
+    expect(vizResult.llmContent).toContain(childId);
   });
 });

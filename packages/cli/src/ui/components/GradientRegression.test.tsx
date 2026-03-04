@@ -22,8 +22,13 @@ vi.mock('../semantic-colors.js', async (importOriginal) => {
     ...original,
     theme: {
       ...original.theme,
+      background: {
+        ...original.theme.background,
+        focus: '#004000',
+      },
       ui: {
         ...original.theme.ui,
+        focus: '#00ff00',
         gradient: [], // Empty array to potentially trigger the crash
       },
     },
@@ -66,52 +71,63 @@ useSessionStatsMock.mockReturnValue({
 });
 
 describe('Gradient Crash Regression Tests', () => {
-  it('<Header /> should not crash when theme.ui.gradient is empty', () => {
-    const { lastFrame } = renderWithProviders(
+  it('<Header /> should not crash when theme.ui.gradient is empty', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <Header version="1.0.0" nightly={false} />,
       {
         width: 120,
       },
     );
+    await waitUntilReady();
     expect(lastFrame()).toBeDefined();
+    unmount();
   });
 
-  it('<ModelDialog /> should not crash when theme.ui.gradient is empty', () => {
-    const { lastFrame } = renderWithProviders(
-      <ModelDialog onClose={() => {}} />,
+  it('<ModelDialog /> should not crash when theme.ui.gradient is empty', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <ModelDialog onClose={async () => {}} />,
       {
         width: 120,
       },
     );
+    await waitUntilReady();
     expect(lastFrame()).toBeDefined();
+    unmount();
   });
 
-  it('<Banner /> should not crash when theme.ui.gradient is empty', () => {
-    const { lastFrame } = renderWithProviders(
+  it('<Banner /> should not crash when theme.ui.gradient is empty', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <Banner bannerText="Test Banner" isWarning={false} width={80} />,
       {
         width: 120,
       },
     );
+    await waitUntilReady();
     expect(lastFrame()).toBeDefined();
+    unmount();
   });
 
-  it('<Footer /> should not crash when theme.ui.gradient has only one color (or empty) and nightly is true', () => {
-    const { lastFrame } = renderWithProviders(<Footer />, {
-      width: 120,
-      uiState: {
-        nightly: true, // Enable nightly to trigger Gradient usage logic
-        sessionStats: mockSessionStats,
+  it('<Footer /> should not crash when theme.ui.gradient has only one color (or empty) and nightly is true', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <Footer />,
+      {
+        width: 120,
+        uiState: {
+          nightly: true, // Enable nightly to trigger Gradient usage logic
+          sessionStats: mockSessionStats,
+        },
       },
-    });
+    );
+    await waitUntilReady();
     // If it crashes, this line won't be reached or lastFrame() will throw
     expect(lastFrame()).toBeDefined();
     // It should fall back to rendering text without gradient
     expect(lastFrame()).not.toContain('Gradient');
+    unmount();
   });
 
-  it('<StatsDisplay /> should not crash when theme.ui.gradient is empty', () => {
-    const { lastFrame } = renderWithProviders(
+  it('<StatsDisplay /> should not crash when theme.ui.gradient is empty', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <StatsDisplay duration="1s" title="My Stats" />,
       {
         width: 120,
@@ -120,8 +136,10 @@ describe('Gradient Crash Regression Tests', () => {
         },
       },
     );
+    await waitUntilReady();
     expect(lastFrame()).toBeDefined();
     // Ensure title is rendered
     expect(lastFrame()).toContain('My Stats');
+    unmount();
   });
 });

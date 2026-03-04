@@ -7,13 +7,9 @@
 import { describe, it, expect } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
-import {
-  StreamingState,
-  ToolCallStatus,
-  type IndividualToolCallDisplay,
-} from '../../types.js';
-import { OverflowProvider } from '../../contexts/OverflowContext.js';
+import { StreamingState, type IndividualToolCallDisplay } from '../../types.js';
 import { waitFor } from '../../../test-utils/async.js';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 
 describe('ToolResultDisplay Overflow', () => {
   it('should display "press ctrl-o" hint when content overflows in ToolGroupMessage', async () => {
@@ -29,46 +25,52 @@ describe('ToolResultDisplay Overflow', () => {
         callId: 'call-1',
         name: 'test-tool',
         description: 'a test tool',
-        status: ToolCallStatus.Success,
+        status: CoreToolCallStatus.Success,
         resultDisplay,
         confirmationDetails: undefined,
       },
     ];
 
-    const { lastFrame } = renderWithProviders(
-      <OverflowProvider>
-        <ToolGroupMessage
-          groupId={1}
-          toolCalls={toolCalls}
-          availableTerminalHeight={15} // Small height to force overflow
-          terminalWidth={80}
-        />
-      </OverflowProvider>,
+    const { lastFrame, waitUntilReady } = renderWithProviders(
+      <ToolGroupMessage
+        item={{ id: 1, type: 'tool_group', tools: toolCalls }}
+        toolCalls={toolCalls}
+        availableTerminalHeight={15} // Small height to force overflow
+        terminalWidth={80}
+        isExpandable={true}
+      />,
       {
         uiState: {
           streamingState: StreamingState.Idle,
           constrainHeight: true,
         },
-        useAlternateBuffer: false,
+        useAlternateBuffer: true,
       },
     );
 
-    // ResizeObserver might take a tick
-    await waitFor(() =>
-      expect(lastFrame()).toContain('Press ctrl-o to show more lines'),
-    );
+    await waitUntilReady();
+
+    // In ASB mode the overflow hint can render before the scroll position
+    // settles. Wait for both the hint and the tail of the content so this
+    // snapshot is deterministic across slower CI runners.
+    await waitFor(() => {
+      const frame = lastFrame();
+      expect(frame).toBeDefined();
+      expect(frame?.toLowerCase()).toContain('press ctrl+o to show more lines');
+      expect(frame).toContain('line 50');
+    });
 
     const frame = lastFrame();
     expect(frame).toBeDefined();
     if (frame) {
-      expect(frame).toContain('Press ctrl-o to show more lines');
+      expect(frame.toLowerCase()).toContain('press ctrl+o to show more lines');
       // Ensure it's AFTER the bottom border
       const linesOfOutput = frame.split('\n');
       const bottomBorderIndex = linesOfOutput.findLastIndex((l) =>
         l.includes('╰─'),
       );
       const hintIndex = linesOfOutput.findIndex((l) =>
-        l.includes('Press ctrl-o to show more lines'),
+        l.toLowerCase().includes('press ctrl+o to show more lines'),
       );
       expect(hintIndex).toBeGreaterThan(bottomBorderIndex);
       expect(frame).toMatchSnapshot();

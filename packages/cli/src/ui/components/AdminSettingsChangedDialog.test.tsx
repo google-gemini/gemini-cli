@@ -16,17 +16,24 @@ describe('AdminSettingsChangedDialog', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders correctly', () => {
-    const { lastFrame } = renderWithProviders(<AdminSettingsChangedDialog />);
+  it('renders correctly', async () => {
+    const { lastFrame, waitUntilReady } = renderWithProviders(
+      <AdminSettingsChangedDialog />,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('restarts on "r" key press', async () => {
-    const { stdin } = renderWithProviders(<AdminSettingsChangedDialog />, {
-      uiActions: {
-        handleRestart: handleRestartMock,
+    const { stdin, waitUntilReady } = renderWithProviders(
+      <AdminSettingsChangedDialog />,
+      {
+        uiActions: {
+          handleRestart: handleRestartMock,
+        },
       },
-    });
+    );
+    await waitUntilReady();
 
     act(() => {
       stdin.write('r');
@@ -36,11 +43,15 @@ describe('AdminSettingsChangedDialog', () => {
   });
 
   it.each(['r', 'R'])('restarts on "%s" key press', async (key) => {
-    const { stdin } = renderWithProviders(<AdminSettingsChangedDialog />, {
-      uiActions: {
-        handleRestart: handleRestartMock,
+    const { stdin, waitUntilReady } = renderWithProviders(
+      <AdminSettingsChangedDialog />,
+      {
+        uiActions: {
+          handleRestart: handleRestartMock,
+        },
       },
-    });
+    );
+    await waitUntilReady();
 
     act(() => {
       stdin.write(key);

@@ -396,6 +396,7 @@ export const skillsCommand: SlashCommand = {
     },
     {
       name: 'reload',
+      altNames: ['refresh'],
       description:
         'Reload the list of discovered skills. Usage: /skills reload',
       kind: CommandKind.BUILT_IN,

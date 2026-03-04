@@ -9,7 +9,7 @@ import { useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
-import { pickDefaultThemeName } from '../themes/theme.js';
+import { pickDefaultThemeName, type Theme } from '../themes/theme.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { DiffRenderer } from './messages/DiffRenderer.js';
 import { colorizeCode } from '../utils/CodeColorizer.js';
@@ -22,12 +22,16 @@ import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { ScopeSelector } from './shared/ScopeSelector.js';
-import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { ColorsDisplay } from './ColorsDisplay.js';
+import { isDevelopment } from '../../utils/installationInfo.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
-  onSelect: (themeName: string, scope: LoadableSettingScope) => void;
+  onSelect: (
+    themeName: string,
+    scope: LoadableSettingScope,
+  ) => void | Promise<void>;
 
   /** Callback function when the dialog is cancelled */
   onCancel: () => void;
@@ -40,24 +44,21 @@ interface ThemeDialogProps {
   terminalWidth: number;
 }
 
-import {
-  getThemeTypeFromBackgroundColor,
-  resolveColor,
-} from '../themes/color-utils.js';
+import { resolveColor } from '../themes/color-utils.js';
 
 function generateThemeItem(
   name: string,
   typeDisplay: string,
-  themeType: string,
-  themeBackground: string | undefined,
+  fullTheme: Theme | undefined,
   terminalBackgroundColor: string | undefined,
-  terminalThemeType: 'light' | 'dark' | undefined,
 ) {
-  const isCompatible =
-    themeType === 'custom' ||
-    terminalThemeType === undefined ||
-    themeType === 'ansi' ||
-    themeType === terminalThemeType;
+  const isCompatible = fullTheme
+    ? themeManager.isThemeCompatible(fullTheme, terminalBackgroundColor)
+    : true;
+
+  const themeBackground = fullTheme
+    ? resolveColor(fullTheme.colors.Background)
+    : undefined;
 
   const isBackgroundMatch =
     terminalBackgroundColor &&
@@ -85,7 +86,6 @@ export function ThemeDialog({
   terminalWidth,
 }: ThemeDialogProps): React.JSX.Element {
   const isAlternateBuffer = useAlternateBuffer();
-  const { refreshStatic } = useUIActions();
   const { terminalBackgroundColor } = useUIState();
   const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
     SettingScope.User,
@@ -111,26 +111,21 @@ export function ThemeDialog({
 
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-  const terminalThemeType = getThemeTypeFromBackgroundColor(
-    terminalBackgroundColor,
-  );
-
   // Generate theme items
   const themeItems = themeManager
     .getAvailableThemes()
     .map((theme) => {
       const fullTheme = themeManager.getTheme(theme.name);
-      const themeBackground = fullTheme
-        ? resolveColor(fullTheme.colors.Background)
-        : undefined;
+      const capitalizedType = capitalize(theme.type);
+      const typeDisplay = theme.name.endsWith(capitalizedType)
+        ? ''
+        : capitalizedType;
 
       return generateThemeItem(
         theme.name,
-        capitalize(theme.type),
-        theme.type,
-        themeBackground,
+        typeDisplay,
+        fullTheme,
         terminalBackgroundColor,
-        terminalThemeType,
       );
     })
     .sort((a, b) => {
@@ -149,11 +144,10 @@ export function ThemeDialog({
   const safeInitialThemeIndex = initialThemeIndex >= 0 ? initialThemeIndex : 0;
 
   const handleThemeSelect = useCallback(
-    (themeName: string) => {
-      onSelect(themeName, selectedScope);
-      refreshStatic();
+    async (themeName: string) => {
+      await onSelect(themeName, selectedScope);
     },
-    [onSelect, selectedScope, refreshStatic],
+    [onSelect, selectedScope],
   );
 
   const handleThemeHighlight = (themeName: string) => {
@@ -166,11 +160,10 @@ export function ThemeDialog({
   }, []);
 
   const handleScopeSelect = useCallback(
-    (scope: LoadableSettingScope) => {
-      onSelect(highlightedThemeName, scope);
-      refreshStatic();
+    async (scope: LoadableSettingScope) => {
+      await onSelect(highlightedThemeName, scope);
     },
-    [onSelect, highlightedThemeName, refreshStatic],
+    [onSelect, highlightedThemeName],
   );
 
   const [mode, setMode] = useState<'theme' | 'scope'>('theme');
@@ -254,6 +247,11 @@ export function ThemeDialog({
   // The code block is slightly longer than the diff, so give it more space.
   const codeBlockHeight = Math.ceil(availableHeightForPanes * 0.6);
   const diffHeight = Math.floor(availableHeightForPanes * 0.4);
+
+  const previewTheme =
+    themeManager.getTheme(highlightedThemeName || DEFAULT_THEME.name) ||
+    DEFAULT_THEME;
+
   return (
     <Box
       borderStyle="round"
@@ -337,53 +335,48 @@ export function ThemeDialog({
             <Text bold color={theme.text.primary}>
               Preview
             </Text>
-            {/* Get the Theme object for the highlighted theme, fall back to default if not found */}
-            {(() => {
-              const previewTheme =
-                themeManager.getTheme(
-                  highlightedThemeName || DEFAULT_THEME.name,
-                ) || DEFAULT_THEME;
-
-              return (
-                <Box
-                  borderStyle="single"
-                  borderColor={theme.border.default}
-                  paddingTop={includePadding ? 1 : 0}
-                  paddingBottom={includePadding ? 1 : 0}
-                  paddingLeft={1}
-                  paddingRight={1}
-                  flexDirection="column"
-                >
-                  {colorizeCode({
-                    code: `# function
+            <Box
+              borderStyle="single"
+              borderColor={theme.border.default}
+              paddingTop={includePadding ? 1 : 0}
+              paddingBottom={includePadding ? 1 : 0}
+              paddingLeft={1}
+              paddingRight={1}
+              flexDirection="column"
+            >
+              {colorizeCode({
+                code: `# function
 def fibonacci(n):
     a, b = 0, 1
     for _ in range(n):
         a, b = b, a + b
     return a`,
-                    language: 'python',
-                    availableHeight:
-                      isAlternateBuffer === false ? codeBlockHeight : undefined,
-                    maxWidth: colorizeCodeWidth,
-                    settings,
-                  })}
-                  <Box marginTop={1} />
-                  <DiffRenderer
-                    diffContent={`--- a/util.py
+                language: 'python',
+                availableHeight:
+                  isAlternateBuffer === false ? codeBlockHeight : undefined,
+                maxWidth: colorizeCodeWidth,
+                settings,
+              })}
+              <Box marginTop={1} />
+              <DiffRenderer
+                diffContent={`--- a/util.py
 +++ b/util.py
 @@ -1,2 +1,2 @@
 - print("Hello, " + name)
 + print(f"Hello, {name}!")
 `}
-                    availableTerminalHeight={
-                      isAlternateBuffer === false ? diffHeight : undefined
-                    }
-                    terminalWidth={colorizeCodeWidth}
-                    theme={previewTheme}
-                  />
-                </Box>
-              );
-            })()}
+                availableTerminalHeight={
+                  isAlternateBuffer === false ? diffHeight : undefined
+                }
+                terminalWidth={colorizeCodeWidth}
+                theme={previewTheme}
+              />
+            </Box>
+            {isDevelopment && (
+              <Box marginTop={1}>
+                <ColorsDisplay activeTheme={previewTheme} />
+              </Box>
+            )}
           </Box>
         </Box>
       ) : (

@@ -21,6 +21,10 @@ import {
   ConfigExtensionDialog,
   type ConfigExtensionDialogProps,
 } from '../components/ConfigExtensionDialog.js';
+import {
+  ExtensionRegistryView,
+  type ExtensionRegistryViewProps,
+} from '../components/views/ExtensionRegistryView.js';
 import { type CommandContext, type SlashCommand } from './types.js';
 
 import {
@@ -39,6 +43,8 @@ import {
 } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
 import { stat } from 'node:fs/promises';
+import { type RegistryExtension } from '../../config/extensionRegistryClient.js';
+import { waitFor } from '../../test-utils/async.js';
 
 vi.mock('../../config/extension-manager.js', async (importOriginal) => {
   const actual =
@@ -167,6 +173,7 @@ describe('extensionsCommand', () => {
       },
       ui: {
         dispatchExtensionStateUpdate: mockDispatchExtensionState,
+        removeComponent: vi.fn(),
       },
     });
   });
@@ -290,7 +297,7 @@ describe('extensionsCommand', () => {
 
     it('should inform user if there are no extensions to update with --all', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([]);
           }
@@ -306,7 +313,7 @@ describe('extensionsCommand', () => {
 
     it('should call setPendingItem and addItem in a finally block on success', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([
               {
@@ -357,7 +364,7 @@ describe('extensionsCommand', () => {
 
     it('should update a single extension by name', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([
               {
@@ -382,7 +389,7 @@ describe('extensionsCommand', () => {
 
     it('should update multiple extensions by name', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([
               {
@@ -428,6 +435,61 @@ describe('extensionsCommand', () => {
     if (!exploreAction) {
       throw new Error('Explore action not found');
     }
+
+    it('should return ExtensionRegistryView custom dialog when experimental.extensionRegistry is true', async () => {
+      mockContext.services.settings.merged.experimental.extensionRegistry = true;
+
+      const result = await exploreAction(mockContext, '');
+
+      expect(result).toBeDefined();
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+
+      const component =
+        result.component as ReactElement<ExtensionRegistryViewProps>;
+      expect(component.type).toBe(ExtensionRegistryView);
+      expect(component.props.extensionManager).toBe(mockExtensionLoader);
+    });
+
+    it('should handle onSelect and onClose in ExtensionRegistryView', async () => {
+      mockContext.services.settings.merged.experimental.extensionRegistry = true;
+
+      const result = await exploreAction(mockContext, '');
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+
+      const component =
+        result.component as ReactElement<ExtensionRegistryViewProps>;
+
+      const extension = {
+        extensionName: 'test-ext',
+        url: 'https://github.com/test/ext.git',
+      } as RegistryExtension;
+
+      vi.mocked(inferInstallMetadata).mockResolvedValue({
+        source: extension.url,
+        type: 'git',
+      });
+      mockInstallExtension.mockResolvedValue({ name: extension.url });
+
+      // Call onSelect
+      component.props.onSelect?.(extension);
+
+      await waitFor(() => {
+        expect(inferInstallMetadata).toHaveBeenCalledWith(extension.url);
+        expect(mockInstallExtension).toHaveBeenCalledWith({
+          source: extension.url,
+          type: 'git',
+        });
+      });
+      expect(mockContext.ui.removeComponent).toHaveBeenCalledTimes(1);
+
+      // Call onClose
+      component.props.onClose?.();
+      expect(mockContext.ui.removeComponent).toHaveBeenCalledTimes(2);
+    });
 
     it("should add an info message and call 'open' in a non-sandbox environment", async () => {
       // Ensure no special environment variables that would affect behavior

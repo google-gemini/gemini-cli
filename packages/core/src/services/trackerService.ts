@@ -7,7 +7,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { TrackerTaskSchema, type TrackerTask } from './trackerTypes.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
+import {
+  TrackerTaskSchema,
+  TaskStatus,
+  type TrackerTask,
+} from './trackerTypes.js';
+import { type z } from 'zod';
 
 export class TrackerService {
   private readonly tasksDir: string;
@@ -43,8 +50,50 @@ export class TrackerService {
       id,
     };
 
+    if (task.parentId) {
+      const parentList = await this.listTasks();
+      if (!parentList.find((t) => t.id === task.parentId)) {
+        throw new Error(`Parent task with ID ${task.parentId} not found.`);
+      }
+    }
+
+    TrackerTaskSchema.parse(task);
+
     await this.saveTask(task);
     return task;
+  }
+
+  /**
+   * Helper to read and validate a JSON file.
+   */
+  private async readJsonFile<T>(
+    filePath: string,
+    schema: z.ZodSchema<T>,
+  ): Promise<T | null> {
+    try {
+      const content = await fs.readFile(filePath, 'utf8');
+      const data: unknown = JSON.parse(content);
+      return schema.parse(data);
+    } catch (error) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (error as NodeJS.ErrnoException).code === 'ENOENT'
+      ) {
+        return null;
+      }
+
+      const fileName = path.basename(filePath);
+      debugLogger.warn(`Failed to read or parse task file ${fileName}:`, error);
+      coreEvents.emitFeedback(
+        'warning',
+        `Task tracker encountered an issue reading ${fileName}. The data might be corrupted.`,
+        error,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -53,21 +102,7 @@ export class TrackerService {
   async getTask(id: string): Promise<TrackerTask | null> {
     await this.ensureInitialized();
     const taskPath = path.join(this.tasksDir, `${id}.json`);
-    try {
-      const content = await fs.readFile(taskPath, 'utf8');
-      const data: unknown = JSON.parse(content);
-      return TrackerTaskSchema.parse(data);
-    } catch (error) {
-      if (
-        error &&
-        typeof error === 'object' &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      ) {
-        return null;
-      }
-      throw error;
-    }
+    return this.readJsonFile(taskPath, TrackerTaskSchema);
   }
 
   /**
@@ -77,18 +112,14 @@ export class TrackerService {
     await this.ensureInitialized();
     try {
       const files = await fs.readdir(this.tasksDir);
-      const jsonFiles = files.filter((f) => f.endsWith('.json'));
+      const jsonFiles = files.filter((f: string) => f.endsWith('.json'));
       const tasks = await Promise.all(
-        jsonFiles.map(async (f) => {
-          const content = await fs.readFile(
-            path.join(this.tasksDir, f),
-            'utf8',
-          );
-          const data: unknown = JSON.parse(content);
-          return TrackerTaskSchema.parse(data);
+        jsonFiles.map(async (f: string) => {
+          const taskPath = path.join(this.tasksDir, f);
+          return this.readJsonFile(taskPath, TrackerTaskSchema);
         }),
       );
-      return tasks;
+      return tasks.filter((t): t is TrackerTask => t !== null);
     } catch (error) {
       if (
         error &&
@@ -109,22 +140,47 @@ export class TrackerService {
     id: string,
     updates: Partial<TrackerTask>,
   ): Promise<TrackerTask> {
-    const task = await this.getTask(id);
+    const isClosing = updates.status === TaskStatus.CLOSED;
+    const changingDependencies = updates.dependencies !== undefined;
+
+    let taskMap: Map<string, TrackerTask> | undefined;
+
+    if (isClosing || changingDependencies) {
+      const allTasks = await this.listTasks();
+      taskMap = new Map<string, TrackerTask>(allTasks.map((t) => [t.id, t]));
+    }
+
+    const task = taskMap ? taskMap.get(id) : await this.getTask(id);
+
     if (!task) {
       throw new Error(`Task with ID ${id} not found.`);
     }
 
-    const updatedTask = { ...task, ...updates };
+    const updatedTask = { ...task, ...updates, id: task.id };
 
-    // Validate status transition if closing
-    if (updatedTask.status === 'closed' && task.status !== 'closed') {
-      await this.validateCanClose(updatedTask);
+    if (updatedTask.parentId) {
+      const parentExists = taskMap
+        ? taskMap.has(updatedTask.parentId)
+        : !!(await this.getTask(updatedTask.parentId));
+      if (!parentExists) {
+        throw new Error(
+          `Parent task with ID ${updatedTask.parentId} not found.`,
+        );
+      }
     }
 
-    // Validate circular dependencies if dependencies changed
-    if (updates.dependencies) {
-      await this.validateNoCircularDependencies(updatedTask);
+    if (taskMap) {
+      if (isClosing && task.status !== TaskStatus.CLOSED) {
+        this.validateCanClose(updatedTask, taskMap);
+      }
+
+      if (changingDependencies) {
+        taskMap.set(updatedTask.id, updatedTask);
+        this.validateNoCircularDependencies(updatedTask, taskMap);
+      }
     }
+
+    TrackerTaskSchema.parse(updatedTask);
 
     await this.saveTask(updatedTask);
     return updatedTask;
@@ -141,13 +197,16 @@ export class TrackerService {
   /**
    * Validates that a task can be closed (all dependencies must be closed).
    */
-  private async validateCanClose(task: TrackerTask): Promise<void> {
+  private validateCanClose(
+    task: TrackerTask,
+    taskMap: Map<string, TrackerTask>,
+  ): void {
     for (const depId of task.dependencies) {
-      const dep = await this.getTask(depId);
+      const dep = taskMap.get(depId);
       if (!dep) {
         throw new Error(`Dependency ${depId} not found for task ${task.id}.`);
       }
-      if (dep.status !== 'closed') {
+      if (dep.status !== TaskStatus.CLOSED) {
         throw new Error(
           `Cannot close task ${task.id} because dependency ${depId} is still ${dep.status}.`,
         );
@@ -158,16 +217,10 @@ export class TrackerService {
   /**
    * Validates that there are no circular dependencies.
    */
-  private async validateNoCircularDependencies(
+  private validateNoCircularDependencies(
     task: TrackerTask,
-  ): Promise<void> {
-    const allTasks = await this.listTasks();
-    const taskMap = new Map<string, TrackerTask>(
-      allTasks.map((t) => [t.id, t]),
-    );
-    // Ensure the current (possibly unsaved) task state is used
-    taskMap.set(task.id, task);
-
+    taskMap: Map<string, TrackerTask>,
+  ): void {
     const visited = new Set<string>();
     const stack = new Set<string>();
 
@@ -185,10 +238,11 @@ export class TrackerService {
       stack.add(currentId);
 
       const currentTask = taskMap.get(currentId);
-      if (currentTask) {
-        for (const depId of currentTask.dependencies) {
-          check(depId);
-        }
+      if (!currentTask) {
+        throw new Error(`Dependency ${currentId} not found.`);
+      }
+      for (const depId of currentTask.dependencies) {
+        check(depId);
       }
 
       stack.delete(currentId);

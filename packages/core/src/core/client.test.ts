@@ -47,6 +47,7 @@ import type {
 } from '../services/modelConfigService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
+import { LlmRole } from '../telemetry/types.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents } from '../utils/events.js';
 
@@ -243,6 +244,7 @@ describe('Gemini Client (client.ts)', () => {
       getShowModelInfoInChat: vi.fn().mockReturnValue(false),
       getContinueOnFailedApiCall: vi.fn(),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
+      getIncludeDirectoryTree: vi.fn().mockReturnValue(true),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
       },
@@ -892,7 +894,7 @@ ${JSON.stringify(
       // Assert
       expect(ideContextStore.get).toHaveBeenCalled();
       expect(mockTurnRunFn).toHaveBeenCalledWith(
-        { model: 'default-routed-model' },
+        { model: 'default-routed-model', isChatModel: true },
         initialRequest,
         expect.any(AbortSignal),
         undefined,
@@ -1722,7 +1724,7 @@ ${JSON.stringify(
         expect(mockConfig.getModelRouterService).toHaveBeenCalled();
         expect(mockRouterService.route).toHaveBeenCalled();
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'routed-model' },
+          { model: 'routed-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
@@ -1740,7 +1742,7 @@ ${JSON.stringify(
 
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'routed-model' },
+          { model: 'routed-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
@@ -1758,7 +1760,7 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         // Should stick to the first model
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'routed-model' },
+          { model: 'routed-model', isChatModel: true },
           [{ text: 'Continue' }],
           expect.any(AbortSignal),
           undefined,
@@ -1776,7 +1778,7 @@ ${JSON.stringify(
 
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'routed-model' },
+          { model: 'routed-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
@@ -1798,7 +1800,7 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(2);
         // Should use the newly routed model
         expect(mockTurnRunFn).toHaveBeenCalledWith(
-          { model: 'new-routed-model' },
+          { model: 'new-routed-model', isChatModel: true },
           [{ text: 'A new topic' }],
           expect.any(AbortSignal),
           undefined,
@@ -1826,7 +1828,7 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(1);
         expect(mockTurnRunFn).toHaveBeenNthCalledWith(
           1,
-          { model: 'original-model' },
+          { model: 'original-model', isChatModel: true },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
           undefined,
@@ -1849,7 +1851,7 @@ ${JSON.stringify(
         expect(mockRouterService.route).toHaveBeenCalledTimes(2);
         expect(mockTurnRunFn).toHaveBeenNthCalledWith(
           2,
-          { model: 'fallback-model' },
+          { model: 'fallback-model', isChatModel: true },
           [{ text: 'Continue' }],
           expect.any(AbortSignal),
           undefined,
@@ -1890,11 +1892,16 @@ ${JSON.stringify(
       );
     });
 
-    it('should recursively call sendMessageStream with "Please continue." when InvalidStream event is received', async () => {
+    it('should recursively call sendMessageStream with "Please continue." when InvalidStream event is received for Gemini 2 models', async () => {
       vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
         true,
       );
-      // Arrange
+      // Arrange - router must return a Gemini 2 model for retry to trigger
+      mockRouterService.route.mockResolvedValue({
+        model: 'gemini-2.0-flash',
+        reason: 'test',
+      });
+
       const mockStream1 = (async function* () {
         yield { type: GeminiEventType.InvalidStream };
       })();
@@ -1924,7 +1931,7 @@ ${JSON.stringify(
 
       // Assert
       expect(events).toEqual([
-        { type: GeminiEventType.ModelInfo, value: 'default-routed-model' },
+        { type: GeminiEventType.ModelInfo, value: 'gemini-2.0-flash' },
         { type: GeminiEventType.InvalidStream },
         { type: GeminiEventType.Content, value: 'Continued content' },
       ]);
@@ -1935,7 +1942,7 @@ ${JSON.stringify(
       // First call with original request
       expect(mockTurnRunFn).toHaveBeenNthCalledWith(
         1,
-        { model: 'default-routed-model' },
+        { model: 'gemini-2.0-flash', isChatModel: true },
         initialRequest,
         expect.any(AbortSignal),
         undefined,
@@ -1944,7 +1951,7 @@ ${JSON.stringify(
       // Second call with "Please continue."
       expect(mockTurnRunFn).toHaveBeenNthCalledWith(
         2,
-        { model: 'default-routed-model' },
+        { model: 'gemini-2.0-flash', isChatModel: true },
         [{ text: 'System: Please continue.' }],
         expect.any(AbortSignal),
         undefined,
@@ -1988,11 +1995,57 @@ ${JSON.stringify(
       expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
     });
 
+    it('should not retry with "Please continue." when InvalidStream event is received for non-Gemini-2 models', async () => {
+      vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
+        true,
+      );
+      // Arrange - router returns a non-Gemini-2 model
+      mockRouterService.route.mockResolvedValue({
+        model: 'gemini-3.0-pro',
+        reason: 'test',
+      });
+
+      const mockStream1 = (async function* () {
+        yield { type: GeminiEventType.InvalidStream };
+      })();
+
+      mockTurnRunFn.mockReturnValueOnce(mockStream1);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const initialRequest = [{ text: 'Hi' }];
+      const promptId = 'prompt-id-invalid-stream-non-g2';
+      const signal = new AbortController().signal;
+
+      // Act
+      const stream = client.sendMessageStream(initialRequest, signal, promptId);
+      const events = await fromAsync(stream);
+
+      // Assert
+      expect(events).toEqual([
+        { type: GeminiEventType.ModelInfo, value: 'gemini-3.0-pro' },
+        { type: GeminiEventType.InvalidStream },
+      ]);
+
+      // Verify that turn.run was called only once (no retry)
+      expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
+    });
+
     it('should stop recursing after one retry when InvalidStream events are repeatedly received', async () => {
       vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
         true,
       );
-      // Arrange
+      // Arrange - router must return a Gemini 2 model for retry to trigger
+      mockRouterService.route.mockResolvedValue({
+        model: 'gemini-2.0-flash',
+        reason: 'test',
+      });
       // Always return a new invalid stream
       mockTurnRunFn.mockImplementation(() =>
         (async function* () {
@@ -2023,7 +2076,7 @@ ${JSON.stringify(
         events
           .filter((e) => e.type === GeminiEventType.ModelInfo)
           .map((e) => e.value),
-      ).toEqual(['default-routed-model']);
+      ).toEqual(['gemini-2.0-flash']);
 
       // Verify that turn.run was called twice
       expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
@@ -2913,6 +2966,7 @@ ${JSON.stringify(
         { model: 'test-model' },
         contents,
         abortSignal,
+        LlmRole.MAIN,
       );
 
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
@@ -2927,6 +2981,7 @@ ${JSON.stringify(
           contents,
         },
         'test-session-id',
+        LlmRole.MAIN,
       );
     });
 
@@ -2938,6 +2993,7 @@ ${JSON.stringify(
         { model: initialModel },
         contents,
         new AbortController().signal,
+        LlmRole.MAIN,
       );
 
       expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
@@ -2945,6 +3001,7 @@ ${JSON.stringify(
           model: initialModel,
         }),
         'test-session-id',
+        LlmRole.MAIN,
       );
     });
 

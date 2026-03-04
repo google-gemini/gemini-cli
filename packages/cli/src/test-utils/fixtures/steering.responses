@@ -1,0 +1,4 @@
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"role":"model","parts":[{"text":"Starting a long task. First, I'll list the files."},{"functionCall":{"name":"list_directory","args":{"dir_path":"."}}}]},"finishReason":"STOP"}]}]}
+{"method":"generateContent","response":{"candidates":[{"content":{"role":"model","parts":[{"text":"ACK: I will focus on .txt files now."}]},"finishReason":"STOP"}]}}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"role":"model","parts":[{"text":"I see the files. Since you want me to focus on .txt files, I will read file1.txt."},{"functionCall":{"name":"read_file","args":{"file_path":"file1.txt"}}}]},"finishReason":"STOP"}]}]}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"role":"model","parts":[{"text":"I have read file1.txt. Task complete."}]},"finishReason":"STOP"}]}]}

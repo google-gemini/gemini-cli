@@ -23,11 +23,13 @@ import {
 import { computeSessionStats } from '../utils/computeStats.js';
 import {
   type RetrieveUserQuotaResponse,
-  VALID_GEMINI_MODELS,
+  isActiveModel,
   getDisplayString,
   isAutoModel,
+  AuthType,
 } from '@google/gemini-cli-core';
 import { useSettings } from '../contexts/SettingsContext.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 import type { QuotaStats } from '../types.js';
 import { QuotaStatsInfo } from './QuotaStatsInfo.js';
 
@@ -82,9 +84,13 @@ const Section: React.FC<SectionProps> = ({ title, children }) => (
 const buildModelRows = (
   models: Record<string, ModelMetrics>,
   quotas?: RetrieveUserQuotaResponse,
+  useGemini3_1 = false,
+  useCustomToolModel = false,
 ) => {
   const getBaseModelName = (name: string) => name.replace('-001', '');
-  const usedModelNames = new Set(Object.keys(models).map(getBaseModelName));
+  const usedModelNames = new Set(
+    Object.keys(models).map(getBaseModelName).map(getDisplayString),
+  );
 
   // 1. Models with active usage
   const activeRows = Object.entries(models).map(([name, metrics]) => {
@@ -93,7 +99,7 @@ const buildModelRows = (
     const inputTokens = metrics.tokens.input;
     return {
       key: name,
-      modelName,
+      modelName: getDisplayString(modelName),
       requests: metrics.api.totalRequests,
       cachedTokens: cachedTokens.toLocaleString(),
       inputTokens: inputTokens.toLocaleString(),
@@ -109,12 +115,12 @@ const buildModelRows = (
       ?.filter(
         (b) =>
           b.modelId &&
-          VALID_GEMINI_MODELS.has(b.modelId) &&
-          !usedModelNames.has(b.modelId),
+          isActiveModel(b.modelId, useGemini3_1, useCustomToolModel) &&
+          !usedModelNames.has(getDisplayString(b.modelId)),
       )
       .map((bucket) => ({
         key: bucket.modelId!,
-        modelName: bucket.modelId!,
+        modelName: getDisplayString(bucket.modelId!),
         requests: '-',
         cachedTokens: '-',
         inputTokens: '-',
@@ -135,6 +141,8 @@ const ModelUsageTable: React.FC<{
   pooledRemaining?: number;
   pooledLimit?: number;
   pooledResetTime?: string;
+  useGemini3_1?: boolean;
+  useCustomToolModel?: boolean;
 }> = ({
   models,
   quotas,
@@ -144,8 +152,10 @@ const ModelUsageTable: React.FC<{
   pooledRemaining,
   pooledLimit,
   pooledResetTime,
+  useGemini3_1,
+  useCustomToolModel,
 }) => {
-  const rows = buildModelRows(models, quotas);
+  const rows = buildModelRows(models, quotas, useGemini3_1, useCustomToolModel);
 
   if (rows.length === 0) {
     return null;
@@ -178,7 +188,7 @@ const ModelUsageTable: React.FC<{
     : `Model Usage`;
 
   return (
-    <Box flexDirection="column" marginTop={1}>
+    <Box flexDirection="column" marginBottom={1}>
       {/* Header */}
       <Box alignItems="flex-end">
         <Box width={nameWidth}>
@@ -379,29 +389,37 @@ interface StatsDisplayProps {
   duration: string;
   title?: string;
   quotas?: RetrieveUserQuotaResponse;
+  footer?: string;
   selectedAuthType?: string;
   userEmail?: string;
   tier?: string;
   currentModel?: string;
   quotaStats?: QuotaStats;
+  creditBalance?: number;
 }
 
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   duration,
   title,
   quotas,
+  footer,
   selectedAuthType,
   userEmail,
   tier,
   currentModel,
   quotaStats,
+  creditBalance,
 }) => {
   const { stats } = useSessionStats();
   const { metrics } = stats;
   const { models, tools, files } = metrics;
   const computed = computeSessionStats(metrics);
   const settings = useSettings();
-
+  const config = useConfig();
+  const useGemini3_1 = config.getGemini31LaunchedSync?.() ?? false;
+  const useCustomToolModel =
+    useGemini3_1 &&
+    config.getContentGeneratorConfig().authType === AuthType.USE_GEMINI;
   const pooledRemaining = quotaStats?.remaining;
   const pooledLimit = quotaStats?.limit;
   const pooledResetTime = quotaStats?.resetTime;
@@ -431,6 +449,13 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         Session Stats
       </Text>
     );
+  };
+
+  const renderFooter = () => {
+    if (!footer) {
+      return null;
+    }
+    return <ThemedGradient bold>{footer}</ThemedGradient>;
   };
 
   return (
@@ -463,6 +488,17 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         {showUserIdentity && tier && (
           <StatRow title="Tier:">
             <Text color={theme.text.primary}>{tier}</Text>
+          </StatRow>
+        )}
+        {showUserIdentity && creditBalance != null && creditBalance >= 0 && (
+          <StatRow title="Google AI Credits:">
+            <Text
+              color={
+                creditBalance > 0 ? theme.text.primary : theme.text.secondary
+              }
+            >
+              {creditBalance.toLocaleString()}
+            </Text>
           </StatRow>
         )}
         <StatRow title="Tool Calls:">
@@ -535,7 +571,10 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         pooledRemaining={pooledRemaining}
         pooledLimit={pooledLimit}
         pooledResetTime={pooledResetTime}
+        useGemini3_1={useGemini3_1}
+        useCustomToolModel={useCustomToolModel}
       />
+      {renderFooter()}
     </Box>
   );
 };

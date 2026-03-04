@@ -47,7 +47,10 @@ describe('Fallback Integration', () => {
     const requestedModel = PREVIEW_GEMINI_MODEL;
 
     // 3. Apply model selection
-    const result = applyModelSelection(config, { model: requestedModel });
+    const result = applyModelSelection(config, {
+      model: requestedModel,
+      isChatModel: true,
+    });
 
     // 4. Expect fallback to Flash
     expect(result.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
@@ -58,7 +61,7 @@ describe('Fallback Integration', () => {
     );
   });
 
-  it('should NOT fallback if config is NOT in AUTO mode', () => {
+  it('should fallback for Gemini 3 models even if config is NOT in AUTO mode', () => {
     // 1. Config is explicitly set to Pro, not Auto
     vi.spyOn(config, 'getModel').mockReturnValue(PREVIEW_GEMINI_MODEL);
 
@@ -71,7 +74,7 @@ describe('Fallback Integration', () => {
     // 4. Apply model selection
     const result = applyModelSelection(config, { model: requestedModel });
 
-    // 5. Expect it to stay on Pro (because single model chain)
-    expect(result.model).toBe(PREVIEW_GEMINI_MODEL);
+    // 5. Expect it to fallback to Flash (because Gemini 3 uses PREVIEW_CHAIN)
+    expect(result.model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
   });
 });

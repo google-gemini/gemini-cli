@@ -13,14 +13,14 @@ import { vi } from 'vitest';
 // The version of waitFor from vitest is still fine to use if you aren't waiting
 // for React state updates.
 export async function waitFor(
-  assertion: () => void,
+  assertion: () => void | Promise<void>,
   { timeout = 2000, interval = 50 } = {},
 ): Promise<void> {
   const startTime = Date.now();
 
   while (true) {
     try {
-      assertion();
+      await assertion();
       return;
     } catch (error) {
       if (Date.now() - startTime > timeout) {

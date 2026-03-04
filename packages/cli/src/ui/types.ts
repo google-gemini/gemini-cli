@@ -4,17 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  CompressionStatus,
-  GeminiCLIExtension,
-  MCPServerConfig,
-  ThoughtSummary,
-  ToolCallConfirmationDetails,
-  SerializableConfirmationDetails,
-  ToolResultDisplay,
-  RetrieveUserQuotaResponse,
-  SkillDefinition,
-  AgentDefinition,
+import {
+  type CompressionStatus,
+  type GeminiCLIExtension,
+  type MCPServerConfig,
+  type ThoughtSummary,
+  type SerializableConfirmationDetails,
+  type ToolResultDisplay,
+  type RetrieveUserQuotaResponse,
+  type SkillDefinition,
+  type AgentDefinition,
+  type ApprovalMode,
+  CoreToolCallStatus,
+  checkExhaustive,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
@@ -57,34 +59,62 @@ export enum ToolCallStatus {
   Error = 'Error',
 }
 
+/**
+ * Maps core tool call status to a simplified UI status.
+ */
+export function mapCoreStatusToDisplayStatus(
+  coreStatus: CoreToolCallStatus,
+): ToolCallStatus {
+  switch (coreStatus) {
+    case CoreToolCallStatus.Validating:
+      return ToolCallStatus.Pending;
+    case CoreToolCallStatus.AwaitingApproval:
+      return ToolCallStatus.Confirming;
+    case CoreToolCallStatus.Executing:
+      return ToolCallStatus.Executing;
+    case CoreToolCallStatus.Success:
+      return ToolCallStatus.Success;
+    case CoreToolCallStatus.Cancelled:
+      return ToolCallStatus.Canceled;
+    case CoreToolCallStatus.Error:
+      return ToolCallStatus.Error;
+    case CoreToolCallStatus.Scheduled:
+      return ToolCallStatus.Pending;
+    default:
+      return checkExhaustive(coreStatus);
+  }
+}
+
 export interface ToolCallEvent {
   type: 'tool_call';
-  status: ToolCallStatus;
+  status: CoreToolCallStatus;
   callId: string;
   name: string;
   args: Record<string, never>;
   resultDisplay: ToolResultDisplay | undefined;
-  confirmationDetails:
-    | ToolCallConfirmationDetails
-    | SerializableConfirmationDetails
-    | undefined;
+  confirmationDetails: SerializableConfirmationDetails | undefined;
   correlationId?: string;
 }
 
 export interface IndividualToolCallDisplay {
   callId: string;
+  parentCallId?: string;
   name: string;
   description: string;
   resultDisplay: ToolResultDisplay | undefined;
-  status: ToolCallStatus;
-  confirmationDetails:
-    | ToolCallConfirmationDetails
-    | SerializableConfirmationDetails
-    | undefined;
+  status: CoreToolCallStatus;
+  // True when the tool was initiated directly by the user (slash/@/shell flows).
+  isClientInitiated?: boolean;
+  confirmationDetails: SerializableConfirmationDetails | undefined;
   renderOutputAsMarkdown?: boolean;
   ptyId?: number;
   outputFile?: string;
   correlationId?: string;
+  approvalMode?: ApprovalMode;
+  progressMessage?: string;
+  originalRequestName?: string;
+  progress?: number;
+  progressTotal?: number;
 }
 
 export interface CompressionProps {
@@ -121,8 +151,10 @@ export type HistoryItemGeminiContent = HistoryItemBase & {
 export type HistoryItemInfo = HistoryItemBase & {
   type: 'info';
   text: string;
+  secondaryText?: string;
   icon?: string;
   color?: string;
+  marginBottom?: number;
 };
 
 export type HistoryItemError = HistoryItemBase & {
@@ -173,6 +205,7 @@ export type HistoryItemStats = HistoryItemQuotaBase & {
   type: 'stats';
   duration: string;
   quotas?: RetrieveUserQuotaResponse;
+  creditBalance?: number;
 };
 
 export type HistoryItemModelStats = HistoryItemQuotaBase & {
@@ -198,6 +231,8 @@ export type HistoryItemToolGroup = HistoryItemBase & {
   tools: IndividualToolCallDisplay[];
   borderTop?: boolean;
   borderBottom?: boolean;
+  borderColor?: string;
+  borderDimColor?: boolean;
 };
 
 export type HistoryItemUserShell = HistoryItemBase & {
@@ -223,6 +258,11 @@ export interface ChatDetail {
 export type HistoryItemThinking = HistoryItemBase & {
   type: 'thinking';
   thought: ThoughtSummary;
+};
+
+export type HistoryItemHint = HistoryItemBase & {
+  type: 'hint';
+  text: string;
 };
 
 export type HistoryItemChatList = HistoryItemBase & {
@@ -302,23 +342,12 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
       isPersistentDisabled: boolean;
     }
   >;
+  errors: Record<string, string>;
   blockedServers: Array<{ name: string; extensionName: string }>;
   discoveryInProgress: boolean;
   connectingServers: string[];
   showDescriptions: boolean;
   showSchema: boolean;
-};
-
-export type HistoryItemHooksList = HistoryItemBase & {
-  type: 'hooks_list';
-  hooks: Array<{
-    config: { command?: string; type: string; timeout?: number };
-    source: string;
-    eventName: string;
-    matcher?: string;
-    sequential?: boolean;
-    enabled: boolean;
-  }>;
 };
 
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
@@ -349,7 +378,7 @@ export type HistoryItemWithoutId =
   | HistoryItemMcpStatus
   | HistoryItemChatList
   | HistoryItemThinking
-  | HistoryItemHooksList;
+  | HistoryItemHint;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -373,7 +402,7 @@ export enum MessageType {
   AGENTS_LIST = 'agents_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
-  HOOKS_LIST = 'hooks_list',
+  HINT = 'hint',
 }
 
 // Simplified message structure for internal feedback

@@ -17,7 +17,8 @@ exports[`<StatsDisplay /> > Code Changes Display > displays Code Changes when li
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              100ms (100.0%)                                                      │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<StatsDisplay /> > Code Changes Display > hides Code Changes when no lines are added or removed 1`] = `
@@ -36,7 +37,8 @@ exports[`<StatsDisplay /> > Code Changes Display > hides Code Changes when no li
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              100ms (100.0%)                                                      │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<StatsDisplay /> > Conditional Color Tests > renders success rate in green for high values 1`] = `
@@ -55,7 +57,8 @@ exports[`<StatsDisplay /> > Conditional Color Tests > renders success rate in gr
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<StatsDisplay /> > Conditional Color Tests > renders success rate in red for low values 1`] = `
@@ -74,7 +77,8 @@ exports[`<StatsDisplay /> > Conditional Color Tests > renders success rate in re
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<StatsDisplay /> > Conditional Color Tests > renders success rate in yellow for medium values 1`] = `
@@ -93,7 +97,8 @@ exports[`<StatsDisplay /> > Conditional Color Tests > renders success rate in ye
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<StatsDisplay /> > Conditional Rendering Tests > hides Efficiency section when cache is not used 1`] = `
@@ -112,12 +117,13 @@ exports[`<StatsDisplay /> > Conditional Rendering Tests > hides Efficiency secti
 │    » API Time:               100ms (100.0%)                                                      │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
-│                                                                                                  │
 │  Model Usage                                                                                     │
 │  Model                       Reqs   Input Tokens   Cache Reads  Output Tokens                    │
 │  ────────────────────────────────────────────────────────────────────────────                    │
 │  gemini-2.5-pro                 1            100             0            100                    │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<StatsDisplay /> > Conditional Rendering Tests > hides User Agreement when no decisions are made 1`] = `
@@ -136,7 +142,8 @@ exports[`<StatsDisplay /> > Conditional Rendering Tests > hides User Agreement w
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              123ms (100.0%)                                                      │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<StatsDisplay /> > Quota Display > renders pooled quota information for auto mode 1`] = `
@@ -155,7 +162,6 @@ exports[`<StatsDisplay /> > Quota Display > renders pooled quota information for
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
-│                                                                                                  │
 │  auto Usage                                                                                      │
 │  65% usage remaining                                                                             │
 │  Usage limit: 1,100                                                                              │
@@ -166,7 +172,9 @@ exports[`<StatsDisplay /> > Quota Display > renders pooled quota information for
 │  ────────────────────────────────────────────────────────────                                    │
 │  gemini-2.5-pro                 -                                                                │
 │  gemini-2.5-flash               -                                                                │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<StatsDisplay /> > Quota Display > renders quota information for unused models 1`] = `
@@ -185,12 +193,13 @@ exports[`<StatsDisplay /> > Quota Display > renders quota information for unused
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
-│                                                                                                  │
 │  Model Usage                                                                                     │
 │  Model                       Reqs             Usage remaining                                    │
 │  ────────────────────────────────────────────────────────────                                    │
 │  gemini-2.5-flash               -          50.0% resets in 2h                                    │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<StatsDisplay /> > Quota Display > renders quota information when quotas are provided 1`] = `
@@ -209,12 +218,13 @@ exports[`<StatsDisplay /> > Quota Display > renders quota information when quota
 │    » API Time:               100ms (100.0%)                                                      │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
-│                                                                                                  │
 │  Model Usage                                                                                     │
 │  Model                       Reqs             Usage remaining                                    │
 │  ────────────────────────────────────────────────────────────                                    │
 │  gemini-2.5-pro                 1      75.0% resets in 1h 30m                                    │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<StatsDisplay /> > Title Rendering > renders the custom title when a title prop is provided 1`] = `
@@ -233,7 +243,8 @@ exports[`<StatsDisplay /> > Title Rendering > renders the custom title when a ti
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<StatsDisplay /> > Title Rendering > renders the default title when no title prop is provided 1`] = `
@@ -252,7 +263,8 @@ exports[`<StatsDisplay /> > Title Rendering > renders the default title when no 
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<StatsDisplay /> > renders a table with two models correctly 1`] = `
@@ -271,7 +283,6 @@ exports[`<StatsDisplay /> > renders a table with two models correctly 1`] = `
 │    » API Time:               19.5s (100.0%)                                                      │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
-│                                                                                                  │
 │  Model Usage                                                                                     │
 │  Model                       Reqs   Input Tokens   Cache Reads  Output Tokens                    │
 │  ────────────────────────────────────────────────────────────────────────────                    │
@@ -279,7 +290,9 @@ exports[`<StatsDisplay /> > renders a table with two models correctly 1`] = `
 │  gemini-2.5-flash               5         15,000        10,000         15,000                    │
 │                                                                                                  │
 │  Savings Highlight: 10,500 (40.4%) of input tokens were served from the cache, reducing costs.   │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<StatsDisplay /> > renders all sections when all data is present 1`] = `
@@ -299,14 +312,15 @@ exports[`<StatsDisplay /> > renders all sections when all data is present 1`] = 
 │    » API Time:               100ms (44.8%)                                                       │
 │    » Tool Time:              123ms (55.2%)                                                       │
 │                                                                                                  │
-│                                                                                                  │
 │  Model Usage                                                                                     │
 │  Model                       Reqs   Input Tokens   Cache Reads  Output Tokens                    │
 │  ────────────────────────────────────────────────────────────────────────────                    │
 │  gemini-2.5-pro                 1             50            50            100                    │
 │                                                                                                  │
 │  Savings Highlight: 50 (50.0%) of input tokens were served from the cache, reducing costs.       │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;
 
 exports[`<StatsDisplay /> > renders only the Performance section in its zero state 1`] = `
@@ -325,5 +339,6 @@ exports[`<StatsDisplay /> > renders only the Performance section in its zero sta
 │    » API Time:               0s (0.0%)                                                           │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
 `;

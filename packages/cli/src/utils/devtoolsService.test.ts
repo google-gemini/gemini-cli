@@ -90,7 +90,7 @@ vi.mock('ws', () => ({
   default: MockWebSocket,
 }));
 
-vi.mock('gemini-cli-devtools', () => ({
+vi.mock('@google/gemini-cli-devtools', () => ({
   DevTools: {
     getInstance: () => mockDevToolsInstance,
   },

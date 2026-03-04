@@ -38,6 +38,8 @@ import { appEvents, AppEvent } from './utils/events.js';
 import {
   type Config,
   type ResumedSessionData,
+  type StartupWarning,
+  WarningPriority,
   debugLogger,
   coreEvents,
   AuthType,
@@ -54,6 +56,20 @@ vi.stubGlobal('performance', performance);
 const runNonInteractiveSpy = vi.hoisted(() => vi.fn());
 vi.mock('./nonInteractiveCli.js', () => ({
   runNonInteractive: runNonInteractiveSpy,
+}));
+
+const terminalNotificationMocks = vi.hoisted(() => ({
+  notifyViaTerminal: vi.fn().mockResolvedValue(true),
+  buildRunEventNotificationContent: vi.fn(() => ({
+    title: 'Session complete',
+    body: 'done',
+    subtitle: 'Run finished',
+  })),
+}));
+vi.mock('./utils/terminalNotifications.js', () => ({
+  notifyViaTerminal: terminalNotificationMocks.notifyViaTerminal,
+  buildRunEventNotificationContent:
+    terminalNotificationMocks.buildRunEventNotificationContent,
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -464,6 +480,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       query: undefined,
       yolo: undefined,
       approvalMode: undefined,
+      policy: undefined,
       allowedMcpServerNames: undefined,
       allowedTools: undefined,
       experimentalAcp: undefined,
@@ -836,6 +853,10 @@ describe('gemini.tsx main function kitty protocol', () => {
     expect(runNonInteractive).toHaveBeenCalled();
     const callArgs = vi.mocked(runNonInteractive).mock.calls[0][0];
     expect(callArgs.input).toBe('stdin-data\n\ntest-question');
+    expect(
+      terminalNotificationMocks.buildRunEventNotificationContent,
+    ).not.toHaveBeenCalled();
+    expect(terminalNotificationMocks.notifyViaTerminal).not.toHaveBeenCalled();
     expect(processExitSpy).toHaveBeenCalledWith(0);
     processExitSpy.mockRestore();
   });
@@ -1161,6 +1182,7 @@ describe('startInteractiveUI', () => {
     getProjectRoot: () => '/root',
     getScreenReader: () => false,
     getDebugMode: () => false,
+    getUseAlternateBuffer: () => true,
   });
   const mockSettings = {
     merged: {
@@ -1174,10 +1196,13 @@ describe('startInteractiveUI', () => {
       },
     },
   } as LoadedSettings;
-  const mockStartupWarnings = ['warning1'];
+  const mockStartupWarnings: StartupWarning[] = [
+    { id: 'w1', message: 'warning1', priority: WarningPriority.High },
+  ];
   const mockWorkspaceRoot = '/root';
   const mockInitializationResult = {
     authError: null,
+    accountSuspensionInfo: null,
     themeError: null,
     shouldOpenAuthDialog: false,
     geminiMdFileCount: 0,
@@ -1193,6 +1218,8 @@ describe('startInteractiveUI', () => {
     runExitCleanup: vi.fn(),
     registerSyncCleanup: vi.fn(),
     registerTelemetryConfig: vi.fn(),
+    setupSignalHandlers: vi.fn(),
+    setupTtyCheck: vi.fn(() => vi.fn()),
   }));
 
   beforeEach(() => {
@@ -1207,7 +1234,7 @@ describe('startInteractiveUI', () => {
   async function startTestInteractiveUI(
     config: Config,
     settings: LoadedSettings,
-    startupWarnings: string[],
+    startupWarnings: StartupWarning[],
     workspaceRoot: string,
     resumedSessionData: ResumedSessionData | undefined,
     initializationResult: InitializationResult,
@@ -1299,7 +1326,8 @@ describe('startInteractiveUI', () => {
 
     // Verify all startup tasks were called
     expect(getVersion).toHaveBeenCalledTimes(1);
-    expect(registerCleanup).toHaveBeenCalledTimes(4);
+    // 5 cleanups: mouseEvents, consolePatcher, lineWrapping, instance.unmount, and TTY check
+    expect(registerCleanup).toHaveBeenCalledTimes(5);
 
     // Verify cleanup handler is registered with unmount function
     const cleanupFn = vi.mocked(registerCleanup).mock.calls[0][0];

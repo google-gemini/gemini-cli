@@ -16,8 +16,9 @@ import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import type { Config } from '../config/config.js';
 import * as fileUtils from '../utils/fileUtils.js';
-import { TOOL_OUTPUTS_DIR } from '../utils/fileUtils.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
+
+const { TOOL_OUTPUTS_DIR } = fileUtils;
 import * as tokenCalculation from '../utils/tokenCalculation.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import os from 'node:os';
@@ -226,8 +227,10 @@ describe('ChatCompressionService', () => {
       false,
       mockModel,
       mockConfig,
-      true,
+      false,
     );
+    // It should now attempt compression even if previously failed (logic removed)
+    // But since history is small, it will be NOOP due to threshold
     expect(result.info.compressionStatus).toBe(CompressionStatus.NOOP);
     expect(result.newHistory).toBeNull();
   });

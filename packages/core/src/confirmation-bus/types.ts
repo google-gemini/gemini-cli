@@ -35,6 +35,10 @@ export interface ToolConfirmationRequest {
   correlationId: string;
   serverName?: string;
   /**
+   * Optional tool annotations (e.g., readOnlyHint, destructiveHint) from MCP.
+   */
+  toolAnnotations?: Record<string, unknown>;
+  /**
    * Optional rich details for the confirmation UI (diffs, counts, etc.)
    */
   details?: SerializableConfirmationDetails;
@@ -95,6 +99,9 @@ export type SerializableConfirmationDetails =
       serverName: string;
       toolName: string;
       toolDisplayName: string;
+      toolArgs?: Record<string, unknown>;
+      toolDescription?: string;
+      toolParameterSchema?: unknown;
     }
   | {
       type: 'ask_user';
@@ -147,9 +154,9 @@ export enum QuestionType {
 export interface Question {
   question: string;
   header: string;
-  /** Question type: 'choice' renders selectable options, 'text' renders free-form input, 'yesno' renders a binary Yes/No choice. Defaults to 'choice'. */
-  type?: QuestionType;
-  /** Selectable choices. REQUIRED when type='choice' or omitted. IGNORED for 'text' and 'yesno'. */
+  /** Question type: 'choice' renders selectable options, 'text' renders free-form input, 'yesno' renders a binary Yes/No choice. */
+  type: QuestionType;
+  /** Selectable choices. REQUIRED when type='choice'. IGNORED for 'text' and 'yesno'. */
   options?: QuestionOption[];
   /** Allow multiple selections. Only applies when type='choice'. */
   multiSelect?: boolean;

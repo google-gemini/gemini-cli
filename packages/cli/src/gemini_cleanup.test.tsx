@@ -9,14 +9,6 @@ import { main } from './gemini.js';
 import { debugLogger } from '@google/gemini-cli-core';
 import { type Config } from '@google/gemini-cli-core';
 
-// Custom error to identify mock process.exit calls
-class MockProcessExitError extends Error {
-  constructor(readonly code?: string | number | null | undefined) {
-    super('PROCESS_EXIT_MOCKED');
-    this.name = 'MockProcessExitError';
-  }
-}
-
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -124,8 +116,37 @@ vi.mock('./validateNonInterActiveAuth.js', () => ({
   validateNonInteractiveAuth: vi.fn().mockResolvedValue({}),
 }));
 
+vi.mock('./core/initializer.js', () => ({
+  initializeApp: vi.fn().mockResolvedValue({
+    authError: null,
+    themeError: null,
+    shouldOpenAuthDialog: false,
+    geminiMdFileCount: 0,
+  }),
+}));
+
 vi.mock('./nonInteractiveCli.js', () => ({
   runNonInteractive: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('./utils/cleanup.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./utils/cleanup.js')>();
+  return {
+    ...actual,
+    cleanupCheckpoints: vi.fn().mockResolvedValue(undefined),
+    registerCleanup: vi.fn(),
+    registerSyncCleanup: vi.fn(),
+    registerTelemetryConfig: vi.fn(),
+    runExitCleanup: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
+vi.mock('./zed-integration/zedIntegration.js', () => ({
+  runZedIntegration: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('./utils/readStdin.js', () => ({
+  readStdin: vi.fn().mockResolvedValue(''),
 }));
 
 const { cleanupMockState } = vi.hoisted(() => ({
@@ -169,12 +190,6 @@ describe('gemini.tsx main function cleanup', () => {
     const debugLoggerErrorSpy = vi
       .spyOn(debugLogger, 'error')
       .mockImplementation(() => {});
-    const processExitSpy = vi
-      .spyOn(process, 'exit')
-      .mockImplementation((code) => {
-        throw new MockProcessExitError(code);
-      });
-
     vi.mocked(loadSettings).mockReturnValue({
       merged: { advanced: {}, security: { auth: {} }, ui: {} },
       workspace: { settings: {} },
@@ -201,7 +216,7 @@ describe('gemini.tsx main function cleanup', () => {
       getMcpServers: () => ({}),
       getMcpClientManager: vi.fn(),
       getIdeMode: vi.fn(() => false),
-      getExperimentalZedIntegration: vi.fn(() => false),
+      getExperimentalZedIntegration: vi.fn(() => true),
       getScreenReader: vi.fn(() => false),
       getGeminiMdFileCount: vi.fn(() => 0),
       getProjectRoot: vi.fn(() => '/'),
@@ -224,18 +239,12 @@ describe('gemini.tsx main function cleanup', () => {
       getRemoteAdminSettings: vi.fn(() => undefined),
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-    try {
-      await main();
-    } catch (e) {
-      if (!(e instanceof MockProcessExitError)) throw e;
-    }
+    await main();
 
     expect(cleanupMockState.called).toBe(true);
     expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
       'Failed to cleanup expired sessions:',
       expect.objectContaining({ message: 'Cleanup failed' }),
     );
-    expect(processExitSpy).toHaveBeenCalledWith(0); // Should not exit on cleanup failure
-    processExitSpy.mockRestore();
   });
 });

@@ -8,13 +8,14 @@ import { expect, it, describe, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import type {
-  ConversationRecord,
-  ToolCallRecord,
-  MessageRecord,
+import {
+  ChatRecordingService,
+  type ConversationRecord,
+  type ToolCallRecord,
+  type MessageRecord,
 } from './chatRecordingService.js';
+import { CoreToolCallStatus } from '../scheduler/types.js';
 import type { Content, Part } from '@google/genai';
-import { ChatRecordingService } from './chatRecordingService.js';
 import type { Config } from '../config/config.js';
 import { getProjectHash } from '../utils/paths.js';
 
@@ -83,6 +84,21 @@ describe('ChatRecordingService', () => {
       const files = fs.readdirSync(chatsDir);
       expect(files.length).toBeGreaterThan(0);
       expect(files[0]).toMatch(/^session-.*-test-ses\.json$/);
+    });
+
+    it('should include the conversation kind when specified', () => {
+      chatRecordingService.initialize(undefined, 'subagent');
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'ping',
+        model: 'm',
+      });
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+      expect(conversation.kind).toBe('subagent');
     });
 
     it('should resume from an existing session if provided', () => {
@@ -247,7 +263,7 @@ describe('ChatRecordingService', () => {
         id: 'tool-1',
         name: 'testTool',
         args: {},
-        status: 'awaiting_approval',
+        status: CoreToolCallStatus.AwaitingApproval,
         timestamp: new Date().toISOString(),
       };
       chatRecordingService.recordToolCalls('gemini-pro', [toolCall]);
@@ -274,7 +290,7 @@ describe('ChatRecordingService', () => {
         id: 'tool-1',
         name: 'testTool',
         args: {},
-        status: 'awaiting_approval',
+        status: CoreToolCallStatus.AwaitingApproval,
         timestamp: new Date().toISOString(),
       };
       chatRecordingService.recordToolCalls('gemini-pro', [toolCall]);
@@ -293,23 +309,33 @@ describe('ChatRecordingService', () => {
   });
 
   describe('deleteSession', () => {
-    it('should delete the session file and tool outputs if they exist', () => {
+    it('should delete the session file, tool outputs, session directory, and logs if they exist', () => {
+      const sessionId = 'test-session-id';
       const chatsDir = path.join(testTempDir, 'chats');
+      const logsDir = path.join(testTempDir, 'logs');
+      const toolOutputsDir = path.join(testTempDir, 'tool-outputs');
+      const sessionDir = path.join(testTempDir, sessionId);
+
       fs.mkdirSync(chatsDir, { recursive: true });
-      const sessionFile = path.join(chatsDir, 'test-session-id.json');
+      fs.mkdirSync(logsDir, { recursive: true });
+      fs.mkdirSync(toolOutputsDir, { recursive: true });
+      fs.mkdirSync(sessionDir, { recursive: true });
+
+      const sessionFile = path.join(chatsDir, `${sessionId}.json`);
       fs.writeFileSync(sessionFile, '{}');
 
-      const toolOutputDir = path.join(
-        testTempDir,
-        'tool-outputs',
-        'session-test-session-id',
-      );
+      const logFile = path.join(logsDir, `session-${sessionId}.jsonl`);
+      fs.writeFileSync(logFile, '{}');
+
+      const toolOutputDir = path.join(toolOutputsDir, `session-${sessionId}`);
       fs.mkdirSync(toolOutputDir, { recursive: true });
 
-      chatRecordingService.deleteSession('test-session-id');
+      chatRecordingService.deleteSession(sessionId);
 
       expect(fs.existsSync(sessionFile)).toBe(false);
+      expect(fs.existsSync(logFile)).toBe(false);
       expect(fs.existsSync(toolOutputDir)).toBe(false);
+      expect(fs.existsSync(sessionDir)).toBe(false);
     });
 
     it('should not throw if session file does not exist', () => {
@@ -571,7 +597,7 @@ describe('ChatRecordingService', () => {
           name: 'list_files',
           args: { path: '.' },
           result: originalResult,
-          status: 'success',
+          status: CoreToolCallStatus.Success,
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -650,7 +676,7 @@ describe('ChatRecordingService', () => {
           name: 'read_file',
           args: { path: 'image.png' },
           result: originalResult,
-          status: 'success',
+          status: CoreToolCallStatus.Success,
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -707,7 +733,7 @@ describe('ChatRecordingService', () => {
           name: 'read_file',
           args: { path: 'test.txt' },
           result: [],
-          status: 'success',
+          status: CoreToolCallStatus.Success,
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -742,6 +768,38 @@ describe('ChatRecordingService', () => {
       expect(result).toHaveLength(2);
       expect(result[0].text).toBe('Prefix metadata or text');
       expect(result[1].functionResponse!.id).toBe(callId);
+    });
+  });
+
+  describe('ENOENT (missing directory) handling', () => {
+    it('should ensure directory exists before writing conversation file', () => {
+      chatRecordingService.initialize();
+
+      const mkdirSyncSpy = vi.spyOn(fs, 'mkdirSync');
+      const writeFileSyncSpy = vi.spyOn(fs, 'writeFileSync');
+
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Hello after dir cleanup',
+        model: 'gemini-pro',
+      });
+
+      // mkdirSync should be called with the parent directory and recursive option
+      const conversationFile = chatRecordingService.getConversationFilePath()!;
+      expect(mkdirSyncSpy).toHaveBeenCalledWith(
+        path.dirname(conversationFile),
+        { recursive: true },
+      );
+
+      // mkdirSync should be called before writeFileSync
+      const mkdirCallOrder = mkdirSyncSpy.mock.invocationCallOrder;
+      const writeCallOrder = writeFileSyncSpy.mock.invocationCallOrder;
+      const lastMkdir = mkdirCallOrder[mkdirCallOrder.length - 1];
+      const lastWrite = writeCallOrder[writeCallOrder.length - 1];
+      expect(lastMkdir).toBeLessThan(lastWrite);
+
+      mkdirSyncSpy.mockRestore();
+      writeFileSyncSpy.mockRestore();
     });
   });
 });

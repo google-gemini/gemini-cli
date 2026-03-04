@@ -14,8 +14,7 @@ import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import { ChangeAuthRequestedError } from '../utils/errors.js';
 import { CodeAssistServer } from '../code_assist/server.js';
 import type { OAuth2Client } from 'google-auth-library';
-import type { GeminiUserTier } from './types.js';
-import { UserTierId } from './types.js';
+import { UserTierId, type GeminiUserTier } from './types.js';
 
 vi.mock('../code_assist/server.js');
 
@@ -71,6 +70,27 @@ describe('setupUser for existing user', () => {
       {},
       'test-project',
       {},
+      '',
+      undefined,
+      undefined,
+    );
+  });
+
+  it('should pass httpOptions to CodeAssistServer when provided', async () => {
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', 'test-project');
+    mockLoad.mockResolvedValue({
+      currentTier: mockPaidTier,
+    });
+    const httpOptions = {
+      headers: {
+        'User-Agent': 'GeminiCLI/1.0.0/gemini-2.0-flash (darwin; arm64)',
+      },
+    };
+    await setupUser({} as OAuth2Client, undefined, httpOptions);
+    expect(CodeAssistServer).toHaveBeenCalledWith(
+      {},
+      'test-project',
+      httpOptions,
       '',
       undefined,
       undefined,

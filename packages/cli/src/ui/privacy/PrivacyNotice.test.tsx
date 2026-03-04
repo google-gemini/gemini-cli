@@ -64,16 +64,18 @@ describe('PrivacyNotice', () => {
     },
   ])(
     'renders $expectedComponent when authType is $authType',
-    ({ authType, expectedComponent }) => {
+    async ({ authType, expectedComponent }) => {
       vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
         authType,
       } as unknown as ContentGeneratorConfig);
 
-      const { lastFrame } = render(
+      const { lastFrame, waitUntilReady, unmount } = render(
         <PrivacyNotice config={mockConfig} onExit={onExit} />,
       );
+      await waitUntilReady();
 
       expect(lastFrame()).toContain(expectedComponent);
+      unmount();
     },
   );
 });
