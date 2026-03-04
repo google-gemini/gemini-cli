@@ -18,6 +18,7 @@ export * from './policy/policy-engine.js';
 export * from './policy/toml-loader.js';
 export * from './policy/config.js';
 export * from './policy/integrity.js';
+export * from './billing/index.js';
 export * from './confirmation-bus/types.js';
 export * from './confirmation-bus/message-bus.js';
 
@@ -76,6 +77,7 @@ export * from './utils/quotaErrorDetection.js';
 export * from './utils/userAccountManager.js';
 export * from './utils/authConsent.js';
 export * from './utils/googleQuotaErrors.js';
+export * from './utils/googleErrors.js';
 export * from './utils/fileUtils.js';
 export * from './utils/planUtils.js';
 export * from './utils/approvalModeUtils.js';
@@ -98,6 +100,7 @@ export * from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';
 export * from './utils/promptIdContext.js';
 export * from './utils/thoughtUtils.js';
+export * from './utils/secure-browser-launcher.js';
 export * from './utils/debugLogger.js';
 export * from './utils/events.js';
 export * from './utils/extensionLoader.js';
@@ -118,6 +121,8 @@ export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
+export * from './services/trackerService.js';
+export * from './services/trackerTypes.js';
 export * from './skills/skillManager.js';
 export * from './skills/skillLoader.js';
 
@@ -164,6 +169,7 @@ export * from './tools/read-many-files.js';
 export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 export * from './tools/write-todos.js';
+export * from './tools/trackerTools.js';
 export * from './tools/activate-skill.js';
 export * from './tools/ask-user.js';
 
@@ -183,6 +189,9 @@ export { OAuthUtils } from './mcp/oauth-utils.js';
 
 // Export telemetry functions
 export * from './telemetry/index.js';
+export * from './telemetry/billingEvents.js';
+export { logBillingEvent } from './telemetry/loggers.js';
+export * from './telemetry/constants.js';
 export { sessionId, createSessionId } from './utils/session.js';
 export * from './utils/compatibility.js';
 export * from './utils/browser.js';

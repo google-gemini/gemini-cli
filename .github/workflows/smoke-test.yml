@@ -20,6 +20,7 @@ on:
 
 jobs:
   smoke-test:
+    if: "github.repository == 'google-gemini/gemini-cli'"
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'

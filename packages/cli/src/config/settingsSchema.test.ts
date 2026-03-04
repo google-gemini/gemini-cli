@@ -96,6 +96,14 @@ describe('SettingsSchema', () => {
       ]);
     });
 
+    it('should have errorVerbosity enum property', () => {
+      const definition = getSettingsSchema().ui?.properties?.errorVerbosity;
+      expect(definition).toBeDefined();
+      expect(definition?.type).toBe('enum');
+      expect(definition?.default).toBe('low');
+      expect(definition?.options?.map((o) => o.value)).toEqual(['low', 'full']);
+    });
+
     it('should have checkpointing nested properties', () => {
       expect(
         getSettingsSchema().general?.properties?.checkpointing.properties
@@ -443,6 +451,60 @@ describe('SettingsSchema', () => {
       expect(hookItemProperties.name.type).toBe('string');
       expect(hookItemProperties.description).toBeDefined();
       expect(hookItemProperties.description.type).toBe('string');
+    });
+
+    it('should have gemmaModelRouter setting in schema', () => {
+      const gemmaModelRouter =
+        getSettingsSchema().experimental.properties.gemmaModelRouter;
+      expect(gemmaModelRouter).toBeDefined();
+      expect(gemmaModelRouter.type).toBe('object');
+      expect(gemmaModelRouter.category).toBe('Experimental');
+      expect(gemmaModelRouter.default).toEqual({});
+      expect(gemmaModelRouter.requiresRestart).toBe(true);
+      expect(gemmaModelRouter.showInDialog).toBe(true);
+      expect(gemmaModelRouter.description).toBe(
+        'Enable Gemma model router (experimental).',
+      );
+
+      const enabled = gemmaModelRouter.properties.enabled;
+      expect(enabled).toBeDefined();
+      expect(enabled.type).toBe('boolean');
+      expect(enabled.category).toBe('Experimental');
+      expect(enabled.default).toBe(false);
+      expect(enabled.requiresRestart).toBe(true);
+      expect(enabled.showInDialog).toBe(true);
+      expect(enabled.description).toBe(
+        'Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+      );
+
+      const classifier = gemmaModelRouter.properties.classifier;
+      expect(classifier).toBeDefined();
+      expect(classifier.type).toBe('object');
+      expect(classifier.category).toBe('Experimental');
+      expect(classifier.default).toEqual({});
+      expect(classifier.requiresRestart).toBe(true);
+      expect(classifier.showInDialog).toBe(false);
+      expect(classifier.description).toBe('Classifier configuration.');
+
+      const host = classifier.properties.host;
+      expect(host).toBeDefined();
+      expect(host.type).toBe('string');
+      expect(host.category).toBe('Experimental');
+      expect(host.default).toBe('http://localhost:9379');
+      expect(host.requiresRestart).toBe(true);
+      expect(host.showInDialog).toBe(false);
+      expect(host.description).toBe('The host of the classifier.');
+
+      const model = classifier.properties.model;
+      expect(model).toBeDefined();
+      expect(model.type).toBe('string');
+      expect(model.category).toBe('Experimental');
+      expect(model.default).toBe('gemma3-1b-gpu-custom');
+      expect(model.requiresRestart).toBe(true);
+      expect(model.showInDialog).toBe(false);
+      expect(model.description).toBe(
+        'The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.',
+      );
     });
   });
 
