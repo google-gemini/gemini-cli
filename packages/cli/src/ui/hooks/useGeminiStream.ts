@@ -597,7 +597,10 @@ export const useGeminiStream = (
       if (!isLowErrorVerbosity || config.getDebugMode()) {
         return;
       }
-      if (lowVerbosityFailureNoteShownRef.current) {
+      if (
+        lowVerbosityFailureNoteShownRef.current ||
+        suppressedToolErrorNoteShownRef.current
+      ) {
         return;
       }
 
