@@ -16,11 +16,12 @@ import type {
   GenerateContentResponseUsageMetadata,
   GenerateContentResponse,
 } from '@google/genai';
-import type { ServerDetails, ContextBreakdown } from '../telemetry/types.js';
 import {
   ApiRequestEvent,
   ApiResponseEvent,
   ApiErrorEvent,
+  type ServerDetails,
+  type ContextBreakdown,
 } from '../telemetry/types.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
 import type { Config } from '../config/config.js';
