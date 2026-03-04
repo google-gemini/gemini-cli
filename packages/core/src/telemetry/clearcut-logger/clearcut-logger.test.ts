@@ -641,9 +641,9 @@ describe('ClearcutLogger', () => {
     });
 
     it('does not include event number when GH_EVENT_NUMBER is not set', () => {
-      const { logger } = setup({});
       vi.stubEnv('GH_EVENT_NUMBER', undefined);
       vi.stubEnv('GITHUB_REPOSITORY', 'google-gemini/gemini-cli');
+      const { logger } = setup({});
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
       const hasEventNumber = event?.event_metadata[0].some(
@@ -655,9 +655,9 @@ describe('ClearcutLogger', () => {
     });
 
     it('does not include event number when GITHUB_REPOSITORY is not set', () => {
-      const { logger } = setup({});
       vi.stubEnv('GH_EVENT_NUMBER', '123');
       vi.stubEnv('GITHUB_REPOSITORY', undefined);
+      const { logger } = setup({});
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
       const hasEventNumber = event?.event_metadata[0].some(
