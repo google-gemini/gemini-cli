@@ -3,7 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Box, Text } from 'ink';
 import { render } from '../../test-utils/render.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
@@ -28,6 +28,10 @@ describe('ShowMoreLines layout and padding', () => {
       overflowingIds: new Set(['1']),
     } as NonNullable<ReturnType<typeof useOverflowState>>);
     mockUseStreamingContext.mockReturnValue(StreamingState.Idle);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('renders with single padding (paddingX=1, marginBottom=1)', async () => {
