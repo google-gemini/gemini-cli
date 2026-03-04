@@ -1,6 +1,6 @@
-# Latest stable release: v0.32.0
+# Latest stable release: v0.32.1
 
-Released: March 03, 2026
+Released: March 4, 2026
 
 For most users, our latest stable release is the recommended release. Install
 the latest stable version with:
@@ -29,6 +29,9 @@ npm install -g @google/gemini-cli
 
 ## What's Changed
 
+- fix(patch): cherry-pick 0659ad1 to release/v0.32.0-pr-21042 to patch version
+  v0.32.0 and create version 0.32.1 by @gemini-cli-robot in
+  [#21048](https://github.com/google-gemini/gemini-cli/pull/21048)
 - feat(plan): add integration tests for plan mode by @Adib234 in
   [#20214](https://github.com/google-gemini/gemini-cli/pull/20214)
 - fix(acp): update auth handshake to spec by @skeshive in
@@ -202,4 +205,4 @@ npm install -g @google/gemini-cli
   [#19781](https://github.com/google-gemini/gemini-cli/pull/19781)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.31.0...v0.32.0
+https://github.com/google-gemini/gemini-cli/compare/v0.31.0...v0.32.1
