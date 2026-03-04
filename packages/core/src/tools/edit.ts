@@ -46,7 +46,6 @@ import {
   logEditCorrectionEvent,
 } from '../telemetry/loggers.js';
 
-import { correctPath } from '../utils/pathCorrector.js';
 import {
   EDIT_TOOL_NAME,
   READ_FILE_TOOL_NAME,
@@ -444,6 +443,8 @@ class EditToolInvocation
   extends BaseToolInvocation<EditToolParams, ToolResult>
   implements ToolInvocation<EditToolParams, ToolResult>
 {
+  private readonly resolvedPath: string;
+
   constructor(
     private readonly config: Config,
     params: EditToolParams,
@@ -452,13 +453,17 @@ class EditToolInvocation
     displayName?: string,
   ) {
     super(params, messageBus, toolName, displayName);
+    this.resolvedPath = path.resolve(
+      this.config.getTargetDir(),
+      this.params.file_path,
+    );
   }
 
   override toolLocations(): ToolLocation[] {
-    return [{ path: this.params.file_path }];
+    return [{ path: this.resolvedPath }];
   }
 
-  protected override getPolicyUpdateOptions(
+  override getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     return {
@@ -481,7 +486,7 @@ class EditToolInvocation
     const initialContentHash = hashContent(currentContent);
     const onDiskContent = await this.config
       .getFileSystemService()
-      .readTextFile(params.file_path);
+      .readTextFile(this.resolvedPath);
     const onDiskContentHash = hashContent(onDiskContent.replace(/\r\n/g, '\n'));
 
     if (initialContentHash !== onDiskContentHash) {
@@ -592,7 +597,7 @@ class EditToolInvocation
     try {
       currentContent = await this.config
         .getFileSystemService()
-        .readTextFile(params.file_path);
+        .readTextFile(this.resolvedPath);
       originalLineEnding = detectLineEnding(currentContent);
       currentContent = currentContent.replace(/\r\n/g, '\n');
       fileExists = true;
@@ -625,7 +630,7 @@ class EditToolInvocation
         isNewFile: false,
         error: {
           display: `File not found. Cannot apply edit. Use an empty old_string to create a new file.`,
-          raw: `File not found: ${params.file_path}`,
+          raw: `File not found: ${this.resolvedPath}`,
           type: ToolErrorType.FILE_NOT_FOUND,
         },
         originalLineEnding,
@@ -640,7 +645,7 @@ class EditToolInvocation
         isNewFile: false,
         error: {
           display: `Failed to read content of file.`,
-          raw: `Failed to read content of existing file: ${params.file_path}`,
+          raw: `Failed to read content of existing file: ${this.resolvedPath}`,
           type: ToolErrorType.READ_CONTENT_FAILURE,
         },
         originalLineEnding,
@@ -655,7 +660,7 @@ class EditToolInvocation
         isNewFile: false,
         error: {
           display: `Failed to edit. Attempted to create a file that already exists.`,
-          raw: `File already exists, cannot create: ${params.file_path}`,
+          raw: `File already exists, cannot create: ${this.resolvedPath}`,
           type: ToolErrorType.ATTEMPT_TO_CREATE_EXISTING_FILE,
         },
         originalLineEnding,
@@ -737,7 +742,7 @@ class EditToolInvocation
       return false;
     }
 
-    const fileName = path.basename(this.params.file_path);
+    const fileName = path.basename(this.resolvedPath);
     const fileDiff = Diff.createPatch(
       fileName,
       editData.currentContent ?? '',
@@ -749,14 +754,14 @@ class EditToolInvocation
     const ideClient = await IdeClient.getInstance();
     const ideConfirmation =
       this.config.getIdeMode() && ideClient.isDiffingEnabled()
-        ? ideClient.openDiff(this.params.file_path, editData.newContent)
+        ? ideClient.openDiff(this.resolvedPath, editData.newContent)
         : undefined;
 
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',
-      title: `Confirm Edit: ${shortenPath(makeRelative(this.params.file_path, this.config.getTargetDir()))}`,
+      title: `Confirm Edit: ${shortenPath(makeRelative(this.resolvedPath, this.config.getTargetDir()))}`,
       fileName,
-      filePath: this.params.file_path,
+      filePath: this.resolvedPath,
       fileDiff,
       originalContent: editData.currentContent,
       newContent: editData.newContent,
@@ -781,7 +786,7 @@ class EditToolInvocation
 
   getDescription(): string {
     const relativePath = makeRelative(
-      this.params.file_path,
+      this.resolvedPath,
       this.config.getTargetDir(),
     );
     if (this.params.old_string === '') {
@@ -807,11 +812,7 @@ class EditToolInvocation
    * @returns Result of the edit operation
    */
   async execute(signal: AbortSignal): Promise<ToolResult> {
-    const resolvedPath = path.resolve(
-      this.config.getTargetDir(),
-      this.params.file_path,
-    );
-    const validationError = this.config.validatePathAccess(resolvedPath);
+    const validationError = this.config.validatePathAccess(this.resolvedPath);
     if (validationError) {
       return {
         llmContent: validationError,
@@ -853,7 +854,7 @@ class EditToolInvocation
     }
 
     try {
-      await this.ensureParentDirectoriesExistAsync(this.params.file_path);
+      await this.ensureParentDirectoriesExistAsync(this.resolvedPath);
       let finalContent = editData.newContent;
 
       // Restore original line endings if they were CRLF, or use OS default for new files
@@ -866,15 +867,15 @@ class EditToolInvocation
       }
       await this.config
         .getFileSystemService()
-        .writeTextFile(this.params.file_path, finalContent);
+        .writeTextFile(this.resolvedPath, finalContent);
 
       let displayResult: ToolResultDisplay;
       if (editData.isNewFile) {
-        displayResult = `Created ${shortenPath(makeRelative(this.params.file_path, this.config.getTargetDir()))}`;
+        displayResult = `Created ${shortenPath(makeRelative(this.resolvedPath, this.config.getTargetDir()))}`;
       } else {
         // Generate diff for display, even though core logic doesn't technically need it
         // The CLI wrapper will use this part of the ToolResult
-        const fileName = path.basename(this.params.file_path);
+        const fileName = path.basename(this.resolvedPath);
         const fileDiff = Diff.createPatch(
           fileName,
           editData.currentContent ?? '', // Should not be null here if not isNewFile
@@ -893,7 +894,7 @@ class EditToolInvocation
         displayResult = {
           fileDiff,
           fileName,
-          filePath: this.params.file_path,
+          filePath: this.resolvedPath,
           originalContent: editData.currentContent,
           newContent: editData.newContent,
           diffStat,
@@ -903,8 +904,8 @@ class EditToolInvocation
 
       const llmSuccessMessageParts = [
         editData.isNewFile
-          ? `Created new file: ${this.params.file_path} with provided content.`
-          : `Successfully modified file: ${this.params.file_path} (${editData.occurrences} replacements).`,
+          ? `Created new file: ${this.resolvedPath} with provided content.`
+          : `Successfully modified file: ${this.resolvedPath} (${editData.occurrences} replacements).`,
       ];
 
       // Return a diff of the file before and after the write so that the agent
@@ -995,16 +996,10 @@ export class EditTool
       return "The 'file_path' parameter must be non-empty.";
     }
 
-    let filePath = params.file_path;
-    if (!path.isAbsolute(filePath)) {
-      // Attempt to auto-correct to an absolute path
-      const result = correctPath(filePath, this.config);
-      if (!result.success) {
-        return result.error;
-      }
-      filePath = result.correctedPath;
-    }
-    params.file_path = filePath;
+    const resolvedPath = path.resolve(
+      this.config.getTargetDir(),
+      params.file_path,
+    );
 
     const newPlaceholders = detectOmissionPlaceholders(params.new_string);
     if (newPlaceholders.length > 0) {
@@ -1019,7 +1014,7 @@ export class EditTool
       }
     }
 
-    return this.config.validatePathAccess(params.file_path);
+    return this.config.validatePathAccess(resolvedPath);
   }
 
   protected createInvocation(

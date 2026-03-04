@@ -245,7 +245,7 @@ export const ToolConfirmationMessage: React.FC<
           });
           if (allowPermanentApproval) {
             options.push({
-              label: 'Allow for all future sessions',
+              label: `Allow for this file in all future sessions`,
               value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
               key: 'Allow for all future sessions',
             });
@@ -281,7 +281,7 @@ export const ToolConfirmationMessage: React.FC<
         });
         if (allowPermanentApproval) {
           options.push({
-            label: `Allow for all future sessions`,
+            label: `Allow this command for all future sessions`,
             value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
             key: `Allow for all future sessions`,
           });
@@ -401,19 +401,16 @@ export const ToolConfirmationMessage: React.FC<
       const options = getOptions();
 
       let initialIndex = 0;
-      if (
-        settings.merged.security.autoAddToPolicyByDefault &&
-        isTrustedFolder &&
-        allowPermanentApproval
-      ) {
+      if (isTrustedFolder && allowPermanentApproval) {
         const isSafeToPersist =
           confirmationDetails.type === 'info' ||
           confirmationDetails.type === 'edit' ||
-          (confirmationDetails.type === 'exec' &&
-            confirmationDetails.rootCommand) ||
           confirmationDetails.type === 'mcp';
 
-        if (isSafeToPersist) {
+        if (
+          isSafeToPersist &&
+          settings.merged.security.autoAddToPolicyByDefault
+        ) {
           const alwaysAndSaveIndex = options.findIndex(
             (o) => o.value === ToolConfirmationOutcome.ProceedAlwaysAndSave,
           );
@@ -671,9 +668,9 @@ export const ToolConfirmationMessage: React.FC<
       mcpToolDetailsText,
       expandDetailsHintKey,
       getPreferredEditor,
-      settings.merged.security.autoAddToPolicyByDefault,
       isTrustedFolder,
       allowPermanentApproval,
+      settings.merged.security.autoAddToPolicyByDefault,
     ]);
 
 

@@ -559,12 +559,15 @@ describe('policy.ts', () => {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
       const tool = { name: 'write_file' } as AnyDeclarativeTool;
-      const details = {
+      const details: SerializableConfirmationDetails = {
         type: 'edit',
-        filePath: 'src/foo.ts',
         title: 'Edit',
-        onConfirm: vi.fn(),
-      } as unknown as SerializableConfirmationDetails;
+        filePath: 'src/foo.ts',
+        fileName: 'foo.ts',
+        fileDiff: '--- foo.ts\n+++ foo.ts\n@@ -1 +1 @@\n-old\n+new',
+        originalContent: 'old',
+        newContent: 'new',
+      };
 
       await updatePolicy(
         tool,

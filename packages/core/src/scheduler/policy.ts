@@ -178,21 +178,8 @@ async function handleStandardPolicyUpdate(
     outcome === ToolConfirmationOutcome.ProceedAlways ||
     outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
   ) {
-    interface ToolInvocationWithOptions {
-      getPolicyUpdateOptions(
-        outcome: ToolConfirmationOutcome,
-      ): PolicyUpdateOptions | undefined;
-    }
-
-    /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
     const options: PolicyUpdateOptions =
-      typeof (toolInvocation as unknown as ToolInvocationWithOptions)
-        ?.getPolicyUpdateOptions === 'function'
-        ? (
-            toolInvocation as unknown as ToolInvocationWithOptions
-          ).getPolicyUpdateOptions(outcome) || {}
-        : {};
-    /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
+      toolInvocation?.getPolicyUpdateOptions?.(outcome) || {};
 
     if (!options.commandPrefix && confirmationDetails?.type === 'exec') {
       options.commandPrefix = confirmationDetails.rootCommands;

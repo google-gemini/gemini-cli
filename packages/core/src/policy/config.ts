@@ -19,7 +19,12 @@ import {
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
 import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
-import { buildArgsPatterns, isSafeRegExp } from './utils.js';
+import {
+  buildArgsPatterns,
+  isSafeRegExp,
+  ALWAYS_ALLOW_PRIORITY,
+  getAlwaysAllowPriorityFraction,
+} from './utils.js';
 import toml from '@iarna/toml';
 import {
   MessageBusType,
@@ -47,12 +52,6 @@ export const USER_POLICY_TIER = 4;
 export const ADMIN_POLICY_TIER = 5;
 
 // Specific priority offsets and derived priorities for dynamic/settings rules.
-// These are added to the tier base (e.g., USER_POLICY_TIER).
-
-// Workspace tier (3) + high priority (950/1000) = ALWAYS_ALLOW_PRIORITY
-// This ensures user "always allow" selections are high priority
-// within the workspace tier but still lose to user/admin policies.
-export const ALWAYS_ALLOW_PRIORITY = WORKSPACE_POLICY_TIER + 0.95;
 
 export const MCP_EXCLUDED_PRIORITY = USER_POLICY_TIER + 0.9;
 export const EXCLUDE_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.4;
@@ -563,21 +562,19 @@ export function createPolicyUpdater(
             }
 
             // Create new rule object
-            const newRule: TomlRule = {};
+            const newRule: TomlRule = {
+              decision: 'allow',
+              priority: getAlwaysAllowPriorityFraction(),
+            };
 
             if (message.mcpName) {
               newRule.mcpName = message.mcpName;
               // Extract simple tool name
-              const simpleToolName = toolName.startsWith(`${message.mcpName}__`)
+              newRule.toolName = toolName.startsWith(`${message.mcpName}__`)
                 ? toolName.slice(message.mcpName.length + 2)
                 : toolName;
-              newRule.toolName = simpleToolName;
-              newRule.decision = 'allow';
-              newRule.priority = 200;
             } else {
               newRule.toolName = toolName;
-              newRule.decision = 'allow';
-              newRule.priority = 100;
             }
 
             if (message.commandPrefix) {

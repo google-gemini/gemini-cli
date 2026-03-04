@@ -166,7 +166,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     return [{ path: this.resolvedPath }];
   }
 
-  protected override getPolicyUpdateOptions(
+  override getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     return {

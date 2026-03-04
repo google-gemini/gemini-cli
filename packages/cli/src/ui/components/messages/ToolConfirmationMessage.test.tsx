@@ -411,7 +411,7 @@ describe('ToolConfirmationMessage', () => {
       unmount();
     });
 
-    it('should show "Allow for all future sessions" when setting is true', async () => {
+    it('should show "Allow for all future sessions" when trusted', async () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
@@ -434,41 +434,9 @@ describe('ToolConfirmationMessage', () => {
       );
       await waitUntilReady();
 
-      expect(lastFrame()).toContain('Allow for all future sessions');
-      unmount();
-    });
-
-    it('should default to "Allow for all future sessions" when autoAddToPolicyByDefault is true', async () => {
-      const mockConfig = {
-        isTrustedFolder: () => true,
-        getIdeMode: () => false,
-      } as unknown as Config;
-
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-        <ToolConfirmationMessage
-          callId="test-call-id"
-          confirmationDetails={editConfirmationDetails}
-          config={mockConfig}
-          getPreferredEditor={vi.fn()}
-          availableTerminalHeight={30}
-          terminalWidth={80}
-        />,
-        {
-          settings: createMockSettings({
-            security: {
-              enablePermanentToolApproval: true,
-              autoAddToPolicyByDefault: true,
-            },
-          }),
-        },
-      );
-      await waitUntilReady();
-
       const output = lastFrame();
-      // In Ink, the selected item is usually highlighted with a cursor or different color.
-      // We can't easily check colors in text output, but we can verify it's NOT the first option
-      // if we could see the selection indicator.
-      // Instead, we'll verify the snapshot which should show the selection.
+      expect(output).toContain('future sessions');
+      // Verify it is the default selection (matching the indicator in the snapshot)
       expect(output).toMatchSnapshot();
       unmount();
     });

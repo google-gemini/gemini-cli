@@ -5,6 +5,32 @@
  */
 
 /**
+ * Priority used for user-defined "Always allow" rules.
+ * This is above extension rules but below user-defined TOML rules.
+ */
+export const ALWAYS_ALLOW_PRIORITY = 3.95;
+
+/**
+ * Calculates a unique priority within the ALWAYS_ALLOW_PRIORITY tier.
+ * It uses the fractional part as a base and adds a small offset.
+ */
+export function getAlwaysAllowPriority(offset: number): number {
+  const base = Math.floor(ALWAYS_ALLOW_PRIORITY);
+  const fraction = ALWAYS_ALLOW_PRIORITY - base;
+  // Use a precision of 3 decimal places for the offset
+  return base + fraction + offset / 1000;
+}
+
+/**
+ * Returns the fractional priority of ALWAYS_ALLOW_PRIORITY scaled to 1000.
+ */
+export function getAlwaysAllowPriorityFraction(): number {
+  return Math.round(
+    (ALWAYS_ALLOW_PRIORITY - Math.floor(ALWAYS_ALLOW_PRIORITY)) * 1000,
+  );
+}
+
+/**
  * Escapes a string for use in a regular expression.
  */
 export function escapeRegex(text: string): string {

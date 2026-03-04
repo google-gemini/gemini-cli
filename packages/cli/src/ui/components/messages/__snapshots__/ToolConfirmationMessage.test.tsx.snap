@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`ToolConfirmationMessage > enablePermanentToolApproval setting > should default to "Allow for all future sessions" when autoAddToPolicyByDefault is true 1`] = `
+exports[`ToolConfirmationMessage > enablePermanentToolApproval setting > should show "Allow for all future sessions" when trusted 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │                                                                              │
 │ No changes detected.                                                         │
@@ -10,7 +10,7 @@ Apply this change?
 
   1. Allow once
   2. Allow for this session
-● 3. Allow for all future sessions
+● 3. Allow for this file in all future sessions
   4. Modify with external editor
   5. No, suggest changes (esc)
 "

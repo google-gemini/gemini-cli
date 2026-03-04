@@ -6,7 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
-import { createPolicyUpdater, ALWAYS_ALLOW_PRIORITY } from './config.js';
+import { createPolicyUpdater } from './config.js';
+import { ALWAYS_ALLOW_PRIORITY } from './utils.js';
 import { PolicyEngine } from './policy-engine.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
