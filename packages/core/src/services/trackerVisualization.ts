@@ -4,27 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/**
- * trackerVisualization.ts
- *
- * Live terminal visualization during task execution (issue #19942).
- *
- * Features
- *  - TTY-safe (CI friendly)
- *  - In-place redraw without terminal spam
- *  - ANSI color only when supported
- *  - Robust error handling
- *  - O(n) ASCII tree builder with children index + single-pass stats
- */
-
 import * as readline from 'node:readline';
 import { TaskStatus, TaskType, type TrackerTask } from './trackerTypes.js';
 import type { TrackerService } from './trackerService.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
-/* ──────────────────────────────────────────────────────────
-   ANSI Utilities
-────────────────────────────────────────────────────────── */
+/**
+ * ANSI Utilities
+ */
 
 const ANSI = {
   reset: '\x1b[0m',
@@ -47,9 +34,9 @@ function color(code: string, text: string): string {
   return `${code}${text}${ANSI.reset}`;
 }
 
-/* ──────────────────────────────────────────────────────────
-   Status / Type display maps
-────────────────────────────────────────────────────────── */
+/**
+ * Status / Type display maps
+ */
 
 const STATUS_SYMBOL: Record<TaskStatus, string> = {
   [TaskStatus.OPEN]: '○',
@@ -71,28 +58,17 @@ const TYPE_ICON: Record<TaskType, string> = {
   [TaskType.BUG]: '⚑',
 };
 
-/* ──────────────────────────────────────────────────────────
-   ASCII Tree Builder  O(n)
-────────────────────────────────────────────────────────── */
-
 /**
- * Builds a plain-text ASCII dependency tree from a flat task list.
- *
- * Performance:
- *  - Single pass to build children index + compute stats (avoids O(n²)
- *    repeated .filter() calls inside the recursive traversal).
- *  - Iterative stack-based traversal (no call-stack overflow on deep trees).
- *
- * Exported so TrackerVisualizeTool in trackerTools.ts can reuse it,
- * keeping the LLM output and terminal output in sync.
+ * ASCII Tree Builder  O(n)
  */
+
 export function buildAsciiTree(tasks: TrackerTask[]): string {
   const lines: string[] = [];
 
-  // ── Single pass: build children index + count statuses ──────────────────
+  // Single pass: build children index + count statuses.
   let closed = 0;
-    let inProgress = 0;
-    let blocked = 0;
+  let inProgress = 0;
+  let blocked = 0;
   const childrenOf = new Map<string, TrackerTask[]>();
   const roots: TrackerTask[] = [];
 
@@ -120,7 +96,7 @@ export function buildAsciiTree(tasks: TrackerTask[]): string {
     }
   }
 
-  // ── Header + progress bar ────────────────────────────────────────────────
+  // Header + progress bar
   const total = tasks.length;
   const open = total - closed - inProgress - blocked;
   const pct = total ? Math.round((closed / total) * 100) : 0;
@@ -172,9 +148,9 @@ export function buildAsciiTree(tasks: TrackerTask[]): string {
   return lines.join('\n');
 }
 
-/* ──────────────────────────────────────────────────────────
-   Line Colorizer
-────────────────────────────────────────────────────────── */
+/**
+ * Line Colorizer
+ */
 
 function colorizeLine(line: string, activeTaskId?: string): string {
   try {
@@ -201,9 +177,9 @@ function colorizeLine(line: string, activeTaskId?: string): string {
   }
 }
 
-/* ──────────────────────────────────────────────────────────
-   Terminal Renderer
-────────────────────────────────────────────────────────── */
+/**
+ * Terminal Renderer
+ */
 
 class TerminalRenderer {
   private lineCount = 0;
@@ -239,9 +215,9 @@ class TerminalRenderer {
   }
 }
 
-/* ──────────────────────────────────────────────────────────
-   Tracker Visualizer
-────────────────────────────────────────────────────────── */
+/**
+ * Tracker Visualizer
+ */
 
 export class TrackerVisualizer {
   private renderer = new TerminalRenderer();
@@ -285,24 +261,10 @@ export class TrackerVisualizer {
   }
 }
 
-/* ──────────────────────────────────────────────────────────
-   Task Execution Wrapper
-────────────────────────────────────────────────────────── */
-
 /**
- * Runs `fn` while keeping the terminal visualization live.
- * Manages the full task lifecycle: OPEN → IN_PROGRESS → CLOSED (or BLOCKED).
- *
- * Usage:
- *   const viz = new TrackerVisualizer(trackerService);
- *   await viz.render(); // draw initial frame
- *
- *   for (const task of readyTasks) {
- *     await executeWithVisualization(trackerService, viz, task.id, async () => {
- *       await doWork();
- *     });
- *   }
+ * Task Execution Wrapper
  */
+
 export async function executeWithVisualization(
   service: TrackerService,
   viz: TrackerVisualizer,
