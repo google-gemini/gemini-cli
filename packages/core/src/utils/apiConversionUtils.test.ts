@@ -6,11 +6,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { convertToRestPayload } from './apiConversionUtils.js';
-import type { GenerateContentParameters } from '@google/genai';
 import {
   FunctionCallingConfigMode,
   HarmCategory,
   HarmBlockThreshold,
+  type GenerateContentParameters,
 } from '@google/genai';
 
 describe('apiConversionUtils', () => {
