@@ -17,8 +17,8 @@ import { fileURLToPath } from 'node:url';
 import {
   loadPoliciesFromToml,
   validateMcpPolicyToolNames,
+  type PolicyLoadResult,
 } from './toml-loader.js';
-import type { PolicyLoadResult } from './toml-loader.js';
 import { PolicyEngine } from './policy-engine.js';
 
 const __filename = fileURLToPath(import.meta.url);

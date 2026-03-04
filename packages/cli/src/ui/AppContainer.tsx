@@ -80,6 +80,7 @@ import {
   type ConsentRequestPayload,
   type AgentsDiscoveredPayload,
   ChangeAuthRequestedError,
+  ProjectIdRequiredError,
   CoreToolCallStatus,
   generateSteeringAckMessage,
   buildUserSteeringHintPrompt,
@@ -129,7 +130,7 @@ import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
-import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
+import { relaunchApp } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useMcpStatus } from './hooks/useMcpStatus.js';
@@ -771,6 +772,12 @@ export const AppContainer = (props: AppContainerProps) => {
           if (e instanceof ChangeAuthRequestedError) {
             return;
           }
+          if (e instanceof ProjectIdRequiredError) {
+            // OAuth succeeded but account setup requires project ID
+            // Show the error message directly without "Failed to authenticate" prefix
+            onAuthError(getErrorMessage(e));
+            return;
+          }
           onAuthError(
             `Failed to authenticate: ${e instanceof Error ? e.message : String(e)}`,
           );
@@ -781,13 +788,12 @@ export const AppContainer = (props: AppContainerProps) => {
           authType === AuthType.LOGIN_WITH_GOOGLE &&
           config.isBrowserLaunchSuppressed()
         ) {
-          await runExitCleanup();
           writeToStdout(`
 ----------------------------------------------------------------
 Logging in with Google... Restarting Gemini CLI to continue.
 ----------------------------------------------------------------
           `);
-          process.exit(RELAUNCH_EXIT_CODE);
+          await relaunchApp();
         }
       }
       setAuthState(AuthState.Authenticated);
@@ -1873,10 +1879,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
-  useKeypress(handleGlobalKeypress, {
-    isActive: true,
-    priority: KeypressPriority.Low,
-  });
+  useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
 
   useKeypress(
     () => {
@@ -2500,8 +2503,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
             });
           }
         }
-        await runExitCleanup();
-        process.exit(RELAUNCH_EXIT_CODE);
+        await relaunchApp();
       },
       handleNewAgentsSelect: async (choice: NewAgentsChoice) => {
         if (newAgents && choice === NewAgentsChoice.ACKNOWLEDGE) {

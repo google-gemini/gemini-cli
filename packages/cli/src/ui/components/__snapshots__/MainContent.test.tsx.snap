@@ -4,7 +4,7 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Focuse
 "ScrollableList
 AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command Running a long command...                                                   │
+│ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
 │ Line 10                                                                                      │
 │ Line 11                                                                                      │
@@ -26,7 +26,7 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Unfocu
 "ScrollableList
 AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command Running a long command...                                                   │
+│ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
 │ Line 10                                                                                      │
 │ Line 11                                                                                      │
@@ -47,7 +47,7 @@ ShowMoreLines
 exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Constrained height' 1`] = `
 "AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command Running a long command...                                                   │
+│ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
 │ ... first 11 lines hidden (Ctrl+O to show) ...                                               │
 │ Line 12                                                                                      │
@@ -67,7 +67,7 @@ ShowMoreLines
 exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unconstrained height' 1`] = `
 "AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⊷  Shell Command Running a long command...                                                   │
+│ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
 │ Line 1                                                                                       │
 │ Line 2                                                                                       │
