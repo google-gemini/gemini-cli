@@ -121,6 +121,8 @@ export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
+export * from './services/trackerService.js';
+export * from './services/trackerTypes.js';
 export * from './skills/skillManager.js';
 export * from './skills/skillLoader.js';
 
@@ -167,6 +169,7 @@ export * from './tools/read-many-files.js';
 export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 export * from './tools/write-todos.js';
+export * from './tools/trackerTools.js';
 export * from './tools/activate-skill.js';
 export * from './tools/ask-user.js';
 

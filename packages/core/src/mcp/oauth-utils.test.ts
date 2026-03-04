@@ -5,11 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type {
-  OAuthAuthorizationServerMetadata,
-  OAuthProtectedResourceMetadata,
+import {
+  OAuthUtils,
+  type OAuthAuthorizationServerMetadata,
+  type OAuthProtectedResourceMetadata,
 } from './oauth-utils.js';
-import { OAuthUtils } from './oauth-utils.js';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
