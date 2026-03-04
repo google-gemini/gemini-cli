@@ -153,7 +153,7 @@ class McpToolInvocation extends BaseToolInvocation<
     }
 
     try {
-      if (this.toolName === 'click_at' || this.toolName === 'click') {
+      if (this.toolName === 'click_at') {
         const x =
           this.params['x'] != null
             ? Number(this.params['x'])
