@@ -1,6 +1,6 @@
 # Preview release: v0.33.0-preview.0
 
-Released: March 03, 2026
+Released: March 3, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
