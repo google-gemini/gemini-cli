@@ -342,7 +342,7 @@ Captures startup configuration and user prompt submissions.
     - `github_workflow_name` (string, optional)
     - `github_repository_hash` (string, optional)
     - `github_event_name` (string, optional)
-    - `github_event_number_hash` (string, optional)
+    - `github_event_number` (string, optional)
 
 - `gemini_cli.user_prompt`: Emitted when a user submits a prompt.
   - **Attributes**:

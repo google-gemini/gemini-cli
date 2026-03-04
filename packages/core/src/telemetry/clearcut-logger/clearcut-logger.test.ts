@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createHash } from 'node:crypto';
 import {
   vi,
   describe,
@@ -623,47 +622,26 @@ describe('ClearcutLogger', () => {
   });
 
   describe('GH_EVENT_NUMBER metadata', () => {
-    it('includes hashed event number when GH_EVENT_NUMBER and GITHUB_REPOSITORY are set', () => {
+    it('includes event number when GH_EVENT_NUMBER is set', () => {
       vi.stubEnv('GH_EVENT_NUMBER', '123');
-      vi.stubEnv('GITHUB_REPOSITORY', 'google-gemini/gemini-cli');
       const { logger } = setup({});
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
 
-      const expectedHash = createHash('sha256')
-        .update('google-gemini/gemini-cli/123')
-        .digest('hex');
-
       expect(event?.event_metadata[0]).toContainEqual({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_EVENT_NUMBER_HASH,
-        value: expectedHash,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_EVENT_NUMBER,
+        value: '123',
       });
     });
 
     it('does not include event number when GH_EVENT_NUMBER is not set', () => {
       vi.stubEnv('GH_EVENT_NUMBER', undefined);
-      vi.stubEnv('GITHUB_REPOSITORY', 'google-gemini/gemini-cli');
       const { logger } = setup({});
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
       const hasEventNumber = event?.event_metadata[0].some(
         (item) =>
-          item.gemini_cli_key ===
-          EventMetadataKey.GEMINI_CLI_GH_EVENT_NUMBER_HASH,
-      );
-      expect(hasEventNumber).toBe(false);
-    });
-
-    it('does not include event number when GITHUB_REPOSITORY is not set', () => {
-      vi.stubEnv('GH_EVENT_NUMBER', '123');
-      vi.stubEnv('GITHUB_REPOSITORY', undefined);
-      const { logger } = setup({});
-
-      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
-      const hasEventNumber = event?.event_metadata[0].some(
-        (item) =>
-          item.gemini_cli_key ===
-          EventMetadataKey.GEMINI_CLI_GH_EVENT_NUMBER_HASH,
+          item.gemini_cli_key === EventMetadataKey.GEMINI_CLI_GH_EVENT_NUMBER,
       );
       expect(hasEventNumber).toBe(false);
     });

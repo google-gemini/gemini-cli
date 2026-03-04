@@ -238,8 +238,8 @@ export enum EventMetadataKey {
   // Logs the event name of the GitHub Action that triggered the session.
   GEMINI_CLI_GH_EVENT_NAME = 172,
 
-  // Logs the hashed event number of the GitHub Action that triggered the session.
-  GEMINI_CLI_GH_EVENT_NUMBER_HASH = 173,
+  // Logs the event number (Issue or PR ID) of the GitHub Action that triggered the session.
+  GEMINI_CLI_GH_EVENT_NUMBER = 173,
 
   // ====
   // Loop Detected Event Keys

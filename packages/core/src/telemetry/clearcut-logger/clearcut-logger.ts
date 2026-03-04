@@ -429,14 +429,10 @@ export class ClearcutLogger {
       });
     }
 
-    if (ghEventNumber && this.hashedGHRepositoryName) {
-      const ghRepositoryName = determineGHRepositoryName()!;
-      const hashedEventNumber = createHash('sha256')
-        .update(`${ghRepositoryName}/${ghEventNumber}`)
-        .digest('hex');
+    if (ghEventNumber) {
       baseMetadata.push({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_EVENT_NUMBER_HASH,
-        value: hashedEventNumber,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_EVENT_NUMBER,
+        value: ghEventNumber,
       });
     }
 
