@@ -23,9 +23,12 @@ import { execSync } from 'node:child_process';
 const chromeAvailable = (() => {
   try {
     if (process.platform === 'darwin') {
-      execSync('test -d "/Applications/Google Chrome.app"', {
-        stdio: 'ignore',
-      });
+      execSync(
+        'test -d "/Applications/Google Chrome.app"  || test -d "/Applications/Chromium.app"',
+        {
+          stdio: 'ignore',
+        },
+      );
     } else if (process.platform === 'linux') {
       execSync(
         'which google-chrome || which chromium-browser || which chromium',
