@@ -421,6 +421,47 @@ describe('FileSearch', () => {
     );
   });
 
+  it('should prioritize filenames closer to the end of the path and shorter paths', async () => {
+    tmpDir = await createTmpDir({
+      src: {
+        'hooks.ts': '',
+        hooks: {
+          'index.ts': '',
+        },
+        utils: {
+          'hooks.tsx': '',
+        },
+        'hooks-dev': {
+          'test.ts': '',
+        },
+      },
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      enableFuzzySearch: true,
+    });
+
+    await fileSearch.initialize();
+    const results = await fileSearch.search('hooks');
+
+    // The order should prioritize matches closer to the end and shorter strings.
+    // FZF matches right-to-left.
+    // src/hooks/ -> length 10, maxPos 8, dist 2
+    // src/hooks.ts -> length 12, maxPos 8, dist 4
+    // src/hooks/index.ts -> length 18, maxPos 8, dist 10
+    expect(results[0]).toBe('src/hooks/');
+    expect(results[1]).toBe('src/hooks.ts');
+  });
+
   it('should return empty array when no matches are found', async () => {
     tmpDir = await createTmpDir({
       src: ['file1.js'],

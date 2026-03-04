@@ -13,6 +13,20 @@ import { AsyncFzf, type FzfResultItem } from 'fzf';
 import { unescapePath } from '../paths.js';
 import type { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
 
+const byLengthAsc = (a: FzfResultItem<string>, b: FzfResultItem<string>) =>
+  a.item.length - b.item.length;
+
+const byMatchPosFromEnd = (
+  a: FzfResultItem<string>,
+  b: FzfResultItem<string>,
+) => {
+  const maxPosA = Math.max(-1, ...a.positions);
+  const maxPosB = Math.max(-1, ...b.positions);
+  const distA = a.item.length - maxPosA;
+  const distB = b.item.length - maxPosB;
+  return distA - distB;
+};
+
 export interface FileSearchOptions {
   projectRoot: string;
   ignoreDirs: string[];
@@ -192,6 +206,8 @@ class RecursiveFileSearch implements FileSearch {
       // files, because the v2 algorithm is just too slow in those cases.
       this.fzf = new AsyncFzf(this.allFiles, {
         fuzzy: this.allFiles.length > 20000 ? 'v1' : 'v2',
+        forward: false,
+        tiebreakers: [byMatchPosFromEnd, byLengthAsc],
       });
     }
   }
