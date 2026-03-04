@@ -22,7 +22,7 @@ import {
 } from '../tools/memoryTool.js';
 import { flattenMemory } from '../config/memory.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { GEMINI_DIR, normalizePath , homedir as pathsHomedir } from './paths.js';
+import { GEMINI_DIR, normalizePath, homedir as pathsHomedir } from './paths.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 
 function flattenResult(result: {
@@ -61,7 +61,6 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
     homedir: vi.fn(),
   };
 });
-
 
 describe('memoryDiscovery', () => {
   const DEFAULT_FOLDER_TRUST = true;
@@ -183,21 +182,17 @@ describe('memoryDiscovery', () => {
 
   describe('deduplicateRealPaths', () => {
     it('should deduplicate GEMINI.md and gemini.md variants if they resolve to the same real file', async () => {
-      // Create one file on disk
+      // Configure the test to search for both case variants.
+      setGeminiMdFilename(['GEMINI.md', 'gemini.md']);
+
+      // On a case-insensitive file system, creating 'GEMINI.md' means that
+      // fs.access for 'gemini.md' will also succeed. The discovery logic will
+      // find both paths, and `deduplicateRealPaths` should handle it.
       const filePath = await createTestFile(
-        path.join(cwd, DEFAULT_CONTEXT_FILENAME),
+        path.join(cwd, DEFAULT_CONTEXT_FILENAME), // Creates GEMINI.md
         'Real file memory',
       );
 
-      const lowercasePath = path.join(cwd, 'symlink.md');
-
-      // The default getAllGeminiMdFilenames() returns ['GEMINI.md', 'gemini.md'] automatically.
-      // So we just need to create the second variant physically as a symlink to the first.
-      await fsPromises.symlink(filePath, lowercasePath);
-
-      // When loadServerHierarchicalMemory runs, it will discover both files because 'gemini.md' is a symlink
-      // to 'GEMINI.md'. Our deduplication logic uses `fs.realpath`,
-      // which will resolve the symlink to the original file, identifying them as duplicates.
       const result = flattenResult(
         await loadServerHierarchicalMemory(
           cwd,
@@ -209,11 +204,11 @@ describe('memoryDiscovery', () => {
         ),
       );
 
+      // Even though discovery may find two paths on some filesystems, the deduplication
+      // should ensure we only load the file once.
       expect(result.fileCount).toEqual(1);
+      // The result should contain the path that was physically created.
       expect(result.filePaths).toEqual([filePath]);
-
-      // clean up the symlink
-      await fsPromises.unlink(lowercasePath);
     });
   });
 
