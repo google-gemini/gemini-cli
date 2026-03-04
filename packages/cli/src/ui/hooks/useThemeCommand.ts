@@ -26,6 +26,7 @@ interface UseThemeCommandReturn {
     themeName: string,
     scope: LoadableSettingScope,
     themeMode?: 'light' | 'dark',
+    otherThemeName?: string,
   ) => Promise<void>;
   handleThemeHighlight: (themeName: string | undefined) => void;
 }
@@ -99,6 +100,7 @@ export const useThemeCommand = (
       themeName: string,
       scope: LoadableSettingScope,
       themeMode?: 'light' | 'dark',
+      otherThemeName?: string,
     ) => {
       try {
         const mergedCustomThemes = {
@@ -114,10 +116,29 @@ export const useThemeCommand = (
           return;
         }
 
+        if (otherThemeName) {
+          const isBuiltInOther = themeManager.findThemeByName(otherThemeName);
+          const isCustomOther =
+            otherThemeName && mergedCustomThemes[otherThemeName];
+          if (!isBuiltInOther && !isCustomOther) {
+            setThemeError(
+              `Theme "${otherThemeName}" not found in selected scope.`,
+            );
+            setIsThemeDialogOpen(true);
+            return;
+          }
+        }
+
         if (themeMode === 'light') {
           loadedSettings.setValue(scope, 'ui.themeLight', themeName);
+          if (otherThemeName) {
+            loadedSettings.setValue(scope, 'ui.themeDark', otherThemeName);
+          }
         } else if (themeMode === 'dark') {
           loadedSettings.setValue(scope, 'ui.themeDark', themeName);
+          if (otherThemeName) {
+            loadedSettings.setValue(scope, 'ui.themeLight', otherThemeName);
+          }
         } else {
           loadedSettings.setValue(scope, 'ui.themeLight', themeName);
           loadedSettings.setValue(scope, 'ui.themeDark', themeName);

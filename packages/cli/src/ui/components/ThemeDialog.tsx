@@ -31,6 +31,8 @@ interface ThemeDialogProps {
   onSelect: (
     themeName: string,
     scope: LoadableSettingScope,
+    themeMode?: 'light' | 'dark',
+    otherThemeName?: string,
   ) => void | Promise<void>;
 
   /** Callback function when the dialog is cancelled */
@@ -44,7 +46,10 @@ interface ThemeDialogProps {
   terminalWidth: number;
 }
 
-import { resolveColor , getThemeTypeFromBackgroundColor } from '../themes/color-utils.js';
+import {
+  resolveColor,
+  getThemeTypeFromBackgroundColor,
+} from '../themes/color-utils.js';
 
 import { DefaultLight } from '../themes/default-light.js';
 import { DefaultDark } from '../themes/default.js';
@@ -137,10 +142,19 @@ export function ThemeDialog({
 
   const handleThemeSelect = useCallback(
     async (themeName: string) => {
-      // @ts-expect-error adding extra argument for the updated hook
-      await onSelect(themeName, selectedScope, activeTab);
+      const otherThemeName =
+        activeTab === 'light'
+          ? highlightedThemeNameDark
+          : highlightedThemeNameLight;
+      await onSelect(themeName, selectedScope, activeTab, otherThemeName);
     },
-    [onSelect, selectedScope, activeTab],
+    [
+      onSelect,
+      selectedScope,
+      activeTab,
+      highlightedThemeNameDark,
+      highlightedThemeNameLight,
+    ],
   );
 
   const handleThemeHighlight = (themeName: string) => {
@@ -158,10 +172,19 @@ export function ThemeDialog({
 
   const handleScopeSelect = useCallback(
     async (scope: LoadableSettingScope) => {
-      // @ts-expect-error adding extra argument
-      await onSelect(highlightedThemeName, scope, activeTab);
+      const otherThemeName =
+        activeTab === 'light'
+          ? highlightedThemeNameDark
+          : highlightedThemeNameLight;
+      await onSelect(highlightedThemeName, scope, activeTab, otherThemeName);
     },
-    [onSelect, highlightedThemeName, activeTab],
+    [
+      onSelect,
+      highlightedThemeName,
+      activeTab,
+      highlightedThemeNameDark,
+      highlightedThemeNameLight,
+    ],
   );
 
   const [mode, setMode] = useState<'theme' | 'scope'>('theme');
