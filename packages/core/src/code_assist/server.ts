@@ -63,7 +63,6 @@ import {
 } from './telemetry.js';
 import { getClientMetadata } from './experiments/client_metadata.js';
 import { InvalidChunkEvent, type LlmRole } from '../telemetry/types.js';
-import { getErrorMessage } from '../utils/errors.js';
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
   /** Additional HTTP headers to be sent with the request. */
@@ -484,11 +483,12 @@ export class CodeAssistServer implements ContentGenerator {
           const chunk = bufferedLines.join('\n');
           try {
             yield JSON.parse(chunk);
-          } catch (e) {
+          } catch (_e) {
             if (server.config) {
               logInvalidChunk(
                 server.config,
-                new InvalidChunkEvent(getErrorMessage(e)),
+                // Don't include the chunk content in the log for security/privacy reasons.
+                new InvalidChunkEvent('Malformed JSON chunk'),
               );
             }
           }

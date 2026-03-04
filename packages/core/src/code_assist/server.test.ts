@@ -707,13 +707,25 @@ describe('CodeAssistServer', () => {
       const { Readable } = await import('node:stream');
 
       const fragmentedCases = [
-        ['d', 'ata: {"foo":', ' "bar"}\n\n'],
-        ['data: {"foo": "bar"}\n', '\n'],
-        ['data: ', '{"foo": "bar"}', '\n\n'],
-        ['data: {"foo": "bar"}\n\n', 'data: {"baz": 1}\n\n'],
+        {
+          chunks: ['d', 'ata: {"foo":', ' "bar"}\n\n'],
+          expected: [{ foo: 'bar' }],
+        },
+        {
+          chunks: ['data: {"foo": "bar"}\n', '\n'],
+          expected: [{ foo: 'bar' }],
+        },
+        {
+          chunks: ['data: ', '{"foo": "bar"}', '\n\n'],
+          expected: [{ foo: 'bar' }],
+        },
+        {
+          chunks: ['data: {"foo": "bar"}\n\n', 'data: {"baz": 1}\n\n'],
+          expected: [{ foo: 'bar' }, { baz: 1 }],
+        },
       ];
 
-      for (const chunks of fragmentedCases) {
+      for (const { chunks, expected } of fragmentedCases) {
         const mockStream = new Readable({
           read() {
             for (const chunk of chunks) {
@@ -726,13 +738,10 @@ describe('CodeAssistServer', () => {
 
         const stream = await server.requestStreamingPost('testStream', {});
         const results = [];
-        try {
-          for await (const res of stream) {
-            results.push(res);
-          }
-        } catch (_e) {
-          // Fragmented JSON might cause SyntaxError, which is fine as long as it doesn't hang
+        for await (const res of stream) {
+          results.push(res);
         }
+        expect(results).toEqual(expected);
       }
     });
 
@@ -853,7 +862,7 @@ data: ${jsonString}
       expect(logInvalidChunk).toHaveBeenCalledWith(
         config,
         expect.objectContaining({
-          error_message: expect.stringContaining('Unexpected token'),
+          error_message: 'Malformed JSON chunk',
         }),
       );
     });
