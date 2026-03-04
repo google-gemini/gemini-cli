@@ -92,7 +92,7 @@ Once you have a solid plan, you can exit Plan Mode to start coding.
 
 - **Keyboard shortcut:** Press `Shift+Tab` to cycle to the desired mode.
 
-- **Tool:** Gemini CLI calls the [`exit_plan_mode`] tool to present the
+- **Tool:** Gemini CLI presents the
   finalized plan for your approval.
 
 ## Customization and best practices
