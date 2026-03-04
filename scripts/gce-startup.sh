@@ -9,10 +9,14 @@ exec > >(tee -a "$LOG") 2>&1
 echo "=== Forever Agent startup $(date) ==="
 
 # Read API key from instance metadata
-GEMINI_API_KEY=$(curl -sf -H "Metadata-Flavor: Google" \
-  "http://metadata.google.internal/computeMetadata/v1/instance/attributes/gemini-api-key" || echo "")
-CHAT_PROJECT_NUMBER=$(curl -sf -H "Metadata-Flavor: Google" \
-  "http://metadata.google.internal/computeMetadata/v1/instance/attributes/chat-project-number" || echo "")
+META="http://metadata.google.internal/computeMetadata/v1"
+meta() { curl -sf -H "Metadata-Flavor: Google" "$META/instance/attributes/$1" || echo "${2:-}"; }
+proj() { curl -sf -H "Metadata-Flavor: Google" "$META/project/project-id" || echo ""; }
+
+GEMINI_API_KEY=$(meta gemini-api-key)
+GIT_BRANCH=$(meta git-branch "afw/forever-gchat")
+GCP_PROJECT=$(meta gcp-project "$(proj)")
+PUBSUB_SUB=$(meta pubsub-subscription "forever-agent-chat-sub")
 
 if [ -z "$GEMINI_API_KEY" ]; then
   echo "ERROR: gemini-api-key not set in instance metadata"
@@ -30,7 +34,7 @@ echo "Node $(node --version)"
 # Clone/update repo
 REPO_DIR="/opt/forever-agent"
 if [ ! -d "$REPO_DIR" ]; then
-  GIT_TERMINAL_PROMPT=0 git clone -b afw/forever-gchat \
+  GIT_TERMINAL_PROMPT=0 git clone -b "$GIT_BRANCH" \
     https://github.com/google-gemini/gemini-cli.git "$REPO_DIR"
 else
   cd "$REPO_DIR" && GIT_TERMINAL_PROMPT=0 git pull --ff-only || true
@@ -102,8 +106,8 @@ After=network.target
 [Service]
 Type=simple
 Environment=A2A_URL=http://127.0.0.1:3100
-Environment=GOOGLE_CLOUD_PROJECT=adamfweidman-test
-Environment=PUBSUB_SUBSCRIPTION=forever-agent-chat-sub
+Environment=GOOGLE_CLOUD_PROJECT=${GCP_PROJECT}
+Environment=PUBSUB_SUBSCRIPTION=${PUBSUB_SUB}
 Environment=GIT_TERMINAL_PROMPT=0
 WorkingDirectory=${REPO_DIR}
 ExecStart=/usr/bin/node ${REPO_DIR}/packages/a2a-server/dist/src/chat-bridge/bridge.js
