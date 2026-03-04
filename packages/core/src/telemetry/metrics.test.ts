@@ -110,6 +110,7 @@ describe('Telemetry Metrics', () => {
   let recordBrowserAgentVisionStatusModule: typeof import('./metrics.js').recordBrowserAgentVisionStatus;
   let recordBrowserAgentTaskMetricsModule: typeof import('./metrics.js').recordBrowserAgentTaskMetrics;
   let recordBrowserAgentCleanupMetricsModule: typeof import('./metrics.js').recordBrowserAgentCleanupMetrics;
+  let recordInvalidChunkModule: typeof import('./metrics.js').recordInvalidChunk;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -169,6 +170,7 @@ describe('Telemetry Metrics', () => {
       metricsJsModule.recordBrowserAgentTaskMetrics;
     recordBrowserAgentCleanupMetricsModule =
       metricsJsModule.recordBrowserAgentCleanupMetrics;
+    recordInvalidChunkModule = metricsJsModule.recordInvalidChunk;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -1567,6 +1569,28 @@ describe('Telemetry Metrics', () => {
           'user.email': 'test@example.com',
           type: 'keychain',
           forced: true,
+        });
+      });
+    });
+
+    describe('recordInvalidChunk', () => {
+      it('should not record metrics if not initialized', () => {
+        const config = makeFakeConfig({});
+        recordInvalidChunkModule(config);
+        expect(mockCounterAddFn).not.toHaveBeenCalled();
+      });
+
+      it('should record invalid chunk when initialized', () => {
+        const config = makeFakeConfig({});
+        initializeMetricsModule(config);
+        mockCounterAddFn.mockClear();
+
+        recordInvalidChunkModule(config);
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
         });
       });
     });
