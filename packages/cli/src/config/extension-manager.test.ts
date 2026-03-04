@@ -346,4 +346,3 @@ describe('ExtensionManager', () => {
     });
   });
 });
-
