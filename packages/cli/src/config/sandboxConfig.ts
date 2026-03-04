@@ -28,6 +28,7 @@ const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
   'podman',
   'sandbox-exec',
   'runsc',
+  'lxc',
 ];
 
 function isSandboxCommand(value: string): value is SandboxConfig['command'] {
@@ -105,6 +106,9 @@ function getSandboxCommand(
   }
 
   return '';
+  // Note: 'lxc' is intentionally not auto-detected because it requires a
+  // pre-existing, running container managed by the user. Use
+  // GEMINI_SANDBOX=lxc or sandbox: "lxc" in settings to enable it.
 }
 
 export async function loadSandboxConfig(

@@ -74,6 +74,50 @@ To set up runsc:
 2.  Configure the Docker daemon to use the runsc runtime.
 3.  Verify the installation.
 
+### 4. LXC/LXD (Linux only, experimental)
+
+Full-system container sandboxing using LXC/LXD. Unlike Docker/Podman, LXC
+containers run a complete Linux system with `systemd`, `snapd`, and other system
+services. This is ideal for tools that don't work in standard Docker containers,
+such as Snapcraft and Rockcraft.
+
+**Prerequisites**:
+
+- Linux only.
+- LXC/LXD must be installed (`snap install lxd` or `apt install lxd`).
+- A container must be created and running before starting Gemini CLI. Gemini
+  does **not** create the container automatically.
+
+**Quick setup**:
+
+```bash
+# Initialize LXD (first time only)
+lxd init --auto
+
+# Create and start an Ubuntu container
+lxc launch ubuntu:24.04 gemini-sandbox
+
+# Enable LXC sandboxing
+export GEMINI_SANDBOX=lxc
+gemini -p "build the project"
+```
+
+**Custom container name**:
+
+```bash
+export GEMINI_SANDBOX=lxc
+export GEMINI_SANDBOX_IMAGE=my-snapcraft-container
+gemini -p "build the snap"
+```
+
+**Limitations**:
+
+- Linux only (LXC is not available on macOS or Windows).
+- The container must already exist and be running.
+- The workspace directory is bind-mounted into the container at the same
+  absolute path — the path must be writable inside the container.
+- Used with tools like Snapcraft or Rockcraft that require a full system.
+
 ## Quickstart
 
 ```bash
@@ -113,7 +157,7 @@ gemini -p "run the test suite"
 
 1. **Command flag**: `-s` or `--sandbox`
 2. **Environment variable**:
-   `GEMINI_SANDBOX=true|docker|podman|runsc|sandbox-exec`
+   `GEMINI_SANDBOX=true|docker|podman|sandbox-exec|runsc|lxc`
 3. **Settings file**: `"sandbox": true` in the `tools` object of your
    `settings.json` file (e.g., `{"tools": {"sandbox": true}}`).
 
