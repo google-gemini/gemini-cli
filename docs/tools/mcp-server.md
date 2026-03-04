@@ -559,6 +559,9 @@ Upon successful connection:
      with underscores
    - Names longer than 63 characters are truncated with middle replacement
      (`___`)
+   - See
+     [Name sanitization](/docs/reference/policy-engine.md#name-sanitization-the-underscore-rule)
+     in the policy engine reference for more details.
 
 ### 3. Conflict resolution
 

@@ -74,11 +74,21 @@ primary conditions are the tool's name and its arguments.
 
 The `toolName` in the rule must match the name of the tool being called.
 
+- **Qualified MCP Names**: Tools from MCP servers are internally prefixed with
+  their server name (for example, `server__tool`). To match an MCP tool, you
+  must use the qualified name or the `mcpName` field. Unqualified names (for
+  example, `toolName = "my_tool"`) don't match MCP tools.
 - **Wildcards**: You can use wildcards to match multiple tools.
   - `*`: Matches **any tool** (built-in or MCP).
   - `server__*`: Matches any tool from a specific MCP server.
   - `*__toolName`: Matches a specific tool name across **all** MCP servers.
   - `*__*`: Matches **any tool from any MCP server**.
+
+> **Note:** **Built-in Protection**: Unqualified rules for built-in tools (like
+> `read_file` or `run_shell_command`) are strictly scoped. A rule for
+> `read_file` will only match the built-in tool and won't automatically allow
+> `my_server__read_file`. This prevents malicious servers from hijacking
+> permissions of built-in tools.
 
 #### Arguments pattern
 
@@ -164,6 +174,20 @@ A rule matches a tool call if all of its conditions are met:
     are converted to a stable JSON string, which is then tested against the
     provided regular expression. If the arguments don't match the pattern, the
     rule does not apply.
+
+### Name sanitization (The "Underscore Rule")
+
+Gemini CLI sanitizes server and tool names to ensure compatibility with the
+Gemini API.
+
+- **Invalid characters**: Any character that is not a letter, number, underscore
+  (`_`), dot (`.`), colon (`:`), or hyphen (`-`) is replaced with an
+  **underscore**.
+- **Spaces**: Spaces are always converted to underscores. For example, a server
+  named `"Google Drive"` is registered as `"Google_Drive"`.
+- **Case sensitivity**: Matching is case-insensitive.
+
+Your TOML rules must use these sanitized names to match correctly at runtime.
 
 ## Configuration
 
