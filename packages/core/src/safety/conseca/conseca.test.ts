@@ -6,8 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ConsecaSafetyChecker } from './conseca.js';
-import { SafetyCheckDecision } from '../protocol.js';
-import type { SafetyCheckInput } from '../protocol.js';
+import { SafetyCheckDecision, type SafetyCheckInput } from '../protocol.js';
 import {
   logConsecaPolicyGeneration,
   logConsecaVerdict,

@@ -6,33 +6,31 @@
 
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
-import os, { EOL } from 'node:os';
+import os from 'node:os';
 import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
-import type {
-  ToolInvocation,
-  ToolResult,
-  ToolCallConfirmationDetails,
-  ToolExecuteConfirmationDetails,
-  PolicyUpdateOptions,
-  ToolLiveOutput,
-} from './tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
+  type ToolInvocation,
+  type ToolResult,
+  type ToolCallConfirmationDetails,
+  type ToolExecuteConfirmationDetails,
+  type PolicyUpdateOptions,
+  type ToolLiveOutput,
 } from './tools.js';
 
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
-import type {
-  ShellExecutionConfig,
-  ShellOutputEvent,
+import {
+  ShellExecutionService,
+  type ShellExecutionConfig,
+  type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
-import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
@@ -309,7 +307,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         if (tempFileExists) {
           const pgrepContent = await fsPromises.readFile(tempFilePath, 'utf8');
-          const pgrepLines = pgrepContent.split(EOL).filter(Boolean);
+          const pgrepLines = pgrepContent.split(os.EOL).filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
               debugLogger.error(`pgrep: ${line}`);

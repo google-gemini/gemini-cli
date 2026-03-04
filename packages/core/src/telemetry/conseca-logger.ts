@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { LogRecord } from '@opentelemetry/api-logs';
-import { logs } from '@opentelemetry/api-logs';
+import { logs, type LogRecord } from '@opentelemetry/api-logs';
 import type { Config } from '../config/config.js';
 import { SERVICE_NAME } from './constants.js';
 import { isTelemetrySdkInitialized } from './sdk.js';

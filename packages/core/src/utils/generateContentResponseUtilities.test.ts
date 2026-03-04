@@ -16,14 +16,14 @@ import {
   getCitations,
   convertToFunctionResponse,
 } from './generateContentResponseUtilities.js';
-import type {
-  GenerateContentResponse,
-  Part,
-  SafetyRating,
-  CitationMetadata,
-  PartListUnion,
+import {
+  FinishReason,
+  type GenerateContentResponse,
+  type Part,
+  type SafetyRating,
+  type CitationMetadata,
+  type PartListUnion,
 } from '@google/genai';
-import { FinishReason } from '@google/genai';
 import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,

@@ -5,8 +5,11 @@
  */
 
 import type { InProcessChecker } from '../built-in.js';
-import type { SafetyCheckInput, SafetyCheckResult } from '../protocol.js';
-import { SafetyCheckDecision } from '../protocol.js';
+import {
+  SafetyCheckDecision,
+  type SafetyCheckInput,
+  type SafetyCheckResult,
+} from '../protocol.js';
 
 import {
   logConsecaPolicyGeneration,

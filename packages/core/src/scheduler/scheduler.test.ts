@@ -75,19 +75,20 @@ import {
   type AnyDeclarativeTool,
   type AnyToolInvocation,
 } from '../tools/tools.js';
-import type {
-  ToolCallRequestInfo,
-  ValidatingToolCall,
-  SuccessfulToolCall,
-  ErroredToolCall,
-  CancelledToolCall,
-  CompletedToolCall,
-  ToolCallResponseInfo,
-  ExecutingToolCall,
-  Status,
-  ToolCall,
+import {
+  CoreToolCallStatus,
+  ROOT_SCHEDULER_ID,
+  type ToolCallRequestInfo,
+  type ValidatingToolCall,
+  type SuccessfulToolCall,
+  type ErroredToolCall,
+  type CancelledToolCall,
+  type CompletedToolCall,
+  type ToolCallResponseInfo,
+  type ExecutingToolCall,
+  type Status,
+  type ToolCall,
 } from './types.js';
-import { CoreToolCallStatus, ROOT_SCHEDULER_ID } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
 import * as ToolUtils from '../utils/tool-utils.js';

@@ -13,12 +13,12 @@ import {
   afterEach,
   afterAll,
 } from 'vitest';
-import type { LogEntry } from './logger.js';
 import {
   Logger,
   MessageSenderType,
   encodeTagName,
   decodeTagName,
+  type LogEntry,
 } from './logger.js';
 import { AuthType } from './contentGenerator.js';
 import { Storage } from '../config/storage.js';

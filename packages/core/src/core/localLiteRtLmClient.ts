@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, type Content } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import type { Content } from '@google/genai';
 
 /**
  * A client for making single, non-streaming calls to a local Gemini-compatible API
