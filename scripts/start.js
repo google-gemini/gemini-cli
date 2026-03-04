@@ -73,6 +73,7 @@ if (isInDebugMode) {
 }
 const child = spawn('node', nodeArgs, { stdio: 'inherit', env });
 
-child.on('close', (code) => {
-  process.exit(code);
+child.on('close', (code, signal) => {
+  if (signal) console.error(`\nGemini CLI crashed (${signal})`);
+  process.exit(code ?? 1);
 });
