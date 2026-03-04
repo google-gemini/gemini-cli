@@ -775,7 +775,7 @@ export const AppContainer = (props: AppContainerProps) => {
           if (e instanceof ProjectIdRequiredError) {
             // OAuth succeeded but account setup requires project ID
             // Show the error message directly without "Failed to authenticate" prefix
-            onAuthError(e.message);
+            onAuthError(getErrorMessage(e));
             return;
           }
           onAuthError(
