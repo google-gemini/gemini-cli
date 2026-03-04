@@ -136,23 +136,5 @@ describe('process-utils', () => {
 
       expect(mockPty.kill).toHaveBeenCalledWith('SIGKILL');
     });
-
-    it('should attempt process group kill on Unix after pty fallback to reap orphaned descendants', async () => {
-      vi.mocked(os.platform).mockReturnValue('linux');
-      // First call (group kill) throws to trigger PTY fallback
-      mockProcessKill.mockImplementationOnce(() => {
-        throw new Error('ESRCH');
-      });
-      // Second call (group kill retry after pty.kill) should succeed
-      mockProcessKill.mockImplementationOnce(() => true);
-      const mockPty = { kill: vi.fn() };
-
-      await killProcessGroup({ pid: 1234, pty: mockPty });
-
-      // PTY kill should be called first
-      expect(mockPty.kill).toHaveBeenCalledWith('SIGKILL');
-      // Then process group kill should be attempted to reap descendants
-      expect(mockProcessKill).toHaveBeenCalledWith(-1234, 'SIGKILL');
-    });
   });
 });

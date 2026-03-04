@@ -90,13 +90,6 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
             // Ignore
           }
         }
-        // Also attempt a process group kill to reap any orphaned
-        // descendant processes that survive the PTY session leader kill.
-        try {
-          process.kill(-pid, 'SIGKILL');
-        } catch {
-          // Ignore — group may not exist or already exited
-        }
       } else {
         try {
           process.kill(pid, 'SIGKILL');
