@@ -72,6 +72,7 @@
         "renderCoreMandates",
         "renderPrimaryWorkflows",
         "renderOperationalGuidelines",
+        "renderSubAgents",
         "renderGitRepo"
       ]
     }
