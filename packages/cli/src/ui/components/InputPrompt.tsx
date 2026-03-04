@@ -394,7 +394,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmit = useCallback(
     (submittedValue: string) => {
-      const trimmedMessage = submittedValue.trim();
+      // Coerce to string to guard against non-string values.
+      const safeValue =
+        typeof submittedValue === 'string'
+          ? submittedValue
+          : String(submittedValue);
+      const trimmedMessage = safeValue.trim();
       const isSlash = isSlashCommand(trimmedMessage);
 
       const isShell = shellModeActive;

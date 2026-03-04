@@ -2441,6 +2441,25 @@ describe('loadCliConfig interactive', () => {
     expect(argv.query).toBeUndefined();
   });
 
+  it('should coerce non-string question to a string to prevent .trim() crash', async () => {
+    // When yargs returns a boolean for `-i` without a value, the question
+    // must still be a string so that downstream .trim() calls do not throw.
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    // Simulate yargs returning boolean `true` for promptInteractive
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (argv as any).promptInteractive = true;
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+    const question = config.getQuestion();
+    expect(typeof question).toBe('string');
+    expect(question).toBe('true');
+  });
+
   it('should handle extensions flag with positional arguments correctly', async () => {
     process.stdin.isTTY = true;
     process.argv = [

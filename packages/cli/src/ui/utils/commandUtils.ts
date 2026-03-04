@@ -32,7 +32,7 @@ const AT_COMMAND_DETECT_REGEX = new RegExp(
  * @returns True if the query looks like an '@' command, false otherwise.
  */
 export const isAtCommand = (query: string): boolean =>
-  AT_COMMAND_DETECT_REGEX.test(query);
+  AT_COMMAND_DETECT_REGEX.test(String(query));
 
 /**
  * Checks if a query string potentially represents an '/' command.
@@ -42,17 +42,18 @@ export const isAtCommand = (query: string): boolean =>
  * @returns True if the query looks like an '/' command, false otherwise.
  */
 export const isSlashCommand = (query: string): boolean => {
-  if (!query.startsWith('/')) {
+  const q = String(query);
+  if (!q.startsWith('/')) {
     return false;
   }
 
   // Exclude line comments that start with '//'
-  if (query.startsWith('//')) {
+  if (q.startsWith('//')) {
     return false;
   }
 
   // Exclude block comments that start with '/*'
-  if (query.startsWith('/*')) {
+  if (q.startsWith('/*')) {
     return false;
   }
 

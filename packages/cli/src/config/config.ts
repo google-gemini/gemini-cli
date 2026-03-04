@@ -541,7 +541,11 @@ export async function loadCliConfig(
     filePaths = result.filePaths;
   }
 
-  const question = argv.promptInteractive || argv.prompt || '';
+  // Coerce to string to prevent crashes when yargs returns a non-string
+  // value (e.g. boolean `true` for `gemini -i` without an argument).
+  const rawQuestion = argv.promptInteractive || argv.prompt || '';
+  const question =
+    typeof rawQuestion === 'string' ? rawQuestion : String(rawQuestion);
 
   // Determine approval mode with backward compatibility
   let approvalMode: ApprovalMode;

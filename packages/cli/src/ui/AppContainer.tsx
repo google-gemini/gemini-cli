@@ -1253,6 +1253,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const handleFinalSubmit = useCallback(
     async (submittedValue: string) => {
+      // Coerce to string to guard against non-string values (e.g. boolean
+      // from yargs when `gemini -i` is used without an argument).
+      const safeValue =
+        typeof submittedValue === 'string'
+          ? submittedValue
+          : String(submittedValue);
       reset();
       // Explicitly hide the expansion hint and clear its x-second timer when a new turn begins.
       triggerExpandHint(null);
@@ -1263,7 +1269,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
       }
 
-      const isSlash = isSlashCommand(submittedValue.trim());
+      const isSlash = isSlashCommand(safeValue.trim());
       const isIdle = streamingState === StreamingState.Idle;
       const isAgentRunning =
         streamingState === StreamingState.Responding ||
@@ -1273,14 +1279,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
         ]);
 
       if (config.isModelSteeringEnabled() && isAgentRunning && !isSlash) {
-        handleHintSubmit(submittedValue);
-        addInput(submittedValue);
+        handleHintSubmit(safeValue);
+        addInput(safeValue);
         return;
       }
 
       if (isSlash || (isIdle && isMcpReady)) {
         if (!isSlash) {
-          const permissions = await checkPermissions(submittedValue, config);
+          const permissions = await checkPermissions(safeValue, config);
           if (permissions.length > 0) {
             setPermissionConfirmationRequest({
               files: permissions,
@@ -1291,14 +1297,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
                     config.getWorkspaceContext().addReadOnlyPath(p),
                   );
                 }
-                void submitQuery(submittedValue);
+                void submitQuery(safeValue);
               },
             });
-            addInput(submittedValue);
+            addInput(safeValue);
             return;
           }
         }
-        void submitQuery(submittedValue);
+        void submitQuery(safeValue);
       } else {
         // Check messageQueue.length === 0 to only notify on the first queued item
         if (isIdle && !isMcpReady && messageQueue.length === 0) {
@@ -1307,9 +1313,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
             'Waiting for MCP servers to initialize... Slash commands are still available and prompts will be queued.',
           );
         }
-        addMessage(submittedValue);
+        addMessage(safeValue);
       }
-      addInput(submittedValue); // Track input for up-arrow history
+      addInput(safeValue); // Track input for up-arrow history
     },
     [
       addMessage,

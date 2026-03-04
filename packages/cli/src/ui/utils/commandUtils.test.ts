@@ -195,6 +195,19 @@ describe('commandUtils', () => {
       expect(isAtCommand('\\@file')).toBe(false);
     });
 
+    it('should handle non-string inputs gracefully', () => {
+      // When yargs returns a boolean (e.g. `gemini -i` without a value),
+      // the value may propagate as a non-string truthy value.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(isAtCommand(true as any)).toBe(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(isAtCommand(123 as any)).toBe(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(isAtCommand(undefined as any)).toBe(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(isAtCommand(null as any)).toBe(false);
+    });
+
     it('should return true for multi-line external editor prompts with @-references', () => {
       expect(isAtCommand('Please review:\n@src/main.py\nand fix bugs.')).toBe(
         true,
@@ -232,6 +245,19 @@ describe('commandUtils', () => {
       expect(isSlashCommand('/* This is a block comment */')).toBe(false);
       expect(isSlashCommand('/*\n * Multi-line comment\n */')).toBe(false);
       expect(isSlashCommand('/*comment without space*/')).toBe(false);
+    });
+
+    it('should handle non-string inputs gracefully', () => {
+      // When yargs returns a boolean (e.g. `gemini -i` without a value),
+      // the value may propagate as a non-string truthy value.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(isSlashCommand(true as any)).toBe(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(isSlashCommand(123 as any)).toBe(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(isSlashCommand(undefined as any)).toBe(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(isSlashCommand(null as any)).toBe(false);
     });
   });
 
