@@ -34,6 +34,8 @@ const chromeAvailable = (() => {
         'which google-chrome || which chromium-browser || which chromium',
         { stdio: 'ignore' },
       );
+    } else if (process.platform === 'win32') {
+      execSync('where chrome || where chromium', { stdio: 'ignore' });
     } else {
       return false;
     }
