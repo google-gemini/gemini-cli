@@ -13,6 +13,10 @@ vi.mock('../semantic-colors.js', () => ({
   theme: {
     ui: {
       gradient: ['red', 'blue'],
+      focus: 'green',
+    },
+    background: {
+      focus: 'darkgreen',
     },
     text: {
       accent: 'cyan',

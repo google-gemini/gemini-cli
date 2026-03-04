@@ -193,7 +193,7 @@ export function AuthDialog({
     return (
       <Box
         borderStyle="round"
-        borderColor={theme.border.focused}
+        borderColor={theme.ui.focus}
         flexDirection="row"
         padding={1}
         width="100%"
@@ -209,7 +209,7 @@ export function AuthDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={theme.border.focused}
+      borderColor={theme.ui.focus}
       flexDirection="row"
       padding={1}
       width="100%"

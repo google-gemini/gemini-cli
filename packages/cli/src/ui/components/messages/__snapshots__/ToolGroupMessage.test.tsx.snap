@@ -71,7 +71,7 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls incl
 │                                                                          │
 │ Test result                                                              │
 │                                                                          │
-│ ⊷  run_shell_command Run command                                         │
+│ ⊶  run_shell_command Run command                                         │
 │                                                                          │
 │ Test result                                                              │
 ╰──────────────────────────────────────────────────────────────────────────╯

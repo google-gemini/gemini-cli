@@ -89,7 +89,7 @@ exports[`ThemeDialog Snapshots > should render correctly in scope selector mode 
 "
 `;
 
-exports[`ThemeDialog Snapshots > should render correctly in theme selection mode 1`] = `
+exports[`ThemeDialog Snapshots > should render correctly in theme selection mode (isDevelopment: false) 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │ > Select Theme                               Preview                                             │
@@ -107,6 +107,93 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │   11. Ayu Light                              │                                                 │ │
 │   12. Default Light                          └─────────────────────────────────────────────────┘ │
 │ ▼                                                                                                │
+│                                                                                                  │
+│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`ThemeDialog Snapshots > should render correctly in theme selection mode (isDevelopment: true) 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│ > Select Theme                               Preview                                             │
+│ ▲                                            ┌─────────────────────────────────────────────────┐ │
+│ ●  1. ANSI Dark (Matches terminal)           │                                                 │ │
+│    2. Atom One Dark                          │ 1 # function                                    │ │
+│    3. Ayu Dark                               │ 2 def fibonacci(n):                             │ │
+│    4. Default Dark                           │ 3     a, b = 0, 1                               │ │
+│    5. Dracula Dark                           │ 4     for _ in range(n):                        │ │
+│    6. GitHub Dark                            │ 5         a, b = b, a + b                       │ │
+│    7. Holiday Dark                           │ 6     return a                                  │ │
+│    8. Shades Of Purple Dark                  │                                                 │ │
+│    9. Solarized Dark                         │ 1 - print("Hello, " + name)                     │ │
+│   10. ANSI Light                             │ 1 + print(f"Hello, {name}!")                    │ │
+│   11. Ayu Light                              │                                                 │ │
+│   12. Default Light                          └─────────────────────────────────────────────────┘ │
+│ ▼                                                                                                │
+│                                              ╭─────────────────────────────────────────────────╮ │
+│                                              │ DEVELOPER TOOLS (Not visible to users)          │ │
+│                                              │                                                 │ │
+│                                              │ How do colors get applied?                      │ │
+│                                              │   • Hex: Rendered exactly by modern terminals.  │ │
+│                                              │   Not overridden by app themes.                 │ │
+│                                              │   • Blank: Uses your terminal's default         │ │
+│                                              │   foreground/background.                        │ │
+│                                              │   • Compatibility: On older terminals, hex is   │ │
+│                                              │   approximated to the nearest ANSI color.       │ │
+│                                              │   • ANSI Names: 'red', 'green', etc. are mapped │ │
+│                                              │   to your terminal app's palette.               │ │
+│                                              │                                                 │ │
+│                                              │  Value     Name                                 │ │
+│                                              │   #1E1E…  backgroun Main terminal background    │ │
+│                                              │           d.primary color                       │ │
+│                                              │   #313…  backgroun  Subtle background for       │ │
+│                                              │          d.message  message blocks              │ │
+│                                              │   #313…   backgroun Background for the input    │ │
+│                                              │           d.input   prompt                      │ │
+│                                              │   #39…   background. Background highlight for   │ │
+│                                              │          focus       selected/focused items     │ │
+│                                              │   #283…  backgrou Background for added lines    │ │
+│                                              │          nd.diff. in diffs                      │ │
+│                                              │          added                                  │ │
+│                                              │   #430…  backgroun Background for removed       │ │
+│                                              │          d.diff.re lines in diffs               │ │
+│                                              │          moved                                  │ │
+│                                              │  (blank text.prim  Primary text color (uses     │ │
+│                                              │  )      ary        terminal default if blank)   │ │
+│                                              │  #6C7086  text.secon Secondary/dimmed text      │ │
+│                                              │           dary       color                      │ │
+│                                              │  #89B4FA text.link Hyperlink and highlighting   │ │
+│                                              │                    color                        │ │
+│                                              │  #CBA6F7  text.accen Accent color for           │ │
+│                                              │           t          emphasis                   │ │
+│                                              │  (blank) text.res  Color for model response     │ │
+│                                              │          ponse     text (uses terminal default  │ │
+│                                              │                    if blank)                    │ │
+│                                              │  #3d3f51   border.def Standard border color     │ │
+│                                              │            ault                                 │ │
+│                                              │  #6C7086ui.comme  Color for code comments and   │ │
+│                                              │         nt        metadata                      │ │
+│                                              │  #6C708 ui.symbol Color for technical symbols   │ │
+│                                              │  6                and UI icons                  │ │
+│                                              │  #89B4F ui.active Border color for active or    │ │
+│                                              │  A                running elements              │ │
+│                                              │  #3d3f5 ui.dark    Deeply dimmed color for      │ │
+│                                              │  1                 subtle UI elements           │ │
+│                                              │  #A6E3A ui.focus   Color for focused elements   │ │
+│                                              │  1                 (e.g. selected menu items,   │ │
+│                                              │                    focused borders)             │ │
+│                                              │  #F38BA8status.err Color for error messages     │ │
+│                                              │         or         and critical status          │ │
+│                                              │  #A6E3A1status.suc Color for success messages   │ │
+│                                              │         cess       and positive status          │ │
+│                                              │  #F9E2A status.wa Color for warnings and        │ │
+│                                              │  F      rning     cautionary status             │ │
+│                                              │  #4796E4   ui.gradien                           │ │
+│                                              │  #847ACE   t                                    │ │
+│                                              │  #C3677F                                        │ │
+│                                              ╰─────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
