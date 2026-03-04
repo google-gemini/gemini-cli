@@ -315,6 +315,8 @@ export interface BrowserAgentCustomConfig {
   profilePath?: string;
   /** Model override for the visual agent. */
   visualModel?: string;
+  /** Disable user input on the browser window during automation. Default: true in non-headless mode */
+  disableUserInput?: boolean;
 }
 
 /**
@@ -2745,6 +2747,7 @@ export class Config implements McpContext {
         headless: customConfig.headless ?? false,
         profilePath: customConfig.profilePath,
         visualModel: customConfig.visualModel,
+        disableUserInput: customConfig.disableUserInput,
       },
     };
   }

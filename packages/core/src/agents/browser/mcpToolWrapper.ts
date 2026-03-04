@@ -30,6 +30,8 @@ import {
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { BrowserManager, McpToolCallResult } from './browserManager.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import type { Config } from '../../config/config.js';
+import { injectInputBlocker } from './inputBlocker.js';
 
 /**
  * Tool invocation that dispatches to BrowserManager's isolated MCP client.
@@ -310,6 +312,60 @@ class McpDeclarativeTool extends DeclarativeTool<
   }
 }
 
+class NavigationMcpToolInvocation extends McpToolInvocation {
+  constructor(
+    private readonly navBrowserManager: BrowserManager,
+    toolName: string,
+    params: Record<string, unknown>,
+    messageBus: MessageBus,
+    private readonly config: Config,
+  ) {
+    super(navBrowserManager, toolName, params, messageBus);
+  }
+
+  override async execute(signal: AbortSignal): Promise<ToolResult> {
+    const result = await super.execute(signal);
+
+    const browserConfig = this.config.getBrowserAgentConfig();
+    const shouldDisableInput =
+      browserConfig.customConfig?.disableUserInput !== false &&
+      !browserConfig.customConfig?.headless;
+
+    if (shouldDisableInput) {
+      setTimeout(async () => {
+        await injectInputBlocker(this.navBrowserManager);
+      }, 500);
+    }
+
+    return result;
+  }
+}
+
+class NavigationMcpDeclarativeTool extends McpDeclarativeTool {
+  constructor(
+    private readonly navBrowserManager: BrowserManager,
+    private readonly config: Config,
+    name: string,
+    description: string,
+    parameterSchema: unknown,
+    private readonly msgBus: MessageBus,
+  ) {
+    super(navBrowserManager, name, description, parameterSchema, msgBus);
+  }
+
+  override build(
+    params: Record<string, unknown>,
+  ): ToolInvocation<Record<string, unknown>, ToolResult> {
+    return new NavigationMcpToolInvocation(
+      this.navBrowserManager,
+      this.name,
+      params,
+      this.msgBus,
+      this.config,
+    );
+  }
+}
+
 /**
  * DeclarativeTool for the custom type_text composite tool.
  */
@@ -384,6 +440,7 @@ class TypeTextDeclarativeTool extends DeclarativeTool<
 export async function createMcpDeclarativeTools(
   browserManager: BrowserManager,
   messageBus: MessageBus,
+  config: Config,
 ): Promise<Array<McpDeclarativeTool | TypeTextDeclarativeTool>> {
   // Get dynamically discovered tools from the MCP server
   const mcpTools = await browserManager.getDiscoveredTools();
@@ -400,6 +457,18 @@ export async function createMcpDeclarativeTools(
         mcpTool.name,
         mcpTool.description ?? '',
       );
+      const navigationTools = new Set(['navigate_page', 'new_page']);
+      if (navigationTools.has(mcpTool.name)) {
+        return new NavigationMcpDeclarativeTool(
+          browserManager,
+          config,
+          mcpTool.name,
+          augmentedDescription,
+          schema.parametersJsonSchema,
+          messageBus,
+        );
+      }
+
       return new McpDeclarativeTool(
         browserManager,
         mcpTool.name,
