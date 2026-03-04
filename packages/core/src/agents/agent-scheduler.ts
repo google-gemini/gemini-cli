@@ -12,7 +12,7 @@ import type {
 } from '../scheduler/types.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { EditorType } from '../utils/editor.js';
-import { ApprovalMode } from '../policy/types.js';
+import type { ApprovalMode } from '../policy/types.js';
 
 /**
  * Options for scheduling agent tools.
@@ -68,8 +68,8 @@ export async function scheduleAgentTools(
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     agentConfig.getApprovalMode = () => override.approvalMode as ApprovalMode;
   } else {
-    // Subagents operate in YOLO mode by default, unless overridden.
-    agentConfig.getApprovalMode = () => ApprovalMode.YOLO;
+    // Subagents follow the global approval mode by default.
+    agentConfig.getApprovalMode = () => config.getApprovalMode();
   }
 
   const scheduler = new Scheduler({
