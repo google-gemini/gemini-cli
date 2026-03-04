@@ -253,9 +253,13 @@ export class MCPOAuthProvider {
     tokenUrl: string,
     mcpServerUrl?: string,
   ): Promise<OAuthTokenResponse> {
+    if (!config.clientId) {
+      throw new Error('Missing required clientId for token refresh');
+    }
+
     return refreshAccessTokenShared(
       {
-        clientId: config.clientId!,
+        clientId: config.clientId,
         clientSecret: config.clientSecret,
         scopes: config.scopes,
         audiences: config.audiences,
