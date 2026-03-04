@@ -36,9 +36,34 @@ export const generateCommand: SlashCommand = {
     let overwrite = false;
     let dryRun = false;
 
-    // Use a basic regex or split to parse args. Actually, minimist or simple splitting is fine.
-    // A simple parsing logic since instruction can have spaces and quotes.
-    const parts = argsTrimmed.split(/\s+/);
+    // Parse arguments handling quotes and escapes
+    const parts: string[] = [];
+    let currentPart = '';
+    let inQuote: '"' | "'" | null = null;
+    let isEscaped = false;
+
+    for (const char of argsTrimmed) {
+      if (isEscaped) {
+        currentPart += char;
+        isEscaped = false;
+      } else if (char === '\\') {
+        isEscaped = true;
+      } else if (inQuote === char) {
+        inQuote = null;
+      } else if (!inQuote && (char === '"' || char === "'")) {
+        inQuote = char;
+      } else if (!inQuote && /\s/.test(char)) {
+        if (currentPart.length > 0) {
+          parts.push(currentPart);
+          currentPart = '';
+        }
+      } else {
+        currentPart += char;
+      }
+    }
+    if (currentPart.length > 0) {
+      parts.push(currentPart);
+    }
 
     // Extract flags from the end
     while (parts.length > 0) {

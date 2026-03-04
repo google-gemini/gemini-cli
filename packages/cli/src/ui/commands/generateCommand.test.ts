@@ -159,4 +159,25 @@ describe('generateCommand', () => {
       'utf-8',
     );
   });
+
+  it('correctly parses arguments containing spaces with quotes', async () => {
+    vi.mocked(fs.access).mockRejectedValueOnce(new Error('File not found'));
+    vi.mocked(fs.mkdir).mockResolvedValueOnce(undefined);
+    vi.mocked(fs.writeFile).mockResolvedValueOnce(undefined);
+
+    mockGenerateContent.mockResolvedValueOnce({
+      text: 'button code',
+    });
+
+    await generateCommand.action!(
+      context,
+      '"create a button" "src/my button.tsx"',
+    );
+
+    expect(fs.writeFile).toHaveBeenCalledWith(
+      expect.stringContaining('my button.tsx'),
+      'button code',
+      'utf-8',
+    );
+  });
 });
