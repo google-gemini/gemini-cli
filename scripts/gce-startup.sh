@@ -24,6 +24,9 @@ if [ -z "$GEMINI_API_KEY" ]; then
 fi
 echo "API key loaded (${#GEMINI_API_KEY} chars)"
 
+# Stop old services before rebuilding (prevents TUI noise flooding serial)
+systemctl stop forever-agent chat-bridge 2>/dev/null || true
+
 # Install Node.js + screen (first boot only)
 if ! command -v node &>/dev/null; then
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
