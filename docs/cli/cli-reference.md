@@ -8,7 +8,7 @@ and parameters.
 | Command                            | Description                        | Example                                                      |
 | ---------------------------------- | ---------------------------------- | ------------------------------------------------------------ |
 | `gemini`                           | Start interactive REPL             | `gemini`                                                     |
-| `gemini "query"`                   | Query non-interactively, then exit | `gemini "explain this project"`                              |
+| `gemini -p "query"`                | Query non-interactively, then exit | `gemini -p "explain this project"`                           |
 | `cat file \| gemini`               | Process piped content              | `cat logs.txt \| gemini`<br>`Get-Content logs.txt \| gemini` |
 | `gemini -i "query"`                | Execute and continue interactively | `gemini -i "What is the purpose of this project?"`           |
 | `gemini -r "latest"`               | Continue most recent session       | `gemini -r "latest"`                                         |
@@ -32,7 +32,7 @@ and parameters.
 | `--version`                      | `-v`  | -       | -         | Show CLI version number and exit                                                                                                                                       |
 | `--help`                         | `-h`  | -       | -         | Show help information                                                                                                                                                  |
 | `--model`                        | `-m`  | string  | `auto`    | Model to use. See [Model Selection](#model-selection) for available values.                                                                                            |
-| `--prompt`                       | `-p`  | string  | -         | Prompt text. Appended to stdin input if provided. **Deprecated:** Use positional arguments instead.                                                                    |
+| `--prompt`                       | `-p`  | string  | -         | Prompt text for non-interactive execution. Appended to stdin input if provided.                                                                                        |
 | `--prompt-interactive`           | `-i`  | string  | -         | Execute prompt and continue in interactive mode                                                                                                                        |
 | `--sandbox`                      | `-s`  | boolean | `false`   | Run in a sandboxed environment for safer execution                                                                                                                     |
 | `--approval-mode`                | -     | string  | `default` | Approval mode for tool execution. Choices: `default`, `auto_edit`, `yolo`                                                                                              |
