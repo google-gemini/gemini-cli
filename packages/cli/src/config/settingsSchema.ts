@@ -376,6 +376,16 @@ const SETTINGS_SCHEMA = {
             description: `Minimum retention period (safety limit, defaults to "${DEFAULT_MIN_RETENTION}")`,
             showInDialog: false,
           },
+          warningAcknowledged: {
+            type: 'boolean',
+            label: 'Warning Acknowledged',
+            category: 'General',
+            requiresRestart: false,
+            default: false as boolean,
+            description:
+              'Whether the user has acknowledged the session retention warning',
+            showInDialog: false,
+          },
         },
         description: 'Settings for automatic session cleanup.',
       },

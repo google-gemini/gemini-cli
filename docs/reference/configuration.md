@@ -175,6 +175,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Minimum retention period (safety limit, defaults to "1d")
   - **Default:** `"1d"`
 
+- **`general.sessionRetention.warningAcknowledged`** (boolean):
+  - **Description:** Whether the user has acknowledged the session retention
+    warning
+  - **Default:** `false`
+
 #### `output`
 
 - **`output.format`** (enum):

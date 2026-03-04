@@ -385,4 +385,8 @@ export class Storage {
   getHistoryFilePath(): string {
     return path.join(this.getProjectTempDir(), 'shell_history');
   }
+
+  getKnowledgeDir(): string {
+    return path.join(this.getGeminiDir(), 'knowledge');
+  }
 }

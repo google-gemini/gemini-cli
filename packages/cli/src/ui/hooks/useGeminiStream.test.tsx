@@ -297,8 +297,13 @@ describe('useGeminiStream', () => {
     })),
     getIdeMode: vi.fn(() => false),
     getEnableHooks: vi.fn(() => false),
+    getIsForeverMode: vi.fn(() => false),
+    getSisyphusMode: vi.fn(() => ({
+      enabled: false,
+      idleTimeout: 1,
+      prompt: 'continue workflow',
+    })),
   } as unknown as Config;
-
   beforeEach(() => {
     vi.clearAllMocks(); // Clear mocks before each test
     mockAddItem = vi.fn();

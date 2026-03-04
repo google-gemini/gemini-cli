@@ -76,6 +76,10 @@ vi.mock('fs', async (importOriginal) => {
       isDirectory: vi.fn().mockReturnValue(true),
     }),
     realpathSync: vi.fn((path) => path),
+    promises: {
+      ...actual.promises,
+      mkdir: vi.fn().mockResolvedValue(undefined),
+    },
   };
 });
 
@@ -270,6 +274,11 @@ describe('Server Config (config.ts)', () => {
     sessionId: SESSION_ID,
     model: MODEL,
     usageStatisticsEnabled: false,
+    sisyphusMode: {
+      enabled: false,
+      idleTimeout: 1,
+      prompt: 'continue workflow',
+    },
   };
 
   describe('maxAttempts', () => {
@@ -1884,6 +1893,11 @@ describe('BaseLlmClient Lifecycle', () => {
     sessionId: SESSION_ID,
     model: MODEL,
     usageStatisticsEnabled: false,
+    sisyphusMode: {
+      enabled: false,
+      idleTimeout: 1,
+      prompt: 'continue workflow',
+    },
   };
 
   it('should throw an error if getBaseLlmClient is called before refreshAuth', () => {
@@ -1939,6 +1953,11 @@ describe('Generation Config Merging (HACK)', () => {
     sessionId: SESSION_ID,
     model: MODEL,
     usageStatisticsEnabled: false,
+    sisyphusMode: {
+      enabled: false,
+      idleTimeout: 1,
+      prompt: 'continue workflow',
+    },
   };
 
   it('should merge default aliases when user provides only overrides', () => {
@@ -3173,5 +3192,44 @@ describe('Model Persistence Bug Fix (#19864)', () => {
     // Verify onModelChange was called to persist the model
     expect(onModelChange).toHaveBeenCalledWith(PREVIEW_GEMINI_3_1_MODEL);
     expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
+  });
+});
+
+describe('Config hippocampus in-memory storage', () => {
+  let config: Config;
+
+  beforeEach(() => {
+    config = new Config({
+      targetDir: '/tmp/test',
+      sessionId: 'test-session',
+      model: 'gemini-2.0-flash',
+      debugMode: false,
+      cwd: '/tmp/test',
+    });
+  });
+
+  it('should return empty string when no entries exist', () => {
+    expect(config.getHippocampusContent()).toBe('');
+  });
+
+  it('should append and retrieve entries', () => {
+    config.appendHippocampusEntry('[00:00:01] - fact one\n');
+    config.appendHippocampusEntry('[00:00:02] - fact two\n');
+    expect(config.getHippocampusContent()).toBe(
+      '[00:00:01] - fact one\n[00:00:02] - fact two\n',
+    );
+  });
+
+  it('should enforce max entries limit by dropping oldest', () => {
+    for (let i = 0; i < 55; i++) {
+      config.appendHippocampusEntry(`[entry-${i}]\n`);
+    }
+    const content = config.getHippocampusContent();
+    // Oldest 5 entries (0-4) should have been dropped
+    expect(content).not.toContain('[entry-0]');
+    expect(content).not.toContain('[entry-4]');
+    // Entry 5 onward should remain
+    expect(content).toContain('[entry-5]');
+    expect(content).toContain('[entry-54]');
   });
 });

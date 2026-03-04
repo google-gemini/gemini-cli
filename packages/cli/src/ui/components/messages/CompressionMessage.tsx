@@ -27,6 +27,7 @@ export function CompressionMessage({
 
   const originalTokens = originalTokenCount ?? 0;
   const newTokens = newTokenCount ?? 0;
+  const archivePath = compression.archivePath;
 
   const getCompressionText = () => {
     if (isPending) {
@@ -36,6 +37,8 @@ export function CompressionMessage({
     switch (compressionStatus) {
       case CompressionStatus.COMPRESSED:
         return `Chat history compressed from ${originalTokens} to ${newTokens} tokens.`;
+      case CompressionStatus.ARCHIVED:
+        return `Chat history archived to ${archivePath} (${originalTokens} to ${newTokens} tokens).`;
       case CompressionStatus.COMPRESSION_FAILED_INFLATED_TOKEN_COUNT:
         // For smaller histories (< 50k tokens), compression overhead likely exceeds benefits
         if (originalTokens < 50000) {

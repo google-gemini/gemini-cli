@@ -259,6 +259,15 @@ Result:
 ${output.result}
 `;
 
+      // After confucius completes in forever mode, refresh system instruction
+      // so GEMINI.md updates are immediately visible to the main conversation.
+      if (
+        this.definition.name === 'confucius' &&
+        this.config.getIsForeverMode()
+      ) {
+        this.config.updateSystemInstructionIfInitialized();
+      }
+
       return {
         llmContent: [{ text: resultContent }],
         returnDisplay: displayContent,

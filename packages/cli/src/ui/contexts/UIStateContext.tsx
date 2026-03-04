@@ -227,6 +227,8 @@ export interface UIState {
     text: string;
     type: TransientMessageType;
   } | null;
+  sisyphusSecondsRemaining: number | null;
+  a2aListenerPort: number | null;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);
