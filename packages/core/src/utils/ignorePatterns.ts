@@ -47,6 +47,19 @@ export const BINARY_FILE_PATTERNS: string[] = [
   '**/*.odt',
   '**/*.ods',
   '**/*.odp',
+  '**/*.xz',
+  '**/*.zst',
+  '**/*.lz4',
+  '**/*.sqlite',
+  '**/*.db',
+  '**/*.mdb',
+  '**/*.iso',
+  '**/*.img',
+  '**/*.dmg',
+  '**/*.ttf',
+  '**/*.otf',
+  '**/*.woff',
+  '**/*.woff2',
 ];
 
 /**
@@ -62,6 +75,14 @@ export const MEDIA_FILE_PATTERNS: string[] = [
   '**/*.webp',
   '**/*.bmp',
   '**/*.svg',
+  '**/*.mp3',
+  '**/*.mp4',
+  '**/*.wav',
+  '**/*.avi',
+  '**/*.mov',
+  '**/*.flac',
+  '**/*.ogg',
+  '**/*.mkv',
 ];
 
 /**
