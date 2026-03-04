@@ -1252,13 +1252,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
   );
 
   const handleFinalSubmit = useCallback(
-    async (submittedValue: string) => {
+    async (submittedValue: unknown) => {
       // Coerce to string to guard against non-string values (e.g. boolean
       // from yargs when `gemini -i` is used without an argument).
-      const safeValue =
-        typeof submittedValue === 'string'
-          ? submittedValue
-          : String(submittedValue);
+      const safeValue = String(submittedValue);
       reset();
       // Explicitly hide the expansion hint and clear its x-second timer when a new turn begins.
       triggerExpandHint(null);
