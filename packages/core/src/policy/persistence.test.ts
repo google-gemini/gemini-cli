@@ -281,7 +281,9 @@ decision = "deny"
       writeFile: vi.fn().mockRejectedValue(new Error('Disk full')),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    vi.mocked(fs.open).mockResolvedValue(mockFileHandle);
+    vi.mocked(fs.open).mockResolvedValue(
+      mockFileHandle as unknown as fs.FileHandle,
+    );
     vi.mocked(fs.unlink).mockResolvedValue(undefined);
 
     await messageBus.publish({
@@ -351,7 +353,10 @@ decision = "deny"
       writeFile: vi.fn().mockResolvedValue(undefined),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    vi.mocked(fs.open).mockResolvedValue(mockFileHandle);
+    vi.mocked(fs.open).mockResolvedValue(
+      mockFileHandle as unknown as fs.FileHandle,
+    );
+    // Simulate cross-device link error
     vi.mocked(fs.rename).mockRejectedValue(
       makeNodeError('EXDEV: cross-device link not permitted', 'EXDEV'),
     );
