@@ -80,6 +80,7 @@ import {
   type ConsentRequestPayload,
   type AgentsDiscoveredPayload,
   ChangeAuthRequestedError,
+  ProjectIdRequiredError,
   CoreToolCallStatus,
   generateSteeringAckMessage,
   buildUserSteeringHintPrompt,
@@ -769,6 +770,12 @@ export const AppContainer = (props: AppContainerProps) => {
           );
         } catch (e) {
           if (e instanceof ChangeAuthRequestedError) {
+            return;
+          }
+          if (e instanceof ProjectIdRequiredError) {
+            // OAuth succeeded but account setup requires project ID
+            // Show the error message directly without "Failed to authenticate" prefix
+            onAuthError(getErrorMessage(e));
             return;
           }
           onAuthError(
