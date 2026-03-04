@@ -8,7 +8,7 @@ and parameters.
 | Command                            | Description                        | Example                                                      |
 | ---------------------------------- | ---------------------------------- | ------------------------------------------------------------ |
 | `gemini`                           | Start interactive REPL             | `gemini`                                                     |
-| `gemini "query"`                   | Query non-interactively, then exit | `gemini "explain this project"`                              |
+| `gemini -p "query"`                | Query non-interactively, then exit | `gemini -p "explain this project"`                           |
 | `cat file \| gemini`               | Process piped content              | `cat logs.txt \| gemini`<br>`Get-Content logs.txt \| gemini` |
 | `gemini -i "query"`                | Execute and continue interactively | `gemini -i "What is the purpose of this project?"`           |
 | `gemini -r "latest"`               | Continue most recent session       | `gemini -r "latest"`                                         |

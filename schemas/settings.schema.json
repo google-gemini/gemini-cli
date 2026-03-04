@@ -1248,6 +1248,13 @@
               "default": true,
               "type": "boolean"
             },
+            "maxFileCount": {
+              "title": "Max File Count",
+              "description": "Maximum number of files to index for autocomplete and search. Defaults to 20,000.",
+              "markdownDescription": "Maximum number of files to index for autocomplete and search. Defaults to 20,000.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `20000`",
+              "default": 20000,
+              "type": "number"
+            },
             "enableRecursiveFileSearch": {
               "title": "Enable Recursive File Search",
               "description": "Enable recursive file search functionality when completing @ references in the prompt.",
