@@ -94,9 +94,7 @@ const INTERNAL_INJECT_STYLES_JS = `
   if (!document.getElementById(styleId)) {
     const style = document.createElement('style');
     style.id = styleId;
-    style.textContent = \\\`
-      ${STATIC_KEYFRAMES.replace(/`/g, '\\`').replace(/\n/g, ' ')}
-    \\\`;
+    style.textContent = ${JSON.stringify(STATIC_KEYFRAMES)};
     document.head.appendChild(style);
   }
 `.trim();
