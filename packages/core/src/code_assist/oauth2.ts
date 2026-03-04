@@ -226,6 +226,13 @@ async function initOauthClient(
   }
 
   if (config.isBrowserLaunchSuppressed()) {
+    if (!config.isInteractive()) {
+      throw new FatalAuthenticationError(
+        'Manual authorization is required but the current session is non-interactive. ' +
+          'Please run the Gemini CLI in an interactive terminal to log in, ' +
+          'provide a GEMINI_API_KEY, or ensure Application Default Credentials are configured.',
+      );
+    }
     let success = false;
     const maxRetries = 2;
     // Enter alternate buffer
@@ -412,14 +419,24 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         '\n\n',
     );
 
-    const code = await new Promise<string>((resolve, _) => {
+    const code = await new Promise<string>((resolve, reject) => {
       const rl = readline.createInterface({
         input: process.stdin,
         output: createWorkingStdio().stdout,
         terminal: true,
       });
 
+      const timeout = setTimeout(() => {
+        rl.close();
+        reject(
+          new FatalAuthenticationError(
+            'Authorization timed out after 5 minutes.',
+          ),
+        );
+      }, 300000); // 5 minute timeout
+
       rl.question('Enter the authorization code: ', (code) => {
+        clearTimeout(timeout);
         rl.close();
         resolve(code.trim());
       });
