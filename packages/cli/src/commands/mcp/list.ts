@@ -17,6 +17,10 @@ import {
 } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
+import {
+  canLoadServer,
+  McpServerEnablementManager,
+} from '../../config/mcp/index.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
@@ -136,6 +140,26 @@ async function getServerStatus(
   serverName: string,
   server: MCPServerConfig,
 ): Promise<MCPServerStatus> {
+  const settings = loadSettings();
+  const mcpEnablementManager = McpServerEnablementManager.getInstance();
+  const loadResult = await canLoadServer(serverName, {
+    adminMcpEnabled: settings.merged.admin?.mcp?.enabled ?? true,
+    allowedList: settings.merged.mcp?.allowed,
+    excludedList: settings.merged.mcp?.excluded,
+    enablement: mcpEnablementManager.getEnablementCallbacks(),
+  });
+
+  if (!loadResult.allowed) {
+    if (
+      loadResult.blockType === 'admin' ||
+      loadResult.blockType === 'allowlist' ||
+      loadResult.blockType === 'excludelist'
+    ) {
+      return MCPServerStatus.BLOCKED;
+    }
+    return MCPServerStatus.DISABLED;
+  }
+
   // Test all server types by attempting actual connection
   return testMCPConnection(serverName, server);
 }
@@ -177,6 +201,14 @@ export async function listMcpServers(settings?: MergedSettings): Promise<void> {
       case MCPServerStatus.CONNECTING:
         statusIndicator = chalk.yellow('…');
         statusText = 'Connecting';
+        break;
+      case MCPServerStatus.BLOCKED:
+        statusIndicator = chalk.red('⛔');
+        statusText = 'Blocked';
+        break;
+      case MCPServerStatus.DISABLED:
+        statusIndicator = chalk.gray('○');
+        statusText = 'Disabled';
         break;
       case MCPServerStatus.DISCONNECTED:
       default:

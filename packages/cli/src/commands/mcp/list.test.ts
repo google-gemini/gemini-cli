@@ -19,6 +19,7 @@ import { createTransport, debugLogger } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionStorage } from '../../config/extensions/storage.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
+import { McpServerEnablementManager } from '../../config/mcp/index.js';
 
 vi.mock('../../config/settings.js', async (importOriginal) => {
   const actual =
@@ -54,6 +55,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       })),
       {
         getGlobalSettingsPath: () => '/tmp/gemini/settings.json',
+        getGlobalGeminiDir: () => '/tmp/gemini',
       },
     ),
     GEMINI_DIR: '.gemini',
@@ -96,6 +98,12 @@ describe('mcp list command', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
+    McpServerEnablementManager.resetInstance();
+    // Use a mock for isFileEnabled to avoid reading real files
+    vi.spyOn(
+      McpServerEnablementManager.prototype,
+      'isFileEnabled',
+    ).mockResolvedValue(true);
 
     mockTransport = { close: vi.fn() };
     mockClient = {
@@ -303,5 +311,30 @@ describe('mcp list command', () => {
         'test-server: /test/server  (stdio) - Disconnected',
       ),
     );
+  });
+
+  it('should display blocked status for servers in excluded list', async () => {
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+    mockedLoadSettings.mockReturnValue({
+      merged: {
+        ...defaultMergedSettings,
+        mcp: {
+          excluded: ['blocked-server'],
+        },
+        mcpServers: {
+          'blocked-server': { command: '/test/server' },
+        },
+      },
+      isTrusted: true,
+    });
+
+    await listMcpServers();
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'blocked-server: /test/server  (stdio) - Blocked',
+      ),
+    );
+    expect(mockedCreateTransport).not.toHaveBeenCalled();
   });
 });
