@@ -485,8 +485,8 @@ export class SchedulerStateManager {
 
     if (isToolCallResponseInfo(reason)) {
       const finalResponse = { ...reason };
-      if (!finalResponse.resultDisplay && existingOutput) {
-        finalResponse.resultDisplay = existingOutput;
+      if (!finalResponse.resultDisplay) {
+        finalResponse.resultDisplay = resultDisplay ?? existingOutput;
       }
 
       return {
