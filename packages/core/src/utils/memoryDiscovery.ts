@@ -449,6 +449,7 @@ export function concatenateInstructions(
 
 export interface MemoryLoadResult {
   files: Array<{ path: string; content: string }>;
+  fileIdentities?: string[];
 }
 
 export async function getGlobalMemoryPaths(
@@ -742,6 +743,7 @@ export async function loadJitSubdirectoryMemory(
   trustedRoots: string[],
   alreadyLoadedPaths: Set<string>,
   debugMode: boolean = false,
+  alreadyLoadedIdentities?: Set<string>,
 ): Promise<MemoryLoadResult> {
   const resolvedTarget = normalizePath(targetPath);
   let bestRoot: string | null = null;
@@ -769,7 +771,7 @@ export async function loadJitSubdirectoryMemory(
         `JIT memory skipped: ${resolvedTarget} is not in any trusted root.`,
       );
     }
-    return { files: [] };
+    return { files: [], fileIdentities: [] };
   }
 
   if (debugMode) {
@@ -786,7 +788,7 @@ export async function loadJitSubdirectoryMemory(
   );
 
   if (potentialPaths.length === 0) {
-    return { files: [] };
+    return { files: [], fileIdentities: [] };
   }
 
   // deduplicate by file identity to handle case-insensitive filesystems
@@ -794,9 +796,10 @@ export async function loadJitSubdirectoryMemory(
   const { paths: deduplicatedNewPaths, identityMap: newPathsIdentityMap } =
     await deduplicatePathsByFileIdentity(potentialPaths, debugMode);
 
-  // get file identities of already loaded paths to compare against
-  const alreadyLoadedIdentities = new Set<string>();
-  if (alreadyLoadedPaths.size > 0) {
+  // Use cached file identities if provided, otherwise build from paths
+  // This avoids redundant fs.stat() calls on already loaded files
+  const cachedIdentities = alreadyLoadedIdentities ?? new Set<string>();
+  if (!alreadyLoadedIdentities && alreadyLoadedPaths.size > 0) {
     const CONCURRENT_LIMIT = 20;
     const alreadyLoadedArray = Array.from(alreadyLoadedPaths);
     const identityPromises: Array<Promise<void>> = [];
@@ -807,7 +810,7 @@ export async function loadJitSubdirectoryMemory(
         try {
           const stats = await fs.stat(filePath);
           const identityKey = `${stats.dev.toString()}:${stats.ino.toString()}`;
-          alreadyLoadedIdentities.add(identityKey);
+          cachedIdentities.add(identityKey);
         } catch {
           // ignore errors - if we can't stat it, we can't deduplicate by identity
         }
@@ -820,9 +823,10 @@ export async function loadJitSubdirectoryMemory(
   // filter out paths that match already loaded files by identity
   // reuse the identities from deduplicatePathsByFileIdentity to avoid redundant stat calls
   const newPaths: string[] = [];
+  const newFileIdentities: string[] = [];
   for (const filePath of deduplicatedNewPaths) {
     const identityKey = newPathsIdentityMap.get(filePath);
-    if (identityKey && alreadyLoadedIdentities.has(identityKey)) {
+    if (identityKey && cachedIdentities.has(identityKey)) {
       if (debugMode) {
         logger.debug(
           `jit memory: skipping ${filePath} (already loaded with different case)`,
@@ -832,10 +836,13 @@ export async function loadJitSubdirectoryMemory(
     }
     // if we don't have an identity (stat failed), include it to be safe
     newPaths.push(filePath);
+    if (identityKey) {
+      newFileIdentities.push(identityKey);
+    }
   }
 
   if (newPaths.length === 0) {
-    return { files: [] };
+    return { files: [], fileIdentities: [] };
   }
 
   if (debugMode) {
@@ -852,5 +859,6 @@ export async function loadJitSubdirectoryMemory(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         content: item.content as string,
       })),
+    fileIdentities: newFileIdentities,
   };
 }

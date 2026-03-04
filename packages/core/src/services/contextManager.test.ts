@@ -56,7 +56,10 @@ describe('ContextManager', () => {
     // default mock: deduplication returns paths as-is (no deduplication)
     vi.mocked(
       memoryDiscovery.deduplicatePathsByFileIdentity,
-    ).mockImplementation(async (paths: string[]) => paths);
+    ).mockImplementation(async (paths: string[]) => ({
+      paths,
+      identityMap: new Map<string, string>(),
+    }));
   });
 
   describe('refresh', () => {
@@ -148,7 +151,10 @@ describe('ContextManager', () => {
       // mock deduplication to return deduplicated paths (simulating same file)
       vi.mocked(
         memoryDiscovery.deduplicatePathsByFileIdentity,
-      ).mockResolvedValue(['/home/user/.gemini/GEMINI.md', '/app/gemini.md']);
+      ).mockResolvedValue({
+        paths: ['/home/user/.gemini/GEMINI.md', '/app/gemini.md'],
+        identityMap: new Map<string, string>(),
+      });
 
       vi.mocked(memoryDiscovery.readGeminiMdFiles).mockResolvedValue([
         { filePath: '/home/user/.gemini/GEMINI.md', content: 'Global Content' },
