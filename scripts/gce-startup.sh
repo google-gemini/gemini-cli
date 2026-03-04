@@ -157,8 +157,8 @@ WorkingDirectory=${WORK_DIR}
 ExecStart=/usr/local/bin/start-forever-agent.sh
 Restart=on-failure
 RestartSec=10
-StandardOutput=null
-StandardError=journal
+StandardOutput=journal
+StandardError=inherit
 
 [Install]
 WantedBy=multi-user.target
