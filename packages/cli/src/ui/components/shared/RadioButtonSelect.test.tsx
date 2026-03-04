@@ -27,6 +27,8 @@ vi.mock('./BaseSelectionList.js', () => ({
 vi.mock('../../semantic-colors.js', () => ({
   theme: {
     text: { secondary: 'COLOR_SECONDARY' },
+    ui: { focus: 'COLOR_FOCUS' },
+    background: { focus: 'COLOR_FOCUS_BG' },
   },
 }));
 
