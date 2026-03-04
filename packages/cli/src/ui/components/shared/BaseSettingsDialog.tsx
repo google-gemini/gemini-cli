@@ -187,12 +187,11 @@ export function BaseSettingsDialog({
     return () => clearInterval(interval);
   }, [editingKey]);
 
-  // Ensure focus stays on settings when scope selection is hidden
-  useEffect(() => {
-    if (!showScopeSelector && focusSection === 'scope') {
-      setFocusSection('settings');
-    }
-  }, [showScopeSelector, focusSection]);
+  // When the scope selector is hidden, treat any 'scope' focus as 'settings'.
+  // Derived on render rather than via an effect — effects are for subscribing
+  // to external systems, not computing values from existing state/props.
+  const effectiveFocusSection =
+    !showScopeSelector && focusSection === 'scope' ? 'settings' : focusSection;
 
   // Scope selector items
   const scopeItems = getScopeItems().map((item) => ({
@@ -228,16 +227,8 @@ export function BaseSettingsDialog({
     setEditCursorPos(0);
   }, [editingKey, editBuffer, currentItem, onEditCommit]);
 
-  // Handle scope highlight (for RadioButtonSelect)
-  const handleScopeHighlight = useCallback(
-    (scope: LoadableSettingScope) => {
-      onScopeChange?.(scope);
-    },
-    [onScopeChange],
-  );
-
-  // Handle scope select (for RadioButtonSelect)
-  const handleScopeSelect = useCallback(
+  // Single callback used for both onSelect and onHighlight on RadioButtonSelect
+  const handleScopeChange = useCallback(
     (scope: LoadableSettingScope) => {
       onScopeChange?.(scope);
     },
@@ -359,7 +350,7 @@ export function BaseSettingsDialog({
       }
 
       // Not in edit mode - handle navigation and actions
-      if (focusSection === 'settings') {
+      if (effectiveFocusSection === 'settings') {
         // Up/Down navigation with wrap-around
         if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
           const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
@@ -426,7 +417,7 @@ export function BaseSettingsDialog({
     },
     {
       isActive: true,
-      priority: focusSection === 'settings' && !editingKey,
+      priority: effectiveFocusSection === 'settings' && !editingKey,
     },
   );
 
@@ -443,10 +434,10 @@ export function BaseSettingsDialog({
         {/* Title */}
         <Box marginX={1}>
           <Text
-            bold={focusSection === 'settings' && !editingKey}
+            bold={effectiveFocusSection === 'settings' && !editingKey}
             wrap="truncate"
           >
-            {focusSection === 'settings' ? '> ' : '  '}
+            {effectiveFocusSection === 'settings' ? '> ' : '  '}
             {title}{' '}
           </Text>
         </Box>
@@ -458,7 +449,7 @@ export function BaseSettingsDialog({
             borderColor={
               editingKey
                 ? theme.border.default
-                : focusSection === 'settings'
+                : effectiveFocusSection === 'settings'
                   ? theme.ui.focus
                   : theme.border.default
             }
@@ -467,7 +458,7 @@ export function BaseSettingsDialog({
             marginTop={1}
           >
             <TextInput
-              focus={focusSection === 'settings' && !editingKey}
+              focus={effectiveFocusSection === 'settings' && !editingKey}
               buffer={searchBuffer}
               placeholder={searchPlaceholder}
             />
@@ -491,7 +482,8 @@ export function BaseSettingsDialog({
             {visibleItems.map((item, idx) => {
               const globalIndex = idx + scrollOffset;
               const isActive =
-                focusSection === 'settings' && activeIndex === globalIndex;
+                effectiveFocusSection === 'settings' &&
+                activeIndex === globalIndex;
 
               // Compute display value with edit mode cursor
               let displayValue: string;
@@ -603,19 +595,19 @@ export function BaseSettingsDialog({
         {/* Scope Selection */}
         {showScopeSelector && (
           <Box marginX={1} flexDirection="column">
-            <Text bold={focusSection === 'scope'} wrap="truncate">
-              {focusSection === 'scope' ? '> ' : '  '}Apply To
+            <Text bold={effectiveFocusSection === 'scope'} wrap="truncate">
+              {effectiveFocusSection === 'scope' ? '> ' : '  '}Apply To
             </Text>
             <RadioButtonSelect
               items={scopeItems}
               initialIndex={scopeItems.findIndex(
                 (item) => item.value === selectedScope,
               )}
-              onSelect={handleScopeSelect}
-              onHighlight={handleScopeHighlight}
-              isFocused={focusSection === 'scope'}
-              showNumbers={focusSection === 'scope'}
-              priority={focusSection === 'scope'}
+              onSelect={handleScopeChange}
+              onHighlight={handleScopeChange}
+              isFocused={effectiveFocusSection === 'scope'}
+              showNumbers={effectiveFocusSection === 'scope'}
+              priority={effectiveFocusSection === 'scope'}
             />
           </Box>
         )}
