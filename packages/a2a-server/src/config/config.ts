@@ -258,32 +258,59 @@ async function refreshAuthentication(
         `[${logPrefix}] USE_CCPA env var is true but unable to resolve GOOGLE_APPLICATION_CREDENTIALS file path ${adcFilePath}. Error ${e}`,
       );
     }
-    try {
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-    } catch (e) {
-      if (
-        e instanceof FatalAuthenticationError &&
-        (isCloudShell() || process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true')
-      ) {
-        logger.warn(
-          `[${logPrefix}] LOGIN_WITH_GOOGLE failed in non-interactive mode. Attempting COMPUTE_ADC fallback.`,
+
+    const useComputeAdc = process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true';
+    const isHeadless = isHeadlessMode();
+    const shouldSkipOauth = isHeadless || useComputeAdc;
+
+    if (shouldSkipOauth) {
+      if (isCloudShell() || useComputeAdc) {
+        logger.info(
+          `[${logPrefix}] Skipping LOGIN_WITH_GOOGLE due to ${isHeadless ? 'headless mode' : 'GEMINI_CLI_USE_COMPUTE_ADC'}. Attempting COMPUTE_ADC.`,
         );
         try {
           await config.refreshAuth(AuthType.COMPUTE_ADC);
-          logger.info(`[${logPrefix}] COMPUTE_ADC fallback successful.`);
+          logger.info(`[${logPrefix}] COMPUTE_ADC successful.`);
         } catch (adcError) {
-          logger.error(
-            `[${logPrefix}] COMPUTE_ADC fallback failed: ${adcError}`,
-          );
-          const originalMessage = e instanceof Error ? e.message : String(e);
           const adcMessage =
             adcError instanceof Error ? adcError.message : String(adcError);
           throw new FatalAuthenticationError(
-            `${originalMessage}. Fallback to COMPUTE_ADC also failed: ${adcMessage}`,
+            `COMPUTE_ADC failed: ${adcMessage}. (Skipped LOGIN_WITH_GOOGLE due to ${isHeadless ? 'headless mode' : 'GEMINI_CLI_USE_COMPUTE_ADC'})`,
           );
         }
       } else {
-        throw e;
+        throw new FatalAuthenticationError(
+          `Interactive terminal required for LOGIN_WITH_GOOGLE. Run in an interactive terminal or set GEMINI_CLI_USE_COMPUTE_ADC=true to use Application Default Credentials.`,
+        );
+      }
+    } else {
+      try {
+        await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      } catch (e) {
+        if (
+          e instanceof FatalAuthenticationError &&
+          (isCloudShell() || useComputeAdc)
+        ) {
+          logger.warn(
+            `[${logPrefix}] LOGIN_WITH_GOOGLE failed. Attempting COMPUTE_ADC fallback.`,
+          );
+          try {
+            await config.refreshAuth(AuthType.COMPUTE_ADC);
+            logger.info(`[${logPrefix}] COMPUTE_ADC fallback successful.`);
+          } catch (adcError) {
+            logger.error(
+              `[${logPrefix}] COMPUTE_ADC fallback failed: ${adcError}`,
+            );
+            const originalMessage = e instanceof Error ? e.message : String(e);
+            const adcMessage =
+              adcError instanceof Error ? adcError.message : String(adcError);
+            throw new FatalAuthenticationError(
+              `${originalMessage}. Fallback to COMPUTE_ADC also failed: ${adcMessage}`,
+            );
+          }
+        } else {
+          throw e;
+        }
       }
     }
     logger.info(

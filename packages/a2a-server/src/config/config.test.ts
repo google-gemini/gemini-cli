@@ -352,6 +352,7 @@ describe('loadConfig', () => {
 
       it('should fall back to COMPUTE_ADC in Cloud Shell if LOGIN_WITH_GOOGLE fails', async () => {
         vi.stubEnv('CLOUD_SHELL', 'true');
+        vi.mocked(isHeadlessMode).mockReturnValue(false);
         const refreshAuthMock = vi.fn().mockImplementation((authType) => {
           if (authType === AuthType.LOGIN_WITH_GOOGLE) {
             throw new FatalAuthenticationError('Non-interactive session');
@@ -382,6 +383,7 @@ describe('loadConfig', () => {
       });
 
       it('should not fall back to COMPUTE_ADC if not in cloud environment', async () => {
+        vi.mocked(isHeadlessMode).mockReturnValue(false);
         const refreshAuthMock = vi.fn().mockImplementation((authType) => {
           if (authType === AuthType.LOGIN_WITH_GOOGLE) {
             throw new FatalAuthenticationError('Non-interactive session');
@@ -410,6 +412,121 @@ describe('loadConfig', () => {
           AuthType.LOGIN_WITH_GOOGLE,
         );
         expect(refreshAuthMock).not.toHaveBeenCalledWith(AuthType.COMPUTE_ADC);
+      });
+
+      it('should skip LOGIN_WITH_GOOGLE and use COMPUTE_ADC directly in headless Cloud Shell', async () => {
+        vi.stubEnv('CLOUD_SHELL', 'true');
+        vi.mocked(isHeadlessMode).mockReturnValue(true);
+
+        const refreshAuthMock = vi.fn().mockResolvedValue(undefined);
+
+        vi.mocked(Config).mockImplementation(
+          (params: unknown) =>
+            ({
+              ...(params as object),
+              initialize: vi.fn(),
+              waitForMcpInit: vi.fn(),
+              refreshAuth: refreshAuthMock,
+              getExperiments: vi.fn().mockReturnValue({ flags: {} }),
+              getRemoteAdminSettings: vi.fn(),
+              setRemoteAdminSettings: vi.fn(),
+            }) as unknown as Config,
+        );
+
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+
+        expect(refreshAuthMock).not.toHaveBeenCalledWith(
+          AuthType.LOGIN_WITH_GOOGLE,
+        );
+        expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.COMPUTE_ADC);
+      });
+
+      it('should skip LOGIN_WITH_GOOGLE and use COMPUTE_ADC directly if GEMINI_CLI_USE_COMPUTE_ADC is true', async () => {
+        vi.stubEnv('GEMINI_CLI_USE_COMPUTE_ADC', 'true');
+        vi.mocked(isHeadlessMode).mockReturnValue(false); // Even if not headless
+
+        const refreshAuthMock = vi.fn().mockResolvedValue(undefined);
+
+        vi.mocked(Config).mockImplementation(
+          (params: unknown) =>
+            ({
+              ...(params as object),
+              initialize: vi.fn(),
+              waitForMcpInit: vi.fn(),
+              refreshAuth: refreshAuthMock,
+              getExperiments: vi.fn().mockReturnValue({ flags: {} }),
+              getRemoteAdminSettings: vi.fn(),
+              setRemoteAdminSettings: vi.fn(),
+            }) as unknown as Config,
+        );
+
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+
+        expect(refreshAuthMock).not.toHaveBeenCalledWith(
+          AuthType.LOGIN_WITH_GOOGLE,
+        );
+        expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.COMPUTE_ADC);
+      });
+
+      it('should throw FatalAuthenticationError in headless mode if no ADC fallback available', async () => {
+        vi.mocked(isHeadlessMode).mockReturnValue(true);
+
+        const refreshAuthMock = vi.fn().mockResolvedValue(undefined);
+
+        vi.mocked(Config).mockImplementation(
+          (params: unknown) =>
+            ({
+              ...(params as object),
+              initialize: vi.fn(),
+              waitForMcpInit: vi.fn(),
+              refreshAuth: refreshAuthMock,
+              getExperiments: vi.fn().mockReturnValue({ flags: {} }),
+              getRemoteAdminSettings: vi.fn(),
+              setRemoteAdminSettings: vi.fn(),
+            }) as unknown as Config,
+        );
+
+        await expect(
+          loadConfig(mockSettings, mockExtensionLoader, taskId),
+        ).rejects.toThrow(
+          'Interactive terminal required for LOGIN_WITH_GOOGLE. Run in an interactive terminal or set GEMINI_CLI_USE_COMPUTE_ADC=true to use Application Default Credentials.',
+        );
+
+        expect(refreshAuthMock).not.toHaveBeenCalled();
+      });
+
+      it('should include both original and fallback error when COMPUTE_ADC fallback fails', async () => {
+        vi.stubEnv('CLOUD_SHELL', 'true');
+        vi.mocked(isHeadlessMode).mockReturnValue(false);
+
+        const refreshAuthMock = vi.fn().mockImplementation((authType) => {
+          if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+            throw new FatalAuthenticationError('OAuth failed');
+          }
+          if (authType === AuthType.COMPUTE_ADC) {
+            throw new Error('ADC failed');
+          }
+          return Promise.resolve();
+        });
+
+        vi.mocked(Config).mockImplementation(
+          (params: unknown) =>
+            ({
+              ...(params as object),
+              initialize: vi.fn(),
+              waitForMcpInit: vi.fn(),
+              refreshAuth: refreshAuthMock,
+              getExperiments: vi.fn().mockReturnValue({ flags: {} }),
+              getRemoteAdminSettings: vi.fn(),
+              setRemoteAdminSettings: vi.fn(),
+            }) as unknown as Config,
+        );
+
+        await expect(
+          loadConfig(mockSettings, mockExtensionLoader, taskId),
+        ).rejects.toThrow(
+          'OAuth failed. Fallback to COMPUTE_ADC also failed: ADC failed',
+        );
       });
     });
   });
