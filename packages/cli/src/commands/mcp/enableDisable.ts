@@ -25,29 +25,41 @@ interface Args {
   session?: boolean;
 }
 
-async function handleEnable(args: Args): Promise<void> {
-  const manager = McpServerEnablementManager.getInstance();
+/**
+ * Validates that a server exists and is not admin-blocked.
+ * Returns true if valid, false if validation failed (error already logged).
+ */
+async function resolveAndValidateServer(args: Args): Promise<boolean> {
   const name = normalizeServerId(args.name);
-
-  // Check settings blocks
-  const settings = loadSettings();
-
-  // Get all servers including extensions
   const { mcpServers, blockedServerNames } = await getMcpServersFromConfig();
+
+  // Reject servers explicitly blocked by administrator
   if (blockedServerNames.map(normalizeServerId).includes(name)) {
     debugLogger.log(
       `${RED}Error:${RESET} MCP server '${args.name}' is blocked by administrator.`,
     );
-    return;
+    return false;
   }
+
+  // Check all known servers (active + blocked) for existence
   const allKnownServers = [...Object.keys(mcpServers), ...blockedServerNames];
-  const normalizedServerNames = allKnownServers.map(normalizeServerId);
-  if (!normalizedServerNames.includes(name)) {
+  if (!allKnownServers.map(normalizeServerId).includes(name)) {
     debugLogger.log(
       `${RED}Error:${RESET} Server '${args.name}' not found. Use 'gemini mcp' to see available servers.`,
     );
-    return;
+    return false;
   }
+
+  return true;
+}
+
+async function handleEnable(args: Args): Promise<void> {
+  const manager = McpServerEnablementManager.getInstance();
+  const name = normalizeServerId(args.name);
+  const settings = loadSettings();
+
+  const isValid = await resolveAndValidateServer(args);
+  if (!isValid) return;
 
   const result = await canLoadServer(name, {
     adminMcpEnabled: settings.merged.admin?.mcp?.enabled ?? true,
@@ -82,16 +94,8 @@ async function handleDisable(args: Args): Promise<void> {
   const manager = McpServerEnablementManager.getInstance();
   const name = normalizeServerId(args.name);
 
-  // Get all servers including extensions
-  const { mcpServers, blockedServerNames } = await getMcpServersFromConfig();
-  const allKnownServers = [...Object.keys(mcpServers), ...blockedServerNames];
-  const normalizedServerNames = allKnownServers.map(normalizeServerId);
-  if (!normalizedServerNames.includes(name)) {
-    debugLogger.log(
-      `${RED}Error:${RESET} Server '${args.name}' not found. Use 'gemini mcp' to see available servers.`,
-    );
-    return;
-  }
+  const isValid = await resolveAndValidateServer(args);
+  if (!isValid) return;
 
   if (args.session) {
     manager.disableForSession(name);
