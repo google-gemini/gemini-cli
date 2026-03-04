@@ -17,15 +17,6 @@ import type { FileDiscoveryService } from '../../services/fileDiscoveryService.j
 const byLengthAsc = (a: { item: string }, b: { item: string }) =>
   a.item.length - b.item.length;
 
-// Tiebreaker: Prefers files over directories.
-const byDirVsFile = (a: { item: string }, b: { item: string }) => {
-  const aIsDir = a.item.endsWith('/');
-  const bIsDir = b.item.endsWith('/');
-  if (aIsDir && !bIsDir) return 1; // a (dir) after b (file)
-  if (!aIsDir && bIsDir) return -1; // a (file) before b (dir)
-  return 0;
-};
-
 // Tiebreaker: Prefers matches at the start of the filename (basename prefix).
 const byBasenamePrefix = (
   a: { item: string; positions: Set<number> },
@@ -240,12 +231,7 @@ class RecursiveFileSearch implements FileSearch {
       this.fzf = new AsyncFzf(this.allFiles, {
         fuzzy: this.allFiles.length > 20000 ? 'v1' : 'v2',
         forward: false,
-        tiebreakers: [
-          byBasenamePrefix,
-          byDirVsFile,
-          byMatchPosFromEnd,
-          byLengthAsc,
-        ],
+        tiebreakers: [byBasenamePrefix, byMatchPosFromEnd, byLengthAsc],
       });
     }
   }

@@ -121,8 +121,8 @@ describe('useAtCompletion', () => {
       expect(result.current.suggestions.map((s) => s.value)).toEqual([
         'src/',
         'src/index.js',
-        'src/components/Button.tsx',
         'src/components/',
+        'src/components/Button.tsx',
       ]);
     });
 
