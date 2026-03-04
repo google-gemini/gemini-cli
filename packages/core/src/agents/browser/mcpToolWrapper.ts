@@ -332,9 +332,7 @@ class NavigationMcpToolInvocation extends McpToolInvocation {
       !browserConfig.customConfig?.headless;
 
     if (shouldDisableInput) {
-      setTimeout(async () => {
-        await injectInputBlocker(this.navBrowserManager);
-      }, 500);
+      void injectInputBlocker(this.navBrowserManager);
     }
 
     return result;
