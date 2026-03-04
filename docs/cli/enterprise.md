@@ -244,7 +244,7 @@ gemini
 You can significantly enhance security by controlling which tools the Gemini
 model can use. This is achieved through the `tools.core` setting and the
 [Policy Engine](../reference/policy-engine.md). For a list of available tools,
-see the [Tools documentation](../tools/index.md).
+see the [Tools reference](../reference/tools.md).
 
 ### Allowlisting with `coreTools`
 
@@ -308,8 +308,8 @@ unintended tool execution.
 ## Managing custom tools (MCP servers)
 
 If your organization uses custom tools via
-[Model-Context Protocol (MCP) servers](../reference/tools-api.md), it is crucial
-to understand how server configurations are managed to apply security policies
+[Model-Context Protocol (MCP) servers](../tools/mcp-server.md), it is crucial to
+understand how server configurations are managed to apply security policies
 effectively.
 
 ### How MCP server configurations are merged
