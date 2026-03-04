@@ -548,6 +548,7 @@ export interface ConfigParameters {
   truncateToolOutputThreshold?: number;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
+  workspacePoliciesDir?: string;
   policyEngineConfig?: PolicyEngineConfig;
   directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
@@ -740,6 +741,7 @@ export class Config implements McpContext {
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useWriteTodos: boolean;
+  private readonly workspacePoliciesDir: string | undefined;
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private policyUpdateConfirmationRequest:
@@ -951,6 +953,7 @@ export class Config implements McpContext {
     this.useWriteTodos = isPreviewModel(this.model)
       ? false
       : (params.useWriteTodos ?? true);
+    this.workspacePoliciesDir = params.workspacePoliciesDir;
     this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? true;
     this.disabledHooks = params.disabledHooks ?? [];
@@ -1954,6 +1957,10 @@ export class Config implements McpContext {
       return Array.from(this.contextManager.getLoadedPaths());
     }
     return this.geminiMdFilePaths;
+  }
+
+  getWorkspacePoliciesDir(): string | undefined {
+    return this.workspacePoliciesDir;
   }
 
   setGeminiMdFilePaths(paths: string[]): void {

@@ -118,6 +118,7 @@ export interface UpdatePolicy {
   type: MessageBusType.UPDATE_POLICY;
   toolName: string;
   persist?: boolean;
+  persistScope?: 'workspace' | 'user';
   argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;

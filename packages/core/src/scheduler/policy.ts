@@ -22,6 +22,7 @@ import {
   type AnyDeclarativeTool,
   type PolicyUpdateOptions,
 } from '../tools/tools.js';
+import { buildFilePathArgsPattern } from '../policy/utils.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
 import type { ValidatingToolCall } from './types.js';
@@ -102,6 +103,20 @@ export async function updatePolicy(
     return;
   }
 
+  // Determine persist scope if we are persisting.
+  let persistScope: 'workspace' | 'user' | undefined;
+  if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
+    // If folder is trusted and workspace policies are enabled, we prefer workspace scope.
+    if (
+      deps.config.isTrustedFolder() &&
+      deps.config.getWorkspacePoliciesDir()
+    ) {
+      persistScope = 'workspace';
+    } else {
+      persistScope = 'user';
+    }
+  }
+
   // Specialized Tools (MCP)
   if (confirmationDetails?.type === 'mcp') {
     await handleMcpPolicyUpdate(
@@ -109,6 +124,7 @@ export async function updatePolicy(
       outcome,
       confirmationDetails,
       deps.messageBus,
+      persistScope,
     );
     return;
   }
@@ -119,6 +135,7 @@ export async function updatePolicy(
     outcome,
     confirmationDetails,
     deps.messageBus,
+    persistScope,
   );
 }
 
@@ -148,6 +165,7 @@ async function handleStandardPolicyUpdate(
   outcome: ToolConfirmationOutcome,
   confirmationDetails: SerializableConfirmationDetails | undefined,
   messageBus: MessageBus,
+  persistScope?: 'workspace' | 'user',
 ): Promise<void> {
   if (
     outcome === ToolConfirmationOutcome.ProceedAlways ||
@@ -157,12 +175,17 @@ async function handleStandardPolicyUpdate(
 
     if (confirmationDetails?.type === 'exec') {
       options.commandPrefix = confirmationDetails.rootCommands;
+    } else if (confirmationDetails?.type === 'edit') {
+      options.argsPattern = buildFilePathArgsPattern(
+        confirmationDetails.filePath,
+      );
     }
 
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
       toolName: tool.name,
       persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
+      persistScope,
       ...options,
     });
   }
@@ -180,6 +203,7 @@ async function handleMcpPolicyUpdate(
     { type: 'mcp' }
   >,
   messageBus: MessageBus,
+  persistScope?: 'workspace' | 'user',
 ): Promise<void> {
   const isMcpAlways =
     outcome === ToolConfirmationOutcome.ProceedAlways ||
@@ -204,5 +228,6 @@ async function handleMcpPolicyUpdate(
     toolName,
     mcpName: confirmationDetails.serverName,
     persist,
+    persistScope,
   });
 }

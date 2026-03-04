@@ -168,6 +168,13 @@ export class Storage {
     return path.join(this.getGeminiDir(), 'policies');
   }
 
+  getWorkspaceAutoSavedPolicyPath(): string {
+    return path.join(
+      this.getWorkspacePoliciesDir(),
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+  }
+
   getAutoSavedPolicyPath(): string {
     return path.join(Storage.getUserPoliciesDir(), AUTO_SAVED_POLICY_FILENAME);
   }

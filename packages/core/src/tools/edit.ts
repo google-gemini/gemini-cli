@@ -20,7 +20,9 @@ import {
   type ToolLocation,
   type ToolResult,
   type ToolResultDisplay,
+  type PolicyUpdateOptions,
 } from './tools.js';
+import { buildFilePathArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
@@ -440,6 +442,14 @@ class EditToolInvocation
 
   override toolLocations(): ToolLocation[] {
     return [{ path: this.params.file_path }];
+  }
+
+  protected override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return {
+      argsPattern: buildFilePathArgsPattern(this.params.file_path),
+    };
   }
 
   private async attemptSelfCorrection(
