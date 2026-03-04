@@ -7,13 +7,17 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
+
   // Next ID: 176
+
+
+
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
-  // ==========================================================================
+  // ====
   // Start Session Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the model id used in the session.
   GEMINI_CLI_START_SESSION_MODEL = 1,
@@ -54,9 +58,9 @@ export enum EventMetadataKey {
   // Logs the output format of the session.
   GEMINI_CLI_START_SESSION_OUTPUT_FORMAT = 94,
 
-  // ==========================================================================
+  // ====
   // Startup Stats Event Keys
-  // ==========================================================================
+  // ====
 
   // Logs the array of startup phases.
   GEMINI_CLI_STARTUP_PHASES = 172,
@@ -70,16 +74,16 @@ export enum EventMetadataKey {
   // Logs whether the CLI is running in docker for startup stats.
   GEMINI_CLI_STARTUP_IS_DOCKER = 175,
 
-  // ==========================================================================
+  // ====
   // User Prompt Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the length of the prompt.
   GEMINI_CLI_USER_PROMPT_LENGTH = 13,
 
-  // ==========================================================================
+  // ====
   // Tool Call Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the function name.
   GEMINI_CLI_TOOL_CALL_NAME = 14,
@@ -105,9 +109,9 @@ export enum EventMetadataKey {
   // Logs the length of tool output
   GEMINI_CLI_TOOL_CALL_CONTENT_LENGTH = 93,
 
-  // ==========================================================================
+  // ====
   // Replace Tool Call Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs a edit tool strategy choice.
   GEMINI_CLI_EDIT_STRATEGY = 109,
@@ -118,16 +122,16 @@ export enum EventMetadataKey {
   // Logs the reason for web fetch fallback.
   GEMINI_CLI_WEB_FETCH_FALLBACK_REASON = 116,
 
-  // ==========================================================================
+  // ====
   // GenAI API Request Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the model id of the request.
   GEMINI_CLI_API_REQUEST_MODEL = 20,
 
-  // ==========================================================================
+  // ====
   // GenAI API Response Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the model id of the API call.
   GEMINI_CLI_API_RESPONSE_MODEL = 21,
@@ -168,9 +172,9 @@ export enum EventMetadataKey {
   // Logs the token count from MCP servers (tool definitions + tool inputs/outputs).
   GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_MCP_SERVERS = 171,
 
-  // ==========================================================================
+  // ====
   // GenAI API Error Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the model id of the API call.
   GEMINI_CLI_API_ERROR_MODEL = 30,
@@ -184,16 +188,16 @@ export enum EventMetadataKey {
   // Logs the duration of the API call in milliseconds.
   GEMINI_CLI_API_ERROR_DURATION_MS = 33,
 
-  // ==========================================================================
+  // ====
   // End Session Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the end of a session.
   GEMINI_CLI_END_SESSION_ID = 34,
 
-  // ==========================================================================
+  // ====
   // Shared Keys
-  // ===========================================================================
+  // =====
 
   // Logs the Prompt Id
   GEMINI_CLI_PROMPT_ID = 35,
@@ -231,16 +235,22 @@ export enum EventMetadataKey {
   // Logs the repository name of the GitHub Action that triggered the session.
   GEMINI_CLI_GH_REPOSITORY_NAME_HASH = 132,
 
-  // ==========================================================================
+  // Logs the event name of the GitHub Action that triggered the session.
+  GEMINI_CLI_GH_EVENT_NAME = 172,
+
+  // Logs the hashed event number of the GitHub Action that triggered the session.
+  GEMINI_CLI_GH_EVENT_NUMBER_HASH = 173,
+
+  // ====
   // Loop Detected Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the type of loop detected.
   GEMINI_CLI_LOOP_DETECTED_TYPE = 38,
 
-  // ==========================================================================
+  // ====
   // Slash Command Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the name of the slash command.
   GEMINI_CLI_SLASH_COMMAND_NAME = 41,
@@ -251,9 +261,9 @@ export enum EventMetadataKey {
   // Logs the status of the slash command (e.g. 'success', 'error')
   GEMINI_CLI_SLASH_COMMAND_STATUS = 51,
 
-  // ==========================================================================
+  // ====
   // Next Speaker Check Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the finish reason of the previous streamGenerateContent response
   GEMINI_CLI_RESPONSE_FINISH_REASON = 43,
@@ -261,16 +271,16 @@ export enum EventMetadataKey {
   // Logs the result of the next speaker check
   GEMINI_CLI_NEXT_SPEAKER_CHECK_RESULT = 44,
 
-  // ==========================================================================
+  // ====
   // Malformed JSON Response Event Keys
-  // ==========================================================================
+  // ====
 
   // Logs the model that produced the malformed JSON response.
   GEMINI_CLI_MALFORMED_JSON_RESPONSE_MODEL = 45,
 
-  // ==========================================================================
+  // ====
   // IDE Connection Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the type of the IDE connection.
   GEMINI_CLI_IDE_CONNECTION_TYPE = 46,
@@ -299,9 +309,9 @@ export enum EventMetadataKey {
   // Logs user removed characters in edit/write tool response.
   GEMINI_CLI_USER_REMOVED_CHARS = 106,
 
-  // ==========================================================================
+  // ====
   // Kitty Sequence Overflow Event Keys
-  // ===========================================================================
+  // =====
 
   // Do not use.
   DEPRECATED_GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
@@ -309,9 +319,9 @@ export enum EventMetadataKey {
   // Logs the length of the kitty sequence that overflowed.
   GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 53,
 
-  // ==========================================================================
+  // ====
   // Conversation Finished Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the approval mode of the session.
   GEMINI_CLI_APPROVAL_MODE = 58,
@@ -337,9 +347,9 @@ export enum EventMetadataKey {
   // Logs name of MCP tools as comma separated string
   GEMINI_CLI_START_SESSION_MCP_TOOLS = 65,
 
-  // ==========================================================================
+  // ====
   // Research Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the research opt-in status (true/false)
   GEMINI_CLI_RESEARCH_OPT_IN_STATUS = 66,
@@ -359,9 +369,9 @@ export enum EventMetadataKey {
   // Logs survey responses for research feedback (JSON stringified)
   GEMINI_CLI_RESEARCH_SURVEY_RESPONSES = 71,
 
-  // ==========================================================================
+  // ====
   // File Operation Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the programming language of the project.
   GEMINI_CLI_PROGRAMMING_LANGUAGE = 56,
@@ -378,9 +388,9 @@ export enum EventMetadataKey {
   // Logs the extension of the file in the file operation.
   GEMINI_CLI_FILE_OPERATION_EXTENSION = 74,
 
-  // ==========================================================================
+  // ====
   // Content Streaming Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the error message for an invalid chunk.
   GEMINI_CLI_INVALID_CHUNK_ERROR_MESSAGE = 75,
@@ -406,9 +416,9 @@ export enum EventMetadataKey {
   // Logs the current nodejs version
   GEMINI_CLI_NODE_VERSION = 83,
 
-  // ==========================================================================
+  // ====
   // Extension Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the name of the extension.
   GEMINI_CLI_EXTENSION_NAME = 85,
@@ -446,9 +456,9 @@ export enum EventMetadataKey {
   // Logs the setting scope for an extension disablement.
   GEMINI_CLI_EXTENSION_DISABLE_SETTING_SCOPE = 107,
 
-  // ==========================================================================
+  // ====
   // Tool Output Truncated Event Keys
-  // ===========================================================================
+  // =====
 
   // Logs the original length of the tool output.
   GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_ORIGINAL_LENGTH = 89,
@@ -462,9 +472,9 @@ export enum EventMetadataKey {
   // Logs the number of lines the tool output was truncated to.
   GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_LINES = 92,
 
-  // ==========================================================================
+  // ====
   // Model Router Event Keys
-  // ==========================================================================
+  // ====
 
   // Logs the outcome of a model routing decision (e.g., which route/model was
   // selected).
@@ -486,9 +496,9 @@ export enum EventMetadataKey {
   // Logs an event when the user uses the /model command.
   GEMINI_CLI_MODEL_SLASH_COMMAND = 108,
 
-  // ==========================================================================
+  // ====
   // Agent Event Keys
-  // ==========================================================================
+  // ====
 
   // Logs the name of the agent.
   GEMINI_CLI_AGENT_NAME = 111,
@@ -517,9 +527,9 @@ export enum EventMetadataKey {
   // Logs whether the session is interactive.
   GEMINI_CLI_INTERACTIVE = 125,
 
-  // ==========================================================================
+  // ====
   // LLM Loop Check Event Keys
-  // ==========================================================================
+  // ====
 
   // Logs the confidence score from the flash model loop check.
   GEMINI_CLI_LLM_LOOP_CHECK_FLASH_CONFIDENCE = 126,
@@ -533,9 +543,9 @@ export enum EventMetadataKey {
   // Logs the model that confirmed the loop.
   GEMINI_CLI_LOOP_DETECTED_CONFIRMED_BY_MODEL = 129,
 
-  // ==========================================================================
+  // ====
   // Hook Call Event Keys
-  // ==========================================================================
+  // ====
 
   // Logs the name of the hook event (e.g., 'BeforeTool', 'AfterModel').
   GEMINI_CLI_HOOK_EVENT_NAME = 133,
@@ -561,9 +571,9 @@ export enum EventMetadataKey {
   // Logs total RAM in GB of user machine.
   GEMINI_CLI_RAM_TOTAL_GB = 140,
 
-  // ==========================================================================
+  // ====
   // Approval Mode Event Keys
-  // ==========================================================================
+  // ====
 
   // Logs the active approval mode in the session.
   GEMINI_CLI_ACTIVE_APPROVAL_MODE = 141,
@@ -574,15 +584,15 @@ export enum EventMetadataKey {
   // Logs the duration spent in an approval mode in milliseconds.
   GEMINI_CLI_APPROVAL_MODE_DURATION_MS = 143,
 
-  // ==========================================================================
+  // ====
   // Rewind Event Keys
-  // ==========================================================================
+  // ====
 
   // Logs the outcome of a rewind operation.
   GEMINI_CLI_REWIND_OUTCOME = 144,
 
   // Model Routing Event Keys (Cont.)
-  // ==========================================================================
+  // ====
 
   // Logs the reasoning for the routing decision.
   GEMINI_CLI_ROUTING_REASONING = 145,
@@ -593,9 +603,9 @@ export enum EventMetadataKey {
   // Logs the classifier threshold used.
   GEMINI_CLI_ROUTING_CLASSIFIER_THRESHOLD = 147,
 
-  // ==========================================================================
+  // ====
   // Tool Output Masking Event Keys
-  // ==========================================================================
+  // ====
 
   // Logs the total tokens in the prunable block before masking.
   GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_BEFORE = 148,
@@ -610,7 +620,7 @@ export enum EventMetadataKey {
   GEMINI_CLI_TOOL_OUTPUT_MASKING_TOTAL_PRUNABLE_TOKENS = 151,
 
   // Ask User Stats Event Keys
-  // ==========================================================================
+  // ====
 
   // Logs the types of questions asked in the ask_user tool.
   GEMINI_CLI_ASK_USER_QUESTION_TYPES = 152,
@@ -624,9 +634,9 @@ export enum EventMetadataKey {
   // Logs the number of questions answered in the ask_user tool.
   GEMINI_CLI_ASK_USER_ANSWER_COUNT = 155,
 
-  // ==========================================================================
+  // ====
   // Keychain & Token Storage Event Keys
-  // ==========================================================================
+  // ====
 
   // Logs whether the keychain is available.
   GEMINI_CLI_KEYCHAIN_AVAILABLE = 156,
@@ -637,7 +647,7 @@ export enum EventMetadataKey {
   // Logs whether the token storage type was forced by an environment variable.
   GEMINI_CLI_TOKEN_STORAGE_FORCED = 158,
   // Conseca Event Keys
-  // ==========================================================================
+  // ====
 
   // Logs the policy generation event.
   CONSECA_POLICY_GENERATION = 159,

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createHash } from 'node:crypto';
 import {
   vi,
   describe,
@@ -593,6 +594,78 @@ describe('ClearcutLogger', () => {
           item.gemini_cli_key === EventMetadataKey.GEMINI_CLI_GH_WORKFLOW_NAME,
       );
       expect(hasWorkflowName).toBe(false);
+    });
+  });
+
+  describe('GITHUB_EVENT_NAME metadata', () => {
+    it('includes event name when GITHUB_EVENT_NAME is set', () => {
+      const { logger } = setup({});
+      vi.stubEnv('GITHUB_EVENT_NAME', 'issues');
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_EVENT_NAME,
+        value: 'issues',
+      });
+    });
+
+    it('does not include event name when GITHUB_EVENT_NAME is not set', () => {
+      const { logger } = setup({});
+      vi.stubEnv('GITHUB_EVENT_NAME', undefined);
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const hasEventName = event?.event_metadata[0].some(
+        (item) =>
+          item.gemini_cli_key === EventMetadataKey.GEMINI_CLI_GH_EVENT_NAME,
+      );
+      expect(hasEventName).toBe(false);
+    });
+  });
+
+  describe('GH_EVENT_NUMBER metadata', () => {
+    it('includes hashed event number when GH_EVENT_NUMBER and GITHUB_REPOSITORY are set', () => {
+      vi.stubEnv('GH_EVENT_NUMBER', '123');
+      vi.stubEnv('GITHUB_REPOSITORY', 'google-gemini/gemini-cli');
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      const expectedHash = createHash('sha256')
+        .update('google-gemini/gemini-cli/123')
+        .digest('hex');
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_EVENT_NUMBER_HASH,
+        value: expectedHash,
+      });
+    });
+
+    it('does not include event number when GH_EVENT_NUMBER is not set', () => {
+      const { logger } = setup({});
+      vi.stubEnv('GH_EVENT_NUMBER', undefined);
+      vi.stubEnv('GITHUB_REPOSITORY', 'google-gemini/gemini-cli');
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const hasEventNumber = event?.event_metadata[0].some(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_EVENT_NUMBER_HASH,
+      );
+      expect(hasEventNumber).toBe(false);
+    });
+
+    it('does not include event number when GITHUB_REPOSITORY is not set', () => {
+      const { logger } = setup({});
+      vi.stubEnv('GH_EVENT_NUMBER', '123');
+      vi.stubEnv('GITHUB_REPOSITORY', undefined);
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const hasEventNumber = event?.event_metadata[0].some(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_EVENT_NUMBER_HASH,
+      );
+      expect(hasEventNumber).toBe(false);
     });
   });
 

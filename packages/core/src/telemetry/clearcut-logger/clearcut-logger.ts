@@ -191,6 +191,20 @@ function determineGHRepositoryName(): string | undefined {
 }
 
 /**
+ * Determines the GitHub event name if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHEventName(): string | undefined {
+  return process.env['GITHUB_EVENT_NAME'];
+}
+
+/**
+ * Determines the GitHub event number if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHEventNumber(): string | undefined {
+  return process.env['GH_EVENT_NUMBER'];
+}
+
+/**
  * Clearcut URL to send logging events to.
  */
 const CLEARCUT_URL = 'https://play.googleapis.com/log?format=json&hasfast=true';
@@ -372,6 +386,8 @@ export class ClearcutLogger {
     const email = this.userAccountManager.getCachedGoogleAccount();
     const surface = determineSurface();
     const ghWorkflowName = determineGHWorkflowName();
+    const ghEventName = determineGHEventName();
+    const ghEventNumber = determineGHEventNumber();
     const baseMetadata: EventValue[] = [
       ...data,
       {
@@ -404,6 +420,26 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
         value: this.hashedGHRepositoryName,
       });
+    }
+
+    if (ghEventName) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_EVENT_NAME,
+        value: ghEventName,
+      });
+    }
+
+    if (ghEventNumber && this.hashedGHRepositoryName) {
+      const ghRepositoryName = determineGHRepositoryName();
+      if (ghRepositoryName) {
+        const hashedEventNumber = createHash('sha256')
+          .update(`${ghRepositoryName}/${ghEventNumber}`)
+          .digest('hex');
+        baseMetadata.push({
+          gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_EVENT_NUMBER_HASH,
+          value: hashedEventNumber,
+        });
+      }
     }
 
     const logEvent: LogEvent = {
