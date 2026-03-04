@@ -624,8 +624,16 @@ export function ensurePowerShellUtf8Encoding(
   const utf8Config =
     '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;';
 
-  const trimmed = command.trimStart();
-  if (trimmed.startsWith(utf8Config)) {
+  const trimmedCommand = command.trim();
+  if (trimmedCommand.startsWith('{') && trimmedCommand.endsWith('}')) {
+    const scriptContent = trimmedCommand.slice(1, -1);
+    if (scriptContent.trim().startsWith(utf8Config)) {
+      return command;
+    }
+    return `{ ${utf8Config} ${scriptContent.trim()} }`;
+  }
+
+  if (command.trimStart().startsWith(utf8Config)) {
     return command;
   }
 

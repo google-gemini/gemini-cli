@@ -364,6 +364,21 @@ describe('ensurePowerShellUtf8Encoding', () => {
       ensurePowerShellUtf8Encoding(`${utf8Prefix} echo "test"`, 'powershell'),
     ).toEqual(`${utf8Prefix} echo "test"`);
   });
+
+  it('should inject utf8 configuration into a powershell script block', () => {
+    expect(
+      ensurePowerShellUtf8Encoding('{ Get-Process }', 'powershell'),
+    ).toEqual(`{ ${utf8Prefix} Get-Process }`);
+  });
+
+  it('should not double-inject into a powershell script block', () => {
+    expect(
+      ensurePowerShellUtf8Encoding(
+        `{ ${utf8Prefix} Get-Process }`,
+        'powershell',
+      ),
+    ).toEqual(`{ ${utf8Prefix} Get-Process }`);
+  });
 });
 
 describe('escapeShellArg', () => {
