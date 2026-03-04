@@ -15,6 +15,7 @@ import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import {
   getShellConfiguration,
   resolveExecutable,
+  ensurePowerShellUtf8Encoding,
   type ShellType,
 } from '../utils/shell-utils.js';
 import { isBinary } from '../utils/textUtils.js';
@@ -303,7 +304,8 @@ export class ShellExecutionService {
     try {
       const isWindows = os.platform() === 'win32';
       const { executable, argsPrefix, shell } = getShellConfiguration();
-      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
+      let guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
+      guardedCommand = ensurePowerShellUtf8Encoding(guardedCommand, shell);
       const spawnArgs = [...argsPrefix, guardedCommand];
 
       const child = cpSpawn(executable, spawnArgs, {
@@ -565,7 +567,8 @@ export class ShellExecutionService {
         );
       }
 
-      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
+      let guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
+      guardedCommand = ensurePowerShellUtf8Encoding(guardedCommand, shell);
       const args = [...argsPrefix, guardedCommand];
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

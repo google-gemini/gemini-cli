@@ -605,6 +605,34 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
 }
 
 /**
+ * For PowerShell, we must explicitly configure the console output encoding to UTF-8
+ * to prevent Node.js from misinterpreting characters emitted by child processes,
+ * especially on Windows systems with different default code pages.
+ *
+ * @param command The command string to execute
+ * @param shell The type of shell being used
+ * @returns The command string, prefixed with the UTF-8 encoding configuration if PowerShell
+ */
+export function ensurePowerShellUtf8Encoding(
+  command: string,
+  shell: ShellType,
+): string {
+  if (shell !== 'powershell') {
+    return command;
+  }
+
+  const utf8Config =
+    '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;';
+
+  const trimmed = command.trimStart();
+  if (trimmed.startsWith(utf8Config)) {
+    return command;
+  }
+
+  return `${utf8Config} ${command}`;
+}
+
+/**
  * Splits a shell command into a list of individual commands, respecting quotes.
  * This is used to separate chained commands (e.g., using &&, ||, ;).
  * @param command The shell command string to parse
