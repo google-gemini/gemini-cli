@@ -82,7 +82,6 @@ import {
   ChangeAuthRequestedError,
   ProjectIdRequiredError,
   CoreToolCallStatus,
-  generateSteeringAckMessage,
   buildUserSteeringHintPrompt,
   logBillingEvent,
   ApiKeyUpdatedEvent,
@@ -2109,15 +2108,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       return;
     }
 
-    void generateSteeringAckMessage(
-      config.getBaseLlmClient(),
-      pendingHint,
-    ).then((ackText) => {
-      historyManager.addItem({
-        type: 'info',
-        text: ackText,
-      });
-    });
     void submitQuery([{ text: buildUserSteeringHintPrompt(pendingHint) }]);
   }, [
     config,
