@@ -498,6 +498,10 @@ export function useTerminalSetupPrompt({
   addItem,
 }: UseTerminalSetupPromptParams): void {
   useEffect(() => {
+    if (process.env['VITEST'] === 'true') {
+      return;
+    }
+
     const hasBeenPrompted = persistentState.get('terminalSetupPromptShown');
     if (hasBeenPrompted) {
       return;
