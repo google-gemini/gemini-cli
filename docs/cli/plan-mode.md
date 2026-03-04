@@ -68,32 +68,38 @@ To start Plan Mode while using Gemini CLI:
 
 ## How to use Plan Mode
 
-Follow this structured approach to maximize the benefits of Plan Mode.
+Plan Mode lets you collaborate with Gemini CLI to design a solution before
+Gemini CLI takes action.
 
-1.  **Explore and analyze:** Analyze requirements and use read-only tools to map
-    the codebase and validate assumptions. For complex tasks, identify at least
-    two viable implementation approaches.
-2.  **Consult:** Present a summary of the identified approaches using
-    [`ask_user`] to obtain a selection. For simple or canonical tasks, this step
-    may be skipped.
-3.  **Draft:** Once an approach is selected, write a detailed implementation
-    plan to the plans directory.
-4.  **Review and approval:** Use the [`exit_plan_mode`] tool to present the
-    finalized plan and formally request approval.
-    - **Approve:** Exit Plan Mode and start implementation.
-    - **Iterate:** Provide feedback to refine the plan.
+1.  **Provide a goal:** Start by describing what you want to achieve. Gemini CLI
+    will then enter Plan Mode (if it's not already) to research the task.
+2.  **Review research and provide input:** As Gemini CLI analyzes your codebase,
+    it may ask you questions or present different implementation options using
+    [`ask_user`]. Provide your preferences to help guide the design.
+3.  **Review the plan:** Once Gemini CLI has a proposed strategy, it creates a
+    detailed implementation plan as a Markdown file in your plans directory. You
+    can open and read this file to understand the proposed changes.
+4.  **Approve or iterate:** Gemini CLI will present the finalized plan for your
+    approval.
+    - **Approve:** If you're satisfied with the plan, approve it to start the
+      implementation immediately: **Yes, automatically accept edits** or **Yes,
+      manually accept edits**.
+    - **Iterate:** If the plan needs adjustments, provide feedback. Gemini CLI
+      will refine the strategy and update the plan.
+    - **Cancel:** You can cancel your plan with `Esc`.
 
 For more complex or specialized planning tasks, you can
 [customize the planning workflow with skills](#custom-planning-with-skills).
 
 ## How to exit Plan Mode
 
-Once you have a solid plan, you can exit Plan Mode to start coding.
+You can exit Plan Mode at any time, whether you have finalized a plan or want to
+switch back to another mode.
 
+- **Approve a plan:** When Gemini CLI presents a finalized plan, approving it
+  automatically exits Plan Mode and starts the implementation.
 - **Keyboard shortcut:** Press `Shift+Tab` to cycle to the desired mode.
-
-- **Tool:** Gemini CLI presents the
-  finalized plan for your approval.
+- **Natural language:** Ask Gemini CLI to "exit plan mode" or "stop planning."
 
 ## Customization and best practices
 
@@ -148,6 +154,9 @@ Because user policies (Tier 2) have a higher base priority than built-in
 policies (Tier 1), you can override Plan Mode's default restrictions by creating
 a rule in your `~/.gemini/policies/` directory.
 
+For more information on how the policy engine works, see the [policy engine]
+docs.
+
 #### Example: Allow git commands in Plan Mode
 
 This rule lets you check the repository status and see changes while in Plan
@@ -181,9 +190,6 @@ modes = ["plan"]
 
 Tell Gemini CLI it can use these tools in your prompt, for example: _"You can
 check ongoing changes in git."_
-
-For more information on how the policy engine works, see the [policy engine]
-docs.
 
 ### Custom plan directory and policies
 
