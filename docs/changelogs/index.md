@@ -754,8 +754,8 @@ on GitHub.
   [@jackwotherspoon](https://github.com/jackwotherspoon)**)**
   - Getting started:
     [https://gofastmcp.com/integrations/gemini-cli](https://gofastmcp.com/integrations/gemini-cli)
-- **Positional Prompt for Non-Interactive:** Seamlessly invoke Gemini CLI
-  headlessly via `gemini -p "Hello"`. ([gif](https://imgur.com/a/hcBznpB),
+- **Non-Interactive Prompt:** Seamlessly invoke Gemini CLI headlessly via
+  `gemini -p "Hello"`. ([gif](https://imgur.com/a/hcBznpB),
   [pr](https://github.com/google-gemini/gemini-cli/pull/7668) by
   [@allenhutchison](https://github.com/allenhutchison))
 - **Experimental Tool output truncation:** Enable truncating shell tool outputs

@@ -18,12 +18,6 @@ and parameters.
 | `gemini extensions`                | Manage extensions                  | See [Extensions Management](#extensions-management)          |
 | `gemini mcp`                       | Configure MCP servers              | See [MCP Server Management](#mcp-server-management)          |
 
-### Positional arguments
-
-| Argument | Type              | Description                                                                                                        |
-| -------- | ----------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `query`  | string (variadic) | Positional prompt. Defaults to one-shot mode. Use `-i/--prompt-interactive` to execute and continue interactively. |
-
 ## CLI Options
 
 | Option                           | Alias | Type    | Default   | Description                                                                                                                                                            |
