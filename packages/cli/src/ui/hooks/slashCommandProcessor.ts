@@ -253,17 +253,9 @@ export const useSlashCommandProcessor = (
         toggleBackgroundShell: actions.toggleBackgroundShell,
         toggleShortcutsHelp: actions.toggleShortcutsHelp,
         getLastOutput: () => lastOutputRef.current,
-        setLastOutput: (output: LastOutput | undefined) => {
-          if (!output) {
-            lastOutputRef.current = undefined;
-            return;
-          }
-          const trimmed = output.content.trim();
-          if (trimmed) {
-            lastOutputRef.current = { content: trimmed };
-          } else {
-            lastOutputRef.current = undefined;
-          }
+        setLastOutput: (output) => {
+          const trimmed = output?.content?.trim();
+          lastOutputRef.current = trimmed ? { content: trimmed } : undefined;
         },
       },
       session: {
