@@ -6,14 +6,14 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StreamJsonFormatter } from './stream-json-formatter.js';
-import { JsonStreamEventType } from './types.js';
-import type {
-  InitEvent,
-  MessageEvent,
-  ToolUseEvent,
-  ToolResultEvent,
-  ErrorEvent,
-  ResultEvent,
+import {
+  JsonStreamEventType,
+  type InitEvent,
+  type MessageEvent,
+  type ToolUseEvent,
+  type ToolResultEvent,
+  type ErrorEvent,
+  type ResultEvent,
 } from './types.js';
 import type { SessionMetrics } from '../telemetry/uiTelemetry.js';
 import { ToolCallDecision } from '../telemetry/tool-call-decision.js';

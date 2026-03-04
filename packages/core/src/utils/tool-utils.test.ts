@@ -10,7 +10,6 @@ import {
   getToolSuggestion,
   shouldHideToolCall,
 } from './tool-utils.js';
-import type { AnyToolInvocation, Config } from '../index.js';
 import {
   ReadFileTool,
   ApprovalMode,
@@ -19,6 +18,8 @@ import {
   WRITE_FILE_DISPLAY_NAME,
   EDIT_DISPLAY_NAME,
   READ_FILE_DISPLAY_NAME,
+  type AnyToolInvocation,
+  type Config,
 } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 

@@ -4,26 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ToolConfirmationOutcome,
-  ToolResult,
-  ToolCallConfirmationDetails,
+import {
+  BaseToolInvocation,
+  type ToolConfirmationOutcome,
+  type ToolResult,
+  type ToolCallConfirmationDetails,
 } from '../tools/tools.js';
-import { BaseToolInvocation } from '../tools/tools.js';
-import { DEFAULT_QUERY_STRING } from './types.js';
-import type {
-  RemoteAgentInputs,
-  RemoteAgentDefinition,
-  AgentInputs,
+import {
+  DEFAULT_QUERY_STRING,
+  type RemoteAgentInputs,
+  type RemoteAgentDefinition,
+  type AgentInputs,
 } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { A2AClientManager } from './a2a-client-manager.js';
+import {
+  A2AClientManager,
+  type SendMessageResult,
+} from './a2a-client-manager.js';
 import { extractIdsFromResponse, A2AResultReassembler } from './a2aUtils.js';
 import { GoogleAuth } from 'google-auth-library';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
-import type { SendMessageResult } from './a2a-client-manager.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 
 /**

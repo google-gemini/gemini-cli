@@ -5,8 +5,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Content, GenerateContentResponse } from '@google/genai';
-import { ApiError, ThinkingLevel } from '@google/genai';
+import {
+  ApiError,
+  ThinkingLevel,
+  type Content,
+  type GenerateContentResponse,
+} from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
   GeminiChat,

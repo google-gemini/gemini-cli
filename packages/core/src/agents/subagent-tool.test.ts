@@ -7,7 +7,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SubagentTool } from './subagent-tool.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
-import { Kind } from '../tools/tools.js';
+import {
+  Kind,
+  type DeclarativeTool,
+  type ToolCallConfirmationDetails,
+  type ToolInvocation,
+  type ToolResult,
+} from '../tools/tools.js';
 import type {
   LocalAgentDefinition,
   RemoteAgentDefinition,
@@ -17,12 +23,6 @@ import { makeFakeConfig } from '../test-utils/config.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import type {
-  DeclarativeTool,
-  ToolCallConfirmationDetails,
-  ToolInvocation,
-  ToolResult,
-} from '../tools/tools.js';
 import {
   GeminiCliOperation,
   GEN_AI_AGENT_DESCRIPTION,

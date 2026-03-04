@@ -31,13 +31,13 @@ import type { AgentTerminateMode } from '../agents/types.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import type { OTelFinishReason } from './semantic.js';
 import {
   toInputMessages,
   toOutputMessages,
   toFinishReasons,
   toOutputType,
   toSystemInstruction,
+  type OTelFinishReason,
 } from './semantic.js';
 import { sanitizeHookName } from './sanitize.js';
 import { getFileDiffFromResultDisplay } from '../utils/fileDiffUtils.js';
