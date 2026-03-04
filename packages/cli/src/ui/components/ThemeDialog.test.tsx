@@ -8,6 +8,22 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ThemeDialog } from './ThemeDialog.js';
+
+const { mockIsDevelopment } = vi.hoisted(() => ({
+  mockIsDevelopment: { value: false },
+}));
+
+vi.mock('../../utils/installationInfo.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../utils/installationInfo.js')>();
+  return {
+    ...actual,
+    get isDevelopment() {
+      return mockIsDevelopment.value;
+    },
+  };
+});
+
 import { createMockSettings } from '../../test-utils/settings.js';
 import { DEFAULT_THEME, themeManager } from '../themes/theme-manager.js';
 import { act } from 'react';
@@ -30,17 +46,21 @@ describe('ThemeDialog Snapshots', () => {
     vi.restoreAllMocks();
   });
 
-  it('should render correctly in theme selection mode', async () => {
-    const settings = createMockSettings();
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <ThemeDialog {...baseProps} settings={settings} />,
-      { settings },
-    );
-    await waitUntilReady();
+  it.each([true, false])(
+    'should render correctly in theme selection mode (isDevelopment: %s)',
+    async (isDev) => {
+      mockIsDevelopment.value = isDev;
+      const settings = createMockSettings();
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ThemeDialog {...baseProps} settings={settings} />,
+        { settings },
+      );
+      await waitUntilReady();
 
-    expect(lastFrame()).toMatchSnapshot();
-    unmount();
-  });
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    },
+  );
 
   it('should render correctly in scope selector mode', async () => {
     const settings = createMockSettings();

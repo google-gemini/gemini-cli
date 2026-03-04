@@ -174,7 +174,7 @@ describe('<Footer />', () => {
     );
     await waitUntilReady();
     expect(lastFrame()).toContain(defaultProps.model);
-    expect(lastFrame()).toMatch(/\d+% context left/);
+    expect(lastFrame()).toMatch(/\d+% context used/);
     unmount();
   });
 
@@ -229,7 +229,7 @@ describe('<Footer />', () => {
       },
     );
     await waitUntilReady();
-    expect(lastFrame()).not.toContain('Usage remaining');
+    expect(lastFrame()).not.toContain('used');
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -262,7 +262,7 @@ describe('<Footer />', () => {
     unmount();
   });
 
-  it('displays the model name and abbreviated context percentage', async () => {
+  it('displays the model name and abbreviated context used label on narrow terminals', async () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <Footer />,
       {
@@ -280,6 +280,7 @@ describe('<Footer />', () => {
     await waitUntilReady();
     expect(lastFrame()).toContain(defaultProps.model);
     expect(lastFrame()).toMatch(/\d+%/);
+    expect(lastFrame()).not.toContain('context used');
     unmount();
   });
 
@@ -477,7 +478,7 @@ describe('<Footer />', () => {
       );
       await waitUntilReady();
       expect(lastFrame()).toContain(defaultProps.model);
-      expect(lastFrame()).not.toMatch(/\d+% context left/);
+      expect(lastFrame()).not.toMatch(/\d+% context used/);
       unmount();
     });
     it('shows the context percentage when hideContextPercentage is false', async () => {
@@ -497,7 +498,7 @@ describe('<Footer />', () => {
       );
       await waitUntilReady();
       expect(lastFrame()).toContain(defaultProps.model);
-      expect(lastFrame()).toMatch(/\d+% context left/);
+      expect(lastFrame()).toMatch(/\d+% context used/);
       unmount();
     });
     it('renders complete footer in narrow terminal (baseline narrow)', async () => {
