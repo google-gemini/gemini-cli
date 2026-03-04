@@ -54,9 +54,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     if (isRestarting) {
-      timer = setTimeout(async () => {
-        await relaunchApp();
-      }, 250);
+      timer = setTimeout(relaunchApp, 250);
     }
     return () => {
       if (timer) clearTimeout(timer);

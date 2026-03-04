@@ -5,7 +5,11 @@
  */
 
 import { vi } from 'vitest';
-import { RELAUNCH_EXIT_CODE, relaunchApp } from './processUtils.js';
+import {
+  RELAUNCH_EXIT_CODE,
+  relaunchApp,
+  _resetRelaunchStateForTesting,
+} from './processUtils.js';
 import * as cleanup from './cleanup.js';
 import * as handleAutoUpdate from './handleAutoUpdate.js';
 
@@ -18,6 +22,10 @@ describe('processUtils', () => {
     .spyOn(process, 'exit')
     .mockReturnValue(undefined as never);
   const runExitCleanup = vi.spyOn(cleanup, 'runExitCleanup');
+
+  beforeEach(() => {
+    _resetRelaunchStateForTesting();
+  });
 
   afterEach(() => vi.clearAllMocks());
 

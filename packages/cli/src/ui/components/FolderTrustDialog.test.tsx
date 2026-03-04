@@ -246,7 +246,9 @@ describe('FolderTrustDialog', () => {
 
   it('should call relaunchApp when isRestarting is true', async () => {
     vi.useFakeTimers();
-    const relaunchApp = vi.spyOn(processUtils, 'relaunchApp');
+    const relaunchApp = vi
+      .spyOn(processUtils, 'relaunchApp')
+      .mockResolvedValue(undefined);
     const { waitUntilReady, unmount } = renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
@@ -259,7 +261,9 @@ describe('FolderTrustDialog', () => {
 
   it('should not call relaunchApp if unmounted before timeout', async () => {
     vi.useFakeTimers();
-    const relaunchApp = vi.spyOn(processUtils, 'relaunchApp');
+    const relaunchApp = vi
+      .spyOn(processUtils, 'relaunchApp')
+      .mockResolvedValue(undefined);
     const { waitUntilReady, unmount } = renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
