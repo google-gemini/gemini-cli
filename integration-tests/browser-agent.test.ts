@@ -164,6 +164,9 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
     await rig.run({
       args: 'Open https://example.com in the browser and check the page title.',
     });
+
+    // Test passes if we reach here, relying on Vitest's timeout mechanism
+    // to detect hanging browser processes.
   });
 
   it('should handle multiple browser operations in sequence', async () => {
