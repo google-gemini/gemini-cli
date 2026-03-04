@@ -29,7 +29,10 @@ import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
 import { GEMINI_DIR, homedir as pathsHomedir } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { writeToStdout } from '../utils/stdio.js';
-import { FatalCancellationError } from '../utils/errors.js';
+import {
+  FatalCancellationError,
+  FatalAuthenticationError,
+} from '../utils/errors.js';
 import process from 'node:process';
 import { coreEvents } from '../utils/events.js';
 import { isHeadlessMode } from '../utils/headless.js';
@@ -95,6 +98,7 @@ const mockConfig = {
   getNoBrowser: () => false,
   getProxy: () => 'http://test.proxy.com:8080',
   isBrowserLaunchSuppressed: () => false,
+  isInteractive: () => true,
   getExperimentalZedIntegration: () => false,
 } as unknown as Config;
 
@@ -310,6 +314,7 @@ describe('oauth2', () => {
         getNoBrowser: () => true,
         getProxy: () => 'http://test.proxy.com:8080',
         isBrowserLaunchSuppressed: () => true,
+        isInteractive: () => true,
       } as unknown as Config;
 
       const mockCodeVerifier = {
@@ -380,6 +385,7 @@ describe('oauth2', () => {
         getNoBrowser: () => true,
         getProxy: () => 'http://test.proxy.com:8080',
         isBrowserLaunchSuppressed: () => true,
+        isInteractive: () => true,
       } as unknown as Config;
 
       const mockCodeVerifier = {
@@ -1160,6 +1166,7 @@ describe('oauth2', () => {
           getNoBrowser: () => true,
           getProxy: () => 'http://test.proxy.com:8080',
           isBrowserLaunchSuppressed: () => true,
+          isInteractive: () => true,
         } as unknown as Config;
 
         const mockOAuth2Client = {
@@ -1198,8 +1205,27 @@ describe('oauth2', () => {
           'Invalid authorization code',
         );
 
-        consoleLogSpy.mockRestore();
         consoleErrorSpy.mockRestore();
+        consoleLogSpy.mockRestore();
+      });
+
+      it('should throw FatalAuthenticationError when non-interactive and browser suppressed', async () => {
+        const mockConfigNonInteractive = {
+          getNoBrowser: () => true,
+          getProxy: () => 'http://test.proxy.com:8080',
+          isBrowserLaunchSuppressed: () => true,
+          isInteractive: () => false,
+        } as unknown as Config;
+
+        await expect(
+          getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfigNonInteractive),
+        ).rejects.toThrow(FatalAuthenticationError);
+
+        await expect(
+          getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfigNonInteractive),
+        ).rejects.toThrow(
+          'Browser launch is suppressed and the session is non-interactive. Cannot perform user code authentication.',
+        );
       });
     });
 

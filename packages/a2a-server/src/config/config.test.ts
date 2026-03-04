@@ -13,8 +13,11 @@ import {
   FileDiscoveryService,
   getCodeAssistServer,
   Config,
+  AuthType,
   ExperimentFlags,
   fetchAdminControlsOnce,
+  isHeadlessMode,
+  FatalAuthenticationError,
   type FetchAdminControlsResponse,
 } from '@google/gemini-cli-core';
 
@@ -53,6 +56,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     FileDiscoveryService: vi.fn(),
     getCodeAssistServer: vi.fn(),
     fetchAdminControlsOnce: vi.fn(),
+    isHeadlessMode: vi.fn(),
+    FatalAuthenticationError: actual.FatalAuthenticationError,
     coreEvents: {
       emitAdminSettingsChanged: vi.fn(),
     },
@@ -310,6 +315,139 @@ describe('loadConfig', () => {
           allowedTools: ['v1-tool'],
         }),
       );
+    });
+  });
+
+  describe('interactivity', () => {
+    it('should set interactive to true when NOT in headless mode', async () => {
+      vi.mocked(isHeadlessMode).mockReturnValue(false);
+      await loadConfig(mockSettings, mockExtensionLoader, taskId);
+      expect(Config).toHaveBeenCalledWith(
+        expect.objectContaining({
+          interactive: true,
+        }),
+      );
+    });
+
+    it('should set interactive to false when in headless mode', async () => {
+      vi.mocked(isHeadlessMode).mockReturnValue(true);
+      await loadConfig(mockSettings, mockExtensionLoader, taskId);
+      expect(Config).toHaveBeenCalledWith(
+        expect.objectContaining({
+          interactive: false,
+        }),
+      );
+    });
+  });
+
+  describe('refreshAuthentication fallback', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let mockConfigInstance: any;
+
+    beforeEach(() => {
+      process.env['USE_CCPA'] = 'true';
+      delete process.env['GEMINI_API_KEY'];
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (Config as any).mockImplementation((params: any) => {
+        mockConfigInstance = {
+          ...params,
+          initialize: vi.fn(),
+          waitForMcpInit: vi.fn(),
+          refreshAuth: vi.fn(),
+          getExperiments: vi.fn().mockReturnValue({ flags: {} }),
+        };
+        return mockConfigInstance;
+      });
+    });
+
+    afterEach(() => {
+      delete process.env['USE_CCPA'];
+      delete process.env['CLOUD_SHELL'];
+      delete process.env['EDITOR_IN_CLOUD_SHELL'];
+      delete process.env['CODER_AGENT_WORKSPACE_PATH'];
+    });
+
+    it('should fall back to COMPUTE_ADC in Cloud Shell when LOGIN_WITH_GOOGLE fails with FatalAuthenticationError', async () => {
+      process.env['CLOUD_SHELL'] = 'true';
+
+      vi.mocked(isHeadlessMode).mockReturnValue(true);
+
+      const refreshAuthMock = vi
+        .fn()
+        .mockRejectedValueOnce(new FatalAuthenticationError('Headless'))
+        .mockResolvedValueOnce(undefined);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (Config as any).mockImplementation((params: any) => {
+        mockConfigInstance = {
+          ...params,
+          initialize: vi.fn(),
+          waitForMcpInit: vi.fn(),
+          refreshAuth: refreshAuthMock,
+          getExperiments: vi.fn().mockReturnValue({ flags: {} }),
+        };
+        return mockConfigInstance;
+      });
+
+      await loadConfig(mockSettings, mockExtensionLoader, taskId);
+
+      expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.LOGIN_WITH_GOOGLE);
+      expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.COMPUTE_ADC);
+    });
+
+    it('should fall back to COMPUTE_ADC in Cloud Workstations when LOGIN_WITH_GOOGLE fails with FatalAuthenticationError', async () => {
+      process.env['CODER_AGENT_WORKSPACE_PATH'] = '/workspace';
+
+      vi.mocked(isHeadlessMode).mockReturnValue(true);
+
+      const refreshAuthMock = vi
+        .fn()
+        .mockRejectedValueOnce(new FatalAuthenticationError('Headless'))
+        .mockResolvedValueOnce(undefined);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (Config as any).mockImplementation((params: any) => {
+        mockConfigInstance = {
+          ...params,
+          initialize: vi.fn(),
+          waitForMcpInit: vi.fn(),
+          refreshAuth: refreshAuthMock,
+          getExperiments: vi.fn().mockReturnValue({ flags: {} }),
+        };
+        return mockConfigInstance;
+      });
+
+      await loadConfig(mockSettings, mockExtensionLoader, taskId);
+
+      expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.LOGIN_WITH_GOOGLE);
+      expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.COMPUTE_ADC);
+    });
+
+    it('should NOT fall back if error is not FatalAuthenticationError', async () => {
+      process.env['CLOUD_SHELL'] = 'true';
+
+      const refreshAuthMock = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('Other error'));
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (Config as any).mockImplementation((params: any) => {
+        mockConfigInstance = {
+          ...params,
+          initialize: vi.fn(),
+          waitForMcpInit: vi.fn(),
+          refreshAuth: refreshAuthMock,
+          getExperiments: vi.fn().mockReturnValue({ flags: {} }),
+        };
+        return mockConfigInstance;
+      });
+
+      await expect(
+        loadConfig(mockSettings, mockExtensionLoader, taskId),
+      ).rejects.toThrow('Other error');
+      expect(refreshAuthMock).toHaveBeenCalledTimes(1);
+      expect(refreshAuthMock).not.toHaveBeenCalledWith(AuthType.COMPUTE_ADC);
     });
   });
 });

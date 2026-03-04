@@ -224,6 +224,11 @@ async function initOauthClient(
   }
 
   if (config.isBrowserLaunchSuppressed()) {
+    if (!config.isInteractive()) {
+      throw new FatalAuthenticationError(
+        'Browser launch is suppressed and the session is non-interactive. Cannot perform user code authentication.',
+      );
+    }
     let success = false;
     const maxRetries = 2;
     // Enter alternate buffer

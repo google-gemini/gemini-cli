@@ -23,6 +23,8 @@ import {
   fetchAdminControlsOnce,
   getCodeAssistServer,
   ExperimentFlags,
+  isHeadlessMode,
+  FatalAuthenticationError,
   type TelemetryTarget,
   type ConfigParameters,
   type ExtensionLoader,
@@ -103,7 +105,7 @@ export async function loadConfig(
     trustedFolder: true,
     extensionLoader,
     checkpointing,
-    interactive: true,
+    interactive: !isHeadlessMode(),
     enableInteractiveShell: true,
     ptyInfo: 'auto',
   };
@@ -255,7 +257,23 @@ async function refreshAuthentication(
         `[${logPrefix}] USE_CCPA env var is true but unable to resolve GOOGLE_APPLICATION_CREDENTIALS file path ${adcFilePath}. Error ${e}`,
       );
     }
-    await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+    try {
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+    } catch (e) {
+      const isCloudEnvironment =
+        process.env['CLOUD_SHELL'] === 'true' ||
+        process.env['EDITOR_IN_CLOUD_SHELL'] === 'true' ||
+        !!process.env['CODER_AGENT_WORKSPACE_PATH'];
+
+      if (e instanceof FatalAuthenticationError && isCloudEnvironment) {
+        logger.info(
+          `[${logPrefix}] Headless environment detected in Cloud Shell/Workstations. Falling back to machine identity (COMPUTE_ADC).`,
+        );
+        await config.refreshAuth(AuthType.COMPUTE_ADC);
+      } else {
+        throw e;
+      }
+    }
     logger.info(
       `[${logPrefix}] GOOGLE_CLOUD_PROJECT: ${process.env['GOOGLE_CLOUD_PROJECT']}`,
     );
