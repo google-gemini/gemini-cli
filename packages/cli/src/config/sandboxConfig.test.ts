@@ -97,7 +97,7 @@ describe('loadSandboxConfig', () => {
     it('should throw if GEMINI_SANDBOX is an invalid command', async () => {
       process.env['GEMINI_SANDBOX'] = 'invalid-command';
       await expect(loadSandboxConfig({}, {})).rejects.toThrow(
-        "Invalid sandbox command 'invalid-command'. Must be one of docker, podman, sandbox-exec",
+        "Invalid sandbox command 'invalid-command'. Must be one of docker, podman, sandbox-exec, lxc",
       );
     });
 
@@ -106,6 +106,22 @@ describe('loadSandboxConfig', () => {
       mockedCommandExistsSync.mockReturnValue(false);
       await expect(loadSandboxConfig({}, {})).rejects.toThrow(
         "Missing sandbox command 'docker' (from GEMINI_SANDBOX)",
+      );
+    });
+
+    it('should use lxc if GEMINI_SANDBOX=lxc and it exists', async () => {
+      process.env['GEMINI_SANDBOX'] = 'lxc';
+      mockedCommandExistsSync.mockReturnValue(true);
+      const config = await loadSandboxConfig({}, {});
+      expect(config).toEqual({ command: 'lxc', image: 'default/image' });
+      expect(mockedCommandExistsSync).toHaveBeenCalledWith('lxc');
+    });
+
+    it('should throw if GEMINI_SANDBOX=lxc but lxc command does not exist', async () => {
+      process.env['GEMINI_SANDBOX'] = 'lxc';
+      mockedCommandExistsSync.mockReturnValue(false);
+      await expect(loadSandboxConfig({}, {})).rejects.toThrow(
+        "Missing sandbox command 'lxc' (from GEMINI_SANDBOX)",
       );
     });
   });
