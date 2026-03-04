@@ -68,5 +68,5 @@ async function getIdeClientName(context: CommandContext) {
     return '';
   }
   const ideClient = await IdeClient.getInstance();
-  return ideClient?.getDetectedIdeDisplayName() ?? '';
+  return ideClient.getDetectedIdeDisplayName() ?? '';
 }

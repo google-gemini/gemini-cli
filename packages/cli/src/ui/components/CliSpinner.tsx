@@ -13,7 +13,7 @@ export type SpinnerProps = ComponentProps<typeof Spinner>;
 
 export const CliSpinner = (props: SpinnerProps) => {
   const settings = useSettings();
-  const shouldShow = settings.merged.ui?.showSpinner !== false;
+  const shouldShow = settings.merged.ui.showSpinner !== false;
 
   useEffect(() => {
     if (shouldShow) {

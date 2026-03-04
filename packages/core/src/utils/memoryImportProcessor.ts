@@ -51,7 +51,7 @@ export interface ProcessImportsResult {
 // Helper to find the project root (looks for .git directory)
 async function findProjectRoot(startDir: string): Promise<string> {
   let currentDir = path.resolve(startDir);
-  while (true) {
+  for (;;) {
     const gitPath = path.join(currentDir, '.git');
     try {
       const stats = await fs.lstat(gitPath);

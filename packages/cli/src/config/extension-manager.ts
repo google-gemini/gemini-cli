@@ -154,11 +154,8 @@ export class ExtensionManager extends ExtensionLoader {
     installMetadata: ExtensionInstallMetadata,
     previousExtensionConfig?: ExtensionConfig,
   ): Promise<GeminiCLIExtension> {
-    if (
-      this.settings.security?.allowedExtensions &&
-      this.settings.security?.allowedExtensions.length > 0
-    ) {
-      const extensionAllowed = this.settings.security?.allowedExtensions.some(
+    if (this.settings.security.allowedExtensions.length > 0) {
+      const extensionAllowed = this.settings.security.allowedExtensions.some(
         (pattern) => {
           try {
             return new RegExp(pattern).test(installMetadata.source);
@@ -312,7 +309,7 @@ Would you like to attempt to install via "git clone" instead?`,
         const destinationPath = new ExtensionStorage(
           newExtensionName,
         ).getExtensionDir();
-        let previousSettings: Record<string, string> | undefined;
+        let previousSettings: Record<string, string | undefined> | undefined;
         if (isUpdate) {
           previousSettings = await getEnvContents(
             previousExtensionConfig,
@@ -626,19 +623,16 @@ Would you like to attempt to install via "git clone" instead?`,
 
     const installMetadata = loadInstallMetadata(extensionDir);
     let effectiveExtensionPath = extensionDir;
-    if (
-      this.settings.security?.allowedExtensions &&
-      this.settings.security?.allowedExtensions.length > 0
-    ) {
+    if (this.settings.security.allowedExtensions.length > 0) {
       if (!installMetadata?.source) {
         throw new Error(
           `Failed to load extension ${extensionDir}. The ${INSTALL_METADATA_FILENAME} file is missing or misconfigured.`,
         );
       }
-      const extensionAllowed = this.settings.security?.allowedExtensions.some(
+      const extensionAllowed = this.settings.security.allowedExtensions.some(
         (pattern) => {
           try {
-            return new RegExp(pattern).test(installMetadata?.source);
+            return new RegExp(pattern).test(installMetadata.source);
           } catch (e) {
             throw new Error(
               `Invalid regex pattern in allowedExtensions setting: "${pattern}. Error: ${getErrorMessage(e)}`,
@@ -672,8 +666,8 @@ Would you like to attempt to install via "git clone" instead?`,
 
       const extensionId = getExtensionId(config, installMetadata);
 
-      let userSettings: Record<string, string> = {};
-      let workspaceSettings: Record<string, string> = {};
+      let userSettings: Record<string, string | undefined> = {};
+      let workspaceSettings: Record<string, string | undefined> = {};
 
       if (this.settings.experimental.extensionConfig) {
         userSettings = await getScopedEnvContents(

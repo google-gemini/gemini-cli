@@ -157,7 +157,7 @@ export function assertUniqueFinalEventIsLast(
   expect(finalEvent.metadata?.['coderAgent']).toMatchObject({
     kind: 'state-change',
   });
-  expect(finalEvent.status?.state).toBe('input-required');
+  expect(finalEvent.status.state).toBe('input-required');
   expect(finalEvent.final).toBe(true);
 
   // There is only one event with final and its the last

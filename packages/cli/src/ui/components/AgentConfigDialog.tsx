@@ -161,25 +161,25 @@ function getFieldDefaultFromDefinition(
     return !definition.experimental; // Experimental agents default to disabled
   }
   if (field.key === 'model') {
-    return definition.modelConfig?.model ?? 'inherit';
+    return definition.modelConfig.model ?? 'inherit';
   }
   if (field.key === 'temperature') {
-    return definition.modelConfig?.generateContentConfig?.temperature;
+    return definition.modelConfig.generateContentConfig?.temperature;
   }
   if (field.key === 'topP') {
-    return definition.modelConfig?.generateContentConfig?.topP;
+    return definition.modelConfig.generateContentConfig?.topP;
   }
   if (field.key === 'topK') {
-    return definition.modelConfig?.generateContentConfig?.topK;
+    return definition.modelConfig.generateContentConfig?.topK;
   }
   if (field.key === 'maxOutputTokens') {
-    return definition.modelConfig?.generateContentConfig?.maxOutputTokens;
+    return definition.modelConfig.generateContentConfig?.maxOutputTokens;
   }
   if (field.key === 'maxTimeMinutes') {
-    return definition.runConfig?.maxTimeMinutes;
+    return definition.runConfig.maxTimeMinutes;
   }
   if (field.key === 'maxTurns') {
-    return definition.runConfig?.maxTurns;
+    return definition.runConfig.maxTurns;
   }
 
   return field.defaultValue;

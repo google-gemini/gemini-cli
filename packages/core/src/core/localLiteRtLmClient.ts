@@ -55,7 +55,7 @@ export class LocalLiteRtLmClient {
 
     if (reminder) {
       const lastContent = geminiContents.at(-1);
-      if (lastContent?.role === 'user' && lastContent.parts?.[0]?.text) {
+      if (lastContent?.role === 'user' && lastContent.parts[0]?.text) {
         lastContent.parts[0].text += `\n\n${reminder}`;
       }
     }

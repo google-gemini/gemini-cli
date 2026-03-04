@@ -76,7 +76,7 @@ export class GcpLogExporter implements LogRecordExporter {
           },
           {
             ...log.attributes,
-            ...log.resource?.attributes,
+            ...log.resource.attributes,
             message: log.body,
           },
         );

@@ -353,7 +353,7 @@ export class Theme {
     this._colorMap = Object.freeze(this._buildColorMap(rawMappings)); // Build and freeze the map
 
     // Determine the default foreground color
-    const rawDefaultColor = rawMappings['hljs']?.color;
+    const rawDefaultColor = rawMappings['hljs'].color;
     this.defaultColor =
       (rawDefaultColor ? Theme._resolveColor(rawDefaultColor) : undefined) ??
       ''; // Default to empty string if not found or resolvable
@@ -394,7 +394,7 @@ export class Theme {
       }
 
       const style = hljsTheme[key];
-      if (style?.color) {
+      if (style.color) {
         const resolvedColor = Theme._resolveColor(style.color);
         if (resolvedColor !== undefined) {
           // Use the original key from the hljsTheme (e.g., 'hljs-keyword')

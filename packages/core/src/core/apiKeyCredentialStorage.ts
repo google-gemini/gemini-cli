@@ -20,7 +20,7 @@ export async function loadApiKey(): Promise<string | null> {
   try {
     const credentials = await storage.getCredentials(DEFAULT_API_KEY_ENTRY);
 
-    if (credentials?.token?.accessToken) {
+    if (credentials?.token.accessToken) {
       return credentials.token.accessToken;
     }
 

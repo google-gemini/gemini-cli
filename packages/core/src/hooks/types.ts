@@ -424,7 +424,7 @@ export class AfterModelHookOutput extends DefaultHookOutput {
       const hookResponse = this.hookSpecificOutput[
         'llm_response'
       ] as Partial<LLMResponse>;
-      if (hookResponse?.candidates?.[0]?.content?.parts?.length) {
+      if (hookResponse.candidates?.[0]?.content?.parts?.length) {
         // Convert hook format to SDK format
         return defaultHookTranslator.fromHookLLMResponse(
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

@@ -124,18 +124,18 @@ const getStdioTty = (): TtyTarget => {
   // On Windows, prioritize stdout to prevent shell-specific formatting (e.g., PowerShell's
   // red stderr) from corrupting the raw escape sequence payload.
   if (process.platform === 'win32') {
-    if (process.stdout?.isTTY)
+    if (process.stdout.isTTY)
       return { stream: process.stdout, closeAfter: false };
-    if (process.stderr?.isTTY)
+    if (process.stderr.isTTY)
       return { stream: process.stderr, closeAfter: false };
     return null;
   }
 
   // On non-Windows platforms, prioritize stderr to avoid polluting stdout,
   // preserving it for potential redirection or piping.
-  if (process.stderr?.isTTY)
+  if (process.stderr.isTTY)
     return { stream: process.stderr, closeAfter: false };
-  if (process.stdout?.isTTY)
+  if (process.stdout.isTTY)
     return { stream: process.stdout, closeAfter: false };
   return null;
 };

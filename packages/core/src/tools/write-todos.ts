@@ -45,7 +45,7 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
-    const count = this.params.todos?.length ?? 0;
+    const count = this.params.todos.length;
     if (count === 0) {
       return 'Cleared todo list';
     }
@@ -56,7 +56,7 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
     _signal: AbortSignal,
     _updateOutput?: (output: string) => void,
   ): Promise<ToolResult> {
-    const todos = this.params.todos ?? [];
+    const todos = this.params.todos;
     const todoListString = todos
       .map(
         (todo, index) => `${index + 1}. [${todo.status}] ${todo.description}`,
@@ -101,19 +101,21 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: WriteTodosToolParams,
   ): string | null {
-    const todos = params?.todos;
-    if (!params || !Array.isArray(todos)) {
+    const todos = params.todos;
+    if (!Array.isArray(todos)) {
       return '`todos` parameter must be an array';
     }
 
     for (const todo of todos) {
-      if (typeof todo !== 'object' || todo === null) {
+      if (typeof todo !== 'object') {
         return 'Each todo item must be an object';
       }
       if (typeof todo.description !== 'string' || !todo.description.trim()) {
         return 'Each todo must have a non-empty description string';
       }
-      if (!TODO_STATUSES.includes(todo.status)) {
+      if (
+        !TODO_STATUSES.includes(todo.status as (typeof TODO_STATUSES)[number])
+      ) {
         return `Each todo must have a valid status (${TODO_STATUSES.join(', ')})`;
       }
     }

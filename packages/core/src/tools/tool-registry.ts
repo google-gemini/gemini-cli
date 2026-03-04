@@ -63,31 +63,28 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
 
     let stdout = '';
     let stderr = '';
-    let error: Error | null = null;
-    let code: number | null = null;
-    let signal: NodeJS.Signals | null = null;
 
-    await new Promise<void>((resolve) => {
+    const result = await new Promise<{
+      code: number | null;
+      signal: NodeJS.Signals | null;
+      error: Error | null;
+    }>((resolve) => {
+      let error: Error | null = null;
       const onStdout = (data: Buffer) => {
-        stdout += data?.toString();
+        stdout += data.toString();
       };
 
       const onStderr = (data: Buffer) => {
-        stderr += data?.toString();
+        stderr += data.toString();
       };
 
       const onError = (err: Error) => {
         error = err;
       };
 
-      const onClose = (
-        _code: number | null,
-        _signal: NodeJS.Signals | null,
-      ) => {
-        code = _code;
-        signal = _signal;
+      const onClose = (code: number | null, signal: NodeJS.Signals | null) => {
         cleanup();
-        resolve();
+        resolve({ code, signal, error });
       };
 
       const cleanup = () => {
@@ -106,14 +103,16 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
       child.on('close', onClose);
     });
 
+    const { code, signal, error } = result;
+
     // if there is any error, non-zero exit code, signal, or stderr, return error details instead of stdout
     if (error || code !== 0 || signal || stderr) {
       const llmContent = [
         `Stdout: ${stdout || '(empty)'}`,
         `Stderr: ${stderr || '(empty)'}`,
-        `Error: ${error ?? '(none)'}`,
-        `Exit Code: ${code ?? '(none)'}`,
-        `Signal: ${signal ?? '(none)'}`,
+        `Error: ${error ? error.message : '(none)'}`,
+        `Exit Code: ${code !== null ? code : '(none)'}`,
+        `Signal: ${signal !== null ? signal : '(none)'}`,
       ].join('\n');
       return {
         llmContent,
@@ -644,7 +643,7 @@ export class ToolRegistry {
     const serverTools: AnyDeclarativeTool[] = [];
     for (const tool of this.getActiveTools()) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      if ((tool as DiscoveredMCPTool)?.serverName === serverName) {
+      if ((tool as DiscoveredMCPTool).serverName === serverName) {
         serverTools.push(tool);
       }
     }

@@ -45,7 +45,7 @@ export const configureCommand: CommandModule<object, ConfigureArgs> = {
     const { name, setting, scope } = args;
     const settings = loadSettings(process.cwd()).merged;
 
-    if (!(settings.experimental?.extensionConfig ?? true)) {
+    if (!(settings.experimental.extensionConfig ?? true)) {
       coreEvents.emitFeedback(
         'error',
         'Extension configuration is currently disabled. Enable it by setting "experimental.extensionConfig" to true.',

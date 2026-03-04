@@ -54,7 +54,7 @@ export const bugCommand: SlashCommand = {
     const kittyProtocol = terminalCapabilityManager.isKittyProtocolEnabled()
       ? 'Supported'
       : 'Unsupported';
-    const authType = config?.getContentGeneratorConfig()?.authType || 'Unknown';
+    const authType = config?.getContentGeneratorConfig().authType || 'Unknown';
 
     let info = `
 * **CLI Version:** ${cliVersion}
@@ -73,13 +73,13 @@ export const bugCommand: SlashCommand = {
       info += `* **IDE Client:** ${ideClient}\n`;
     }
 
-    const chat = config?.getGeminiClient()?.getChat();
+    const chat = config?.getGeminiClient().getChat();
     const history = chat?.getHistory() || [];
     let historyFileMessage = '';
     let problemValue = bugDescription;
 
     if (history.length > INITIAL_HISTORY_LENGTH) {
-      const tempDir = config?.storage?.getProjectTempDir();
+      const tempDir = config?.storage.getProjectTempDir();
       if (tempDir) {
         const historyFileName = `bug-report-history-${Date.now()}.json`;
         const historyFilePath = path.join(tempDir, historyFileName);

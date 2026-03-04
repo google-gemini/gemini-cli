@@ -452,7 +452,7 @@ export class IdeClient {
       // Don't log an error if the method is not found, which is a common case.
       if (
         error instanceof Error &&
-        !error.message?.includes('Method not found')
+        !error.message.includes('Method not found')
       ) {
         logger.error(`Error discovering tools from IDE: ${error.message}`);
       } else {

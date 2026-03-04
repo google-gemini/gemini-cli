@@ -425,7 +425,7 @@ export class ApiRequestEvent implements BaseTelemetryEvent {
     const { 'gen_ai.response.model': _, ...requestConventionAttributes } =
       getConventionAttributes({
         model: this.model,
-        auth_type: config.getContentGeneratorConfig()?.authType,
+        auth_type: config.getContentGeneratorConfig().authType,
       });
     const attributes: LogAttributes = {
       ...getCommonAttributes(config),

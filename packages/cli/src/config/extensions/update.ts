@@ -48,7 +48,7 @@ export async function updateExtension(
       `Extension ${extension.name} cannot be updated, type is unknown.`,
     );
   }
-  if (installMetadata?.type === 'link') {
+  if (installMetadata.type === 'link') {
     dispatchExtensionStateUpdate({
       type: 'SET_STATE',
       payload: { name: extension.name, state: ExtensionUpdateState.UP_TO_DATE },

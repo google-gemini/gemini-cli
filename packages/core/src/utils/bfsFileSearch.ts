@@ -81,7 +81,7 @@ export async function bfsFileSearch(
       } catch (error) {
         // Warn user that a directory could not be read, as this affects search results.
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const message = (error as Error)?.message ?? 'Unknown error';
+        const message = (error as Error).message ?? 'Unknown error';
         debugLogger.warn(
           `[WARN] Skipping unreadable directory: ${currentDir} (${message})`,
         );
@@ -155,7 +155,7 @@ export function bfsFileSearchSync(
         );
       } catch (error) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const message = (error as Error)?.message ?? 'Unknown error';
+        const message = (error as Error).message ?? 'Unknown error';
         debugLogger.warn(
           `[WARN] Skipping unreadable directory: ${currentDir} (${message})`,
         );

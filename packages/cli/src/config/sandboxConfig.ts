@@ -45,7 +45,7 @@ function getSandboxCommand(
   const environmentConfiguredSandbox =
     process.env['GEMINI_SANDBOX']?.toLowerCase().trim() ?? '';
   sandbox =
-    environmentConfiguredSandbox?.length > 0
+    environmentConfiguredSandbox.length > 0
       ? environmentConfiguredSandbox
       : sandbox;
   if (sandbox === '1' || sandbox === 'true') sandbox = true;

@@ -6,6 +6,8 @@
 
 import { GemmaClassifierStrategy } from './strategies/gemmaClassifierStrategy.js';
 import type { Config } from '../config/config.js';
+import { resolveModel } from '../config/models.js';
+import { ModelRoutingEvent } from '../telemetry/types.js';
 import type {
   RoutingContext,
   RoutingDecision,
@@ -21,7 +23,6 @@ import { OverrideStrategy } from './strategies/overrideStrategy.js';
 import { ApprovalModeStrategy } from './strategies/approvalModeStrategy.js';
 
 import { logModelRouting } from '../telemetry/loggers.js';
-import { ModelRoutingEvent } from '../telemetry/types.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 /**
@@ -47,7 +48,7 @@ export class ModelRouterService {
     strategies.push(new ApprovalModeStrategy());
 
     // Then, if enabled, the Gemma classifier is used.
-    if (this.config.getGemmaModelRouterSettings()?.enabled) {
+    if (this.config.getGemmaModelRouterSettings().enabled) {
       strategies.push(new GemmaClassifierStrategy());
     }
 
@@ -74,7 +75,18 @@ export class ModelRouterService {
    */
   async route(context: RoutingContext): Promise<RoutingDecision> {
     const startTime = Date.now();
-    let decision: RoutingDecision;
+    const fallbackModel = resolveModel(
+      this.config.getModel(),
+      this.config.getGemini31LaunchedSync(),
+    );
+    let decision: RoutingDecision = {
+      model: fallbackModel,
+      metadata: {
+        source: 'fallback',
+        latencyMs: 0,
+        reasoning: 'Initialized with fallback model',
+      },
+    };
 
     const [enableNumericalRouting, thresholdValue] = await Promise.all([
       this.config.getNumericalRoutingEnabled(),
@@ -118,10 +130,10 @@ export class ModelRouterService {
       );
     } finally {
       const event = new ModelRoutingEvent(
-        decision!.model,
-        decision!.metadata.source,
-        decision!.metadata.latencyMs,
-        decision!.metadata.reasoning,
+        decision.model,
+        decision.metadata.source,
+        decision.metadata.latencyMs,
+        decision.metadata.reasoning,
         failed,
         error_message,
         this.config.getApprovalMode(),

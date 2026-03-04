@@ -1231,7 +1231,7 @@ describe('Session', () => {
       streamStarted(true);
       const reader = stream.getReader();
       try {
-        while (true) {
+        for (;;) {
           process.stdout.write('TEST: waiting for read\n');
           const { done, value } = await reader.read();
           process.stdout.write(`TEST: read returned done=${done}\n`);

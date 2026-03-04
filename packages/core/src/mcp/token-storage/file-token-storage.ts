@@ -82,10 +82,8 @@ export class FileTokenStorage extends BaseTokenStorage {
         return new Map();
       }
       if (
-        err.message?.includes('Invalid encrypted data format') ||
-        err.message?.includes(
-          'Unsupported state or unable to authenticate data',
-        )
+        err.message.includes('Invalid encrypted data format') ||
+        err.message.includes('Unsupported state or unable to authenticate data')
       ) {
         // Decryption failed - this can happen when switching between auth types
         // or if the file is genuinely corrupted.

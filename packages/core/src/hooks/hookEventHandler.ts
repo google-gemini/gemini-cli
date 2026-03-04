@@ -372,7 +372,7 @@ export class HookEventHandler {
     const transcriptPath =
       this.config
         .getGeminiClient()
-        ?.getChatRecordingService()
+        .getChatRecordingService()
         ?.getConversationFilePath() ?? '';
 
     return {

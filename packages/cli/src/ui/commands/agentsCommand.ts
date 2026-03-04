@@ -91,7 +91,7 @@ async function enableAction(
   const allAgents = agentRegistry.getAllAgentNames();
   const overrides = settings.merged.agents.overrides;
   const disabledAgents = Object.keys(overrides).filter(
-    (name) => overrides[name]?.enabled === false,
+    (name) => overrides[name].enabled === false,
   );
 
   if (allAgents.includes(agentName) && !disabledAgents.includes(agentName)) {
@@ -167,7 +167,7 @@ async function disableAction(
   const allAgents = agentRegistry.getAllAgentNames();
   const overrides = settings.merged.agents.overrides;
   const disabledAgents = Object.keys(overrides).filter(
-    (name) => overrides[name]?.enabled === false,
+    (name) => overrides[name].enabled === false,
   );
 
   if (disabledAgents.includes(agentName)) {
@@ -271,7 +271,7 @@ function completeAgentsToEnable(context: CommandContext, partialArg: string) {
 
   const overrides = settings.merged.agents.overrides;
   const disabledAgents = Object.entries(overrides)
-    .filter(([_, override]) => override?.enabled === false)
+    .filter(([_, override]) => override.enabled === false)
     .map(([name]) => name);
 
   return disabledAgents.filter((name) => name.startsWith(partialArg));
@@ -291,7 +291,7 @@ function completeAllAgents(context: CommandContext, partialArg: string) {
   if (!config) return [];
 
   const agentRegistry = config.getAgentRegistry();
-  const allAgents = agentRegistry?.getAllDiscoveredAgentNames() ?? [];
+  const allAgents = agentRegistry.getAllDiscoveredAgentNames() ?? [];
   return allAgents.filter((name: string) => name.startsWith(partialArg));
 }
 

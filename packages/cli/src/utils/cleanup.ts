@@ -92,7 +92,7 @@ export async function runExitCleanup() {
 }
 
 async function drainStdin() {
-  if (!process.stdin?.isTTY) return;
+  if (!process.stdin.isTTY) return;
   // Resume stdin and attach a no-op listener to drain the buffer.
   // We use removeAllListeners to ensure we don't trigger other handlers.
   process.stdin

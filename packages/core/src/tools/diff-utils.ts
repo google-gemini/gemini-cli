@@ -25,12 +25,12 @@ export function getDiffContextSnippet(
 
   for (const change of changes) {
     if (change.added) {
-      ranges.push({ start: newLineIdx, end: newLineIdx + (change.count ?? 0) });
-      newLineIdx += change.count ?? 0;
+      ranges.push({ start: newLineIdx, end: newLineIdx + change.count });
+      newLineIdx += change.count;
     } else if (change.removed) {
       ranges.push({ start: newLineIdx, end: newLineIdx });
     } else {
-      newLineIdx += change.count ?? 0;
+      newLineIdx += change.count;
     }
   }
 

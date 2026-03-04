@@ -42,7 +42,7 @@ export function isAppleTerminal(): boolean {
  */
 export function supports256Colors(): boolean {
   // Check if stdout supports at least 8-bit color depth
-  if (process.stdout.getColorDepth && process.stdout.getColorDepth() >= 8) {
+  if (process.stdout.getColorDepth() >= 8) {
     return true;
   }
 
@@ -68,7 +68,7 @@ export function supportsTrueColor(): boolean {
   }
 
   // Check if stdout supports 24-bit color depth
-  if (process.stdout.getColorDepth && process.stdout.getColorDepth() >= 24) {
+  if (process.stdout.getColorDepth() >= 24) {
     return true;
   }
 

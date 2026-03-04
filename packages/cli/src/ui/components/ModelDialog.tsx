@@ -42,7 +42,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
 
   const shouldShowPreviewModels = config?.getHasAccessToPreviewModel();
-  const useGemini31 = config?.getGemini31LaunchedSync?.() ?? false;
+  const useGemini31 = config?.getGemini31LaunchedSync() ?? false;
   const selectedAuthType = settings.merged.security.auth.selectedType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;

@@ -418,12 +418,12 @@ export class HookRunner {
       }
 
       // Collect stdout
-      child.stdout?.on('data', (data: Buffer) => {
+      child.stdout.on('data', (data: Buffer) => {
         stdout += data.toString();
       });
 
       // Collect stderr
-      child.stderr?.on('data', (data: Buffer) => {
+      child.stderr.on('data', (data: Buffer) => {
         stderr += data.toString();
       });
 

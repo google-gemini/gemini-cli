@@ -223,15 +223,11 @@ export async function activate(context: vscode.ExtensionContext) {
 export async function deactivate(): Promise<void> {
   log('Extension deactivated');
   try {
-    if (ideServer) {
-      await ideServer.stop();
-    }
+    await ideServer.stop();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log(`Failed to stop IDE server during deactivation: ${message}`);
   } finally {
-    if (logger) {
-      logger.dispose();
-    }
+    logger.dispose();
   }
 }

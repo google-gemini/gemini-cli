@@ -271,7 +271,7 @@ function fromGaxiosError(errorObj: object): ErrorShape | undefined {
       data = data[0];
     }
 
-    if (typeof data === 'object' && data !== null) {
+    if (typeof data === 'object') {
       if ('error' in data) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const potentialError = (data as { error: unknown }).error;
@@ -334,7 +334,7 @@ function fromApiError(errorObj: object): ErrorShape | undefined {
       data = data[0];
     }
 
-    if (typeof data === 'object' && data !== null) {
+    if (typeof data === 'object') {
       if ('error' in data) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const potentialError = (data as { error: unknown }).error;

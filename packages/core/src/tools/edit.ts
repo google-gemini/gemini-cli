@@ -56,7 +56,6 @@ import { EDIT_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 
-const ENABLE_FUZZY_MATCH_RECOVERY = true;
 const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
 const WHITESPACE_PENALTY_FACTOR = 0.1; // Whitespace differences cost 10% of a character difference
 interface ReplacementContext {
@@ -88,7 +87,7 @@ export function applyReplacement(
     return oldString === '' ? newString : '';
   }
   // If oldString is empty and it's not a new file, do not modify the content.
-  if (oldString === '' && !isNewFile) {
+  if (oldString === '') {
     return currentContent;
   }
 
@@ -326,11 +325,8 @@ export async function calculateReplacement(
     return regexResult;
   }
 
-  let fuzzyResult;
-  if (
-    ENABLE_FUZZY_MATCH_RECOVERY &&
-    (fuzzyResult = await calculateFuzzyReplacement(config, context))
-  ) {
+  const fuzzyResult = await calculateFuzzyReplacement(config, context);
+  if (fuzzyResult) {
     return fuzzyResult;
   }
 

@@ -86,21 +86,21 @@ export function useHistory({
         switch (itemData.type) {
           case 'compression':
           case 'info':
-            chatRecordingService?.recordMessage({
+            chatRecordingService.recordMessage({
               model: undefined,
               type: 'info',
               content: itemData.text ?? '',
             });
             break;
           case 'warning':
-            chatRecordingService?.recordMessage({
+            chatRecordingService.recordMessage({
               model: undefined,
               type: 'warning',
               content: itemData.text ?? '',
             });
             break;
           case 'error':
-            chatRecordingService?.recordMessage({
+            chatRecordingService.recordMessage({
               model: undefined,
               type: 'error',
               content: itemData.text ?? '',

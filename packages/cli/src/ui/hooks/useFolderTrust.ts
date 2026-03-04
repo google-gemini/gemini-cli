@@ -35,7 +35,7 @@ export const useFolderTrust = (
   const [isRestarting, setIsRestarting] = useState(false);
   const startupMessageSent = useRef(false);
 
-  const folderTrust = settings.merged.security.folderTrust.enabled ?? true;
+  const folderTrust = settings.merged.security.folderTrust.enabled;
 
   useEffect(() => {
     let isMounted = true;
@@ -68,13 +68,11 @@ export const useFolderTrust = (
     };
 
     if (isHeadlessMode()) {
-      if (isMounted) {
-        setIsTrusted(trusted);
-        setIsFolderTrustDialogOpen(false);
-        onTrustChange(true);
-        showUntrustedMessage();
-      }
-    } else if (isMounted) {
+      setIsTrusted(trusted);
+      setIsFolderTrustDialogOpen(false);
+      onTrustChange(true);
+      showUntrustedMessage();
+    } else {
       setIsTrusted(trusted);
       setIsFolderTrustDialogOpen(trusted === undefined);
       onTrustChange(trusted);
@@ -95,7 +93,6 @@ export const useFolderTrust = (
       };
 
       const trustLevel = trustLevelMap[choice];
-      if (!trustLevel) return;
 
       const cwd = process.cwd();
       const trustedFolders = loadTrustedFolders();

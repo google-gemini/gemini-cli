@@ -75,11 +75,11 @@ export function getSettingDefinition(
 }
 
 export function requiresRestart(key: string): boolean {
-  return getFlattenedSchema()[key]?.requiresRestart ?? false;
+  return getFlattenedSchema()[key].requiresRestart ?? false;
 }
 
 export function getDefaultValue(key: string): SettingsValue {
-  return getFlattenedSchema()[key]?.default;
+  return getFlattenedSchema()[key].default;
 }
 
 /**
@@ -208,11 +208,11 @@ export function isValidSettingKey(key: string): boolean {
 }
 
 export function getSettingCategory(key: string): string | undefined {
-  return getFlattenedSchema()[key]?.category;
+  return getFlattenedSchema()[key].category;
 }
 
 export function shouldShowInDialog(key: string): boolean {
-  return getFlattenedSchema()[key]?.showInDialog ?? true; // Default to true for backward compatibility
+  return getFlattenedSchema()[key].showInDialog ?? true; // Default to true for backward compatibility
 }
 
 export function getDialogSettingKeys(): string[] {
@@ -285,7 +285,7 @@ export function getDisplayValue(
   let valueString = String(value);
 
   if (definition?.type === 'enum' && definition.options) {
-    const option = definition.options?.find((option) => option.value === value);
+    const option = definition.options.find((option) => option.value === value);
     valueString = option?.label ?? `${value}`;
   }
 

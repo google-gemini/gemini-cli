@@ -159,7 +159,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   // This is needed because CallToolResults should return errors inside the response.
   // ref: https://modelcontextprotocol.io/specification/2025-06-18/schema#calltoolresult
   isMCPToolError(rawResponseParts: Part[]): boolean {
-    const functionResponse = rawResponseParts?.[0]?.functionResponse;
+    const functionResponse = rawResponseParts[0]?.functionResponse;
     const response = functionResponse?.response;
 
     interface McpError {
@@ -174,7 +174,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       }
 
       // Legacy check for nested error object (keep for backward compatibility if any tools rely on it)
-      const error = (response as { error?: McpError })?.error;
+      const error = (response as { error?: McpError }).error;
       const isError = error?.isError;
 
       if (error && (isError === true || isError === 'true')) {
@@ -379,10 +379,10 @@ function transformResourceBlock(
   toolName: string,
 ): Part | Part[] | null {
   const resource = block.resource;
-  if (resource?.text) {
+  if (resource.text) {
     return { text: resource.text };
   }
-  if (resource?.blob) {
+  if (resource.blob) {
     const mimeType = resource.mimeType || 'application/octet-stream';
     return [
       {
@@ -412,7 +412,7 @@ function transformResourceLinkBlock(block: McpResourceLinkBlock): Part {
  * @returns A clean Part[] array ready for the scheduler.
  */
 function transformMcpContentToParts(sdkResponse: Part[]): Part[] {
-  const funcResponse = sdkResponse?.[0]?.functionResponse;
+  const funcResponse = sdkResponse[0]?.functionResponse;
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const mcpContent = funcResponse?.response?.['content'] as McpContentBlock[];
   const toolName = funcResponse?.name || 'unknown tool';
@@ -452,7 +452,7 @@ function transformMcpContentToParts(sdkResponse: Part[]): Part[] {
  */
 function getStringifiedResultForDisplay(rawResponse: Part[]): string {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const mcpContent = rawResponse?.[0]?.functionResponse?.response?.[
+  const mcpContent = rawResponse[0]?.functionResponse?.response?.[
     'content'
   ] as McpContentBlock[];
 
@@ -471,11 +471,11 @@ function getStringifiedResultForDisplay(rawResponse: Part[]): string {
       case 'resource_link':
         return `[Link to ${block.title || block.name}: ${block.uri}]`;
       case 'resource':
-        if (block.resource?.text) {
+        if (block.resource.text) {
           return block.resource.text;
         }
         return `[Embedded Resource: ${
-          block.resource?.mimeType || 'unknown type'
+          block.resource.mimeType || 'unknown type'
         }]`;
       default:
         return `[Unknown content type: ${(block as { type: string }).type}]`;

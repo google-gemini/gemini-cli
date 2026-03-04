@@ -121,7 +121,7 @@ function isValidContent(content: Content): boolean {
     return false;
   }
   for (const part of content.parts) {
-    if (part === undefined || Object.keys(part).length === 0) {
+    if (Object.keys(part).length === 0) {
       return false;
     }
     if (!part.thought && part.text !== undefined && part.text === '') {
@@ -154,7 +154,7 @@ function validateHistory(history: Content[]) {
  * ensures that subsequent requests could be accepted by the model.
  */
 function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
-  if (comprehensiveHistory === undefined || comprehensiveHistory.length === 0) {
+  if (comprehensiveHistory.length === 0) {
     return [];
   }
   const curatedHistory: Content[] = [];
@@ -496,7 +496,7 @@ export class GeminiChat {
       () => lastModelToUse,
     );
     // Track initial active model to detect fallback changes
-    const initialActiveModel = this.config.getActiveModel();
+    const initialActiveModel = this.config.getActiveModel?.();
 
     const apiCall = async () => {
       const useGemini3_1 = (await this.config.getGemini31Launched?.()) ?? false;
@@ -634,7 +634,7 @@ export class GeminiChat {
     const streamResponse = await retryWithBackoff(apiCall, {
       onPersistent429: onPersistent429Callback,
       onValidationRequired: onValidationRequiredCallback,
-      authType: this.config.getContentGeneratorConfig()?.authType,
+      authType: this.config.getContentGeneratorConfig().authType,
       retryFetchErrors: this.config.getRetryFetchErrors(),
       signal: abortSignal,
       maxAttempts: availabilityMaxAttempts ?? this.config.getMaxAttempts(),
@@ -828,7 +828,7 @@ export class GeminiChat {
     let finishReason: FinishReason | undefined;
 
     for await (const chunk of streamResponse) {
-      const candidateWithReason = chunk?.candidates?.find(
+      const candidateWithReason = chunk.candidates?.find(
         (candidate) => candidate.finishReason,
       );
       if (candidateWithReason) {
@@ -863,7 +863,7 @@ export class GeminiChat {
       }
 
       const hookSystem = this.config.getHookSystem();
-      if (originalRequest && chunk && hookSystem) {
+      if (hookSystem) {
         const hookResult = await hookSystem.fireAfterModelEvent(
           originalRequest,
           chunk,
@@ -893,7 +893,8 @@ export class GeminiChat {
     for (const part of modelResponseParts) {
       const lastPart = consolidatedParts[consolidatedParts.length - 1];
       if (
-        lastPart?.text &&
+        lastPart &&
+        lastPart.text &&
         isValidNonThoughtTextPart(lastPart) &&
         isValidNonThoughtTextPart(part)
       ) {
@@ -978,10 +979,10 @@ export class GeminiChat {
     toolCalls: CompletedToolCall[],
   ): void {
     const toolCallRecords = toolCalls.map((call) => {
-      const resultDisplayRaw = call.response?.resultDisplay;
+      const resultDisplayRaw = call.response.resultDisplay;
       const resultDisplay =
         typeof resultDisplayRaw === 'string' ||
-        (typeof resultDisplayRaw === 'object' && resultDisplayRaw !== null)
+        typeof resultDisplayRaw === 'object'
           ? resultDisplayRaw
           : undefined;
 
@@ -989,7 +990,7 @@ export class GeminiChat {
         id: call.request.callId,
         name: call.request.name,
         args: call.request.args,
-        result: call.response?.responseParts || null,
+        result: call.response.responseParts || null,
         status: call.status,
         timestamp: new Date().toISOString(),
         resultDisplay,
@@ -1007,7 +1008,7 @@ export class GeminiChat {
       return;
     }
 
-    const thoughtPart = content.parts[0];
+    const thoughtPart = content.parts![0];
     if (thoughtPart.text) {
       // Extract subject and description using the same logic as turn.ts
       const rawText = thoughtPart.text;

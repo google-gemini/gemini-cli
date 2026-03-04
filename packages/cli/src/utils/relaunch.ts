@@ -12,7 +12,7 @@ import {
 } from '@google/gemini-cli-core';
 
 export async function relaunchOnExitCode(runner: () => Promise<number>) {
-  while (true) {
+  for (;;) {
     try {
       const exitCode = await runner();
 

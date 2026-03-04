@@ -404,7 +404,7 @@ export function BaseSettingsDialog({
         }
 
         // Number keys for quick edit on number fields
-        if (currentItem?.type === 'number' && /^[0-9]$/.test(key.sequence)) {
+        if (currentItem.type === 'number' && /^[0-9]$/.test(key.sequence)) {
           startEditing(currentItem.key, key.sequence);
           return true;
         }

@@ -183,7 +183,7 @@ export class GeminiCliSession {
       { text: prompt },
     ];
 
-    while (true) {
+    for (;;) {
       if (typeof this.instructions === 'function') {
         const context: SessionContext = {
           sessionId,

@@ -254,7 +254,7 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
           isSubtle: true,
         };
         activeModels.forEach(([name, metrics]) => {
-          const roleMetrics = metrics.roles?.[role];
+          const roleMetrics = metrics.roles[role];
           if (roleMetrics) {
             row[name] = getValue(roleMetrics);
           } else {

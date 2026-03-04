@@ -109,9 +109,9 @@ export async function loadConfig(
   };
 
   const fileService = new FileDiscoveryService(workspaceDir, {
-    respectGitIgnore: configParams?.fileFiltering?.respectGitIgnore,
-    respectGeminiIgnore: configParams?.fileFiltering?.respectGeminiIgnore,
-    customIgnoreFilePaths: configParams?.fileFiltering?.customIgnoreFilePaths,
+    respectGitIgnore: configParams.fileFiltering?.respectGitIgnore,
+    respectGeminiIgnore: configParams.fileFiltering?.respectGeminiIgnore,
+    customIgnoreFilePaths: configParams.fileFiltering?.customIgnoreFilePaths,
   });
   const { memoryContent, fileCount, filePaths } =
     await loadServerHierarchicalMemory(
@@ -212,7 +212,7 @@ export function loadEnvironment(): void {
 
 function findEnvFile(startDir: string): string | null {
   let currentDir = path.resolve(startDir);
-  while (true) {
+  for (;;) {
     // prefer gemini-specific .env under GEMINI_DIR
     const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
     if (fs.existsSync(geminiEnvPath)) {

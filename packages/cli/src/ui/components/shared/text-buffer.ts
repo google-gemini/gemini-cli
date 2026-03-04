@@ -2041,7 +2041,7 @@ function textBufferReducerLogic(
         if (visualToLogicalMap[newVisualRow]) {
           const [logRow, logicalStartCol] = visualToLogicalMap[newVisualRow];
           const transformedToLogicalMap =
-            visualLayout.transformedToLogicalMaps?.[logRow] ?? [];
+            visualLayout.transformedToLogicalMaps[logRow] ?? [];
           let transformedStartCol = 0;
           while (
             transformedStartCol < transformedToLogicalMap.length &&
@@ -3324,12 +3324,11 @@ export function useTextBuffer({
 
       if (visualToLogicalMap[clampedVisRow]) {
         const [logRow] = visualToLogicalMap[clampedVisRow];
-        const transformedToLogicalMap =
-          transformedToLogicalMaps?.[logRow] ?? [];
+        const transformedToLogicalMap = transformedToLogicalMaps[logRow] ?? [];
 
         // Where does this visual line begin within the transformed line?
         const startColInTransformed =
-          visualToTransformedMap?.[clampedVisRow] ?? 0;
+          visualToTransformedMap[clampedVisRow] ?? 0;
 
         // Handle wide characters: convert visual X position to character offset
         const codePoints = toCodePoints(visualLine);
@@ -3397,11 +3396,10 @@ export function useTextBuffer({
       }
 
       const [logRow] = visualToLogicalMap[clampedVisRow];
-      const transformedToLogicalMap = transformedToLogicalMaps?.[logRow] ?? [];
+      const transformedToLogicalMap = transformedToLogicalMaps[logRow] ?? [];
 
       // Where does this visual line begin within the transformed line?
-      const startColInTransformed =
-        visualToTransformedMap?.[clampedVisRow] ?? 0;
+      const startColInTransformed = visualToTransformedMap[clampedVisRow] ?? 0;
 
       // Handle wide characters: convert visual X position to character offset
       const codePoints = toCodePoints(visualLine);

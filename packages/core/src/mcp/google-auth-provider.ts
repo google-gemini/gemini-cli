@@ -49,7 +49,7 @@ export class GoogleCredentialProvider implements McpAuthProvider {
       );
     }
 
-    const scopes = this.config?.oauth?.scopes;
+    const scopes = this.config.oauth?.scopes;
     if (!scopes || scopes.length === 0) {
       throw new Error(
         'Scopes must be provided in the oauth config for Google Credentials provider',
@@ -98,7 +98,7 @@ export class GoogleCredentialProvider implements McpAuthProvider {
       token_type: 'Bearer',
     };
 
-    const expiryTime = client.credentials?.expiry_date;
+    const expiryTime = client.credentials.expiry_date;
     if (expiryTime) {
       this.tokenExpiryTime = expiryTime;
       this.cachedToken = newToken;

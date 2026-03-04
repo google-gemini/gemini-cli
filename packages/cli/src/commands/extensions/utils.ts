@@ -99,12 +99,6 @@ export async function configureSpecificSetting(
   const extensionConfig = await extensionManager.loadExtensionConfig(
     extension.path,
   );
-  if (!extensionConfig) {
-    logger.error(
-      `Could not find configuration for extension "${extensionName}".`,
-    );
-    return;
-  }
 
   await updateSetting(
     extensionConfig,
@@ -137,11 +131,7 @@ export async function configureExtension(
   const extensionConfig = await extensionManager.loadExtensionConfig(
     extension.path,
   );
-  if (
-    !extensionConfig ||
-    !extensionConfig.settings ||
-    extensionConfig.settings.length === 0
-  ) {
+  if (!extensionConfig.settings || extensionConfig.settings.length === 0) {
     logger.log(`Extension "${extensionName}" has no settings to configure.`);
     return;
   }
@@ -175,11 +165,7 @@ export async function configureAllExtensions(
     const extensionConfig = await extensionManager.loadExtensionConfig(
       extension.path,
     );
-    if (
-      extensionConfig &&
-      extensionConfig.settings &&
-      extensionConfig.settings.length > 0
-    ) {
+    if (extensionConfig.settings && extensionConfig.settings.length > 0) {
       logger.log(`\nConfiguring settings for "${extension.name}"...`);
       await configureExtensionSettings(
         extensionConfig,
@@ -208,7 +194,7 @@ export async function configureExtensionSettings(
     process.cwd(),
   );
 
-  let workspaceSettings: Record<string, string> = {};
+  let workspaceSettings: Record<string, string | undefined> = {};
   if (scope === ExtensionSettingScope.USER) {
     workspaceSettings = await getScopedEnvContents(
       extensionConfig,

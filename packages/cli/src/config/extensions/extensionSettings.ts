@@ -64,7 +64,7 @@ export async function maybePromptForSettings(
   extensionId: string,
   requestSetting: (setting: ExtensionSetting) => Promise<string>,
   previousExtensionConfig?: ExtensionConfig,
-  previousSettings?: Record<string, string>,
+  previousSettings?: Record<string, string | undefined>,
 ): Promise<void> {
   const { name: extensionName, settings } = extensionConfig;
   if (
@@ -92,7 +92,9 @@ export async function maybePromptForSettings(
     previousExtensionConfig?.settings ?? [],
   );
 
-  const allSettings: Record<string, string> = { ...previousSettings };
+  const allSettings: Record<string, string | undefined> = {
+    ...previousSettings,
+  };
 
   for (const removedEnvSetting of settingsChanges.removeEnv) {
     delete allSettings[removedEnvSetting.envVar];
@@ -174,13 +176,13 @@ export async function getScopedEnvContents(
   extensionId: string,
   scope: ExtensionSettingScope,
   workspaceDir?: string,
-): Promise<Record<string, string>> {
+): Promise<Record<string, string | undefined>> {
   const { name: extensionName } = extensionConfig;
   const keychain = new KeychainTokenStorage(
     getKeychainStorageName(extensionName, extensionId, scope, workspaceDir),
   );
   const envFilePath = getEnvFilePath(extensionName, scope, workspaceDir);
-  let customEnv: Record<string, string> = {};
+  let customEnv: Record<string, string | undefined> = {};
   if (fsSync.existsSync(envFilePath)) {
     const stat = fsSync.statSync(envFilePath);
     if (!stat.isDirectory()) {
@@ -206,7 +208,7 @@ export async function getEnvContents(
   extensionConfig: ExtensionConfig,
   extensionId: string,
   workspaceDir: string,
-): Promise<Record<string, string>> {
+): Promise<Record<string, string | undefined>> {
   if (!extensionConfig.settings || extensionConfig.settings.length === 0) {
     return Promise.resolve({});
   }

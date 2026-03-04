@@ -79,9 +79,9 @@ describe('Core System Prompt (prompts.ts)', () => {
     // Stub process.platform to 'linux' by default for deterministic snapshots across OSes
     mockPlatform('linux');
 
-    vi.stubEnv('SANDBOX', undefined);
-    vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
-    vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
+    vi.stubEnv('SANDBOX', '');
+    vi.stubEnv('GEMINI_SYSTEM_MD', '');
+    vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', '');
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue(['grep_search', 'glob']),

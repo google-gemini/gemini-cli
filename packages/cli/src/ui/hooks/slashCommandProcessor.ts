@@ -273,10 +273,6 @@ export const useSlashCommandProcessor = (
   );
 
   useEffect(() => {
-    if (!config) {
-      return;
-    }
-
     const listener = () => {
       reloadCommands();
     };
@@ -535,7 +531,7 @@ export const useSlashCommandProcessor = (
                     }
                   }
                 case 'load_history': {
-                  config?.getGeminiClient()?.setHistory(result.clientHistory);
+                  config?.getGeminiClient().setHistory(result.clientHistory);
                   fullCommandContext.ui.clear();
                   result.history.forEach((item, index) => {
                     fullCommandContext.ui.addItem(item, index);
@@ -688,7 +684,7 @@ export const useSlashCommandProcessor = (
             command: resolvedCommandPath[0],
             subcommand,
             status: SlashCommandStatus.ERROR,
-            extension_id: commandToExecute?.extensionId,
+            extension_id: commandToExecute.extensionId,
           });
           logSlashCommand(config, event);
         }
@@ -706,7 +702,7 @@ export const useSlashCommandProcessor = (
             command: resolvedCommandPath[0],
             subcommand,
             status: SlashCommandStatus.SUCCESS,
-            extension_id: commandToExecute?.extensionId,
+            extension_id: commandToExecute.extensionId,
           });
           logSlashCommand(config, event);
         }

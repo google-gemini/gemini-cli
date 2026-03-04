@@ -16,7 +16,7 @@ export function isGitRepository(directory: string): boolean {
   try {
     let currentDir = path.resolve(directory);
 
-    while (true) {
+    for (;;) {
       const gitDir = path.join(currentDir, '.git');
 
       // Check if .git exists (either as directory or file for worktrees)
@@ -50,7 +50,7 @@ export function findGitRoot(directory: string): string | null {
   try {
     let currentDir = path.resolve(directory);
 
-    while (true) {
+    for (;;) {
       const gitDir = path.join(currentDir, '.git');
 
       if (fs.existsSync(gitDir)) {

@@ -236,7 +236,7 @@ export class ProjectRegistry {
     let counter = 0;
     const existingIds = new Set(Object.values(existingMappings));
 
-    while (true) {
+    for (;;) {
       const candidate = counter === 0 ? slug : `${slug}-${counter}`;
       counter++;
 

@@ -41,7 +41,7 @@ function renderHastNode(
   if (node.type === 'element') {
     const nodeClasses: string[] =
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      (node.properties?.['className'] as string[]) || [];
+      (node.properties['className'] as string[]) || [];
     let elementColor: string | undefined = undefined;
 
     // Find color defined specifically for this element's class
@@ -59,7 +59,7 @@ function renderHastNode(
 
     // Recursively render children, passing the determined color down
     // Ensure child type matches expected HAST structure (ElementContent is common)
-    const children = node.children?.map(
+    const children = node.children.map(
       (child: ElementContent, index: number) => (
         <React.Fragment key={index}>
           {renderHastNode(child, theme, colorToPassDown)}
@@ -81,7 +81,7 @@ function renderHastNode(
 
     // Pass down the initial inheritedColor (likely undefined from the top call)
     // Ensure child type matches expected HAST structure (RootContent is common)
-    return node.children?.map((child: RootContent, index: number) => (
+    return node.children.map((child: RootContent, index: number) => (
       <React.Fragment key={index}>
         {renderHastNode(child, theme, inheritedColor)}
       </React.Fragment>

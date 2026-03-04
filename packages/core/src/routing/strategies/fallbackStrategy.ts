@@ -38,10 +38,7 @@ export class FallbackStrategy implements RoutingStrategy {
 
     const selection = selectModelForAvailability(config, requestedModel);
 
-    if (
-      selection?.selectedModel &&
-      selection.selectedModel !== requestedModel
-    ) {
+    if (selection.selectedModel && selection.selectedModel !== requestedModel) {
       return {
         model: selection.selectedModel,
         metadata: {

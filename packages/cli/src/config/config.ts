@@ -327,11 +327,11 @@ export async function parseArguments(
       return true;
     });
 
-  if (settings.experimental?.extensionManagement) {
+  if (settings.experimental.extensionManagement) {
     yargsInstance.command(extensionsCommand);
   }
 
-  if (settings.skills?.enabled ?? true) {
+  if (settings.skills.enabled) {
     yargsInstance.command(skillsCommand);
   }
   // Register hooks command if hooks are enabled
@@ -456,16 +456,16 @@ export async function loadCliConfig(
     process.env['GEMINI_SANDBOX'] = 'true';
   }
 
-  const memoryImportFormat = settings.context?.importFormat || 'tree';
-  const includeDirectoryTree = settings.context?.includeDirectoryTree ?? true;
+  const memoryImportFormat = settings.context.importFormat || 'tree';
+  const includeDirectoryTree = settings.context.includeDirectoryTree;
 
-  const ideMode = settings.ide?.enabled ?? false;
+  const ideMode = settings.ide.enabled;
 
   const folderTrust =
     process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true' ||
     process.env['VITEST'] === 'true'
       ? false
-      : (settings.security?.folderTrust?.enabled ?? false);
+      : settings.security.folderTrust.enabled;
   const trustedFolder =
     isWorkspaceTrusted(settings, cwd, undefined, {
       prompt: argv.prompt,
@@ -476,7 +476,7 @@ export async function loadCliConfig(
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
   // directly to the Config constructor in core, and have core handle setGeminiMdFilename.
   // However, loadHierarchicalGeminiMemory is called *before* createServerConfig.
-  if (settings.context?.fileName) {
+  if (settings.context.fileName) {
     setServerGeminiMdFilename(settings.context.fileName);
   } else {
     // Reset to default if not provided in settings.
@@ -487,15 +487,15 @@ export async function loadCliConfig(
 
   const memoryFileFiltering = {
     ...DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
-    ...settings.context?.fileFiltering,
+    ...settings.context.fileFiltering,
   };
 
   const fileFiltering = {
     ...DEFAULT_FILE_FILTERING_OPTIONS,
-    ...settings.context?.fileFiltering,
+    ...settings.context.fileFiltering,
   };
 
-  const includeDirectories = (settings.context?.includeDirectories || [])
+  const includeDirectories = settings.context.includeDirectories
     .map(resolvePath)
     .concat((argv.includeDirectories || []).map(resolvePath));
 
@@ -515,7 +515,7 @@ export async function loadCliConfig(
     .getExtensions()
     .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
-  const experimentalJitContext = settings.experimental?.jitContext ?? false;
+  const experimentalJitContext = settings.experimental.jitContext;
 
   let memoryContent: string | HierarchicalMemory = '';
   let fileCount = 0;
@@ -525,7 +525,7 @@ export async function loadCliConfig(
     // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
     const result = await loadServerHierarchicalMemory(
       cwd,
-      settings.context?.loadMemoryFromIncludeDirectories || false
+      settings.context.loadMemoryFromIncludeDirectories
         ? includeDirectories
         : [],
       debugMode,
@@ -534,7 +534,7 @@ export async function loadCliConfig(
       trustedFolder,
       memoryImportFormat,
       memoryFileFiltering,
-      settings.context?.discoveryMaxDirs,
+      settings.context.discoveryMaxDirs,
     );
     memoryContent = result.memoryContent;
     fileCount = result.fileCount;
@@ -548,8 +548,8 @@ export async function loadCliConfig(
   const rawApprovalMode =
     argv.approvalMode ||
     (argv.yolo ? 'yolo' : undefined) ||
-    ((settings.general?.defaultApprovalMode as string) !== 'yolo'
-      ? settings.general?.defaultApprovalMode
+    ((settings.general.defaultApprovalMode as string) !== 'yolo'
+      ? settings.general.defaultApprovalMode
       : undefined);
 
   if (rawApprovalMode) {
@@ -561,7 +561,7 @@ export async function loadCliConfig(
         approvalMode = ApprovalMode.AUTO_EDIT;
         break;
       case 'plan':
-        if (!(settings.experimental?.plan ?? false)) {
+        if (!settings.experimental.plan) {
           debugLogger.warn(
             'Approval mode "plan" is only available when experimental.plan is enabled. Falling back to "default".',
           );
@@ -583,9 +583,9 @@ export async function loadCliConfig(
   }
 
   // Override approval mode if disableYoloMode is set.
-  if (settings.security?.disableYoloMode || settings.admin?.secureModeEnabled) {
+  if (settings.security.disableYoloMode || settings.admin.secureModeEnabled) {
     if (approvalMode === ApprovalMode.YOLO) {
-      if (settings.admin?.secureModeEnabled) {
+      if (settings.admin.secureModeEnabled) {
         debugLogger.error(
           'YOLO mode is disabled by "secureModeEnabled" setting.',
         );
@@ -636,7 +636,7 @@ export async function loadCliConfig(
     (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
       !argv.isCommand);
 
-  const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
+  const allowedTools = argv.allowedTools || settings.tools.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
 
   // In non-interactive mode, exclude tools that require a prompt.
@@ -694,7 +694,7 @@ export async function loadCliConfig(
     },
     mcp: {
       ...settings.mcp,
-      allowed: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
+      allowed: argv.allowedMcpServerNames ?? settings.mcp.allowed,
     },
     policyPaths: argv.policy,
   };
@@ -715,7 +715,7 @@ export async function loadCliConfig(
 
   const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
   const specifiedModel =
-    argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
+    argv.model || process.env['GEMINI_MODEL'] || settings.model.name;
 
   const resolvedModel =
     specifiedModel === GEMINI_MODEL_ALIAS_AUTO
@@ -729,9 +729,9 @@ export async function loadCliConfig(
 
   const ptyInfo = await getPty();
 
-  const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
-  const extensionsEnabled = settings.admin?.extensions?.enabled ?? true;
-  const adminSkillsEnabled = settings.admin?.skills?.enabled ?? true;
+  const mcpEnabled = settings.admin.mcp.enabled;
+  const extensionsEnabled = settings.admin.extensions.enabled;
+  const adminSkillsEnabled = settings.admin.skills.enabled;
 
   // Create MCP enablement manager and callbacks
   const mcpEnablementManager = McpServerEnablementManager.getInstance();
@@ -739,8 +739,8 @@ export async function loadCliConfig(
     ? mcpEnablementManager.getEnablementCallbacks()
     : undefined;
 
-  const adminAllowlist = settings.admin?.mcp?.config;
-  let mcpServerCommand = mcpEnabled ? settings.mcp?.serverCommand : undefined;
+  const adminAllowlist = settings.admin.mcp.config;
+  let mcpServerCommand = mcpEnabled ? settings.mcp.serverCommand : undefined;
   let mcpServers = mcpEnabled ? settings.mcpServers : {};
 
   if (mcpEnabled && adminAllowlist && Object.keys(adminAllowlist).length > 0) {
@@ -748,7 +748,7 @@ export async function loadCliConfig(
     mcpServers = result.mcpServers;
     mcpServerCommand = undefined;
 
-    if (result.blockedServerNames && result.blockedServerNames.length > 0) {
+    if (result.blockedServerNames.length > 0) {
       const message = getAdminBlockedMcpServersMessage(
         result.blockedServerNames,
         undefined,
@@ -766,17 +766,17 @@ export async function loadCliConfig(
     includeDirectoryTree,
     includeDirectories,
     loadMemoryFromIncludeDirectories:
-      settings.context?.loadMemoryFromIncludeDirectories || false,
+      settings.context.loadMemoryFromIncludeDirectories,
     debugMode,
     question,
 
-    coreTools: settings.tools?.core || undefined,
+    coreTools: settings.tools.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
     policyUpdateConfirmationRequest,
     excludeTools,
-    toolDiscoveryCommand: settings.tools?.discoveryCommand,
-    toolCallCommand: settings.tools?.callCommand,
+    toolDiscoveryCommand: settings.tools.discoveryCommand,
+    toolCallCommand: settings.tools.callCommand,
     mcpServerCommand,
     mcpServers,
     mcpEnablementCallbacks,
@@ -785,32 +785,32 @@ export async function loadCliConfig(
     agents: settings.agents,
     adminSkillsEnabled,
     allowedMcpServers: mcpEnabled
-      ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
+      ? (argv.allowedMcpServerNames ?? settings.mcp.allowed)
       : undefined,
     blockedMcpServers: mcpEnabled
       ? argv.allowedMcpServerNames
         ? undefined
-        : settings.mcp?.excluded
+        : settings.mcp.excluded
       : undefined,
     blockedEnvironmentVariables:
-      settings.security?.environmentVariableRedaction?.blocked,
+      settings.security.environmentVariableRedaction.blocked,
     enableEnvironmentVariableRedaction:
-      settings.security?.environmentVariableRedaction?.enabled,
+      settings.security.environmentVariableRedaction.enabled,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,
     approvalMode,
     disableYoloMode:
-      settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
-    showMemoryUsage: settings.ui?.showMemoryUsage || false,
+      settings.security.disableYoloMode || settings.admin.secureModeEnabled,
+    showMemoryUsage: settings.ui.showMemoryUsage,
     accessibility: {
-      ...settings.ui?.accessibility,
+      ...settings.ui.accessibility,
       screenReader,
     },
     telemetry: telemetrySettings,
-    usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled,
+    usageStatisticsEnabled: settings.privacy.usageStatisticsEnabled,
     fileFiltering,
-    checkpointing: settings.general?.checkpointing?.enabled,
+    checkpointing: settings.general.checkpointing.enabled,
     proxy:
       process.env['HTTPS_PROXY'] ||
       process.env['https_proxy'] ||

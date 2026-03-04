@@ -22,7 +22,7 @@ const TERMINAL_CLEANUP_SEQUENCE = '\x1b[<u\x1b[>4;0m\x1b[?2004l';
 
 export function cleanupTerminalOnExit() {
   try {
-    if (process.stdout?.fd !== undefined) {
+    if (process.stdout.fd !== undefined) {
       fs.writeSync(process.stdout.fd, TERMINAL_CLEANUP_SEQUENCE);
       return;
     }

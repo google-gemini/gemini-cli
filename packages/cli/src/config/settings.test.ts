@@ -460,7 +460,7 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.security?.folderTrust?.enabled).toBe(false); // Workspace setting should be used
+      expect(settings.merged.security.folderTrust?.enabled).toBe(false); // Workspace setting should be used
     });
 
     it('should use system folderTrust over user setting', () => {
@@ -500,7 +500,7 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.security?.folderTrust?.enabled).toBe(true); // System setting should be used
+      expect(settings.merged.security.folderTrust?.enabled).toBe(true); // System setting should be used
     });
 
     it('should not allow user or workspace to override system disableYoloMode', () => {
@@ -534,7 +534,7 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.security?.disableYoloMode).toBe(true); // System setting should be used
+      expect(settings.merged.security.disableYoloMode).toBe(true); // System setting should be used
     });
 
     it.each([
@@ -630,7 +630,7 @@ describe('Settings Loading and Merging', () => {
         'WORKSPACE_DEBUG',
         'WORKSPACE_VAR',
       ]);
-      expect(settings.merged.advanced?.excludedEnvVars).toEqual([
+      expect(settings.merged.advanced.excludedEnvVars).toEqual([
         'DEBUG',
         'DEBUG_MODE',
         'NODE_ENV',
@@ -658,7 +658,7 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.context?.fileName).toBeUndefined();
+      expect(settings.merged.context.fileName).toBeUndefined();
     });
 
     it.each([
@@ -991,7 +991,7 @@ describe('Settings Loading and Merging', () => {
         );
 
         const settings = loadSettings(MOCK_WORKSPACE_DIR);
-        expect(settings.merged.model?.compressionThreshold).toEqual(expected);
+        expect(settings.merged.model.compressionThreshold).toEqual(expected);
       });
     });
 
@@ -1018,7 +1018,7 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      expect(settings.merged.model?.compressionThreshold).toEqual(0.5);
+      expect(settings.merged.model.compressionThreshold).toEqual(0.5);
     });
 
     it('should merge includeDirectories from all scopes', () => {
@@ -1052,7 +1052,7 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      expect(settings.merged.context?.includeDirectories).toEqual([
+      expect(settings.merged.context.includeDirectories).toEqual([
         '/system/defaults/dir',
         '/user/dir1',
         '/user/dir2',
@@ -1247,7 +1247,7 @@ describe('Settings Loading and Merging', () => {
       expect((settings.merged as TestSettings)['workspaceOnly']).toBe(
         'workspace_value',
       );
-      expect(settings.merged.ui?.theme).toBe('light'); // workspace overrides user
+      expect(settings.merged.ui.theme).toBe('light'); // workspace overrides user
 
       delete process.env['SYSTEM_VAR'];
       delete process.env['USER_VAR'];
@@ -1275,7 +1275,7 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.advanced?.dnsResolutionOrder).toBe('verbatim');
+      expect(settings.merged.advanced.dnsResolutionOrder).toBe('verbatim');
     });
 
     it('should use user dnsResolutionOrder if workspace is not defined', () => {
@@ -1294,7 +1294,7 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.advanced?.dnsResolutionOrder).toBe('verbatim');
+      expect(settings.merged.advanced.dnsResolutionOrder).toBe('verbatim');
     });
 
     it('should leave unresolved environment variables as is', () => {
@@ -1599,7 +1599,7 @@ describe('Settings Loading and Merging', () => {
         const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
         // Verify the settings were loaded correctly
-        expect(settings.merged.advanced?.excludedEnvVars).toEqual([
+        expect(settings.merged.advanced.excludedEnvVars).toEqual([
           'DEBUG',
           'DEBUG_MODE',
         ]);
@@ -1637,7 +1637,7 @@ describe('Settings Loading and Merging', () => {
         'NODE_ENV',
         'DEBUG',
       ]);
-      expect(settings.merged.advanced?.excludedEnvVars).toEqual([
+      expect(settings.merged.advanced.excludedEnvVars).toEqual([
         'DEBUG',
         'DEBUG_MODE',
         'NODE_ENV',
@@ -1677,7 +1677,7 @@ describe('Settings Loading and Merging', () => {
         'WORKSPACE_DEBUG',
         'WORKSPACE_VAR',
       ]);
-      expect(settings.merged.advanced?.excludedEnvVars).toEqual([
+      expect(settings.merged.advanced.excludedEnvVars).toEqual([
         'DEBUG',
         'DEBUG_MODE',
         'NODE_ENV',
@@ -1711,9 +1711,9 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect(settings.merged.tools?.sandbox).toBe(true);
-      expect(settings.merged.context?.fileName).toBe('WORKSPACE.md');
-      expect(settings.merged.ui?.theme).toBe('dark');
+      expect(settings.merged.tools.sandbox).toBe(true);
+      expect(settings.merged.context.fileName).toBe('WORKSPACE.md');
+      expect(settings.merged.ui.theme).toBe('dark');
     });
 
     it('should NOT merge workspace settings when workspace is not trusted', () => {
@@ -1744,9 +1744,9 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      expect(settings.merged.tools?.sandbox).toBe(false); // User setting
-      expect(settings.merged.context?.fileName).toBe('USER.md'); // User setting
-      expect(settings.merged.ui?.theme).toBe('dark'); // User setting
+      expect(settings.merged.tools.sandbox).toBe(false); // User setting
+      expect(settings.merged.context.fileName).toBe('USER.md'); // User setting
+      expect(settings.merged.ui.theme).toBe('dark'); // User setting
     });
 
     it('should NOT merge workspace settings when workspace trust is undefined', () => {
@@ -1777,8 +1777,8 @@ describe('Settings Loading and Merging', () => {
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      expect(settings.merged.tools?.sandbox).toBe(false); // User setting
-      expect(settings.merged.context?.fileName).toBe('USER.md'); // User setting
+      expect(settings.merged.tools.sandbox).toBe(false); // User setting
+      expect(settings.merged.context.fileName).toBe('USER.md'); // User setting
     });
   });
 
@@ -2229,7 +2229,7 @@ describe('Settings Loading and Merging', () => {
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
       // Verify it was migrated in the merged settings
-      expect(settings.merged.general?.enableAutoUpdate).toBe(false);
+      expect(settings.merged.general.enableAutoUpdate).toBe(false);
 
       // Verify it was saved back to disk (via setValue calling updateSettingsFilePreservingFormat)
       expect(updateSettingsFilePreservingFormat).toHaveBeenCalledWith(
@@ -2289,7 +2289,7 @@ describe('Settings Loading and Merging', () => {
       ).toBe(true);
 
       // Merged should also reflect it (system overrides defaults, but both are migrated)
-      expect(settings.merged.general?.enableAutoUpdateNotification).toBe(false);
+      expect(settings.merged.general.enableAutoUpdateNotification).toBe(false);
 
       // Verify it was NOT saved back to disk
       expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalledWith(
@@ -2487,10 +2487,10 @@ describe('Settings Loading and Merging', () => {
 
       // 1. Verify that on initial load, file-based admin settings are ignored
       //    and schema defaults are used instead.
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false); // default: false
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true); // default: true
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true); // default: true
-      expect(loadedSettings.merged.ui?.theme).toBe('system-theme'); // non-admin setting should be loaded
+      expect(loadedSettings.merged.admin.secureModeEnabled).toBe(false); // default: false
+      expect(loadedSettings.merged.admin.mcp?.enabled).toBe(true); // default: true
+      expect(loadedSettings.merged.admin.extensions?.enabled).toBe(true); // default: true
+      expect(loadedSettings.merged.ui.theme).toBe('system-theme'); // non-admin setting should be loaded
 
       // 2. Now, set remote admin settings.
       loadedSettings.setRemoteAdminSettings({
@@ -2503,11 +2503,11 @@ describe('Settings Loading and Merging', () => {
       });
 
       // 3. Verify that remote admin settings take precedence.
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin.secureModeEnabled).toBe(true);
+      expect(loadedSettings.merged.admin.mcp?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin.extensions?.enabled).toBe(false);
       // non-admin setting should remain unchanged
-      expect(loadedSettings.merged.ui?.theme).toBe('system-theme');
+      expect(loadedSettings.merged.ui.theme).toBe('system-theme');
     });
 
     it('should set remote admin settings and recompute merged settings', () => {
@@ -2532,10 +2532,10 @@ describe('Settings Loading and Merging', () => {
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
       // Ensure initial state from defaults (as file-based admin settings are ignored)
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
-      expect(loadedSettings.merged.ui?.theme).toBe('initial-theme');
+      expect(loadedSettings.merged.admin.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.ui.theme).toBe('initial-theme');
 
       const newRemoteSettings = {
         strictModeDisabled: false,
@@ -2549,11 +2549,11 @@ describe('Settings Loading and Merging', () => {
       loadedSettings.setRemoteAdminSettings(newRemoteSettings);
 
       // Verify that remote admin settings are applied
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin.secureModeEnabled).toBe(true);
+      expect(loadedSettings.merged.admin.mcp?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin.extensions?.enabled).toBe(false);
       // Non-admin settings should remain untouched
-      expect(loadedSettings.merged.ui?.theme).toBe('initial-theme');
+      expect(loadedSettings.merged.ui.theme).toBe('initial-theme');
     });
 
     it('should correctly handle undefined remote admin settings', () => {
@@ -2573,16 +2573,16 @@ describe('Settings Loading and Merging', () => {
 
       const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
       // Should have default admin settings
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin.extensions?.enabled).toBe(true);
 
       loadedSettings.setRemoteAdminSettings({}); // Set empty remote settings
 
       // Admin settings should revert to defaults because there are no remote overrides
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin.extensions?.enabled).toBe(true);
     });
 
     it('should un-nest MCP configuration from remote settings', () => {
@@ -2604,7 +2604,7 @@ describe('Settings Loading and Merging', () => {
         },
       });
 
-      expect(loadedSettings.merged.admin?.mcp?.config).toEqual(mcpServers);
+      expect(loadedSettings.merged.admin.mcp?.config).toEqual(mcpServers);
     });
 
     it('should set skills based on unmanagedCapabilitiesEnabled', () => {
@@ -2630,9 +2630,9 @@ describe('Settings Loading and Merging', () => {
       loadedSettings.setRemoteAdminSettings({});
 
       // Should default to schema defaults (standard defaults)
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin.extensions?.enabled).toBe(true);
     });
   });
 

@@ -119,7 +119,7 @@ export class ShellProcessor implements IPromptProcessor {
 
       if (!command) continue;
 
-      if (context.session.sessionShellAllowlist?.has(command)) {
+      if (context.session.sessionShellAllowlist.has(command)) {
         continue;
       }
 

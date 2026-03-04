@@ -37,7 +37,7 @@ export async function loadWasmBinary(
 ): Promise<Uint8Array> {
   try {
     const module = await dynamicImport();
-    if (module?.default instanceof Uint8Array) {
+    if (module.default instanceof Uint8Array) {
       return module.default;
     }
   } catch (error) {

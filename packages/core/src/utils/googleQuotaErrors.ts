@@ -375,16 +375,9 @@ export function classifyGoogleError(error: unknown): unknown {
   // If we reached this point and the status is still 429 or 499, we return retryable.
   if (status === 429 || status === 499) {
     const errorMessage =
-      googleApiError?.message ||
+      googleApiError.message ||
       (error instanceof Error ? error.message : String(error));
-    return new RetryableQuotaError(
-      errorMessage,
-      googleApiError ?? {
-        code: status,
-        message: errorMessage,
-        details: [],
-      },
-    );
+    return new RetryableQuotaError(errorMessage, googleApiError);
   }
   return error; // Fallback to original error if no specific classification fits.
 }

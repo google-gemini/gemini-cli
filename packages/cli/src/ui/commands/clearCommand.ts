@@ -25,7 +25,7 @@ export const clearCommand: SlashCommand = {
     const config = context.services.config;
     const chatRecordingService = context.services.config
       ?.getGeminiClient()
-      ?.getChat()
+      .getChat()
       .getChatRecordingService();
 
     // Fire SessionEnd hook before clearing

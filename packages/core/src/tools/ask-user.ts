@@ -44,7 +44,7 @@ export class AskUserTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: AskUserParams,
   ): string | null {
-    if (!params.questions || params.questions.length === 0) {
+    if (params.questions.length === 0) {
       return 'At least one question is required.';
     }
 
@@ -73,10 +73,7 @@ export class AskUserTool extends BaseDeclarativeTool<
           ) {
             return `Question ${i + 1}, option ${j + 1}: 'label' is required and must be a non-empty string.`;
           }
-          if (
-            opt.description === undefined ||
-            typeof opt.description !== 'string'
-          ) {
+          if (typeof opt.description !== 'string') {
             return `Question ${i + 1}, option ${j + 1}: 'description' is required and must be a string.`;
           }
         }
@@ -184,7 +181,7 @@ export class AskUserInvocation extends BaseToolInvocation<
       ? `**User answered:**\n${answerEntries
           .map(([index, answer]) => {
             const question = this.params.questions[parseInt(index, 10)];
-            const category = question?.header ?? `Q${index}`;
+            const category = question.header;
             const prefix = `  ${category} → `;
             const indent = ' '.repeat(prefix.length);
 

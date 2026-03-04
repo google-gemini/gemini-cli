@@ -147,6 +147,9 @@ describe('GeminiChat', () => {
       }),
       getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
       setQuotaErrorOccurred: vi.fn(),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
+      getGemini31Launched: vi.fn().mockResolvedValue(false),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
       flashFallbackHandler: undefined,
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {

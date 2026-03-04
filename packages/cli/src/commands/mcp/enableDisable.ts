@@ -43,9 +43,9 @@ async function handleEnable(args: Args): Promise<void> {
   }
 
   const result = await canLoadServer(name, {
-    adminMcpEnabled: settings.merged.admin?.mcp?.enabled ?? true,
-    allowedList: settings.merged.mcp?.allowed,
-    excludedList: settings.merged.mcp?.excluded,
+    adminMcpEnabled: settings.merged.admin.mcp.enabled,
+    allowedList: settings.merged.mcp.allowed,
+    excludedList: settings.merged.mcp.excluded,
   });
 
   if (

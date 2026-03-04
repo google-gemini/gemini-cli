@@ -174,7 +174,7 @@ ${formattedHistory}
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
     const gemmaRouterSettings = config.getGemmaModelRouterSettings();
-    if (!gemmaRouterSettings?.enabled) {
+    if (!gemmaRouterSettings.enabled) {
       return null;
     }
 

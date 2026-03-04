@@ -344,7 +344,7 @@ ${textContent}
     const chunks: Uint8Array[] = [];
     let totalLength = 0;
     try {
-      while (true) {
+      for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
         totalLength += value.length;

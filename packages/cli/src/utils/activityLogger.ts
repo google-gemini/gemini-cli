@@ -340,7 +340,7 @@ export class ActivityLogger extends EventEmitter {
 
           const readStream = async () => {
             try {
-              while (true) {
+              for (;;) {
                 const { done, value } = await reader.read();
                 if (done) break;
 

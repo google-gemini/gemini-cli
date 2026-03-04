@@ -41,8 +41,8 @@ export function resolvePolicyChain(
   wrapsAround: boolean = false,
 ): ModelPolicyChain {
   const modelFromConfig =
-    preferredModel ?? config.getActiveModel?.() ?? config.getModel();
-  const configuredModel = config.getModel();
+    preferredModel ?? config.getActiveModel?.() ?? config.getModel?.();
+  const configuredModel = config.getModel?.();
 
   let chain;
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
@@ -73,7 +73,7 @@ export function resolvePolicyChain(
         configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
       chain = getModelPolicyChain({
         previewEnabled,
-        userTier: config.getUserTier(),
+        userTier: config.getUserTier?.(),
         useGemini31,
         useCustomToolModel,
       });
@@ -82,7 +82,7 @@ export function resolvePolicyChain(
       // to the stable Gemini 2.5 chain.
       return getModelPolicyChain({
         previewEnabled: false,
-        userTier: config.getUserTier(),
+        userTier: config.getUserTier?.(),
         useGemini31,
         useCustomToolModel,
       });
@@ -139,7 +139,7 @@ export function resolvePolicyAction(
   failureKind: FailureKind,
   policy: ModelPolicy,
 ): FallbackAction {
-  return policy.actions?.[failureKind] ?? 'prompt';
+  return policy.actions[failureKind] ?? 'prompt';
 }
 
 /**
@@ -236,7 +236,7 @@ export function applyAvailabilityTransition(
   const context = getContext?.();
   if (!context) return;
 
-  const transition = context.policy.stateTransitions?.[failureKind];
+  const transition = context.policy.stateTransitions[failureKind];
   if (!transition) return;
 
   if (transition === 'terminal') {

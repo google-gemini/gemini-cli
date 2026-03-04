@@ -191,8 +191,8 @@ export async function modifyWithEditor<ToolParams>(
     : await modifyContext.getProposedContent(originalParams);
 
   const { oldPath, newPath, dirPath } = createTempFilesForModify(
-    currentContent ?? '',
-    proposedContent ?? '',
+    currentContent,
+    proposedContent,
     modifyContext.getFilePath(originalParams),
   );
 

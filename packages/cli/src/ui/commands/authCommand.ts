@@ -37,7 +37,7 @@ const authLogoutCommand: SlashCommand = {
       undefined,
     );
     // Strip thoughts from history instead of clearing completely
-    context.services.config?.getGeminiClient()?.stripThoughtsFromHistory();
+    context.services.config?.getGeminiClient().stripThoughtsFromHistory();
     // Return logout action to signal explicit state change
     return {
       type: 'logout',

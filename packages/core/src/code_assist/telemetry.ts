@@ -197,7 +197,7 @@ function includesCode(resp: GenerateContentResponse): boolean {
       continue;
     }
     for (const part of candidate.content.parts) {
-      if ('text' in part && part?.text?.includes('```')) {
+      if ('text' in part && part.text?.includes('```')) {
         return true;
       }
     }
@@ -232,7 +232,7 @@ function hasError(response: GenerateContentResponse): boolean {
   // Non-OK SDK results should be considered an error.
   if (
     response.sdkHttpResponse &&
-    !response.sdkHttpResponse?.responseInternal?.ok
+    !response.sdkHttpResponse.responseInternal.ok
   ) {
     return true;
   }

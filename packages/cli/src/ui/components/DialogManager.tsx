@@ -255,7 +255,7 @@ export const DialogManager = ({
           onClose={uiActions.closeAgentConfigDialog}
           onSave={async () => {
             // Reload agent registry to pick up changes
-            const agentRegistry = config?.getAgentRegistry();
+            const agentRegistry = config.getAgentRegistry();
             if (agentRegistry) {
               await agentRegistry.reload();
             }

@@ -148,7 +148,7 @@ function isPersistedStateMetadata(
 export function getPersistedState(
   metadata: PersistedTaskMetadata,
 ): PersistedStateMetadata | undefined {
-  const state = metadata?.[METADATA_KEY];
+  const state = metadata[METADATA_KEY];
   if (isPersistedStateMetadata(state)) {
     return state;
   }

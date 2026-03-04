@@ -84,7 +84,7 @@ export function useSessionResume({
         }
 
         // Give the history to the Gemini client.
-        await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
+        await config.getGeminiClient().resumeChat(clientHistory, resumedData);
       } catch (error) {
         coreEvents.emitFeedback(
           'error',

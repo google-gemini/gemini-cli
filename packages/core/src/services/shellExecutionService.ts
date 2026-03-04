@@ -834,7 +834,7 @@ export class ShellExecutionService {
                 aborted: abortSignal.aborted,
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 pid: ptyProcess.pid,
-                executionMethod: ptyInfo?.name ?? 'node-pty',
+                executionMethod: ptyInfo.name ?? 'node-pty',
               });
             };
 

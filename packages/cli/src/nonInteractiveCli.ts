@@ -135,7 +135,7 @@ export async function runNonInteractive({
         key: { name?: string; ctrl?: boolean },
       ) => {
         // Detect Ctrl+C: either ctrl+c key combo or raw character code 3
-        if ((key && key.ctrl && key.name === 'c') || str === '\u0003') {
+        if ((key.ctrl && key.name === 'c') || str === '\u0003') {
           // Only handle once
           if (isAborting) {
             return;
@@ -289,7 +289,7 @@ export async function runNonInteractive({
       let currentMessages: Content[] = [{ role: 'user', parts: query }];
 
       let turnCount = 0;
-      while (true) {
+      for (;;) {
         turnCount++;
         if (
           config.getMaxSessionTurns() >= 0 &&
@@ -461,8 +461,8 @@ export async function runNonInteractive({
             (tc) => tc.response.errorType === ToolErrorType.STOP_EXECUTION,
           );
 
-          if (stopExecutionTool && stopExecutionTool.response.error) {
-            const stopMessage = `Agent execution stopped: ${stopExecutionTool.response.error.message}`;
+          if (stopExecutionTool) {
+            const stopMessage = `Agent execution stopped: ${stopExecutionTool.response.error?.message}`;
 
             if (config.getOutputFormat() === OutputFormat.TEXT) {
               process.stderr.write(`${stopMessage}\n`);

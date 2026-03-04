@@ -138,7 +138,7 @@ export function useQuotaAndFallback({
             : null,
           `/stats model for usage details`,
           `/model to switch models.`,
-          contentGeneratorConfig?.authType === AuthType.LOGIN_WITH_GOOGLE
+          contentGeneratorConfig.authType === AuthType.LOGIN_WITH_GOOGLE
             ? `/auth to switch to API key.`
             : null,
         ].filter(Boolean);
@@ -194,7 +194,7 @@ export function useQuotaAndFallback({
             message,
             isTerminalQuotaError,
             isModelNotFoundError,
-            authType: contentGeneratorConfig?.authType,
+            authType: contentGeneratorConfig.authType,
           });
         },
       );

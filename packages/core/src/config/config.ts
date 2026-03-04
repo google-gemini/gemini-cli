@@ -1386,7 +1386,7 @@ export class Config implements McpContext {
   }
 
   getContentGeneratorConfig(): ContentGeneratorConfig {
-    return this.contentGeneratorConfig;
+    return this.contentGeneratorConfig ?? {};
   }
 
   getModel(): string {

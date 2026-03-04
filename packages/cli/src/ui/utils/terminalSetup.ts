@@ -78,10 +78,8 @@ const TERMINAL_DATA: Record<SupportedTerminal, TerminalData> = {
 /**
  * Maps a supported terminal ID to its display name and config folder name.
  */
-function getSupportedTerminalData(
-  terminal: SupportedTerminal,
-): TerminalData | null {
-  return TERMINAL_DATA[terminal] || null;
+function getSupportedTerminalData(terminal: SupportedTerminal): TerminalData {
+  return TERMINAL_DATA[terminal];
 }
 
 type Keybinding = {

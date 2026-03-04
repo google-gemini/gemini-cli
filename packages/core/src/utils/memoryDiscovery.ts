@@ -43,7 +43,7 @@ export interface GeminiFileContent {
 
 async function findProjectRoot(startDir: string): Promise<string | null> {
   let currentDir = normalizePath(startDir);
-  while (true) {
+  for (;;) {
     const gitPath = path.join(currentDir, '.git');
     try {
       const stats = await fs.lstat(gitPath);
@@ -441,7 +441,7 @@ async function findUpwardGeminiFiles(
     );
   }
 
-  while (true) {
+  for (;;) {
     if (currentDir === globalGeminiDir) {
       break;
     }

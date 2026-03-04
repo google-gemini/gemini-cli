@@ -44,7 +44,7 @@ export function ApiAuthDialog({
 
   const buffer = useTextBuffer({
     initialText: initialApiKey || '',
-    initialCursorOffset: initialApiKey?.length || 0,
+    initialCursorOffset: initialApiKey.length || 0,
     viewport: {
       width: viewportWidth,
       height: 4,

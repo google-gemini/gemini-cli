@@ -139,7 +139,7 @@ const authCommand: SlashCommand = {
       }
       // Update the client with the new tools
       const geminiClient = config.getGeminiClient();
-      if (geminiClient?.isInitialized()) {
+      if (geminiClient.isInitialized()) {
         await geminiClient.setTools();
       }
 
@@ -361,7 +361,7 @@ const refreshCommand: SlashCommand = {
 
     // Update the client with the new tools
     const geminiClient = config.getGeminiClient();
-    if (geminiClient?.isInitialized()) {
+    if (geminiClient.isInitialized()) {
       await geminiClient.setTools();
     }
 
@@ -419,9 +419,9 @@ async function handleEnableDisable(
   if (enable) {
     const settings = loadSettings();
     const result = await canLoadServer(name, {
-      adminMcpEnabled: settings.merged.admin?.mcp?.enabled ?? true,
-      allowedList: settings.merged.mcp?.allowed,
-      excludedList: settings.merged.mcp?.excluded,
+      adminMcpEnabled: settings.merged.admin.mcp.enabled ?? true,
+      allowedList: settings.merged.mcp.allowed,
+      excludedList: settings.merged.mcp.excluded,
     });
     if (
       !result.allowed &&
@@ -465,7 +465,7 @@ async function handleEnableDisable(
     );
     await mcpClientManager.restart();
   }
-  if (config.getGeminiClient()?.isInitialized())
+  if (config.getGeminiClient().isInitialized())
     await config.getGeminiClient().setTools();
   context.ui.reloadCommands();
 

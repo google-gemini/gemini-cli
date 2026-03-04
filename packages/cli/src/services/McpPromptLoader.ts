@@ -62,7 +62,7 @@ export class McpPromptLoader implements ICommandLoader {
                 let helpMessage = `Arguments for "${prompt.name}":\n\n`;
                 if (prompt.arguments && prompt.arguments.length > 0) {
                   helpMessage += `You can provide arguments by name (e.g., --argName="value") or by position.\n\n`;
-                  helpMessage += `e.g., ${prompt.name} ${prompt.arguments?.map((_) => `"foo"`)} is equivalent to ${prompt.name} ${prompt.arguments?.map((arg) => `--${arg.name}="foo"`)}\n\n`;
+                  helpMessage += `e.g., ${prompt.name} ${prompt.arguments.map((_) => `"foo"`)} is equivalent to ${prompt.name} ${prompt.arguments.map((arg) => `--${arg.name}="foo"`)}\n\n`;
                 }
                 for (const arg of prompt.arguments) {
                   helpMessage += `  --${arg.name}\n`;
@@ -123,7 +123,7 @@ export class McpPromptLoader implements ICommandLoader {
                 };
               }
 
-              const maybeContent = result.messages?.[0]?.content;
+              const maybeContent = result.messages[0]?.content;
               if (maybeContent.type !== 'text') {
                 return {
                   type: 'message',

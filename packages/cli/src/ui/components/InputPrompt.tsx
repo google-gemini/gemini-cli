@@ -148,7 +148,7 @@ const DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS = 350;
  * Returns true if a toggle action was performed or hint was shown, false otherwise.
  */
 export function tryTogglePasteExpansion(buffer: TextBuffer): boolean {
-  if (!buffer.pastedContent || Object.keys(buffer.pastedContent).length === 0) {
+  if (Object.keys(buffer.pastedContent).length === 0) {
     return false;
   }
 
@@ -344,13 +344,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
       let processedValue = submittedValue;
-      if (buffer.pastedContent) {
-        // Replace placeholders like [Pasted Text: 6 lines] with actual content
-        processedValue = processedValue.replace(
-          PASTED_TEXT_PLACEHOLDER_REGEX,
-          (match) => buffer.pastedContent[match] || match,
-        );
-      }
+      // Replace placeholders like [Pasted Text: 6 lines] with actual content
+      processedValue = processedValue.replace(
+        PASTED_TEXT_PLACEHOLDER_REGEX,
+        (match) => buffer.pastedContent[match] || match,
+      );
 
       if (shellModeActive) {
         shellHistory.addCommandToHistory(processedValue);
@@ -487,7 +485,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
 
-      if (settings.experimental?.useOSC52Paste) {
+      if (settings.experimental.useOSC52Paste) {
         stdout.write('\x1b]52;c;?\x07');
       } else {
         const textToInsert = await clipboardy.read();
@@ -1537,7 +1535,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   const absoluteVisualIdx =
                     scrollVisualRow + visualIdxInRenderedSet;
                   const mapEntry = buffer.visualToLogicalMap[absoluteVisualIdx];
-                  if (!mapEntry) return null;
 
                   const cursorVisualRow =
                     cursorVisualRowAbsolute - scrollVisualRow;

@@ -47,7 +47,7 @@ export const generateSvgForTerminal = (terminal: Terminal): string => {
         const b = v[c % 6];
         const g = v[Math.floor(c / 6) % 6];
         const r = v[Math.floor(c / 36) % 6];
-        return `#${[r, g, b].map((x) => x?.toString(16).padStart(2, '0')).join('')}`;
+        return `#${[r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')}`;
       } else if (colorCode >= 232 && colorCode <= 255) {
         const gray = 8 + (colorCode - 232) * 10;
         const hex = gray.toString(16).padStart(2, '0');

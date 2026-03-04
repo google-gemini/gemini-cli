@@ -149,6 +149,8 @@ describe('GCP Exporters', () => {
             hrTime: [1234567890, 123456789],
             hrTimeObserved: [1234567890, 123456789],
             body: 'Test log message',
+            attributes: {},
+            resource: { attributes: {} },
           } as unknown as ReadableLogRecord,
         ];
 
@@ -173,6 +175,8 @@ describe('GCP Exporters', () => {
             hrTime: [1234567890, 123456789],
             hrTimeObserved: [1234567890, 123456789],
             body: 'Test log message',
+            attributes: {},
+            resource: { attributes: {} },
           } as unknown as ReadableLogRecord,
         ];
 
@@ -211,6 +215,8 @@ describe('GCP Exporters', () => {
               hrTimeObserved: [1234567890, 123456789],
               severityNumber,
               body: 'Test message',
+              attributes: {},
+              resource: { attributes: {} },
             } as unknown as ReadableLogRecord,
           ];
 
@@ -240,6 +246,8 @@ describe('GCP Exporters', () => {
             hrTime: [1234567890, 123456789],
             hrTimeObserved: [1234567890, 123456789],
             body: 'Test log message',
+            attributes: {},
+            resource: { attributes: {} },
           } as unknown as ReadableLogRecord,
         ];
 
@@ -268,6 +276,8 @@ describe('GCP Exporters', () => {
             hrTime: [1234567890, 123456789],
             hrTimeObserved: [1234567890, 123456789],
             body: 'Test log message 1',
+            attributes: {},
+            resource: { attributes: {} },
           } as unknown as ReadableLogRecord,
         ];
 
@@ -276,6 +286,8 @@ describe('GCP Exporters', () => {
             hrTime: [1234567890, 123456789],
             hrTimeObserved: [1234567890, 123456789],
             body: 'Test log message 2',
+            attributes: {},
+            resource: { attributes: {} },
           } as unknown as ReadableLogRecord,
         ];
 
@@ -314,6 +326,8 @@ describe('GCP Exporters', () => {
             hrTime: [1234567890, 123456789],
             hrTimeObserved: [1234567890, 123456789],
             body: 'Test log message',
+            attributes: {},
+            resource: { attributes: {} },
           } as unknown as ReadableLogRecord,
         ];
 
@@ -355,6 +369,8 @@ describe('GCP Exporters', () => {
             hrTime: [1234567890, 123456789],
             hrTimeObserved: [1234567890, 123456789],
             body: 'Test log message',
+            attributes: {},
+            resource: { attributes: {} },
           } as unknown as ReadableLogRecord,
         ];
 
@@ -383,6 +399,8 @@ describe('GCP Exporters', () => {
             hrTime: [1234567890, 123456789],
             hrTimeObserved: [1234567890, 123456789],
             body: 'Test log message',
+            attributes: {},
+            resource: { attributes: {} },
           } as unknown as ReadableLogRecord,
         ];
 

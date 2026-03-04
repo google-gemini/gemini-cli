@@ -33,7 +33,7 @@ export async function runDeferredCommand(settings: MergedSettings) {
   const adminSettings = settings.admin;
   const commandName = deferredCommand.commandName;
 
-  if (commandName === 'mcp' && adminSettings?.mcp?.enabled === false) {
+  if (commandName === 'mcp' && adminSettings.mcp.enabled === false) {
     coreEvents.emitFeedback(
       'error',
       getAdminErrorMessage('MCP', undefined /* config */),
@@ -44,7 +44,7 @@ export async function runDeferredCommand(settings: MergedSettings) {
 
   if (
     commandName === 'extensions' &&
-    adminSettings?.extensions?.enabled === false
+    adminSettings.extensions.enabled === false
   ) {
     coreEvents.emitFeedback(
       'error',
@@ -54,7 +54,7 @@ export async function runDeferredCommand(settings: MergedSettings) {
     process.exit(ExitCodes.FATAL_CONFIG_ERROR);
   }
 
-  if (commandName === 'skills' && adminSettings?.skills?.enabled === false) {
+  if (commandName === 'skills' && adminSettings.skills.enabled === false) {
     coreEvents.emitFeedback(
       'error',
       getAdminErrorMessage('Agent skills', undefined /* config */),

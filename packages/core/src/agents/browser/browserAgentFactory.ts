@@ -101,7 +101,7 @@ export async function createBrowserAgentDefinition(
         `The installed chrome-devtools-mcp version may be too old.`
       );
     }
-    const authType = config.getContentGeneratorConfig()?.authType;
+    const authType = config.getContentGeneratorConfig().authType;
     const blockedAuthTypes = new Set([
       AuthType.LOGIN_WITH_GOOGLE,
       AuthType.LEGACY_CLOUD_SHELL,

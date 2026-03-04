@@ -36,7 +36,7 @@ function toParts(input: PartListUnion): Part[] {
   for (const part of Array.isArray(input) ? input : [input]) {
     if (typeof part === 'string') {
       parts.push({ text: part });
-    } else if (part) {
+    } else {
       parts.push(part);
     }
   }
@@ -130,9 +130,6 @@ export function convertToFunctionResponse(
 }
 
 export function getResponseTextFromParts(parts: Part[]): string | undefined {
-  if (!parts) {
-    return undefined;
-  }
   const textSegments = parts
     .map((part) => part.text)
     .filter((text): text is string => typeof text === 'string');
@@ -160,9 +157,6 @@ export function getFunctionCalls(
 export function getFunctionCallsFromParts(
   parts: Part[],
 ): FunctionCall[] | undefined {
-  if (!parts) {
-    return undefined;
-  }
   const functionCallParts = parts
     .filter((part) => !!part.functionCall)
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

@@ -272,10 +272,7 @@ function normalizeCommandName(raw: string): string {
 function extractNameFromNode(node: Node): string | null {
   switch (node.type) {
     case 'command': {
-      const nameNode = node.childForFieldName('name');
-      if (!nameNode) {
-        return null;
-      }
+      const nameNode = node.childForFieldName('name')!;
       return normalizeCommandName(nameNode.text);
     }
     case 'declaration_command':
@@ -878,12 +875,8 @@ export async function* execStreaming(
         }
       }
 
-      if (child.exitCode !== null) {
-        checkExit(child.exitCode);
-      } else {
-        child.on('close', (code) => checkExit(code));
-        child.on('error', (err) => reject(err));
-      }
+      child.on('close', (code) => checkExit(code));
+      child.on('error', (err) => reject(err));
     });
   }
 }

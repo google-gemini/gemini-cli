@@ -208,7 +208,7 @@ I am triaging a GitHub issue labeled as 'possible-duplicate'. I need to decide i
 <target_issue>
 ID: #${issue.number}
 Title: ${issue.title}
-Author: ${issue.author?.login}
+Author: ${issue.author.login}
 Reactions: ${getReactionCount(issue)}
 Body:
 ${issue.body.slice(0, 8000)}
@@ -221,7 +221,7 @@ ${candidates
 <candidate>
 ID: #${c.number}
 Title: ${c.title}
-Author: ${c.author?.login}
+Author: ${c.author.login}
 Reactions: ${getReactionCount(c)}
 Body:
 ${c.body.slice(0, 4000)}
@@ -815,7 +815,7 @@ Return a JSON object with:
         </Box>
         <Text bold>{selectedCandidate.title}</Text>
         <Text color="gray">
-          Author: {selectedCandidate.author?.login} | 👍{' '}
+          Author: {selectedCandidate.author.login} | 👍{' '}
           {getReactionCount(selectedCandidate)}
         </Text>
         <Text color="gray">{selectedCandidate.url}</Text>
@@ -874,7 +874,7 @@ Return a JSON object with:
             - {currentIssue.title}
           </Text>
           <Text color="gray">
-            Author: {currentIssue.author?.login} | 👍{' '}
+            Author: {currentIssue.author.login} | 👍{' '}
             {getReactionCount(currentIssue)}
           </Text>
         </Box>

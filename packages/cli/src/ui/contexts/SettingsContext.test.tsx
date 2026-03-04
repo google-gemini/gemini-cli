@@ -113,7 +113,7 @@ describe('SettingsContext', () => {
   it('should trigger re-renders when settings change (external event)', () => {
     const { result } = renderHook(() => useSettingsStore(), { wrapper });
 
-    expect(result.current.settings.merged.ui?.theme).toBe('default-theme');
+    expect(result.current.settings.merged.ui.theme).toBe('default-theme');
 
     const newSnapshot = {
       ...mockSnapshot,
@@ -128,7 +128,7 @@ describe('SettingsContext', () => {
       listeners.forEach((l) => l());
     });
 
-    expect(result.current.settings.merged.ui?.theme).toBe('new-theme');
+    expect(result.current.settings.merged.ui.theme).toBe('new-theme');
   });
 
   it('should call store.setValue when setSetting is called', () => {

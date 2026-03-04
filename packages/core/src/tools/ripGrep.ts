@@ -675,7 +675,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
       this.config,
       this.fileDiscoveryService,
       params,
-      messageBus ?? this.messageBus,
+      messageBus,
       _toolName,
       _toolDisplayName,
     );

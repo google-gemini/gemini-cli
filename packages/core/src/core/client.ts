@@ -229,10 +229,7 @@ export class GeminiClient {
   }
 
   private getContentGeneratorOrFail(): ContentGenerator {
-    if (!this.config.getContentGenerator()) {
-      throw new Error('Content generator not initialized');
-    }
-    return this.config.getContentGenerator();
+    return this.config.getContentGenerator()!;
   }
 
   async addHistory(content: Content) {
@@ -551,7 +548,7 @@ export class GeminiClient {
     // including any permanent fallbacks (config.setModel) or manual overrides.
     return resolveModel(
       this.config.getActiveModel(),
-      this.config.getGemini31LaunchedSync?.() ?? false,
+      this.config.getGemini31LaunchedSync(),
     );
   }
 
@@ -761,7 +758,7 @@ export class GeminiClient {
       }
     }
 
-    if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
+    if (!turn.pendingToolCalls.length && !signal.aborted) {
       if (
         !this.config.getQuotaErrorOccurred() &&
         !this.config.getSkipNextSpeakerCheck()
@@ -810,7 +807,6 @@ export class GeminiClient {
     }
 
     const hooksEnabled = this.config.getEnableHooks();
-    const messageBus = this.config.getMessageBus();
 
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id, partListUnionToString(request));
@@ -819,7 +815,7 @@ export class GeminiClient {
       this.currentSequenceModel = null;
     }
 
-    if (hooksEnabled && messageBus) {
+    if (hooksEnabled) {
       const hookResult = await this.fireBeforeAgentHookSafe(request, prompt_id);
       if (hookResult) {
         if (
@@ -830,10 +826,7 @@ export class GeminiClient {
           this.getChat().addHistory(createUserContent(request));
           yield hookResult;
           return new Turn(this.getChat(), prompt_id);
-        } else if (
-          'type' in hookResult &&
-          hookResult.type === GeminiEventType.AgentExecutionBlocked
-        ) {
+        } else if ('type' in hookResult) {
           yield hookResult;
           return new Turn(this.getChat(), prompt_id);
         } else if ('additionalContext' in hookResult) {
@@ -863,7 +856,7 @@ export class GeminiClient {
       );
 
       // Fire AfterAgent hook if we have a turn and no pending tools
-      if (hooksEnabled && messageBus) {
+      if (hooksEnabled) {
         const hookOutput = await this.fireAfterAgentHookSafe(
           request,
           prompt_id,
@@ -920,9 +913,8 @@ export class GeminiClient {
       const hookState = this.hookStateMap.get(prompt_id);
       if (hookState) {
         hookState.activeCalls--;
-        const isPendingTools =
-          turn?.pendingToolCalls && turn.pendingToolCalls.length > 0;
-        const isAborted = signal?.aborted;
+        const isPendingTools = turn.pendingToolCalls.length > 0;
+        const isAborted = signal.aborted;
 
         if (hookState.activeCalls <= 0) {
           if (!isPendingTools || isAborted) {
@@ -957,9 +949,7 @@ export class GeminiClient {
         maxAttempts: availabilityMaxAttempts,
       } = applyModelSelection(this.config, modelConfigKey);
       currentAttemptModel = model;
-      if (newConfig) {
-        currentAttemptGenerateContentConfig = newConfig;
-      }
+      currentAttemptGenerateContentConfig = newConfig;
 
       // Define callback to refresh context based on currentAttemptModel which might be updated by fallback handler
       const getAvailabilityContext: () => RetryAvailabilityContext | undefined =
@@ -1031,7 +1021,7 @@ export class GeminiClient {
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: onPersistent429Callback,
         onValidationRequired: onValidationRequiredCallback,
-        authType: this.config.getContentGeneratorConfig()?.authType,
+        authType: this.config.getContentGeneratorConfig().authType,
         maxAttempts: availabilityMaxAttempts,
         getAvailabilityContext,
       });

@@ -19,7 +19,7 @@
  */
 export function resolveEnvVarsInString(
   value: string,
-  customEnv?: Record<string, string>,
+  customEnv?: Record<string, string | undefined>,
 ): string {
   const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g; // Find $VAR_NAME or ${VAR_NAME}
   return value.replace(envVarRegex, (match, varName1, varName2) => {
@@ -56,7 +56,7 @@ export function resolveEnvVarsInString(
  */
 export function resolveEnvVarsInObject<T>(
   obj: T,
-  customEnv?: Record<string, string>,
+  customEnv?: Record<string, string | undefined>,
 ): T {
   return resolveEnvVarsInObjectInternal(obj, new WeakSet(), customEnv);
 }
@@ -71,7 +71,7 @@ export function resolveEnvVarsInObject<T>(
 function resolveEnvVarsInObjectInternal<T>(
   obj: T,
   visited: WeakSet<object>,
-  customEnv?: Record<string, string>,
+  customEnv?: Record<string, string | undefined>,
 ): T {
   if (
     obj === null ||

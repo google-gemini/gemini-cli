@@ -201,7 +201,7 @@ const findTextMatches = (
     const lowerContent = m.toLowerCase();
     let startIndex = 0;
 
-    while (true) {
+    for (;;) {
       const matchIndex = lowerContent.indexOf(lowerQuery, startIndex);
       if (matchIndex === -1) break;
 

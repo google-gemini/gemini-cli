@@ -158,7 +158,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       themeCommand,
       toolsCommand,
       ...(this.config?.isSkillsSupportEnabled()
-        ? this.config?.getSkillManager()?.isAdminEnabled() === false
+        ? this.config.getSkillManager().isAdminEnabled() === false
           ? [
               {
                 name: 'skills',

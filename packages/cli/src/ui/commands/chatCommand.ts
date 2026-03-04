@@ -34,7 +34,7 @@ const getSavedChatTags = async (
   mtSortDesc: boolean,
 ): Promise<ChatDetail[]> => {
   const cfg = context.services.config;
-  const geminiDir = cfg?.storage?.getProjectTempDir();
+  const geminiDir = cfg?.storage.getProjectTempDir();
   if (!geminiDir) {
     return [];
   }
@@ -123,7 +123,7 @@ const saveCommand: SlashCommand = {
       }
     }
 
-    const chat = config?.getGeminiClient()?.getChat();
+    const chat = config?.getGeminiClient().getChat();
     if (!chat) {
       return {
         type: 'message',
@@ -134,7 +134,7 @@ const saveCommand: SlashCommand = {
 
     const history = chat.getHistory();
     if (history.length > INITIAL_HISTORY_LENGTH) {
-      const authType = config?.getContentGeneratorConfig()?.authType;
+      const authType = config?.getContentGeneratorConfig().authType;
       await logger.saveCheckpoint({ history, authType }, tag);
       return {
         type: 'message',
@@ -183,7 +183,7 @@ const resumeCommand: SlashCommand = {
       };
     }
 
-    const currentAuthType = config?.getContentGeneratorConfig()?.authType;
+    const currentAuthType = config?.getContentGeneratorConfig().authType;
     if (
       checkpoint.authType &&
       currentAuthType &&
@@ -296,7 +296,7 @@ const shareCommand: SlashCommand = {
       };
     }
 
-    const chat = context.services.config?.getGeminiClient()?.getChat();
+    const chat = context.services.config?.getGeminiClient().getChat();
     if (!chat) {
       return {
         type: 'message',

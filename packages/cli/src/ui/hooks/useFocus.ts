@@ -41,13 +41,13 @@ export const useFocus = (): {
     };
 
     // Enable focus reporting
-    stdout?.write(ENABLE_FOCUS_REPORTING);
-    stdin?.on('data', handleData);
+    stdout.write(ENABLE_FOCUS_REPORTING);
+    stdin.on('data', handleData);
 
     return () => {
       // Disable focus reporting on cleanup
-      stdout?.write(DISABLE_FOCUS_REPORTING);
-      stdin?.removeListener('data', handleData);
+      stdout.write(DISABLE_FOCUS_REPORTING);
+      stdin.removeListener('data', handleData);
     };
   }, [stdin, stdout]);
 

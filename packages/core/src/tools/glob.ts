@@ -17,7 +17,6 @@ import {
 } from './tools.js';
 import { shortenPath, makeRelative } from '../utils/paths.js';
 import { type Config } from '../config/config.js';
-import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
 import { GLOB_TOOL_NAME, GLOB_DISPLAY_NAME } from './tool-names.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -184,13 +183,11 @@ class GlobToolInvocation extends BaseToolInvocation<
       const { filteredPaths, ignoredCount } =
         fileDiscovery.filterFilesWithReport(relativePaths, {
           respectGitIgnore:
-            this.params?.respect_git_ignore ??
-            this.config.getFileFilteringOptions().respectGitIgnore ??
-            DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
+            this.params.respect_git_ignore ??
+            this.config.getFileFilteringOptions().respectGitIgnore,
           respectGeminiIgnore:
-            this.params?.respect_gemini_ignore ??
-            this.config.getFileFilteringOptions().respectGeminiIgnore ??
-            DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
+            this.params.respect_gemini_ignore ??
+            this.config.getFileFilteringOptions().respectGeminiIgnore,
         });
 
       const filteredAbsolutePaths = new Set(
@@ -201,7 +198,7 @@ class GlobToolInvocation extends BaseToolInvocation<
         filteredAbsolutePaths.has(entry.fullpath()),
       );
 
-      if (!filteredEntries || filteredEntries.length === 0) {
+      if (filteredEntries.length === 0) {
         let message = `No files found matching pattern "${this.params.pattern}"`;
         if (searchDirectories.length === 1) {
           message += ` within ${searchDirectories[0]}`;

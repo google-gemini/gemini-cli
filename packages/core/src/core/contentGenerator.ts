@@ -114,7 +114,7 @@ export async function createContentGeneratorConfig(
 
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
-    proxy: config?.getProxy(),
+    proxy: config.getProxy(),
   };
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
@@ -206,7 +206,7 @@ export async function createContentGenerator(
       config.authType === AuthType.USE_VERTEX_AI
     ) {
       let headers: Record<string, string> = { ...baseHeaders };
-      if (gcConfig?.getUsageStatisticsEnabled()) {
+      if (gcConfig.getUsageStatisticsEnabled()) {
         const installationManager = new InstallationManager();
         const installationId = installationManager.getInstallationId();
         headers = {

@@ -396,8 +396,8 @@ export class PolicyEngine {
       isShellCommand = true;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const args = toolCall.args as { command?: string; dir_path?: string };
-      command = args?.command;
-      shellDirPath = args?.dir_path;
+      command = args.command;
+      shellDirPath = args.dir_path;
     }
 
     // Find the first matching rule (already sorted by priority)

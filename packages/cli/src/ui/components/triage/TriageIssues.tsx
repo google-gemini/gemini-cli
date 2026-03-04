@@ -183,7 +183,7 @@ I am triaging GitHub issues for the Gemini CLI project. I need to identify issue
 <issue>
 ID: #${issue.number}
 Title: ${issue.title}
-Author: ${issue.author?.login}
+Author: ${issue.author.login}
 Labels: ${issue.labels.map((l) => l.name).join(', ')}
 Body:
 ${issue.body.slice(0, 8000)}
@@ -566,7 +566,7 @@ Return a JSON object with:
             - {currentIssue.title}
           </Text>
           <Text color="gray">
-            Author: {currentIssue.author?.login} | 👍{' '}
+            Author: {currentIssue.author.login} | 👍{' '}
             {getReactionCount(currentIssue)}
           </Text>
         </Box>

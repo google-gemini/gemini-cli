@@ -266,10 +266,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     } = correctedContentResult;
     // fileExists is true if the file existed (and was readable or unreadable but caught by readError).
     // fileExists is false if the file did not exist (ENOENT).
-    const isNewFile =
-      !fileExists ||
-      (correctedContentResult.error !== undefined &&
-        !correctedContentResult.fileExists);
+    const isNewFile = !fileExists;
 
     try {
       const dirName = path.dirname(this.resolvedPath);
@@ -298,9 +295,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       // If there was a readError, originalContent in correctedContentResult is '',
       // but for the diff, we want to show the original content as it was before the write if possible.
       // However, if it was unreadable, currentContentForDiff will be empty.
-      const currentContentForDiff = correctedContentResult.error
-        ? '' // Or some indicator of unreadable content
-        : originalContent;
+      const currentContentForDiff = originalContent;
 
       const fileDiff = Diff.createPatch(
         fileName,
@@ -483,7 +478,7 @@ export class WriteFileTool
     return new WriteFileToolInvocation(
       this.config,
       params,
-      messageBus ?? this.messageBus,
+      messageBus,
       this.name,
       this.displayName,
     );

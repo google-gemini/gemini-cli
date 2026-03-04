@@ -59,7 +59,7 @@ export function getErrorType(error: unknown): string {
 
   // Return constructor name if the generic 'Error' name is used (for custom errors)
   return error.name === 'Error'
-    ? (error.constructor?.name ?? 'Error')
+    ? (error.constructor.name ?? 'Error')
     : error.name;
 }
 
@@ -153,23 +153,15 @@ function isResponseData(data: unknown): data is ResponseData {
     return false;
   }
   const error = candidate.error;
-  if (typeof error !== 'object' || error === null) {
+  if (typeof error !== 'object') {
     return false; // error property exists but is not an object (could be undefined, but we checked 'in')
   }
 
   // Optional properties check
-  if (
-    'code' in error &&
-    typeof error.code !== 'number' &&
-    error.code !== undefined
-  ) {
+  if ('code' in error && typeof error.code !== 'number') {
     return false;
   }
-  if (
-    'message' in error &&
-    typeof error.message !== 'string' &&
-    error.message !== undefined
-  ) {
+  if ('message' in error && typeof error.message !== 'string') {
     return false;
   }
 

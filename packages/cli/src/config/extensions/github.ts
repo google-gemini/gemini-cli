@@ -109,16 +109,16 @@ export function tryParseGithubUrl(source: string): GithubRepoInfo | null {
   if (!parsedUrl) {
     throw new Error(`Invalid repo URL: ${source}`);
   }
-  if (parsedUrl?.host !== 'github.com') {
+  if (parsedUrl.host !== 'github.com') {
     return null;
   }
   // The pathname should be "/owner/repo".
-  const parts = parsedUrl?.pathname
+  const parts = parsedUrl.pathname
     .split('/')
     // Remove the empty segments, fixes trailing and leading slashes
     .filter((part) => part !== '');
 
-  if (parts?.length !== 2) {
+  if (parts.length !== 2) {
     throw new Error(
       `Invalid GitHub repository source: ${source}. Expected "owner/repo" or a github repo uri.`,
     );

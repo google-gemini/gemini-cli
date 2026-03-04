@@ -75,7 +75,7 @@ export function handleError(
 ): never {
   const errorMessage = parseAndFormatApiError(
     error,
-    config.getContentGeneratorConfig()?.authType,
+    config.getContentGeneratorConfig().authType,
   );
 
   if (config.getOutputFormat() === OutputFormat.STREAM_JSON) {

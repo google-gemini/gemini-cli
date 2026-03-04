@@ -18,7 +18,7 @@ export async function waitFor(
 ): Promise<void> {
   const startTime = Date.now();
 
-  while (true) {
+  for (;;) {
     try {
       await assertion();
       return;

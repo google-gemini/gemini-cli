@@ -63,8 +63,8 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
       : Math.floor(terminalHeight * 0.5);
 
   const isRoutine =
-    tool.confirmationDetails?.type === 'ask_user' ||
-    tool.confirmationDetails?.type === 'exit_plan_mode';
+    tool.confirmationDetails.type === 'ask_user' ||
+    tool.confirmationDetails.type === 'exit_plan_mode';
   const borderColor = isRoutine ? theme.status.success : theme.status.warning;
   const hideToolIdentity = isRoutine;
 

@@ -214,7 +214,7 @@ function bufferBackslashEnter(
   keypressHandler: KeypressHandler,
 ): KeypressHandler {
   const bufferer = (function* (): Generator<void, void, Key | null> {
-    while (true) {
+    for (;;) {
       const key = yield;
 
       if (key == null) {
@@ -260,7 +260,7 @@ function bufferBackslashEnter(
  */
 function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
   const bufferer = (function* (): Generator<void, void, Key | null> {
-    while (true) {
+    for (;;) {
       let key = yield;
 
       if (key === null) {
@@ -271,7 +271,7 @@ function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
       }
 
       let buffer = '';
-      while (true) {
+      for (;;) {
         const timeoutId = setTimeout(() => bufferer.next(null), PASTE_TIMEOUT);
         key = yield;
         clearTimeout(timeoutId);
@@ -340,7 +340,7 @@ function* emitKeys(
   const lcAll = process.env['LC_ALL'] || '';
   const isGreek = lang.startsWith('el') || lcAll.startsWith('el');
 
-  while (true) {
+  for (;;) {
     let ch = yield;
     let sequence = ch;
     let escaped = false;
@@ -376,7 +376,7 @@ function* emitKeys(
         let buffer = '';
 
         // Read until BEL, `ESC \`, or timeout (empty string)
-        while (true) {
+        for (;;) {
           const next = yield;
           if (next === '' || next === '\u0007') {
             break;

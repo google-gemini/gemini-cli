@@ -117,11 +117,6 @@ export abstract class BaseToolInvocation<
       );
     }
 
-    if (decision === 'ASK_USER') {
-      return this.getConfirmationDetails(abortSignal);
-    }
-
-    // Default to confirmation details if decision is unknown (should not happen with exhaustive policy)
     return this.getConfirmationDetails(abortSignal);
   }
 
@@ -167,10 +162,6 @@ export abstract class BaseToolInvocation<
   protected async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (!this.messageBus) {
-      return false;
-    }
-
     const confirmationDetails: ToolCallConfirmationDetails = {
       type: 'info',
       title: `Confirm: ${this._toolDisplayName || this._toolName}`,
@@ -185,8 +176,8 @@ export abstract class BaseToolInvocation<
   protected getMessageBusDecision(
     abortSignal: AbortSignal,
   ): Promise<'ALLOW' | 'DENY' | 'ASK_USER'> {
-    if (!this.messageBus || !this._toolName) {
-      // If there's no message bus, we can't make a decision, so we allow.
+    if (!this._toolName) {
+      // If there's no tool name, we can't make a decision, so we allow.
       // The legacy confirmation flow will still apply if the tool needs it.
       return Promise.resolve('ALLOW');
     }
@@ -205,11 +196,6 @@ export abstract class BaseToolInvocation<
     };
 
     return new Promise<'ALLOW' | 'DENY' | 'ASK_USER'>((resolve) => {
-      if (!this.messageBus) {
-        resolve('ALLOW');
-        return;
-      }
-
       let timeoutId: NodeJS.Timeout | null = null;
       let unsubscribe: (() => void) | null = null;
 
@@ -260,7 +246,7 @@ export abstract class BaseToolInvocation<
         responseHandler,
       );
       unsubscribe = () => {
-        this.messageBus?.unsubscribe(
+        this.messageBus.unsubscribe(
           MessageBusType.TOOL_CONFIRMATION_RESPONSE,
           responseHandler,
         );

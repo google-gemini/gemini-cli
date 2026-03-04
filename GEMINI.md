@@ -73,6 +73,10 @@ powerful tool for developers.
   and `packages/core` (Backend logic).
 - **Imports:** Use specific imports and avoid restricted relative imports
   between packages (enforced by ESLint).
+- **Linting:** Never suppress the `@typescript-eslint/no-unnecessary-condition`
+  warning (e.g., via `eslint-disable`). This rule ensures that optional chaining
+  and truthiness checks are only used when truly necessary according to the type
+  system, keeping the code clean and predictable.
 - **License Headers:** For all new source code files (`.ts`, `.tsx`, `.js`),
   include the Apache-2.0 license header with the current year. (e.g.,
   `Copyright 2026 Google LLC`). This is enforced by ESLint.

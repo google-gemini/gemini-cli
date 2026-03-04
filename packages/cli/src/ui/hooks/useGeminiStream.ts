@@ -968,7 +968,7 @@ export const useGeminiStream = (
           type: MessageType.ERROR,
           text: parseAndFormatApiError(
             eventValue.error,
-            config.getContentGeneratorConfig()?.authType,
+            config.getContentGeneratorConfig().authType,
             undefined,
             config.getModel(),
             DEFAULT_GEMINI_FLASH_MODEL,
@@ -1407,7 +1407,7 @@ export const useGeminiStream = (
                   new UserPromptEvent(
                     promptText.length,
                     prompt_id!,
-                    config.getContentGeneratorConfig()?.authType,
+                    config.getContentGeneratorConfig().authType,
                     promptText,
                   ),
                 );
@@ -1499,7 +1499,7 @@ export const useGeminiStream = (
                     type: MessageType.ERROR,
                     text: parseAndFormatApiError(
                       getErrorMessage(error) || 'Unknown error',
-                      config.getContentGeneratorConfig()?.authType,
+                      config.getContentGeneratorConfig().authType,
                       undefined,
                       config.getModel(),
                       DEFAULT_GEMINI_FLASH_MODEL,
@@ -1625,7 +1625,7 @@ export const useGeminiStream = (
                 | TrackedCompletedToolCall
                 | TrackedCancelledToolCall;
               return (
-                completedOrCancelledCall.response?.responseParts !== undefined
+                completedOrCancelledCall.response.responseParts !== undefined
               );
             }
             return false;
@@ -1653,7 +1653,7 @@ export const useGeminiStream = (
         const isShell = t.request.name === 'run_shell_command';
         // Access result from the tracked tool call response
         const response = t.response as ToolResponseWithParts;
-        const rawData = response?.data;
+        const rawData = response.data;
         const data = isShellToolData(rawData) ? rawData : undefined;
 
         // Use data.pid for shell commands moved to the background.
@@ -1661,9 +1661,9 @@ export const useGeminiStream = (
 
         if (isShell && pid) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const command = (data?.['command'] as string) ?? 'shell';
+          const command = (data['command'] as string) ?? 'shell';
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const initialOutput = (data?.['initialOutput'] as string) ?? '';
+          const initialOutput = (data['initialOutput'] as string) ?? '';
 
           registerBackgroundShell(pid, command, initialOutput);
         }

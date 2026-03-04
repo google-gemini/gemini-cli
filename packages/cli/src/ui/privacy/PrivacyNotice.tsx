@@ -22,7 +22,7 @@ const PrivacyNoticeText = ({
   config: Config;
   onExit: () => void;
 }) => {
-  const authType = config.getContentGeneratorConfig()?.authType;
+  const authType = config.getContentGeneratorConfig().authType;
 
   switch (authType) {
     case AuthType.USE_GEMINI:

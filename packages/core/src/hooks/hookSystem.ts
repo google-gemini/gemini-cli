@@ -292,8 +292,8 @@ export class HookSystem {
           beforeModelOutput.applyLLMRequestModifications(llmRequest);
         return {
           blocked: false,
-          modifiedConfig: modifiedRequest?.config,
-          modifiedContents: modifiedRequest?.contents,
+          modifiedConfig: modifiedRequest.config,
+          modifiedContents: modifiedRequest.contents,
         };
       }
 

@@ -181,7 +181,7 @@ export async function loadSkillFromFile(
       name: sanitizedName,
       description: frontmatter.description,
       location: filePath,
-      body: match[2]?.trim() ?? '',
+      body: match[2].trim() ?? '',
     };
   } catch (error) {
     debugLogger.log(`Error parsing skill file ${filePath}:`, error);

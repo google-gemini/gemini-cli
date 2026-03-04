@@ -1142,7 +1142,7 @@ ${JSON.stringify(
 
       // Consume the stream manually to get the final return value.
       let finalResult: Turn | undefined;
-      while (true) {
+      for (;;) {
         const result = await stream.next();
         if (result.done) {
           finalResult = result.value;
@@ -1198,7 +1198,7 @@ ${JSON.stringify(
       let finalResult: Turn | undefined;
 
       // Consume the stream and count iterations
-      while (true) {
+      for (;;) {
         const result = await stream.next();
         if (result.done) {
           finalResult = result.value;
@@ -1325,7 +1325,7 @@ ${JSON.stringify(
 
       // Consume the stream and count iterations
       try {
-        while (true) {
+        for (;;) {
           const result = await stream.next();
           if (result.done) {
             break;

@@ -594,10 +594,7 @@ export class LoopDetectionService {
         role: LlmRole.UTILITY_LOOP_DETECTOR,
       });
 
-      if (
-        result &&
-        typeof result['unproductive_state_confidence'] === 'number'
-      ) {
+      if (typeof result['unproductive_state_confidence'] === 'number') {
         return result;
       }
       return null;

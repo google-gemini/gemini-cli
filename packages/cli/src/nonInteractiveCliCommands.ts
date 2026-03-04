@@ -56,14 +56,14 @@ export const handleSlashCommand = async (
     if (commandToExecute.action) {
       // Not used by custom commands but may be in the future.
       const sessionStats: SessionStatsState = {
-        sessionId: config?.getSessionId(),
+        sessionId: config.getSessionId(),
         sessionStartTime: new Date(),
         metrics: uiTelemetryService.getMetrics(),
         lastPromptTokenCount: 0,
         promptCount: 1,
       };
 
-      const logger = new Logger(config?.getSessionId() || '', config?.storage);
+      const logger = new Logger(config.getSessionId() || '', config.storage);
 
       const context: CommandContext = {
         services: {

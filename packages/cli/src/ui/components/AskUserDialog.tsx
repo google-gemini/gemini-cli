@@ -1083,7 +1083,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   const currentQuestion = questions[currentQuestionIndex];
 
   const effectiveQuestion = useMemo(() => {
-    if (currentQuestion?.type === 'yesno') {
+    if (currentQuestion.type === 'yesno') {
       return {
         ...currentQuestion,
         options: [

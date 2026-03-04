@@ -40,7 +40,7 @@ export const DetailedMessagesDisplay: React.FC<
       if (textWidth <= 0) {
         return 1;
       }
-      const lines = Math.ceil((msg.content?.length || 1) / textWidth);
+      const lines = Math.ceil((msg.content.length || 1) / textWidth);
       return Math.max(1, lines);
     },
     [width, messages],

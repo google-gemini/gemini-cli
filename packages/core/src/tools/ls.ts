@@ -15,8 +15,7 @@ import {
   type ToolResult,
 } from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
-import type { Config } from '../config/config.js';
-import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
+import { type Config } from '../config/config.js';
 import { ToolErrorType } from './tool-error.js';
 import { LS_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -167,15 +166,6 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
 
     try {
       const stats = await fs.stat(resolvedDirPath);
-      if (!stats) {
-        // fs.statSync throws on non-existence, so this check might be redundant
-        // but keeping for clarity. Error message adjusted.
-        return this.errorResult(
-          `Error: Directory not found or inaccessible: ${resolvedDirPath}`,
-          `Directory not found or inaccessible.`,
-          ToolErrorType.FILE_NOT_FOUND,
-        );
-      }
       if (!stats.isDirectory()) {
         return this.errorResult(
           `Error: Path is not a directory: ${resolvedDirPath}`,
@@ -205,12 +195,10 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
         fileDiscovery.filterFilesWithReport(relativePaths, {
           respectGitIgnore:
             this.params.file_filtering_options?.respect_git_ignore ??
-            this.config.getFileFilteringOptions().respectGitIgnore ??
-            DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
+            this.config.getFileFilteringOptions().respectGitIgnore,
           respectGeminiIgnore:
             this.params.file_filtering_options?.respect_gemini_ignore ??
-            this.config.getFileFilteringOptions().respectGeminiIgnore ??
-            DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
+            this.config.getFileFilteringOptions().respectGeminiIgnore,
         });
 
       const entries = [];
@@ -325,7 +313,7 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
     return new LSToolInvocation(
       this.config,
       params,
-      messageBus ?? this.messageBus,
+      messageBus,
       _toolName,
       _toolDisplayName,
     );

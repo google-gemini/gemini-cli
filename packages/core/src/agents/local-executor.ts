@@ -492,7 +492,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             }
           : { role: 'user', parts: [{ text: query }] };
 
-        while (true) {
+        for (;;) {
           // Check for termination conditions like max turns.
           const reason = this.checkTermination(turnCounter, maxTurns);
           if (reason) {

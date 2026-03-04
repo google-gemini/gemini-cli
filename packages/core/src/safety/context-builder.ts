@@ -19,7 +19,7 @@ export class ContextBuilder {
    * Builds the full context object with all available data.
    */
   buildFullContext(): SafetyCheckInput['context'] {
-    const clientHistory = this.config.getGeminiClient()?.getHistory() || [];
+    const clientHistory = this.config.getGeminiClient().getHistory() || [];
     const history = this.convertHistoryToTurns(clientHistory);
 
     debugLogger.debug(

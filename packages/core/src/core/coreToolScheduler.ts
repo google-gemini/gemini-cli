@@ -618,23 +618,10 @@ export class CoreToolScheduler {
       return;
     }
 
-    // This logic is moved from the old `for` loop in `_schedule`.
     if (toolCall.status === CoreToolCallStatus.Validating) {
       const { request: reqInfo, invocation } = toolCall;
 
       try {
-        if (signal.aborted) {
-          this.setStatusInternal(
-            reqInfo.callId,
-            CoreToolCallStatus.Cancelled,
-            signal,
-            'Tool call cancelled by user.',
-          );
-          // The completion check will handle the cascade.
-          await this.checkAndNotifyCompletion(signal);
-          return;
-        }
-
         // Policy Check using PolicyEngine
         // We must reconstruct the FunctionCall format expected by PolicyEngine
         const toolCallForPolicy = {
@@ -759,27 +746,17 @@ export class CoreToolScheduler {
           }
         }
       } catch (error) {
-        if (signal.aborted) {
-          this.setStatusInternal(
-            reqInfo.callId,
-            CoreToolCallStatus.Cancelled,
-            signal,
-            'Tool call cancelled by user.',
-          );
-          await this.checkAndNotifyCompletion(signal);
-        } else {
-          this.setStatusInternal(
-            reqInfo.callId,
-            CoreToolCallStatus.Error,
-            signal,
-            createErrorResponse(
-              reqInfo,
-              error instanceof Error ? error : new Error(String(error)),
-              ToolErrorType.UNHANDLED_EXCEPTION,
-            ),
-          );
-          await this.checkAndNotifyCompletion(signal);
-        }
+        this.setStatusInternal(
+          reqInfo.callId,
+          CoreToolCallStatus.Error,
+          signal,
+          createErrorResponse(
+            reqInfo,
+            error instanceof Error ? error : new Error(String(error)),
+            ToolErrorType.UNHANDLED_EXCEPTION,
+          ),
+        );
+        await this.checkAndNotifyCompletion(signal);
       }
     }
     await this.attemptExecutionOfScheduledCalls(signal);
@@ -912,8 +889,6 @@ export class CoreToolScheduler {
       );
 
       for (const toolCall of callsToExecute) {
-        if (toolCall.status !== CoreToolCallStatus.Scheduled) continue;
-
         this.setStatusInternal(
           toolCall.request.callId,
           CoreToolCallStatus.Executing,

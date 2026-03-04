@@ -269,7 +269,7 @@ export class Turn {
       );
 
       for await (const streamEvent of responseStream) {
-        if (signal?.aborted) {
+        if (signal.aborted) {
           yield { type: GeminiEventType.UserCancelled };
           return;
         }

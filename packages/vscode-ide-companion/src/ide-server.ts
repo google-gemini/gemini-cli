@@ -214,7 +214,7 @@ export class IDEServer {
         const sessionId = getSessionId(req);
         let transport: StreamableHTTPServerTransport;
 
-        if (sessionId && this.transports[sessionId]) {
+        if (sessionId && sessionId in this.transports) {
           transport = this.transports[sessionId];
         } else if (!sessionId && isInitializeRequest(req.body)) {
           transport = new StreamableHTTPServerTransport({
@@ -294,7 +294,7 @@ export class IDEServer {
 
       const handleSessionRequest = async (req: Request, res: Response) => {
         const sessionId = getSessionId(req);
-        if (!sessionId || !this.transports[sessionId]) {
+        if (!sessionId || !(sessionId in this.transports)) {
           this.log('Invalid or missing session ID');
           res.status(400).send('Invalid or missing session ID');
           return;

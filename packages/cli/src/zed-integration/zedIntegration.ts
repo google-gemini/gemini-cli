@@ -657,11 +657,11 @@ export class Session {
       try {
         const model = resolveModel(
           this.config.getModel(),
-          (await this.config.getGemini31Launched?.()) ?? false,
+          (await this.config.getGemini31Launched()) ?? false,
         );
         const responseStream = await chat.sendMessageStream(
           { model },
-          nextMessage?.parts ?? [],
+          nextMessage.parts ?? [],
           promptId,
           pendingSend.signal,
           LlmRole.MAIN,

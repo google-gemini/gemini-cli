@@ -226,7 +226,7 @@ export class McpServerEnablementManager {
   async isFileEnabled(serverName: string): Promise<boolean> {
     const config = await this.readConfig();
     const state = config[normalizeServerId(serverName)];
-    return state?.enabled ?? true;
+    return state.enabled ?? true;
   }
 
   /**

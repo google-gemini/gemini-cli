@@ -71,10 +71,6 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (!this.messageBus) {
-      return false;
-    }
-
     const skillName = this.params.name;
     const skill = this.config.getSkillManager().getSkill(skillName);
 

@@ -115,7 +115,7 @@ interface ResourceSuggestionCandidate {
 function buildResourceCandidates(
   config?: Config,
 ): ResourceSuggestionCandidate[] {
-  const registry = config?.getResourceRegistry?.();
+  const registry = config?.getResourceRegistry();
   if (!registry) {
     return [];
   }
@@ -137,7 +137,7 @@ function buildResourceCandidates(
 }
 
 function buildAgentCandidates(config?: Config): Suggestion[] {
-  const registry = config?.getAgentRegistry?.();
+  const registry = config?.getAgentRegistry();
   if (!registry) {
     return [];
   }
@@ -232,7 +232,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
   }, [cwd, config]);
 
   useEffect(() => {
-    const workspaceContext = config?.getWorkspaceContext?.();
+    const workspaceContext = config?.getWorkspaceContext();
     if (!workspaceContext) return;
 
     const unsubscribe =
@@ -274,9 +274,9 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     const initialize = async () => {
       const currentEpoch = initEpoch.current;
       try {
-        const directories = config
-          ?.getWorkspaceContext?.()
-          ?.getDirectories() ?? [cwd];
+        const directories = config?.getWorkspaceContext().getDirectories() ?? [
+          cwd,
+        ];
 
         const initPromises: Array<Promise<void>> = [];
 
@@ -296,7 +296,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
               config?.getEnableRecursiveFileSearch() ?? true,
             enableFuzzySearch:
               config?.getFileFilteringEnableFuzzySearch() ?? true,
-            maxFiles: config?.getFileFilteringOptions()?.maxFileCount,
+            maxFiles: config?.getFileFilteringOptions().maxFileCount,
           });
 
           initPromises.push(
@@ -342,7 +342,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       }, 200);
 
       const timeoutMs =
-        config?.getFileFilteringOptions()?.searchTimeout ??
+        config?.getFileFilteringOptions().searchTimeout ??
         DEFAULT_SEARCH_TIMEOUT_MS;
 
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -358,9 +358,9 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       })();
 
       try {
-        const directories = config
-          ?.getWorkspaceContext?.()
-          ?.getDirectories() ?? [cwd];
+        const directories = config?.getWorkspaceContext().getDirectories() ?? [
+          cwd,
+        ];
         const cwdRealpath = directories[0];
 
         const allSearchPromises = [...fileSearchMap.current.entries()].map(

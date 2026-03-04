@@ -24,10 +24,7 @@ import {
   type ProcessedFileReadResult,
 } from '../utils/fileUtils.js';
 import type { PartListUnion } from '@google/genai';
-import {
-  type Config,
-  DEFAULT_FILE_FILTERING_OPTIONS,
-} from '../config/config.js';
+import { type Config } from '../config/config.js';
 import { FileOperation } from '../telemetry/metrics.js';
 import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
@@ -215,12 +212,10 @@ ${finalExclusionPatternsForDescription
         fileDiscovery.filterFilesWithReport(relativeEntries, {
           respectGitIgnore:
             this.params.file_filtering_options?.respect_git_ignore ??
-            this.config.getFileFilteringOptions().respectGitIgnore ??
-            DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
+            this.config.getFileFilteringOptions().respectGitIgnore,
           respectGeminiIgnore:
             this.params.file_filtering_options?.respect_gemini_ignore ??
-            this.config.getFileFilteringOptions().respectGeminiIgnore ??
-            DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
+            this.config.getFileFilteringOptions().respectGeminiIgnore,
         });
 
       for (const relativePath of filteredPaths) {

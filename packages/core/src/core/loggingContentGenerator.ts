@@ -212,7 +212,7 @@ export class LoggingContentGenerator implements ContentGenerator {
     const genConfig = this.config.getContentGeneratorConfig();
 
     // Case 2: Using an API key for Vertex AI.
-    if (genConfig?.vertexai) {
+    if (genConfig.vertexai) {
       const location = process.env['GOOGLE_CLOUD_LOCATION'];
       if (location) {
         return { address: `${location}-aiplatform.googleapis.com`, port: 443 };
@@ -252,7 +252,7 @@ export class LoggingContentGenerator implements ContentGenerator {
         candidates: responseCandidates,
         response_id: responseId,
       },
-      this.config.getContentGeneratorConfig()?.authType,
+      this.config.getContentGeneratorConfig().authType,
       usageMetadata,
       responseText,
       role,
@@ -330,7 +330,7 @@ export class LoggingContentGenerator implements ContentGenerator {
           generate_content_config: generationConfig,
           server: serverDetails,
         },
-        this.config.getContentGeneratorConfig()?.authType,
+        this.config.getContentGeneratorConfig().authType,
         errorType,
         isStructuredError(error)
           ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

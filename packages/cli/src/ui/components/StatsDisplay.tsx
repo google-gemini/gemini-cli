@@ -416,7 +416,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   const computed = computeSessionStats(metrics);
   const settings = useSettings();
   const config = useConfig();
-  const useGemini3_1 = config.getGemini31LaunchedSync?.() ?? false;
+  const useGemini3_1 = config.getGemini31LaunchedSync() ?? false;
   const useCustomToolModel =
     useGemini3_1 &&
     config.getContentGeneratorConfig().authType === AuthType.USE_GEMINI;

@@ -101,7 +101,7 @@ export async function setupUser(
   };
 
   let loadRes: LoadCodeAssistResponse;
-  while (true) {
+  for (;;) {
     loadRes = await caServer.loadCodeAssist({
       cloudaicompanionProject: projectId,
       metadata: {

@@ -119,7 +119,7 @@ function categorizeAtCommands(
   const resourceParts: AtCommandPart[] = [];
   const fileParts: AtCommandPart[] = [];
 
-  const agentRegistry = config.getAgentRegistry?.();
+  const agentRegistry = config.getAgentRegistry();
   const resourceRegistry = config.getResourceRegistry();
 
   for (const part of commandParts) {
@@ -129,7 +129,7 @@ function categorizeAtCommands(
 
     const name = part.content.substring(1);
 
-    if (agentRegistry?.getDefinition(name)) {
+    if (agentRegistry.getDefinition(name)) {
       agentParts.push(part);
     } else if (resourceRegistry.findResourceByUri(name)) {
       resourceParts.push(part);

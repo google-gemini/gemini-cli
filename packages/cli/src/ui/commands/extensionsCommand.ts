@@ -236,7 +236,7 @@ async function restartAction(
   if (failures.length < extensionsToRestart.length) {
     try {
       await context.services.config?.reloadSkills();
-      await context.services.config?.getAgentRegistry()?.reload();
+      await context.services.config?.getAgentRegistry().reload();
     } catch (error) {
       context.ui.addItem({
         type: MessageType.ERROR,
@@ -271,7 +271,7 @@ async function exploreAction(
   context: CommandContext,
 ): Promise<SlashCommandActionReturn | void> {
   const settings = context.services.settings.merged;
-  const useRegistryUI = settings.experimental?.extensionRegistry;
+  const useRegistryUI = settings.experimental.extensionRegistry;
 
   if (useRegistryUI) {
     const extensionManager = context.services.config?.getExtensionLoader();

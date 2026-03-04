@@ -974,7 +974,7 @@ class LenientJsonSchemaValidator implements jsonSchemaValidator {
     } catch (error) {
       debugLogger.warn(
         `Failed to compile MCP tool output schema (${
-          (schema as Record<string, unknown>)?.['$id'] ?? '<no $id>'
+          (schema as Record<string, unknown>)['$id'] ?? '<no $id>'
         }): ${error instanceof Error ? error.message : String(error)}. ` +
           'Skipping output validation for this tool.',
       );
@@ -1149,7 +1149,7 @@ export async function discoverTools(
           mcpServerName,
           toolDef.name,
           toolDef.description ?? '',
-          toolDef.inputSchema ?? { type: 'object', properties: {} },
+          toolDef.inputSchema,
           messageBus,
           mcpServerConfig.trust,
           isReadOnly,
@@ -1175,10 +1175,7 @@ export async function discoverTools(
     }
     return discoveredTools;
   } catch (error) {
-    if (
-      error instanceof Error &&
-      !error.message?.includes('Method not found')
-    ) {
+    if (error instanceof Error && !error.message.includes('Method not found')) {
       cliConfig.emitMcpDiagnostic(
         'error',
         `Error discovering tools from ${mcpServerName}: ${getErrorMessage(
@@ -1303,7 +1300,7 @@ export async function discoverPrompts(
     }));
   } catch (error) {
     // It's okay if the method is not found, which is a common case.
-    if (error instanceof Error && error.message?.includes('Method not found')) {
+    if (error instanceof Error && error.message.includes('Method not found')) {
       return [];
     }
     cliConfig.emitMcpDiagnostic(
@@ -1347,11 +1344,11 @@ async function listResources(
         },
         ListResourcesResultSchema,
       );
-      resources.push(...(response.resources ?? []));
+      resources.push(...response.resources);
       cursor = response.nextCursor ?? undefined;
     } while (cursor);
   } catch (error) {
-    if (error instanceof Error && error.message?.includes('Method not found')) {
+    if (error instanceof Error && error.message.includes('Method not found')) {
       return [];
     }
     cliConfig.emitMcpDiagnostic(
@@ -1399,10 +1396,7 @@ export async function invokeMcpPrompt(
 
     return response;
   } catch (error) {
-    if (
-      error instanceof Error &&
-      !error.message?.includes('Method not found')
-    ) {
+    if (error instanceof Error && !error.message.includes('Method not found')) {
       cliConfig.emitMcpDiagnostic(
         'error',
         `Error invoking prompt '${promptName}' from ${mcpServerName} ${promptParams}: ${getErrorMessage(
@@ -1707,7 +1701,6 @@ export async function connectToMcpServer(
       // Continue to OAuth handling below (after SSE fallback section)
     } else if (
       // If not 401, and HTTP failed with url without explicit type, try SSE fallback
-      firstAttemptError &&
       mcpServerConfig.url &&
       !mcpServerConfig.type &&
       !mcpServerConfig.httpUrl
@@ -2036,7 +2029,7 @@ export async function createTransport(
     if (authProvider === undefined) {
       // Check if we have OAuth configuration or stored tokens
       let accessToken: string | null = null;
-      if (mcpServerConfig.oauth?.enabled && mcpServerConfig.oauth) {
+      if (mcpServerConfig.oauth?.enabled) {
         const tokenStorage = new MCPOAuthTokenStorage();
         const mcpAuthProvider = new MCPOAuthProvider(tokenStorage);
         accessToken = await mcpAuthProvider.getValidToken(

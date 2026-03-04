@@ -39,10 +39,12 @@ export async function getMcpServersFromConfig(
     requestSetting: promptForSetting,
   });
   const extensions = await extensionManager.loadExtensions();
-  const mcpServers = { ...settings.mcpServers };
+  const mcpServers: Record<string, MCPServerConfig> = {
+    ...settings.mcpServers,
+  };
   for (const extension of extensions) {
     Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
-      if (mcpServers[key]) {
+      if (key in mcpServers) {
         return;
       }
       mcpServers[key] = {
@@ -52,7 +54,7 @@ export async function getMcpServersFromConfig(
     });
   }
 
-  const adminAllowlist = settings.admin?.mcp?.config;
+  const adminAllowlist = settings.admin.mcp.config;
   const filteredResult = applyAdminAllowlist(mcpServers, adminAllowlist);
 
   return filteredResult;

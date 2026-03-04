@@ -146,12 +146,10 @@ export class OpenFilesManager {
       return;
     }
 
-    file.cursor = editor.selection.active
-      ? {
-          line: editor.selection.active.line + 1,
-          character: editor.selection.active.character + 1,
-        }
-      : undefined;
+    file.cursor = {
+      line: editor.selection.active.line + 1,
+      character: editor.selection.active.character + 1,
+    };
 
     let selectedText: string | undefined =
       editor.document.getText(editor.selection) || undefined;

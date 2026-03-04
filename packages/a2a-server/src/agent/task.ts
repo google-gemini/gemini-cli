@@ -793,7 +793,7 @@ export class Task {
         ) {
           errorEvent = event;
         }
-        const errorMessage = errorEvent?.value?.error
+        const errorMessage = errorEvent?.value.error
           ? getErrorMessage(errorEvent.value.error)
           : 'Unknown error from LLM stream';
         logger.error(
@@ -802,7 +802,7 @@ export class Task {
         );
 
         let errMessage = `Unknown error from LLM stream: ${JSON.stringify(event)}`;
-        if (errorEvent?.value?.error) {
+        if (errorEvent?.value.error) {
           errMessage = parseAndFormatApiError(errorEvent.value.error);
         }
         this.cancelPendingTools(`LLM stream error: ${errorMessage}`);

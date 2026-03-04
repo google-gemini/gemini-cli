@@ -118,7 +118,7 @@ export const MainContent = () => {
             isExpandable={true}
           />
         ))}
-        {showConfirmationQueue && confirmingTool && (
+        {showConfirmationQueue && (
           <ToolConfirmationQueue confirmingTool={confirmingTool} />
         )}
       </Box>

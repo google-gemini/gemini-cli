@@ -195,8 +195,8 @@ export async function start_sandbox(
         stdio: 'inherit',
       });
       return await new Promise((resolve, reject) => {
-        sandboxProcess?.on('error', reject);
-        sandboxProcess?.on('close', (code) => {
+        sandboxProcess.on('error', reject);
+        sandboxProcess.on('close', (code) => {
           process.stdin.resume();
           resolve(code ?? 1);
         });
@@ -707,7 +707,7 @@ export async function start_sandbox(
         reject(err);
       });
 
-      sandboxProcess?.on('close', (code, signal) => {
+      sandboxProcess.on('close', (code, signal) => {
         process.stdin.resume();
         if (code !== 0 && code !== null) {
           debugLogger.log(

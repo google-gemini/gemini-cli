@@ -11,5 +11,5 @@ export type InlineThinkingMode = 'off' | 'full';
 export function getInlineThinkingMode(
   settings: LoadedSettings,
 ): InlineThinkingMode {
-  return settings.merged.ui?.inlineThinkingMode ?? 'off';
+  return settings.merged.ui.inlineThinkingMode ?? 'off';
 }

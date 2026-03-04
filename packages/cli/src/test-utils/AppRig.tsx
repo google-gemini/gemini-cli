@@ -312,7 +312,7 @@ export class AppRig {
             const details = call.confirmationDetails;
             const title = 'title' in details ? details.title : '';
             const toolDisplayName =
-              call.tool?.displayName || title.replace(/^Confirm:\s*/, '');
+              call.tool.displayName || title.replace(/^Confirm:\s*/, '');
             if (!this.pendingConfirmations.has(call.correlationId)) {
               this.pendingConfirmations.set(call.correlationId, {
                 toolName: call.request.name,
@@ -469,7 +469,7 @@ export class AppRig {
     } = options;
     const start = Date.now();
 
-    while (true) {
+    for (;;) {
       if (await predicate()) return;
 
       if (Date.now() - start > timeout) {
@@ -622,7 +622,7 @@ export class AppRig {
     onConfirmation?: (confirmation: PendingConfirmation) => void | boolean,
     timeout = 60000,
   ) {
-    while (true) {
+    for (;;) {
       const event = await this.waitForNextEvent(timeout);
       if (event.type === 'idle') {
         break;
@@ -710,7 +710,7 @@ export class AppRig {
     if (this.config) {
       const recordingService = this.config
         .getGeminiClient()
-        ?.getChatRecordingService();
+        .getChatRecordingService();
       if (recordingService) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
         (recordingService as any).conversationFile = null;

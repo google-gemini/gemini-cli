@@ -166,7 +166,7 @@ export class ExtensionEnablementManager {
     const extensionConfig = config[extensionName];
     // Extensions are enabled by default.
     let enabled = true;
-    const allOverrides = extensionConfig?.overrides ?? [];
+    const allOverrides = extensionConfig.overrides ?? [];
     for (const rule of allOverrides) {
       const override = Override.fromFileRule(rule);
       if (override.matchesPath(ensureLeadingAndTrailingSlash(currentPath))) {

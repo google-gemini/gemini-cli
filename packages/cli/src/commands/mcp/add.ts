@@ -117,7 +117,7 @@ async function addMcpServer(
   const existingSettings = settings.forScope(settingsScope).settings;
   const mcpServers = existingSettings.mcpServers || {};
 
-  const isExistingServer = !!mcpServers[name];
+  const isExistingServer = Object.hasOwn(mcpServers, name);
   if (isExistingServer) {
     debugLogger.log(
       `MCP server "${name}" is already configured within ${scope} settings.`,
@@ -211,11 +211,12 @@ export const addCommand: CommandModule = {
       })
       .middleware((argv) => {
         // Handle -- separator args as server args if present
-        if (argv['--']) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const dashArgs = argv['--'] as string[] | undefined;
+        if (dashArgs && dashArgs.length > 0) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const existingArgs = (argv['args'] as Array<string | number>) || [];
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          argv['args'] = [...existingArgs, ...(argv['--'] as string[])];
+          const existingArgs = argv['args'] as Array<string | number>;
+          argv['args'] = [...existingArgs, ...dashArgs];
         }
       }),
   handler: async (argv) => {

@@ -195,7 +195,7 @@ describe('Settings Repro', () => {
     // If it doesn't throw, check if it merged correctly.
     // The model.compressionThreshold should be present.
     // And model.name should probably be undefined or default, but certainly NOT { compressionThreshold: 0.8 }
-    expect(settings.merged.model?.compressionThreshold).toBe(0.8);
-    expect(typeof settings.merged.model?.name).not.toBe('object');
+    expect(settings.merged.model.compressionThreshold).toBe(0.8);
+    expect(typeof settings.merged.model.name).not.toBe('object');
   });
 });

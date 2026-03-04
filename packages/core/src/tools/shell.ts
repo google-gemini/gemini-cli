@@ -280,7 +280,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           },
         );
 
-      if (pid) {
+      if (pid !== undefined) {
         if (setPidCallback) {
           setPidCallback(pid);
         }

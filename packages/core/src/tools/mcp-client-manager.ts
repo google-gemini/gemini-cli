@@ -281,7 +281,7 @@ export class McpClientManager {
     // Check if blocked by admin settings (allowlist/excludelist)
     if (this.isBlockedBySettings(name)) {
       if (!this.blockedMcpServers.find((s) => s.name === name)) {
-        this.blockedMcpServers?.push({
+        this.blockedMcpServers.push({
           name,
           extensionName: config.extension?.name ?? '',
         });

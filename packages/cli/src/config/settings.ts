@@ -54,24 +54,20 @@ import {
 export function getMergeStrategyForPath(
   path: string[],
 ): MergeStrategy | undefined {
-  let current: SettingDefinition | undefined = undefined;
   let currentSchema: SettingsSchema | undefined = getSettingsSchema();
   let parent: SettingDefinition | undefined = undefined;
 
   for (const key of path) {
-    if (!currentSchema || !currentSchema[key]) {
+    const current: SettingDefinition | undefined = currentSchema?.[key];
+    if (!current) {
       // Key not found in schema - check if parent has additionalProperties
-      if (parent?.additionalProperties?.mergeStrategy) {
-        return parent.additionalProperties.mergeStrategy;
-      }
-      return undefined;
+      return parent?.additionalProperties?.mergeStrategy;
     }
     parent = current;
-    current = currentSchema[key];
     currentSchema = current.properties;
   }
 
-  return current?.mergeStrategy;
+  return parent?.mergeStrategy;
 }
 
 export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
@@ -372,19 +368,17 @@ export class LoadedSettings {
     // Remote admin settings always take precedence and file-based admin settings
     // are ignored.
     const adminSettingSchema = getSettingsSchema().admin;
-    if (adminSettingSchema?.properties) {
-      const adminSchema = adminSettingSchema.properties;
-      const adminDefaults = getDefaultsFromSchema(adminSchema);
+    const adminSchema = adminSettingSchema.properties;
+    const adminDefaults = getDefaultsFromSchema(adminSchema);
 
-      // The final admin settings are the defaults overridden by remote settings.
-      // Any admin settings from files are ignored.
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      merged.admin = customDeepMerge(
-        (path: string[]) => getMergeStrategyForPath(['admin', ...path]),
-        adminDefaults,
-        this._remoteAdminSettings?.admin ?? {},
-      ) as MergedSettings['admin'];
-    }
+    // The final admin settings are the defaults overridden by remote settings.
+    // Any admin settings from files are ignored.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    merged.admin = customDeepMerge(
+      (path: string[]) => getMergeStrategyForPath(['admin', ...path]),
+      adminDefaults,
+      this._remoteAdminSettings?.admin ?? {},
+    ) as MergedSettings['admin'];
     return merged;
   }
 
@@ -493,7 +487,7 @@ export class LoadedSettings {
 
 function findEnvFile(startDir: string): string | null {
   let currentDir = path.resolve(startDir);
-  while (true) {
+  for (;;) {
     // prefer gemini-specific .env under GEMINI_DIR
     const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
     if (fs.existsSync(geminiEnvPath)) {
@@ -583,7 +577,7 @@ export function loadEnvironment(
       const parsedEnv = dotenv.parse(envFileContent);
 
       const excludedVars =
-        settings?.advanced?.excludedEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
+        settings.advanced?.excludedEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
       const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
 
       for (const key in parsedEnv) {
@@ -1085,7 +1079,7 @@ function migrateExperimentalSettings(
     };
     const agentsOverrides = {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      ...((agentsSettings['overrides'] as Record<string, unknown>) || {}),
+      ...(agentsSettings['overrides'] as Record<string, unknown>),
     };
     let modified = false;
 

@@ -378,7 +378,7 @@ export async function main() {
 
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||
-    (settings.merged.tools?.allowed && settings.merged.tools.allowed.length > 0)
+    (settings.merged.tools.allowed && settings.merged.tools.allowed.length > 0)
   ) {
     coreEvents.emitFeedback(
       'warning',
@@ -387,7 +387,7 @@ export async function main() {
   }
 
   if (
-    settings.merged.tools?.exclude &&
+    settings.merged.tools.exclude &&
     settings.merged.tools.exclude.length > 0
   ) {
     coreEvents.emitFeedback(
@@ -748,7 +748,7 @@ export async function main() {
       ? SessionStartSource.Resume
       : SessionStartSource.Startup;
 
-    const hookSystem = config?.getHookSystem();
+    const hookSystem = config.getHookSystem();
     if (hookSystem) {
       const result = await hookSystem.fireSessionStartEvent(sessionStartSource);
 
@@ -784,7 +784,7 @@ export async function main() {
       new UserPromptEvent(
         input.length,
         prompt_id,
-        config.getContentGeneratorConfig()?.authType,
+        config.getContentGeneratorConfig().authType,
         input,
       ),
     );
@@ -881,7 +881,7 @@ function setupAdminControlsListener() {
       type?: string;
       settings?: AdminControlsSettings;
     };
-    if (message?.type === 'admin-settings' && message.settings) {
+    if (message.type === 'admin-settings' && message.settings) {
       if (config) {
         config.setRemoteAdminSettings(message.settings);
       } else {

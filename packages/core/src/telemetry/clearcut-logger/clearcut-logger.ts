@@ -275,7 +275,7 @@ export class ClearcutLogger {
   private constructor(config: Config) {
     this.config = config;
     this.events = new FixedDeque<LogEventEntry[]>(Array, MAX_EVENTS);
-    this.promptId = config?.getSessionId() ?? '';
+    this.promptId = config.getSessionId() ?? '';
     this.installationManager = new InstallationManager();
     this.userAccountManager = new UserAccountManager();
 
@@ -288,7 +288,7 @@ export class ClearcutLogger {
   }
 
   static getInstance(config?: Config): ClearcutLogger | undefined {
-    if (config === undefined || !config?.getUsageStatisticsEnabled())
+    if (config === undefined || !config.getUsageStatisticsEnabled())
       return undefined;
     if (!ClearcutLogger.instance) {
       ClearcutLogger.instance = new ClearcutLogger(config);
@@ -1731,7 +1731,7 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_ACTIVE_APPROVAL_MODE,
         value:
           typeof this.config?.getPolicyEngine === 'function' &&
-          typeof this.config.getPolicyEngine()?.getApprovalMode === 'function'
+          typeof this.config.getPolicyEngine().getApprovalMode === 'function'
             ? this.config.getPolicyEngine().getApprovalMode()
             : '',
       },
@@ -1739,7 +1739,7 @@ export class ClearcutLogger {
     if (this.config?.getExperiments()) {
       defaultLogMetadata.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXPERIMENT_IDS,
-        value: this.config?.getExperiments()?.experimentIds.toString() ?? 'NA',
+        value: this.config.getExperiments()?.experimentIds.toString() ?? 'NA',
       });
     }
     return [...data, ...defaultLogMetadata];

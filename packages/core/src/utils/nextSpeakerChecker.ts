@@ -70,10 +70,7 @@ export async function checkNextSpeaker(
 
   // If the last message is a user message containing only function_responses,
   // then the model should speak next.
-  if (
-    lastComprehensiveMessage &&
-    isFunctionResponse(lastComprehensiveMessage)
-  ) {
+  if (isFunctionResponse(lastComprehensiveMessage)) {
     return {
       reasoning:
         'The last message was a function response, so the model should speak next.',
@@ -82,7 +79,6 @@ export async function checkNextSpeaker(
   }
 
   if (
-    lastComprehensiveMessage &&
     lastComprehensiveMessage.role === 'model' &&
     lastComprehensiveMessage.parts &&
     lastComprehensiveMessage.parts.length === 0
@@ -98,7 +94,7 @@ export async function checkNextSpeaker(
   // Things checked out. Let's proceed to potentially making an LLM request.
 
   const lastMessage = curatedHistory[curatedHistory.length - 1];
-  if (!lastMessage || lastMessage.role !== 'model') {
+  if (lastMessage.role !== 'model') {
     // Cannot determine next speaker if the last turn wasn't from the model
     // or if history is empty.
     return null;
@@ -121,7 +117,6 @@ export async function checkNextSpeaker(
     })) as unknown as NextSpeakerResponse;
 
     if (
-      parsedResponse &&
       parsedResponse.next_speaker &&
       ['user', 'model'].includes(parsedResponse.next_speaker)
     ) {

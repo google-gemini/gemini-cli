@@ -82,7 +82,7 @@ export async function handleUpdate(args: UpdateArgs) {
         extensionManager,
         updateState,
         () => {},
-        settings.experimental?.extensionReloading,
+        settings.experimental.extensionReloading,
       ))!;
       if (
         updatedExtensionInfo.originalVersion !==

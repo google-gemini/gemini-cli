@@ -99,7 +99,7 @@ async function findCommand(
       }
     } else if (platform === 'linux') {
       // Linux
-      const linuxConfig = appConfigs[appname]?.linux;
+      const linuxConfig = appConfigs[appname].linux;
       if (linuxConfig) {
         locations.push(
           `/usr/share/${linuxConfig.appBinary}/bin/${linuxConfig.appBinary}`,
@@ -178,7 +178,7 @@ class VsCodeInstaller implements IdeInstaller {
 
       if (result.status !== 0) {
         throw new Error(
-          `Failed to install extension: ${result.stderr?.toString()}`,
+          `Failed to install extension: ${result.stderr.toString()}`,
         );
       }
 
@@ -228,7 +228,7 @@ class PositronInstaller implements IdeInstaller {
 
       if (result.status !== 0) {
         throw new Error(
-          `Failed to install extension: ${result.stderr?.toString()}`,
+          `Failed to install extension: ${result.stderr.toString()}`,
         );
       }
 
@@ -281,7 +281,7 @@ class AntigravityInstaller implements IdeInstaller {
 
       if (result.status !== 0) {
         throw new Error(
-          `Failed to install extension: ${result.stderr?.toString()}`,
+          `Failed to install extension: ${result.stderr.toString()}`,
         );
       }
 

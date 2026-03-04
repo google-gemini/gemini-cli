@@ -185,7 +185,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
           config,
           config.getSessionId() || 'unknown-session',
         );
-      const useGemini3_1 = (await config.getGemini31Launched?.()) ?? false;
+      const useGemini3_1 = (await config.getGemini31Launched()) ?? false;
       const useCustomToolModel =
         useGemini3_1 &&
         config.getContentGeneratorConfig().authType === AuthType.USE_GEMINI;

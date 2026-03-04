@@ -86,12 +86,14 @@ export function findCompressSplitPoint(
 
   // We found no split points after targetCharCount.
   // Check if it's safe to compress everything.
-  const lastContent = contents[contents.length - 1];
-  if (
-    lastContent?.role === 'model' &&
-    !lastContent?.parts?.some((part) => part.functionCall)
-  ) {
-    return contents.length;
+  if (contents.length > 0) {
+    const lastContent = contents[contents.length - 1];
+    if (
+      lastContent.role === 'model' &&
+      !lastContent.parts?.some((part) => part.functionCall)
+    ) {
+      return contents.length;
+    }
   }
 
   // Can't compress everything so just compress at last splitpoint.

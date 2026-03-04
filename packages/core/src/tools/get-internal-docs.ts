@@ -54,7 +54,7 @@ async function getDocsRoot(): Promise<string> {
     return false;
   };
 
-  while (true) {
+  for (;;) {
     const candidate = path.join(searchDir, 'docs');
     if (await isDocsDir(candidate)) {
       return candidate;
