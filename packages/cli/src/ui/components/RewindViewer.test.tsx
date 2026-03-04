@@ -14,6 +14,11 @@ import type {
   MessageRecord,
 } from '@google/gemini-cli-core';
 
+vi.mock('ink', async () => {
+  const actual = await vi.importActual<typeof import('ink')>('ink');
+  return { ...actual, useIsScreenReaderEnabled: vi.fn(() => false) };
+});
+
 vi.mock('./CliSpinner.js', () => ({
   CliSpinner: () => 'MockSpinner',
 }));
@@ -418,4 +423,32 @@ describe('RewindViewer', () => {
     expect(lastFrame2()).toMatchSnapshot('after-update');
     unmount2();
   });
+});
+it('renders accessible screen reader view when screen reader is enabled', async () => {
+  const { useIsScreenReaderEnabled } = await import('ink');
+  vi.mocked(useIsScreenReaderEnabled).mockReturnValue(true);
+
+  const messages: MessageRecord[] = [
+    { type: 'user', content: 'Hello world', id: '1', timestamp: '1' },
+    { type: 'user', content: 'Second message', id: '2', timestamp: '2' },
+  ];
+  const conversation = createConversation(messages);
+  const onExit = vi.fn();
+  const onRewind = vi.fn();
+
+  const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    <RewindViewer
+      conversation={conversation}
+      onExit={onExit}
+      onRewind={onRewind}
+    />,
+  );
+  await waitUntilReady();
+
+  const frame = lastFrame();
+  expect(frame).toContain('Rewind - Select a conversation point:');
+  expect(frame).toContain('Stay at current position');
+
+  vi.mocked(useIsScreenReaderEnabled).mockReturnValue(false);
+  unmount();
 });

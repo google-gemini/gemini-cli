@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import type React from 'react';
 import { useMemo } from 'react';
 import { theme } from '../semantic-colors.js';
@@ -59,8 +59,8 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
   onConfirm,
   terminalWidth,
   timestamp,
-  isScreenReaderEnabled = false,
 }) => {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   useKeypress(
     (key) => {
       if (keyMatchers[Command.ESCAPE](key)) {

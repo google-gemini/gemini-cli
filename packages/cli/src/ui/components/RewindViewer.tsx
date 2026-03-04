@@ -166,7 +166,6 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
         stats={confirmationStats}
         terminalWidth={terminalWidth}
         timestamp={selectedMessage?.timestamp}
-        isScreenReaderEnabled={isScreenReaderEnabled}
         onConfirm={(outcome) => {
           if (outcome === RewindOutcome.Cancel) {
             clearSelection();
@@ -188,15 +187,12 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   }
 
   if (isScreenReaderEnabled) {
-    // FIX #5: slice items to maxItemsToShow to prevent overflow in small windows
-    const visibleItems = items.slice(0, maxItemsToShow);
-
     return (
       <Box flexDirection="column" width={terminalWidth}>
         <Text bold>Rewind - Select a conversation point:</Text>
         <BaseSelectionList
-          items={visibleItems}
-          initialIndex={visibleItems.length - 1}
+          items={items}
+          initialIndex={items.length - 1}
           isFocused={true}
           // FIX #4: use showNumbers={true} instead of manually prepending numbers
           showNumbers={true}
