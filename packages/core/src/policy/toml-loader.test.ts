@@ -17,8 +17,8 @@ import { fileURLToPath } from 'node:url';
 import {
   loadPoliciesFromToml,
   validateMcpPolicyToolNames,
+  type PolicyLoadResult,
 } from './toml-loader.js';
-import type { PolicyLoadResult } from './toml-loader.js';
 import { PolicyEngine } from './policy-engine.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -909,7 +909,7 @@ priority = 100
       }
     });
 
-    it('should override default subagent rules when in Plan Mode', async () => {
+    it('should override default subagent rules when in Plan Mode for unknown subagents', async () => {
       const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
       const fileContent = await fs.readFile(planTomlPath, 'utf-8');
       const tempPolicyDir = await fs.mkdtemp(
@@ -931,9 +931,9 @@ priority = 100
           approvalMode: ApprovalMode.PLAN,
         });
 
-        // 3. Simulate a Subagent being registered (Dynamic Rule)
+        // 3. Simulate an unknown Subagent being registered (Dynamic Rule)
         engine.addRule({
-          toolName: 'codebase_investigator',
+          toolName: 'unknown_subagent',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
           source: 'AgentRegistry (Dynamic)',
@@ -942,13 +942,13 @@ priority = 100
         // 4. Verify Behavior:
         // The Plan Mode "Catch-All Deny" (from plan.toml) should override the Subagent Allow
         const checkResult = await engine.check(
-          { name: 'codebase_investigator' },
+          { name: 'unknown_subagent' },
           undefined,
         );
 
         expect(
           checkResult.decision,
-          'Subagent should be DENIED in Plan Mode',
+          'Unknown subagent should be DENIED in Plan Mode',
         ).toBe(PolicyDecision.DENY);
 
         // 5. Verify Explicit Allows still work
@@ -957,6 +957,25 @@ priority = 100
         expect(
           readResult.decision,
           'Explicitly allowed tools (read_file) should be ALLOWED in Plan Mode',
+        ).toBe(PolicyDecision.ALLOW);
+
+        // 6. Verify Built-in Research Subagents are ALLOWED
+        const codebaseResult = await engine.check(
+          { name: 'codebase_investigator' },
+          undefined,
+        );
+        expect(
+          codebaseResult.decision,
+          'codebase_investigator should be ALLOWED in Plan Mode',
+        ).toBe(PolicyDecision.ALLOW);
+
+        const cliHelpResult = await engine.check(
+          { name: 'cli_help' },
+          undefined,
+        );
+        expect(
+          cliHelpResult.decision,
+          'cli_help should be ALLOWED in Plan Mode',
         ).toBe(PolicyDecision.ALLOW);
       } finally {
         await fs.rm(tempPolicyDir, { recursive: true, force: true });
