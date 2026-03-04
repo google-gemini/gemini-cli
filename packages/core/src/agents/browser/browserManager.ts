@@ -26,7 +26,7 @@ import { Storage } from '../../config/storage.js';
 import * as path from 'node:path';
 
 // Pin chrome-devtools-mcp version for reproducibility.
-const CHROME_DEVTOOLS_MCP_VERSION = '0.17.1';
+const CHROME_DEVTOOLS_MCP_VERSION = '0.18.1';
 
 // Default browser profile directory name within ~/.gemini/
 const BROWSER_PROFILE_DIR = 'cli-browser-profile';
