@@ -10,13 +10,15 @@ Footer
 `;
 
 exports[`Composer > Snapshots > matches snapshot in minimal UI mode 1`] = `
-"                                                                                       ShortcutsHint
+"
+                                                                                       ShortcutsHint
 InputPrompt:   Type your message or @path/to/file
 "
 `;
 
 exports[`Composer > Snapshots > matches snapshot in minimal UI mode while loading 1`] = `
-" LoadingIndicator
+"
+ LoadingIndicator
 InputPrompt:   Type your message or @path/to/file
 "
 `;

@@ -249,8 +249,13 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             marginTop={isNarrow ? 1 : 0}
             flexDirection="column"
             alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+            minHeight={1}
           >
-            {showUiDetails && showShortcutsHint && <ShortcutsHint />}
+            {showUiDetails && showShortcutsHint ? (
+              <ShortcutsHint />
+            ) : (
+              <Text> </Text>
+            )}
           </Box>
         </Box>
         {showMinimalMetaRow && (
@@ -309,6 +314,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                 marginTop={isNarrow && showMinimalBleedThroughRow ? 1 : 0}
                 flexDirection={isNarrow ? 'column' : 'row'}
                 alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+                minHeight={1}
               >
                 {showMinimalContextBleedThrough && (
                   <ContextUsageDisplay
@@ -317,18 +323,14 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                     terminalWidth={uiState.terminalWidth}
                   />
                 )}
-                {showShortcutsHint && (
-                  <Box
-                    marginLeft={
-                      showMinimalContextBleedThrough && !isNarrow ? 1 : 0
-                    }
-                    marginTop={
-                      showMinimalContextBleedThrough && isNarrow ? 1 : 0
-                    }
-                  >
-                    <ShortcutsHint />
-                  </Box>
-                )}
+                <Box
+                  marginLeft={
+                    showMinimalContextBleedThrough && !isNarrow ? 1 : 0
+                  }
+                  marginTop={showMinimalContextBleedThrough && isNarrow ? 1 : 0}
+                >
+                  {showShortcutsHint ? <ShortcutsHint /> : <Text> </Text>}
+                </Box>
               </Box>
             )}
           </Box>
