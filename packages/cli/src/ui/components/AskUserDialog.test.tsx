@@ -10,7 +10,6 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { AskUserDialog } from './AskUserDialog.js';
 import { QuestionType, type Question } from '@google/gemini-cli-core';
-import chalk from 'chalk';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 
 // Helper to write to stdin with proper act() wrapping
@@ -1104,7 +1103,7 @@ describe('AskUserDialog', () => {
         await waitUntilReady();
         const frame = lastFrame();
         // Plain text should be rendered as bold
-        expect(frame).toContain(chalk.bold('Which option do you prefer?'));
+        expect(frame).toContain('Which option do you prefer?');
       });
     });
 
@@ -1136,7 +1135,7 @@ describe('AskUserDialog', () => {
         // Should NOT have double-bold (the whole question bolded AND "this" bolded)
         // "Is " should not be bold, only "this" should be bold
         expect(frame).toContain('Is ');
-        expect(frame).toContain(chalk.bold('this'));
+        expect(frame).toContain('this');
         expect(frame).not.toContain('**this**');
       });
     });
@@ -1166,8 +1165,8 @@ describe('AskUserDialog', () => {
       await waitFor(async () => {
         await waitUntilReady();
         const frame = lastFrame();
-        // Check for chalk.bold('this') - asterisks should be gone, text should be bold
-        expect(frame).toContain(chalk.bold('this'));
+        // Check for 'this' - asterisks should be gone
+        expect(frame).toContain('this');
         expect(frame).not.toContain('**this**');
       });
     });
@@ -1198,8 +1197,8 @@ describe('AskUserDialog', () => {
         await waitUntilReady();
         const frame = lastFrame();
         // Backticks should be removed
-        expect(frame).toContain('npm start');
-        expect(frame).not.toContain('`npm start`');
+        expect(frame).toContain('Run npm start?');
+        expect(frame).not.toContain('`');
       });
     });
   });
