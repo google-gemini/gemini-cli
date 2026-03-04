@@ -601,17 +601,18 @@ describe('FileSearch', () => {
   describe('truncation warning', () => {
     it('should detect truncation and emit a warning when maxFiles is hit', async () => {
       // Reset modules so hasWarnedTruncation starts as false regardless of test order.
-      // Both fileSearch and events must be re-imported after the reset so that
-      // the spy targets the same coreEvents instance that the fresh module uses.
       vi.resetModules();
       const [
         { FileSearchFactory: FreshFileSearchFactory },
         { coreEvents: freshCoreEvents },
+        freshCrawler,
       ] = await Promise.all([
         import('./fileSearch.js'),
         import('../events.js'),
+        import('./crawler.js'),
       ]);
       const emitFeedbackSpy = vi.spyOn(freshCoreEvents, 'emitFeedback');
+      const crawlerSpy = vi.spyOn(freshCrawler, 'crawl');
 
       const largeDir: Record<string, string> = {};
       for (let i = 0; i < 10; i++) {
@@ -626,8 +627,8 @@ describe('FileSearch', () => {
           respectGeminiIgnore: false,
         }),
         ignoreDirs: [],
-        cache: false,
-        cacheTtl: 0,
+        cache: true,
+        cacheTtl: 10,
         enableRecursiveFileSearch: true,
         enableFuzzySearch: true,
         maxFiles: 5,
@@ -641,6 +642,8 @@ describe('FileSearch', () => {
         'warning',
         expect.stringContaining('Indexed 5 files (limit reached)'),
       );
+      // The crawler should have been called once
+      expect(crawlerSpy).toHaveBeenCalledTimes(1);
 
       // Initializing again or searching should not emit the warning again
       await fileSearch.initialize();
