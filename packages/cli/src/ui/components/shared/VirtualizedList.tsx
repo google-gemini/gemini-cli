@@ -8,7 +8,6 @@ import {
   useState,
   useRef,
   useLayoutEffect,
-  forwardRef,
   useImperativeHandle,
   useMemo,
   useCallback,
@@ -754,11 +753,6 @@ function VirtualizedList<T>(
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-const VirtualizedListWithForwardRef = forwardRef(VirtualizedList) as <T>(
-  props: VirtualizedListProps<T> & { ref?: React.Ref<VirtualizedListRef<T>> },
-) => React.ReactElement;
-
-export { VirtualizedListWithForwardRef as VirtualizedList };
+export { VirtualizedList };
 
 VirtualizedList.displayName = 'VirtualizedList';

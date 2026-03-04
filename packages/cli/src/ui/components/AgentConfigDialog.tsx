@@ -117,7 +117,11 @@ interface AgentConfigDialogProps {
 /**
  * Set a nested value in an object using a path array, creating intermediate objects as needed
  */
-function setNestedValue(obj: unknown, path: string[], value: unknown): unknown {
+function setNestedValue(
+  obj: AgentOverride,
+  path: string[],
+  value: unknown,
+): AgentOverride {
   if (!isRecord(obj)) return obj;
 
   const result = { ...obj };
@@ -281,6 +285,16 @@ export function AgentConfigDialog({
         const rawValue =
           currentValue !== undefined ? currentValue : effectiveValue;
 
+        function isPrimitive(
+          v: unknown,
+        ): v is string | number | boolean | undefined {
+          return (
+            v === undefined ||
+            typeof v === 'string' ||
+            typeof v === 'number' ||
+            typeof v === 'boolean'
+          );
+        }
         return {
           key: field.key,
           label: field.label,
@@ -289,8 +303,7 @@ export function AgentConfigDialog({
           displayValue,
           isGreyedOut: currentValue === undefined,
           scopeMessage: undefined,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          rawValue: rawValue as string | number | boolean | undefined,
+          rawValue: isPrimitive(rawValue) ? rawValue : undefined,
         };
       }),
     [pendingOverride, definition, modifiedFields],
@@ -315,12 +328,8 @@ export function AgentConfigDialog({
         currentValue !== undefined ? currentValue : defaultValue;
       const newValue = !effectiveValue;
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const newOverride = setNestedValue(
-        pendingOverride,
-        field.path,
-        newValue,
-      ) as AgentOverride;
+      const newOverride = setNestedValue(pendingOverride, field.path, newValue);
+
       setPendingOverride(newOverride);
       setModifiedFields((prev) => new Set(prev).add(key));
 
@@ -355,12 +364,7 @@ export function AgentConfigDialog({
       }
 
       // Update pending override locally
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const newOverride = setNestedValue(
-        pendingOverride,
-        field.path,
-        parsed,
-      ) as AgentOverride;
+      const newOverride = setNestedValue(pendingOverride, field.path, parsed);
 
       setPendingOverride(newOverride);
       setModifiedFields((prev) => new Set(prev).add(key));
@@ -378,12 +382,11 @@ export function AgentConfigDialog({
       if (!field) return;
 
       // Remove the override (set to undefined)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const newOverride = setNestedValue(
         pendingOverride,
         field.path,
         undefined,
-      ) as AgentOverride;
+      );
 
       setPendingOverride(newOverride);
       setModifiedFields((prev) => {

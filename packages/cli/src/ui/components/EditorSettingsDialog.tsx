@@ -131,10 +131,7 @@ export function EditorSettingsDialog({
     isEditorAvailable(settings.merged.general.preferredEditor)
   ) {
     mergedEditorName =
-      EDITOR_DISPLAY_NAMES[
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        settings.merged.general.preferredEditor as EditorType
-      ];
+      EDITOR_DISPLAY_NAMES[settings.merged.general.preferredEditor];
   }
 
   return (

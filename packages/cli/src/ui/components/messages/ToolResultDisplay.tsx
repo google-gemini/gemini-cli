@@ -28,6 +28,19 @@ import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 import { calculateToolContentMaxLines } from '../../utils/toolLayoutUtils.js';
 import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
 
+function isAnsiOutput(value: unknown): value is AnsiOutput {
+  return Array.isArray(value) && value.every(Array.isArray);
+}
+
+function isFileDiffResult(value: unknown): value is FileDiffResult {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'fileDiff' in value &&
+    'fileName' in value
+  );
+}
+
 export interface ToolResultDisplayProps {
   resultDisplay: string | object | undefined;
   availableTerminalHeight?: number;
@@ -149,12 +162,8 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     ) {
       content = (
         <DiffRenderer
-          diffContent={
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (contentData as FileDiffResult).fileDiff
-          }
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          filename={(contentData as FileDiffResult).fileName}
+          diffContent={contentData.fileDiff}
+          filename={contentData.fileName}
           availableTerminalHeight={availableHeight}
           terminalWidth={childWidth}
         />
@@ -166,8 +175,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
       content = (
         <AnsiOutputText
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          data={contentData as AnsiOutput}
+          data={contentData}
           availableTerminalHeight={
             isAlternateBuffer ? undefined : availableHeight
           }

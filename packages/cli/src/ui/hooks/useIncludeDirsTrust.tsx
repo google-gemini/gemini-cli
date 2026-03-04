@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 import { type Config } from '@google/gemini-cli-core';
 import { loadTrustedFolders } from '../../config/trustedFolders.js';
 import { expandHomeDir, batchAddDirectories } from '../utils/directoryUtils.js';
+import { toErrorMessage } from '../utils/errorUtils.js';
 import {
   debugLogger,
   refreshServerHierarchicalMemory,
@@ -38,8 +39,7 @@ async function finishAddingDirectories(
       await refreshServerHierarchicalMemory(config);
     }
   } catch (error) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    errors.push(`Error refreshing memory: ${(error as Error).message}`);
+    errors.push(`Error refreshing memory: ${toErrorMessage(error)}`);
   }
 
   if (added.length > 0) {

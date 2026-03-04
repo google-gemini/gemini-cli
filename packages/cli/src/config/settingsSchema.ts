@@ -24,6 +24,7 @@ import {
 } from '@google/gemini-cli-core';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
+import type { EditorType } from '@google/gemini-cli-core/src/utils/editor.js';
 
 export type SettingsType =
   | 'boolean'
@@ -195,7 +196,7 @@ const SETTINGS_SCHEMA = {
         label: 'Preferred Editor',
         category: 'General',
         requiresRestart: false,
-        default: undefined as string | undefined,
+        default: undefined as EditorType | undefined,
         description: 'The preferred editor to open files in.',
         showInDialog: false,
       },
