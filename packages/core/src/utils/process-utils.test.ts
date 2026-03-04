@@ -42,14 +42,20 @@ describe('process-utils', () => {
       expect(mockProcessKill).not.toHaveBeenCalled();
     });
 
-    it('should use pty.kill() on Windows if pty is provided', async () => {
+    it('should use pty.kill() on Windows if pty is provided and also taskkill for descendants', async () => {
       vi.mocked(os.platform).mockReturnValue('win32');
       const mockPty = { kill: vi.fn() };
 
       await killProcessGroup({ pid: 1234, pty: mockPty });
 
       expect(mockPty.kill).toHaveBeenCalled();
-      expect(mockSpawn).not.toHaveBeenCalled();
+      // taskkill is also called to reap orphaned descendant processes
+      expect(mockSpawn).toHaveBeenCalledWith('taskkill', [
+        '/pid',
+        '1234',
+        '/f',
+        '/t',
+      ]);
     });
 
     it('should kill the process group on Unix with SIGKILL by default', async () => {
@@ -129,6 +135,39 @@ describe('process-utils', () => {
       await killProcessGroup({ pid: 1234, pty: mockPty });
 
       expect(mockPty.kill).toHaveBeenCalledWith('SIGKILL');
+    });
+
+    it('should also invoke taskkill on Windows when pty is provided to reap descendants', async () => {
+      vi.mocked(os.platform).mockReturnValue('win32');
+      const mockPty = { kill: vi.fn() };
+
+      await killProcessGroup({ pid: 1234, pty: mockPty });
+
+      expect(mockPty.kill).toHaveBeenCalled();
+      expect(mockSpawn).toHaveBeenCalledWith('taskkill', [
+        '/pid',
+        '1234',
+        '/f',
+        '/t',
+      ]);
+    });
+
+    it('should attempt process group kill on Unix after pty fallback to reap orphaned descendants', async () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      // First call (group kill) throws to trigger PTY fallback
+      mockProcessKill.mockImplementationOnce(() => {
+        throw new Error('ESRCH');
+      });
+      // Second call (group kill retry after pty.kill) should succeed
+      mockProcessKill.mockImplementationOnce(() => true);
+      const mockPty = { kill: vi.fn() };
+
+      await killProcessGroup({ pid: 1234, pty: mockPty });
+
+      // PTY kill should be called first
+      expect(mockPty.kill).toHaveBeenCalledWith('SIGKILL');
+      // Then process group kill should be attempted to reap descendants
+      expect(mockProcessKill).toHaveBeenCalledWith(-1234, 'SIGKILL');
     });
   });
 });
