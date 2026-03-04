@@ -1,9 +1,8 @@
 # Model steering (experimental)
 
 Model steering lets you provide real-time guidance and feedback to Gemini CLI
-while it is actively executing a task. This allows you to correct course, add
-missing context, or skip unnecessary steps without having to stop and restart
-the agent.
+while it is actively executing a task. This lets you correct course, add missing
+context, or skip unnecessary steps without having to stop and restart the agent.
 
 > **Note:** This is a preview feature currently under active development. It is
 > only available on the preview channel.
@@ -63,7 +62,7 @@ You can use steering hints to guide the model in several ways:
 
 When you submit a steering hint, Gemini CLI performs the following actions:
 
-1.  **Immediate acknowledgement:** It uses a small, fast model to generate a
+1.  **Immediate acknowledgment:** It uses a small, fast model to generate a
     one-sentence acknowledgment so you know your hint was received.
 2.  **Context injection:** It prepends an internal instruction to your hint that
     tells the main agent to:
