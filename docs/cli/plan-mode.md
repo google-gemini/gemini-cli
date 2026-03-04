@@ -107,7 +107,9 @@ structure, and consultation level are proportional to the task's complexity:
 4.  **Review & Approval:** Use the [`exit_plan_mode`] tool to present the plan
     and formally request approval.
     - **Approve:** Exit Plan Mode and start implementation.
-    - **Iterate:** Provide feedback to refine the plan.
+    - **Iterate:** Provide feedback to refine the plan. You can also use
+      [**model steering**](./model-steering.md) to provide real-time feedback
+      while Gemini CLI is researching or drafting the plan.
     - **Refine manually:** Press **Ctrl + X** to open the plan file in your
       [preferred external editor]. This allows you to manually refine the plan
       steps before approval. If you make any changes and save the file, the CLI
