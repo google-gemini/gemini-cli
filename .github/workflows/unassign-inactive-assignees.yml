@@ -1,0 +1,315 @@
+name: 'Unassign Inactive Issue Assignees'
+
+# This workflow runs daily and scans every open "help wanted" issue that has
+# one or more assignees.  For each assignee it checks whether they have a
+# non-draft pull request (open and ready for review, or already merged) that
+# is linked to the issue.  Draft PRs are intentionally excluded so that
+# contributors cannot reset the check by opening a no-op PR.  If no
+# qualifying PR is found within 7 days of assignment the assignee is
+# automatically removed and a friendly comment is posted so that other
+# contributors can pick up the work.
+# Maintainers, org members, and collaborators (anyone with write access or
+# above) are always exempted and will never be auto-unassigned.
+
+on:
+  schedule:
+    - cron: '0 9 * * *' # Every day at 09:00 UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode (no changes will be applied)'
+        required: false
+        default: false
+        type: 'boolean'
+
+concurrency:
+  group: '${{ github.workflow }}'
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: 'bash'
+
+jobs:
+  unassign-inactive-assignees:
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    runs-on: 'ubuntu-latest'
+    permissions:
+      issues: 'write'
+
+    steps:
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@v2'
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+
+      - name: 'Unassign inactive assignees'
+        uses: 'actions/github-script@v7'
+        env:
+          DRY_RUN: '${{ inputs.dry_run }}'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |
+            const dryRun = process.env.DRY_RUN === 'true';
+            if (dryRun) {
+              core.info('DRY RUN MODE ENABLED: No changes will be applied.');
+            }
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const GRACE_PERIOD_DAYS = 7;
+            const now = new Date();
+
+            let maintainerLogins = new Set();
+            const teams = ['gemini-cli-maintainers', 'gemini-cli-askmode-approvers', 'gemini-cli-docs'];
+
+            for (const team_slug of teams) {
+              try {
+                const members = await github.paginate(github.rest.teams.listMembersInOrg, {
+                  org: owner,
+                  team_slug,
+                });
+                for (const m of members) maintainerLogins.add(m.login.toLowerCase());
+                core.info(`Fetched ${members.length} members from team ${team_slug}.`);
+              } catch (e) {
+                core.warning(`Could not fetch team ${team_slug}: ${e.message}`);
+              }
+            }
+
+            const isGooglerCache = new Map();
+            const isGoogler = async (login) => {
+              if (isGooglerCache.has(login)) return isGooglerCache.get(login);
+              try {
+                for (const org of ['googlers', 'google']) {
+                  try {
+                    await github.rest.orgs.checkMembershipForUser({ org, username: login });
+                    isGooglerCache.set(login, true);
+                    return true;
+                  } catch (e) {
+                    if (e.status !== 404) throw e;
+                  }
+                }
+              } catch (e) {
+                core.warning(`Could not check org membership for ${login}: ${e.message}`);
+              }
+              isGooglerCache.set(login, false);
+              return false;
+            };
+
+            const permissionCache = new Map();
+            const isPrivilegedUser = async (login) => {
+              if (maintainerLogins.has(login.toLowerCase())) return true;
+
+              if (permissionCache.has(login)) return permissionCache.get(login);
+
+              try {
+                const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner,
+                  repo,
+                  username: login,
+                });
+                const privileged = ['admin', 'maintain', 'write', 'triage'].includes(data.permission);
+                permissionCache.set(login, privileged);
+                if (privileged) {
+                  core.info(`  @${login} is a repo collaborator (${data.permission}) — exempt.`);
+                  return true;
+                }
+              } catch (e) {
+                if (e.status !== 404) {
+                  core.warning(`Could not check permission for ${login}: ${e.message}`);
+                }
+              }
+
+              const googler = await isGoogler(login);
+              permissionCache.set(login, googler);
+              return googler;
+            };
+
+            core.info('Fetching open "help wanted" issues with assignees...');
+
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: 'open',
+              labels: 'help wanted',
+              per_page: 100,
+            });
+
+            const assignedIssues = issues.filter(
+              (issue) => !issue.pull_request && issue.assignees && issue.assignees.length > 0
+            );
+
+            core.info(`Found ${assignedIssues.length} assigned "help wanted" issues.`);
+
+            let totalUnassigned = 0;
+
+              let timelineEvents = [];
+              try {
+                timelineEvents = await github.paginate(github.rest.issues.listEventsForTimeline, {
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  per_page: 100,
+                  mediaType: { previews: ['mockingbird'] },
+                });
+              } catch (err) {
+                core.warning(`Could not fetch timeline for issue #${issue.number}: ${err.message}`);
+                continue;
+              }
+
+              const assignedAtMap = new Map();
+
+              for (const event of timelineEvents) {
+                if (event.event === 'assigned' && event.assignee) {
+                  const login = event.assignee.login.toLowerCase();
+                  const at = new Date(event.created_at);
+                  assignedAtMap.set(login, at);
+                } else if (event.event === 'unassigned' && event.assignee) {
+                  assignedAtMap.delete(event.assignee.login.toLowerCase());
+                }
+              }
+
+              const linkedPRAuthorSet = new Set();
+              const seenPRKeys = new Set();
+
+              for (const event of timelineEvents) {
+                if (
+                  event.event !== 'cross-referenced' ||
+                  !event.source ||
+                  event.source.type !== 'pull_request' ||
+                  !event.source.issue ||
+                  !event.source.issue.user ||
+                  !event.source.issue.number ||
+                  !event.source.issue.repository
+                ) continue;
+
+                const prOwner  = event.source.issue.repository.owner.login;
+                const prRepo   = event.source.issue.repository.name;
+                const prNumber = event.source.issue.number;
+                const prAuthor = event.source.issue.user.login.toLowerCase();
+                const prKey    = `${prOwner}/${prRepo}#${prNumber}`;
+
+                if (seenPRKeys.has(prKey)) continue;
+                seenPRKeys.add(prKey);
+
+                try {
+                  const { data: pr } = await github.rest.pulls.get({
+                    owner: prOwner,
+                    repo: prRepo,
+                    pull_number: prNumber,
+                  });
+
+                  const isReady = (pr.state === 'open' && !pr.draft) ||
+                                  (pr.state === 'closed' && pr.merged_at !== null);
+
+                  core.info(
+                    `  PR ${prKey} by @${prAuthor}: ` +
+                    `state=${pr.state}, draft=${pr.draft}, merged=${!!pr.merged_at} → ` +
+                    (isReady ? 'qualifies' : 'does NOT qualify (draft or closed without merge)')
+                  );
+
+                  if (isReady) linkedPRAuthorSet.add(prAuthor);
+                } catch (err) {
+                  core.warning(`Could not fetch PR ${prKey}: ${err.message}`);
+                }
+              }
+
+              const assigneesToRemove = [];
+
+              for (const assignee of issue.assignees) {
+                const login = assignee.login.toLowerCase();
+
+                if (await isPrivilegedUser(assignee.login)) {
+                  core.info(`  @${assignee.login}: privileged user — skipping.`);
+                  continue;
+                }
+
+                const assignedAt = assignedAtMap.get(login);
+
+                if (!assignedAt) {
+                  core.warning(
+                    `No 'assigned' event found for @${login} on issue #${issue.number}; ` +
+                    `falling back to issue creation date (${issue.created_at}).`
+                  );
+                  assignedAtMap.set(login, new Date(issue.created_at));
+                }
+                const resolvedAssignedAt = assignedAtMap.get(login);
+
+                const daysSinceAssignment = (now - resolvedAssignedAt) / (1000 * 60 * 60 * 24);
+
+                core.info(
+                  `  @${login}: assigned ${daysSinceAssignment.toFixed(1)} day(s) ago, ` +
+                  `ready-for-review PR: ${linkedPRAuthorSet.has(login) ? 'yes' : 'no'}`
+                );
+
+                if (daysSinceAssignment < GRACE_PERIOD_DAYS) {
+                  core.info(`    → within grace period, skipping.`);
+                  continue;
+                }
+
+                if (linkedPRAuthorSet.has(login)) {
+                  core.info(`    → ready-for-review PR found, keeping assignment.`);
+                  continue;
+                }
+
+                core.info(`    → no ready-for-review PR after ${GRACE_PERIOD_DAYS} days, will unassign.`);
+                assigneesToRemove.push(assignee.login);
+              }
+
+              if (assigneesToRemove.length === 0) {
+                continue;
+              }
+
+              if (!dryRun) {
+                try {
+                  await github.rest.issues.removeAssignees({
+                    owner,
+                    repo,
+                    issue_number: issue.number,
+                    assignees: assigneesToRemove,
+                  });
+                } catch (err) {
+                  core.warning(
+                    `Failed to unassign ${assigneesToRemove.join(', ')} from issue #${issue.number}: ${err.message}`
+                  );
+                  continue;
+                }
+
+                const mentionList = assigneesToRemove.map((l) => `@${l}`).join(', ');
+                const commentBody =
+                  `👋 ${mentionList} — it has been more than ${GRACE_PERIOD_DAYS} days since ` +
+                  `you were assigned to this issue and we could not find a pull request ` +
+                  `ready for review.\n\n` +
+                  `To keep the backlog moving and ensure issues stay accessible to all ` +
+                  `contributors, we require a PR that is open and ready for review (not a ` +
+                  `draft) within ${GRACE_PERIOD_DAYS} days of assignment.\n\n` +
+                  `We are automatically unassigning you so that other contributors can pick ` +
+                  `this up. If you are still actively working on this, please:\n` +
+                  `1. Re-assign yourself by commenting \`/assign\`.\n` +
+                  `2. Open a PR (not a draft) linked to this issue (e.g. \`Fixes #${issue.number}\`) ` +
+                  `within ${GRACE_PERIOD_DAYS} days so the automation knows real progress is being made.\n\n` +
+                  `Thank you for your contribution — we hope to see a PR from you soon! 🙏`;
+
+                try {
+                  await github.rest.issues.createComment({
+                    owner,
+                    repo,
+                    issue_number: issue.number,
+                    body: commentBody,
+                  });
+                } catch (err) {
+                  core.warning(
+                    `Failed to post comment on issue #${issue.number}: ${err.message}`
+                  );
+                }
+              }
+
+              totalUnassigned += assigneesToRemove.length;
+              core.info(
+                `  ${dryRun ? '[DRY RUN] Would have unassigned' : 'Unassigned'}: ${assigneesToRemove.join(', ')}`
+              );
+            }
+
+            core.info(`\nDone. Total assignees ${dryRun ? 'that would be' : ''} unassigned: ${totalUnassigned}`);

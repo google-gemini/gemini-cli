@@ -74,6 +74,20 @@ export interface WriteFileToolParams {
   ai_proposed_content?: string;
 }
 
+export function isWriteFileToolParams(
+  args: unknown,
+): args is WriteFileToolParams {
+  if (typeof args !== 'object' || args === null) {
+    return false;
+  }
+  return (
+    'file_path' in args &&
+    typeof args.file_path === 'string' &&
+    'content' in args &&
+    typeof args.content === 'string'
+  );
+}
+
 interface GetCorrectedFileContentResult {
   originalContent: string;
   correctedContent: string;
