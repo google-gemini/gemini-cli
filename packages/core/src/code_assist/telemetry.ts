@@ -150,7 +150,9 @@ function summarizeToolCalls(
           );
           if (fileDiff?.diffStat) {
             const lines = computeModelAddedAndRemovedLines(fileDiff.diffStat);
-            acceptedLines += lines.addedLines;
+
+            // The API expects acceptedLines to be addedLines + removedLines.
+            acceptedLines += lines.addedLines + lines.removedLines;
             removedLines += lines.removedLines;
           }
         }
