@@ -1419,6 +1419,7 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.customConfig.headless).toBe(false);
       expect(browserConfig.customConfig.profilePath).toBeUndefined();
       expect(browserConfig.customConfig.visualModel).toBeUndefined();
+      expect(browserConfig.customConfig.showCursorAnimations).toBe(true);
     });
 
     it('should return custom browser agent config from agents.overrides', () => {
@@ -1436,6 +1437,7 @@ describe('Server Config (config.ts)', () => {
             headless: true,
             profilePath: '/path/to/profile',
             visualModel: 'custom-visual-model',
+            showCursorAnimations: true,
           },
         },
       };
@@ -1450,6 +1452,7 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.customConfig.visualModel).toBe(
         'custom-visual-model',
       );
+      expect(browserConfig.customConfig.showCursorAnimations).toBe(true);
     });
 
     it('should apply defaults for partial custom config', () => {
@@ -1473,6 +1476,7 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.customConfig.headless).toBe(true);
       // Defaults for unspecified fields
       expect(browserConfig.customConfig.sessionMode).toBe('persistent');
+      expect(browserConfig.customConfig.showCursorAnimations).toBe(false);
     });
   });
 });

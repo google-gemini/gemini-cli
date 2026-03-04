@@ -30,6 +30,10 @@ import {
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { BrowserManager, McpToolCallResult } from './browserManager.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import {
+  generateClickAnimationScript,
+  generateScrollAnimationScript,
+} from './cursorAnimations.js';
 
 /**
  * Tool invocation that dispatches to BrowserManager's isolated MCP client.
@@ -97,6 +101,10 @@ class McpToolInvocation extends BaseToolInvocation<
           .join('\n');
       }
 
+      if (!result.isError && !signal.aborted) {
+        await this.injectAnimationIfApplicable(signal);
+      }
+
       // Post-process to add contextual hints for common error patterns
       const processedContent = postProcessToolResult(
         this.toolName,
@@ -131,6 +139,80 @@ class McpToolInvocation extends BaseToolInvocation<
         error: { message: errorMsg },
       };
     }
+  }
+
+  private async injectAnimationIfApplicable(
+    signal: AbortSignal,
+  ): Promise<void> {
+    const config = this.browserManager.getConfig().getBrowserAgentConfig();
+    if (
+      config.customConfig.headless ||
+      !config.customConfig.showCursorAnimations
+    ) {
+      return;
+    }
+
+    try {
+      if (this.toolName === 'click_at' || this.toolName === 'click') {
+        const x =
+          Number(this.params['x']) ||
+          (Array.isArray(this.params['coordinate'])
+            ? Number(this.params['coordinate'][0])
+            : undefined);
+        const y =
+          Number(this.params['y']) ||
+          (Array.isArray(this.params['coordinate'])
+            ? Number(this.params['coordinate'][1])
+            : undefined);
+
+        if (x !== undefined && y !== undefined && !isNaN(x) && !isNaN(y)) {
+          await this.injectClickAnimation(x, y, signal);
+        }
+      } else if (this.toolName === 'press_key') {
+        const key = String(this.params['key']);
+        if (this.isScrollKey(key)) {
+          await this.injectScrollAnimation(
+            this.getScrollDirection(key),
+            signal,
+          );
+        }
+      }
+    } catch (error) {
+      // Ignore animation injection errors so they don't fail the main action
+      debugLogger.warn(`Failed to inject cursor animation: ${error}`);
+    }
+  }
+
+  private isScrollKey(key: string): boolean {
+    return [
+      'PageDown',
+      'PageUp',
+      'ArrowDown',
+      'ArrowUp',
+      'End',
+      'Home',
+    ].includes(key);
+  }
+
+  private getScrollDirection(key: string): 'up' | 'down' {
+    return ['PageUp', 'ArrowUp', 'Home'].includes(key) ? 'up' : 'down';
+  }
+
+  private async injectClickAnimation(
+    x: number,
+    y: number,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const script = generateClickAnimationScript(x, y);
+    await this.browserManager.callTool('evaluate_script', { script }, signal);
+  }
+
+  private async injectScrollAnimation(
+    direction: 'up' | 'down',
+    signal: AbortSignal,
+  ): Promise<void> {
+    const script = generateScrollAnimationScript(direction);
+    await this.browserManager.callTool('evaluate_script', { script }, signal);
   }
 }
 

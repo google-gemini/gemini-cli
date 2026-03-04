@@ -315,6 +315,8 @@ export interface BrowserAgentCustomConfig {
   profilePath?: string;
   /** Model override for the visual agent. */
   visualModel?: string;
+  /** Show visual cursor animations for clicks and scrolls. Default: true in non-headless mode */
+  showCursorAnimations?: boolean;
 }
 
 /**
@@ -2745,6 +2747,8 @@ export class Config implements McpContext {
         headless: customConfig.headless ?? false,
         profilePath: customConfig.profilePath,
         visualModel: customConfig.visualModel,
+        showCursorAnimations:
+          customConfig.showCursorAnimations ?? !customConfig.headless,
       },
     };
   }

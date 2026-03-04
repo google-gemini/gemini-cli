@@ -83,6 +83,13 @@ export class BrowserManager {
   constructor(private config: Config) {}
 
   /**
+   * Gets the configuration used by this browser manager.
+   */
+  getConfig(): Config {
+    return this.config;
+  }
+
+  /**
    * Gets the raw MCP SDK Client for direct tool calls.
    * This client is ISOLATED from the main tool registry.
    */

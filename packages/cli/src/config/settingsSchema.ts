@@ -1075,6 +1075,16 @@ const SETTINGS_SCHEMA = {
             description: 'Model override for the visual agent.',
             showInDialog: false,
           },
+          showCursorAnimations: {
+            type: 'boolean',
+            label: 'Show Cursor Animations',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Display visual overlay animations when the browser agent clicks or scrolls.',
+            showInDialog: true,
+          },
         },
       },
     },

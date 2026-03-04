@@ -41,11 +41,41 @@ describe('mcpToolWrapper', () => {
           required: ['uid'],
         },
       },
+      {
+        name: 'click_at',
+        description: 'Click at a specific coordinate',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            coordinate: { type: 'array', items: { type: 'number' } },
+          },
+        },
+      },
+      {
+        name: 'press_key',
+        description: 'Press a specific key',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            key: { type: 'string' },
+          },
+        },
+      },
     ];
+
+    const mockConfig = {
+      getBrowserAgentConfig: vi.fn().mockReturnValue({
+        customConfig: {
+          showCursorAnimations: true,
+          headless: false,
+        },
+      }),
+    };
 
     // Setup mock browser manager
     mockBrowserManager = {
       getDiscoveredTools: vi.fn().mockResolvedValue(mockMcpTools),
+      getConfig: vi.fn().mockReturnValue(mockConfig),
       callTool: vi.fn().mockResolvedValue({
         content: [{ type: 'text', text: 'Tool result' }],
       } as McpToolCallResult),
@@ -70,10 +100,12 @@ describe('mcpToolWrapper', () => {
         mockMessageBus,
       );
 
-      expect(tools).toHaveLength(3);
+      expect(tools).toHaveLength(5);
       expect(tools[0].name).toBe('take_snapshot');
       expect(tools[1].name).toBe('click');
-      expect(tools[2].name).toBe('type_text');
+      expect(tools[2].name).toBe('click_at');
+      expect(tools[3].name).toBe('press_key');
+      expect(tools[4].name).toBe('type_text');
     });
 
     it('should return tools with correct description', async () => {
@@ -143,6 +175,92 @@ describe('mcpToolWrapper', () => {
         },
         expect.any(AbortSignal),
       );
+    });
+
+    it('should inject animation for click_at', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+      );
+
+      const invocation = tools[2].build({ coordinate: [100, 200] });
+      await invocation.execute(new AbortController().signal);
+
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'click_at',
+        { coordinate: [100, 200] },
+        expect.any(AbortSignal),
+      );
+
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'evaluate_script',
+        expect.objectContaining({
+          script: expect.stringContaining('__gemini_click'),
+        }),
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('should inject animation for press_key with scroll key', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+      );
+
+      const invocation = tools[3].build({ key: 'PageDown' });
+      await invocation.execute(new AbortController().signal);
+
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'evaluate_script',
+        expect.objectContaining({
+          script: expect.stringContaining('__gemini_scroll_down'),
+        }),
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('should NOT inject animation if headless=true', async () => {
+      const headlessConfig = {
+        getBrowserAgentConfig: vi.fn().mockReturnValue({
+          customConfig: { showCursorAnimations: true, headless: true },
+        }),
+      };
+      vi.mocked(mockBrowserManager.getConfig).mockReturnValue(
+        headlessConfig as ReturnType<typeof mockBrowserManager.getConfig>,
+      );
+
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+      );
+
+      const invocation = tools[2].build({ coordinate: [100, 200] });
+      await invocation.execute(new AbortController().signal);
+
+      // It should only be called once, for click_at, but NOT for evaluate_script
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(1);
+    });
+
+    it('should NOT inject animation if showCursorAnimations=false', async () => {
+      const noAnimConfig = {
+        getBrowserAgentConfig: vi.fn().mockReturnValue({
+          customConfig: { showCursorAnimations: false, headless: false },
+        }),
+      };
+      vi.mocked(mockBrowserManager.getConfig).mockReturnValue(
+        noAnimConfig as ReturnType<typeof mockBrowserManager.getConfig>,
+      );
+
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+      );
+
+      const invocation = tools[2].build({ coordinate: [100, 200] });
+      await invocation.execute(new AbortController().signal);
+
+      // It should only be called once, for click_at, but NOT for evaluate_script
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(1);
     });
 
     it('should return success result from MCP tool', async () => {
