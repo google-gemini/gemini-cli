@@ -5,17 +5,27 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Mocked, MockInstance } from 'vitest';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { ConfigParameters } from '../config/config.js';
-import { Config } from '../config/config.js';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mocked,
+  type MockInstance,
+} from 'vitest';
+import { Config, type ConfigParameters } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
 import { DiscoveredMCPTool, MCP_QUALIFIED_NAME_SEPARATOR } from './mcp-tool.js';
-import type { FunctionDeclaration, CallableTool } from '@google/genai';
-import { mcpToTool } from '@google/genai';
+import {
+  mcpToTool,
+  type FunctionDeclaration,
+  type CallableTool,
+} from '@google/genai';
 import { spawn } from 'node:child_process';
 
 import fs from 'node:fs';
