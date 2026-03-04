@@ -122,10 +122,10 @@ const LOOP_DETECTION_SCHEMA: Record<string, unknown> = {
  */
 export interface LoopDetectionResult {
   count: number;
+  type?: LoopType;
   detail?: string;
   confirmedByModel?: string;
 }
-
 /**
  * Service for detecting and preventing infinite loops in AI responses.
  * Monitors tool call repetitions and content sentence repetitions.
@@ -148,6 +148,7 @@ export class LoopDetectionService {
   private lastLoopDetail?: string;
   private inCodeBlock = false;
 
+  private lastLoopType?: LoopType;
   // LLM loop track tracking
   private turnsInCurrentPrompt = 0;
   private llmCheckInterval = DEFAULT_LLM_CHECK_INTERVAL;
@@ -186,9 +187,12 @@ export class LoopDetectionService {
     if (this.disabledForSession || this.config.getDisableLoopDetection()) {
       return { count: 0 };
     }
-
     if (this.loopDetected) {
-      return { count: this.detectedCount, detail: this.lastLoopDetail };
+      return {
+        count: this.detectedCount,
+        type: this.lastLoopType,
+        detail: this.lastLoopDetail,
+      };
     }
 
     let isLoop = false;
@@ -218,20 +222,26 @@ export class LoopDetectionService {
       this.loopDetected = true;
       this.detectedCount++;
       this.lastLoopDetail = detail;
+      this.lastLoopType =
+        event.type === GeminiEventType.ToolCallRequest
+          ? LoopType.CONSECUTIVE_IDENTICAL_TOOL_CALLS
+          : LoopType.CONTENT_CHANTING_LOOP;
 
       logLoopDetected(
         this.config,
         new LoopDetectedEvent(
-          event.type === GeminiEventType.ToolCallRequest
-            ? LoopType.CONSECUTIVE_IDENTICAL_TOOL_CALLS
-            : LoopType.CONTENT_CHANTING_LOOP,
+          this.lastLoopType,
           this.promptId,
           this.detectedCount,
         ),
       );
     }
     return isLoop
-      ? { count: this.detectedCount, detail: this.lastLoopDetail }
+      ? {
+          count: this.detectedCount,
+          type: this.lastLoopType,
+          detail: this.lastLoopDetail,
+        }
       : { count: 0 };
   }
 
@@ -249,9 +259,12 @@ export class LoopDetectionService {
     if (this.disabledForSession || this.config.getDisableLoopDetection()) {
       return { count: 0 };
     }
-
     if (this.loopDetected) {
-      return { count: this.detectedCount, detail: this.lastLoopDetail };
+      return {
+        count: this.detectedCount,
+        type: this.lastLoopType,
+        detail: this.lastLoopDetail,
+      };
     }
 
     this.turnsInCurrentPrompt++;
@@ -267,11 +280,12 @@ export class LoopDetectionService {
         this.loopDetected = true;
         this.detectedCount++;
         this.lastLoopDetail = analysis;
+        this.lastLoopType = LoopType.LLM_DETECTED_LOOP;
 
         logLoopDetected(
           this.config,
           new LoopDetectedEvent(
-            LoopType.LLM_DETECTED_LOOP,
+            this.lastLoopType,
             this.promptId,
             this.detectedCount,
             confirmedByModel,
@@ -282,12 +296,12 @@ export class LoopDetectionService {
 
         return {
           count: this.detectedCount,
+          type: this.lastLoopType,
           detail: this.lastLoopDetail,
           confirmedByModel,
         };
       }
     }
-
     return { count: 0 };
   }
 
@@ -702,6 +716,7 @@ export class LoopDetectionService {
     this.loopDetected = false;
     this.detectedCount = 0;
     this.lastLoopDetail = undefined;
+    this.lastLoopType = undefined;
   }
 
   /**

@@ -2964,10 +2964,12 @@ ${JSON.stringify(
 
         // Verify recovery call parameters
         const recoveryCall = sendMessageStreamSpy.mock.calls[1];
-        expect(recoveryCall[0][0].text).toContain(
+        expect((recoveryCall[0] as Part[])[0].text).toContain(
           'System: Potential loop detected',
         );
-        expect(recoveryCall[0][0].text).toContain('Repetitive tool call');
+        expect((recoveryCall[0] as Part[])[0].text).toContain(
+          'Repetitive tool call',
+        );
 
         // Verify loopDetector.clearDetection was called
         expect(client['loopDetector'].clearDetection).toHaveBeenCalled();
