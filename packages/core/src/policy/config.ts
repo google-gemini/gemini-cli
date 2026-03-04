@@ -536,15 +536,6 @@ export function createPolicyUpdater(
                 : storage.getAutoSavedPolicyPath();
             await fs.mkdir(path.dirname(policyFile), { recursive: true });
 
-            // Backup existing file if it exists
-            try {
-              await fs.copyFile(policyFile, `${policyFile}.bak`);
-            } catch (error) {
-              if (!isNodeError(error) || error.code !== 'ENOENT') {
-                debugLogger.warn(`Failed to backup ${policyFile}`, error);
-              }
-            }
-
             // Read existing file
             let existingData: { rule?: TomlRule[] } = {};
             try {

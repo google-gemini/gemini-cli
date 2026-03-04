@@ -284,33 +284,4 @@ describe('createPolicyUpdater', () => {
       policyFile,
     );
   });
-
-  it('should backup existing policy file before writing', async () => {
-    createPolicyUpdater(policyEngine, messageBus, mockStorage);
-
-    const policyFile = '/mock/user/.gemini/policies/auto-saved.toml';
-    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
-    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
-    (fs.readFile as unknown as Mock).mockResolvedValue(
-      '[[rule]]\ntoolName = "existing"',
-    );
-    (fs.copyFile as unknown as Mock).mockResolvedValue(undefined);
-
-    const mockFileHandle = {
-      writeFile: vi.fn().mockResolvedValue(undefined),
-      close: vi.fn().mockResolvedValue(undefined),
-    };
-    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
-    (fs.rename as unknown as Mock).mockResolvedValue(undefined);
-
-    await messageBus.publish({
-      type: MessageBusType.UPDATE_POLICY,
-      toolName: 'new_tool',
-      persist: true,
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(fs.copyFile).toHaveBeenCalledWith(policyFile, `${policyFile}.bak`);
-  });
 });

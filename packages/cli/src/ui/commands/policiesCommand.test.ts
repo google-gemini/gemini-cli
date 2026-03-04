@@ -9,14 +9,11 @@ import { policiesCommand } from './policiesCommand.js';
 import { CommandKind } from './types.js';
 import { MessageType } from '../types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import * as fs from 'node:fs/promises';
 import {
   type Config,
   PolicyDecision,
   ApprovalMode,
 } from '@google/gemini-cli-core';
-
-vi.mock('node:fs/promises');
 
 describe('policiesCommand', () => {
   let mockContext: ReturnType<typeof createMockCommandContext>;
@@ -29,9 +26,8 @@ describe('policiesCommand', () => {
     expect(policiesCommand.name).toBe('policies');
     expect(policiesCommand.description).toBe('Manage policies');
     expect(policiesCommand.kind).toBe(CommandKind.BUILT_IN);
-    expect(policiesCommand.subCommands).toHaveLength(2);
+    expect(policiesCommand.subCommands).toHaveLength(1);
     expect(policiesCommand.subCommands![0].name).toBe('list');
-    expect(policiesCommand.subCommands![1].name).toBe('undo');
   });
 
   describe('list subcommand', () => {
@@ -162,65 +158,6 @@ describe('policiesCommand', () => {
       expect(content).toContain('**ALLOW** tool: `glob` [Priority: 70]');
       // shell ALLOW has no modes (applies to all), appears in normal section
       expect(content).toContain('**ALLOW** tool: `shell` [Priority: 50]');
-    });
-  });
-
-  describe('undo subcommand', () => {
-    it('should show error if config is missing', async () => {
-      mockContext.services.config = null;
-      const undoCommand = policiesCommand.subCommands![1];
-      await undoCommand.action!(mockContext, '');
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.ERROR,
-          text: 'Error: Config not available.',
-        }),
-        expect.any(Number),
-      );
-    });
-
-    it('should show message if no backups found', async () => {
-      const mockStorage = {
-        getAutoSavedPolicyPath: vi.fn().mockReturnValue('user.toml'),
-        getWorkspaceAutoSavedPolicyPath: vi.fn().mockReturnValue('ws.toml'),
-      };
-      mockContext.services.config = {
-        storage: mockStorage,
-      } as unknown as Config;
-
-      vi.mocked(fs.access).mockRejectedValue(new Error('no backup'));
-      const undoCommand = policiesCommand.subCommands![1];
-      await undoCommand.action!(mockContext, '');
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.WARNING,
-          text: 'No policy backups found to restore.',
-        }),
-        expect.any(Number),
-      );
-    });
-
-    it('should restore backups if found', async () => {
-      const mockStorage = {
-        getAutoSavedPolicyPath: vi.fn().mockReturnValue('user.toml'),
-        getWorkspaceAutoSavedPolicyPath: vi.fn().mockReturnValue('ws.toml'),
-      };
-      mockContext.services.config = {
-        storage: mockStorage,
-      } as unknown as Config;
-
-      vi.mocked(fs.access).mockResolvedValue(undefined);
-      vi.mocked(fs.copyFile).mockResolvedValue(undefined);
-      const undoCommand = policiesCommand.subCommands![1];
-      await undoCommand.action!(mockContext, '');
-      expect(fs.copyFile).toHaveBeenCalled();
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: expect.stringContaining('Successfully restored'),
-        }),
-        expect.any(Number),
-      );
     });
   });
 });
