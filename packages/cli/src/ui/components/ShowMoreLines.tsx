@@ -14,15 +14,11 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 interface ShowMoreLinesProps {
   constrainHeight: boolean;
   isOverflowing?: boolean;
-  marginTop?: number;
-  marginBottom?: number;
 }
 
 export const ShowMoreLines = ({
   constrainHeight,
   isOverflowing: isOverflowingProp,
-  marginTop,
-  marginBottom,
 }: ShowMoreLinesProps) => {
   const isAlternateBuffer = useAlternateBuffer();
   const overflowState = useOverflowState();
@@ -46,7 +42,7 @@ export const ShowMoreLines = ({
   }
 
   return (
-    <Box paddingX={1} marginTop={marginTop} marginBottom={marginBottom ?? 1}>
+    <Box paddingX={1} marginBottom={1}>
       <Text color={theme.text.accent} wrap="truncate">
         Press Ctrl+O to show more lines
       </Text>

@@ -56,10 +56,6 @@ vi.mock('./AppHeader.js', () => ({
   ),
 }));
 
-vi.mock('./ShowMoreLines.js', () => ({
-  ShowMoreLines: () => <Text>ShowMoreLines</Text>,
-}));
-
 vi.mock('./shared/ScrollableList.js', () => ({
   ScrollableList: ({
     data,
@@ -424,6 +420,60 @@ describe('MainContent', () => {
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
     expect(output).toContain('Hi there');
+    unmount();
+  });
+
+  it('renders multiple history items with single line padding between them', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+    const uiState = {
+      ...defaultMockUiState,
+      history: [
+        { id: '1', type: 'gemini', text: 'Gemini message 1\n'.repeat(10) },
+        { id: '2', type: 'gemini', text: 'Gemini message 2\n'.repeat(10) },
+      ],
+      constrainHeight: true,
+      staticAreaMaxItemHeight: 5,
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <MainContent />,
+      {
+        uiState: uiState as unknown as Partial<UIState>,
+        useAlternateBuffer: true,
+      },
+    );
+
+    await waitUntilReady();
+
+    const output = lastFrame();
+    expect(output).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders mixed history items (user + gemini) with single line padding between them', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+    const uiState = {
+      ...defaultMockUiState,
+      history: [
+        { id: '1', type: 'user', text: 'User message' },
+        { id: '2', type: 'gemini', text: 'Gemini response\n'.repeat(10) },
+      ],
+      constrainHeight: true,
+      staticAreaMaxItemHeight: 5,
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <MainContent />,
+      {
+        uiState: uiState as unknown as Partial<UIState>,
+        useAlternateBuffer: true,
+      },
+    );
+
+    await waitUntilReady();
+
+    const output = lastFrame();
+    expect(output).toMatchSnapshot();
     unmount();
   });
 

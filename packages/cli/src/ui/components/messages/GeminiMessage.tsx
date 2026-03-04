@@ -54,8 +54,6 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
         <Box>
           <ShowMoreLines
             constrainHeight={availableTerminalHeight !== undefined}
-            marginTop={isAlternateBuffer ? 0 : 1}
-            marginBottom={isAlternateBuffer ? 1 : 0}
           />
         </Box>
       </Box>
