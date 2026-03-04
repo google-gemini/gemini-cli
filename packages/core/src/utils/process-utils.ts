@@ -44,6 +44,13 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
       } catch {
         // Ignore errors for dead processes
       }
+      // Also invoke taskkill to reap any orphaned descendant processes
+      // that survive the PTY session leader being killed.
+      try {
+        cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
+      } catch {
+        // Ignore errors if the process tree is already dead
+      }
     } else {
       cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
     }
@@ -85,6 +92,13 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
           } catch {
             // Ignore
           }
+        }
+        // Also attempt a process group kill to reap any orphaned
+        // descendant processes that survive the PTY session leader kill.
+        try {
+          process.kill(-pid, 'SIGKILL');
+        } catch {
+          // Ignore — group may not exist or already exited
         }
       } else {
         try {
