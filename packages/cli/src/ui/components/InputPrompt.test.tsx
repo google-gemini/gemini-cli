@@ -2640,6 +2640,78 @@ describe('InputPrompt', () => {
       unmount();
     });
 
+    describe('shell mode toggle via ! key', () => {
+      // Simulate terminal without Kitty/bracketed-paste (e.g. Termux): no paste event fires,
+      // characters arrive one-by-one. The recentUnsafePasteTime guard must protect against
+      // a pasted ! triggering shell mode when a bracketed paste sequence IS sent.
+      beforeEach(() => {
+        vi.useFakeTimers();
+        mockedUseKittyKeyboardProtocol.mockReturnValue({
+          enabled: false,
+          checking: false,
+        });
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('activates shell mode when ! is typed alone on an empty buffer', async () => {
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+        );
+
+        await act(async () => {
+          stdin.write('!');
+        });
+
+        await waitFor(() => {
+          expect(props.setShellModeActive).toHaveBeenCalledWith(true);
+        });
+        unmount();
+      });
+
+      it('does NOT activate shell mode when ! is pasted via bracketed paste sequence', async () => {
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+        );
+
+        await act(async () => {
+          stdin.write('\x1b[200~!important note\x1b[201~');
+        });
+
+        expect(props.setShellModeActive).not.toHaveBeenCalled();
+        unmount();
+      });
+
+      it('activates shell mode again once the paste-protection window expires', async () => {
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+        );
+
+        await act(async () => {
+          stdin.write('\x1b[200~some text\x1b[201~');
+        });
+        await act(async () => {
+          stdin.write('!');
+        });
+        expect(props.setShellModeActive).not.toHaveBeenCalled();
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(50);
+        });
+        mockBuffer.text = '';
+        await act(async () => {
+          stdin.write('!');
+        });
+
+        await waitFor(() => {
+          expect(props.setShellModeActive).toHaveBeenCalledWith(true);
+        });
+        unmount();
+      });
+    });
+
     it('should handle ESC when completion suggestions are showing', async () => {
       mockedUseCommandCompletion.mockReturnValue({
         ...mockCommandCompletion,
