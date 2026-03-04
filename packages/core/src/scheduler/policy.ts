@@ -20,6 +20,7 @@ import {
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
+  type AnyToolInvocation,
   type PolicyUpdateOptions,
 } from '../tools/tools.js';
 import { buildFilePathArgsPattern } from '../policy/utils.js';
@@ -95,7 +96,11 @@ export async function updatePolicy(
   tool: AnyDeclarativeTool,
   outcome: ToolConfirmationOutcome,
   confirmationDetails: SerializableConfirmationDetails | undefined,
-  deps: { config: Config; messageBus: MessageBus },
+  deps: {
+    config: Config;
+    messageBus: MessageBus;
+    toolInvocation?: AnyToolInvocation;
+  },
 ): Promise<void> {
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
@@ -136,6 +141,7 @@ export async function updatePolicy(
     confirmationDetails,
     deps.messageBus,
     persistScope,
+    deps.toolInvocation,
   );
 }
 
@@ -166,16 +172,31 @@ async function handleStandardPolicyUpdate(
   confirmationDetails: SerializableConfirmationDetails | undefined,
   messageBus: MessageBus,
   persistScope?: 'workspace' | 'user',
+  toolInvocation?: AnyToolInvocation,
 ): Promise<void> {
   if (
     outcome === ToolConfirmationOutcome.ProceedAlways ||
     outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
   ) {
-    const options: PolicyUpdateOptions = {};
+    interface ToolInvocationWithOptions {
+      getPolicyUpdateOptions(
+        outcome: ToolConfirmationOutcome,
+      ): PolicyUpdateOptions | undefined;
+    }
 
-    if (confirmationDetails?.type === 'exec') {
+    /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+    const options: PolicyUpdateOptions =
+      typeof (toolInvocation as unknown as ToolInvocationWithOptions)
+        ?.getPolicyUpdateOptions === 'function'
+        ? (
+            toolInvocation as unknown as ToolInvocationWithOptions
+          ).getPolicyUpdateOptions(outcome) || {}
+        : {};
+    /* eslint-enable @typescript-eslint/no-unsafe-type-assertion */
+
+    if (!options.commandPrefix && confirmationDetails?.type === 'exec') {
       options.commandPrefix = confirmationDetails.rootCommands;
-    } else if (confirmationDetails?.type === 'edit') {
+    } else if (!options.argsPattern && confirmationDetails?.type === 'edit') {
       options.argsPattern = buildFilePathArgsPattern(
         confirmationDetails.filePath,
       );
