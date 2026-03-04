@@ -1267,16 +1267,9 @@ export class Config implements McpContext {
       this.setHasAccessToPreviewModel(true);
     }
 
-    // Update model if user no longer has access to the preview model
-    // Only reset the model if we're certain the user doesn't have access.
-    // For LOGIN_WITH_GOOGLE, we rely on refreshUserQuota() to set hasAccessToPreviewModel.
-    // If refreshUserQuota() wasn't called (e.g., no projectId), we should not reset the model
-    // as the user may still have access through their subscription.
-    if (
-      !this.hasAccessToPreviewModel &&
-      isPreviewModel(this.model) &&
-      authType !== AuthType.LOGIN_WITH_GOOGLE
-    ) {
+    // Only reset when we have explicit "no access" (hasAccessToPreviewModel === false).
+    // When null (quota not fetched) or true, we preserve the saved model.
+    if (isPreviewModel(this.model) && this.hasAccessToPreviewModel === false) {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
     }
 
