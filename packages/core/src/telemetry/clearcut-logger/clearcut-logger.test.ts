@@ -14,10 +14,17 @@ import {
   afterAll,
   beforeEach,
 } from 'vitest';
-import type { LogEvent, LogEventEntry } from './clearcut-logger.js';
-import { ClearcutLogger, EventNames, TEST_ONLY } from './clearcut-logger.js';
-import type { ContentGeneratorConfig } from '../../core/contentGenerator.js';
-import { AuthType } from '../../core/contentGenerator.js';
+import {
+  ClearcutLogger,
+  EventNames,
+  TEST_ONLY,
+  type LogEvent,
+  type LogEventEntry,
+} from './clearcut-logger.js';
+import {
+  AuthType,
+  type ContentGeneratorConfig,
+} from '../../core/contentGenerator.js';
 import type { SuccessfulToolCall } from '../../core/coreToolScheduler.js';
 import type { ConfigParameters } from '../../config/config.js';
 import { EventMetadataKey } from './event-metadata-key.js';
@@ -35,13 +42,14 @@ import {
   WebFetchFallbackAttemptEvent,
   HookCallEvent,
 } from '../types.js';
+import { HookType } from '../../hooks/types.js';
 import { AgentTerminateMode } from '../../agents/types.js';
+import { ApprovalMode } from '../../policy/types.js';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { InstallationManager } from '../../utils/installationManager.js';
 
-import si from 'systeminformation';
-import type { Systeminformation } from 'systeminformation';
+import si, { type Systeminformation } from 'systeminformation';
 import * as os from 'node:os';
 
 interface CustomMatchers<R = unknown> {
@@ -904,6 +912,7 @@ describe('ClearcutLogger', () => {
         'some reasoning',
         false,
         undefined,
+        ApprovalMode.DEFAULT,
       );
 
       logger?.logModelRoutingEvent(event);
@@ -938,6 +947,7 @@ describe('ClearcutLogger', () => {
         'some reasoning',
         true,
         'Something went wrong',
+        ApprovalMode.DEFAULT,
       );
 
       logger?.logModelRoutingEvent(event);
@@ -976,6 +986,7 @@ describe('ClearcutLogger', () => {
         '[Score: 90 / Threshold: 80] reasoning',
         false,
         undefined,
+        ApprovalMode.DEFAULT,
         true,
         '80',
       );
@@ -1401,7 +1412,7 @@ describe('ClearcutLogger', () => {
 
       const event = new HookCallEvent(
         'before-tool',
-        'command',
+        HookType.Command,
         hookName,
         {}, // input
         150, // duration

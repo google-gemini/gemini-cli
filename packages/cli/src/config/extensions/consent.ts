@@ -91,10 +91,12 @@ export async function requestConsentInteractive(
  * This should not be called from interactive mode as it will break the CLI.
  *
  * @param prompt A yes/no prompt to ask the user
- * @returns Whether or not the user answers 'y' (yes). Defaults to 'yes' on enter.
+ * @param defaultValue Whether to resolve as true or false on enter.
+ * @returns Whether or not the user answers 'y' (yes).
  */
-async function promptForConsentNonInteractive(
+export async function promptForConsentNonInteractive(
   prompt: string,
+  defaultValue = true,
 ): Promise<boolean> {
   const readline = await import('node:readline');
   const rl = readline.createInterface({
@@ -105,7 +107,12 @@ async function promptForConsentNonInteractive(
   return new Promise((resolve) => {
     rl.question(prompt, (answer) => {
       rl.close();
-      resolve(['y', ''].includes(answer.trim().toLowerCase()));
+      const trimmedAnswer = answer.trim().toLowerCase();
+      if (trimmedAnswer === '') {
+        resolve(defaultValue);
+      } else {
+        resolve(['y', 'yes'].includes(trimmedAnswer));
+      }
     });
   });
 }

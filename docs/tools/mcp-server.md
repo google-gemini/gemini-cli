@@ -163,7 +163,8 @@ Each server configuration supports the following properties:
 - **`args`** (string[]): Command-line arguments for Stdio transport
 - **`headers`** (object): Custom HTTP headers when using `url` or `httpUrl`
 - **`env`** (object): Environment variables for the server process. Values can
-  reference environment variables using `$VAR_NAME` or `${VAR_NAME}` syntax
+  reference environment variables using `$VAR_NAME` or `${VAR_NAME}` syntax (all
+  platforms), or `%VAR_NAME%` (Windows only).
 - **`cwd`** (string): Working directory for Stdio transport
 - **`timeout`** (number): Request timeout in milliseconds (default: 600,000ms =
   10 minutes)
@@ -183,6 +184,63 @@ Each server configuration supports the following properties:
 - **`targetServiceAccount`** (string): The email address of the Google Cloud
   Service Account to impersonate. Used with
   `authProviderType: 'service_account_impersonation'`.
+
+### Environment variable expansion
+
+Gemini CLI automatically expands environment variables in the `env` block of
+your MCP server configuration. This allows you to securely reference variables
+defined in your shell or environment without hardcoding sensitive information
+directly in your `settings.json` file.
+
+The expansion utility supports:
+
+- **POSIX/Bash syntax:** `$VARIABLE_NAME` or `${VARIABLE_NAME}` (supported on
+  all platforms)
+- **Windows syntax:** `%VARIABLE_NAME%` (supported only when running on Windows)
+
+If a variable is not defined in the current environment, it resolves to an empty
+string.
+
+**Example:**
+
+```json
+"env": {
+  "API_KEY": "$MY_EXTERNAL_TOKEN",
+  "LOG_LEVEL": "$LOG_LEVEL",
+  "TEMP_DIR": "%TEMP%"
+}
+```
+
+### Security and environment sanitization
+
+To protect your credentials, Gemini CLI performs environment sanitization when
+spawning MCP server processes.
+
+#### Automatic redaction
+
+By default, the CLI redacts sensitive environment variables from the base
+environment (inherited from the host process) to prevent unintended exposure to
+third-party MCP servers. This includes:
+
+- Core project keys: `GEMINI_API_KEY`, `GOOGLE_API_KEY`, etc.
+- Variables matching sensitive patterns: `*TOKEN*`, `*SECRET*`, `*PASSWORD*`,
+  `*KEY*`, `*AUTH*`, `*CREDENTIAL*`.
+- Certificates and private key patterns.
+
+#### Explicit overrides
+
+If an environment variable must be passed to an MCP server, you must explicitly
+state it in the `env` property of the server configuration in `settings.json`.
+Explicitly defined variables (including those from extensions) are trusted and
+are **not** subjected to the automatic redaction process.
+
+This follows the security principle that if a variable is explicitly configured
+by the user for a specific server, it constitutes informed consent to share that
+specific data with that server.
+
+> **Note:** Even when explicitly defined, you should avoid hardcoding secrets.
+> Instead, use environment variable expansion (e.g., `"MY_KEY": "$MY_KEY"`) to
+> securely pull the value from your host environment at runtime.
 
 ### OAuth support for remote MCP servers
 
@@ -738,7 +796,9 @@ The MCP integration tracks several states:
 - **Trust settings:** The `trust` option bypasses all confirmation dialogs. Use
   cautiously and only for servers you completely control
 - **Access tokens:** Be security-aware when configuring environment variables
-  containing API keys or tokens
+  containing API keys or tokens. See
+  [Security and environment sanitization](#security-and-environment-sanitization)
+  for details on how Gemini CLI protects your credentials.
 - **Sandbox compatibility:** When using sandboxing, ensure MCP servers are
   available within the sandbox environment
 - **Private data:** Using broadly scoped personal access tokens can lead to
@@ -1006,6 +1066,11 @@ command has no flags.
 gemini mcp list
 ```
 
+> **Note on Trust:** For security, `stdio` MCP servers (those using the
+> `command` property) are only tested and displayed as "Connected" if the
+> current folder is trusted. If the folder is untrusted, they will show as
+> "Disconnected". Use `gemini trust` to trust the current folder.
+
 **Example output:**
 
 ```sh
@@ -1013,6 +1078,23 @@ gemini mcp list
 ✓ http-server: https://api.example.com/mcp (http) - Connected
 ✗ sse-server: https://api.example.com/sse (sse) - Disconnected
 ```
+
+## Troubleshooting and Diagnostics
+
+To minimize noise during startup, MCP connection errors for background servers
+are "silent by default." If issues are detected during startup, a single
+informational hint will be shown: _"MCP issues detected. Run /mcp list for
+status."_
+
+Detailed, actionable diagnostics for a specific server are automatically
+re-enabled when:
+
+1.  You run an interactive command like `/mcp list`, `/mcp auth`, etc.
+2.  The model attempts to execute a tool from that server.
+3.  You invoke an MCP prompt from that server.
+
+You can also use `gemini mcp list` from your shell to see connection errors for
+all configured servers.
 
 ### Removing a server (`gemini mcp remove`)
 

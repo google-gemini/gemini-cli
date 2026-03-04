@@ -4,12 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Credentials, AuthClient, JWTInput } from 'google-auth-library';
 import {
   OAuth2Client,
   Compute,
   CodeChallengeMethod,
   GoogleAuth,
+  type Credentials,
+  type AuthClient,
+  type JWTInput,
 } from 'google-auth-library';
 import * as http from 'node:http';
 import url from 'node:url';
@@ -271,9 +273,12 @@ async function initOauthClient(
 
     await triggerPostAuthCallbacks(client.credentials);
   } else {
-    const userConsent = await getConsentForOauth('');
-    if (!userConsent) {
-      throw new FatalCancellationError('Authentication cancelled by user.');
+    // In Zed integration, we skip the interactive consent and directly open the browser
+    if (!config.getExperimentalZedIntegration()) {
+      const userConsent = await getConsentForOauth('');
+      if (!userConsent) {
+        throw new FatalCancellationError('Authentication cancelled by user.');
+      }
     }
 
     const webLogin = await authWithWeb(client);

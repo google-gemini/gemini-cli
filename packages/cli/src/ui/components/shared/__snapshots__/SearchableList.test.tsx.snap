@@ -7,7 +7,7 @@ exports[`SearchableList > should match snapshot 1`] = `
  │ Search...                                                                                      │
  ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
 
-  ● Item One
+  ● Item One  
     Description for item one
 
     Item Two
@@ -28,7 +28,7 @@ exports[`SearchableList > should reset selection to top when items change if res
     Item One
     Description for item one
 
-  ● Item Two
+  ● Item Two  
     Description for item two
 
     Item Three
@@ -43,7 +43,7 @@ exports[`SearchableList > should reset selection to top when items change if res
  │ One                                                                                            │
  ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
 
-  ● Item One
+  ● Item One  
     Description for item one
 "
 `;
@@ -55,7 +55,7 @@ exports[`SearchableList > should reset selection to top when items change if res
  │ Search...                                                                                      │
  ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
 
-  ● Item One
+  ● Item One  
     Description for item one
 
     Item Two
