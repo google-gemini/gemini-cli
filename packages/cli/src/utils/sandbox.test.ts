@@ -474,4 +474,112 @@ describe('sandbox', () => {
       expect(entrypointCmd).toContain('su -p gemini');
     });
   });
+
+  describe('gVisor (runsc)', () => {
+    it('should use docker with --runtime=runsc on Linux', async () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      const config: SandboxConfig = {
+        command: 'runsc',
+        image: 'gemini-cli-sandbox',
+      };
+
+      // Mock image check
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      // Mock docker run
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config, [], undefined, ['arg1']);
+
+      // Verify docker (not runsc) is called for image check
+      expect(spawn).toHaveBeenNthCalledWith(
+        1,
+        'docker',
+        expect.arrayContaining(['images', '-q', 'gemini-cli-sandbox']),
+      );
+
+      // Verify docker run includes --runtime=runsc
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
+        'docker',
+        expect.arrayContaining(['run', '--runtime=runsc']),
+        expect.objectContaining({ stdio: 'inherit' }),
+      );
+    });
+
+    it('should throw FatalSandboxError on non-Linux platforms', async () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      const config: SandboxConfig = {
+        command: 'runsc',
+        image: 'gemini-cli-sandbox',
+      };
+
+      await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
+      await expect(start_sandbox(config)).rejects.toThrow(
+        'gVisor (runsc) sandboxing is only supported on Linux',
+      );
+    });
+
+    it('should show friendly tip when using docker with --runtime=runsc in SANDBOX_FLAGS', async () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      process.env['SANDBOX_FLAGS'] = '--runtime=runsc';
+      const config: SandboxConfig = {
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      };
+
+      // Mock image check
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      // Mock docker run
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      const { debugLogger } = await import('@google/gemini-cli-core');
+      expect(debugLogger.log).toHaveBeenCalledWith(
+        'ℹ️  Tip: You can now use sandbox: "runsc" for native gVisor support with automatic validation!',
+      );
+    });
+  });
 });

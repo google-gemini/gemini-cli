@@ -203,7 +203,17 @@ export async function start_sandbox(
       });
     }
 
-    debugLogger.log(`hopping into sandbox (command: ${config.command}) ...`);
+    // runsc uses docker with --runtime=runsc
+    const command = config.command === 'runsc' ? 'docker' : config.command;
+
+    // gVisor (runsc) is only supported on Linux
+    if (config.command === 'runsc' && os.platform() !== 'linux') {
+      throw new FatalSandboxError(
+        'gVisor (runsc) sandboxing is only supported on Linux',
+      );
+    }
+
+    debugLogger.log(`hopping into sandbox (command: ${command}) ...`);
 
     // determine full path for gemini-cli to distinguish linked vs installed setting
     const gcPath = process.argv[1] ? fs.realpathSync(process.argv[1]) : '';
@@ -246,7 +256,7 @@ export async function start_sandbox(
             stdio: 'inherit',
             env: {
               ...process.env,
-              GEMINI_SANDBOX: config.command, // in case sandbox is enabled via flags (see config.ts under cli package)
+              GEMINI_SANDBOX: command, // in case sandbox is enabled via flags (see config.ts under cli package)
             },
           },
         );
@@ -254,9 +264,7 @@ export async function start_sandbox(
     }
 
     // stop if image is missing
-    if (
-      !(await ensureSandboxImageIsPresent(config.command, image, cliConfig))
-    ) {
+    if (!(await ensureSandboxImageIsPresent(command, image, cliConfig))) {
       const remedy =
         image === LOCAL_DEV_SANDBOX_IMAGE_NAME
           ? 'Try running `npm run build:all` or `npm run build:sandbox` under the gemini-cli repo to build it locally, or check the image name and your network connection.'
@@ -270,11 +278,29 @@ export async function start_sandbox(
     // run init binary inside container to forward signals & reap zombies
     const args = ['run', '-i', '--rm', '--init', '--workdir', containerWorkdir];
 
+    // add runsc runtime if using runsc
+    if (config.command === 'runsc') {
+      args.push('--runtime=runsc');
+    }
+
     // add custom flags from SANDBOX_FLAGS
     if (process.env['SANDBOX_FLAGS']) {
       const flags = parse(process.env['SANDBOX_FLAGS'], process.env).filter(
         (f): f is string => typeof f === 'string',
       );
+
+      // friendly reminder about native runsc support
+      if (config.command === 'docker') {
+        const hasRunscFlag = flags.some(
+          (f) => f === '--runtime=runsc' || f.startsWith('--runtime=runsc'),
+        );
+        if (hasRunscFlag) {
+          debugLogger.log(
+            'ℹ️  Tip: You can now use sandbox: "runsc" for native gVisor support with automatic validation!',
+          );
+        }
+      }
+
       args.push(...flags);
     }
 
@@ -410,7 +436,7 @@ export async function start_sandbox(
       // if using proxy, switch to internal networking through proxy
       if (proxy) {
         execSync(
-          `${config.command} network inspect ${SANDBOX_NETWORK_NAME} || ${config.command} network create --internal ${SANDBOX_NETWORK_NAME}`,
+          `${command} network inspect ${SANDBOX_NETWORK_NAME} || ${command} network create --internal ${SANDBOX_NETWORK_NAME}`,
         );
         args.push('--network', SANDBOX_NETWORK_NAME);
         // if proxy command is set, create a separate network w/ host access (i.e. non-internal)
@@ -418,7 +444,7 @@ export async function start_sandbox(
         // this allows proxy to work even on rootless podman on macos with host<->vm<->container isolation
         if (proxyCommand) {
           execSync(
-            `${config.command} network inspect ${SANDBOX_PROXY_NAME} || ${config.command} network create ${SANDBOX_PROXY_NAME}`,
+            `${command} network inspect ${SANDBOX_PROXY_NAME} || ${command} network create ${SANDBOX_PROXY_NAME}`,
           );
         }
       }
@@ -437,7 +463,7 @@ export async function start_sandbox(
     } else {
       let index = 0;
       const containerNameCheck = (
-        await execAsync(`${config.command} ps -a --format "{{.Names}}"`)
+        await execAsync(`${command} ps -a --format "{{.Names}}"`)
       ).stdout.trim();
       while (containerNameCheck.includes(`${imageName}-${index}`)) {
         index++;
@@ -587,7 +613,7 @@ export async function start_sandbox(
     args.push('--env', `SANDBOX=${containerName}`);
 
     // for podman only, use empty --authfile to skip unnecessary auth refresh overhead
-    if (config.command === 'podman') {
+    if (command === 'podman') {
       const emptyAuthFilePath = path.join(os.tmpdir(), 'empty_auth.json');
       fs.writeFileSync(emptyAuthFilePath, '{}', 'utf-8');
       args.push('--authfile', emptyAuthFilePath);
@@ -651,7 +677,7 @@ export async function start_sandbox(
 
     if (proxyCommand) {
       // run proxyCommand in its own container
-      const proxyContainerCommand = `${config.command} run --rm --init ${userFlag} --name ${SANDBOX_PROXY_NAME} --network ${SANDBOX_PROXY_NAME} -p 8877:8877 -v ${process.cwd()}:${workdir} --workdir ${workdir} ${image} ${proxyCommand}`;
+      const proxyContainerCommand = `${command} run --rm --init ${userFlag} --name ${SANDBOX_PROXY_NAME} --network ${SANDBOX_PROXY_NAME} -p 8877:8877 -v ${process.cwd()}:${workdir} --workdir ${workdir} ${image} ${proxyCommand}`;
       proxyProcess = spawn(proxyContainerCommand, {
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: true,
@@ -660,7 +686,7 @@ export async function start_sandbox(
       // install handlers to stop proxy on exit/signal
       const stopProxy = () => {
         debugLogger.log('stopping proxy container ...');
-        execSync(`${config.command} rm -f ${SANDBOX_PROXY_NAME}`);
+        execSync(`${command} rm -f ${SANDBOX_PROXY_NAME}`);
       };
       process.off('exit', stopProxy);
       process.on('exit', stopProxy);
@@ -691,13 +717,13 @@ export async function start_sandbox(
       // connect proxy container to sandbox network
       // (workaround for older versions of docker that don't support multiple --network args)
       await execAsync(
-        `${config.command} network connect ${SANDBOX_NETWORK_NAME} ${SANDBOX_PROXY_NAME}`,
+        `${command} network connect ${SANDBOX_NETWORK_NAME} ${SANDBOX_PROXY_NAME}`,
       );
     }
 
     // spawn child and let it inherit stdio
     process.stdin.pause();
-    sandboxProcess = spawn(config.command, args, {
+    sandboxProcess = spawn(command, args, {
       stdio: 'inherit',
     });
 
