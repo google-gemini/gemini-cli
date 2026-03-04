@@ -11,6 +11,8 @@ import {
   useState,
   useCallback,
   useMemo,
+  useRef,
+  useEffect,
 } from 'react';
 
 export interface OverflowState {
@@ -42,31 +44,70 @@ export const OverflowProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [overflowingIds, setOverflowingIds] = useState(new Set<string>());
 
-  const addOverflowingId = useCallback((id: string) => {
-    setOverflowingIds((prevIds) => {
-      if (prevIds.has(id)) {
-        return prevIds;
-      }
-      const newIds = new Set(prevIds);
-      newIds.add(id);
-      return newIds;
-    });
+  /**
+   * We use a ref to track the current set of overflowing IDs and a timeout to
+   * batch updates to the next tick. This prevents infinite render loops (layout
+   * oscillation) where showing an overflow hint causes a layout shift that
+   * hides the hint, which then restores the layout and shows the hint again.
+   */
+  const idsRef = useRef(new Set<string>());
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const syncState = useCallback(() => {
+    if (timeoutRef.current) return;
+
+    // Use a microtask to batch updates and break synchronous recursive loops.
+    // This prevents "Maximum update depth exceeded" errors during layout shifts.
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
+      setOverflowingIds((prevIds) => {
+        // Optimization: only update state if the set has actually changed
+        if (
+          prevIds.size === idsRef.current.size &&
+          [...prevIds].every((id) => idsRef.current.has(id))
+        ) {
+          return prevIds;
+        }
+        return new Set(idsRef.current);
+      });
+    }, 0);
   }, []);
 
-  const removeOverflowingId = useCallback((id: string) => {
-    setOverflowingIds((prevIds) => {
-      if (!prevIds.has(id)) {
-        return prevIds;
+  useEffect(
+    () => () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
-      const newIds = new Set(prevIds);
-      newIds.delete(id);
-      return newIds;
-    });
-  }, []);
+    },
+    [],
+  );
+
+  const addOverflowingId = useCallback(
+    (id: string) => {
+      if (!idsRef.current.has(id)) {
+        idsRef.current.add(id);
+        syncState();
+      }
+    },
+    [syncState],
+  );
+
+  const removeOverflowingId = useCallback(
+    (id: string) => {
+      if (idsRef.current.has(id)) {
+        idsRef.current.delete(id);
+        syncState();
+      }
+    },
+    [syncState],
+  );
 
   const reset = useCallback(() => {
-    setOverflowingIds(new Set());
-  }, []);
+    if (idsRef.current.size > 0) {
+      idsRef.current.clear();
+      syncState();
+    }
+  }, [syncState]);
 
   const stateValue = useMemo(
     () => ({
