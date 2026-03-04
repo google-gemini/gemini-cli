@@ -18,7 +18,7 @@ import {
 import type { A2AAuthConfig } from './auth-provider/types.js';
 import { isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage, isNodeError } from '../utils/errors.js';
 /**
  * DTO for Markdown parsing - represents the structure from frontmatter.
  */
@@ -527,9 +527,11 @@ export async function loadAgentsFromDirectory(
         realPath = await fs.realpath(filePath);
       } catch (e) {
         if (entry.isSymbolicLink()) {
-          result.errors.push(
-            new AgentLoadError(filePath, 'Symlink target does not exist'),
-          );
+          const message =
+            isNodeError(e) && e.code === 'ENOENT'
+              ? 'Symlink target does not exist'
+              : `Failed to resolve symlink: ${getErrorMessage(e)}`;
+          result.errors.push(new AgentLoadError(filePath, message));
           continue;
         }
         throw e;
