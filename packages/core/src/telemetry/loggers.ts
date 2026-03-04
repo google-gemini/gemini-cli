@@ -76,6 +76,7 @@ import {
   recordPlanExecution,
   recordKeychainAvailability,
   recordTokenStorageInitialization,
+  recordInvalidChunk,
 } from './metrics.js';
 import { bufferTelemetryEvent } from './sdk.js';
 import { uiTelemetryService, type UiEvent } from './uiTelemetry.js';
@@ -480,6 +481,7 @@ export function logInvalidChunk(
       attributes: event.toOpenTelemetryAttributes(config),
     };
     logger.emit(logRecord);
+    recordInvalidChunk(config);
   });
 }
 

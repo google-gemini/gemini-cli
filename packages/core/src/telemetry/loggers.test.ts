@@ -1742,6 +1742,7 @@ describe('loggers', () => {
   describe('logInvalidChunk', () => {
     beforeEach(() => {
       vi.spyOn(ClearcutLogger.prototype, 'logInvalidChunkEvent');
+      vi.spyOn(metrics, 'recordInvalidChunk');
     });
 
     it('logs the event to Clearcut and OTEL', () => {
@@ -1766,6 +1767,8 @@ describe('loggers', () => {
           'error.message': 'Unexpected token',
         },
       });
+
+      expect(metrics.recordInvalidChunk).toHaveBeenCalledWith(mockConfig);
     });
   });
 
