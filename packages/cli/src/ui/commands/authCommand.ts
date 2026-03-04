@@ -10,7 +10,12 @@ import type {
   LogoutActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
-import { clearCachedCredentialFile } from '@google/gemini-cli-core';
+import {
+  clearCachedCredentialFile,
+  UserAccountManager,
+  AuthType,
+} from '@google/gemini-cli-core';
+import type { MessageActionReturn } from '@google/gemini-cli-core';
 import { SettingScope } from '../../config/settings.js';
 
 const authLoginCommand: SlashCommand = {
@@ -50,7 +55,50 @@ export const authCommand: SlashCommand = {
   description: 'Manage authentication',
   kind: CommandKind.BUILT_IN,
   subCommands: [authLoginCommand, authLogoutCommand],
-  action: (context, args) =>
-    // Default to login if no subcommand is provided
-    authLoginCommand.action!(context, args),
+  action: (context, _args): MessageActionReturn | OpenDialogActionReturn => {
+    // If no subcommand is provided, show current account info
+    const selectedAuthType =
+      context.services.settings.merged.security.auth.selectedType;
+    const authType =
+      context.services.config?.getContentGeneratorConfig()?.authType;
+
+    // Show account info for Google login
+    if (
+      authType === AuthType.LOGIN_WITH_GOOGLE ||
+      selectedAuthType === 'oauth-personal'
+    ) {
+      const userAccountManager = new UserAccountManager();
+      const cachedAccount = userAccountManager.getCachedGoogleAccount();
+
+      if (cachedAccount) {
+        return {
+          type: 'message',
+          messageType: 'info',
+          content: `Currently authenticated with Google account: ${cachedAccount}\n\nUse \`/auth login\` to change authentication method.\nUse \`/auth logout\` to log out.`,
+        };
+      } else {
+        return {
+          type: 'message',
+          messageType: 'info',
+          content:
+            'Logged in with Google (account email not available)\n\nUse `/auth login` to change authentication method.\nUse `/auth logout` to log out.',
+        };
+      }
+    }
+
+    // For other auth types, show current auth method
+    if (selectedAuthType) {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `Current authentication method: ${selectedAuthType}\n\nUse \`/auth login\` to change authentication method.\nUse \`/auth logout\` to log out.`,
+      };
+    }
+
+    // No auth selected, open dialog
+    return {
+      type: 'dialog',
+      dialog: 'auth',
+    };
+  },
 };

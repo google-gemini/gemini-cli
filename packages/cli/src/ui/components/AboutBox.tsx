@@ -105,6 +105,18 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
           <Text color={theme.text.primary}>{osVersion}</Text>
         </Box>
       </Box>
+      {userEmail && (
+        <Box flexDirection="row">
+          <Box width="35%">
+            <Text bold color={theme.text.link}>
+              Account
+            </Text>
+          </Box>
+          <Box>
+            <Text color={theme.text.primary}>{userEmail}</Text>
+          </Box>
+        </Box>
+      )}
       {showUserIdentity && (
         <Box flexDirection="row">
           <Box width="35%">

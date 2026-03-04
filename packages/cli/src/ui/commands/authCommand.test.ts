@@ -9,12 +9,14 @@ import { authCommand } from './authCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { SettingScope } from '../../config/settings.js';
+import { UserAccountManager, AuthType } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual('@google/gemini-cli-core');
   return {
     ...actual,
     clearCachedCredentialFile: vi.fn().mockResolvedValue(undefined),
+    UserAccountManager: vi.fn(),
   };
 });
 
@@ -41,16 +43,105 @@ describe('authCommand', () => {
     expect(authCommand.subCommands?.[1]?.name).toBe('logout');
   });
 
-  it('should return a dialog action to open the auth dialog when called with no args', () => {
-    if (!authCommand.action) {
-      throw new Error('The auth command must have an action.');
-    }
+  describe('auth command default action', () => {
+    it('should return a dialog action when no auth is selected', () => {
+      if (!authCommand.action) {
+        throw new Error('The auth command must have an action.');
+      }
 
-    const result = authCommand.action(mockContext, '');
+      mockContext.services.settings.merged.security.auth.selectedType =
+        undefined;
+      mockContext.services.config = null;
 
-    expect(result).toEqual({
-      type: 'dialog',
-      dialog: 'auth',
+      const result = authCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'dialog',
+        dialog: 'auth',
+      });
+    });
+
+    it('should show account info when authenticated with Google', () => {
+      if (!authCommand.action) {
+        throw new Error('The auth command must have an action.');
+      }
+
+      const mockGetCachedAccount = vi.fn().mockReturnValue('user@example.com');
+      vi.mocked(UserAccountManager).mockImplementation(
+        () =>
+          ({
+            getCachedGoogleAccount: mockGetCachedAccount,
+          }) as unknown as UserAccountManager,
+      );
+
+      mockContext.services.settings.merged.security.auth.selectedType =
+        AuthType.LOGIN_WITH_GOOGLE;
+      mockContext.services.config = {
+        getContentGeneratorConfig: vi.fn().mockReturnValue({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        }),
+      } as unknown as typeof mockContext.services.config;
+
+      const result = authCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: expect.stringContaining('user@example.com'),
+      });
+      expect(mockGetCachedAccount).toHaveBeenCalled();
+    });
+
+    it('should show auth method when authenticated with non-Google method', () => {
+      if (!authCommand.action) {
+        throw new Error('The auth command must have an action.');
+      }
+
+      mockContext.services.settings.merged.security.auth.selectedType =
+        AuthType.USE_GEMINI;
+      mockContext.services.config = {
+        getContentGeneratorConfig: vi.fn().mockReturnValue({
+          authType: AuthType.USE_GEMINI,
+        }),
+      } as unknown as typeof mockContext.services.config;
+
+      const result = authCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: expect.stringContaining('gemini-api-key'),
+      });
+    });
+
+    it('should handle missing account email gracefully', () => {
+      if (!authCommand.action) {
+        throw new Error('The auth command must have an action.');
+      }
+
+      const mockGetCachedAccount = vi.fn().mockReturnValue(null);
+      vi.mocked(UserAccountManager).mockImplementation(
+        () =>
+          ({
+            getCachedGoogleAccount: mockGetCachedAccount,
+          }) as unknown as UserAccountManager,
+      );
+
+      mockContext.services.settings.merged.security.auth.selectedType =
+        AuthType.LOGIN_WITH_GOOGLE;
+      mockContext.services.config = {
+        getContentGeneratorConfig: vi.fn().mockReturnValue({
+          authType: AuthType.LOGIN_WITH_GOOGLE,
+        }),
+      } as unknown as typeof mockContext.services.config;
+
+      const result = authCommand.action(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: expect.stringContaining('Logged in with Google'),
+      });
     });
   });
 

@@ -85,6 +85,7 @@ import {
   buildUserSteeringHintPrompt,
   logBillingEvent,
   ApiKeyUpdatedEvent,
+  UserAccountManager,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -465,6 +466,27 @@ export const AppContainer = (props: AppContainerProps) => {
       generateSummary(config).catch((e) => {
         debugLogger.warn('Background summary generation failed:', e);
       });
+
+      // Show connected account at startup (only for fresh sessions, not resumed)
+      if (
+        sessionStartSource === SessionStartSource.Startup &&
+        config.isInitialized()
+      ) {
+        const authType = config.getContentGeneratorConfig()?.authType;
+        if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+          const userAccountManager = new UserAccountManager();
+          const cachedAccount = userAccountManager.getCachedGoogleAccount();
+          if (cachedAccount) {
+            historyManager.addItem(
+              {
+                type: MessageType.INFO,
+                text: `Authenticated with Google account: ${cachedAccount}`,
+              },
+              Date.now(),
+            );
+          }
+        }
+      }
     })();
     registerCleanup(async () => {
       // Turn off mouse scroll.
