@@ -63,7 +63,7 @@ export const GEMINI_3_SET: CoreToolSet = {
 
   write_file: {
     name: WRITE_FILE_TOOL_NAME,
-    description: `Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use '${EDIT_TOOL_NAME}' for targeted edits to large files.`,
+    description: `Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use '${EDIT_TOOL_NAME}' for targeted edits to existing files to avoid data loss. Writing to large existing files (200+ lines) will require explicit user confirmation.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {

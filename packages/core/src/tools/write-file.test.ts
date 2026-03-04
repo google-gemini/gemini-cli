@@ -556,6 +556,78 @@ describe('WriteFileTool', () => {
       );
     });
 
+    describe('large file protection in AUTO_EDIT mode', () => {
+      beforeEach(() => {
+        mockConfigInternal.getApprovalMode.mockReturnValue(
+          ApprovalMode.AUTO_EDIT,
+        );
+      });
+
+      it('should force confirmation for large existing files (>= 200 lines) even in AUTO_EDIT mode', async () => {
+        const filePath = path.join(rootDir, 'large_file.txt');
+        // Create a file with exactly 200 lines
+        const largeContent = Array.from(
+          { length: 200 },
+          (_, i) => `line ${i + 1}`,
+        ).join('\n');
+        fs.writeFileSync(filePath, largeContent, 'utf8');
+
+        const proposedContent = 'Replacement content that truncates the file.';
+        mockEnsureCorrectEdit.mockResolvedValue({
+          params: {
+            file_path: filePath,
+            old_string: largeContent,
+            new_string: proposedContent,
+          },
+          occurrences: 1,
+        });
+
+        const params = { file_path: filePath, content: proposedContent };
+        const invocation = tool.build(params);
+        const confirmation = await invocation.shouldConfirmExecute(abortSignal);
+
+        // In AUTO_EDIT mode with a large file, confirmation should NOT be false
+        // — it should return confirmation details to protect against truncation
+        expect(confirmation).not.toBe(false);
+        expect(confirmation).toEqual(
+          expect.objectContaining({
+            title: expect.stringContaining('Confirm Write'),
+          }),
+        );
+      });
+
+      it('should skip confirmation for small files in AUTO_EDIT mode', async () => {
+        const filePath = path.join(rootDir, 'small_file.txt');
+        const smallContent = 'Just a few lines\nof content\nhere.';
+        fs.writeFileSync(filePath, smallContent, 'utf8');
+
+        const params = {
+          file_path: filePath,
+          content: 'New content.',
+        };
+        const invocation = tool.build(params);
+        const confirmation = await invocation.shouldConfirmExecute(abortSignal);
+
+        // Small files in AUTO_EDIT should still skip confirmation
+        expect(confirmation).toBe(false);
+      });
+
+      it('should skip confirmation for new files in AUTO_EDIT mode', async () => {
+        const filePath = path.join(rootDir, 'brand_new_file.txt');
+        // File does not exist on disk
+
+        const params = {
+          file_path: filePath,
+          content: 'New file content.',
+        };
+        const invocation = tool.build(params);
+        const confirmation = await invocation.shouldConfirmExecute(abortSignal);
+
+        // New files (non-existent) in AUTO_EDIT should skip confirmation
+        expect(confirmation).toBe(false);
+      });
+    });
+
     describe('with IDE integration', () => {
       beforeEach(() => {
         // Enable IDE mode and set connection status for these tests

@@ -330,6 +330,11 @@ export function renderOperationalGuidelines(
   )}${toolUsageRememberingFacts(options)}
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
+## Tool Safety
+- **Respect Project-Defined Tools:** If the project or user has defined custom safety wrappers or specialized tools (via MCP servers, discovered tools, or project context), you MUST prefer those over built-in equivalents for the same operation. Project-defined tools encode domain-specific safety constraints that built-in tools cannot replicate.
+- **Prefer Surgical Edits:** When modifying an existing file, strongly prefer ${formatToolName(EDIT_TOOL_NAME)} over ${formatToolName(WRITE_FILE_TOOL_NAME)}. Full-file overwrites via ${formatToolName(WRITE_FILE_TOOL_NAME)} risk data loss, especially on large files. Reserve ${formatToolName(WRITE_FILE_TOOL_NAME)} for creating new files or when a complete rewrite is explicitly requested.
+- **Large File Caution:** Exercise extreme caution with files exceeding 200 lines. Never perform a full-file overwrite on a large existing file without explicit user approval. If you must modify a large file, use ${formatToolName(EDIT_TOOL_NAME)} to apply targeted, surgical changes.
+
 ## Interaction Details
 - **Help Command:** The user can use '/help' to display help information.
 - **Feedback:** To report a bug or provide feedback, please use the /bug command.
