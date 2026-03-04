@@ -11,19 +11,16 @@ import type {
   JsonSchemaType,
   JsonSchemaValidator,
 } from '@modelcontextprotocol/sdk/validation/types.js';
-import type { SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import {
+  SSEClientTransport,
+  type SSEClientTransportOptions,
+} from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import type { StreamableHTTPClientTransportOptions } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {
+  StreamableHTTPClientTransport,
+  type StreamableHTTPClientTransportOptions,
+} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type {
-  GetPromptResult,
-  Prompt,
-  ReadResourceResult,
-  Resource,
-  Tool as McpTool,
-} from '@modelcontextprotocol/sdk/types.js';
 import {
   ListResourcesResultSchema,
   ListRootsRequestSchema,
@@ -32,14 +29,19 @@ import {
   ToolListChangedNotificationSchema,
   PromptListChangedNotificationSchema,
   ProgressNotificationSchema,
+  type GetPromptResult,
+  type Prompt,
+  type ReadResourceResult,
+  type Resource,
+  type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
-import type {
-  Config,
-  MCPServerConfig,
-  GeminiCLIExtension,
+import {
+  AuthProviderType,
+  type Config,
+  type MCPServerConfig,
+  type GeminiCLIExtension,
 } from '../config/config.js';
-import { AuthProviderType } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
