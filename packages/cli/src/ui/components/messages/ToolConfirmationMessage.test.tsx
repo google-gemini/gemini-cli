@@ -437,6 +437,41 @@ describe('ToolConfirmationMessage', () => {
       expect(lastFrame()).toContain('Allow for all future sessions');
       unmount();
     });
+
+    it('should default to "Allow for all future sessions" when autoAddToPolicyByDefault is true', async () => {
+      const mockConfig = {
+        isTrustedFolder: () => true,
+        getIdeMode: () => false,
+      } as unknown as Config;
+
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ToolConfirmationMessage
+          callId="test-call-id"
+          confirmationDetails={editConfirmationDetails}
+          config={mockConfig}
+          getPreferredEditor={vi.fn()}
+          availableTerminalHeight={30}
+          terminalWidth={80}
+        />,
+        {
+          settings: createMockSettings({
+            security: {
+              enablePermanentToolApproval: true,
+              autoAddToPolicyByDefault: true,
+            },
+          }),
+        },
+      );
+      await waitUntilReady();
+
+      const output = lastFrame();
+      // In Ink, the selected item is usually highlighted with a cursor or different color.
+      // We can't easily check colors in text output, but we can verify it's NOT the first option
+      // if we could see the selection indicator.
+      // Instead, we'll verify the snapshot which should show the selection.
+      expect(output).toMatchSnapshot();
+      unmount();
+    });
   });
 
   describe('Modify with external editor option', () => {

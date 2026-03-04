@@ -82,3 +82,15 @@ export function buildArgsPatterns(
 
   return [argsPattern];
 }
+
+/**
+ * Builds a regex pattern to match a specific file path in tool arguments.
+ * This is used to narrow tool approvals for edit tools to specific files.
+ *
+ * @param filePath The relative path to the file.
+ * @returns A regex string that matches "file_path":"<path>" in a JSON string.
+ */
+export function buildFilePathArgsPattern(filePath: string): string {
+  const jsonPath = JSON.stringify(filePath).slice(1, -1);
+  return `"file_path":"${escapeRegex(jsonPath)}"`;
+}

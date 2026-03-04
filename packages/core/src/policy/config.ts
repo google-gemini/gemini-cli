@@ -530,8 +530,20 @@ export function createPolicyUpdater(
       if (message.persist) {
         persistenceQueue = persistenceQueue.then(async () => {
           try {
-            const policyFile = storage.getAutoSavedPolicyPath();
+            const policyFile =
+              message.persistScope === 'workspace'
+                ? storage.getWorkspaceAutoSavedPolicyPath()
+                : storage.getAutoSavedPolicyPath();
             await fs.mkdir(path.dirname(policyFile), { recursive: true });
+
+            // Backup existing file if it exists
+            try {
+              await fs.copyFile(policyFile, `${policyFile}.bak`);
+            } catch (error) {
+              if (!isNodeError(error) || error.code !== 'ENOENT') {
+                debugLogger.warn(`Failed to backup ${policyFile}`, error);
+              }
+            }
 
             // Read existing file
             let existingData: { rule?: TomlRule[] } = {};

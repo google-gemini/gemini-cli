@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs/promises';
 import { ApprovalMode, type PolicyRule } from '@google/gemini-cli-core';
 import { CommandKind, type SlashCommand } from './types.js';
 import { MessageType } from '../types.js';
@@ -111,10 +112,66 @@ const listPoliciesCommand: SlashCommand = {
   },
 };
 
+const undoPoliciesCommand: SlashCommand = {
+  name: 'undo',
+  description: 'Undo the last auto-saved policy update',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: async (context) => {
+    const { config } = context.services;
+    if (!config) {
+      context.ui.addItem(
+        {
+          type: MessageType.ERROR,
+          text: 'Error: Config not available.',
+        },
+        Date.now(),
+      );
+      return;
+    }
+
+    const storage = config.storage;
+    const paths = [
+      storage.getAutoSavedPolicyPath(),
+      storage.getWorkspaceAutoSavedPolicyPath(),
+    ];
+
+    let restoredCount = 0;
+    for (const p of paths) {
+      const bak = `${p}.bak`;
+      try {
+        await fs.access(bak);
+        await fs.copyFile(bak, p);
+        restoredCount++;
+      } catch {
+        // No backup or failed to restore
+      }
+    }
+
+    if (restoredCount > 0) {
+      context.ui.addItem(
+        {
+          type: MessageType.INFO,
+          text: `Successfully restored ${restoredCount} policy file(s) from backup. Please restart the CLI to apply changes.`,
+        },
+        Date.now(),
+      );
+    } else {
+      context.ui.addItem(
+        {
+          type: MessageType.WARNING,
+          text: 'No policy backups found to restore.',
+        },
+        Date.now(),
+      );
+    }
+  },
+};
+
 export const policiesCommand: SlashCommand = {
   name: 'policies',
   description: 'Manage policies',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
-  subCommands: [listPoliciesCommand],
+  subCommands: [listPoliciesCommand, undoPoliciesCommand],
 };

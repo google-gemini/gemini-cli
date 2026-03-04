@@ -230,15 +230,87 @@ describe('createPolicyUpdater', () => {
     // Note: @iarna/toml optimizes for shortest representation, so it may use single quotes 'foo"bar'
     // instead of "foo\"bar\"" if there are no single quotes in the string.
     try {
-      expect(writtenContent).toContain(`mcpName = "my\\"jira\\"server"`);
+      expect(writtenContent).toContain('mcpName = "my\\"jira\\"server"');
     } catch {
-      expect(writtenContent).toContain(`mcpName = 'my"jira"server'`);
+      expect(writtenContent).toContain('mcpName = \'my"jira"server\'');
     }
 
     try {
-      expect(writtenContent).toContain(`toolName = "search\\"tool\\""`);
+      expect(writtenContent).toContain('toolName = "search\\"tool\\""');
     } catch {
-      expect(writtenContent).toContain(`toolName = 'search"tool"'`);
+      expect(writtenContent).toContain('toolName = \'search"tool"\'');
     }
+  });
+
+  it('should persist to workspace when persistScope is workspace', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+    vi.spyOn(mockStorage, 'getWorkspaceAutoSavedPolicyPath').mockReturnValue(
+      policyFile,
+    );
+    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
+    (fs.readFile as unknown as Mock).mockRejectedValue(
+      new Error('File not found'),
+    );
+    (fs.copyFile as unknown as Mock).mockResolvedValue(undefined);
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
+    (fs.rename as unknown as Mock).mockResolvedValue(undefined);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+      persistScope: 'workspace',
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(mockStorage.getWorkspaceAutoSavedPolicyPath).toHaveBeenCalled();
+    expect(fs.mkdir).toHaveBeenCalledWith(workspacePoliciesDir, {
+      recursive: true,
+    });
+    expect(fs.rename).toHaveBeenCalledWith(
+      expect.stringMatching(/\.tmp$/),
+      policyFile,
+    );
+  });
+
+  it('should backup existing policy file before writing', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const policyFile = '/mock/user/.gemini/policies/auto-saved.toml';
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+    (fs.mkdir as unknown as Mock).mockResolvedValue(undefined);
+    (fs.readFile as unknown as Mock).mockResolvedValue(
+      '[[rule]]\ntoolName = "existing"',
+    );
+    (fs.copyFile as unknown as Mock).mockResolvedValue(undefined);
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    (fs.open as unknown as Mock).mockResolvedValue(mockFileHandle);
+    (fs.rename as unknown as Mock).mockResolvedValue(undefined);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'new_tool',
+      persist: true,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(fs.copyFile).toHaveBeenCalledWith(policyFile, `${policyFile}.bak`);
   });
 });
