@@ -75,7 +75,7 @@ export const MainContent = () => {
                 : undefined
             }
             availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
-            key={h.id}
+            key={`${h.id}-${uiState.historyRemountKey}`}
             item={h}
             isPending={false}
             commands={uiState.slashCommands}
@@ -90,6 +90,7 @@ export const MainContent = () => {
       uiState.slashCommands,
       uiState.constrainHeight,
       lastUserPromptIndex,
+      uiState.historyRemountKey,
     ],
   );
 
@@ -108,7 +109,7 @@ export const MainContent = () => {
       <Box flexDirection="column">
         {pendingHistoryItems.map((item, i) => (
           <HistoryItemDisplay
-            key={i}
+            key={`pending-${i}-${uiState.historyRemountKey}`}
             availableTerminalHeight={
               uiState.constrainHeight ? staticAreaMaxItemHeight : undefined
             }
@@ -130,6 +131,7 @@ export const MainContent = () => {
       mainAreaWidth,
       showConfirmationQueue,
       confirmingTool,
+      uiState.historyRemountKey,
     ],
   );
 
@@ -151,7 +153,7 @@ export const MainContent = () => {
       if (item.type === 'header') {
         return (
           <MemoizedAppHeader
-            key="app-header"
+            key={`app-header-${uiState.historyRemountKey}`}
             version={version}
             showDetails={showHeaderDetails}
           />
@@ -166,7 +168,7 @@ export const MainContent = () => {
                 : undefined
             }
             availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
-            key={item.item.id}
+            key={`${item.item.id}-${uiState.historyRemountKey}`}
             item={item.item}
             isPending={false}
             commands={uiState.slashCommands}
@@ -185,6 +187,7 @@ export const MainContent = () => {
       pendingItems,
       uiState.constrainHeight,
       staticAreaMaxItemHeight,
+      uiState.historyRemountKey,
     ],
   );
 
@@ -198,9 +201,11 @@ export const MainContent = () => {
         renderItem={renderItem}
         estimatedItemHeight={() => 100}
         keyExtractor={(item, _index) => {
-          if (item.type === 'header') return 'header';
-          if (item.type === 'history') return item.item.id.toString();
-          return 'pending';
+          if (item.type === 'header')
+            return `header-${uiState.historyRemountKey}`;
+          if (item.type === 'history')
+            return `${item.item.id}-${uiState.historyRemountKey}`;
+          return `pending-${uiState.historyRemountKey}`;
         }}
         initialScrollIndex={SCROLL_TO_ITEM_END}
         initialScrollOffsetInIndex={SCROLL_TO_ITEM_END}
