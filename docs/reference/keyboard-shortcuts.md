@@ -87,12 +87,12 @@ available combinations.
 
 #### Text Input
 
-| Action                                         | Keys                                                                                      |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Submit the current prompt.                     | `Enter (no Shift, Alt, Ctrl, Cmd)`                                                        |
-| Insert a newline without submitting.           | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Alt + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
-| Open the current prompt in an external editor. | `Ctrl + X`                                                                                |
-| Paste from the clipboard.                      | `Ctrl + V`<br />`Cmd + V`<br />`Alt + V`                                                  |
+| Action                                                     | Keys                                                                                      |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Submit the current prompt.                                 | `Enter (no Shift, Alt, Ctrl, Cmd)`                                                        |
+| Insert a newline without submitting.                       | `Ctrl + Enter`<br />`Cmd + Enter`<br />`Alt + Enter`<br />`Shift + Enter`<br />`Ctrl + J` |
+| Open the current prompt or the plan in an external editor. | `Ctrl + X`                                                                                |
+| Paste from the clipboard.                                  | `Ctrl + V`<br />`Cmd + V`<br />`Alt + V`                                                  |
 
 #### App Controls
 
@@ -152,3 +152,13 @@ available combinations.
   inline when the cursor is over the placeholder.
 - `Double-click` on a paste placeholder (alternate buffer mode only): Expand to
   view full content inline. Double-click again to collapse.
+
+## Limitations
+
+- On [Windows Terminal](https://en.wikipedia.org/wiki/Windows_Terminal):
+  - `shift+enter` is not supported.
+  - `shift+tab`
+    [is not supported](https://github.com/google-gemini/gemini-cli/issues/20314)
+    on Node 20 and earlier versions of Node 22.
+- On macOS's [Terminal](<https://en.wikipedia.org/wiki/Terminal_(macOS)>):
+  - `shift+enter` is not supported.
