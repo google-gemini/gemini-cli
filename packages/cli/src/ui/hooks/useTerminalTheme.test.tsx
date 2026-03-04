@@ -43,7 +43,7 @@ const mockSettings = {
       themeLight: 'default', // DEFAULT_THEME.name
       themeDark: 'default',
       autoThemeSwitching: true,
-      terminalBackgroundPollingInterval: 60,
+      terminalBackgroundPollingInterval: 5,
     },
   },
 };
