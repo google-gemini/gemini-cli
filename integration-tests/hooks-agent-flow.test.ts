@@ -198,8 +198,10 @@ describe('Hooks Agent Flow', () => {
 
       rig.setup('should process clearContext in AfterAgent hook output', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             BeforeModel: [
               {
                 hooks: [
