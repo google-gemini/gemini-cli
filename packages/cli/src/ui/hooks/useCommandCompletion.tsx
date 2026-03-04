@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo, useEffect } from 'react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
@@ -37,6 +37,9 @@ export interface UseCommandCompletionReturn {
   showSuggestions: boolean;
   isLoadingSuggestions: boolean;
   isPerfectMatch: boolean;
+  forceShowShellSuggestions: boolean;
+  setForceShowShellSuggestions: (value: boolean) => void;
+  isShellSuggestionsVisible: boolean;
   setActiveSuggestionIndex: React.Dispatch<React.SetStateAction<number>>;
   resetCompletionState: () => void;
   navigateUp: () => void;
@@ -80,6 +83,9 @@ export function useCommandCompletion({
   config,
   active,
 }: UseCommandCompletionOptions): UseCommandCompletionReturn {
+  const [forceShowShellSuggestions, setForceShowShellSuggestions] =
+    useState(false);
+
   const {
     suggestions,
     activeSuggestionIndex,
@@ -93,10 +99,15 @@ export function useCommandCompletion({
     setIsPerfectMatch,
     setVisibleStartIndex,
 
-    resetCompletionState,
+    resetCompletionState: baseResetCompletionState,
     navigateUp,
     navigateDown,
   } = useCompletion();
+
+  const resetCompletionState = useCallback(() => {
+    baseResetCompletionState();
+    setForceShowShellSuggestions(false);
+  }, [baseResetCompletionState]);
 
   const cursorRow = buffer.cursor[0];
   const cursorCol = buffer.cursor[1];
@@ -231,9 +242,72 @@ export function useCommandCompletion({
       ? shellCompletionRange.query
       : memoQuery;
 
-  const promptCompletion = usePromptCompletion({
+  const basePromptCompletion = usePromptCompletion({
     buffer,
   });
+
+  const isShellSuggestionsVisible =
+    completionMode !== CompletionMode.SHELL || forceShowShellSuggestions;
+
+  const promptCompletion = useMemo(() => {
+    if (
+      completionMode === CompletionMode.SHELL &&
+      suggestions.length === 1 &&
+      query != null &&
+      shellCompletionRange.completionStart === shellCompletionRange.activeStart
+    ) {
+      const suggestion = suggestions[0];
+      const textToInsertBase = suggestion.value;
+
+      if (
+        textToInsertBase.startsWith(query) &&
+        textToInsertBase.length > query.length
+      ) {
+        const currentLine = buffer.lines[cursorRow] || '';
+        const start = shellCompletionRange.completionStart;
+        const end = shellCompletionRange.completionEnd;
+
+        let textToInsert = textToInsertBase;
+        const charAfterCompletion = currentLine[end];
+        if (
+          charAfterCompletion !== ' ' &&
+          !textToInsert.endsWith('/') &&
+          !textToInsert.endsWith('\\')
+        ) {
+          textToInsert += ' ';
+        }
+
+        const newText =
+          currentLine.substring(0, start) +
+          textToInsert +
+          currentLine.substring(end);
+
+        return {
+          text: newText,
+          isActive: true,
+          isLoading: false,
+          accept: () => {
+            buffer.replaceRangeByOffset(
+              logicalPosToOffset(buffer.lines, cursorRow, start),
+              logicalPosToOffset(buffer.lines, cursorRow, end),
+              textToInsert,
+            );
+          },
+          clear: () => {},
+          markSelected: () => {},
+        };
+      }
+    }
+    return basePromptCompletion;
+  }, [
+    completionMode,
+    suggestions,
+    query,
+    basePromptCompletion,
+    buffer,
+    cursorRow,
+    shellCompletionRange,
+  ]);
 
   useEffect(() => {
     setActiveSuggestionIndex(suggestions.length > 0 ? 0 : -1);
@@ -271,6 +345,7 @@ export function useCommandCompletion({
     active &&
     completionMode !== CompletionMode.IDLE &&
     !reverseSearchActive &&
+    isShellSuggestionsVisible &&
     (isLoadingSuggestions || suggestions.length > 0);
 
   /**
@@ -395,6 +470,9 @@ export function useCommandCompletion({
     showSuggestions,
     isLoadingSuggestions,
     isPerfectMatch,
+    forceShowShellSuggestions,
+    setForceShowShellSuggestions,
+    isShellSuggestionsVisible,
     setActiveSuggestionIndex,
     resetCompletionState,
     navigateUp,
