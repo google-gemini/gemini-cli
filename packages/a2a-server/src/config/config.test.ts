@@ -16,6 +16,9 @@ import {
   ExperimentFlags,
   fetchAdminControlsOnce,
   type FetchAdminControlsResponse,
+  AuthType,
+  isHeadlessMode,
+  FatalAuthenticationError,
 } from '@google/gemini-cli-core';
 
 // Mock dependencies
@@ -50,6 +53,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     startupProfiler: {
       flush: vi.fn(),
     },
+    isHeadlessMode: vi.fn().mockReturnValue(false),
     FileDiscoveryService: vi.fn(),
     getCodeAssistServer: vi.fn(),
     fetchAdminControlsOnce: vi.fn(),
@@ -62,6 +66,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 vi.mock('../utils/logger.js', () => ({
   logger: {
     info: vi.fn(),
+    warn: vi.fn(),
     error: vi.fn(),
   },
 }));
@@ -310,6 +315,105 @@ describe('loadConfig', () => {
           allowedTools: ['v1-tool'],
         }),
       );
+    });
+
+    describe('interactivity', () => {
+      it('should set interactive true when not headless', async () => {
+        vi.mocked(isHeadlessMode).mockReturnValue(false);
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            interactive: true,
+            enableInteractiveShell: true,
+          }),
+        );
+      });
+
+      it('should set interactive false when headless', async () => {
+        vi.mocked(isHeadlessMode).mockReturnValue(true);
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            interactive: false,
+            enableInteractiveShell: false,
+          }),
+        );
+      });
+    });
+
+    describe('authentication fallback', () => {
+      beforeEach(() => {
+        process.env['USE_CCPA'] = 'true';
+        delete process.env['GEMINI_API_KEY'];
+      });
+
+      afterEach(() => {
+        delete process.env['USE_CCPA'];
+        delete process.env['CLOUD_SHELL'];
+        delete process.env['GEMINI_CLI_USE_COMPUTE_ADC'];
+      });
+
+      it('should fall back to COMPUTE_ADC in Cloud Shell if LOGIN_WITH_GOOGLE fails', async () => {
+        process.env['CLOUD_SHELL'] = 'true';
+        const refreshAuthMock = vi.fn().mockImplementation((authType) => {
+          if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+            throw new FatalAuthenticationError('Non-interactive session');
+          }
+          return Promise.resolve();
+        });
+
+        // Update the mock implementation for this test
+        vi.mocked(Config).mockImplementation(
+          (params: unknown) =>
+            ({
+              ...(params as object),
+              initialize: vi.fn(),
+              waitForMcpInit: vi.fn(),
+              refreshAuth: refreshAuthMock,
+              getExperiments: vi.fn().mockReturnValue({ flags: {} }),
+              getRemoteAdminSettings: vi.fn(),
+              setRemoteAdminSettings: vi.fn(),
+            }) as unknown as Config,
+        );
+
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+
+        expect(refreshAuthMock).toHaveBeenCalledWith(
+          AuthType.LOGIN_WITH_GOOGLE,
+        );
+        expect(refreshAuthMock).toHaveBeenCalledWith(AuthType.COMPUTE_ADC);
+      });
+
+      it('should not fall back to COMPUTE_ADC if not in cloud environment', async () => {
+        const refreshAuthMock = vi.fn().mockImplementation((authType) => {
+          if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+            throw new FatalAuthenticationError('Non-interactive session');
+          }
+          return Promise.resolve();
+        });
+
+        vi.mocked(Config).mockImplementation(
+          (params: unknown) =>
+            ({
+              ...(params as object),
+              initialize: vi.fn(),
+              waitForMcpInit: vi.fn(),
+              refreshAuth: refreshAuthMock,
+              getExperiments: vi.fn().mockReturnValue({ flags: {} }),
+              getRemoteAdminSettings: vi.fn(),
+              setRemoteAdminSettings: vi.fn(),
+            }) as unknown as Config,
+        );
+
+        await expect(
+          loadConfig(mockSettings, mockExtensionLoader, taskId),
+        ).rejects.toThrow('Non-interactive session');
+
+        expect(refreshAuthMock).toHaveBeenCalledWith(
+          AuthType.LOGIN_WITH_GOOGLE,
+        );
+        expect(refreshAuthMock).not.toHaveBeenCalledWith(AuthType.COMPUTE_ADC);
+      });
     });
   });
 });

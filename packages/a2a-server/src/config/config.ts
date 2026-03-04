@@ -23,6 +23,8 @@ import {
   fetchAdminControlsOnce,
   getCodeAssistServer,
   ExperimentFlags,
+  isHeadlessMode,
+  FatalAuthenticationError,
   type TelemetryTarget,
   type ConfigParameters,
   type ExtensionLoader,
@@ -103,8 +105,8 @@ export async function loadConfig(
     trustedFolder: true,
     extensionLoader,
     checkpointing,
-    interactive: true,
-    enableInteractiveShell: true,
+    interactive: !isHeadlessMode(),
+    enableInteractiveShell: !isHeadlessMode(),
     ptyInfo: 'auto',
   };
 
@@ -255,7 +257,30 @@ async function refreshAuthentication(
         `[${logPrefix}] USE_CCPA env var is true but unable to resolve GOOGLE_APPLICATION_CREDENTIALS file path ${adcFilePath}. Error ${e}`,
       );
     }
-    await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+    try {
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+    } catch (e) {
+      if (
+        e instanceof FatalAuthenticationError &&
+        (isCloudEnvironment() ||
+          process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true')
+      ) {
+        logger.warn(
+          `[${logPrefix}] LOGIN_WITH_GOOGLE failed in non-interactive mode. Attempting COMPUTE_ADC fallback.`,
+        );
+        try {
+          await config.refreshAuth(AuthType.COMPUTE_ADC);
+          logger.info(`[${logPrefix}] COMPUTE_ADC fallback successful.`);
+        } catch (adcError) {
+          logger.error(
+            `[${logPrefix}] COMPUTE_ADC fallback failed: ${adcError}`,
+          );
+          throw e; // throw the original error
+        }
+      } else {
+        throw e;
+      }
+    }
     logger.info(
       `[${logPrefix}] GOOGLE_CLOUD_PROJECT: ${process.env['GOOGLE_CLOUD_PROJECT']}`,
     );
@@ -267,4 +292,8 @@ async function refreshAuthentication(
     logger.error(errorMessage);
     throw new Error(errorMessage);
   }
+}
+
+function isCloudEnvironment(): boolean {
+  return !!(process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']);
 }
