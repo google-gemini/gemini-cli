@@ -89,8 +89,7 @@ export const PerfDisplay: React.FC<PerfDisplayProps> = ({
       </Text>
       {startupPhases === null ? (
         <Text color={theme.text.secondary}>
-          No startup timing data available (run `/stats perf` earlier in the
-          session).
+          No startup timing data was recorded for this session.
         </Text>
       ) : (
         startupPhases.map((phase) => (

@@ -119,7 +119,9 @@ describe('<PerfDisplay />', () => {
       baseMemory,
       null,
     );
-    expect(lastFrame()).toContain('No startup timing data available');
+    expect(lastFrame()).toContain(
+      'No startup timing data was recorded for this session.',
+    );
     unmount();
   });
 
