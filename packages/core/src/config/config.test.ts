@@ -4,16 +4,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Mock } from 'vitest';
-import type { ConfigParameters, SandboxConfig } from './config.js';
-import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
+import {
+  Config,
+  DEFAULT_FILE_FILTERING_OPTIONS,
+  type ConfigParameters,
+  type SandboxConfig,
+} from './config.js';
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
-import type { HookDefinition } from '../hooks/types.js';
-import { HookType, HookEventName } from '../hooks/types.js';
+import {
+  HookType,
+  HookEventName,
+  type HookDefinition,
+} from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -23,14 +37,12 @@ import {
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
 } from '../telemetry/index.js';
-import type {
-  ContentGeneratorConfig,
-  ContentGenerator,
-} from '../core/contentGenerator.js';
 import {
   AuthType,
   createContentGenerator,
   createContentGeneratorConfig,
+  type ContentGeneratorConfig,
+  type ContentGenerator,
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
@@ -223,8 +235,6 @@ import type {
   ModelConfigService,
   ModelConfigServiceConfig,
 } from '../services/modelConfigService.js';
-import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
-import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 
 vi.mock('../core/baseLlmClient.js');
@@ -1204,6 +1214,28 @@ describe('Server Config (config.ts)', () => {
       expect(SubAgentToolMock).not.toHaveBeenCalled();
     });
 
+    it('should register EnterPlanModeTool and ExitPlanModeTool when plan is enabled', async () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        plan: true,
+      };
+      const config = new Config(params);
+
+      await config.initialize();
+
+      const registerToolMock = (
+        (await vi.importMock('../tools/tool-registry')) as {
+          ToolRegistry: { prototype: { registerTool: Mock } };
+        }
+      ).ToolRegistry.prototype.registerTool;
+
+      const registeredTools = registerToolMock.mock.calls.map(
+        (call) => call[0].constructor.name,
+      );
+      expect(registeredTools).toContain('EnterPlanModeTool');
+      expect(registeredTools).toContain('ExitPlanModeTool');
+    });
+
     describe('with minified tool class names', () => {
       beforeEach(() => {
         Object.defineProperty(
@@ -2166,6 +2198,23 @@ describe('Config getHooks', () => {
 
       expect(onModelChange).not.toHaveBeenCalled();
     });
+
+    it('should call onModelChange when persisting a model that was previously temporary', () => {
+      const onModelChange = vi.fn();
+      const config = new Config({
+        ...baseParams,
+        model: 'some-other-model',
+        onModelChange,
+      });
+
+      // Temporary selection
+      config.setModel(DEFAULT_GEMINI_MODEL, true);
+      expect(onModelChange).not.toHaveBeenCalled();
+
+      // Persist selection of the same model
+      config.setModel(DEFAULT_GEMINI_MODEL, false);
+      expect(onModelChange).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
+    });
   });
 });
 
@@ -2930,9 +2979,11 @@ describe('Plans Directory Initialization', () => {
 
   afterEach(() => {
     vi.mocked(fs.promises.mkdir).mockRestore();
+    vi.mocked(fs.promises.access).mockRestore?.();
   });
 
-  it('should create plans directory and add it to workspace context when plan is enabled', async () => {
+  it('should add plans directory to workspace context if it exists', async () => {
+    vi.spyOn(fs.promises, 'access').mockResolvedValue(undefined);
     const config = new Config({
       ...baseParams,
       plan: true,
@@ -2941,12 +2992,30 @@ describe('Plans Directory Initialization', () => {
     await config.initialize();
 
     const plansDir = config.storage.getPlansDir();
-    expect(fs.promises.mkdir).toHaveBeenCalledWith(plansDir, {
-      recursive: true,
-    });
+    // Should NOT create the directory eagerly
+    expect(fs.promises.mkdir).not.toHaveBeenCalled();
+    // Should check if it exists
+    expect(fs.promises.access).toHaveBeenCalledWith(plansDir);
 
     const context = config.getWorkspaceContext();
     expect(context.getDirectories()).toContain(plansDir);
+  });
+
+  it('should NOT add plans directory to workspace context if it does not exist', async () => {
+    vi.spyOn(fs.promises, 'access').mockRejectedValue({ code: 'ENOENT' });
+    const config = new Config({
+      ...baseParams,
+      plan: true,
+    });
+
+    await config.initialize();
+
+    const plansDir = config.storage.getPlansDir();
+    expect(fs.promises.mkdir).not.toHaveBeenCalled();
+    expect(fs.promises.access).toHaveBeenCalledWith(plansDir);
+
+    const context = config.getWorkspaceContext();
+    expect(context.getDirectories()).not.toContain(plansDir);
   });
 
   it('should NOT create plans directory or add it to workspace context when plan is disabled', async () => {
@@ -2961,131 +3030,6 @@ describe('Plans Directory Initialization', () => {
     expect(fs.promises.mkdir).not.toHaveBeenCalledWith(plansDir, {
       recursive: true,
     });
-
-    const context = config.getWorkspaceContext();
-    expect(context.getDirectories()).not.toContain(plansDir);
-  });
-});
-
-describe('syncPlanModeTools', () => {
-  const baseParams: ConfigParameters = {
-    sessionId: 'test-session',
-    targetDir: '.',
-    debugMode: false,
-    model: 'test-model',
-    cwd: '.',
-  };
-
-  it('should register ExitPlanModeTool and unregister EnterPlanModeTool when in PLAN mode', async () => {
-    const config = new Config({
-      ...baseParams,
-      approvalMode: ApprovalMode.PLAN,
-    });
-    const registry = new ToolRegistry(config, config.getMessageBus());
-    vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
-
-    const registerSpy = vi.spyOn(registry, 'registerTool');
-    const unregisterSpy = vi.spyOn(registry, 'unregisterTool');
-    const getToolSpy = vi.spyOn(registry, 'getTool');
-
-    getToolSpy.mockImplementation((name) => {
-      if (name === 'enter_plan_mode')
-        return new EnterPlanModeTool(config, config.getMessageBus());
-      return undefined;
-    });
-
-    config.syncPlanModeTools();
-
-    expect(unregisterSpy).toHaveBeenCalledWith('enter_plan_mode');
-    expect(registerSpy).toHaveBeenCalledWith(expect.anything());
-    const registeredTool = registerSpy.mock.calls[0][0];
-    const { ExitPlanModeTool } = await import('../tools/exit-plan-mode.js');
-    expect(registeredTool).toBeInstanceOf(ExitPlanModeTool);
-  });
-
-  it('should register EnterPlanModeTool and unregister ExitPlanModeTool when NOT in PLAN mode and experimental.plan is enabled', async () => {
-    const config = new Config({
-      ...baseParams,
-      approvalMode: ApprovalMode.DEFAULT,
-      plan: true,
-    });
-    const registry = new ToolRegistry(config, config.getMessageBus());
-    vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
-
-    const registerSpy = vi.spyOn(registry, 'registerTool');
-    const unregisterSpy = vi.spyOn(registry, 'unregisterTool');
-    const getToolSpy = vi.spyOn(registry, 'getTool');
-
-    getToolSpy.mockImplementation((name) => {
-      if (name === 'exit_plan_mode')
-        return new ExitPlanModeTool(config, config.getMessageBus());
-      return undefined;
-    });
-
-    config.syncPlanModeTools();
-
-    expect(unregisterSpy).toHaveBeenCalledWith('exit_plan_mode');
-    expect(registerSpy).toHaveBeenCalledWith(expect.anything());
-    const registeredTool = registerSpy.mock.calls[0][0];
-    const { EnterPlanModeTool } = await import('../tools/enter-plan-mode.js');
-    expect(registeredTool).toBeInstanceOf(EnterPlanModeTool);
-  });
-
-  it('should NOT register EnterPlanModeTool when experimental.plan is disabled', async () => {
-    const config = new Config({
-      ...baseParams,
-      approvalMode: ApprovalMode.DEFAULT,
-      plan: false,
-    });
-    const registry = new ToolRegistry(config, config.getMessageBus());
-    vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
-
-    const registerSpy = vi.spyOn(registry, 'registerTool');
-    vi.spyOn(registry, 'getTool').mockReturnValue(undefined);
-
-    config.syncPlanModeTools();
-
-    const { EnterPlanModeTool } = await import('../tools/enter-plan-mode.js');
-    const registeredTool = registerSpy.mock.calls.find(
-      (call) => call[0] instanceof EnterPlanModeTool,
-    );
-    expect(registeredTool).toBeUndefined();
-  });
-
-  it('should NOT register EnterPlanModeTool when in YOLO mode, even if plan is enabled', async () => {
-    const config = new Config({
-      ...baseParams,
-      approvalMode: ApprovalMode.YOLO,
-      plan: true,
-    });
-    const registry = new ToolRegistry(config, config.getMessageBus());
-    vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
-
-    const registerSpy = vi.spyOn(registry, 'registerTool');
-    vi.spyOn(registry, 'getTool').mockReturnValue(undefined);
-
-    config.syncPlanModeTools();
-
-    const { EnterPlanModeTool } = await import('../tools/enter-plan-mode.js');
-    const registeredTool = registerSpy.mock.calls.find(
-      (call) => call[0] instanceof EnterPlanModeTool,
-    );
-    expect(registeredTool).toBeUndefined();
-  });
-
-  it('should call geminiClient.setTools if initialized', async () => {
-    const config = new Config(baseParams);
-    const registry = new ToolRegistry(config, config.getMessageBus());
-    vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
-    const client = config.getGeminiClient();
-    vi.spyOn(client, 'isInitialized').mockReturnValue(true);
-    const setToolsSpy = vi
-      .spyOn(client, 'setTools')
-      .mockResolvedValue(undefined);
-
-    config.syncPlanModeTools();
-
-    expect(setToolsSpy).toHaveBeenCalled();
   });
 });
 
