@@ -367,7 +367,7 @@ describe('editor utils', () => {
       const command = getDiffCommand('old.txt', 'new.txt', 'sublime');
       expect(command).toEqual({
         command: 'subl',
-        args: ['--wait', 'old.txt'],
+        args: ['--wait', 'new.txt'],
       });
     });
 
