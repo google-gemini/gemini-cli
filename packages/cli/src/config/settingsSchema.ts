@@ -196,7 +196,8 @@ const SETTINGS_SCHEMA = {
         category: 'General',
         requiresRestart: false,
         default: undefined as string | undefined,
-        description: 'The preferred editor to open files in.',
+        description:
+          'The preferred editor to open files in. Must be one of the built-in supported identifiers — run /editor in the CLI for the full list. Power users who need an editor not in this list can leave this unset and configure $VISUAL or $EDITOR in their shell environment instead.',
         showInDialog: false,
       },
       vimMode: {
