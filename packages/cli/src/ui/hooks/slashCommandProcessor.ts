@@ -185,6 +185,12 @@ export const useSlashCommandProcessor = (
         historyItemContent = {
           type: 'tool_stats',
         };
+      } else if (message.type === MessageType.PERF_STATS) {
+        historyItemContent = {
+          type: 'perf_stats',
+          memoryUsage: message.memoryUsage,
+          startupPhases: message.startupPhases,
+        };
       } else if (message.type === MessageType.QUIT) {
         historyItemContent = {
           type: 'quit',
