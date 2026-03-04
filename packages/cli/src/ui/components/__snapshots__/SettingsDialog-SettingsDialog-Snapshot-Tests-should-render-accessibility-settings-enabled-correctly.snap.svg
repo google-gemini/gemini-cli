@@ -8,7 +8,7 @@
     <text x="0" y="19" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="19" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="36" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="9" y="36" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs">  &gt; Settings                                                                                      </text>
+    <text x="27" y="36" fill="#ffffff" textLength="99" lengthAdjust="spacingAndGlyphs" font-weight="bold">&gt; Settings </text>
     <text x="891" y="36" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="53" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="53" fill="#3d3f51" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
