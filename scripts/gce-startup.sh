@@ -160,12 +160,12 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
 
-# Start both services
+# Restart both services (restart, not start — pick up newly built code)
 systemctl daemon-reload
 systemctl enable chat-bridge forever-agent
-systemctl start chat-bridge
+systemctl restart chat-bridge
 sleep 2
-systemctl start forever-agent
+systemctl restart forever-agent
 
 echo "=== Chat bridge started on port 8081 ==="
 echo "=== Forever agent started in screen session ==="
