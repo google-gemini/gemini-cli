@@ -45,7 +45,7 @@ import {
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { XcodeMcpBridgeFixTransport } from './xcode-mcp-fix-transport.js';
+import { StructuredContentFixTransport } from './structured-content-fix-transport.js';
 
 import type { CallableTool, FunctionCall, Part, Tool } from '@google/genai';
 import { basename } from 'node:path';
@@ -157,7 +157,7 @@ export class McpClient implements McpProgressReporter {
     private readonly debugMode: boolean,
     private readonly clientVersion: string,
     private readonly onToolsUpdated?: (signal?: AbortSignal) => Promise<void>,
-  ) {}
+  ) { }
 
   /**
    * Connects to the MCP server.
@@ -973,10 +973,9 @@ class LenientJsonSchemaValidator implements jsonSchemaValidator {
       return this.ajvValidator.getValidator<T>(schema);
     } catch (error) {
       debugLogger.warn(
-        `Failed to compile MCP tool output schema (${
-          (schema as Record<string, unknown>)?.['$id'] ?? '<no $id>'
+        `Failed to compile MCP tool output schema (${(schema as Record<string, unknown>)?.['$id'] ?? '<no $id>'
         }): ${error instanceof Error ? error.message : String(error)}. ` +
-          'Skipping output validation for this tool.',
+        'Skipping output validation for this tool.',
       );
       return (input: unknown) => ({
         valid: true as const,
@@ -1164,9 +1163,8 @@ export async function discoverTools(
       } catch (error) {
         cliConfig.emitMcpDiagnostic(
           'error',
-          `Error discovering tool: '${
-            toolDef.name
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          `Error discovering tool: '${toolDef.name
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           }' from MCP server '${mcpServerName}': ${(error as Error).message}`,
           error,
           mcpServerName,
@@ -1198,7 +1196,7 @@ class McpCallableTool implements CallableTool {
     private readonly toolDef: McpTool,
     private readonly timeout: number,
     private readonly progressReporter?: McpProgressReporter,
-  ) {}
+  ) { }
 
   async tool(): Promise<Tool> {
     return {
@@ -1968,7 +1966,7 @@ function createUrlTransport(
     if (mcpServerConfig.url) {
       debugLogger.warn(
         `MCP server '${mcpServerName}': Both 'httpUrl' and 'url' are configured. ` +
-          `Using deprecated 'httpUrl'. Please migrate to 'url' with 'type: "http"'.`,
+        `Using deprecated 'httpUrl'. Please migrate to 'url' with 'type: "http"'.`,
       );
     }
     return new StreamableHTTPClientTransport(
@@ -2122,24 +2120,20 @@ export async function createTransport(
       stderr: 'pipe',
     });
 
-    // Fix for Xcode 26.3 mcpbridge non-compliant responses
-    // It returns JSON in `content` instead of `structuredContent`
-    if (
-      mcpServerConfig.command === 'xcrun' &&
-      mcpServerConfig.args?.includes('mcpbridge')
-    ) {
-      transport = new XcodeMcpBridgeFixTransport(transport);
-    }
+    // Fix for MCP servers that return JSON in `content` text instead of
+    // `structuredContent` when the tool has an outputSchema. The MCP SDK
+    // validates structuredContent and throws error -32600 if it is missing.
+    transport = new StructuredContentFixTransport(transport);
 
     if (debugMode) {
-      // The `XcodeMcpBridgeFixTransport` wrapper hides the underlying `StdioClientTransport`,
+      // The `StructuredContentFixTransport` wrapper hides the underlying `StdioClientTransport`,
       // which exposes `stderr` for debug logging. We need to unwrap it to attach the listener.
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const underlyingTransport =
-        transport instanceof XcodeMcpBridgeFixTransport
+        transport instanceof StructuredContentFixTransport
           ? // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-            (transport as any).transport
+          (transport as any).transport
           : transport;
 
       if (
