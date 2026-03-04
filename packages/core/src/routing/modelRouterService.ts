@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { GemmaClassifierStrategy } from './strategies/gemmaClassifierStrategy.js';
 import type { Config } from '../config/config.js';
 import type {
   RoutingContext,
   RoutingDecision,
+  RoutingStrategy,
   TerminalStrategy,
 } from './routingStrategy.js';
 import { DefaultStrategy } from './strategies/defaultStrategy.js';
@@ -16,6 +18,7 @@ import { NumericalClassifierStrategy } from './strategies/numericalClassifierStr
 import { CompositeStrategy } from './strategies/compositeStrategy.js';
 import { FallbackStrategy } from './strategies/fallbackStrategy.js';
 import { OverrideStrategy } from './strategies/overrideStrategy.js';
+import { ApprovalModeStrategy } from './strategies/approvalModeStrategy.js';
 
 import { logModelRouting } from '../telemetry/loggers.js';
 import { ModelRoutingEvent } from '../telemetry/types.js';
@@ -34,16 +37,31 @@ export class ModelRouterService {
   }
 
   private initializeDefaultStrategy(): TerminalStrategy {
-    // Initialize the composite strategy with the desired priority order.
-    // The strategies are ordered in order of highest priority.
+    const strategies: RoutingStrategy[] = [];
+
+    // Order matters here. Fallback and override are checked first.
+    strategies.push(new FallbackStrategy());
+    strategies.push(new OverrideStrategy());
+
+    // Approval mode is next.
+    strategies.push(new ApprovalModeStrategy());
+
+    // Then, if enabled, the Gemma classifier is used.
+    if (this.config.getGemmaModelRouterSettings()?.enabled) {
+      strategies.push(new GemmaClassifierStrategy());
+    }
+
+    // The generic classifier is next.
+    strategies.push(new ClassifierStrategy());
+
+    // The numerical classifier is next.
+    strategies.push(new NumericalClassifierStrategy());
+
+    // The default strategy is the terminal strategy.
+    const terminalStrategy = new DefaultStrategy();
+
     return new CompositeStrategy(
-      [
-        new FallbackStrategy(),
-        new OverrideStrategy(),
-        new ClassifierStrategy(),
-        new NumericalClassifierStrategy(),
-        new DefaultStrategy(),
-      ],
+      [...strategies, terminalStrategy],
       'agent-router',
     );
   }
@@ -73,6 +91,7 @@ export class ModelRouterService {
         context,
         this.config,
         this.config.getBaseLlmClient(),
+        this.config.getLocalLiteRtLmClient(),
       );
 
       debugLogger.debug(
@@ -105,6 +124,7 @@ export class ModelRouterService {
         decision!.metadata.reasoning,
         failed,
         error_message,
+        this.config.getApprovalMode(),
         enableNumericalRouting,
         classifierThreshold,
       );

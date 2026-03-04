@@ -75,6 +75,21 @@ export abstract class ExtensionLoader {
       await this.config.getMcpClientManager()!.startExtension(extension);
       await this.maybeRefreshGeminiTools(extension);
 
+      // Register policy rules and checkers
+      if (extension.rules || extension.checkers) {
+        const policyEngine = this.config.getPolicyEngine();
+        if (extension.rules) {
+          for (const rule of extension.rules) {
+            policyEngine.addRule(rule);
+          }
+        }
+        if (extension.checkers) {
+          for (const checker of extension.checkers) {
+            policyEngine.addChecker(checker);
+          }
+        }
+      }
+
       // Note: Context files are loaded only once all extensions are done
       // loading/unloading to reduce churn, see the `maybeRefreshMemories` call
       // below.
@@ -167,6 +182,27 @@ export abstract class ExtensionLoader {
     try {
       await this.config.getMcpClientManager()!.stopExtension(extension);
       await this.maybeRefreshGeminiTools(extension);
+
+      // Unregister policy rules and checkers
+      if (extension.rules || extension.checkers) {
+        const policyEngine = this.config.getPolicyEngine();
+        const sources = new Set<string>();
+        if (extension.rules) {
+          for (const rule of extension.rules) {
+            if (rule.source) sources.add(rule.source);
+          }
+        }
+        if (extension.checkers) {
+          for (const checker of extension.checkers) {
+            if (checker.source) sources.add(checker.source);
+          }
+        }
+
+        for (const source of sources) {
+          policyEngine.removeRulesBySource(source);
+          policyEngine.removeCheckersBySource(source);
+        }
+      }
 
       // Note: Context files are loaded only once all extensions are done
       // loading/unloading to reduce churn, see the `maybeRefreshMemories` call

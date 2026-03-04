@@ -48,6 +48,24 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
+    CoreToolCallStatus: {
+      Validating: 'validating',
+      Scheduled: 'scheduled',
+      Error: 'error',
+      Success: 'success',
+      Executing: 'executing',
+      Cancelled: 'cancelled',
+      AwaitingApproval: 'awaiting_approval',
+    },
+    LlmRole: {
+      MAIN: 'main',
+      SUBAGENT: 'subagent',
+      UTILITY_TOOL: 'utility_tool',
+      USER: 'user',
+      MODEL: 'model',
+      SYSTEM: 'system',
+      TOOL: 'tool',
+    },
     convertSessionToClientHistory: vi.fn(),
   };
 });
@@ -75,6 +93,10 @@ describe('GeminiAgent Session Resume', () => {
       },
       getApprovalMode: vi.fn().mockReturnValue('default'),
       isPlanEnabled: vi.fn().mockReturnValue(false),
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
+      getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
+      getCheckpointingEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
     mockSettings = {
       merged: {
@@ -185,6 +207,10 @@ describe('GeminiAgent Session Resume', () => {
         ],
         currentModeId: ApprovalMode.DEFAULT,
       },
+      models: {
+        availableModels: expect.any(Array) as unknown,
+        currentModelId: 'gemini-pro',
+      },
     });
 
     // Verify resumeChat received the correct arguments
@@ -256,6 +282,7 @@ describe('GeminiAgent Session Resume', () => {
             toolCallId: 'call-2',
             status: 'failed',
             title: 'Write File',
+            kind: 'read',
           }),
         }),
       );

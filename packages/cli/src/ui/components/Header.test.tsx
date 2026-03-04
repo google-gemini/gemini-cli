@@ -96,16 +96,20 @@ describe('<Header />', () => {
       },
       background: {
         primary: '',
+        message: '',
+        input: '',
+        focus: '',
         diff: { added: '', removed: '' },
       },
       border: {
         default: '',
-        focused: '',
       },
       ui: {
         comment: '',
         symbol: '',
+        active: '',
         dark: '',
+        focus: '',
         gradient: undefined,
       },
       status: {

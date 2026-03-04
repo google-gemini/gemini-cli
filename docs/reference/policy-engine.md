@@ -10,9 +10,19 @@ confirmation.
 To create your first policy:
 
 1.  **Create the policy directory** if it doesn't exist:
+
+    **macOS/Linux**
+
     ```bash
     mkdir -p ~/.gemini/policies
     ```
+
+    **Windows (PowerShell)**
+
+    ```powershell
+    New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\policies"
+    ```
+
 2.  **Create a new policy file** (e.g., `~/.gemini/policies/my-rules.toml`). You
     can use any filename ending in `.toml`; all such files in this directory
     will be loaded and combined:
@@ -64,9 +74,11 @@ primary conditions are the tool's name and its arguments.
 
 The `toolName` in the rule must match the name of the tool being called.
 
-- **Wildcards**: For Model-hosting-protocol (MCP) servers, you can use a
-  wildcard. A `toolName` of `my-server__*` will match any tool from the
-  `my-server` MCP.
+- **Wildcards**: You can use wildcards to match multiple tools.
+  - `*`: Matches **any tool** (built-in or MCP).
+  - `server__*`: Matches any tool from a specific MCP server.
+  - `*__toolName`: Matches a specific tool name across **all** MCP servers.
+  - `*__*`: Matches **any tool from any MCP server**.
 
 #### Arguments pattern
 
@@ -95,9 +107,10 @@ has a designated number that forms the base of the final priority calculation.
 | Tier      | Base | Description                                                                |
 | :-------- | :--- | :------------------------------------------------------------------------- |
 | Default   | 1    | Built-in policies that ship with the Gemini CLI.                           |
-| Workspace | 2    | Policies defined in the current workspace's configuration directory.       |
-| User      | 3    | Custom policies defined by the user.                                       |
-| Admin     | 4    | Policies managed by an administrator (e.g., in an enterprise environment). |
+| Extension | 2    | Policies defined in extensions.                                            |
+| Workspace | 3    | Policies defined in the current workspace's configuration directory.       |
+| User      | 4    | Custom policies defined by the user.                                       |
+| Admin     | 5    | Policies managed by an administrator (e.g., in an enterprise environment). |
 
 Within a TOML policy file, you assign a priority value from **0 to 999**. The
 engine transforms this into a final priority using the following formula:
@@ -144,9 +157,9 @@ A rule matches a tool call if all of its conditions are met:
 
 1.  **Tool name**: The `toolName` in the rule must match the name of the tool
     being called.
-    - **Wildcards**: For Model-hosting-protocol (MCP) servers, you can use a
-      wildcard. A `toolName` of `my-server__*` will match any tool from the
-      `my-server` MCP.
+    - **Wildcards**: You can use wildcards like `*`, `server__*`, or
+      `*__toolName` to match multiple tools. See [Tool Name](#tool-name) for
+      details.
 2.  **Arguments pattern**: If `argsPattern` is specified, the tool's arguments
     are converted to a stable JSON string, which is then tested against the
     provided regular expression. If the arguments don't match the pattern, the
@@ -202,6 +215,10 @@ toolName = "run_shell_command"
 # (Optional) The name of an MCP server. Can be combined with toolName
 # to form a composite name like "mcpName__toolName".
 mcpName = "my-custom-server"
+
+# (Optional) Metadata hints provided by the tool. A rule matches if all
+# key-value pairs provided here are present in the tool's annotations.
+toolAnnotations = { readOnlyHint = true }
 
 # (Optional) A regex to match against the tool's arguments.
 argsPattern = '"command":"(git|npm)'
@@ -272,13 +289,12 @@ priority = 100
 
 ### Special syntax for MCP tools
 
-You can create rules that target tools from Model-hosting-protocol (MCP) servers
-using the `mcpName` field or a wildcard pattern.
+You can create rules that target tools from Model Context Protocol (MCP) servers
+using the `mcpName` field or composite wildcard patterns.
 
-**1. Using `mcpName`**
+**1. Targeting a specific tool on a server**
 
-To target a specific tool from a specific server, combine `mcpName` and
-`toolName`.
+Combine `mcpName` and `toolName` to target a single operation.
 
 ```toml
 # Allows the `search` tool on the `my-jira-server` MCP
@@ -289,10 +305,10 @@ decision = "allow"
 priority = 200
 ```
 
-**2. Using a wildcard**
+**2. Targeting all tools on a specific server**
 
-To create a rule that applies to _all_ tools on a specific MCP server, specify
-only the `mcpName`.
+Specify only the `mcpName` to apply a rule to every tool provided by that
+server.
 
 ```toml
 # Denies all tools from the `untrusted-server` MCP
@@ -301,6 +317,33 @@ mcpName = "untrusted-server"
 decision = "deny"
 priority = 500
 deny_message = "This server is not trusted by the admin."
+```
+
+**3. Targeting all MCP servers**
+
+Use `mcpName = "*"` to create a rule that applies to **all** tools from **any**
+registered MCP server. This is useful for setting category-wide defaults.
+
+```toml
+# Ask user for any tool call from any MCP server
+[[rule]]
+mcpName = "*"
+decision = "ask_user"
+priority = 10
+```
+
+**4. Targeting a tool name across all servers**
+
+Use `mcpName = "*"` with a specific `toolName` to target that operation
+regardless of which server provides it.
+
+```toml
+# Allow the `search` tool across all connected MCP servers
+[[rule]]
+mcpName = "*"
+toolName = "search"
+decision = "allow"
+priority = 50
 ```
 
 ## Default policies
