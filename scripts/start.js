@@ -21,6 +21,7 @@ import { spawn, execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
+import { constants } from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
@@ -73,6 +74,11 @@ if (isInDebugMode) {
 }
 const child = spawn('node', nodeArgs, { stdio: 'inherit', env });
 
-child.on('close', (code) => {
-  process.exit(code);
+child.on('close', (code, signal) => {
+  if (signal) {
+    console.error(`\nGemini CLI was terminated by signal: ${signal}`);
+    const signalNumber = constants.signals[signal];
+    process.exit(signalNumber ? 128 + signalNumber : 1);
+  }
+  process.exit(code ?? 1);
 });
