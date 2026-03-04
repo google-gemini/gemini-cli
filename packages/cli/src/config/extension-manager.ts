@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { stat } from 'node:fs/promises';
 import chalk from 'chalk';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
+import { ExtensionIntegrityManager } from './extensions/integrity.js';
 import { type MergedSettings, SettingScope } from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { loadInstallMetadata, type ExtensionConfig } from './extension.js';
@@ -98,6 +99,7 @@ interface ExtensionManagerParams {
  */
 export class ExtensionManager extends ExtensionLoader {
   private extensionEnablementManager: ExtensionEnablementManager;
+  private integrityManager: ExtensionIntegrityManager;
   private settings: MergedSettings;
   private requestConsent: (consent: string) => Promise<boolean>;
   private requestSetting:
@@ -114,6 +116,7 @@ export class ExtensionManager extends ExtensionLoader {
     this.extensionEnablementManager = new ExtensionEnablementManager(
       options.enabledExtensionOverrides,
     );
+    this.integrityManager = new ExtensionIntegrityManager();
     this.settings = options.settings;
     this.telemetryConfig = new Config({
       telemetry: options.settings.telemetry,
@@ -372,6 +375,11 @@ Would you like to attempt to install via "git clone" instead?`,
           INSTALL_METADATA_FILENAME,
         );
         await fs.promises.writeFile(metadataPath, metadataString);
+
+        await this.integrityManager.storeIntegrity(
+          newExtensionName,
+          installMetadata,
+        );
 
         // TODO: Gracefully handle this call failing, we should back up the old
         // extension prior to overwriting it and then restore and restart it.

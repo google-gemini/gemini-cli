@@ -27,11 +27,13 @@ vi.mock('node:fs', async (importOriginal) => {
     default: {
       ...actual.default,
       existsSync: vi.fn(),
+      readFileSync: vi.fn(),
       statSync: vi.fn(),
       lstatSync: vi.fn(),
       realpathSync: vi.fn((p) => p),
     },
     existsSync: vi.fn(),
+    readFileSync: vi.fn(),
     statSync: vi.fn(),
     lstatSync: vi.fn(),
     realpathSync: vi.fn((p) => p),
@@ -134,9 +136,18 @@ describe('extensionUpdates', () => {
     vi.mocked(fs.promises.writeFile).mockResolvedValue(undefined);
     vi.mocked(fs.promises.rm).mockResolvedValue(undefined);
     vi.mocked(fs.promises.cp).mockResolvedValue(undefined);
+    vi.mocked(fs.readFileSync).mockReturnValue('');
 
     // Allow directories to exist by default to satisfy Config/WorkspaceContext checks
-    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      if (
+        typeof p === 'string' &&
+        (p.endsWith('integrity.key') || p.endsWith('extension_integrity.json'))
+      ) {
+        return false;
+      }
+      return true;
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

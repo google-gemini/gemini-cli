@@ -13,6 +13,16 @@ import { createTestMergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
 
+const mockStoreIntegrity = vi.fn();
+const mockVerifyIntegrity = vi.fn();
+
+vi.mock('./extensions/integrity.js', () => ({
+  ExtensionIntegrityManager: vi.fn().mockImplementation(() => ({
+    storeIntegrity: mockStoreIntegrity,
+    verifyIntegrity: mockVerifyIntegrity,
+  })),
+}));
+
 const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
 
 vi.mock('os', async (importOriginal) => {
@@ -183,6 +193,74 @@ describe('ExtensionManager', () => {
       expect(names).toEqual(['ext1', 'ext2']);
 
       fs.rmSync(externalDir, { recursive: true, force: true });
+    });
+  });
+
+  describe('installOrUpdateExtension integrity', () => {
+    it('should call storeIntegrity when installing an extension', async () => {
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'test-integrity-ext',
+        version: '1.0.0',
+      });
+
+      await extensionManager.loadExtensions();
+      await extensionManager.installOrUpdateExtension({
+        source: sourceExtDir,
+        type: 'local',
+      });
+
+      expect(mockStoreIntegrity).toHaveBeenCalledWith(
+        'test-integrity-ext',
+        expect.objectContaining({
+          source: expect.stringContaining('test-integrity-ext'),
+          type: 'local',
+        }),
+      );
+    });
+
+    it('should call storeIntegrity when updating an extension', async () => {
+      const extensionName = 'test-update-integrity-ext';
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: extensionName,
+        version: '1.0.0',
+      });
+
+      await extensionManager.loadExtensions();
+      await extensionManager.installOrUpdateExtension({
+        source: sourceExtDir,
+        type: 'local',
+      });
+
+      mockStoreIntegrity.mockClear();
+
+      const updatedSourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: extensionName,
+        version: '1.1.0',
+      });
+
+      const previousExtensionConfig = {
+        name: extensionName,
+        version: '1.0.0',
+      };
+
+      await extensionManager.installOrUpdateExtension(
+        {
+          source: updatedSourceExtDir,
+          type: 'local',
+        },
+        previousExtensionConfig,
+      );
+
+      expect(mockStoreIntegrity).toHaveBeenCalledWith(
+        extensionName,
+        expect.objectContaining({
+          source: expect.stringContaining(extensionName),
+          type: 'local',
+        }),
+      );
     });
   });
 });
