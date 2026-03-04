@@ -48,14 +48,16 @@ export const QuotaDisplay: React.FC<QuotaDisplayProps> = ({
   let text: string;
   if (remaining === 0) {
     const resetMsg = resetTime
-      ? `, resets in ${formatResetTime(resetTime, true)}`
+      ? `, resets in ${formatResetTime(resetTime, 'terse')}`
       : '';
     text = terse ? 'Limit reached' : `Limit reached${resetMsg}`;
   } else {
     text = terse
       ? `${usedPercentage.toFixed(0)}%`
       : `${usedPercentage.toFixed(0)}% used${
-          resetTime ? ` (Limit resets in ${formatResetTime(resetTime)})` : ''
+          resetTime
+            ? ` (Limit resets in ${formatResetTime(resetTime, 'terse')})`
+            : ''
         }`;
   }
 
