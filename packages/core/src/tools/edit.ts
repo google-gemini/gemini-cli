@@ -413,6 +413,20 @@ export interface EditToolParams {
   ai_proposed_content?: string;
 }
 
+export function isEditToolParams(args: unknown): args is EditToolParams {
+  if (typeof args !== 'object' || args === null) {
+    return false;
+  }
+  return (
+    'file_path' in args &&
+    typeof args.file_path === 'string' &&
+    'old_string' in args &&
+    typeof args.old_string === 'string' &&
+    'new_string' in args &&
+    typeof args.new_string === 'string'
+  );
+}
+
 interface CalculatedEdit {
   currentContent: string | null;
   newContent: string;
