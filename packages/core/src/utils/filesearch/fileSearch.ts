@@ -13,12 +13,45 @@ import { AsyncFzf, type FzfResultItem } from 'fzf';
 import { unescapePath } from '../paths.js';
 import type { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
 
-const byLengthAsc = (a: FzfResultItem<string>, b: FzfResultItem<string>) =>
+// Tiebreaker: Prefers shorter paths.
+const byLengthAsc = (a: { item: string }, b: { item: string }) =>
   a.item.length - b.item.length;
 
+// Tiebreaker: Prefers files over directories.
+const byDirVsFile = (a: { item: string }, b: { item: string }) => {
+  const aIsDir = a.item.endsWith('/');
+  const bIsDir = b.item.endsWith('/');
+  if (aIsDir && !bIsDir) return 1; // a (dir) after b (file)
+  if (!aIsDir && bIsDir) return -1; // a (file) before b (dir)
+  return 0;
+};
+
+// Tiebreaker: Prefers matches at the start of the filename (basename prefix).
+const byBasenamePrefix = (
+  a: { item: string; positions: Set<number> },
+  b: { item: string; positions: Set<number> },
+) => {
+  const getBasenameStart = (p: string) => {
+    const trimmed = p.endsWith('/') ? p.slice(0, -1) : p;
+    return Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\')) + 1;
+  };
+  const aDiff = Math.min(...a.positions) - getBasenameStart(a.item);
+  const bDiff = Math.min(...b.positions) - getBasenameStart(b.item);
+
+  const aIsFilenameMatch = aDiff >= 0;
+  const bIsFilenameMatch = bDiff >= 0;
+
+  if (aIsFilenameMatch && !bIsFilenameMatch) return -1;
+  if (!aIsFilenameMatch && bIsFilenameMatch) return 1;
+  if (aIsFilenameMatch && bIsFilenameMatch) return aDiff - bDiff;
+
+  return 0; // Both are directory matches, let subsequent tiebreakers decide.
+};
+
+// Tiebreaker: Prefers matches closer to the end of the path.
 const byMatchPosFromEnd = (
-  a: FzfResultItem<string>,
-  b: FzfResultItem<string>,
+  a: { item: string; positions: Set<number> },
+  b: { item: string; positions: Set<number> },
 ) => {
   const maxPosA = Math.max(-1, ...a.positions);
   const maxPosB = Math.max(-1, ...b.positions);
@@ -207,7 +240,12 @@ class RecursiveFileSearch implements FileSearch {
       this.fzf = new AsyncFzf(this.allFiles, {
         fuzzy: this.allFiles.length > 20000 ? 'v1' : 'v2',
         forward: false,
-        tiebreakers: [byMatchPosFromEnd, byLengthAsc],
+        tiebreakers: [
+          byDirVsFile,
+          byBasenamePrefix,
+          byMatchPosFromEnd,
+          byLengthAsc,
+        ],
       });
     }
   }
