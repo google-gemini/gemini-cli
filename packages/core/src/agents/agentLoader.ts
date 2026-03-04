@@ -19,7 +19,6 @@ import type { A2AAuthConfig } from './auth-provider/types.js';
 import { isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
 import { getErrorMessage } from '../utils/errors.js';
-
 /**
  * DTO for Markdown parsing - represents the structure from frontmatter.
  */
