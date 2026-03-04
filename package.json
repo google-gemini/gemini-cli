@@ -62,8 +62,10 @@
     "release:version": "node scripts/version.js",
     "telemetry": "node scripts/telemetry.js",
     "data:validate": "tsx scripts/validate-data.ts",
-    "data:format": "prettier --write 'data/**/*.ts' 'data/*.json' 'scripts/validate-data.ts' 'packages/core/src/evals/**/*.ts'",
-    "data:lint": "eslint 'data/**/*.ts' 'scripts/validate-data.ts' 'packages/core/src/evals/**/*.ts'",
+    "data:format": "prettier --write 'data/*.json' 'scripts/validate-data.ts' 'scripts/optimization/**/*.ts'",
+    "data:lint": "eslint 'scripts/validate-data.ts' 'scripts/optimization/**/*.ts'",
+    "optimize": "tsx scripts/optimization/run.ts",
+    "optimize:extract": "tsx scripts/optimization/extract.ts",
     "check:lockfile": "node scripts/check-lockfile.js",
     "clean": "node scripts/clean.js",
     "pre-commit": "node scripts/pre-commit.js"
@@ -145,6 +147,7 @@
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {
+    "@ax-llm/ax": "^19.0.11",
     "@lydell/node-pty": "1.1.0",
     "@lydell/node-pty-darwin-arm64": "1.1.0",
     "@lydell/node-pty-darwin-x64": "1.1.0",

@@ -66,6 +66,14 @@
     },
     "file_descriptions": {
       "data/tool_alignment.jsonl": "Ensures the model selects the correct built-in tool over generic shell commands and optimizes for brevity."
+    },
+    "optimization_targets": {
+      "snippets": [
+        "renderCoreMandates",
+        "renderPrimaryWorkflows",
+        "renderOperationalGuidelines",
+        "renderGitRepo"
+      ]
     }
   }
 }

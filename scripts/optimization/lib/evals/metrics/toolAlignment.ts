@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger } from '../../utils/debugLogger.js';
+import { debugLogger } from '../../../../../packages/core/src/utils/debugLogger.js';
 import type { Scenario, ToolCall } from '../schema.js';
 import { DEFAULT_EVAL_CONFIG } from '../config.js';
-import { MetricObjective, OptimizationDirection } from '../types.js';
+import { MetricObjective } from '../types.js';
 import type { MetricResult } from '../types.js';
 
 /**
@@ -41,7 +41,6 @@ export function evaluateToolAlignment(
       return {
         score: config.hardFailureScore,
         objective: MetricObjective.ALIGNMENT,
-        direction: OptimizationDirection.MAXIMIZE,
         reason: `Hard Failure: ${negative.reason}`,
         metadata: {
           matchedNegativeReason: negative.reason,
@@ -59,7 +58,6 @@ export function evaluateToolAlignment(
     return {
       score: config.invalidResponseScore,
       objective: MetricObjective.ALIGNMENT,
-      direction: OptimizationDirection.MAXIMIZE,
       reason: 'Model failed to produce any tool calls.',
     };
   }
@@ -79,7 +77,6 @@ export function evaluateToolAlignment(
     return {
       score: config.invalidResponseScore,
       objective: MetricObjective.ALIGNMENT,
-      direction: OptimizationDirection.MAXIMIZE,
       reason: 'Model selected the wrong tool(s).',
     };
   }
@@ -100,7 +97,6 @@ export function evaluateToolAlignment(
     return {
       score: config.toolNameMatchOnlyScore,
       objective: MetricObjective.ALIGNMENT,
-      direction: OptimizationDirection.MAXIMIZE,
       reason: 'Correct tool selected, but arguments are incorrect or missing.',
     };
   }
@@ -112,7 +108,6 @@ export function evaluateToolAlignment(
   return {
     score: config.functionalSuccessScore,
     objective: MetricObjective.ALIGNMENT,
-    direction: OptimizationDirection.MAXIMIZE,
     reason:
       'Functional Success: Tool and arguments align perfectly with golden scenario.',
   };

@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { evaluateToolAlignment } from './toolAlignment.js';
-import { MetricObjective, OptimizationDirection } from '../types.js';
+import { MetricObjective } from '../types.js';
 import type { Scenario } from '../schema.js';
 
 describe('evaluateToolAlignment', () => {
@@ -36,7 +36,6 @@ describe('evaluateToolAlignment', () => {
     const result = evaluateToolAlignment(prediction, mockScenario);
     expect(result.score).toBe(1.0);
     expect(result.objective).toBe(MetricObjective.ALIGNMENT);
-    expect(result.direction).toBe(OptimizationDirection.MAXIMIZE);
     expect(result.reason).toContain('Functional Success');
   });
 

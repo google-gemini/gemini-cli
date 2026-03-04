@@ -5,19 +5,11 @@
  */
 
 /**
- * Defines whether an objective should be increased or decreased during optimization.
- */
-export enum OptimizationDirection {
-  MINIMIZE = 'minimize',
-  MAXIMIZE = 'maximize',
-}
-
-/**
  * The specific dimensions being measured by the evaluation pipeline.
  */
 export enum MetricObjective {
   ALIGNMENT = 'alignment',
-  FRUGALITY = 'frugality',
+  BREVITY = 'brevity',
 }
 
 /**
@@ -27,6 +19,7 @@ export enum MetricObjective {
 export interface MetricResult {
   /**
    * The numeric score calculated by the metric.
+   * All metrics must provide a value where HIGHER is BETTER.
    */
   score: number;
 
@@ -34,11 +27,6 @@ export interface MetricResult {
    * The specific objective this result corresponds to.
    */
   objective: MetricObjective;
-
-  /**
-   * Whether the goal is to increase or decrease this specific score.
-   */
-  direction: OptimizationDirection;
 
   /**
    * A human-readable (and optimizer-reflective) reason for the score.
