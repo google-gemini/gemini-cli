@@ -8,7 +8,6 @@ import {
   useState,
   useRef,
   useLayoutEffect,
-  forwardRef,
   useImperativeHandle,
   useMemo,
   useCallback,
@@ -30,6 +29,7 @@ type VirtualizedListProps<T> = {
   initialScrollIndex?: number;
   initialScrollOffsetInIndex?: number;
   scrollbarThumbColor?: string;
+  ref?: React.Ref<VirtualizedListRef<T>>;
 };
 
 export type VirtualizedListRef<T> = {
@@ -66,10 +66,7 @@ function findLastIndex<T>(
   return -1;
 }
 
-function VirtualizedList<T>(
-  props: VirtualizedListProps<T>,
-  ref: React.Ref<VirtualizedListRef<T>>,
-) {
+function VirtualizedList<T>(props: VirtualizedListProps<T>) {
   const {
     data,
     renderItem,
@@ -77,6 +74,7 @@ function VirtualizedList<T>(
     keyExtractor,
     initialScrollIndex,
     initialScrollOffsetInIndex,
+    ref,
   } = props;
   const { copyModeEnabled } = useUIState();
   const dataRef = useRef(data);
@@ -554,11 +552,6 @@ function VirtualizedList<T>(
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-const VirtualizedListWithForwardRef = forwardRef(VirtualizedList) as <T>(
-  props: VirtualizedListProps<T> & { ref?: React.Ref<VirtualizedListRef<T>> },
-) => React.ReactElement;
-
-export { VirtualizedListWithForwardRef as VirtualizedList };
+export { VirtualizedList };
 
 VirtualizedList.displayName = 'VirtualizedList';

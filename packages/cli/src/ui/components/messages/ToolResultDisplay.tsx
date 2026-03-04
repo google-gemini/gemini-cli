@@ -26,6 +26,19 @@ import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 import { calculateToolContentMaxLines } from '../../utils/toolLayoutUtils.js';
 import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
 
+function isAnsiOutput(value: unknown): value is AnsiOutput {
+  return Array.isArray(value) && value.every(Array.isArray);
+}
+
+function isFileDiffResult(value: unknown): value is FileDiffResult {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'fileDiff' in value &&
+    'fileName' in value
+  );
+}
+
 export interface ToolResultDisplayProps {
   resultDisplay: string | object | undefined;
   availableTerminalHeight?: number;
@@ -118,28 +131,23 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           {contentData}
         </Text>
       );
-    } else if (typeof contentData === 'object' && 'fileDiff' in contentData) {
+    } else if (isFileDiffResult(contentData)) {
       content = (
         <DiffRenderer
-          diffContent={
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (contentData as FileDiffResult).fileDiff
-          }
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          filename={(contentData as FileDiffResult).fileName}
+          diffContent={contentData.fileDiff}
+          filename={contentData.fileName}
           availableTerminalHeight={availableHeight}
           terminalWidth={childWidth}
         />
       );
-    } else {
+    } else if (isAnsiOutput(contentData)) {
       const shouldDisableTruncation =
         isAlternateBuffer ||
         (availableTerminalHeight === undefined && maxLines === undefined);
 
       content = (
         <AnsiOutputText
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          data={contentData as AnsiOutput}
+          data={contentData}
           availableTerminalHeight={
             isAlternateBuffer ? undefined : availableHeight
           }
@@ -148,6 +156,8 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
           disableTruncation={shouldDisableTruncation}
         />
       );
+    } else {
+      content = null;
     }
 
     // Final render based on session mode
@@ -171,20 +181,15 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   // ASB Mode Handling (Interactive/Fullscreen)
   if (isAlternateBuffer) {
     // Virtualized path for large ANSI arrays
-    if (Array.isArray(resultDisplay)) {
+    if (isAnsiOutput(resultDisplay)) {
       const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
-      const listHeight = Math.min(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        (resultDisplay as AnsiOutput).length,
-        limit,
-      );
+      const listHeight = Math.min(resultDisplay.length, limit);
 
       return (
         <Box width={childWidth} flexDirection="column" maxHeight={listHeight}>
           <ScrollableList
             width={childWidth}
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            data={resultDisplay as AnsiOutput}
+            data={resultDisplay}
             renderItem={renderVirtualizedAnsiLine}
             estimatedItemHeight={() => 1}
             keyExtractor={keyExtractor}

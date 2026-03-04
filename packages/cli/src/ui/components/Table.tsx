@@ -18,12 +18,15 @@ export interface Column<T> {
   renderCell?: (item: T) => React.ReactNode;
 }
 
-interface TableProps<T> {
+interface TableProps<T extends Record<string, unknown>> {
   data: T[];
   columns: Array<Column<T>>;
 }
 
-export function Table<T>({ data, columns }: TableProps<T>) {
+export function Table<T extends Record<string, unknown>>({
+  data,
+  columns,
+}: TableProps<T>) {
   return (
     <Box flexDirection="column">
       {/* Header */}
@@ -74,10 +77,7 @@ export function Table<T>({ data, columns }: TableProps<T>) {
               {col.renderCell ? (
                 col.renderCell(item)
               ) : (
-                <Text color={theme.text.primary}>
-                  {/* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */}
-                  {String((item as Record<string, unknown>)[col.key])}
-                </Text>
+                <Text color={theme.text.primary}>{String(item[col.key])}</Text>
               )}
             </Box>
           ))}

@@ -83,15 +83,13 @@ export function AuthDialog({
     );
   }
 
-  let defaultAuthType = null;
+  let defaultAuthType: AuthType | null = null;
   const defaultAuthTypeEnv = process.env['GEMINI_DEFAULT_AUTH_TYPE'];
-  if (
-    defaultAuthTypeEnv &&
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    Object.values(AuthType).includes(defaultAuthTypeEnv as AuthType)
-  ) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    defaultAuthType = defaultAuthTypeEnv as AuthType;
+  function isAuthType(value: string): value is AuthType {
+    return (Object.values(AuthType) as string[]).includes(value);
+  }
+  if (defaultAuthTypeEnv && isAuthType(defaultAuthTypeEnv)) {
+    defaultAuthType = defaultAuthTypeEnv;
   }
 
   let initialAuthIndex = items.findIndex((item) => {
