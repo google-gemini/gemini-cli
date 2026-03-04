@@ -6,7 +6,11 @@
 
 // File for 'gemini mcp list' command
 import type { CommandModule } from 'yargs';
-import { type MergedSettings, loadSettings } from '../../config/settings.js';
+import type {
+  LoadedSettings,
+  type MergedSettings,
+  loadSettings,
+} from '../../config/settings.js';
 import type { MCPServerConfig } from '@google/gemini-cli-core';
 import {
   MCPServerStatus,
@@ -65,9 +69,8 @@ export async function getMcpServersFromConfig(
 async function testMCPConnection(
   serverName: string,
   config: MCPServerConfig,
+  settings: LoadedSettings,
 ): Promise<MCPServerStatus> {
-  const settings = loadSettings();
-
   // SECURITY: Only test connection if workspace is trusted or if it's a remote server.
   // stdio servers execute local commands and must never run in untrusted workspaces.
   const isStdio = !!config.command;
@@ -139,8 +142,8 @@ async function testMCPConnection(
 async function getServerStatus(
   serverName: string,
   server: MCPServerConfig,
+  settings: LoadedSettings,
 ): Promise<MCPServerStatus> {
-  const settings = loadSettings();
   const mcpEnablementManager = McpServerEnablementManager.getInstance();
   const loadResult = await canLoadServer(serverName, {
     adminMcpEnabled: settings.merged.admin?.mcp?.enabled ?? true,
@@ -161,13 +164,14 @@ async function getServerStatus(
   }
 
   // Test all server types by attempting actual connection
-  return testMCPConnection(serverName, server);
+  return testMCPConnection(serverName, server, settings);
 }
 
 export async function listMcpServers(settings?: MergedSettings): Promise<void> {
   const { mcpServers, blockedServerNames } =
     await getMcpServersFromConfig(settings);
   const serverNames = Object.keys(mcpServers);
+  const loadedSettings = loadSettings();
 
   if (blockedServerNames.length > 0) {
     const message = getAdminBlockedMcpServersMessage(
@@ -189,7 +193,7 @@ export async function listMcpServers(settings?: MergedSettings): Promise<void> {
   for (const serverName of serverNames) {
     const server = mcpServers[serverName];
 
-    const status = await getServerStatus(serverName, server);
+    const status = await getServerStatus(serverName, server, loadedSettings);
 
     let statusIndicator = '';
     let statusText = '';
