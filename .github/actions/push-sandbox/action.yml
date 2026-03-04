@@ -81,7 +81,7 @@ runs:
         STEPS_IMAGE_TAG_OUTPUTS_FINAL_TAG: '${{ steps.image_tag.outputs.FINAL_TAG }}'
       run: |-
         npm run build:sandbox -- \
-          --image google/gemini-cli-sandbox:${STEPS_IMAGE_TAG_OUTPUTS_FINAL_TAG} \
+          --image "google/gemini-cli-sandbox:${STEPS_IMAGE_TAG_OUTPUTS_FINAL_TAG}" \
           --output-file final_image_uri.txt
         echo "uri=$(cat final_image_uri.txt)" >> $GITHUB_OUTPUT
     - name: 'verify'
@@ -102,7 +102,7 @@ runs:
         STEPS_IMAGE_TAG_OUTPUTS_FINAL_TAG: '${{ steps.image_tag.outputs.FINAL_TAG }}'
       run: |-
         npm run build:sandbox -- \
-          --image google/gemini-cli-sandbox:${STEPS_IMAGE_TAG_OUTPUTS_FINAL_TAG}
+          --image "google/gemini-cli-sandbox:${STEPS_IMAGE_TAG_OUTPUTS_FINAL_TAG}"
     - name: 'Create issue on failure'
       if: |-
         ${{ failure() }}
