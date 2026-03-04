@@ -7,17 +7,18 @@
 // DISCLAIMER: This is a copied version of https://github.com/googleapis/js-genai/blob/main/src/chats.ts with the intention of working around a key bug
 // where function responses are not treated as "valid" responses: https://b.corp.google.com/issues/420354090
 
-import type {
-  GenerateContentResponse,
-  Content,
-  Part,
-  Tool,
-  PartListUnion,
-  GenerateContentConfig,
-  GenerateContentParameters,
+import {
+  createUserContent,
+  FinishReason,
+  type GenerateContentResponse,
+  type Content,
+  type Part,
+  type Tool,
+  type PartListUnion,
+  type GenerateContentConfig,
+  type GenerateContentParameters,
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
-import { createUserContent, FinishReason } from '@google/genai';
 import { retryWithBackoff, isRetryableError } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import type { Config } from '../config/config.js';
@@ -40,6 +41,7 @@ import {
 import {
   ContentRetryEvent,
   ContentRetryFailureEvent,
+  type LlmRole,
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
@@ -51,7 +53,6 @@ import {
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
-import type { LlmRole } from '../telemetry/types.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -189,11 +190,16 @@ export class InvalidStreamError extends Error {
   readonly type:
     | 'NO_FINISH_REASON'
     | 'NO_RESPONSE_TEXT'
-    | 'MALFORMED_FUNCTION_CALL';
+    | 'MALFORMED_FUNCTION_CALL'
+    | 'UNEXPECTED_TOOL_CALL';
 
   constructor(
     message: string,
-    type: 'NO_FINISH_REASON' | 'NO_RESPONSE_TEXT' | 'MALFORMED_FUNCTION_CALL',
+    type:
+      | 'NO_FINISH_REASON'
+      | 'NO_RESPONSE_TEXT'
+      | 'MALFORMED_FUNCTION_CALL'
+      | 'UNEXPECTED_TOOL_CALL',
   ) {
     super(message);
     this.name = 'InvalidStreamError';
@@ -933,6 +939,12 @@ export class GeminiChat {
         throw new InvalidStreamError(
           'Model stream ended with malformed function call.',
           'MALFORMED_FUNCTION_CALL',
+        );
+      }
+      if (finishReason === FinishReason.UNEXPECTED_TOOL_CALL) {
+        throw new InvalidStreamError(
+          'Model stream ended with unexpected tool call.',
+          'UNEXPECTED_TOOL_CALL',
         );
       }
       if (!responseText) {
