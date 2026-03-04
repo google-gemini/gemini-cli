@@ -514,15 +514,7 @@ export class LoopDetectionService {
       history.shift();
     }
 
-    return history.map((content) => ({
-      role: content.role,
-      parts: (content.parts || []).map((part) => {
-        if (part.text && part.text.length > 500) {
-          return { text: part.text.substring(0, 500) + '... [TRUNCATED]' };
-        }
-        return part;
-      }),
-    }));
+    return history;
   }
 
   private async checkForLoopWithLLM(
