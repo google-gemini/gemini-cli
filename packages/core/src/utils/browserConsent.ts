@@ -86,6 +86,7 @@ async function markConsentAsAcknowledged(
       `Browser privacy consent acknowledged at ${new Date().toISOString()}\n`,
     );
   } catch {
+    // Best-effort: if we can't persist, the dialog will appear again next time.
     void 0;
   }
 }
