@@ -14,7 +14,9 @@ import {
   coreEvents,
   processSingleFileContent,
   type ProcessedFileReadResult,
+  readFileWithEncoding,
 } from '@google/gemini-cli-core';
+import { copyToClipboard } from '../utils/commandUtils.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -25,6 +27,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       emitFeedback: vi.fn(),
     },
     processSingleFileContent: vi.fn(),
+    readFileWithEncoding: vi.fn(),
     partToString: vi.fn((val) => val),
   };
 });
@@ -35,8 +38,13 @@ vi.mock('node:path', async (importOriginal) => {
     ...actual,
     default: { ...actual },
     join: vi.fn((...args) => args.join('/')),
+    basename: vi.fn((p) => p.split('/').pop()),
   };
 });
+
+vi.mock('../utils/commandUtils.js', () => ({
+  copyToClipboard: vi.fn(),
+}));
 
 describe('planCommand', () => {
   let mockContext: CommandContext;
@@ -113,6 +121,48 @@ describe('planCommand', () => {
     expect(mockContext.ui.addItem).toHaveBeenCalledWith({
       type: MessageType.GEMINI,
       text: '# Approved Plan Content',
+    });
+  });
+
+  describe('copy subcommand', () => {
+    it('should copy the approved plan to clipboard', async () => {
+      const mockPlanPath = '/mock/plans/dir/approved-plan.md';
+      vi.mocked(
+        mockContext.services.config!.getApprovedPlanPath,
+      ).mockReturnValue(mockPlanPath);
+      vi.mocked(readFileWithEncoding).mockResolvedValue('# Plan Content');
+
+      const copySubCommand = planCommand.subCommands?.find(
+        (sc) => sc.name === 'copy',
+      );
+      if (!copySubCommand?.action) throw new Error('Copy action missing');
+
+      await copySubCommand.action(mockContext, '');
+
+      expect(readFileWithEncoding).toHaveBeenCalledWith(mockPlanPath);
+      expect(copyToClipboard).toHaveBeenCalledWith('# Plan Content');
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        'Plan copied to clipboard (approved-plan.md).',
+      );
+    });
+
+    it('should warn if no approved plan is found', async () => {
+      vi.mocked(
+        mockContext.services.config!.getApprovedPlanPath,
+      ).mockReturnValue(undefined);
+
+      const copySubCommand = planCommand.subCommands?.find(
+        (sc) => sc.name === 'copy',
+      );
+      if (!copySubCommand?.action) throw new Error('Copy action missing');
+
+      await copySubCommand.action(mockContext, '');
+
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        'No approved plan found to copy.',
+      );
     });
   });
 });
