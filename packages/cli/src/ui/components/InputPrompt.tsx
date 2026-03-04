@@ -1621,18 +1621,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   (r:){' '}
                 </Text>
               ) : (
-                '!'
+                '! '
               )
             ) : commandSearchActive ? (
               <Text color={theme.text.accent}>(r:) </Text>
             ) : showYoloStyling ? (
-              '*'
+              '* '
             ) : voiceState.isRecording ? (
               '🎤'
             ) : voiceState.isTranscribing ? (
-              <Spinner type="dots" />
+              <>
+                <Spinner type="dots" />
+                {' '}
+              </>
             ) : (
-              '>'
+              // Use two spaces for single-width icons to match double-width emoji
+              // and prevent layout shift when toggling voice.
+              '> '
             )}{' '}
           </Text>
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
