@@ -29,6 +29,9 @@ vi.mock('../semantic-colors.js', () => ({
     status: {
       warning: 'mock-warning-color',
     },
+    ui: {
+      focus: 'mock-focus-color',
+    },
   },
 }));
 
