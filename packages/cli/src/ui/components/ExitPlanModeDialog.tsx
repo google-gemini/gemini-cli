@@ -27,7 +27,7 @@ import { formatCommand } from '../utils/keybindingUtils.js';
 
 export interface ExitPlanModeDialogProps {
   planPath: string;
-  onApprove: (approvalMode: ApprovalMode) => void;
+  onApprove: (approvalMode: ApprovalMode, clearConversation?: boolean) => void;
   onFeedback: (feedback: string) => void;
   onCancel: () => void;
   getPreferredEditor: () => EditorType | undefined;
@@ -50,7 +50,9 @@ interface PlanContentState {
 
 enum ApprovalOption {
   Auto = 'Yes, automatically accept edits',
+  AutoClear = 'Yes, automatically accept edits & clear conversation',
   Manual = 'Yes, manually accept edits',
+  ManualClear = 'Yes, manually accept edits & clear conversation',
 }
 
 /**
@@ -240,9 +242,19 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
                   'Approves plan and allows tools to run automatically',
               },
               {
+                label: ApprovalOption.AutoClear,
+                description:
+                  'Approves plan, runs automatically, and clears prior conversation context',
+              },
+              {
                 label: ApprovalOption.Manual,
                 description:
                   'Approves plan but requires confirmation for each tool',
+              },
+              {
+                label: ApprovalOption.ManualClear,
+                description:
+                  'Approves plan, requires confirmation, and clears prior conversation context',
               },
             ],
             placeholder: 'Type your feedback...',
@@ -251,10 +263,19 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
         ]}
         onSubmit={(answers) => {
           const answer = answers['0'];
-          if (answer === ApprovalOption.Auto) {
-            onApprove(ApprovalMode.AUTO_EDIT);
-          } else if (answer === ApprovalOption.Manual) {
-            onApprove(ApprovalMode.DEFAULT);
+          const clearConversation =
+            answer === ApprovalOption.AutoClear ||
+            answer === ApprovalOption.ManualClear;
+          if (
+            answer === ApprovalOption.Auto ||
+            answer === ApprovalOption.AutoClear
+          ) {
+            onApprove(ApprovalMode.AUTO_EDIT, clearConversation);
+          } else if (
+            answer === ApprovalOption.Manual ||
+            answer === ApprovalOption.ManualClear
+          ) {
+            onApprove(ApprovalMode.DEFAULT, clearConversation);
           } else if (answer) {
             onFeedback(answer);
           }

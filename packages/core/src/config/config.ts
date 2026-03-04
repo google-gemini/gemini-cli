@@ -1960,6 +1960,12 @@ export class Config implements McpContext {
     this.geminiMdFilePaths = paths;
   }
 
+  private planModeHistoryStartIndex = 0;
+
+  getPlanModeHistoryStartIndex(): number {
+    return this.planModeHistoryStartIndex;
+  }
+
   getApprovalMode(): ApprovalMode {
     return this.policyEngine.getApprovalMode();
   }
@@ -2016,6 +2022,14 @@ export class Config implements McpContext {
     }
 
     this.policyEngine.setApprovalMode(mode);
+
+    if (mode === ApprovalMode.PLAN && currentMode !== ApprovalMode.PLAN) {
+      this.planModeHistoryStartIndex = this.geminiClient?.isInitialized()
+        ? this.geminiClient.getHistory().length
+        : 0;
+    }
+
+    coreEvents.emitApprovalModeChanged(mode);
 
     const isPlanModeTransition =
       currentMode !== mode &&

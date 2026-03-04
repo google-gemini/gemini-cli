@@ -207,7 +207,7 @@ Implement a comprehensive authentication system with multiple providers.
         writeKey(stdin, '\r');
 
         await waitFor(() => {
-          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.AUTO_EDIT);
+          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.AUTO_EDIT, false);
         });
       });
 
@@ -223,10 +223,11 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\r');
 
         await waitFor(() => {
-          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.DEFAULT);
+          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.DEFAULT, false);
         });
       });
 
@@ -349,11 +350,11 @@ Implement a comprehensive authentication system with multiple providers.
           expect(lastFrame()).toContain('Add user authentication');
         });
 
-        // Press '2' to select second option directly
-        writeKey(stdin, '2');
+        // Press '3' to select third option directly
+        writeKey(stdin, '3');
 
         await waitFor(() => {
-          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.DEFAULT);
+          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.DEFAULT, false);
         });
       });
 
@@ -369,6 +370,8 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         // Navigate to feedback option and start typing
+        writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\r'); // Select to focus input
@@ -493,7 +496,9 @@ Implement a comprehensive authentication system with multiple providers.
           expect(lastFrame()).toContain('Add user authentication');
         });
 
-        // Navigate to feedback option
+        // Focus feedback option
+        writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
 
@@ -523,6 +528,8 @@ Implement a comprehensive authentication system with multiple providers.
         // Navigate to feedback option and start typing
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\x1b[B'); // Down arrow
 
         // Type some feedback
         for (const char of 'test') {
@@ -531,12 +538,13 @@ Implement a comprehensive authentication system with multiple providers.
 
         // Now use up arrow to navigate back to a different option
         writeKey(stdin, '\x1b[A'); // Up arrow
+        writeKey(stdin, '\x1b[A'); // Up arrow
 
-        // Press Enter to select the second option (manually accept edits)
+        // Press Enter to select the manually accept edits option
         writeKey(stdin, '\r');
 
         await waitFor(() => {
-          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.DEFAULT);
+          expect(onApprove).toHaveBeenCalledWith(ApprovalMode.DEFAULT, false);
         });
         expect(onFeedback).not.toHaveBeenCalled();
       });

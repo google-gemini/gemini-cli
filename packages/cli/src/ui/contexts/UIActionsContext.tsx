@@ -57,6 +57,7 @@ export interface UIActions {
   setConstrainHeight: (value: boolean) => void;
   onEscapePromptChange: (show: boolean) => void;
   refreshStatic: () => void;
+  handleClearPlanContext: () => void;
   handleFinalSubmit: (value: string) => Promise<void>;
   handleClearScreen: () => void;
   handleProQuotaChoice: (

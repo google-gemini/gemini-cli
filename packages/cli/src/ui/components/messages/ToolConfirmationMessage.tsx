@@ -29,6 +29,7 @@ import {
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
+import { useUIActions } from '../../contexts/UIActionsContext.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
 import { formatCommand } from '../../utils/keybindingUtils.js';
 import {
@@ -68,6 +69,7 @@ export const ToolConfirmationMessage: React.FC<
   terminalWidth,
 }) => {
   const { confirm, isDiffingEnabled } = useToolActions();
+  const { handleClearPlanContext } = useUIActions();
   const [mcpDetailsExpansionState, setMcpDetailsExpansionState] = useState<{
     callId: string;
     expanded: boolean;
@@ -428,10 +430,14 @@ export const ToolConfirmationMessage: React.FC<
         <ExitPlanModeDialog
           planPath={confirmationDetails.planPath}
           getPreferredEditor={getPreferredEditor}
-          onApprove={(approvalMode) => {
+          onApprove={(approvalMode, clearConversation) => {
+            if (clearConversation) {
+              handleClearPlanContext();
+            }
             handleConfirm(ToolConfirmationOutcome.ProceedOnce, {
               approved: true,
               approvalMode,
+              clearConversation,
             });
           }}
           onFeedback={(feedback) => {
@@ -623,17 +629,18 @@ export const ToolConfirmationMessage: React.FC<
 
     return { question, bodyContent, options, securityWarnings };
   }, [
-    confirmationDetails,
     getOptions,
-    availableBodyContentHeight,
-    terminalWidth,
-    handleConfirm,
     deceptiveUrlWarningText,
-    isMcpToolDetailsExpanded,
-    hasMcpToolDetails,
-    mcpToolDetailsText,
-    expandDetailsHintKey,
+    confirmationDetails,
+    terminalWidth,
+    availableBodyContentHeight,
+    handleConfirm,
     getPreferredEditor,
+    handleClearPlanContext,
+    hasMcpToolDetails,
+    isMcpToolDetailsExpanded,
+    expandDetailsHintKey,
+    mcpToolDetailsText,
   ]);
 
   const bodyOverflowDirection: 'top' | 'bottom' =

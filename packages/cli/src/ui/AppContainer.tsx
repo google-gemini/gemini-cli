@@ -50,7 +50,7 @@ import {
   type GeminiUserTier,
   type UserFeedbackPayload,
   type AgentDefinition,
-  type ApprovalMode,
+  ApprovalMode,
   IdeClient,
   ideContextStore,
   getErrorMessage,
@@ -398,6 +398,20 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
+  const [planModeUIHistoryStartIndex, setPlanModeUIHistoryStartIndex] =
+    useState<number | null>(null);
+
+  useEffect(() => {
+    const handleApprovalModeChanged = ({ mode }: { mode: ApprovalMode }) => {
+      if (mode === ApprovalMode.PLAN) {
+        setPlanModeUIHistoryStartIndex(historyManager.history.length);
+      }
+    };
+    coreEvents.on(CoreEvent.ApprovalModeChanged, handleApprovalModeChanged);
+    return () => {
+      coreEvents.off(CoreEvent.ApprovalModeChanged, handleApprovalModeChanged);
+    };
+  }, [historyManager.history.length]);
 
   const logger = useLogger(config.storage);
   const { inputHistory, addInput, initializeFromLogger } =
@@ -1345,6 +1359,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
     reset,
     triggerExpandHint,
   ]);
+
+  const handleClearPlanContext = useCallback(() => {
+    if (planModeUIHistoryStartIndex !== null) {
+      const newHistory = historyManager.history.slice(
+        0,
+        planModeUIHistoryStartIndex,
+      );
+      historyManager.loadHistory(newHistory);
+      refreshStatic();
+    }
+  }, [planModeUIHistoryStartIndex, historyManager, refreshStatic]);
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
@@ -2456,6 +2481,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setConstrainHeight,
       onEscapePromptChange: handleEscapePromptChange,
       refreshStatic,
+      handleClearPlanContext,
       handleFinalSubmit,
       handleClearScreen,
       handleProQuotaChoice,
@@ -2548,6 +2574,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setConstrainHeight,
       handleEscapePromptChange,
       refreshStatic,
+      handleClearPlanContext,
       handleFinalSubmit,
       handleClearScreen,
       handleProQuotaChoice,

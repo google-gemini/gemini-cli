@@ -214,6 +214,34 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       this.config.setApprovalMode(newMode);
       this.config.setApprovedPlanPath(resolvedPlanPath);
 
+      if (payload.clearConversation) {
+        const geminiClient = this.config.getGeminiClient();
+        if (geminiClient) {
+          const history = geminiClient.getHistory();
+          const startIndex = this.config.getPlanModeHistoryStartIndex();
+
+          // Find the first user message at or after the start index.
+          // This represents the beginning of the current planning phase.
+          let planningUserIndex = -1;
+          for (let i = startIndex; i < history.length - 1; i++) {
+            if (history[i].role === 'user') {
+              planningUserIndex = i;
+              break;
+            }
+          }
+
+          if (planningUserIndex !== -1) {
+            const lastModelMessage = history[history.length - 1];
+            // Keep everything before the plan, plus the initial plan request turn.
+            const newHistory = [
+              ...history.slice(0, planningUserIndex + 1),
+              lastModelMessage,
+            ];
+            geminiClient.setHistory(newHistory);
+          }
+        }
+      }
+
       logPlanExecution(this.config, new PlanExecutionEvent(newMode));
 
       const exitMessage = getPlanModeExitMessage(newMode);
