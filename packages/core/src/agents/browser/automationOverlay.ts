@@ -64,7 +64,7 @@ const OVERLAY_INJECTION_SCRIPT = `
     animation: __gemini_pulse 2s ease-in-out infinite;
   \`;
   
-  document.body.appendChild(overlay);
+  document.documentElement.appendChild(overlay);
   
   return 'Automation overlay injected successfully';
 })();
