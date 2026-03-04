@@ -1050,9 +1050,9 @@ describe('useGeminiStream', () => {
     );
     expect(noteIndex).toBeGreaterThanOrEqual(0);
     expect(stopIndex).toBeGreaterThanOrEqual(0);
-    expect(failureHintIndex).toBeGreaterThanOrEqual(0);
+    // The failure hint should NOT be present if the suppressed error note was shown
+    expect(failureHintIndex).toBe(-1);
     expect(noteIndex).toBeLessThan(stopIndex);
-    expect(stopIndex).toBeLessThan(failureHintIndex);
   });
 
   it('should group multiple cancelled tool call responses into a single history entry', async () => {
