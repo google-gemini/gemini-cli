@@ -31,6 +31,7 @@ export function sanitizeAdminSettings(
 
   if (sanitized.mcpSetting?.mcpConfigJson) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const parsed = JSON.parse(sanitized.mcpSetting.mcpConfigJson);
       const validationResult = McpConfigDefinitionSchema.safeParse(parsed);
 

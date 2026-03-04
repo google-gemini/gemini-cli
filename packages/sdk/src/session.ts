@@ -210,6 +210,7 @@ export class GeminiCliSession {
           const toolCall = event.value;
           let args = toolCall.args;
           if (typeof args === 'string') {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             args = JSON.parse(args);
           }
           toolCallsToSchedule.push({
@@ -238,6 +239,7 @@ export class GeminiCliSession {
       };
 
       const originalRegistry = this.config.getToolRegistry();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const scopedRegistry: ToolRegistry = Object.create(originalRegistry);
       scopedRegistry.getTool = (name: string) => {
         const tool = originalRegistry.getTool(name);

@@ -102,6 +102,8 @@ export interface ConversationRecord {
   summary?: string;
   /** Workspace directories added during the session via /dir add */
   directories?: string[];
+  /** The kind of conversation (main agent or subagent) */
+  kind?: 'main' | 'subagent';
 }
 
 /**
@@ -128,6 +130,7 @@ export class ChatRecordingService {
   private cachedLastConvData: string | null = null;
   private sessionId: string;
   private projectHash: string;
+  private kind?: 'main' | 'subagent';
   private queuedThoughts: Array<ThoughtSummary & { timestamp: string }> = [];
   private queuedTokens: TokensSummary | null = null;
   private config: Config;
@@ -141,13 +144,21 @@ export class ChatRecordingService {
   /**
    * Initializes the chat recording service: creates a new conversation file and associates it with
    * this service instance, or resumes from an existing session if resumedSessionData is provided.
+   *
+   * @param resumedSessionData Data from a previous session to resume from.
+   * @param kind The kind of conversation (main or subagent).
    */
-  initialize(resumedSessionData?: ResumedSessionData): void {
+  initialize(
+    resumedSessionData?: ResumedSessionData,
+    kind?: 'main' | 'subagent',
+  ): void {
     try {
+      this.kind = kind;
       if (resumedSessionData) {
         // Resume from existing session
         this.conversationFile = resumedSessionData.filePath;
         this.sessionId = resumedSessionData.conversation.sessionId;
+        this.kind = resumedSessionData.conversation.kind;
 
         // Update the session ID in the existing file
         this.updateConversation((conversation) => {
@@ -180,6 +191,7 @@ export class ChatRecordingService {
           startTime: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),
           messages: [],
+          kind: this.kind,
         });
       }
 
@@ -419,6 +431,7 @@ export class ChatRecordingService {
   private readConversation(): ConversationRecord {
     try {
       this.cachedLastConvData = fs.readFileSync(this.conversationFile!, 'utf8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return JSON.parse(this.cachedLastConvData);
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -434,6 +447,7 @@ export class ChatRecordingService {
         startTime: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
         messages: [],
+        kind: this.kind,
       };
     }
   }
@@ -555,6 +569,13 @@ export class ChatRecordingService {
         fs.unlinkSync(sessionPath);
       }
 
+      // Cleanup Activity logs in the project logs directory
+      const logsDir = path.join(tempDir, 'logs');
+      const logPath = path.join(logsDir, `session-${sessionId}.jsonl`);
+      if (fs.existsSync(logPath)) {
+        fs.unlinkSync(logPath);
+      }
+
       // Cleanup tool outputs for this session
       const safeSessionId = sanitizeFilenamePart(sessionId);
       const toolOutputDir = path.join(
@@ -570,6 +591,13 @@ export class ChatRecordingService {
         toolOutputDir.startsWith(toolOutputsBase)
       ) {
         fs.rmSync(toolOutputDir, { recursive: true, force: true });
+      }
+
+      // ALSO cleanup the session-specific directory (contains plans, tasks, etc.)
+      const sessionDir = path.join(tempDir, safeSessionId);
+      // Robustness: Ensure the path is strictly within the temp root
+      if (fs.existsSync(sessionDir) && sessionDir.startsWith(tempDir)) {
+        fs.rmSync(sessionDir, { recursive: true, force: true });
       }
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);

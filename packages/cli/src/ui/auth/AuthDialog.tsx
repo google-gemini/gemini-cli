@@ -193,7 +193,7 @@ export function AuthDialog({
     return (
       <Box
         borderStyle="round"
-        borderColor={theme.border.focused}
+        borderColor={theme.ui.focus}
         flexDirection="row"
         padding={1}
         width="100%"
@@ -209,7 +209,7 @@ export function AuthDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={theme.border.focused}
+      borderColor={theme.ui.focus}
       flexDirection="row"
       padding={1}
       width="100%"
@@ -250,9 +250,7 @@ export function AuthDialog({
         </Box>
         <Box marginTop={1}>
           <Text color={theme.text.link}>
-            {
-              'https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md'
-            }
+            {'https://geminicli.com/docs/resources/tos-privacy/'}
           </Text>
         </Box>
       </Box>

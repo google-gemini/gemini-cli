@@ -4,27 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  GenerateContentConfig,
-  PartListUnion,
-  Content,
-  Tool,
-  GenerateContentResponse,
+import {
+  createUserContent,
+  type GenerateContentConfig,
+  type PartListUnion,
+  type Content,
+  type Tool,
+  type GenerateContentResponse,
 } from '@google/genai';
-import { createUserContent } from '@google/genai';
+import { partListUnionToString } from './geminiRequest.js';
 import {
   getDirectoryContextString,
   getInitialChatHistory,
 } from '../utils/environmentContext.js';
-import type { ServerGeminiStreamEvent, ChatCompressionInfo } from './turn.js';
-import { CompressionStatus } from './turn.js';
-import { Turn, GeminiEventType } from './turn.js';
+import {
+  CompressionStatus,
+  Turn,
+  GeminiEventType,
+  type ServerGeminiStreamEvent,
+  type ChatCompressionInfo,
+} from './turn.js';
 import type { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
-import { retryWithBackoff } from '../utils/retry.js';
+import {
+  retryWithBackoff,
+  type RetryAvailabilityContext,
+} from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
@@ -47,6 +55,7 @@ import type {
 import {
   ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
+  type LlmRole,
 } from '../telemetry/types.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import type { IdeContext, File } from '../ide/types.js';
@@ -60,11 +69,9 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
-import { resolveModel } from '../config/models.js';
-import type { RetryAvailabilityContext } from '../utils/retry.js';
+import { resolveModel, isGemini2Model } from '../config/models.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
-import type { LlmRole } from '../telemetry/types.js';
 
 const MAX_TURNS = 100;
 
@@ -542,7 +549,10 @@ export class GeminiClient {
 
     // Availability logic: The configured model is the source of truth,
     // including any permanent fallbacks (config.setModel) or manual overrides.
-    return resolveModel(this.config.getActiveModel());
+    return resolveModel(
+      this.config.getActiveModel(),
+      this.config.getGemini31LaunchedSync?.() ?? false,
+    );
   }
 
   private async *processTurn(
@@ -722,7 +732,10 @@ export class GeminiClient {
     }
 
     if (isInvalidStream) {
-      if (this.config.getContinueOnFailedApiCall()) {
+      if (
+        this.config.getContinueOnFailedApiCall() &&
+        isGemini2Model(modelToUse)
+      ) {
         if (isInvalidStreamRetry) {
           logContentRetryFailure(
             this.config,
@@ -800,7 +813,7 @@ export class GeminiClient {
     const messageBus = this.config.getMessageBus();
 
     if (this.lastPromptId !== prompt_id) {
-      this.loopDetector.reset(prompt_id);
+      this.loopDetector.reset(prompt_id, partListUnionToString(request));
       this.hookStateMap.delete(this.lastPromptId);
       this.lastPromptId = prompt_id;
       this.currentSequenceModel = null;
@@ -955,17 +968,21 @@ export class GeminiClient {
           () => currentAttemptModel,
         );
 
+      let initialActiveModel = this.config.getActiveModel();
+
       const apiCall = () => {
         // AvailabilityService
         const active = this.config.getActiveModel();
-        if (active !== currentAttemptModel) {
-          currentAttemptModel = active;
+        if (active !== initialActiveModel) {
+          initialActiveModel = active;
           // Re-resolve config if model changed
-          const newConfig = this.config.modelConfigService.getResolvedConfig({
-            ...modelConfigKey,
-            model: currentAttemptModel,
-          });
-          currentAttemptGenerateContentConfig = newConfig.generateContentConfig;
+          const { model: resolvedModel, generateContentConfig } =
+            this.config.modelConfigService.getResolvedConfig({
+              ...modelConfigKey,
+              model: active,
+            });
+          currentAttemptModel = resolvedModel;
+          currentAttemptGenerateContentConfig = generateContentConfig;
         }
 
         const requestConfig: GenerateContentConfig = {

@@ -34,14 +34,13 @@ export interface GoogleCredentialsAuthConfig extends BaseAuthConfig {
   scopes?: string[];
 }
 
-/** Client config corresponding to APIKeySecurityScheme. */
+/** Client config corresponding to APIKeySecurityScheme. Only header location is supported. */
+// TODO: Add 'query' and 'cookie' location support if needed.
 export interface ApiKeyAuthConfig extends BaseAuthConfig {
   type: 'apiKey';
   /** The secret. Supports $ENV_VAR, !command, or literal. */
   key: string;
-  /** Defaults to server's SecurityScheme.in value. */
-  location?: 'header' | 'query' | 'cookie';
-  /** Defaults to server's SecurityScheme.name value. */
+  /** Header name. @default 'X-API-Key' */
   name?: string;
 }
 
@@ -60,6 +59,12 @@ export type HttpAuthConfig = BaseAuthConfig & {
         username: string;
         /** For Basic. Supports $ENV_VAR, !command, or literal. */
         password: string;
+      }
+    | {
+        /** Any IANA-registered scheme (e.g., "Digest", "HOBA", "Custom"). */
+        scheme: string;
+        /** Raw value to be sent as "Authorization: <scheme> <value>". Supports $ENV_VAR, !command, or literal. */
+        value: string;
       }
   );
 

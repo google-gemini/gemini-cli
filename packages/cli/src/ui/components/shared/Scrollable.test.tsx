@@ -6,20 +6,11 @@
 
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { Scrollable } from './Scrollable.js';
-import { Text } from 'ink';
+import { Text, Box } from 'ink';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as ScrollProviderModule from '../../contexts/ScrollProvider.js';
 import { act } from 'react';
-
-vi.mock('ink', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('ink')>();
-  return {
-    ...actual,
-    getInnerHeight: vi.fn(() => 5),
-    getScrollHeight: vi.fn(() => 10),
-    getBoundingBox: vi.fn(() => ({ x: 0, y: 0, width: 10, height: 5 })),
-  };
-});
+import { waitFor } from '../../../test-utils/async.js';
 
 vi.mock('../../hooks/useAnimatedScrollbar.js', () => ({
   useAnimatedScrollbar: (
@@ -108,22 +99,48 @@ describe('<Scrollable />', () => {
       throw new Error('capturedEntry is undefined');
     }
 
-    // Initial state (starts at bottom because of auto-scroll logic)
-    expect(capturedEntry.getScrollState().scrollTop).toBe(5);
+    // Initial state (starts at top by default)
+    expect(capturedEntry.getScrollState().scrollTop).toBe(0);
+
+    // Initial state with scrollToBottom={true}
+    unmount();
+    const { waitUntilReady: waitUntilReady2, unmount: unmount2 } =
+      renderWithProviders(
+        <Scrollable hasFocus={true} height={5} scrollToBottom={true}>
+          <Text>Line 1</Text>
+          <Text>Line 2</Text>
+          <Text>Line 3</Text>
+          <Text>Line 4</Text>
+          <Text>Line 5</Text>
+          <Text>Line 6</Text>
+          <Text>Line 7</Text>
+          <Text>Line 8</Text>
+          <Text>Line 9</Text>
+          <Text>Line 10</Text>
+        </Scrollable>,
+      );
+    await waitUntilReady2();
+    await waitFor(() => {
+      expect(capturedEntry?.getScrollState().scrollTop).toBe(5);
+    });
 
     // Call scrollBy multiple times (upwards) in the same tick
     await act(async () => {
-      capturedEntry!.scrollBy(-1);
-      capturedEntry!.scrollBy(-1);
+      capturedEntry?.scrollBy(-1);
+      capturedEntry?.scrollBy(-1);
     });
-    // Should have moved up by 2
-    expect(capturedEntry.getScrollState().scrollTop).toBe(3);
+    // Should have moved up by 2 (5 -> 3)
+    await waitFor(() => {
+      expect(capturedEntry?.getScrollState().scrollTop).toBe(3);
+    });
 
     await act(async () => {
-      capturedEntry!.scrollBy(-2);
+      capturedEntry?.scrollBy(-2);
     });
-    expect(capturedEntry.getScrollState().scrollTop).toBe(1);
-    unmount();
+    await waitFor(() => {
+      expect(capturedEntry?.getScrollState().scrollTop).toBe(1);
+    });
+    unmount2();
   });
 
   describe('keypress handling', () => {
@@ -171,10 +188,6 @@ describe('<Scrollable />', () => {
         keySequence,
         expectedScrollTop,
       }) => {
-        // Dynamically import ink to mock getScrollHeight
-        const ink = await import('ink');
-        vi.mocked(ink.getScrollHeight).mockReturnValue(scrollHeight);
-
         let capturedEntry: ScrollProviderModule.ScrollableEntry | undefined;
         vi.spyOn(ScrollProviderModule, 'useScrollable').mockImplementation(
           async (entry, isActive) => {
@@ -186,7 +199,9 @@ describe('<Scrollable />', () => {
 
         const { stdin, waitUntilReady, unmount } = renderWithProviders(
           <Scrollable hasFocus={true} height={5}>
-            <Text>Content</Text>
+            <Box height={scrollHeight}>
+              <Text>Content</Text>
+            </Box>
           </Scrollable>,
         );
         await waitUntilReady();

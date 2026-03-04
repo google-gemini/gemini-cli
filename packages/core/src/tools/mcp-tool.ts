@@ -5,29 +5,37 @@
  */
 
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import type {
-  ToolCallConfirmationDetails,
-  ToolInvocation,
-  ToolMcpConfirmationDetails,
-  ToolResult,
-} from './tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
   ToolConfirmationOutcome,
+  type ToolCallConfirmationDetails,
+  type ToolInvocation,
+  type ToolMcpConfirmationDetails,
+  type ToolResult,
   type PolicyUpdateOptions,
 } from './tools.js';
 import type { CallableTool, FunctionCall, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
-import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { McpContext } from './mcp-client.js';
 
 /**
  * The separator used to qualify MCP tool names with their server prefix.
  * e.g. "server_name__tool_name"
  */
 export const MCP_QUALIFIED_NAME_SEPARATOR = '__';
+
+/**
+ * Returns true if `name` matches the MCP qualified name format: "server__tool",
+ * i.e. exactly two non-empty parts separated by the MCP_QUALIFIED_NAME_SEPARATOR.
+ */
+export function isMcpToolName(name: string): boolean {
+  if (!name.includes(MCP_QUALIFIED_NAME_SEPARATOR)) return false;
+  const parts = name.split(MCP_QUALIFIED_NAME_SEPARATOR);
+  return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
+}
 
 type ToolParams = Record<string, unknown>;
 
@@ -79,18 +87,25 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     messageBus: MessageBus,
     readonly trust?: boolean,
     params: ToolParams = {},
-    private readonly cliConfig?: Config,
+    private readonly cliConfig?: McpContext,
+    private readonly toolDescription?: string,
+    private readonly toolParameterSchema?: unknown,
+    toolAnnotationsData?: Record<string, unknown>,
   ) {
     // Use composite format for policy checks: serverName__toolName
     // This enables server wildcards (e.g., "google-workspace__*")
-    // while still allowing specific tool rules
+    // while still allowing specific tool rules.
+    // We use the same sanitized names as the registry to ensure policy matches.
 
     super(
       params,
       messageBus,
-      `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${serverToolName}`,
+      generateValidName(
+        `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${serverToolName}`,
+      ),
       displayName,
-      serverName,
+      generateValidName(serverName),
+      toolAnnotationsData,
     );
   }
 
@@ -123,6 +138,9 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       serverName: this.serverName,
       toolName: this.serverToolName, // Display original tool name in confirmation
       toolDisplayName: this.displayName, // Display global registry name exposed to model and user
+      toolArgs: this.params,
+      toolDescription: this.toolDescription,
+      toolParameterSchema: this.toolParameterSchema,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
           DiscoveredMCPToolInvocation.allowlist.add(serverAllowListKey);
@@ -167,6 +185,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   }
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
+    this.cliConfig?.setUserInteractedWithMcp?.();
     const functionCalls: FunctionCall[] = [
       {
         name: this.serverToolName,
@@ -249,12 +268,13 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     readonly trust?: boolean,
     isReadOnly?: boolean,
     nameOverride?: string,
-    private readonly cliConfig?: Config,
+    private readonly cliConfig?: McpContext,
     override readonly extensionName?: string,
     override readonly extensionId?: string,
+    private readonly _toolAnnotations?: Record<string, unknown>,
   ) {
     super(
-      nameOverride ?? generateValidName(serverToolName),
+      generateValidName(nameOverride ?? serverToolName),
       `${serverToolName} (${serverName} MCP Server)`,
       description,
       Kind.Other,
@@ -277,12 +297,18 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     return super.isReadOnly;
   }
 
+  override get toolAnnotations(): Record<string, unknown> | undefined {
+    return this._toolAnnotations;
+  }
+
   getFullyQualifiedPrefix(): string {
     return `${this.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}`;
   }
 
   getFullyQualifiedName(): string {
-    return `${this.getFullyQualifiedPrefix()}${generateValidName(this.serverToolName)}`;
+    return generateValidName(
+      `${this.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${this.serverToolName}`,
+    );
   }
 
   asFullyQualifiedTool(): DiscoveredMCPTool {
@@ -299,6 +325,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.cliConfig,
       this.extensionName,
       this.extensionId,
+      this._toolAnnotations,
     );
   }
 
@@ -317,6 +344,9 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.trust,
       params,
       this.cliConfig,
+      this.description,
+      this.parameterSchema,
+      this._toolAnnotations,
     );
   }
 }
@@ -455,16 +485,29 @@ function getStringifiedResultForDisplay(rawResponse: Part[]): string {
   return displayParts.join('\n');
 }
 
+/**
+ * Maximum length for a function name in the Gemini API.
+ * @see https://docs.cloud.google.com/vertex-ai/generative-ai/docs/model-reference/function-calling#functiondeclaration
+ */
+const MAX_FUNCTION_NAME_LENGTH = 64;
+
 /** Visible for testing */
 export function generateValidName(name: string) {
   // Replace invalid characters (based on 400 error message from Gemini API) with underscores
-  let validToolname = name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+  let validToolname = name.replace(/[^a-zA-Z0-9_.:-]/g, '_');
 
-  // If longer than 63 characters, replace middle with '___'
-  // (Gemini API says max length 64, but actual limit seems to be 63)
-  if (validToolname.length > 63) {
-    validToolname =
-      validToolname.slice(0, 28) + '___' + validToolname.slice(-32);
+  // Ensure it starts with a letter or underscore
+  if (/^[^a-zA-Z_]/.test(validToolname)) {
+    validToolname = `_${validToolname}`;
   }
+
+  // If longer than the API limit, replace middle with '...'
+  // Note: We use 63 instead of 64 to be safe, as some environments have off-by-one behaviors.
+  const safeLimit = MAX_FUNCTION_NAME_LENGTH - 1;
+  if (validToolname.length > safeLimit) {
+    validToolname =
+      validToolname.slice(0, 30) + '...' + validToolname.slice(-30);
+  }
+
   return validToolname;
 }

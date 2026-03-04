@@ -45,7 +45,9 @@ export class KeychainTokenStorage
     try {
       // Try to import keytar without any timeout - let the OS handle it
       const moduleName = 'keytar';
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const module = await import(moduleName);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       this.keytarModule = module.default || module;
     } catch (_) {
       //Keytar is optional so we shouldn't raise an error of log anything.
