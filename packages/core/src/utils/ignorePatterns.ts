@@ -60,6 +60,10 @@ export const BINARY_FILE_PATTERNS: string[] = [
   '**/*.otf',
   '**/*.woff',
   '**/*.woff2',
+  '**/*.mp4',
+  '**/*.avi',
+  '**/*.mov',
+  '**/*.mkv',
 ];
 
 /**
@@ -76,13 +80,9 @@ export const MEDIA_FILE_PATTERNS: string[] = [
   '**/*.bmp',
   '**/*.svg',
   '**/*.mp3',
-  '**/*.mp4',
   '**/*.wav',
-  '**/*.avi',
-  '**/*.mov',
   '**/*.flac',
   '**/*.ogg',
-  '**/*.mkv',
 ];
 
 /**
