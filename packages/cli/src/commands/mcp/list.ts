@@ -6,12 +6,11 @@
 
 // File for 'gemini mcp list' command
 import type { CommandModule } from 'yargs';
-import type {
-  LoadedSettings,
+import {
   type MergedSettings,
   loadSettings,
+  type LoadedSettings,
 } from '../../config/settings.js';
-import type { MCPServerConfig } from '@google/gemini-cli-core';
 import {
   MCPServerStatus,
   createTransport,
@@ -19,6 +18,7 @@ import {
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
 } from '@google/gemini-cli-core';
+import type { MCPServerConfig } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import {

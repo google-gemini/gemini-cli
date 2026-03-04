@@ -46,6 +46,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       CONNECTED: 'CONNECTED',
       CONNECTING: 'CONNECTING',
       DISCONNECTED: 'DISCONNECTED',
+      BLOCKED: 'BLOCKED',
+      DISABLED: 'DISABLED',
     },
     Storage: Object.assign(
       vi.fn().mockImplementation((_cwd: string) => ({
