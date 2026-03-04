@@ -536,7 +536,11 @@ export async function loadAgentsFromDirectory(
       }
 
       // Security: reject symlinks pointing outside the agents directory
-      if (entry.isSymbolicLink() && !realPath.startsWith(resolvedDir)) {
+      const relative = path.relative(resolvedDir, realPath);
+      if (
+        entry.isSymbolicLink() &&
+        (relative.startsWith('..') || path.isAbsolute(relative))
+      ) {
         result.errors.push(
           new AgentLoadError(
             filePath,

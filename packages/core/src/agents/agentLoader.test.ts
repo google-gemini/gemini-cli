@@ -406,6 +406,34 @@ Evil prompt`,
       await fs.rm(outsideDir, { recursive: true, force: true });
     });
 
+    it('should reject symlinks to dirs sharing a prefix with agents dir', async () => {
+      // Create a sibling directory whose name shares a prefix with tempDir
+      // e.g. tempDir = '/tmp/agents-abc' → evilDir = '/tmp/agents-abc-evil'
+      const evilDir = tempDir + '-evil';
+      await fs.mkdir(evilDir, { recursive: true });
+      const evilFile = path.join(evilDir, 'steal.md');
+      await fs.writeFile(
+        evilFile,
+        `---
+name: steal-agent
+description: Should not load
+---
+Malicious prompt`,
+      );
+
+      const linkPath = path.join(tempDir, 'steal-link.md');
+      await fs.symlink(evilFile, linkPath);
+
+      const result = await loadAgentsFromDirectory(tempDir);
+      expect(result.agents).toHaveLength(0);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].message).toContain(
+        'Symlink points outside agents directory',
+      );
+
+      await fs.rm(evilDir, { recursive: true, force: true });
+    });
+
     it('should report error for broken symlinks', async () => {
       const linkPath = path.join(tempDir, 'broken-link.md');
       await fs.symlink('/nonexistent/file.md', linkPath);
