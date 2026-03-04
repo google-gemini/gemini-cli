@@ -6,7 +6,6 @@
 
 import {
   useRef,
-  forwardRef,
   useImperativeHandle,
   useCallback,
   useMemo,
@@ -43,14 +42,11 @@ interface ScrollableListProps<T> extends VirtualizedListProps<T> {
 
 export type ScrollableListRef<T> = VirtualizedListRef<T>;
 
-function ScrollableList<T>(
-  props: ScrollableListProps<T>,
-  ref: React.Ref<ScrollableListRef<T>>,
-) {
+function ScrollableList<T>(props: ScrollableListProps<T>) {
   const keyMatchers = useKeyMatchers();
   const { hasFocus, width, scrollbar = true, stableScrollback } = props;
   const virtualizedListRef = useRef<VirtualizedListRef<T>>(null);
-  const containerRef = useRef<DOMElement>(null);
+  const containerRef = useRef<DOMElement | null>(null);
 
   useImperativeHandle(
     ref,
@@ -238,8 +234,7 @@ function ScrollableList<T>(
 
   const scrollableEntry = useMemo(
     () => ({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      ref: containerRef as React.RefObject<DOMElement>,
+      ref: containerRef,
       getScrollState,
       scrollBy: scrollByWithAnimation,
       scrollTo: smoothScrollTo,
@@ -270,9 +265,4 @@ function ScrollableList<T>(
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-const ScrollableListWithForwardRef = forwardRef(ScrollableList) as <T>(
-  props: ScrollableListProps<T> & { ref?: React.Ref<ScrollableListRef<T>> },
-) => React.ReactElement;
-
-export { ScrollableListWithForwardRef as ScrollableList };
+export { ScrollableList };

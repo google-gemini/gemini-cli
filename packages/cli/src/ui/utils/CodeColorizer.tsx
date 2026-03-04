@@ -40,9 +40,12 @@ function renderHastNode(
 
   // Handle Element Nodes: Determine color and pass it down, don't wrap
   if (node.type === 'element') {
-    const nodeClasses: string[] =
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      (node.properties?.['className'] as string[]) || [];
+    //type guard to check if className is an array of strings, as it can be various types in properties
+    function isStringArray(value: unknown): value is string[] {
+      return Array.isArray(value) && value.every((c) => typeof c === 'string');
+    }
+    const rawClass = node.properties?.['className'];
+    const nodeClasses: string[] = isStringArray(rawClass) ? rawClass : [];
     let elementColor: string | undefined = undefined;
 
     // Find color defined specifically for this element's class
