@@ -1417,6 +1417,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable file watcher updates for @ file suggestions
     (experimental).
   - **Default:** `false`
+  - **Requires restart:** Yes
 
 - **`context.fileFiltering.maxFileCount`** (number):
   - **Description:** Maximum number of files to index for autocomplete and
