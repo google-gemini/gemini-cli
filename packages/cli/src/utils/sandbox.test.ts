@@ -527,19 +527,6 @@ describe('sandbox', () => {
       );
     });
 
-    it('should throw FatalSandboxError on non-Linux platforms', async () => {
-      vi.mocked(os.platform).mockReturnValue('darwin');
-      const config: SandboxConfig = {
-        command: 'runsc',
-        image: 'gemini-cli-sandbox',
-      };
-
-      await expect(start_sandbox(config)).rejects.toThrow(FatalSandboxError);
-      await expect(start_sandbox(config)).rejects.toThrow(
-        'gVisor (runsc) sandboxing is only supported on Linux',
-      );
-    });
-
     it('should show friendly tip when using docker with --runtime=runsc in SANDBOX_FLAGS', async () => {
       vi.mocked(os.platform).mockReturnValue('linux');
       process.env['SANDBOX_FLAGS'] = '--runtime=runsc';

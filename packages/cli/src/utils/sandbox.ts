@@ -206,13 +206,6 @@ export async function start_sandbox(
     // runsc uses docker with --runtime=runsc
     const command = config.command === 'runsc' ? 'docker' : config.command;
 
-    // gVisor (runsc) is only supported on Linux
-    if (config.command === 'runsc' && os.platform() !== 'linux') {
-      throw new FatalSandboxError(
-        'gVisor (runsc) sandboxing is only supported on Linux',
-      );
-    }
-
     debugLogger.log(`hopping into sandbox (command: ${command}) ...`);
 
     // determine full path for gemini-cli to distinguish linked vs installed setting
@@ -677,10 +670,32 @@ export async function start_sandbox(
 
     if (proxyCommand) {
       // run proxyCommand in its own container
-      const proxyContainerCommand = `${command} run --rm --init ${userFlag} --name ${SANDBOX_PROXY_NAME} --network ${SANDBOX_PROXY_NAME} -p 8877:8877 -v ${process.cwd()}:${workdir} --workdir ${workdir} ${image} ${proxyCommand}`;
-      proxyProcess = spawn(proxyContainerCommand, {
+      // build args array to prevent command injection
+      const proxyContainerArgs = [
+        'run',
+        '--rm',
+        '--init',
+        ...(userFlag ? userFlag.split(' ') : []),
+        '--name',
+        SANDBOX_PROXY_NAME,
+        '--network',
+        SANDBOX_PROXY_NAME,
+        '-p',
+        '8877:8877',
+        '-v',
+        `${process.cwd()}:${workdir}`,
+        '--workdir',
+        workdir,
+        image,
+        // proxyCommand may be a shell string, so parse it into tokens safely
+        ...parse(proxyCommand, process.env).filter(
+          (f): f is string => typeof f === 'string',
+        ),
+      ];
+
+      proxyProcess = spawn(command, proxyContainerArgs, {
         stdio: ['ignore', 'pipe', 'pipe'],
-        shell: true,
+        shell: false, // <-- no shell; args are passed directly
         detached: true,
       });
       // install handlers to stop proxy on exit/signal
@@ -707,7 +722,7 @@ export async function start_sandbox(
           process.kill(-sandboxProcess.pid, 'SIGTERM');
         }
         throw new FatalSandboxError(
-          `Proxy container command '${proxyContainerCommand}' exited with code ${code}, signal ${signal}`,
+          `Proxy container command '${command} ${proxyContainerArgs.join(' ')}' exited with code ${code}, signal ${signal}`,
         );
       });
       debugLogger.log('waiting for proxy to start ...');
