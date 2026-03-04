@@ -343,10 +343,7 @@ describe('eslint configuration', () => {
 
   // ── 5. Node protocol enforcement ───────────────────────────────────────
   describe('node protocol enforcement', () => {
-    // Find the config block that provides the import plugin
-    const entry = configArray.find(
-      (entry) => entry.plugins && 'import' in entry.plugins,
-    );
+    const entry = findAllWithRule('import/enforce-node-protocol-usage')[0];
 
     it('has the enforce-node-protocol-usage rule', () => {
       expect(
