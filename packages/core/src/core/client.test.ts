@@ -2939,10 +2939,12 @@ ${JSON.stringify(
 
         const sendMessageStreamSpy = vi.spyOn(client, 'sendMessageStream');
 
-        mockTurnRunFn.mockImplementation(() => (async function* () {
+        mockTurnRunFn.mockImplementation(() =>
+          (async function* () {
             yield { type: GeminiEventType.Content, value: 'First event' };
             yield { type: GeminiEventType.Content, value: 'Second event' };
-          })());
+          })(),
+        );
 
         // Act
         const stream = client.sendMessageStream(
@@ -2985,10 +2987,12 @@ ${JSON.stringify(
 
         const sendMessageStreamSpy = vi.spyOn(client, 'sendMessageStream');
 
-        mockTurnRunFn.mockImplementation(() => (async function* () {
+        mockTurnRunFn.mockImplementation(() =>
+          (async function* () {
             yield { type: GeminiEventType.Content, value: 'Event' };
             yield { type: GeminiEventType.Content, value: 'Event' };
-          })());
+          })(),
+        );
 
         // Act
         const stream = client.sendMessageStream(
@@ -3019,9 +3023,11 @@ ${JSON.stringify(
 
         const sendMessageStreamSpy = vi.spyOn(client, 'sendMessageStream');
 
-        mockTurnRunFn.mockImplementation(() => (async function* () {
+        mockTurnRunFn.mockImplementation(() =>
+          (async function* () {
             yield { type: GeminiEventType.Content, value: 'Event' };
-          })());
+          })(),
+        );
 
         // Act
         const stream = client.sendMessageStream(
@@ -3055,10 +3061,12 @@ ${JSON.stringify(
 
         const sendMessageStreamSpy = vi.spyOn(client, 'sendMessageStream');
 
-        mockTurnRunFn.mockImplementation(() => (async function* () {
+        mockTurnRunFn.mockImplementation(() =>
+          (async function* () {
             yield { type: GeminiEventType.Content, value: 'Event' };
             yield { type: GeminiEventType.Content, value: 'Event 2' };
-          })());
+          })(),
+        );
 
         // Act
         const stream = client.sendMessageStream(
@@ -3102,10 +3110,12 @@ ${JSON.stringify(
 
         const sendMessageStreamSpy = vi.spyOn(client, 'sendMessageStream');
 
-        mockTurnRunFn.mockImplementation(() => (async function* () {
+        mockTurnRunFn.mockImplementation(() =>
+          (async function* () {
             yield { type: GeminiEventType.Content, value: 'Event' };
             yield { type: GeminiEventType.Content, value: 'Event 2' };
-          })());
+          })(),
+        );
 
         // Act
         const stream = client.sendMessageStream(
@@ -3132,9 +3142,11 @@ ${JSON.stringify(
         vi.spyOn(client['loopDetector'], 'addAndCheck').mockReturnValue({
           count: 0,
         });
-        mockTurnRunFn.mockImplementation(() => (async function* () {
+        mockTurnRunFn.mockImplementation(() =>
+          (async function* () {
             yield { type: GeminiEventType.Content, value: 'Event' };
-          })());
+          })(),
+        );
 
         // Act
         const stream = client.sendMessageStream(

@@ -517,9 +517,7 @@ export class LoopDetectionService {
     return history;
   }
 
-  private async checkForLoopWithLLM(
-    signal: AbortSignal,
-  ): Promise<{
+  private async checkForLoopWithLLM(signal: AbortSignal): Promise<{
     isLoop: boolean;
     analysis?: string;
     confirmedByModel?: string;
