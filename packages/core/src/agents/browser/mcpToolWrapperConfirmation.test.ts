@@ -14,7 +14,6 @@ import {
   type ToolCallConfirmationDetails,
   type PolicyUpdateOptions,
 } from '../../tools/tools.js';
-import type { Config } from '../../config/config.js';
 
 interface TestableConfirmation {
   getConfirmationDetails(
@@ -28,7 +27,6 @@ interface TestableConfirmation {
 describe('mcpToolWrapper Confirmation', () => {
   let mockBrowserManager: BrowserManager;
   let mockMessageBus: MessageBus;
-  let mockConfig: Config;
 
   beforeEach(() => {
     mockBrowserManager = {
@@ -45,17 +43,12 @@ describe('mcpToolWrapper Confirmation', () => {
       subscribe: vi.fn(),
       unsubscribe: vi.fn(),
     } as unknown as MessageBus;
-
-    mockConfig = {
-      getBrowserAgentConfig: vi.fn().mockReturnValue({ customConfig: {} }),
-    } as unknown as Config;
   });
 
   it('getConfirmationDetails returns specific MCP details', async () => {
     const tools = await createMcpDeclarativeTools(
       mockBrowserManager,
       mockMessageBus,
-      mockConfig,
     );
     const invocation = tools[0].build({}) as unknown as TestableConfirmation;
 
@@ -91,7 +84,6 @@ describe('mcpToolWrapper Confirmation', () => {
     const tools = await createMcpDeclarativeTools(
       mockBrowserManager,
       mockMessageBus,
-      mockConfig,
     );
     const invocation = tools[0].build({}) as unknown as TestableConfirmation;
 

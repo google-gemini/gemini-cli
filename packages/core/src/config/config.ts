@@ -2752,6 +2752,18 @@ export class Config implements McpContext {
     };
   }
 
+  /**
+   * Determines if user input should be disabled during browser automation.
+   * Based on the `disableUserInput` setting and `headless` mode.
+   */
+  shouldDisableBrowserUserInput(): boolean {
+    const browserConfig = this.getBrowserAgentConfig();
+    return (
+      browserConfig.customConfig?.disableUserInput !== false &&
+      !browserConfig.customConfig?.headless
+    );
+  }
+
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this, this.messageBus);
 

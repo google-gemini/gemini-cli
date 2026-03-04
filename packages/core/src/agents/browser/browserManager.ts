@@ -23,6 +23,7 @@ import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
+import { injectInputBlocker } from './inputBlocker.js';
 import * as path from 'node:path';
 
 // Pin chrome-devtools-mcp version for reproducibility.
@@ -323,6 +324,7 @@ export class BrowserManager {
           await this.rawMcpClient!.connect(this.mcpTransport!);
           debugLogger.log('MCP client connected to chrome-devtools-mcp');
           await this.discoverTools();
+          this.registerInputBlockerHandler();
         })(),
         new Promise<never>((_, reject) => {
           timeoutId = setTimeout(
@@ -431,6 +433,39 @@ export class BrowserManager {
     debugLogger.log(
       `Discovered ${this.discoveredTools.length} tools from chrome-devtools-mcp: ` +
         this.discoveredTools.map((t) => t.name).join(', '),
+    );
+  }
+
+  /**
+   * Registers a fallback notification handler on the MCP client to
+   * automatically re-inject the input blocker after any server-side
+   * notification (e.g. page navigation, resource updates).
+   *
+   * This covers ALL navigation types (link clicks, form submissions,
+   * history navigation) — not just explicit navigate_page tool calls.
+   */
+  private registerInputBlockerHandler(): void {
+    if (!this.rawMcpClient) {
+      return;
+    }
+
+    if (!this.config.shouldDisableBrowserUserInput()) {
+      return;
+    }
+
+    this.rawMcpClient.fallbackNotificationHandler = async (notification: {
+      method: string;
+    }) => {
+      // Only re-inject on resource update notifications which indicate
+      // page content has changed (navigation, new page, etc.)
+      if (notification.method === 'notifications/resources/updated') {
+        debugLogger.log('Page content changed, re-injecting input blocker...');
+        void injectInputBlocker(this);
+      }
+    };
+
+    debugLogger.log(
+      'Registered global notification handler for input blocker re-injection',
     );
   }
 }

@@ -9,13 +9,11 @@ import { createMcpDeclarativeTools } from './mcpToolWrapper.js';
 import type { BrowserManager, McpToolCallResult } from './browserManager.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
-import type { Config } from '../../config/config.js';
 
 describe('mcpToolWrapper', () => {
   let mockBrowserManager: BrowserManager;
   let mockMessageBus: MessageBus;
   let mockMcpTools: McpTool[];
-  let mockConfig: Config;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -59,11 +57,6 @@ describe('mcpToolWrapper', () => {
       subscribe: vi.fn(),
       unsubscribe: vi.fn(),
     } as unknown as MessageBus;
-
-    // Setup mock config
-    mockConfig = {
-      getBrowserAgentConfig: vi.fn().mockReturnValue({ customConfig: {} }),
-    } as unknown as Config;
   });
 
   afterEach(() => {
@@ -75,7 +68,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       expect(tools).toHaveLength(3);
@@ -88,7 +80,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       // Descriptions include augmented hints, so we check they contain the original
@@ -102,7 +93,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       const schema = tools[0].schema;
@@ -116,7 +106,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       const invocation = tools[0].build({ verbose: true });
@@ -129,7 +118,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       const invocation = tools[0].build({});
@@ -143,7 +131,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       const invocation = tools[1].build({ uid: 'elem-123' });
@@ -162,7 +149,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       const invocation = tools[0].build({ verbose: true });
@@ -181,7 +167,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       const invocation = tools[1].build({ uid: 'invalid' });
@@ -199,7 +184,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       const invocation = tools[0].build({});
