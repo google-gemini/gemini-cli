@@ -154,7 +154,7 @@ export function colorizeCode({
   try {
     // Render the HAST tree using the adapted theme
     // Apply the theme's default foreground color to the top-level Text element
-    let lines = codeToHighlight.split('\n');
+    let lines = codeToHighlight.split(/\r?\n/);
     const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
 
     let hiddenLinesCount = 0;
@@ -223,7 +223,7 @@ export function colorizeCode({
     );
     // Fall back to plain text with default color on error
     // Also display line numbers in fallback
-    const lines = codeToHighlight.split('\n');
+    const lines = codeToHighlight.split(/\r?\n/);
     const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
     const fallbackLines = lines.map((line, index) => (
       <Box key={index} minHeight={1}>

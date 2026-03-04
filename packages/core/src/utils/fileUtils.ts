@@ -473,7 +473,7 @@ export async function processSingleFileContent(
       case 'text': {
         // Use BOM-aware reader to avoid leaving a BOM character in content and to support UTF-16/32 transparently
         const content = await readFileWithEncoding(filePath);
-        const lines = content.split('\n');
+        const lines = content.split(/\r?\n/);
         const originalLineCount = lines.length;
 
         let sliceStart = 0;
