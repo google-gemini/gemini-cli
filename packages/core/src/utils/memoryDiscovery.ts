@@ -802,7 +802,6 @@ export async function loadJitSubdirectoryMemory(
   if (!alreadyLoadedIdentities && alreadyLoadedPaths.size > 0) {
     const CONCURRENT_LIMIT = 20;
     const alreadyLoadedArray = Array.from(alreadyLoadedPaths);
-    const identityPromises: Array<Promise<void>> = [];
 
     for (let i = 0; i < alreadyLoadedArray.length; i += CONCURRENT_LIMIT) {
       const batch = alreadyLoadedArray.slice(i, i + CONCURRENT_LIMIT);
@@ -815,9 +814,9 @@ export async function loadJitSubdirectoryMemory(
           // ignore errors - if we can't stat it, we can't deduplicate by identity
         }
       });
-      identityPromises.push(...batchPromises);
+      // Await each batch to properly limit concurrency and prevent EMFILE errors
+      await Promise.allSettled(batchPromises);
     }
-    await Promise.allSettled(identityPromises);
   }
 
   // filter out paths that match already loaded files by identity
