@@ -21,11 +21,10 @@ export const DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
   customIgnoreFilePaths: [],
 };
 
-// For all other files
 export const DEFAULT_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
   respectGitIgnore: true,
   respectGeminiIgnore: true,
-  maxFileCount: 100000,
+  maxFileCount: 20000,
   searchTimeout: 5000,
   customIgnoreFilePaths: [],
 };

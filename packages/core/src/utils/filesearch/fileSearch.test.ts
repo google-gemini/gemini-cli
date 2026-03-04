@@ -569,7 +569,7 @@ describe('FileSearch', () => {
     expect(results).toEqual(['src/', 'src/main.js']);
   });
 
-  it('should respect default maxFiles budget of 100000 in RecursiveFileSearch', async () => {
+  it('should respect default maxFiles budget of 20000 in RecursiveFileSearch', async () => {
     const crawlSpy = vi.spyOn(crawler, 'crawl');
 
     tmpDir = await createTmpDir({
@@ -593,7 +593,7 @@ describe('FileSearch', () => {
 
     expect(crawlSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        maxFiles: 100000,
+        maxFiles: 20000,
       }),
     );
   });
