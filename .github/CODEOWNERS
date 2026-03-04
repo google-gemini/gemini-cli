@@ -14,3 +14,4 @@
 
 # Docs have a dedicated approver group in addition to maintainers
 /docs/ @google-gemini/gemini-cli-maintainers @google-gemini/gemini-cli-docs
+/README.md @google-gemini/gemini-cli-maintainers @google-gemini/gemini-cli-docs

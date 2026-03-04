@@ -511,6 +511,10 @@ export async function loadCliConfig(
   });
   await extensionManager.loadExtensions();
 
+  const extensionPlanSettings = extensionManager
+    .getExtensions()
+    .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
+
   const experimentalJitContext = settings.experimental?.jitContext ?? false;
 
   let memoryContent: string | HierarchicalMemory = '';
@@ -826,8 +830,11 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
+    tracker: settings.experimental?.taskTracker,
     directWebFetch: settings.experimental?.directWebFetch,
-    planSettings: settings.general?.plan,
+    planSettings: settings.general?.plan?.directory
+      ? settings.general.plan
+      : (extensionPlanSettings ?? settings.general?.plan),
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,

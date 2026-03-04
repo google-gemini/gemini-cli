@@ -10,6 +10,7 @@ import {
   extractIdsFromResponse,
   isTerminalState,
   A2AResultReassembler,
+  AUTH_REQUIRED_MSG,
 } from './a2aUtils.js';
 import type { SendMessageResult } from './a2a-client-manager.js';
 import type {
@@ -283,6 +284,66 @@ describe('a2aUtils', () => {
       expect(output).toBe(
         'Analyzing...\n\nProcessing...\n\nArtifact (Code):\nprint("Done")',
       );
+    });
+
+    it('should handle auth-required state with a message', () => {
+      const reassembler = new A2AResultReassembler();
+
+      reassembler.update({
+        kind: 'status-update',
+        status: {
+          state: 'auth-required',
+          message: {
+            kind: 'message',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'I need your permission.' }],
+          } as Message,
+        },
+      } as unknown as SendMessageResult);
+
+      expect(reassembler.toString()).toContain('I need your permission.');
+      expect(reassembler.toString()).toContain(AUTH_REQUIRED_MSG);
+    });
+
+    it('should handle auth-required state without relying on metadata', () => {
+      const reassembler = new A2AResultReassembler();
+
+      reassembler.update({
+        kind: 'status-update',
+        status: {
+          state: 'auth-required',
+        },
+      } as unknown as SendMessageResult);
+
+      expect(reassembler.toString()).toContain(AUTH_REQUIRED_MSG);
+    });
+
+    it('should not duplicate the auth instruction OR agent message if multiple identical auth-required chunks arrive', () => {
+      const reassembler = new A2AResultReassembler();
+
+      const chunk = {
+        kind: 'status-update',
+        status: {
+          state: 'auth-required',
+          message: {
+            kind: 'message',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'You need to login here.' }],
+          } as Message,
+        },
+      } as unknown as SendMessageResult;
+
+      reassembler.update(chunk);
+      // Simulate multiple updates with the same overall state
+      reassembler.update(chunk);
+      reassembler.update(chunk);
+
+      const output = reassembler.toString();
+      // The substring should only appear exactly once
+      expect(output.split(AUTH_REQUIRED_MSG).length - 1).toBe(1);
+
+      // Crucially, the agent's actual custom message should ALSO only appear exactly once
+      expect(output.split('You need to login here.').length - 1).toBe(1);
     });
 
     it('should fallback to history in a task chunk if no message or artifacts exist and task is terminal', () => {

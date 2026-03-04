@@ -21,13 +21,15 @@ implementation. It allows you to:
   - [Entering Plan Mode](#entering-plan-mode)
   - [Planning Workflow](#planning-workflow)
   - [Exiting Plan Mode](#exiting-plan-mode)
+  - [Commands](#commands)
 - [Tool Restrictions](#tool-restrictions)
   - [Customizing Planning with Skills](#customizing-planning-with-skills)
   - [Customizing Policies](#customizing-policies)
     - [Example: Allow git commands in Plan Mode](#example-allow-git-commands-in-plan-mode)
-    - [Example: Enable research subagents in Plan Mode](#example-enable-research-subagents-in-plan-mode)
+    - [Example: Enable custom subagents in Plan Mode](#example-enable-custom-subagents-in-plan-mode)
   - [Custom Plan Directory and Policies](#custom-plan-directory-and-policies)
 - [Automatic Model Routing](#automatic-model-routing)
+- [Cleanup](#cleanup)
 
 ## Enabling Plan Mode
 
@@ -109,8 +111,9 @@ structure, and consultation level are proportional to the task's complexity:
     - **Iterate:** Provide feedback to refine the plan.
     - **Refine manually:** Press **Ctrl + X** to open the plan file in your
       [preferred external editor]. This allows you to manually refine the plan
-      steps before approval. The CLI will automatically refresh and show the
-      updated plan after you save and close the editor.
+      steps before approval. If you make any changes and save the file, the CLI
+      will automatically send the updated plan back to the agent for review and
+      iteration.
 
 For more complex or specialized planning tasks, you can
 [customize the planning workflow with skills](#customizing-planning-with-skills).
@@ -124,6 +127,10 @@ To exit Plan Mode, you can:
 - **Tool:** Gemini CLI calls the [`exit_plan_mode`] tool to present the
   finalized plan for your approval.
 
+### Commands
+
+- **`/plan copy`**: Copy the currently approved plan to your clipboard.
+
 ## Tool Restrictions
 
 Plan Mode enforces strict safety policies to prevent accidental changes.
@@ -132,6 +139,7 @@ These are the only allowed tools:
 
 - **FileSystem (Read):** [`read_file`], [`list_directory`], [`glob`]
 - **Search:** [`grep_search`], [`google_web_search`]
+- **Research Subagents:** [`codebase_investigator`], [`cli_help`]
 - **Interaction:** [`ask_user`]
 - **MCP Tools (Read):** Read-only [MCP tools] (e.g., `github_read_issue`,
   `postgres_read_schema`) are allowed.
@@ -202,16 +210,17 @@ priority = 100
 modes = ["plan"]
 ```
 
-#### Example: Enable research subagents in Plan Mode
+#### Example: Enable custom subagents in Plan Mode
 
-You can enable experimental research [subagents] like `codebase_investigator` to
-help gather architecture details during the planning phase.
+Built-in research [subagents] like [`codebase_investigator`] and [`cli_help`]
+are enabled by default in Plan Mode. You can enable additional [custom
+subagents] by adding a rule to your policy.
 
 `~/.gemini/policies/research-subagents.toml`
 
 ```toml
 [[rule]]
-toolName = "codebase_investigator"
+toolName = "my_custom_subagent"
 decision = "allow"
 priority = 100
 modes = ["plan"]
@@ -289,6 +298,24 @@ performance. You can disable this automatic switching in your settings:
 }
 ```
 
+## Cleanup
+
+By default, Gemini CLI automatically cleans up old session data, including all
+associated plan files and task trackers.
+
+- **Default behavior:** Sessions (and their plans) are retained for **30 days**.
+- **Configuration:** You can customize this behavior via the `/settings` command
+  (search for **Session Retention**) or in your `settings.json` file. See
+  [session retention] for more details.
+
+Manual deletion also removes all associated artifacts:
+
+- **Command Line:** Use `gemini --delete-session <index|id>`.
+- **Session Browser:** Press `/resume`, navigate to a session, and press `x`.
+
+If you use a [custom plans directory](#custom-plan-directory-and-policies),
+those files are not automatically deleted and must be managed manually.
+
 [`list_directory`]: /docs/tools/file-system.md#1-list_directory-readfolder
 [`read_file`]: /docs/tools/file-system.md#2-read_file-readfile
 [`grep_search`]: /docs/tools/file-system.md#5-grep_search-searchtext
@@ -299,7 +326,10 @@ performance. You can disable this automatic switching in your settings:
 [MCP tools]: /docs/tools/mcp-server.md
 [`save_memory`]: /docs/tools/memory.md
 [`activate_skill`]: /docs/cli/skills.md
+[`codebase_investigator`]: /docs/core/subagents.md#codebase_investigator
+[`cli_help`]: /docs/core/subagents.md#cli_help
 [subagents]: /docs/core/subagents.md
+[custom subagents]: /docs/core/subagents.md#creating-custom-subagents
 [policy engine]: /docs/reference/policy-engine.md
 [`enter_plan_mode`]: /docs/tools/planning.md#1-enter_plan_mode-enterplanmode
 [`exit_plan_mode`]: /docs/tools/planning.md#2-exit_plan_mode-exitplanmode
@@ -310,3 +340,4 @@ performance. You can disable this automatic switching in your settings:
 [auto model]: /docs/reference/configuration.md#model-settings
 [model routing]: /docs/cli/telemetry.md#model-routing
 [preferred external editor]: /docs/reference/configuration.md#general
+[session retention]: /docs/cli/session-management.md#session-retention
