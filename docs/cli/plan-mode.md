@@ -46,7 +46,7 @@ To start Gemini CLI directly in Plan Mode by default:
 1.  Use the `/settings` command.
 2.  Set **Default Approval Mode** to `Plan`.
 
-To launch Gemini CLI in plan mode once:
+To launch Gemini CLI in Plan Mode once:
 
 1. Use `gemini --approval-mode=plan` when launching Gemini CLI.
 
@@ -129,7 +129,7 @@ These are the only allowed tools:
 You can use [Agent Skills](./skills.md) to customize how Gemini CLI approaches
 planning for specific types of tasks. When a skill is activated during Plan
 Mode, its specialized instructions and procedural workflows will guide the
-research, design and planning phases.
+research, design, and planning phases.
 
 For example:
 
@@ -245,3 +245,4 @@ argsPattern = "\"file_path\":\"[^\"]*/\\.gemini/plans/[a-zA-Z0-9_-]+\\.md\""
 [`enter_plan_mode`]: /docs/tools/planning.md#1-enter_plan_mode-enterplanmode
 [`exit_plan_mode`]: /docs/tools/planning.md#2-exit_plan_mode-exitplanmode
 [`ask_user`]: /docs/tools/ask-user.md
+[YOLO mode]: /docs/reference/configuration.md#command-line-arguments
