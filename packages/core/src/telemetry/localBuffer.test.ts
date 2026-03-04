@@ -6,12 +6,18 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { MeterProvider } from '@opentelemetry/sdk-metrics';
-import { localMetricReader, getLocalMetricsSnapshot } from './localBuffer.js';
+import {
+  localMetricReader,
+  getLocalMetricsSnapshot,
+  localMetricExporter,
+} from './localBuffer.js';
 
 describe('Telemetry Local Buffer', () => {
   let meterProvider: MeterProvider;
 
   beforeEach(() => {
+    localMetricExporter.reset();
+
     // 1. Create a fresh OTel engine just for this test,
     // passing our custom local bridge directly into the constructor.
     meterProvider = new MeterProvider({
@@ -27,8 +33,6 @@ describe('Telemetry Local Buffer', () => {
   it('should correctly capture and simplify OTel counters and histograms', async () => {
     const meter = meterProvider.getMeter('test-meter');
 
-    // --- SIMULATE THE ENGINE RECORDING DATA ---
-
     // 1. Simulate an API Request Counter
     const counter = meter.createCounter('gemini_cli.api.request.count');
     counter.add(10);
@@ -40,12 +44,8 @@ describe('Telemetry Local Buffer', () => {
     histogram.record(200);
     histogram.record(300); // Count: 3, Sum: 600, Min: 100, Max: 300
 
-    // --- TEST OUR BRIDGE ---
-
     // 3. Pull the snapshot through our bridge utility
     const snapshot = await getLocalMetricsSnapshot();
-
-    // --- ASSERTIONS ---
 
     // 4. Prove the counter was flattened correctly
     expect(snapshot.counters['gemini_cli.api.request.count']).toBe(15);
