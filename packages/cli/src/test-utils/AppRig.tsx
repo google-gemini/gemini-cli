@@ -110,6 +110,18 @@ vi.mock('../ui/auth/useAuth.js', () => ({
   validateAuthMethodWithSettings: () => null,
 }));
 
+vi.mock('../utils/persistentState.ts', async () => {
+  const mockState: Record<string, boolean> = {
+    terminalSetupPromptShown: true,
+  };
+
+  return {
+    persistentState: {
+      get: vi.fn((key: string) => mockState[key]),
+      set: vi.fn(),
+    },
+  };
+});
 // A minimal mock ExtensionManager to satisfy AppContainer's forceful cast
 class MockExtensionManager extends ExtensionLoader {
   getExtensions = vi.fn().mockReturnValue([]);
