@@ -6,7 +6,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 describe('API Resilience E2E', () => {
   let rig: TestRig;
@@ -21,7 +22,10 @@ describe('API Resilience E2E', () => {
 
   it('should not crash when receiving metadata-only chunks in a stream', async () => {
     await rig.setup('api-resilience-metadata-only', {
-      fakeResponsesPath: join(import.meta.dirname, 'api-resilience.responses'),
+      fakeResponsesPath: join(
+        dirname(fileURLToPath(import.meta.url)),
+        'api-resilience.responses',
+      ),
       settings: {
         planSettings: { modelRouting: false },
       },
