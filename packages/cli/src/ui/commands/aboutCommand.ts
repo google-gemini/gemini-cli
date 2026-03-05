@@ -31,7 +31,7 @@ export const aboutCommand: SlashCommand = {
       })`;
     }
     const modelVersion = context.services.config?.getModel() || 'Unknown';
-    const cliVersion = await getVersion();
+    const cliVersion = (await getVersion()) + ' (TermViz Integrated)';
     const selectedAuthType =
       context.services.settings.merged.security.auth.selectedType || '';
     const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'] || '';
