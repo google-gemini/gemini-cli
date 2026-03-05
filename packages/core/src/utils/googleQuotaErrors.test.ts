@@ -81,7 +81,7 @@ describe('classifyGoogleError', () => {
     }
   });
 
-  it('should return original error if code is not 429 or 503', () => {
+  it('should return original error if code is not 429, 499 or 503', () => {
     const apiError: GoogleApiError = {
       code: 500,
       message: 'Server error',
@@ -93,6 +93,22 @@ describe('classifyGoogleError', () => {
     expect(result).toBe(originalError);
     expect(result).not.toBeInstanceOf(TerminalQuotaError);
     expect(result).not.toBeInstanceOf(RetryableQuotaError);
+  });
+
+  it('should return RetryableQuotaError for 499 Client Closed Request', () => {
+    const apiError: GoogleApiError = {
+      code: 499,
+      message: 'Client Closed Request',
+      details: [],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const originalError = new Error('Client Closed Request');
+    const result = classifyGoogleError(originalError);
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    if (result instanceof RetryableQuotaError) {
+      expect(result.cause).toBe(apiError);
+      expect(result.message).toBe('Client Closed Request');
+    }
   });
 
   it('should return TerminalQuotaError for daily quota violations in QuotaFailure', () => {
@@ -295,6 +311,26 @@ describe('classifyGoogleError', () => {
     vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
     const result = classifyGoogleError(new Error());
     expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
+  it('should return TerminalQuotaError for INSUFFICIENT_G1_CREDITS_BALANCE without domain', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Resource has been exhausted (e.g. check quota).',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'INSUFFICIENT_G1_CREDITS_BALANCE',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+    expect((result as TerminalQuotaError).isInsufficientCredits).toBe(true);
+    expect((result as TerminalQuotaError).reason).toBe(
+      'INSUFFICIENT_G1_CREDITS_BALANCE',
+    );
   });
 
   it('should prioritize daily limit over retry info', () => {

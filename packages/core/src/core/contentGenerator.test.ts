@@ -5,12 +5,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { ContentGenerator } from './contentGenerator.js';
 import {
   createContentGenerator,
   AuthType,
   createContentGeneratorConfig,
   validateBaseUrl,
+  type ContentGenerator,
 } from './contentGenerator.js';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';

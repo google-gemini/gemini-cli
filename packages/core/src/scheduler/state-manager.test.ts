@@ -6,17 +6,18 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SchedulerStateManager } from './state-manager.js';
-import type {
-  ValidatingToolCall,
-  WaitingToolCall,
-  SuccessfulToolCall,
-  ErroredToolCall,
-  CancelledToolCall,
-  ExecutingToolCall,
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
+import {
+  CoreToolCallStatus,
+  ROOT_SCHEDULER_ID,
+  type ValidatingToolCall,
+  type WaitingToolCall,
+  type SuccessfulToolCall,
+  type ErroredToolCall,
+  type CancelledToolCall,
+  type ExecutingToolCall,
+  type ToolCallRequestInfo,
+  type ToolCallResponseInfo,
 } from './types.js';
-import { CoreToolCallStatus, ROOT_SCHEDULER_ID } from './types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
@@ -680,6 +681,65 @@ describe('SchedulerStateManager', () => {
       expect(snapshot[0].request.callId).toBe('1');
       expect(snapshot[1].request.callId).toBe('2');
       expect(snapshot[2].request.callId).toBe('3');
+    });
+  });
+
+  describe('progress field preservation', () => {
+    it('should preserve progress and progressTotal in toExecuting', () => {
+      const call = createValidatingCall('progress-1');
+      stateManager.enqueue([call]);
+      stateManager.dequeue();
+
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+        {
+          progress: 5,
+          progressTotal: 10,
+          progressMessage: 'Working',
+          progressPercent: 50,
+        },
+      );
+
+      const active = stateManager.firstActiveCall as ExecutingToolCall;
+      expect(active.status).toBe(CoreToolCallStatus.Executing);
+      expect(active.progress).toBe(5);
+      expect(active.progressTotal).toBe(10);
+      expect(active.progressMessage).toBe('Working');
+      expect(active.progressPercent).toBe(50);
+    });
+
+    it('should preserve progress fields after a liveOutput update', () => {
+      const call = createValidatingCall('progress-2');
+      stateManager.enqueue([call]);
+      stateManager.dequeue();
+
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+        {
+          progress: 5,
+          progressTotal: 10,
+          progressMessage: 'Working',
+          progressPercent: 50,
+        },
+      );
+
+      stateManager.updateStatus(
+        call.request.callId,
+        CoreToolCallStatus.Executing,
+        {
+          liveOutput: 'some output',
+        },
+      );
+
+      const active = stateManager.firstActiveCall as ExecutingToolCall;
+      expect(active.status).toBe(CoreToolCallStatus.Executing);
+      expect(active.liveOutput).toBe('some output');
+      expect(active.progress).toBe(5);
+      expect(active.progressTotal).toBe(10);
+      expect(active.progressMessage).toBe('Working');
+      expect(active.progressPercent).toBe(50);
     });
   });
 });

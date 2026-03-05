@@ -58,7 +58,10 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   borderColor,
 
   borderDimColor,
+
   isExpandable,
+
+  originalRequestName,
 }) => {
   const {
     activePtyId: activeShellPtyId,
@@ -122,13 +125,18 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         borderDimColor={borderDimColor}
         containerRef={headerRef}
       >
-        <ToolStatusIndicator status={status} name={name} />
+        <ToolStatusIndicator
+          status={status}
+          name={name}
+          isFocused={isThisShellFocused}
+        />
 
         <ToolInfo
           name={name}
           status={status}
           description={description}
           emphasis={emphasis}
+          originalRequestName={originalRequestName}
         />
 
         <FocusHint

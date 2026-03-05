@@ -1,7 +1,8 @@
 {
   "experimental": {
     "plan": true,
-    "extensionReloading": true
+    "extensionReloading": true,
+    "modelSteering": true
   },
   "general": {
     "devtools": true
