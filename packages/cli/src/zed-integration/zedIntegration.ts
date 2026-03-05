@@ -210,24 +210,15 @@ export class GeminiAgent {
         }
       }
 
-      // Extract token from headers if available, or use apiKey
-      // Zed might pass the token in headers.Authorization
-      const finalApiKey = apiKey ?? this.apiKey;
-      if (
-        headers?.['Authorization'] &&
-        headers['Authorization'].startsWith('Bearer ')
-      ) {
-        // If we have a bearer token, we might want to use it as the apiKey if that's how the inner sdk expects it
-        // Or just pass the headers. The contentGenerator will check apiKeyAuthMechanism.
-        // If the user provided a token in the headers, we should probably respect it.
-        // But config.refreshAuth takes apiKey as 2nd arg.
-        // Let's pass the headers to refreshAuth and let contentGenerator handle it.
-      }
-
       this.baseUrl = baseUrl;
       this.customHeaders = headers;
 
-      await this.config.refreshAuth(method, finalApiKey, baseUrl, headers);
+      await this.config.refreshAuth(
+        method,
+        apiKey ?? this.apiKey,
+        baseUrl,
+        headers,
+      );
     } catch (e) {
       throw new acp.RequestError(-32000, getAcpErrorMessage(e));
     }
