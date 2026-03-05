@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Config,
-  GeminiChat,
-  ToolResult,
-  ToolCallConfirmationDetails,
-  FilterFilesOptions,
-} from '@google/gemini-cli-core';
 import {
+  type Config,
+  type GeminiChat,
+  type ToolResult,
+  type ToolCallConfirmationDetails,
+  type FilterFilesOptions,
+  type ConversationRecord,
+  CoreToolCallStatus,
   AuthType,
   logToolCall,
   convertToFunctionResponse,
@@ -27,16 +27,38 @@ import {
   ToolCallEvent,
   debugLogger,
   ReadManyFilesTool,
-  getEffectiveModel,
+  REFERENCE_CONTENT_START,
+  resolveModel,
   createWorkingStdio,
   startupProfiler,
+  Kind,
+  partListUnionToString,
+  LlmRole,
+  ApprovalMode,
+  getVersion,
+  convertSessionToClientHistory,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  getDisplayString,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
+import { getAcpErrorMessage } from './acpErrors.js';
 import { Readable, Writable } from 'node:stream';
+
+function hasMeta(obj: unknown): obj is { _meta?: Record<string, unknown> } {
+  return typeof obj === 'object' && obj !== null && '_meta' in obj;
+}
 import type { Content, Part, FunctionCall } from '@google/genai';
 import type { LoadedSettings } from '../config/settings.js';
-import { SettingScope } from '../config/settings.js';
+import { SettingScope, loadSettings } from '../config/settings.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
@@ -44,26 +66,38 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
+import { runExitCleanup } from '../utils/cleanup.js';
+import { SessionSelector } from '../utils/sessionUtils.js';
 
+import { CommandHandler } from './commandHandler.js';
 export async function runZedIntegration(
   config: Config,
   settings: LoadedSettings,
   argv: CliArgs,
 ) {
+  // ... (skip unchanged lines) ...
+
   const { stdout: workingStdout } = createWorkingStdio();
   const stdout = Writable.toWeb(workingStdout) as WritableStream;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
 
   const stream = acp.ndJsonStream(stdout, stdin);
-  new acp.AgentSideConnection(
+  const connection = new acp.AgentSideConnection(
     (connection) => new GeminiAgent(config, settings, argv, connection),
     stream,
   );
+
+  // SIGTERM/SIGINT handlers (in sdk.ts) don't fire when stdin closes.
+  // We must explicitly await the connection close to flush telemetry.
+  // Use finally() to ensure cleanup runs even on stream errors.
+  await connection.closed.finally(runExitCleanup);
 }
 
 export class GeminiAgent {
   private sessions: Map<string, Session> = new Map();
   private clientCapabilities: acp.ClientCapabilities | undefined;
+  private apiKey: string | undefined;
 
   constructor(
     private config: Config,
@@ -80,26 +114,37 @@ export class GeminiAgent {
       {
         id: AuthType.LOGIN_WITH_GOOGLE,
         name: 'Log in with Google',
-        description: null,
+        description: 'Log in with your Google account',
       },
       {
         id: AuthType.USE_GEMINI,
-        name: 'Use Gemini API key',
-        description:
-          'Requires setting the `GEMINI_API_KEY` environment variable',
+        name: 'Gemini API key',
+        description: 'Use an API key with Gemini Developer API',
+        _meta: {
+          'api-key': {
+            provider: 'google',
+          },
+        },
       },
       {
         id: AuthType.USE_VERTEX_AI,
         name: 'Vertex AI',
-        description: null,
+        description: 'Use an API key with Vertex AI GenAI API',
       },
     ];
 
+    await this.config.initialize();
+    const version = await getVersion();
     return {
       protocolVersion: acp.PROTOCOL_VERSION,
       authMethods,
+      agentInfo: {
+        name: 'gemini-cli',
+        title: 'Gemini CLI',
+        version,
+      },
       agentCapabilities: {
-        loadSession: false,
+        loadSession: true,
         promptCapabilities: {
           image: true,
           audio: true,
@@ -113,19 +158,31 @@ export class GeminiAgent {
     };
   }
 
-  async authenticate({ methodId }: acp.AuthenticateRequest): Promise<void> {
+  async authenticate(req: acp.AuthenticateRequest): Promise<void> {
+    const { methodId } = req;
     const method = z.nativeEnum(AuthType).parse(methodId);
-    const selectedAuthType = this.settings.merged.security?.auth?.selectedType;
+    const selectedAuthType = this.settings.merged.security.auth.selectedType;
 
     // Only clear credentials when switching to a different auth method
     if (selectedAuthType && selectedAuthType !== method) {
       await clearCachedCredentialFile();
     }
+    // Check for api-key in _meta
+    const meta = hasMeta(req) ? req._meta : undefined;
+    const apiKey =
+      typeof meta?.['api-key'] === 'string' ? meta['api-key'] : undefined;
 
     // Refresh auth with the requested method
     // This will reuse existing credentials if they're valid,
     // or perform new authentication if needed
-    await this.config.refreshAuth(method);
+    try {
+      if (apiKey) {
+        this.apiKey = apiKey;
+      }
+      await this.config.refreshAuth(method, apiKey ?? this.apiKey);
+    } catch (e) {
+      throw new acp.RequestError(-32000, getAcpErrorMessage(e));
+    }
     this.settings.setValue(
       SettingScope.User,
       'security.auth.selectedType',
@@ -138,22 +195,45 @@ export class GeminiAgent {
     mcpServers,
   }: acp.NewSessionRequest): Promise<acp.NewSessionResponse> {
     const sessionId = randomUUID();
-    const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
+    const loadedSettings = loadSettings(cwd);
+    const config = await this.newSessionConfig(
+      sessionId,
+      cwd,
+      mcpServers,
+      loadedSettings,
+    );
+
+    const authType =
+      loadedSettings.merged.security.auth.selectedType || AuthType.USE_GEMINI;
 
     let isAuthenticated = false;
-    if (this.settings.merged.security?.auth?.selectedType) {
-      try {
-        await config.refreshAuth(
-          this.settings.merged.security.auth.selectedType,
-        );
-        isAuthenticated = true;
-      } catch (e) {
-        debugLogger.error(`Authentication failed: ${e}`);
+    let authErrorMessage = '';
+    try {
+      await config.refreshAuth(authType, this.apiKey);
+      isAuthenticated = true;
+
+      // Extra validation for Gemini API key
+      const contentGeneratorConfig = config.getContentGeneratorConfig();
+      if (
+        authType === AuthType.USE_GEMINI &&
+        (!contentGeneratorConfig || !contentGeneratorConfig.apiKey)
+      ) {
+        isAuthenticated = false;
+        authErrorMessage = 'Gemini API key is missing or not configured.';
       }
+    } catch (e) {
+      isAuthenticated = false;
+      authErrorMessage = getAcpErrorMessage(e);
+      debugLogger.error(
+        `Authentication failed: ${e instanceof Error ? e.stack : e}`,
+      );
     }
 
     if (!isAuthenticated) {
-      throw acp.RequestError.authRequired();
+      throw new acp.RequestError(
+        -32000,
+        authErrorMessage || 'Authentication required.',
+      );
     }
 
     if (this.clientCapabilities?.fs) {
@@ -166,22 +246,153 @@ export class GeminiAgent {
       config.setFileSystemService(acpFileSystemService);
     }
 
+    await config.initialize();
+    startupProfiler.flush(config);
+
     const geminiClient = config.getGeminiClient();
     const chat = await geminiClient.startChat();
-    const session = new Session(sessionId, chat, config, this.connection);
+    const session = new Session(
+      sessionId,
+      chat,
+      config,
+      this.connection,
+      this.settings,
+    );
     this.sessions.set(sessionId, session);
 
-    return {
+    setTimeout(() => {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      session.sendAvailableCommands();
+    }, 0);
+
+    const { availableModels, currentModelId } = buildAvailableModels(
+      config,
+      loadedSettings,
+    );
+
+    const response = {
       sessionId,
+      modes: {
+        availableModes: buildAvailableModes(config.isPlanEnabled()),
+        currentModeId: config.getApprovalMode(),
+      },
+      models: {
+        availableModels,
+        currentModelId,
+      },
     };
+    return response;
+  }
+
+  async loadSession({
+    sessionId,
+    cwd,
+    mcpServers,
+  }: acp.LoadSessionRequest): Promise<acp.LoadSessionResponse> {
+    const config = await this.initializeSessionConfig(
+      sessionId,
+      cwd,
+      mcpServers,
+    );
+
+    const sessionSelector = new SessionSelector(config);
+    const { sessionData, sessionPath } =
+      await sessionSelector.resolveSession(sessionId);
+
+    if (this.clientCapabilities?.fs) {
+      const acpFileSystemService = new AcpFileSystemService(
+        this.connection,
+        sessionId,
+        this.clientCapabilities.fs,
+        config.getFileSystemService(),
+      );
+      config.setFileSystemService(acpFileSystemService);
+    }
+
+    const clientHistory = convertSessionToClientHistory(sessionData.messages);
+
+    const geminiClient = config.getGeminiClient();
+    await geminiClient.initialize();
+    await geminiClient.resumeChat(clientHistory, {
+      conversation: sessionData,
+      filePath: sessionPath,
+    });
+
+    const session = new Session(
+      sessionId,
+      geminiClient.getChat(),
+      config,
+      this.connection,
+      this.settings,
+    );
+    this.sessions.set(sessionId, session);
+
+    // Stream history back to client
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    session.streamHistory(sessionData.messages);
+
+    setTimeout(() => {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      session.sendAvailableCommands();
+    }, 0);
+
+    const { availableModels, currentModelId } = buildAvailableModels(
+      config,
+      this.settings,
+    );
+
+    const response = {
+      modes: {
+        availableModes: buildAvailableModes(config.isPlanEnabled()),
+        currentModeId: config.getApprovalMode(),
+      },
+      models: {
+        availableModels,
+        currentModelId,
+      },
+    };
+    return response;
+  }
+
+  private async initializeSessionConfig(
+    sessionId: string,
+    cwd: string,
+    mcpServers: acp.McpServer[],
+  ): Promise<Config> {
+    const selectedAuthType = this.settings.merged.security.auth.selectedType;
+    if (!selectedAuthType) {
+      throw acp.RequestError.authRequired();
+    }
+
+    // 1. Create config WITHOUT initializing it (no MCP servers started yet)
+    const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
+
+    // 2. Authenticate BEFORE initializing configuration or starting MCP servers.
+    // This satisfies the security requirement to verify the user before executing
+    // potentially unsafe server definitions.
+    try {
+      await config.refreshAuth(selectedAuthType, this.apiKey);
+    } catch (e) {
+      debugLogger.error(`Authentication failed: ${e}`);
+      throw acp.RequestError.authRequired();
+    }
+
+    // 3. Now that we are authenticated, it is safe to initialize the config
+    // which starts the MCP servers and other heavy resources.
+    await config.initialize();
+    startupProfiler.flush(config);
+
+    return config;
   }
 
   async newSessionConfig(
     sessionId: string,
     cwd: string,
     mcpServers: acp.McpServer[],
+    loadedSettings?: LoadedSettings,
   ): Promise<Config> {
-    const mergedMcpServers = { ...this.settings.merged.mcpServers };
+    const currentSettings = loadedSettings || this.settings;
+    const mergedMcpServers = { ...currentSettings.merged.mcpServers };
 
     for (const server of mcpServers) {
       if (
@@ -216,12 +427,13 @@ export class GeminiAgent {
       }
     }
 
-    const settings = { ...this.settings.merged, mcpServers: mergedMcpServers };
+    const settings = {
+      ...currentSettings.merged,
+      mcpServers: mergedMcpServers,
+    };
 
-    const config = await loadCliConfig(settings, sessionId, this.argv, cwd);
+    const config = await loadCliConfig(settings, sessionId, this.argv, { cwd });
 
-    await config.initialize();
-    startupProfiler.flush(config);
     return config;
   }
 
@@ -240,16 +452,38 @@ export class GeminiAgent {
     }
     return session.prompt(params);
   }
+
+  async setSessionMode(
+    params: acp.SetSessionModeRequest,
+  ): Promise<acp.SetSessionModeResponse> {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${params.sessionId}`);
+    }
+    return session.setMode(params.modeId);
+  }
+
+  async unstable_setSessionModel(
+    params: acp.SetSessionModelRequest,
+  ): Promise<acp.SetSessionModelResponse> {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${params.sessionId}`);
+    }
+    return session.setModel(params.modelId);
+  }
 }
 
 export class Session {
   private pendingPrompt: AbortController | null = null;
+  private commandHandler = new CommandHandler();
 
   constructor(
     private readonly id: string,
     private readonly chat: GeminiChat,
     private readonly config: Config,
     private readonly connection: acp.AgentSideConnection,
+    private readonly settings: LoadedSettings,
   ) {}
 
   async cancelPendingPrompt(): Promise<void> {
@@ -261,42 +495,182 @@ export class Session {
     this.pendingPrompt = null;
   }
 
+  setMode(modeId: acp.SessionModeId): acp.SetSessionModeResponse {
+    const availableModes = buildAvailableModes(this.config.isPlanEnabled());
+    const mode = availableModes.find((m) => m.id === modeId);
+    if (!mode) {
+      throw new Error(`Invalid or unavailable mode: ${modeId}`);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    this.config.setApprovalMode(mode.id as ApprovalMode);
+    return {};
+  }
+
+  private getAvailableCommands() {
+    return this.commandHandler.getAvailableCommands();
+  }
+
+  async sendAvailableCommands(): Promise<void> {
+    const availableCommands = this.getAvailableCommands().map((command) => ({
+      name: command.name,
+      description: command.description,
+    }));
+
+    await this.sendUpdate({
+      sessionUpdate: 'available_commands_update',
+      availableCommands,
+    });
+  }
+
+  setModel(modelId: acp.ModelId): acp.SetSessionModelResponse {
+    this.config.setModel(modelId);
+    return {};
+  }
+
+  async streamHistory(messages: ConversationRecord['messages']): Promise<void> {
+    for (const msg of messages) {
+      const contentString = partListUnionToString(msg.content);
+
+      if (msg.type === 'user') {
+        if (contentString.trim()) {
+          await this.sendUpdate({
+            sessionUpdate: 'user_message_chunk',
+            content: { type: 'text', text: contentString },
+          });
+        }
+      } else if (msg.type === 'gemini') {
+        // Thoughts
+        if (msg.thoughts) {
+          for (const thought of msg.thoughts) {
+            const thoughtText = `**${thought.subject}**\n${thought.description}`;
+            await this.sendUpdate({
+              sessionUpdate: 'agent_thought_chunk',
+              content: { type: 'text', text: thoughtText },
+            });
+          }
+        }
+
+        // Message text
+        if (contentString.trim()) {
+          await this.sendUpdate({
+            sessionUpdate: 'agent_message_chunk',
+            content: { type: 'text', text: contentString },
+          });
+        }
+
+        // Tool calls
+        if (msg.toolCalls) {
+          for (const toolCall of msg.toolCalls) {
+            const toolCallContent: acp.ToolCallContent[] = [];
+            if (toolCall.resultDisplay) {
+              if (typeof toolCall.resultDisplay === 'string') {
+                toolCallContent.push({
+                  type: 'content',
+                  content: { type: 'text', text: toolCall.resultDisplay },
+                });
+              } else if ('fileName' in toolCall.resultDisplay) {
+                toolCallContent.push({
+                  type: 'diff',
+                  path: toolCall.resultDisplay.fileName,
+                  oldText: toolCall.resultDisplay.originalContent,
+                  newText: toolCall.resultDisplay.newContent,
+                });
+              }
+            }
+
+            const tool = this.config.getToolRegistry().getTool(toolCall.name);
+
+            await this.sendUpdate({
+              sessionUpdate: 'tool_call',
+              toolCallId: toolCall.id,
+              status:
+                toolCall.status === CoreToolCallStatus.Success
+                  ? 'completed'
+                  : 'failed',
+              title: toolCall.displayName || toolCall.name,
+              content: toolCallContent,
+              kind: tool ? toAcpToolKind(tool.kind) : 'other',
+            });
+          }
+        }
+      }
+    }
+  }
+
   async prompt(params: acp.PromptRequest): Promise<acp.PromptResponse> {
     this.pendingPrompt?.abort();
     const pendingSend = new AbortController();
     this.pendingPrompt = pendingSend;
+
+    await this.config.waitForMcpInit();
 
     const promptId = Math.random().toString(16).slice(2);
     const chat = this.chat;
 
     const parts = await this.#resolvePrompt(params.prompt, pendingSend.signal);
 
+    // Command interception
+    let commandText = '';
+
+    for (const part of parts) {
+      if (typeof part === 'object' && part !== null) {
+        if ('text' in part) {
+          // It is a text part
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion
+          const text = (part as any).text;
+          if (typeof text === 'string') {
+            commandText += text;
+          }
+        } else {
+          // Non-text part (image, embedded resource)
+          // Stop looking for command
+          break;
+        }
+      }
+    }
+
+    commandText = commandText.trim();
+
+    if (
+      commandText &&
+      (commandText.startsWith('/') || commandText.startsWith('$'))
+    ) {
+      // If we found a command, pass it to handleCommand
+      // Note: handleCommand currently expects `commandText` to be the command string
+      // It uses `parts` argument but effectively ignores it in current implementation
+      const handled = await this.handleCommand(commandText, parts);
+      if (handled) {
+        return { stopReason: 'end_turn' };
+      }
+    }
+
     let nextMessage: Content | null = { role: 'user', parts };
 
     while (nextMessage !== null) {
       if (pendingSend.signal.aborted) {
         chat.addHistory(nextMessage);
-        return { stopReason: 'cancelled' };
+        return { stopReason: CoreToolCallStatus.Cancelled };
       }
 
       const functionCalls: FunctionCall[] = [];
 
       try {
-        const model = getEffectiveModel(
+        const model = resolveModel(
           this.config.getModel(),
-          this.config.getPreviewFeatures(),
+          (await this.config.getGemini31Launched?.()) ?? false,
         );
         const responseStream = await chat.sendMessageStream(
           { model },
           nextMessage?.parts ?? [],
           promptId,
           pendingSend.signal,
+          LlmRole.MAIN,
         );
         nextMessage = null;
 
         for await (const resp of responseStream) {
           if (pendingSend.signal.aborted) {
-            return { stopReason: 'cancelled' };
+            return { stopReason: CoreToolCallStatus.Cancelled };
           }
 
           if (
@@ -331,7 +705,7 @@ export class Session {
         }
 
         if (pendingSend.signal.aborted) {
-          return { stopReason: 'cancelled' };
+          return { stopReason: CoreToolCallStatus.Cancelled };
         }
       } catch (error) {
         if (getErrorStatus(error) === 429) {
@@ -345,10 +719,13 @@ export class Session {
           pendingSend.signal.aborted ||
           (error instanceof Error && error.name === 'AbortError')
         ) {
-          return { stopReason: 'cancelled' };
+          return { stopReason: CoreToolCallStatus.Cancelled };
         }
 
-        throw error;
+        throw new acp.RequestError(
+          getErrorStatus(error) || 500,
+          getAcpErrorMessage(error),
+        );
       }
 
       if (functionCalls.length > 0) {
@@ -366,9 +743,28 @@ export class Session {
     return { stopReason: 'end_turn' };
   }
 
-  private async sendUpdate(
-    update: acp.SessionNotification['update'],
-  ): Promise<void> {
+  private async handleCommand(
+    commandText: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    parts: Part[],
+  ): Promise<boolean> {
+    const gitService = await this.config.getGitService();
+    const commandContext = {
+      config: this.config,
+      settings: this.settings,
+      git: gitService,
+      sendMessage: async (text: string) => {
+        await this.sendUpdate({
+          sessionUpdate: 'agent_message_chunk',
+          content: { type: 'text', text },
+        });
+      },
+    };
+
+    return this.commandHandler.handleCommand(commandText, commandContext);
+  }
+
+  private async sendUpdate(update: acp.SessionUpdate): Promise<void> {
     const params: acp.SessionNotification = {
       sessionId: this.id,
       update,
@@ -441,9 +837,16 @@ export class Session {
         if (confirmationDetails.type === 'edit') {
           content.push({
             type: 'diff',
-            path: confirmationDetails.fileName,
+            path: confirmationDetails.filePath,
             oldText: confirmationDetails.originalContent,
             newText: confirmationDetails.newContent,
+            _meta: {
+              kind: !confirmationDetails.originalContent
+                ? 'add'
+                : confirmationDetails.newContent === ''
+                  ? 'delete'
+                  : 'modify',
+            },
           });
         }
 
@@ -456,13 +859,14 @@ export class Session {
             title: invocation.getDescription(),
             content,
             locations: invocation.toolLocations(),
-            kind: tool.kind,
+            kind: toAcpToolKind(tool.kind),
           },
         };
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const output = await this.connection.requestPermission(params);
         const outcome =
-          output.outcome.outcome === 'cancelled'
+          output.outcome.outcome === CoreToolCallStatus.Cancelled
             ? ToolConfirmationOutcome.Cancel
             : z
                 .nativeEnum(ToolConfirmationOutcome)
@@ -495,7 +899,7 @@ export class Session {
           title: invocation.getDescription(),
           content: [],
           locations: invocation.toolLocations(),
-          kind: tool.kind,
+          kind: toAcpToolKind(tool.kind),
         });
       }
 
@@ -525,6 +929,33 @@ export class Session {
         ),
       );
 
+      this.chat.recordCompletedToolCalls(this.config.getActiveModel(), [
+        {
+          status: CoreToolCallStatus.Success,
+          request: {
+            callId,
+            name: fc.name,
+            args,
+            isClientInitiated: false,
+            prompt_id: promptId,
+          },
+          tool,
+          invocation,
+          response: {
+            callId,
+            responseParts: convertToFunctionResponse(
+              fc.name,
+              callId,
+              toolResult.llmContent,
+              this.config.getActiveModel(),
+            ),
+            resultDisplay: toolResult.returnDisplay,
+            error: undefined,
+            errorType: undefined,
+          },
+        },
+      ]);
+
       return convertToFunctionResponse(
         fc.name,
         callId,
@@ -542,6 +973,35 @@ export class Session {
           { type: 'content', content: { type: 'text', text: error.message } },
         ],
       });
+
+      this.chat.recordCompletedToolCalls(this.config.getActiveModel(), [
+        {
+          status: CoreToolCallStatus.Error,
+          request: {
+            callId,
+            name: fc.name,
+            args,
+            isClientInitiated: false,
+            prompt_id: promptId,
+          },
+          tool,
+          response: {
+            callId,
+            responseParts: [
+              {
+                functionResponse: {
+                  id: callId,
+                  name: fc.name ?? '',
+                  response: { error: error.message },
+                },
+              },
+            ],
+            resultDisplay: error.message,
+            error,
+            errorType: undefined,
+          },
+        },
+      ]);
 
       return errorResponse(error);
     }
@@ -609,7 +1069,10 @@ export class Session {
     const ignoredPaths: string[] = [];
 
     const toolRegistry = this.config.getToolRegistry();
-    const readManyFilesTool = new ReadManyFilesTool(this.config);
+    const readManyFilesTool = new ReadManyFilesTool(
+      this.config,
+      this.config.getMessageBus(),
+    );
     const globTool = toolRegistry.getTool('glob');
 
     if (!readManyFilesTool) {
@@ -788,7 +1251,7 @@ export class Session {
           title: invocation.getDescription(),
           content: [],
           locations: invocation.toolLocations(),
-          kind: readManyFilesTool.kind,
+          kind: toAcpToolKind(readManyFilesTool.kind),
         });
 
         const result = await invocation.execute(abortSignal);
@@ -808,7 +1271,7 @@ export class Session {
         if (Array.isArray(result.llmContent)) {
           const fileContentRegex = /^--- (.*?) ---\n\n([\s\S]*?)\n\n$/;
           processedQueryParts.push({
-            text: '\n--- Content from referenced files ---',
+            text: `\n${REFERENCE_CONTENT_START}`,
           });
           for (const part of result.llmContent) {
             if (typeof part === 'string') {
@@ -902,9 +1365,18 @@ function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
       if ('fileName' in toolResult.returnDisplay) {
         return {
           type: 'diff',
-          path: toolResult.returnDisplay.fileName,
+          path:
+            toolResult.returnDisplay.filePath ??
+            toolResult.returnDisplay.fileName,
           oldText: toolResult.returnDisplay.originalContent,
           newText: toolResult.returnDisplay.newContent,
+          _meta: {
+            kind: !toolResult.returnDisplay.originalContent
+              ? 'add'
+              : toolResult.returnDisplay.newContent === ''
+                ? 'delete'
+                : 'modify',
+          },
         };
       }
       return null;
@@ -972,9 +1444,162 @@ function toPermissionOptions(
         },
         ...basicPermissionOptions,
       ];
+    case 'ask_user':
+      // askuser doesn't need "always allow" options since it's asking questions
+      return [...basicPermissionOptions];
+    case 'exit_plan_mode':
+      // exit_plan_mode doesn't need "always allow" options since it's a plan approval flow
+      return [...basicPermissionOptions];
     default: {
       const unreachable: never = confirmation;
       throw new Error(`Unexpected: ${unreachable}`);
     }
   }
+}
+
+/**
+ * Maps our internal tool kind to the ACP ToolKind.
+ * Fallback to 'other' for kinds that are not supported by the ACP protocol.
+ */
+function toAcpToolKind(kind: Kind): acp.ToolKind {
+  switch (kind) {
+    case Kind.Read:
+    case Kind.Edit:
+    case Kind.Execute:
+    case Kind.Search:
+    case Kind.Delete:
+    case Kind.Move:
+    case Kind.Think:
+    case Kind.Fetch:
+    case Kind.SwitchMode:
+    case Kind.Other:
+      return kind as acp.ToolKind;
+    case Kind.Agent:
+      return 'think';
+    case Kind.Plan:
+    case Kind.Communicate:
+    default:
+      return 'other';
+  }
+}
+
+function buildAvailableModes(isPlanEnabled: boolean): acp.SessionMode[] {
+  const modes: acp.SessionMode[] = [
+    {
+      id: ApprovalMode.DEFAULT,
+      name: 'Default',
+      description: 'Prompts for approval',
+    },
+    {
+      id: ApprovalMode.AUTO_EDIT,
+      name: 'Auto Edit',
+      description: 'Auto-approves edit tools',
+    },
+    {
+      id: ApprovalMode.YOLO,
+      name: 'YOLO',
+      description: 'Auto-approves all tools',
+    },
+  ];
+
+  if (isPlanEnabled) {
+    modes.push({
+      id: ApprovalMode.PLAN,
+      name: 'Plan',
+      description: 'Read-only mode',
+    });
+  }
+
+  return modes;
+}
+
+function buildAvailableModels(
+  config: Config,
+  settings: LoadedSettings,
+): {
+  availableModels: Array<{
+    modelId: string;
+    name: string;
+    description?: string;
+  }>;
+  currentModelId: string;
+} {
+  const preferredModel = config.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
+  const shouldShowPreviewModels = config.getHasAccessToPreviewModel();
+  const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
+  const selectedAuthType = settings.merged.security.auth.selectedType;
+  const useCustomToolModel =
+    useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
+
+  const mainOptions = [
+    {
+      value: DEFAULT_GEMINI_MODEL_AUTO,
+      title: getDisplayString(DEFAULT_GEMINI_MODEL_AUTO),
+      description:
+        'Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash',
+    },
+  ];
+
+  if (shouldShowPreviewModels) {
+    mainOptions.unshift({
+      value: PREVIEW_GEMINI_MODEL_AUTO,
+      title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
+      description: useGemini31
+        ? 'Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash'
+        : 'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
+    });
+  }
+
+  const manualOptions = [
+    {
+      value: DEFAULT_GEMINI_MODEL,
+      title: getDisplayString(DEFAULT_GEMINI_MODEL),
+    },
+    {
+      value: DEFAULT_GEMINI_FLASH_MODEL,
+      title: getDisplayString(DEFAULT_GEMINI_FLASH_MODEL),
+    },
+    {
+      value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      title: getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL),
+    },
+  ];
+
+  if (shouldShowPreviewModels) {
+    const previewProModel = useGemini31
+      ? PREVIEW_GEMINI_3_1_MODEL
+      : PREVIEW_GEMINI_MODEL;
+
+    const previewProValue = useCustomToolModel
+      ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
+      : previewProModel;
+
+    manualOptions.unshift(
+      {
+        value: previewProValue,
+        title: getDisplayString(previewProModel),
+      },
+      {
+        value: PREVIEW_GEMINI_FLASH_MODEL,
+        title: getDisplayString(PREVIEW_GEMINI_FLASH_MODEL),
+      },
+    );
+  }
+
+  const scaleOptions = (
+    options: Array<{ value: string; title: string; description?: string }>,
+  ) =>
+    options.map((o) => ({
+      modelId: o.value,
+      name: o.title,
+      description: o.description,
+    }));
+
+  return {
+    availableModels: [
+      ...scaleOptions(mainOptions),
+      ...scaleOptions(manualOptions),
+    ],
+    currentModelId: preferredModel,
+  };
 }

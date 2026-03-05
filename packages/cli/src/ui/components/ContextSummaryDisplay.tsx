@@ -17,6 +17,8 @@ interface ContextSummaryDisplayProps {
   mcpServers?: Record<string, MCPServerConfig>;
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   ideContext?: IdeContext;
+  skillCount: number;
+  backgroundProcessCount?: number;
 }
 
 export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
@@ -25,6 +27,8 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   mcpServers,
   blockedMcpServers,
   ideContext,
+  skillCount,
+  backgroundProcessCount = 0,
 }) => {
   const { columns: terminalWidth } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
@@ -36,7 +40,9 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     geminiMdFileCount === 0 &&
     mcpServerCount === 0 &&
     blockedMcpServerCount === 0 &&
-    openFileCount === 0
+    openFileCount === 0 &&
+    skillCount === 0 &&
+    backgroundProcessCount === 0
   ) {
     return <Text> </Text>; // Render an empty space to reserve height
   }
@@ -83,15 +89,36 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     return parts.join(', ');
   })();
 
-  const summaryParts = [openFilesText, geminiMdText, mcpText].filter(Boolean);
+  const skillText = (() => {
+    if (skillCount === 0) {
+      return '';
+    }
+    return `${skillCount} skill${skillCount > 1 ? 's' : ''}`;
+  })();
+
+  const backgroundText = (() => {
+    if (backgroundProcessCount === 0) {
+      return '';
+    }
+    return `${backgroundProcessCount} Background process${
+      backgroundProcessCount > 1 ? 'es' : ''
+    }`;
+  })();
+
+  const summaryParts = [
+    openFilesText,
+    geminiMdText,
+    mcpText,
+    skillText,
+    backgroundText,
+  ].filter(Boolean);
 
   if (isNarrow) {
     return (
       <Box flexDirection="column" paddingX={1}>
-        <Text color={theme.text.secondary}>Using:</Text>
         {summaryParts.map((part, index) => (
           <Text key={index} color={theme.text.secondary}>
-            {'  '}- {part}
+            - {part}
           </Text>
         ))}
       </Box>
@@ -100,9 +127,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
 
   return (
     <Box paddingX={1}>
-      <Text color={theme.text.secondary}>
-        Using: {summaryParts.join(' | ')}
-      </Text>
+      <Text color={theme.text.secondary}>{summaryParts.join(' | ')}</Text>
     </Box>
   );
 };

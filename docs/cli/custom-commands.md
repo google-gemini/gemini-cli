@@ -30,6 +30,9 @@ separator (`/` or `\`) being converted to a colon (`:`).
 - A file at `<project>/.gemini/commands/git/commit.toml` becomes the namespaced
   command `/git:commit`.
 
+> [!TIP] After creating or modifying `.toml` command files, run
+> `/commands reload` to pick up your changes without restarting the CLI.
+
 ## TOML file format (v1)
 
 Your command definition files must be written in the TOML format and use the
@@ -50,7 +53,7 @@ Your command definition files must be written in the TOML format and use the
 ## Handling arguments
 
 Custom commands support two powerful methods for handling arguments. The CLI
-automatically chooses the correct method based on the content of your command\'s
+automatically chooses the correct method based on the content of your command's
 `prompt`.
 
 ### 1. Context-aware injection with `{{args}}`
@@ -96,13 +99,13 @@ Search Results:
 """
 ```
 
-When you run `/grep-code It\'s complicated`:
+When you run `/grep-code It's complicated`:
 
 1. The CLI sees `{{args}}` used both outside and inside `!{...}`.
-2. Outside: The first `{{args}}` is replaced raw with `It\'s complicated`.
+2. Outside: The first `{{args}}` is replaced raw with `It's complicated`.
 3. Inside: The second `{{args}}` is replaced with the escaped version (e.g., on
    Linux: `"It\'s complicated"`).
-4. The command executed is `grep -r "It\'s complicated" .`.
+4. The command executed is `grep -r "It's complicated" .`.
 5. The CLI prompts you to confirm this exact, secure command before execution.
 6. The final prompt is sent.
 
@@ -129,13 +132,13 @@ format and behavior.
 # In: <project>/.gemini/commands/changelog.toml
 # Invoked via: /changelog 1.2.0 added "Support for default argument parsing."
 
-description = "Adds a new entry to the project\'s CHANGELOG.md file."
+description = "Adds a new entry to the project's CHANGELOG.md file."
 prompt = """
 # Task: Update Changelog
 
 You are an expert maintainer of this software project. A user has invoked a command to add a new entry to the changelog.
 
-**The user\'s raw command is appended below your instructions.**
+**The user's raw command is appended below your instructions.**
 
 Your task is to parse the `<version>`, `<change_type>`, and `<message>` from their input and use the `write_file` tool to correctly update the `CHANGELOG.md` file.
 
@@ -147,7 +150,7 @@ The command follows this format: `/changelog <version> <type> <message>`
 1. Read the `CHANGELOG.md` file.
 2. Find the section for the specified `<version>`.
 3. Add the `<message>` under the correct `<type>` heading.
-4. If the version or type section doesn\'t exist, create it.
+4. If the version or type section doesn't exist, create it.
 5. Adhere strictly to the "Keep a Changelog" format.
 """
 ```
@@ -241,7 +244,7 @@ operate on specific files.
 **Example (`review.toml`):**
 
 This command injects the content of a _fixed_ best practices file
-(`docs/best-practices.md`) and uses the user\'s arguments to provide context for
+(`docs/best-practices.md`) and uses the user's arguments to provide context for
 the review.
 
 ```toml
@@ -275,9 +278,18 @@ Let's create a global command that asks the model to refactor a piece of code.
 First, ensure the user commands directory exists, then create a `refactor`
 subdirectory for organization and the final TOML file.
 
+**macOS/Linux**
+
 ```bash
 mkdir -p ~/.gemini/commands/refactor
 touch ~/.gemini/commands/refactor/pure.toml
+```
+
+**Windows (PowerShell)**
+
+```powershell
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\commands\refactor"
+New-Item -ItemType File -Force -Path "$env:USERPROFILE\.gemini\commands\refactor\pure.toml"
 ```
 
 **2. Add the content to the file:**
@@ -293,7 +305,7 @@ practice.
 description = "Asks the model to refactor the current context into a pure function."
 
 prompt = """
-Please analyze the code I\'ve provided in the current context.
+Please analyze the code I've provided in the current context.
 Refactor it into a pure function.
 
 Your response should include:

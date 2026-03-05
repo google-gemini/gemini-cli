@@ -5,8 +5,11 @@
  */
 
 import type { HookRegistry, HookRegistryEntry } from './hookRegistry.js';
-import type { HookExecutionPlan } from './types.js';
-import type { HookEventName } from './types.js';
+import {
+  getHookKey,
+  type HookExecutionPlan,
+  type HookEventName,
+} from './types.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 /**
@@ -124,7 +127,7 @@ export class HookPlanner {
     const deduplicated: HookRegistryEntry[] = [];
 
     for (const entry of entries) {
-      const key = this.getHookKey(entry);
+      const key = getHookKey(entry.config);
 
       if (!seen.has(key)) {
         seen.add(key);
@@ -135,15 +138,6 @@ export class HookPlanner {
     }
 
     return deduplicated;
-  }
-
-  /**
-   * Generate a unique key for a hook entry
-   */
-  private getHookKey(entry: HookRegistryEntry): string {
-    const name = entry.config.name || '';
-    const command = entry.config.command || '';
-    return `${name}:${command}`;
   }
 }
 

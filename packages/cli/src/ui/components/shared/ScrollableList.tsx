@@ -10,7 +10,7 @@ import {
   useImperativeHandle,
   useCallback,
   useMemo,
-  useEffect,
+  useLayoutEffect,
 } from 'react';
 import type React from 'react';
 import {
@@ -37,6 +37,7 @@ type VirtualizedListProps<T> = {
 
 interface ScrollableListProps<T> extends VirtualizedListProps<T> {
   hasFocus: boolean;
+  width?: string | number;
 }
 
 export type ScrollableListRef<T> = VirtualizedListRef<T>;
@@ -45,7 +46,7 @@ function ScrollableList<T>(
   props: ScrollableListProps<T>,
   ref: React.Ref<ScrollableListRef<T>>,
 ) {
-  const { hasFocus } = props;
+  const { hasFocus, width } = props;
   const virtualizedListRef = useRef<VirtualizedListRef<T>>(null);
   const containerRef = useRef<DOMElement>(null);
 
@@ -104,10 +105,13 @@ function ScrollableList<T>(
     smoothScrollState.current.active = false;
   }, []);
 
-  useEffect(() => stopSmoothScroll, [stopSmoothScroll]);
+  useLayoutEffect(() => stopSmoothScroll, [stopSmoothScroll]);
 
   const smoothScrollTo = useCallback(
-    (targetScrollTop: number, duration: number = 200) => {
+    (
+      targetScrollTop: number,
+      duration: number = process.env['NODE_ENV'] === 'test' ? 0 : 200,
+    ) => {
       stopSmoothScroll();
 
       const scrollState = virtualizedListRef.current?.getScrollState() ?? {
@@ -116,15 +120,19 @@ function ScrollableList<T>(
         innerHeight: 0,
       };
       const {
-        scrollTop: startScrollTop,
+        scrollTop: rawStartScrollTop,
         scrollHeight,
         innerHeight,
       } = scrollState;
 
       const maxScrollTop = Math.max(0, scrollHeight - innerHeight);
+      const startScrollTop = Math.min(rawStartScrollTop, maxScrollTop);
 
       let effectiveTarget = targetScrollTop;
-      if (targetScrollTop === SCROLL_TO_ITEM_END) {
+      if (
+        targetScrollTop === SCROLL_TO_ITEM_END ||
+        targetScrollTop >= maxScrollTop
+      ) {
         effectiveTarget = maxScrollTop;
       }
 
@@ -134,8 +142,11 @@ function ScrollableList<T>(
       );
 
       if (duration === 0) {
-        if (targetScrollTop === SCROLL_TO_ITEM_END) {
-          virtualizedListRef.current?.scrollTo(SCROLL_TO_ITEM_END);
+        if (
+          targetScrollTop === SCROLL_TO_ITEM_END ||
+          targetScrollTop >= maxScrollTop
+        ) {
+          virtualizedListRef.current?.scrollTo(Number.MAX_SAFE_INTEGER);
         } else {
           virtualizedListRef.current?.scrollTo(Math.round(clampedTarget));
         }
@@ -164,8 +175,11 @@ function ScrollableList<T>(
               ease;
 
           if (progress >= 1) {
-            if (targetScrollTop === SCROLL_TO_ITEM_END) {
-              virtualizedListRef.current?.scrollTo(SCROLL_TO_ITEM_END);
+            if (
+              targetScrollTop === SCROLL_TO_ITEM_END ||
+              targetScrollTop >= maxScrollTop
+            ) {
+              virtualizedListRef.current?.scrollTo(Number.MAX_SAFE_INTEGER);
             } else {
               virtualizedListRef.current?.scrollTo(Math.round(current));
             }
@@ -185,25 +199,35 @@ function ScrollableList<T>(
       if (keyMatchers[Command.SCROLL_UP](key)) {
         stopSmoothScroll();
         scrollByWithAnimation(-1);
+        return true;
       } else if (keyMatchers[Command.SCROLL_DOWN](key)) {
         stopSmoothScroll();
         scrollByWithAnimation(1);
+        return true;
       } else if (
         keyMatchers[Command.PAGE_UP](key) ||
         keyMatchers[Command.PAGE_DOWN](key)
       ) {
         const direction = keyMatchers[Command.PAGE_UP](key) ? -1 : 1;
         const scrollState = getScrollState();
+        const maxScroll = Math.max(
+          0,
+          scrollState.scrollHeight - scrollState.innerHeight,
+        );
         const current = smoothScrollState.current.active
           ? smoothScrollState.current.to
-          : scrollState.scrollTop;
+          : Math.min(scrollState.scrollTop, maxScroll);
         const innerHeight = scrollState.innerHeight;
         smoothScrollTo(current + direction * innerHeight);
+        return true;
       } else if (keyMatchers[Command.SCROLL_HOME](key)) {
         smoothScrollTo(0);
+        return true;
       } else if (keyMatchers[Command.SCROLL_END](key)) {
         smoothScrollTo(SCROLL_TO_ITEM_END);
+        return true;
       }
+      return false;
     },
     { isActive: hasFocus },
   );
@@ -212,6 +236,7 @@ function ScrollableList<T>(
 
   const scrollableEntry = useMemo(
     () => ({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       ref: containerRef as React.RefObject<DOMElement>,
       getScrollState,
       scrollBy: scrollByWithAnimation,
@@ -228,7 +253,7 @@ function ScrollableList<T>(
     ],
   );
 
-  useScrollable(scrollableEntry, hasFocus);
+  useScrollable(scrollableEntry, true);
 
   return (
     <Box
@@ -236,6 +261,7 @@ function ScrollableList<T>(
       flexGrow={1}
       flexDirection="column"
       overflow="hidden"
+      width={width}
     >
       <VirtualizedList
         ref={virtualizedListRef}
@@ -246,6 +272,7 @@ function ScrollableList<T>(
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 const ScrollableListWithForwardRef = forwardRef(ScrollableList) as <T>(
   props: ScrollableListProps<T> & { ref?: React.Ref<ScrollableListRef<T>> },
 ) => React.ReactElement;

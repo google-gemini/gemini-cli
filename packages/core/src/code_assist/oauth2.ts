@@ -4,12 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Credentials, AuthClient, JWTInput } from 'google-auth-library';
 import {
   OAuth2Client,
   Compute,
   CodeChallengeMethod,
   GoogleAuth,
+  type Credentials,
+  type AuthClient,
+  type JWTInput,
 } from 'google-auth-library';
 import * as http from 'node:http';
 import url from 'node:url';
@@ -45,6 +47,7 @@ import {
   exitAlternateScreen,
 } from '../utils/terminal.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
+import { getConsentForOauth } from '../utils/authConsent.js';
 
 export const authEvents = new EventEmitter();
 
@@ -114,8 +117,9 @@ async function initOauthClient(
 
   if (
     credentials &&
-    (credentials as { type?: string }).type ===
-      'external_account_authorized_user'
+    typeof credentials === 'object' &&
+    'type' in credentials &&
+    credentials.type === 'external_account_authorized_user'
   ) {
     const auth = new GoogleAuth({
       scopes: OAUTH_SCOPE,
@@ -222,6 +226,13 @@ async function initOauthClient(
   }
 
   if (config.isBrowserLaunchSuppressed()) {
+    if (!config.isInteractive()) {
+      throw new FatalAuthenticationError(
+        'Manual authorization is required but the current session is non-interactive. ' +
+          'Please run the Gemini CLI in an interactive terminal to log in, ' +
+          'provide a GEMINI_API_KEY, or ensure Application Default Credentials are configured.',
+      );
+    }
     let success = false;
     const maxRetries = 2;
     // Enter alternate buffer
@@ -269,13 +280,20 @@ async function initOauthClient(
 
     await triggerPostAuthCallbacks(client.credentials);
   } else {
+    // In Zed integration, we skip the interactive consent and directly open the browser
+    if (!config.getExperimentalZedIntegration()) {
+      const userConsent = await getConsentForOauth('');
+      if (!userConsent) {
+        throw new FatalCancellationError('Authentication cancelled by user.');
+      }
+    }
+
     const webLogin = await authWithWeb(client);
 
     coreEvents.emit(CoreEvent.UserFeedback, {
       severity: 'info',
       message:
-        `\n\nCode Assist login required.\n` +
-        `Attempting to open authentication page in your browser.\n` +
+        `\n\nAttempting to open authentication page in your browser.\n` +
         `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n\n`,
     });
     try {
@@ -325,7 +343,41 @@ async function initOauthClient(
       }, authTimeout);
     });
 
-    await Promise.race([webLogin.loginCompletePromise, timeoutPromise]);
+    // Listen for SIGINT to stop waiting for auth so the terminal doesn't hang
+    // if the user chooses not to auth.
+    let sigIntHandler: (() => void) | undefined;
+    let stdinHandler: ((data: Buffer) => void) | undefined;
+    const cancellationPromise = new Promise<never>((_, reject) => {
+      sigIntHandler = () =>
+        reject(new FatalCancellationError('Authentication cancelled by user.'));
+      process.on('SIGINT', sigIntHandler);
+
+      // Note that SIGINT might not get raised on Ctrl+C in raw mode
+      // so we also need to look for Ctrl+C directly in stdin.
+      stdinHandler = (data: Buffer) => {
+        if (data.includes(0x03)) {
+          reject(
+            new FatalCancellationError('Authentication cancelled by user.'),
+          );
+        }
+      };
+      process.stdin.on('data', stdinHandler);
+    });
+
+    try {
+      await Promise.race([
+        webLogin.loginCompletePromise,
+        timeoutPromise,
+        cancellationPromise,
+      ]);
+    } finally {
+      if (sigIntHandler) {
+        process.removeListener('SIGINT', sigIntHandler);
+      }
+      if (stdinHandler) {
+        process.stdin.removeListener('data', stdinHandler);
+      }
+    }
 
     coreEvents.emit(CoreEvent.UserFeedback, {
       severity: 'info',
@@ -367,14 +419,24 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
         '\n\n',
     );
 
-    const code = await new Promise<string>((resolve, _) => {
+    const code = await new Promise<string>((resolve, reject) => {
       const rl = readline.createInterface({
         input: process.stdin,
         output: createWorkingStdio().stdout,
         terminal: true,
       });
 
+      const timeout = setTimeout(() => {
+        rl.close();
+        reject(
+          new FatalAuthenticationError(
+            'Authorization timed out after 5 minutes.',
+          ),
+        );
+      }, 300000); // 5 minute timeout
+
       rl.question('Enter the authorization code: ', (code) => {
+        clearTimeout(timeout);
         rl.close();
         resolve(code.trim());
       });
@@ -425,12 +487,12 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
 async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   const port = await getAvailablePort();
   // The hostname used for the HTTP server binding (e.g., '0.0.0.0' in Docker).
-  const host = process.env['OAUTH_CALLBACK_HOST'] || 'localhost';
+  const host = process.env['OAUTH_CALLBACK_HOST'] || '127.0.0.1';
   // The `redirectUri` sent to Google's authorization server MUST use a loopback IP literal
   // (i.e., 'localhost' or '127.0.0.1'). This is a strict security policy for credentials of
   // type 'Desktop app' or 'Web application' (when using loopback flow) to mitigate
   // authorization code interception attacks.
-  const redirectUri = `http://localhost:${port}/oauth2callback`;
+  const redirectUri = `http://127.0.0.1:${port}/oauth2callback`;
   const state = crypto.randomBytes(32).toString('hex');
   const authUrl = client.generateAuthUrl({
     redirect_uri: redirectUri,
@@ -450,9 +512,10 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
               'OAuth callback not received. Unexpected request: ' + req.url,
             ),
           );
+          return;
         }
         // acquire the code from the querystring, and close the web server.
-        const qs = new url.URL(req.url!, 'http://localhost:3000').searchParams;
+        const qs = new url.URL(req.url!, 'http://127.0.0.1:3000').searchParams;
         if (qs.get('error')) {
           res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
           res.end();
@@ -562,8 +625,10 @@ export function getAvailablePort(): Promise<number> {
       }
       const server = net.createServer();
       server.listen(0, () => {
-        const address = server.address()! as net.AddressInfo;
-        port = address.port;
+        const address = server.address();
+        if (address && typeof address === 'object') {
+          port = address.port;
+        }
       });
       server.on('listening', () => {
         server.close();
@@ -593,6 +658,7 @@ async function fetchCachedCredentials(): Promise<
   for (const keyFile of pathsToTry) {
     try {
       const keyFileString = await fs.readFile(keyFile, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return JSON.parse(keyFileString);
     } catch (error) {
       // Log specific error for debugging, but continue trying other paths
@@ -652,6 +718,7 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
       return;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const userInfo = await response.json();
     await userAccountManager.cacheGoogleAccount(userInfo.email);
   } catch (error) {

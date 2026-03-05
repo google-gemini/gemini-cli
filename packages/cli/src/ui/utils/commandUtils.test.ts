@@ -14,6 +14,7 @@ import {
   copyToClipboard,
   getUrlOpenCommand,
 } from './commandUtils.js';
+import type { Settings } from '../../config/settingsSchema.js';
 
 // Constants used by OSC-52 tests
 const ESC = '\u001B';
@@ -33,10 +34,20 @@ vi.mock('child_process');
 // fs (for /dev/tty)
 const mockFs = vi.hoisted(() => ({
   createWriteStream: vi.fn(),
+  writeSync: vi.fn(),
+  constants: { W_OK: 2 },
 }));
-vi.mock('node:fs', () => ({
-  default: mockFs,
-}));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      ...mockFs,
+    },
+    ...mockFs,
+  };
+});
 
 // Mock process.platform for platform-specific tests
 const mockProcess = vi.hoisted(() => ({
@@ -63,10 +74,12 @@ const makeWritable = (opts?: { isTTY?: boolean; writeReturn?: boolean }) => {
     once: EventEmitter.prototype.once,
     on: EventEmitter.prototype.on,
     off: EventEmitter.prototype.off,
+    removeAllListeners: EventEmitter.prototype.removeAllListeners,
   }) as unknown as EventEmitter & {
     write: Mock;
     end: Mock;
     isTTY?: boolean;
+    removeAllListeners: Mock;
   };
   return stream;
 };
@@ -81,6 +94,7 @@ const resetEnv = () => {
   delete process.env['WSLENV'];
   delete process.env['WSL_INTEROP'];
   delete process.env['TERM'];
+  delete process.env['WT_SESSION'];
 };
 
 interface MockChildProcess extends EventEmitter {
@@ -98,6 +112,9 @@ describe('commandUtils', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    // Reset platform to default for test isolation
+    mockProcess.platform = 'darwin';
+
     // Dynamically import and set up spawn mock
     const { spawn } = await import('node:child_process');
     mockSpawn = spawn as Mock;
@@ -122,9 +139,11 @@ describe('commandUtils', () => {
     // Setup clipboardy mock
     mockClipboardyWrite = clipboardy.write as Mock;
 
-    // default: no /dev/tty available
+    // default: /dev/tty creation succeeds and emits 'open'
     mockFs.createWriteStream.mockImplementation(() => {
-      throw new Error('ENOENT');
+      const tty = makeWritable({ isTTY: true });
+      setTimeout(() => tty.emit('open'), 0);
+      return tty;
     });
 
     // default: stdio are not TTY for tests unless explicitly set
@@ -144,7 +163,6 @@ describe('commandUtils', () => {
     it('should return true when query starts with @', () => {
       expect(isAtCommand('@file')).toBe(true);
       expect(isAtCommand('@path/to/file')).toBe(true);
-      expect(isAtCommand('@')).toBe(true);
     });
 
     it('should return true when query contains @ preceded by whitespace', () => {
@@ -153,17 +171,36 @@ describe('commandUtils', () => {
       expect(isAtCommand('   @file')).toBe(true);
     });
 
-    it('should return false when query does not start with @ and has no spaced @', () => {
+    it('should return true when @ is preceded by non-whitespace (external editor scenario)', () => {
+      // When a user composes a prompt in an external editor, @-references may
+      // appear after punctuation characters such as ':' or '(' without a space.
+      // The processor must still recognise these as @-commands so that the
+      // referenced files are pre-loaded before the query is sent to the model.
+      expect(isAtCommand('check:@file.py')).toBe(true);
+      expect(isAtCommand('analyze(@file.py)')).toBe(true);
+      expect(isAtCommand('hello@file')).toBe(true);
+      expect(isAtCommand('text@path/to/file')).toBe(true);
+      expect(isAtCommand('user@host')).toBe(true);
+    });
+
+    it('should return false when query does not contain any @<path> pattern', () => {
       expect(isAtCommand('file')).toBe(false);
       expect(isAtCommand('hello')).toBe(false);
       expect(isAtCommand('')).toBe(false);
-      expect(isAtCommand('email@domain.com')).toBe(false);
-      expect(isAtCommand('user@host')).toBe(false);
+      // A bare '@' with no following path characters is not an @-command.
+      expect(isAtCommand('@')).toBe(false);
     });
 
-    it('should return false when @ is not preceded by whitespace', () => {
-      expect(isAtCommand('hello@file')).toBe(false);
-      expect(isAtCommand('text@path')).toBe(false);
+    it('should return false when @ is escaped with a backslash', () => {
+      expect(isAtCommand('\\@file')).toBe(false);
+    });
+
+    it('should return true for multi-line external editor prompts with @-references', () => {
+      expect(isAtCommand('Please review:\n@src/main.py\nand fix bugs.')).toBe(
+        true,
+      );
+      // @file after a colon on the same line.
+      expect(isAtCommand('Files:@src/a.py,@src/b.py')).toBe(true);
     });
   });
 
@@ -221,7 +258,10 @@ describe('commandUtils', () => {
     it('writes OSC-52 to /dev/tty when in SSH', async () => {
       const testText = 'abc';
       const tty = makeWritable({ isTTY: true });
-      mockFs.createWriteStream.mockReturnValue(tty);
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
 
       process.env['SSH_CONNECTION'] = '1';
 
@@ -236,11 +276,38 @@ describe('commandUtils', () => {
       expect(mockClipboardyWrite).not.toHaveBeenCalled();
     });
 
-    it('wraps OSC-52 for tmux', async () => {
+    it('uses OSC-52 when useOSC52Copy setting is enabled', async () => {
+      const testText = 'forced-osc52';
+      const tty = makeWritable({ isTTY: true });
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
+
+      // NO environment signals for SSH/WSL/etc.
+      const settings = {
+        experimental: { useOSC52Copy: true },
+      } as unknown as Settings;
+
+      await copyToClipboard(testText, settings);
+
+      const b64 = Buffer.from(testText, 'utf8').toString('base64');
+      const expected = `${ESC}]52;c;${b64}${BEL}`;
+
+      expect(tty.write).toHaveBeenCalledTimes(1);
+      expect(tty.write.mock.calls[0][0]).toBe(expected);
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('wraps OSC-52 for tmux when in SSH', async () => {
       const testText = 'tmux-copy';
       const tty = makeWritable({ isTTY: true });
-      mockFs.createWriteStream.mockReturnValue(tty);
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
 
+      process.env['SSH_CONNECTION'] = '1';
       process.env['TMUX'] = '1';
 
       await copyToClipboard(testText);
@@ -254,12 +321,16 @@ describe('commandUtils', () => {
       expect(mockClipboardyWrite).not.toHaveBeenCalled();
     });
 
-    it('wraps OSC-52 for GNU screen with chunked DCS', async () => {
+    it('wraps OSC-52 for GNU screen with chunked DCS when in SSH', async () => {
       // ensure payload > chunk size (240) so there are multiple chunks
       const testText = 'x'.repeat(1200);
       const tty = makeWritable({ isTTY: true });
-      mockFs.createWriteStream.mockReturnValue(tty);
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
 
+      process.env['SSH_CONNECTION'] = '1';
       process.env['STY'] = 'screen-session';
 
       await copyToClipboard(testText);
@@ -285,6 +356,13 @@ describe('commandUtils', () => {
 
       process.env['SSH_TTY'] = '/dev/pts/1';
 
+      // Simulate /dev/tty access failure
+      mockFs.createWriteStream.mockImplementation(() => {
+        const tty = makeWritable({ isTTY: true });
+        setTimeout(() => tty.emit('error', new Error('EACCES')), 0);
+        return tty;
+      });
+
       await copyToClipboard(testText);
 
       const b64 = Buffer.from(testText, 'utf8').toString('base64');
@@ -298,7 +376,11 @@ describe('commandUtils', () => {
       const testText = 'no-tty';
       mockClipboardyWrite.mockResolvedValue(undefined);
 
-      // /dev/tty throws; stderr/stdout are non-TTY by default
+      // /dev/tty throws or errors
+      mockFs.createWriteStream.mockImplementation(() => {
+        throw new Error('ENOENT');
+      });
+
       process.env['SSH_CLIENT'] = 'client';
 
       await copyToClipboard(testText);
@@ -308,7 +390,10 @@ describe('commandUtils', () => {
 
     it('resolves on drain when backpressure occurs', async () => {
       const tty = makeWritable({ isTTY: true, writeReturn: false });
-      mockFs.createWriteStream.mockReturnValue(tty);
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
       process.env['SSH_CONNECTION'] = '1';
 
       const p = copyToClipboard('drain-test');
@@ -320,7 +405,10 @@ describe('commandUtils', () => {
 
     it('propagates errors from OSC-52 write path', async () => {
       const tty = makeWritable({ isTTY: true, writeReturn: false });
-      mockFs.createWriteStream.mockReturnValue(tty);
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
       process.env['SSH_CONNECTION'] = '1';
 
       const p = copyToClipboard('err-test');
@@ -344,7 +432,10 @@ describe('commandUtils', () => {
 
     it('uses clipboardy when not in eligible env even if /dev/tty exists', async () => {
       const tty = makeWritable({ isTTY: true });
-      mockFs.createWriteStream.mockReturnValue(tty);
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
       const text = 'local-terminal';
       mockClipboardyWrite.mockResolvedValue(undefined);
 
@@ -353,6 +444,169 @@ describe('commandUtils', () => {
       expect(mockClipboardyWrite).toHaveBeenCalledWith(text);
       expect(tty.write).not.toHaveBeenCalled();
       expect(tty.end).not.toHaveBeenCalled();
+    });
+
+    it('falls back if /dev/tty emits error (e.g. sandbox)', async () => {
+      const testText = 'access-denied-fallback';
+      process.env['SSH_CONNECTION'] = '1'; // normally would trigger OSC52 on TTY
+
+      mockFs.createWriteStream.mockImplementation(() => {
+        const stream = makeWritable({ isTTY: true });
+        // Emit error instead of open
+        setTimeout(() => stream.emit('error', new Error('EACCES')), 0);
+        return stream;
+      });
+
+      // Fallback to clipboardy since stdio isn't configured as TTY in this test (default from beforeEach)
+      mockClipboardyWrite.mockResolvedValue(undefined);
+
+      await copyToClipboard(testText);
+
+      expect(mockFs.createWriteStream).toHaveBeenCalled();
+      expect(mockClipboardyWrite).toHaveBeenCalledWith(testText);
+    });
+    it('uses clipboardy in tmux when not in SSH/WSL', async () => {
+      const tty = makeWritable({ isTTY: true });
+      mockFs.createWriteStream.mockImplementation(() => {
+        setTimeout(() => tty.emit('open'), 0);
+        return tty;
+      });
+      const text = 'tmux-local';
+      mockClipboardyWrite.mockResolvedValue(undefined);
+
+      process.env['TMUX'] = '1';
+
+      await copyToClipboard(text);
+
+      expect(mockClipboardyWrite).toHaveBeenCalledWith(text);
+      expect(tty.write).not.toHaveBeenCalled();
+      expect(tty.end).not.toHaveBeenCalled();
+    });
+
+    it('falls back if /dev/tty hangs (timeout)', async () => {
+      const testText = 'timeout-fallback';
+      process.env['SSH_CONNECTION'] = '1';
+
+      mockFs.createWriteStream.mockImplementation(() =>
+        // Stream that never emits open or error
+        makeWritable({ isTTY: true }),
+      );
+
+      mockClipboardyWrite.mockResolvedValue(undefined);
+
+      // Should complete even though stream hangs
+      await copyToClipboard(testText);
+
+      expect(mockFs.createWriteStream).toHaveBeenCalled();
+      expect(mockClipboardyWrite).toHaveBeenCalledWith(testText);
+    });
+
+    it('skips /dev/tty on Windows and uses stderr fallback for OSC-52', async () => {
+      mockProcess.platform = 'win32';
+      const stderrStream = makeWritable({ isTTY: true });
+      Object.defineProperty(process, 'stderr', {
+        value: stderrStream,
+        configurable: true,
+      });
+
+      // Set SSH environment to trigger OSC-52 path
+      process.env['SSH_CONNECTION'] = '1';
+
+      await copyToClipboard('windows-ssh-test');
+
+      expect(mockFs.createWriteStream).not.toHaveBeenCalled();
+      expect(stderrStream.write).toHaveBeenCalled();
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('uses clipboardy on native Windows without SSH/WSL', async () => {
+      mockProcess.platform = 'win32';
+      mockClipboardyWrite.mockResolvedValue(undefined);
+
+      await copyToClipboard('windows-native-test');
+
+      // Fallback to clipboardy and not /dev/tty
+      expect(mockClipboardyWrite).toHaveBeenCalledWith('windows-native-test');
+      expect(mockFs.createWriteStream).not.toHaveBeenCalled();
+    });
+
+    it('uses OSC-52 on Windows Terminal (WT_SESSION) and prioritizes stdout', async () => {
+      mockProcess.platform = 'win32';
+      const stdoutStream = makeWritable({ isTTY: true });
+      const stderrStream = makeWritable({ isTTY: true });
+      Object.defineProperty(process, 'stdout', {
+        value: stdoutStream,
+        configurable: true,
+      });
+      Object.defineProperty(process, 'stderr', {
+        value: stderrStream,
+        configurable: true,
+      });
+
+      process.env['WT_SESSION'] = 'some-uuid';
+
+      const testText = 'windows-terminal-test';
+      await copyToClipboard(testText);
+
+      const b64 = Buffer.from(testText, 'utf8').toString('base64');
+      const expected = `${ESC}]52;c;${b64}${BEL}`;
+
+      expect(stdoutStream.write).toHaveBeenCalledWith(expected);
+      expect(stderrStream.write).not.toHaveBeenCalled();
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('uses fs.writeSync on Windows when stdout has an fd (bypassing Ink)', async () => {
+      mockProcess.platform = 'win32';
+      const stdoutStream = makeWritable({ isTTY: true });
+      // Simulate FD
+      (stdoutStream as unknown as { fd: number }).fd = 1;
+
+      Object.defineProperty(process, 'stdout', {
+        value: stdoutStream,
+        configurable: true,
+      });
+
+      process.env['WT_SESSION'] = 'some-uuid';
+
+      const testText = 'direct-write-test';
+      await copyToClipboard(testText);
+
+      const b64 = Buffer.from(testText, 'utf8').toString('base64');
+      const expected = `${ESC}]52;c;${b64}${BEL}`;
+
+      expect(mockFs.writeSync).toHaveBeenCalledWith(1, expected);
+      expect(stdoutStream.write).not.toHaveBeenCalled();
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
+    });
+
+    it('uses fs.writeSync on Windows when stderr has an fd and stdout is not a TTY', async () => {
+      mockProcess.platform = 'win32';
+      const stdoutStream = makeWritable({ isTTY: false });
+      const stderrStream = makeWritable({ isTTY: true });
+      // Simulate FD
+      (stderrStream as unknown as { fd: number }).fd = 2;
+
+      Object.defineProperty(process, 'stdout', {
+        value: stdoutStream,
+        configurable: true,
+      });
+      Object.defineProperty(process, 'stderr', {
+        value: stderrStream,
+        configurable: true,
+      });
+
+      process.env['WT_SESSION'] = 'some-uuid';
+
+      const testText = 'direct-write-stderr-test';
+      await copyToClipboard(testText);
+
+      const b64 = Buffer.from(testText, 'utf8').toString('base64');
+      const expected = `${ESC}]52;c;${b64}${BEL}`;
+
+      expect(mockFs.writeSync).toHaveBeenCalledWith(2, expected);
+      expect(stderrStream.write).not.toHaveBeenCalled();
+      expect(mockClipboardyWrite).not.toHaveBeenCalled();
     });
   });
 

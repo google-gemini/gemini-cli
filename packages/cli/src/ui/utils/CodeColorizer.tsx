@@ -22,7 +22,6 @@ import {
 } from '../components/shared/MaxSizedBox.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { debugLogger } from '@google/gemini-cli-core';
-import { isAlternateBufferEnabled } from '../hooks/useAlternateBuffer.js';
 
 // Configure theming and parsing utilities.
 const lowlight = createLowlight(common);
@@ -41,6 +40,7 @@ function renderHastNode(
   // Handle Element Nodes: Determine color and pass it down, don't wrap
   if (node.type === 'element') {
     const nodeClasses: string[] =
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (node.properties?.['className'] as string[]) || [];
     let elementColor: string | undefined = undefined;
 
@@ -149,9 +149,8 @@ export function colorizeCode({
   const activeTheme = theme || themeManager.getActiveTheme();
   const showLineNumbers = hideLineNumbers
     ? false
-    : (settings?.merged.ui?.showLineNumbers ?? true);
+    : settings.merged.ui.showLineNumbers;
 
-  const useMaxSizedBox = !isAlternateBufferEnabled(settings);
   try {
     // Render the HAST tree using the adapted theme
     // Apply the theme's default foreground color to the top-level Text element
@@ -161,7 +160,7 @@ export function colorizeCode({
     let hiddenLinesCount = 0;
 
     // Optimization to avoid highlighting lines that cannot possibly be displayed.
-    if (availableHeight !== undefined && useMaxSizedBox) {
+    if (availableHeight !== undefined) {
       availableHeight = Math.max(availableHeight, MINIMUM_MAX_HEIGHT);
       if (lines.length > availableHeight) {
         const sliceIndex = lines.length - availableHeight;
@@ -178,17 +177,8 @@ export function colorizeCode({
       );
 
       return (
-        <Box key={index} minHeight={useMaxSizedBox ? undefined : 1}>
-          {/* We have to render line numbers differently depending on whether we are using MaxSizeBox or not */}
-          {showLineNumbers && useMaxSizedBox && (
-            <Text color={activeTheme.colors.Gray}>
-              {`${String(index + 1 + hiddenLinesCount).padStart(
-                padWidth,
-                ' ',
-              )} `}
-            </Text>
-          )}
-          {showLineNumbers && !useMaxSizedBox && (
+        <Box key={index} minHeight={1}>
+          {showLineNumbers && (
             <Box
               minWidth={padWidth + 1}
               flexShrink={0}
@@ -208,7 +198,7 @@ export function colorizeCode({
       );
     });
 
-    if (useMaxSizedBox) {
+    if (availableHeight !== undefined) {
       return (
         <MaxSizedBox
           maxHeight={availableHeight}
@@ -236,14 +226,8 @@ export function colorizeCode({
     const lines = codeToHighlight.split('\n');
     const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
     const fallbackLines = lines.map((line, index) => (
-      <Box key={index} minHeight={useMaxSizedBox ? undefined : 1}>
-        {/* We have to render line numbers differently depending on whether we are using MaxSizeBox or not */}
-        {showLineNumbers && useMaxSizedBox && (
-          <Text color={activeTheme.defaultColor}>
-            {`${String(index + 1).padStart(padWidth, ' ')} `}
-          </Text>
-        )}
-        {showLineNumbers && !useMaxSizedBox && (
+      <Box key={index} minHeight={1}>
+        {showLineNumbers && (
           <Box
             minWidth={padWidth + 1}
             flexShrink={0}
@@ -258,7 +242,7 @@ export function colorizeCode({
       </Box>
     ));
 
-    if (useMaxSizedBox) {
+    if (availableHeight !== undefined) {
       return (
         <MaxSizedBox
           maxHeight={availableHeight}

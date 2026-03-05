@@ -7,17 +7,18 @@
 import type { Config } from '../config/config.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
-import { Type } from '@google/genai';
-import type {
-  Content,
-  Part,
-  FunctionCall,
-  FunctionDeclaration,
-  Schema,
+import {
+  Type,
+  type Content,
+  type Part,
+  type FunctionCall,
+  type FunctionDeclaration,
+  type Schema,
 } from '@google/genai';
-import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { type ToolCallRequestInfo, CompressionStatus } from '../core/turn.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { CompressionStatus } from '../core/turn.js';
+import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
@@ -29,23 +30,33 @@ import {
 import {
   AgentStartEvent,
   AgentFinishEvent,
+  LlmRole,
   RecoveryAttemptEvent,
 } from '../telemetry/types.js';
-import type {
-  LocalAgentDefinition,
-  AgentInputs,
-  OutputObject,
-  SubagentActivityEvent,
+import {
+  AgentTerminateMode,
+  DEFAULT_QUERY_STRING,
+  DEFAULT_MAX_TURNS,
+  DEFAULT_MAX_TIME_MINUTES,
+  type LocalAgentDefinition,
+  type AgentInputs,
+  type OutputObject,
+  type SubagentActivityEvent,
 } from './types.js';
-import { AgentTerminateMode } from './types.js';
+import { getErrorMessage } from '../utils/errors.js';
 import { templateString } from './utils.js';
+import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
+import type { RoutingContext } from '../routing/routingStrategy.js';
 import { parseThought } from '../utils/thoughtUtils.js';
 import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getModelConfigAlias } from './registry.js';
 import { getVersion } from '../utils/version.js';
-import { ApprovalMode } from '../policy/types.js';
+import { getToolCallContext } from '../utils/toolCallContext.js';
+import { scheduleAgentTools } from './agent-scheduler.js';
+import { DeadlineTimer } from '../utils/deadlineTimer.js';
+import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -65,6 +76,10 @@ type AgentTurnResult =
       finalResult: string | null;
     };
 
+export function createUnauthorizedToolError(toolName: string): string {
+  return `Unauthorized tool call: '${toolName}' is not available to this agent.`;
+}
+
 /**
  * Executes an agent loop based on an {@link AgentDefinition}.
  *
@@ -79,6 +94,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly runtimeContext: Config;
   private readonly onActivity?: ActivityCallback;
   private readonly compressionService: ChatCompressionService;
+  private readonly parentCallId?: string;
   private hasFailedCompressionAttempt = false;
 
   /**
@@ -98,18 +114,44 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     onActivity?: ActivityCallback,
   ): Promise<LocalAgentExecutor<TOutput>> {
     // Create an isolated tool registry for this agent instance.
-    const agentToolRegistry = new ToolRegistry(runtimeContext);
+    const agentToolRegistry = new ToolRegistry(
+      runtimeContext,
+      runtimeContext.getMessageBus(),
+    );
     const parentToolRegistry = runtimeContext.getToolRegistry();
+    const allAgentNames = new Set(
+      runtimeContext.getAgentRegistry().getAllAgentNames(),
+    );
+
+    const registerToolByName = (toolName: string) => {
+      // Check if the tool is a subagent to prevent recursion.
+      // We do not allow agents to call other agents.
+      if (allAgentNames.has(toolName)) {
+        debugLogger.warn(
+          `[LocalAgentExecutor] Skipping subagent tool '${toolName}' for agent '${definition.name}' to prevent recursion.`,
+        );
+        return;
+      }
+
+      // If the tool is referenced by name, retrieve it from the parent
+      // registry and register it with the agent's isolated registry.
+      const tool = parentToolRegistry.getTool(toolName);
+      if (tool) {
+        if (tool instanceof DiscoveredMCPTool) {
+          // Subagents MUST use fully qualified names for MCP tools to ensure
+          // unambiguous tool calls and to comply with policy requirements.
+          // We automatically "upgrade" any MCP tool to its qualified version.
+          agentToolRegistry.registerTool(tool.asFullyQualifiedTool());
+        } else {
+          agentToolRegistry.registerTool(tool);
+        }
+      }
+    };
 
     if (definition.toolConfig) {
       for (const toolRef of definition.toolConfig.tools) {
         if (typeof toolRef === 'string') {
-          // If the tool is referenced by name, retrieve it from the parent
-          // registry and register it with the agent's isolated registry.
-          const toolFromParent = parentToolRegistry.getTool(toolRef);
-          if (toolFromParent) {
-            agentToolRegistry.registerTool(toolFromParent);
-          }
+          registerToolByName(toolRef);
         } else if (
           typeof toolRef === 'object' &&
           'name' in toolRef &&
@@ -120,18 +162,28 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         // Note: Raw `FunctionDeclaration` objects in the config don't need to be
         // registered; their schemas are passed directly to the model later.
       }
-
-      agentToolRegistry.sortTools();
+    } else {
+      // If no tools are explicitly configured, default to all available tools.
+      for (const toolName of parentToolRegistry.getAllToolNames()) {
+        registerToolByName(toolName);
+      }
     }
+
+    agentToolRegistry.sortTools();
 
     // Get the parent prompt ID from context
     const parentPromptId = promptIdContext.getStore();
+
+    // Get the parent tool call ID from context
+    const toolContext = getToolCallContext();
+    const parentCallId = toolContext?.callId;
 
     return new LocalAgentExecutor(
       definition,
       runtimeContext,
       agentToolRegistry,
       parentPromptId,
+      parentCallId,
       onActivity,
     );
   }
@@ -147,6 +199,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     runtimeContext: Config,
     toolRegistry: ToolRegistry,
     parentPromptId: string | undefined,
+    parentCallId: string | undefined,
     onActivity?: ActivityCallback,
   ) {
     this.definition = definition;
@@ -154,6 +207,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.toolRegistry = toolRegistry;
     this.onActivity = onActivity;
     this.compressionService = new ChatCompressionService();
+    this.parentCallId = parentCallId;
 
     const randomIdPart = Math.random().toString(36).slice(2, 8);
     // parentPromptId will be undefined if this agent is invoked directly
@@ -175,6 +229,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     turnCounter: number,
     combinedSignal: AbortSignal,
     timeoutSignal: AbortSignal, // Pass the timeout controller's signal
+    onWaitingForConfirmation?: (waiting: boolean) => void,
   ): Promise<AgentTurnResult> {
     const promptId = `${this.agentId}#${turnCounter}`;
 
@@ -208,8 +263,22 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       };
     }
 
-    const { nextMessage, submittedOutput, taskCompleted } =
-      await this.processFunctionCalls(functionCalls, combinedSignal, promptId);
+    const { nextMessage, submittedOutput, taskCompleted, aborted } =
+      await this.processFunctionCalls(
+        functionCalls,
+        combinedSignal,
+        promptId,
+        onWaitingForConfirmation,
+      );
+
+    if (aborted) {
+      return {
+        status: 'stop',
+        terminateReason: AgentTerminateMode.ABORTED,
+        finalResult: null,
+      };
+    }
+
     if (taskCompleted) {
       const finalResult = submittedOutput ?? 'Task completed successfully.';
       return {
@@ -266,6 +335,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       | AgentTerminateMode.MAX_TURNS
       | AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
     externalSignal: AbortSignal, // The original signal passed to run()
+    onWaitingForConfirmation?: (waiting: boolean) => void,
   ): Promise<string | null> {
     this.emitActivity('THOUGHT_CHUNK', {
       text: `Execution limit reached (${reason}). Attempting one final recovery turn with a grace period.`,
@@ -299,6 +369,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         turnCounter, // This will be the "last" turn number
         combinedSignal,
         graceTimeoutController.signal, // Pass grace signal to identify a *grace* timeout
+        onWaitingForConfirmation,
       );
 
       if (
@@ -355,15 +426,26 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
     let finalResult: string | null = null;
 
-    const { max_time_minutes } = this.definition.runConfig;
-    const timeoutController = new AbortController();
-    const timeoutId = setTimeout(
-      () => timeoutController.abort(new Error('Agent timed out.')),
-      max_time_minutes * 60 * 1000,
+    const maxTimeMinutes =
+      this.definition.runConfig.maxTimeMinutes ?? DEFAULT_MAX_TIME_MINUTES;
+    const maxTurns = this.definition.runConfig.maxTurns ?? DEFAULT_MAX_TURNS;
+
+    const deadlineTimer = new DeadlineTimer(
+      maxTimeMinutes * 60 * 1000,
+      'Agent timed out.',
     );
 
+    // Track time spent waiting for user confirmation to credit it back to the agent.
+    const onWaitingForConfirmation = (waiting: boolean) => {
+      if (waiting) {
+        deadlineTimer.pause();
+      } else {
+        deadlineTimer.resume();
+      }
+    };
+
     // Combine the external signal with the internal timeout signal.
-    const combinedSignal = AbortSignal.any([signal, timeoutController.signal]);
+    const combinedSignal = AbortSignal.any([signal, deadlineTimer.signal]);
 
     logAgentStart(
       this.runtimeContext,
@@ -385,45 +467,83 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       chat = await this.createChatObject(augmentedInputs, tools);
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, augmentedInputs)
-        : 'Get Started!';
-      let currentMessage: Content = { role: 'user', parts: [{ text: query }] };
+        : DEFAULT_QUERY_STRING;
 
-      while (true) {
-        // Check for termination conditions like max turns.
-        const reason = this.checkTermination(startTime, turnCounter);
-        if (reason) {
-          terminateReason = reason;
-          break;
-        }
+      const pendingHintsQueue: string[] = [];
+      const hintListener = (hint: string) => {
+        pendingHintsQueue.push(hint);
+      };
+      // Capture the index of the last hint before starting to avoid re-injecting old hints.
+      // NOTE: Hints added AFTER this point will be broadcast to all currently running
+      // local agents via the listener below.
+      const startIndex =
+        this.runtimeContext.userHintService.getLatestHintIndex();
+      this.runtimeContext.userHintService.onUserHint(hintListener);
 
-        // Check for timeout or external abort.
-        if (combinedSignal.aborted) {
-          // Determine which signal caused the abort.
-          terminateReason = timeoutController.signal.aborted
-            ? AgentTerminateMode.TIMEOUT
-            : AgentTerminateMode.ABORTED;
-          break;
-        }
+      try {
+        const initialHints =
+          this.runtimeContext.userHintService.getUserHintsAfter(startIndex);
+        const formattedInitialHints = formatUserHintsForModel(initialHints);
 
-        const turnResult = await this.executeTurn(
-          chat,
-          currentMessage,
-          turnCounter++,
-          combinedSignal,
-          timeoutController.signal,
-        );
+        let currentMessage: Content = formattedInitialHints
+          ? {
+              role: 'user',
+              parts: [{ text: formattedInitialHints }, { text: query }],
+            }
+          : { role: 'user', parts: [{ text: query }] };
 
-        if (turnResult.status === 'stop') {
-          terminateReason = turnResult.terminateReason;
-          // Only set finalResult if the turn provided one (e.g., error or goal).
-          if (turnResult.finalResult) {
-            finalResult = turnResult.finalResult;
+        while (true) {
+          // Check for termination conditions like max turns.
+          const reason = this.checkTermination(turnCounter, maxTurns);
+          if (reason) {
+            terminateReason = reason;
+            break;
           }
-          break; // Exit the loop for *any* stop reason.
-        }
 
-        // If status is 'continue', update message for the next loop
-        currentMessage = turnResult.nextMessage;
+          // Check for timeout or external abort.
+          if (combinedSignal.aborted) {
+            // Determine which signal caused the abort.
+            terminateReason = deadlineTimer.signal.aborted
+              ? AgentTerminateMode.TIMEOUT
+              : AgentTerminateMode.ABORTED;
+            break;
+          }
+
+          const turnResult = await this.executeTurn(
+            chat,
+            currentMessage,
+            turnCounter++,
+            combinedSignal,
+            deadlineTimer.signal,
+            onWaitingForConfirmation,
+          );
+
+          if (turnResult.status === 'stop') {
+            terminateReason = turnResult.terminateReason;
+            // Only set finalResult if the turn provided one (e.g., error or goal).
+            if (turnResult.finalResult) {
+              finalResult = turnResult.finalResult;
+            }
+            break; // Exit the loop for *any* stop reason.
+          }
+
+          // If status is 'continue', update message for the next loop
+          currentMessage = turnResult.nextMessage;
+
+          // Check for new user steering hints collected via subscription
+          if (pendingHintsQueue.length > 0) {
+            const hintsToProcess = [...pendingHintsQueue];
+            pendingHintsQueue.length = 0;
+            const formattedHints = formatUserHintsForModel(hintsToProcess);
+            if (formattedHints) {
+              // Append hints to the current message (next turn)
+              currentMessage.parts ??= [];
+              currentMessage.parts.unshift({ text: formattedHints });
+            }
+          }
+        }
+      } finally {
+        this.runtimeContext.userHintService.offUserHint(hintListener);
       }
 
       // === UNIFIED RECOVERY BLOCK ===
@@ -439,6 +559,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           turnCounter, // Use current turnCounter for the recovery attempt
           terminateReason,
           signal, // Pass the external signal
+          onWaitingForConfirmation,
         );
 
         if (recoveryResult !== null) {
@@ -448,13 +569,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         } else {
           // Recovery Failed. Set the final error message based on the *original* reason.
           if (terminateReason === AgentTerminateMode.TIMEOUT) {
-            finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
+            finalResult = `Agent timed out after ${maxTimeMinutes} minutes.`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'timeout',
             });
           } else if (terminateReason === AgentTerminateMode.MAX_TURNS) {
-            finalResult = `Agent reached max turns limit (${this.definition.runConfig.max_turns}).`;
+            finalResult = `Agent reached max turns limit (${maxTurns}).`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'max_turns',
@@ -492,7 +613,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       if (
         error instanceof Error &&
         error.name === 'AbortError' &&
-        timeoutController.signal.aborted &&
+        deadlineTimer.signal.aborted &&
         !signal.aborted // Ensure the external signal was not the cause
       ) {
         terminateReason = AgentTerminateMode.TIMEOUT;
@@ -504,6 +625,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             turnCounter, // Use current turnCounter
             AgentTerminateMode.TIMEOUT,
             signal,
+            onWaitingForConfirmation,
           );
 
           if (recoveryResult !== null) {
@@ -518,7 +640,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
 
         // Recovery failed or wasn't possible
-        finalResult = `Agent timed out after ${this.definition.runConfig.max_time_minutes} minutes.`;
+        finalResult = `Agent timed out after ${maxTimeMinutes} minutes.`;
         this.emitActivity('ERROR', {
           error: finalResult,
           context: 'timeout',
@@ -532,7 +654,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.emitActivity('ERROR', { error: String(error) });
       throw error; // Re-throw other errors or external aborts.
     } finally {
-      clearTimeout(timeoutId);
+      deadlineTimer.abort();
       logAgentFinish(
         this.runtimeContext,
         new AgentFinishEvent(
@@ -550,7 +672,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     chat: GeminiChat,
     prompt_id: string,
   ): Promise<void> {
-    const model = this.definition.modelConfig.model;
+    const model = this.definition.modelConfig.model ?? DEFAULT_GEMINI_MODEL;
 
     const { newHistory, info } = await this.compressionService.compress(
       chat,
@@ -571,6 +693,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         chat.setHistory(newHistory);
         this.hasFailedCompressionAttempt = false;
       }
+    } else if (info.compressionStatus === CompressionStatus.CONTENT_TRUNCATED) {
+      if (newHistory) {
+        chat.setHistory(newHistory);
+        // Do NOT reset hasFailedCompressionAttempt.
+        // We only truncated content because summarization previously failed.
+        // We want to keep avoiding expensive summarization calls.
+      }
     }
   }
 
@@ -585,14 +714,52 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     signal: AbortSignal,
     promptId: string,
   ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+    const modelConfigAlias = getModelConfigAlias(this.definition);
+
+    // Resolve the model config early to get the concrete model string (which may be `auto`).
+    const resolvedConfig =
+      this.runtimeContext.modelConfigService.getResolvedConfig({
+        model: modelConfigAlias,
+        overrideScope: this.definition.name,
+      });
+    const requestedModel = resolvedConfig.model;
+
+    let modelToUse: string;
+    if (isAutoModel(requestedModel)) {
+      // TODO(joshualitt): This try / catch is inconsistent with the routing
+      // behavior for the main agent. Ideally, we would have a universal
+      // policy for routing failure. Given routing failure does not necessarily
+      // mean generation will fail, we may want to share this logic with
+      // other places we use model routing.
+      try {
+        const routingContext: RoutingContext = {
+          history: chat.getHistory(/*curated=*/ true),
+          request: message.parts || [],
+          signal,
+          requestedModel,
+        };
+        const router = this.runtimeContext.getModelRouterService();
+        const decision = await router.route(routingContext);
+        modelToUse = decision.model;
+      } catch (error) {
+        debugLogger.warn(`Error during model routing: ${error}`);
+        modelToUse = DEFAULT_GEMINI_MODEL;
+      }
+    } else {
+      modelToUse = requestedModel;
+    }
+
+    const role = LlmRole.SUBAGENT;
+
     const responseStream = await chat.sendMessageStream(
       {
-        model: getModelConfigAlias(this.definition),
+        model: modelToUse,
         overrideScope: this.definition.name,
       },
       message.parts || [],
       promptId,
       signal,
+      role,
     );
 
     const functionCalls: FunctionCall[] = [];
@@ -663,16 +830,19 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         systemInstruction,
         [{ functionDeclarations: tools }],
         startHistory,
+        undefined,
+        undefined,
+        'subagent',
       );
-    } catch (error) {
+    } catch (e: unknown) {
       await reportError(
-        error,
+        e,
         `Error initializing Gemini chat for agent ${this.definition.name}.`,
         startHistory,
         'startChat',
       );
       // Re-throw as a more specific error after reporting.
-      throw new Error(`Failed to create chat object: ${error}`);
+      throw new Error(`Failed to create chat object: ${getErrorMessage(e)}`);
     }
   }
 
@@ -685,10 +855,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     functionCalls: FunctionCall[],
     signal: AbortSignal,
     promptId: string,
+    onWaitingForConfirmation?: (waiting: boolean) => void,
   ): Promise<{
     nextMessage: Content;
     submittedOutput: string | null;
     taskCompleted: boolean;
+    aborted: boolean;
   }> {
     const allowedToolNames = new Set(this.toolRegistry.getAllToolNames());
     // Always allow the completion tool
@@ -696,27 +868,47 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     let submittedOutput: string | null = null;
     let taskCompleted = false;
+    let aborted = false;
 
-    // We'll collect promises for the tool executions
-    const toolExecutionPromises: Array<Promise<Part[] | void>> = [];
-    // And we'll need a place to store the synchronous results (like complete_task or blocked calls)
-    const syncResponseParts: Part[] = [];
+    // We'll separate complete_task from other tools
+    const toolRequests: ToolCallRequestInfo[] = [];
+    // Map to keep track of tool name by callId for activity emission
+    const toolNameMap = new Map<string, string>();
+    // Synchronous results (like complete_task or unauthorized calls)
+    const syncResults = new Map<string, Part>();
 
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
       const args = functionCall.args ?? {};
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const toolName = functionCall.name as string;
+
+      let displayName = toolName;
+      let description: string | undefined = undefined;
+
+      try {
+        const tool = this.toolRegistry.getTool(toolName);
+        if (tool) {
+          displayName = tool.displayName ?? toolName;
+          const invocation = tool.build(args);
+          description = invocation.getDescription();
+        }
+      } catch {
+        // Ignore errors during formatting for activity emission
+      }
 
       this.emitActivity('TOOL_CALL_START', {
-        name: functionCall.name,
+        name: toolName,
+        displayName,
+        description,
         args,
       });
 
-      if (functionCall.name === TASK_COMPLETE_TOOL_NAME) {
+      if (toolName === TASK_COMPLETE_TOOL_NAME) {
         if (taskCompleted) {
-          // We already have a completion from this turn. Ignore subsequent ones.
           const error =
             'Task already marked complete in this turn. Ignoring duplicate call.';
-          syncResponseParts.push({
+          syncResults.set(callId, {
             functionResponse: {
               name: TASK_COMPLETE_TOOL_NAME,
               response: { error },
@@ -725,7 +917,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           });
           this.emitActivity('ERROR', {
             context: 'tool_call',
-            name: functionCall.name,
+            name: toolName,
             error,
           });
           continue;
@@ -743,7 +935,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             if (!validationResult.success) {
               taskCompleted = false; // Validation failed, revoke completion
               const error = `Output validation failed: ${JSON.stringify(validationResult.error.flatten())}`;
-              syncResponseParts.push({
+              syncResults.set(callId, {
                 functionResponse: {
                   name: TASK_COMPLETE_TOOL_NAME,
                   response: { error },
@@ -752,12 +944,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               });
               this.emitActivity('ERROR', {
                 context: 'tool_call',
-                name: functionCall.name,
+                name: toolName,
                 error,
               });
               continue;
             }
 
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             const validatedOutput = validationResult.data;
             if (this.definition.processOutput) {
               submittedOutput = this.definition.processOutput(validatedOutput);
@@ -767,7 +960,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
                   ? outputValue
                   : JSON.stringify(outputValue, null, 2);
             }
-            syncResponseParts.push({
+            syncResults.set(callId, {
               functionResponse: {
                 name: TASK_COMPLETE_TOOL_NAME,
                 response: { result: 'Output submitted and task completed.' },
@@ -775,14 +968,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               },
             });
             this.emitActivity('TOOL_CALL_END', {
-              name: functionCall.name,
+              name: toolName,
               output: 'Output submitted and task completed.',
             });
           } else {
             // Failed to provide required output.
             taskCompleted = false; // Revoke completion status
             const error = `Missing required argument '${outputName}' for completion.`;
-            syncResponseParts.push({
+            syncResults.set(callId, {
               functionResponse: {
                 name: TASK_COMPLETE_TOOL_NAME,
                 response: { error },
@@ -791,7 +984,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             });
             this.emitActivity('ERROR', {
               context: 'tool_call',
-              name: functionCall.name,
+              name: toolName,
               error,
             });
           }
@@ -807,7 +1000,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               typeof resultArg === 'string'
                 ? resultArg
                 : JSON.stringify(resultArg, null, 2);
-            syncResponseParts.push({
+            syncResults.set(callId, {
               functionResponse: {
                 name: TASK_COMPLETE_TOOL_NAME,
                 response: { status: 'Result submitted and task completed.' },
@@ -815,7 +1008,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               },
             });
             this.emitActivity('TOOL_CALL_END', {
-              name: functionCall.name,
+              name: toolName,
               output: 'Result submitted and task completed.',
             });
           } else {
@@ -823,7 +1016,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             taskCompleted = false; // Revoke completion
             const error =
               'Missing required "result" argument. You must provide your findings when calling complete_task.';
-            syncResponseParts.push({
+            syncResults.set(callId, {
               functionResponse: {
                 name: TASK_COMPLETE_TOOL_NAME,
                 response: { error },
@@ -832,7 +1025,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             });
             this.emitActivity('ERROR', {
               context: 'tool_call',
-              name: functionCall.name,
+              name: toolName,
               error,
             });
           }
@@ -841,14 +1034,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
 
       // Handle standard tools
-      if (!allowedToolNames.has(functionCall.name as string)) {
-        const error = `Unauthorized tool call: '${functionCall.name}' is not available to this agent.`;
-
+      if (!allowedToolNames.has(toolName)) {
+        const error = createUnauthorizedToolError(toolName);
         debugLogger.warn(`[LocalAgentExecutor] Blocked call: ${error}`);
 
-        syncResponseParts.push({
+        syncResults.set(callId, {
           functionResponse: {
-            name: functionCall.name as string,
+            name: toolName,
             id: callId,
             response: { error },
           },
@@ -856,7 +1048,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
         this.emitActivity('ERROR', {
           context: 'tool_call_unauthorized',
-          name: functionCall.name,
+          name: toolName,
           callId,
           error,
         });
@@ -864,53 +1056,65 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         continue;
       }
 
-      const requestInfo: ToolCallRequestInfo = {
+      toolRequests.push({
         callId,
-        name: functionCall.name as string,
+        name: toolName,
         args,
-        isClientInitiated: true,
+        isClientInitiated: false, // These are coming from the subagent (the "model")
         prompt_id: promptId,
-      };
-
-      // Create a promise for the tool execution
-      const executionPromise = (async () => {
-        const agentContext = Object.create(this.runtimeContext);
-        agentContext.getToolRegistry = () => this.toolRegistry;
-        agentContext.getApprovalMode = () => ApprovalMode.YOLO;
-
-        const { response: toolResponse } = await executeToolCall(
-          agentContext,
-          requestInfo,
-          signal,
-        );
-
-        if (toolResponse.error) {
-          this.emitActivity('ERROR', {
-            context: 'tool_call',
-            name: functionCall.name,
-            error: toolResponse.error.message,
-          });
-        } else {
-          this.emitActivity('TOOL_CALL_END', {
-            name: functionCall.name,
-            output: toolResponse.resultDisplay,
-          });
-        }
-
-        return toolResponse.responseParts;
-      })();
-
-      toolExecutionPromises.push(executionPromise);
+      });
+      toolNameMap.set(callId, toolName);
     }
 
-    // Wait for all tool executions to complete
-    const asyncResults = await Promise.all(toolExecutionPromises);
+    // Execute standard tool calls using the new scheduler
+    if (toolRequests.length > 0) {
+      const completedCalls = await scheduleAgentTools(
+        this.runtimeContext,
+        toolRequests,
+        {
+          schedulerId: this.agentId,
+          parentCallId: this.parentCallId,
+          toolRegistry: this.toolRegistry,
+          signal,
+          onWaitingForConfirmation,
+        },
+      );
 
-    // Combine all response parts
-    const toolResponseParts: Part[] = [...syncResponseParts];
-    for (const result of asyncResults) {
-      if (result) {
-        toolResponseParts.push(...result);
+      for (const call of completedCalls) {
+        const toolName =
+          toolNameMap.get(call.request.callId) || call.request.name;
+        if (call.status === 'success') {
+          this.emitActivity('TOOL_CALL_END', {
+            name: toolName,
+            output: call.response.resultDisplay,
+          });
+        } else if (call.status === 'error') {
+          this.emitActivity('ERROR', {
+            context: 'tool_call',
+            name: toolName,
+            error: call.response.error?.message || 'Unknown error',
+          });
+        } else if (call.status === 'cancelled') {
+          this.emitActivity('ERROR', {
+            context: 'tool_call',
+            name: toolName,
+            error: 'Request cancelled.',
+          });
+          aborted = true;
+        }
+
+        // Add result to syncResults to preserve order later
+        syncResults.set(call.request.callId, call.response.responseParts[0]);
+      }
+    }
+
+    // Reconstruct toolResponseParts in the original order
+    const toolResponseParts: Part[] = [];
+    for (const [index, functionCall] of functionCalls.entries()) {
+      const callId = functionCall.id ?? `${promptId}-${index}`;
+      const part = syncResults.get(callId);
+      if (part) {
+        toolResponseParts.push(part);
       }
     }
 
@@ -929,6 +1133,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       nextMessage: { role: 'user', parts: toolResponseParts },
       submittedOutput,
       taskCompleted,
+      aborted,
     };
   }
 
@@ -980,6 +1185,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         ...schema
       } = jsonSchema;
       completeTool.parameters!.properties![outputConfig.outputName] =
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         schema as Schema;
       completeTool.parameters!.required!.push(outputConfig.outputName);
     } else {
@@ -1063,12 +1269,10 @@ Important Rules:
    * @returns The reason for termination, or `null` if execution can continue.
    */
   private checkTermination(
-    startTime: number,
     turnCounter: number,
+    maxTurns: number,
   ): AgentTerminateMode | null {
-    const { runConfig } = this.definition;
-
-    if (runConfig.max_turns && turnCounter >= runConfig.max_turns) {
+    if (turnCounter >= maxTurns) {
       return AgentTerminateMode.MAX_TURNS;
     }
 

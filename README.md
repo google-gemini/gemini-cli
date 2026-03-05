@@ -4,7 +4,7 @@
 [![Gemini CLI E2E (Chained)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml)
 [![Version](https://img.shields.io/npm/v/@google/gemini-cli)](https://www.npmjs.com/package/@google/gemini-cli)
 [![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
-[![View Code Wiki](https://www.gstatic.com/_/boq-sdlc-agents-ui/_/r/YUi5dj2UWvE.svg)](https://codewiki.google/github.com/google-gemini/gemini-cli)
+[![View Code Wiki](https://assets.codewiki.google/readme-badge/static.svg)](https://codewiki.google/github.com/google-gemini/gemini-cli?utm_source=badge&utm_medium=github&utm_campaign=github.com/google-gemini/gemini-cli)
 
 ![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
 
@@ -18,7 +18,8 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 - **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
   account.
-- **🧠 Powerful Gemini 2.5 Pro**: Access to 1M token context window.
+- **🧠 Powerful Gemini 3 models**: Access to improved reasoning and 1M token
+  context window.
 - **🔧 Built-in tools**: Google Search grounding, file operations, shell
   commands, web fetching.
 - **🔌 Extensible**: MCP (Model Context Protocol) support for custom
@@ -28,10 +29,9 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 ## 📦 Installation
 
-### Pre-requisites before installation
-
-- Node.js version 20 or higher
-- macOS, Linux, or Windows
+See
+[Gemini CLI installation, execution, and releases](./docs/get-started/installation.md)
+for recommended system specifications and a detailed installation guide.
 
 ### Quick Install
 
@@ -39,7 +39,7 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 ```bash
 # Using npx (no installation required)
-npx https://github.com/google-gemini/gemini-cli
+npx @google/gemini-cli
 ```
 
 #### Install globally with npm
@@ -52,6 +52,23 @@ npm install -g @google/gemini-cli
 
 ```bash
 brew install gemini-cli
+```
+
+#### Install globally with MacPorts (macOS)
+
+```bash
+sudo port install gemini-cli
+```
+
+#### Install with Anaconda (for restricted environments)
+
+```bash
+# Create and activate a new environment
+conda create -y -n gemini_env -c conda-forge nodejs
+conda activate gemini_env
+
+# Install Gemini CLI globally via npm (inside the environment)
+npm install -g @google/gemini-cli
 ```
 
 ## Release Cadence and Tags
@@ -140,7 +157,7 @@ for details)
 **Benefits:**
 
 - **Free tier**: 60 requests/min and 1,000 requests/day
-- **Gemini 2.5 Pro** with 1M token context window
+- **Gemini 3 models** with 1M token context window
 - **No API key management** - just sign in with your Google account
 - **Automatic updates** to latest models
 
@@ -164,7 +181,7 @@ gemini
 
 **Benefits:**
 
-- **Free tier**: 100 requests/day with Gemini 2.5 Pro
+- **Free tier**: 1000 requests/day with Gemini 3 (mix of flash and pro)
 - **Model selection**: Choose specific Gemini models
 - **Usage-based billing**: Upgrade for higher limits when needed
 
@@ -265,14 +282,14 @@ gemini
   quickly.
 - [**Authentication Setup**](./docs/get-started/authentication.md) - Detailed
   auth configuration.
-- [**Configuration Guide**](./docs/get-started/configuration.md) - Settings and
+- [**Configuration Guide**](./docs/reference/configuration.md) - Settings and
   customization.
-- [**Keyboard Shortcuts**](./docs/cli/keyboard-shortcuts.md) - Productivity
-  tips.
+- [**Keyboard Shortcuts**](./docs/reference/keyboard-shortcuts.md) -
+  Productivity tips.
 
 ### Core Features
 
-- [**Commands Reference**](./docs/cli/commands.md) - All slash commands
+- [**Commands Reference**](./docs/reference/commands.md) - All slash commands
   (`/help`, `/chat`, etc).
 - [**Custom Commands**](./docs/cli/custom-commands.md) - Create your own
   reusable commands.
@@ -284,7 +301,7 @@ gemini
 
 ### Tools & Extensions
 
-- [**Built-in Tools Overview**](./docs/tools/index.md)
+- [**Built-in Tools Overview**](./docs/reference/tools.md)
   - [File System Operations](./docs/tools/file-system.md)
   - [Shell Commands](./docs/tools/shell.md)
   - [Web Fetch & Search](./docs/tools/web-fetch.md)
@@ -306,15 +323,15 @@ gemini
 - [**Enterprise Guide**](./docs/cli/enterprise.md) - Deploy and manage in a
   corporate environment.
 - [**Telemetry & Monitoring**](./docs/cli/telemetry.md) - Usage tracking.
-- [**Tools API Development**](./docs/core/tools-api.md) - Create custom tools.
+- [**Tools reference**](./docs/reference/tools.md) - Built-in tools overview.
 - [**Local development**](./docs/local-development.md) - Local development
   tooling.
 
 ### Troubleshooting & Support
 
-- [**Troubleshooting Guide**](./docs/troubleshooting.md) - Common issues and
-  solutions.
-- [**FAQ**](./docs/faq.md) - Frequently asked questions.
+- [**Troubleshooting Guide**](./docs/resources/troubleshooting.md) - Common
+  issues and solutions.
+- [**FAQ**](./docs/resources/faq.md) - Frequently asked questions.
 - Use `/bug` command to report issues directly from the CLI.
 
 ### Using MCP Servers
@@ -360,12 +377,13 @@ for planned features and priorities.
 
 ### Uninstall
 
-See the [Uninstall Guide](docs/cli/uninstall.md) for removal instructions.
+See the [Uninstall Guide](./docs/resources/uninstall.md) for removal
+instructions.
 
 ## 📄 Legal
 
 - **License**: [Apache License 2.0](LICENSE)
-- **Terms of Service**: [Terms & Privacy](./docs/tos-privacy.md)
+- **Terms of Service**: [Terms & Privacy](./docs/resources/tos-privacy.md)
 - **Security**: [Security Policy](SECURITY.md)
 
 ---

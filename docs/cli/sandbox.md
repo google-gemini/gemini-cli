@@ -11,7 +11,7 @@ Before using sandboxing, you need to install and set up the Gemini CLI:
 npm install -g @google/gemini-cli
 ```
 
-To verify the installation
+To verify the installation:
 
 ```bash
 gemini --version
@@ -50,17 +50,100 @@ Cross-platform sandboxing with complete process isolation.
 **Note**: Requires building the sandbox image locally or using a published image
 from your organization's registry.
 
+### 3. gVisor / runsc (Linux only)
+
+Strongest isolation available: runs containers inside a user-space kernel via
+[gVisor](https://github.com/google/gvisor). gVisor intercepts all container
+system calls and handles them in a sandboxed kernel written in Go, providing a
+strong security barrier between AI operations and the host OS.
+
+**Prerequisites:**
+
+- Linux (gVisor supports Linux only)
+- Docker installed and running
+- gVisor/runsc runtime configured
+
+When you set `sandbox: "runsc"`, Gemini CLI runs
+`docker run --runtime=runsc ...` to execute containers with gVisor isolation.
+runsc is not auto-detected; you must specify it explicitly (e.g.
+`GEMINI_SANDBOX=runsc` or `sandbox: "runsc"`).
+
+To set up runsc:
+
+1.  Install the runsc binary.
+2.  Configure the Docker daemon to use the runsc runtime.
+3.  Verify the installation.
+
+### 4. LXC/LXD (Linux only, experimental)
+
+Full-system container sandboxing using LXC/LXD. Unlike Docker/Podman, LXC
+containers run a complete Linux system with `systemd`, `snapd`, and other system
+services. This is ideal for tools that don't work in standard Docker containers,
+such as Snapcraft and Rockcraft.
+
+**Prerequisites**:
+
+- Linux only.
+- LXC/LXD must be installed (`snap install lxd` or `apt install lxd`).
+- A container must be created and running before starting Gemini CLI. Gemini
+  does **not** create the container automatically.
+
+**Quick setup**:
+
+```bash
+# Initialize LXD (first time only)
+lxd init --auto
+
+# Create and start an Ubuntu container
+lxc launch ubuntu:24.04 gemini-sandbox
+
+# Enable LXC sandboxing
+export GEMINI_SANDBOX=lxc
+gemini -p "build the project"
+```
+
+**Custom container name**:
+
+```bash
+export GEMINI_SANDBOX=lxc
+export GEMINI_SANDBOX_IMAGE=my-snapcraft-container
+gemini -p "build the snap"
+```
+
+**Limitations**:
+
+- Linux only (LXC is not available on macOS or Windows).
+- The container must already exist and be running.
+- The workspace directory is bind-mounted into the container at the same
+  absolute path — the path must be writable inside the container.
+- Used with tools like Snapcraft or Rockcraft that require a full system.
+
 ## Quickstart
 
 ```bash
 # Enable sandboxing with command flag
 gemini -s -p "analyze the code structure"
+```
 
-# Use environment variable
+**Use environment variable**
+
+**macOS/Linux**
+
+```bash
 export GEMINI_SANDBOX=true
 gemini -p "run the test suite"
+```
 
-# Configure in settings.json
+**Windows (PowerShell)**
+
+```powershell
+$env:GEMINI_SANDBOX="true"
+gemini -p "run the test suite"
+```
+
+**Configure in settings.json**
+
+```json
 {
   "tools": {
     "sandbox": "docker"
@@ -73,7 +156,8 @@ gemini -p "run the test suite"
 ### Enable sandboxing (in order of precedence)
 
 1. **Command flag**: `-s` or `--sandbox`
-2. **Environment variable**: `GEMINI_SANDBOX=true|docker|podman|sandbox-exec`
+2. **Environment variable**:
+   `GEMINI_SANDBOX=true|docker|podman|sandbox-exec|runsc|lxc`
 3. **Settings file**: `"sandbox": true` in the `tools` object of your
    `settings.json` file (e.g., `{"tools": {"sandbox": true}}`).
 
@@ -82,10 +166,11 @@ gemini -p "run the test suite"
 Built-in profiles (set via `SEATBELT_PROFILE` env var):
 
 - `permissive-open` (default): Write restrictions, network allowed
-- `permissive-closed`: Write restrictions, no network
 - `permissive-proxied`: Write restrictions, network via proxy
 - `restrictive-open`: Strict restrictions, network allowed
-- `restrictive-closed`: Maximum restrictions
+- `restrictive-proxied`: Strict restrictions, network via proxy
+- `strict-open`: Read and write restrictions, network allowed
+- `strict-proxied`: Read and write restrictions, network via proxy
 
 ### Custom sandbox flags
 
@@ -98,14 +183,30 @@ use cases.
 
 To disable SELinux labeling for volume mounts, you can set the following:
 
+**macOS/Linux**
+
 ```bash
 export SANDBOX_FLAGS="--security-opt label=disable"
 ```
 
+**Windows (PowerShell)**
+
+```powershell
+$env:SANDBOX_FLAGS="--security-opt label=disable"
+```
+
 Multiple flags can be provided as a space-separated string:
+
+**macOS/Linux**
 
 ```bash
 export SANDBOX_FLAGS="--flag1 --flag2=value"
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:SANDBOX_FLAGS="--flag1 --flag2=value"
 ```
 
 ## Linux UID/GID handling
@@ -113,9 +214,18 @@ export SANDBOX_FLAGS="--flag1 --flag2=value"
 The sandbox automatically handles user permissions on Linux. Override these
 permissions with:
 
+**macOS/Linux**
+
 ```bash
 export SANDBOX_SET_UID_GID=true   # Force host UID/GID
 export SANDBOX_SET_UID_GID=false  # Disable UID/GID mapping
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:SANDBOX_SET_UID_GID="true"   # Force host UID/GID
+$env:SANDBOX_SET_UID_GID="false"  # Disable UID/GID mapping
 ```
 
 ## Troubleshooting
@@ -166,6 +276,6 @@ gemini -s -p "run shell command: mount | grep workspace"
 
 ## Related documentation
 
-- [Configuration](../get-started/configuration.md): Full configuration options.
-- [Commands](./commands.md): Available commands.
-- [Troubleshooting](../troubleshooting.md): General troubleshooting.
+- [Configuration](../reference/configuration.md): Full configuration options.
+- [Commands](../reference/commands.md): Available commands.
+- [Troubleshooting](../resources/troubleshooting.md): General troubleshooting.

@@ -6,14 +6,14 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { StreamJsonFormatter } from './stream-json-formatter.js';
-import { JsonStreamEventType } from './types.js';
-import type {
-  InitEvent,
-  MessageEvent,
-  ToolUseEvent,
-  ToolResultEvent,
-  ErrorEvent,
-  ResultEvent,
+import {
+  JsonStreamEventType,
+  type InitEvent,
+  type MessageEvent,
+  type ToolUseEvent,
+  type ToolResultEvent,
+  type ErrorEvent,
+  type ResultEvent,
 } from './types.js';
 import type { SessionMetrics } from '../telemetry/uiTelemetry.js';
 import { ToolCallDecision } from '../telemetry/tool-call-decision.js';
@@ -289,6 +289,7 @@ describe('StreamJsonFormatter', () => {
           thoughts: 0,
           tool: 0,
         },
+        roles: {},
       };
       metrics.tools.totalCalls = 2;
       metrics.tools.totalDecisions[ToolCallDecision.AUTO_ACCEPT] = 2;
@@ -319,6 +320,7 @@ describe('StreamJsonFormatter', () => {
           thoughts: 0,
           tool: 0,
         },
+        roles: {},
       };
       metrics.models['gemini-ultra'] = {
         api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 2000 },
@@ -331,6 +333,7 @@ describe('StreamJsonFormatter', () => {
           thoughts: 0,
           tool: 0,
         },
+        roles: {},
       };
       metrics.tools.totalCalls = 5;
 
@@ -360,6 +363,7 @@ describe('StreamJsonFormatter', () => {
           thoughts: 0,
           tool: 0,
         },
+        roles: {},
       };
 
       const result = formatter.convertToStreamStats(metrics, 1200);

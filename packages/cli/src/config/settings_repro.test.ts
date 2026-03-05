@@ -131,10 +131,8 @@ describe('Settings Repro', () => {
       },
       general: {
         debugKeystrokeLogging: false,
-        enablePromptCompletion: false,
         preferredEditor: 'vim',
         vimMode: false,
-        previewFeatures: false,
       },
       security: {
         auth: {
@@ -150,13 +148,16 @@ describe('Settings Repro', () => {
           showColor: true,
           enableInteractiveShell: true,
         },
-        enableMessageBusIntegration: true,
       },
       experimental: {
         useModelRouter: false,
         enableSubagents: false,
-        codebaseInvestigatorSettings: {
-          enabled: true,
+      },
+      agents: {
+        overrides: {
+          codebase_investigator: {
+            enabled: true,
+          },
         },
       },
       ui: {

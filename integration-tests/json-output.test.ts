@@ -14,7 +14,6 @@ describe('JSON output', () => {
 
   beforeEach(async () => {
     rig = new TestRig();
-    await rig.setup('json-output-test');
   });
 
   afterEach(async () => {
@@ -22,6 +21,12 @@ describe('JSON output', () => {
   });
 
   it('should return a valid JSON with response and stats', async () => {
+    await rig.setup('json-output-france', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'json-output.france.responses',
+      ),
+    });
     const result = await rig.run({
       args: ['What is the capital of France?', '--output-format', 'json'],
     });
@@ -36,6 +41,12 @@ describe('JSON output', () => {
   });
 
   it('should return a valid JSON with a session ID', async () => {
+    await rig.setup('json-output-session-id', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'json-output.session-id.responses',
+      ),
+    });
     const result = await rig.run({
       args: ['Hello', '--output-format', 'json'],
     });
@@ -47,7 +58,6 @@ describe('JSON output', () => {
   });
 
   it('should return a JSON error for sd auth mismatch before running', async () => {
-    process.env['GOOGLE_GENAI_USE_GCA'] = 'true';
     await rig.setup('json-output-auth-mismatch', {
       settings: {
         security: {
@@ -58,19 +68,22 @@ describe('JSON output', () => {
 
     let thrown: Error | undefined;
     try {
-      await rig.run({ args: ['Hello', '--output-format', 'json'] });
+      await rig.run({
+        args: ['Hello', '--output-format', 'json'],
+        env: { GOOGLE_GENAI_USE_GCA: 'true' },
+      });
       expect.fail('Expected process to exit with error');
     } catch (e) {
       thrown = e as Error;
-    } finally {
-      delete process.env['GOOGLE_GENAI_USE_GCA'];
     }
 
     expect(thrown).toBeDefined();
     const message = (thrown as Error).message;
 
     // Use a regex to find the first complete JSON object in the string
-    const jsonMatch = message.match(/{[\s\S]*}/);
+    // We expect the JSON to start with a quote (e.g. {"error": ...}) to avoid
+    // matching random error objects printed to stderr (like ENOENT).
+    const jsonMatch = message.match(/{\s*"[\s\S]*}/);
 
     // Fail if no JSON-like text was found
     expect(
@@ -102,7 +115,7 @@ describe('JSON output', () => {
   });
 
   it('should not exit on tool errors and allow model to self-correct in JSON mode', async () => {
-    rig.setup('json-output-error', {
+    await rig.setup('json-output-error', {
       fakeResponsesPath: join(
         import.meta.dirname,
         'json-output.error.responses',

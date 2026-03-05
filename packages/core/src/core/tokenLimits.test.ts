@@ -6,14 +6,24 @@
 
 import { describe, it, expect } from 'vitest';
 import { tokenLimit, DEFAULT_TOKEN_LIMIT } from './tokenLimits.js';
+import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_MODEL,
+} from '../config/models.js';
 
 describe('tokenLimit', () => {
-  it('should return the correct token limit for gemini-1.5-pro', () => {
-    expect(tokenLimit('gemini-1.5-pro')).toBe(2_097_152);
+  it('should return the correct token limit for default models', () => {
+    expect(tokenLimit(DEFAULT_GEMINI_MODEL)).toBe(1_048_576);
+    expect(tokenLimit(DEFAULT_GEMINI_FLASH_MODEL)).toBe(1_048_576);
+    expect(tokenLimit(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(1_048_576);
   });
 
-  it('should return the correct token limit for gemini-1.5-flash', () => {
-    expect(tokenLimit('gemini-1.5-flash')).toBe(1_048_576);
+  it('should return the correct token limit for preview models', () => {
+    expect(tokenLimit(PREVIEW_GEMINI_MODEL)).toBe(1_048_576);
+    expect(tokenLimit(PREVIEW_GEMINI_FLASH_MODEL)).toBe(1_048_576);
   });
 
   it('should return the default token limit for an unknown model', () => {

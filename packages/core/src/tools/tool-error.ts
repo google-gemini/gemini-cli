@@ -12,6 +12,10 @@
  * - Fatal: System-level issues that prevent continued execution (e.g., disk full, critical I/O errors)
  */
 export enum ToolErrorType {
+  POLICY_VIOLATION = 'policy_violation',
+  /**
+   * General tool execution failure (e.g. file system error, API error).
+   */
   // General Errors
   INVALID_TOOL_PARAMS = 'invalid_tool_params',
   UNKNOWN = 'unknown',
@@ -71,6 +75,9 @@ export enum ToolErrorType {
 
   // WebSearch-specific Errors
   WEB_SEARCH_FAILED = 'web_search_failed',
+
+  // Hook-specific Errors
+  STOP_EXECUTION = 'stop_execution',
 }
 
 /**

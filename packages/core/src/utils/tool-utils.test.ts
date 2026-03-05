@@ -5,9 +5,136 @@
  */
 
 import { expect, describe, it } from 'vitest';
-import { doesToolInvocationMatch } from './tool-utils.js';
-import type { AnyToolInvocation, Config } from '../index.js';
-import { ReadFileTool } from '../tools/read-file.js';
+import {
+  doesToolInvocationMatch,
+  getToolSuggestion,
+  shouldHideToolCall,
+} from './tool-utils.js';
+import {
+  ReadFileTool,
+  ApprovalMode,
+  CoreToolCallStatus,
+  ASK_USER_DISPLAY_NAME,
+  WRITE_FILE_DISPLAY_NAME,
+  EDIT_DISPLAY_NAME,
+  READ_FILE_DISPLAY_NAME,
+  type AnyToolInvocation,
+  type Config,
+} from '../index.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+
+describe('shouldHideToolCall', () => {
+  it.each([
+    {
+      status: CoreToolCallStatus.Scheduled,
+      hasResult: true,
+      shouldHide: true,
+    },
+    {
+      status: CoreToolCallStatus.Executing,
+      hasResult: true,
+      shouldHide: true,
+    },
+    {
+      status: CoreToolCallStatus.AwaitingApproval,
+      hasResult: true,
+      shouldHide: true,
+    },
+    {
+      status: CoreToolCallStatus.Validating,
+      hasResult: true,
+      shouldHide: true,
+    },
+    {
+      status: CoreToolCallStatus.Success,
+      hasResult: true,
+      shouldHide: false,
+    },
+    {
+      status: CoreToolCallStatus.Error,
+      hasResult: false,
+      shouldHide: true,
+    },
+    {
+      status: CoreToolCallStatus.Error,
+      hasResult: true,
+      shouldHide: false,
+    },
+  ])(
+    'AskUser: status=$status, hasResult=$hasResult -> hide=$shouldHide',
+    ({ status, hasResult, shouldHide }) => {
+      expect(
+        shouldHideToolCall({
+          displayName: ASK_USER_DISPLAY_NAME,
+          status,
+          hasResultDisplay: hasResult,
+        }),
+      ).toBe(shouldHide);
+    },
+  );
+
+  it.each([
+    {
+      name: WRITE_FILE_DISPLAY_NAME,
+      mode: ApprovalMode.PLAN,
+      visible: false,
+    },
+    { name: EDIT_DISPLAY_NAME, mode: ApprovalMode.PLAN, visible: false },
+    {
+      name: WRITE_FILE_DISPLAY_NAME,
+      mode: ApprovalMode.DEFAULT,
+      visible: true,
+    },
+    { name: READ_FILE_DISPLAY_NAME, mode: ApprovalMode.PLAN, visible: true },
+  ])(
+    'Plan Mode: tool=$name, mode=$mode -> visible=$visible',
+    ({ name, mode, visible }) => {
+      expect(
+        shouldHideToolCall({
+          displayName: name,
+          status: CoreToolCallStatus.Success,
+          approvalMode: mode,
+          hasResultDisplay: true,
+        }),
+      ).toBe(!visible);
+    },
+  );
+
+  it('hides tool calls with a parentCallId', () => {
+    expect(
+      shouldHideToolCall({
+        displayName: 'any_tool',
+        status: CoreToolCallStatus.Success,
+        hasResultDisplay: true,
+        parentCallId: 'some-parent',
+      }),
+    ).toBe(true);
+  });
+});
+
+describe('getToolSuggestion', () => {
+  it('should suggest the top N closest tool names for a typo', () => {
+    const allToolNames = ['list_files', 'read_file', 'write_file'];
+
+    // Test that the right tool is selected, with only 1 result, for typos
+    const misspelledTool = getToolSuggestion('list_fils', allToolNames, 1);
+    expect(misspelledTool).toBe(' Did you mean "list_files"?');
+
+    // Test that the right tool is selected, with only 1 result, for prefixes
+    const prefixedTool = getToolSuggestion(
+      'github.list_files',
+      allToolNames,
+      1,
+    );
+    expect(prefixedTool).toBe(' Did you mean "list_files"?');
+
+    // Test that the right tool is first
+    const suggestionMultiple = getToolSuggestion('list_fils', allToolNames);
+    expect(suggestionMultiple).toBe(
+      ' Did you mean one of: "list_files", "read_file", "write_file"?',
+    );
+  });
+});
 
 describe('doesToolInvocationMatch', () => {
   it('should not match a partial command prefix', () => {
@@ -59,7 +186,11 @@ describe('doesToolInvocationMatch', () => {
   });
 
   describe('for non-shell tools', () => {
-    const readFileTool = new ReadFileTool({} as Config);
+    const mockConfig = {
+      getTargetDir: () => '/tmp',
+      getFileFilteringOptions: () => ({}),
+    } as unknown as Config;
+    const readFileTool = new ReadFileTool(mockConfig, createMockMessageBus());
     const invocation = {
       params: { file: 'test.txt' },
     } as AnyToolInvocation;

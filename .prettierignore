@@ -17,5 +17,8 @@ eslint.config.js
 **/generated
 gha-creds-*.json
 junit.xml
+.gemini-linters/
 Thumbs.db
 .pytest_cache
+**/SKILL.md
+packages/sdk/test-data/*.json

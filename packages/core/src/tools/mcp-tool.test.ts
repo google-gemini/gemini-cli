@@ -5,14 +5,24 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Mocked } from 'vitest';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mocked,
+} from 'vitest';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
-import type { ToolResult } from './tools.js';
-import { ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
+import { ToolConfirmationOutcome, type ToolResult } from './tools.js';
 import type { CallableTool, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
+import {
+  createMockMessageBus,
+  getMockMessageBusInstance,
+} from '../test-utils/mock-message-bus.js';
 
 // Mock @google/genai mcpToTool and CallableTool
 // We only need to mock the parts of CallableTool that DiscoveredMCPTool uses.
@@ -50,7 +60,7 @@ describe('generateValidName', () => {
 
   it('should truncate long names', () => {
     expect(generateValidName('x'.repeat(80))).toBe(
-      'xxxxxxxxxxxxxxxxxxxxxxxxxxxx___xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
     );
   });
 
@@ -85,12 +95,15 @@ describe('DiscoveredMCPTool', () => {
   beforeEach(() => {
     mockCallTool.mockClear();
     mockToolMethod.mockClear();
+    const bus = createMockMessageBus();
+    getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
     tool = new DiscoveredMCPTool(
       mockCallableToolInstance,
       serverName,
       serverToolName,
       baseDescription,
       inputSchema,
+      bus,
     );
     // Clear allowlist before each relevant test, especially for shouldConfirmExecute
     const invocation = tool.build({ param: 'mock' }) as any;
@@ -190,6 +203,13 @@ describe('DiscoveredMCPTool', () => {
           serverToolName,
           baseDescription,
           inputSchema,
+          createMockMessageBus(),
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
         );
         const params = { param: 'isErrorTrueCase' };
         const functionCall = {
@@ -230,6 +250,13 @@ describe('DiscoveredMCPTool', () => {
         serverToolName,
         baseDescription,
         inputSchema,
+        createMockMessageBus(),
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
       );
       const params = { param: 'isErrorTopLevelCase' };
       const functionCall = {
@@ -273,6 +300,13 @@ describe('DiscoveredMCPTool', () => {
           serverToolName,
           baseDescription,
           inputSchema,
+          createMockMessageBus(),
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
         );
         const params = { param: 'isErrorFalseCase' };
         const mockToolSuccessResultObject = {
@@ -728,9 +762,13 @@ describe('DiscoveredMCPTool', () => {
         serverToolName,
         baseDescription,
         inputSchema,
+        createMockMessageBus(),
         true,
         undefined,
+        undefined,
         { isTrustedFolder: () => true } as any,
+        undefined,
+        undefined,
       );
       const invocation = trustedTool.build({ param: 'mock' });
       expect(
@@ -862,15 +900,21 @@ describe('DiscoveredMCPTool', () => {
           'return confirmation details if trust is false, even if folder is trusted',
       },
     ])('should $description', async ({ trust, isTrusted, shouldConfirm }) => {
+      const bus = createMockMessageBus();
+      getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
       const testTool = new DiscoveredMCPTool(
         mockCallableToolInstance,
         serverName,
         serverToolName,
         baseDescription,
         inputSchema,
+        bus,
         trust,
         undefined,
+        undefined,
         mockConfig(isTrusted) as any,
+        undefined,
+        undefined,
       );
       const invocation = testTool.build({ param: 'mock' });
       const confirmation = await invocation.shouldConfirmExecute(
@@ -892,6 +936,85 @@ describe('DiscoveredMCPTool', () => {
       const invocation = tool.build(params);
       const description = invocation.getDescription();
       expect(description).toBe('{"param":"testValue","param2":"anotherOne"}');
+    });
+  });
+});
+
+describe('MCP Tool Naming Regression Fixes', () => {
+  describe('generateValidName', () => {
+    it('should replace spaces with underscores', () => {
+      expect(generateValidName('My Tool')).toBe('My_Tool');
+    });
+
+    it('should allow colons', () => {
+      expect(generateValidName('namespace:tool')).toBe('namespace:tool');
+    });
+
+    it('should ensure name starts with a letter or underscore', () => {
+      expect(generateValidName('123-tool')).toBe('_123-tool');
+      expect(generateValidName('-tool')).toBe('_-tool');
+      expect(generateValidName('.tool')).toBe('_.tool');
+    });
+
+    it('should handle very long names by truncating in the middle', () => {
+      const longName = 'a'.repeat(40) + '__' + 'b'.repeat(40);
+      const result = generateValidName(longName);
+      expect(result.length).toBeLessThanOrEqual(63);
+      expect(result).toMatch(/^a{30}\.\.\.b{30}$/);
+    });
+
+    it('should handle very long names starting with a digit', () => {
+      const longName = '1' + 'a'.repeat(80);
+      const result = generateValidName(longName);
+      expect(result.length).toBeLessThanOrEqual(63);
+      expect(result.startsWith('_1')).toBe(true);
+    });
+  });
+
+  describe('DiscoveredMCPTool qualified names', () => {
+    it('should generate a valid qualified name even with spaces in server name', () => {
+      const tool = new DiscoveredMCPTool(
+        {} as any,
+        'My Server',
+        'my-tool',
+        'desc',
+        {},
+        {} as any,
+      );
+
+      const qn = tool.getFullyQualifiedName();
+      expect(qn).toBe('My_Server__my-tool');
+    });
+
+    it('should handle long server and tool names in qualified name', () => {
+      const serverName = 'a'.repeat(40);
+      const toolName = 'b'.repeat(40);
+      const tool = new DiscoveredMCPTool(
+        {} as any,
+        serverName,
+        toolName,
+        'desc',
+        {},
+        {} as any,
+      );
+
+      const qn = tool.getFullyQualifiedName();
+      expect(qn.length).toBeLessThanOrEqual(63);
+      expect(qn).toContain('...');
+    });
+
+    it('should handle server names starting with digits', () => {
+      const tool = new DiscoveredMCPTool(
+        {} as any,
+        '123-server',
+        'tool',
+        'desc',
+        {},
+        {} as any,
+      );
+
+      const qn = tool.getFullyQualifiedName();
+      expect(qn).toBe('_123-server__tool');
     });
   });
 });

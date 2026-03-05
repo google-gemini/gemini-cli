@@ -9,6 +9,7 @@ import { Box, Text } from 'ink';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { ExtensionUpdateState } from '../../state/extensions.js';
 import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
+import { getFormattedSettingValue } from '../../../commands/extensions/utils.js';
 
 interface ExtensionsList {
   extensions: readonly GeminiCLIExtension[];
@@ -22,8 +23,8 @@ export const ExtensionsList: React.FC<ExtensionsList> = ({ extensions }) => {
   }
 
   return (
-    <Box flexDirection="column" marginTop={1} marginBottom={1}>
-      <Text>Installed extensions:</Text>
+    <Box flexDirection="column" marginBottom={1}>
+      <Text>Installed extensions: </Text>
       <Box flexDirection="column" paddingLeft={2}>
         {extensions.map((ext) => {
           const state = extensionsUpdateState.get(ext.name);
@@ -59,12 +60,31 @@ export const ExtensionsList: React.FC<ExtensionsList> = ({ extensions }) => {
           }
 
           return (
-            <Box key={ext.name}>
+            <Box key={ext.name} flexDirection="column" marginBottom={1}>
               <Text>
                 <Text color="cyan">{`${ext.name} (v${ext.version})`}</Text>
                 <Text color={activeColor}>{` - ${activeString}`}</Text>
                 {<Text color={stateColor}>{` (${stateText})`}</Text>}
               </Text>
+              {ext.resolvedSettings && ext.resolvedSettings.length > 0 && (
+                <Box flexDirection="column" paddingLeft={2}>
+                  <Text>settings:</Text>
+                  {ext.resolvedSettings.map((setting) => (
+                    <Text key={setting.name}>
+                      - {setting.name}: {getFormattedSettingValue(setting)}
+                      {setting.scope && (
+                        <Text color="gray">
+                          {' '}
+                          (
+                          {setting.scope.charAt(0).toUpperCase() +
+                            setting.scope.slice(1)}
+                          {setting.source ? ` - ${setting.source}` : ''})
+                        </Text>
+                      )}
+                    </Text>
+                  ))}
+                </Box>
+              )}
             </Box>
           );
         })}

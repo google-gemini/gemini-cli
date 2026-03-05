@@ -1,10 +1,15 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export const formatMemoryUsage = (bytes: number): string => {
+import {
+  REFERENCE_CONTENT_START,
+  REFERENCE_CONTENT_END,
+} from '@google/gemini-cli-core';
+
+export const formatBytes = (bytes: number): string => {
   const gb = bytes / (1024 * 1024 * 1024);
   if (bytes < 1024 * 1024) {
     return `${(bytes / 1024).toFixed(1)} KB`;
@@ -60,4 +65,59 @@ export const formatDuration = (milliseconds: number): string => {
   }
 
   return parts.join(' ');
+};
+
+export const formatTimeAgo = (date: string | number | Date): string => {
+  const past = new Date(date);
+  if (isNaN(past.getTime())) {
+    return 'invalid date';
+  }
+
+  const now = new Date();
+  const diffMs = now.getTime() - past.getTime();
+  if (diffMs < 60000) {
+    return 'just now';
+  }
+  return `${formatDuration(diffMs)} ago`;
+};
+
+/**
+ * Removes content bounded by reference content markers from the given text.
+ * The markers are "${REFERENCE_CONTENT_START}" and "${REFERENCE_CONTENT_END}".
+ *
+ * @param text The input text containing potential reference blocks.
+ * @returns The text with reference blocks removed and trimmed.
+ */
+export function stripReferenceContent(text: string): string {
+  // Match optional newline, the start marker, content (non-greedy), and the end marker
+  const pattern = new RegExp(
+    `\\n?${REFERENCE_CONTENT_START}[\\s\\S]*?${REFERENCE_CONTENT_END}`,
+    'g',
+  );
+
+  return text.replace(pattern, '').trim();
+}
+
+export const formatResetTime = (resetTime: string): string => {
+  const diff = new Date(resetTime).getTime() - Date.now();
+  if (diff <= 0) return '';
+
+  const totalMinutes = Math.ceil(diff / (1000 * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  const fmt = (val: number, unit: 'hour' | 'minute') =>
+    new Intl.NumberFormat('en', {
+      style: 'unit',
+      unit,
+      unitDisplay: 'narrow',
+    }).format(val);
+
+  if (hours > 0 && minutes > 0) {
+    return `resets in ${fmt(hours, 'hour')} ${fmt(minutes, 'minute')}`;
+  } else if (hours > 0) {
+    return `resets in ${fmt(hours, 'hour')}`;
+  }
+
+  return `resets in ${fmt(minutes, 'minute')}`;
 };

@@ -47,7 +47,7 @@ const findScrollableCandidates = (
   const candidates: Array<ScrollableEntry & { area: number }> = [];
 
   for (const entry of scrollables.values()) {
-    if (!entry.ref.current || !entry.hasFocus()) {
+    if (!entry.ref.current) {
       continue;
     }
 

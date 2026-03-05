@@ -6,14 +6,13 @@
 
 import {
   uiTelemetryService,
-  fireSessionEndHook,
-  fireSessionStartHook,
   SessionEndReason,
   SessionStartSource,
   flushTelemetry,
 } from '@google/gemini-cli-core';
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
+import { MessageType } from '../types.js';
 import { randomUUID } from 'node:crypto';
 
 export const clearCommand: SlashCommand = {
@@ -28,11 +27,11 @@ export const clearCommand: SlashCommand = {
       ?.getGeminiClient()
       ?.getChat()
       .getChatRecordingService();
-    const messageBus = config?.getMessageBus();
 
     // Fire SessionEnd hook before clearing
-    if (config?.getEnableHooks() && messageBus) {
-      await fireSessionEndHook(messageBus, SessionEndReason.Clear);
+    const hookSystem = config?.getHookSystem();
+    if (hookSystem) {
+      await hookSystem.fireSessionEndEvent(SessionEndReason.Clear);
     }
 
     if (geminiClient) {
@@ -44,6 +43,9 @@ export const clearCommand: SlashCommand = {
       context.ui.setDebugMessage('Clearing terminal.');
     }
 
+    // Reset user steering hints
+    config?.userHintService.clear();
+
     // Start a new conversation recording with a new session ID
     if (config && chatRecordingService) {
       const newSessionId = randomUUID();
@@ -52,8 +54,9 @@ export const clearCommand: SlashCommand = {
     }
 
     // Fire SessionStart hook after clearing
-    if (config?.getEnableHooks() && messageBus) {
-      await fireSessionStartHook(messageBus, SessionStartSource.Clear);
+    let result;
+    if (hookSystem) {
+      result = await hookSystem.fireSessionStartEvent(SessionStartSource.Clear);
     }
 
     // Give the event loop a chance to process any pending telemetry operations
@@ -68,5 +71,15 @@ export const clearCommand: SlashCommand = {
 
     uiTelemetryService.setLastPromptTokenCount(0);
     context.ui.clear();
+
+    if (result?.systemMessage) {
+      context.ui.addItem(
+        {
+          type: MessageType.INFO,
+          text: result.systemMessage,
+        },
+        Date.now(),
+      );
+    }
   },
 };

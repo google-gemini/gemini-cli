@@ -8,6 +8,7 @@ import type { MCPServerConfig } from '@google/gemini-cli-core';
 import { MCPServerStatus } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
 import type React from 'react';
+import { MAX_MCP_RESOURCES_TO_SHOW } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
 import type {
   HistoryItemMcpStatus,
@@ -24,6 +25,8 @@ interface McpStatusProps {
   blockedServers: Array<{ name: string; extensionName: string }>;
   serverStatus: (serverName: string) => MCPServerStatus;
   authStatus: HistoryItemMcpStatus['authStatus'];
+  enablementState: HistoryItemMcpStatus['enablementState'];
+  errors: Record<string, string>;
   discoveryInProgress: boolean;
   connectingServers: string[];
   showDescriptions: boolean;
@@ -38,6 +41,8 @@ export const McpStatus: React.FC<McpStatusProps> = ({
   blockedServers,
   serverStatus,
   authStatus,
+  enablementState,
+  errors,
   discoveryInProgress,
   connectingServers,
   showDescriptions,
@@ -103,23 +108,35 @@ export const McpStatus: React.FC<McpStatusProps> = ({
         let statusText = '';
         let statusColor = theme.text.primary;
 
-        switch (status) {
-          case MCPServerStatus.CONNECTED:
-            statusIndicator = '🟢';
-            statusText = 'Ready';
-            statusColor = theme.status.success;
-            break;
-          case MCPServerStatus.CONNECTING:
-            statusIndicator = '🔄';
-            statusText = 'Starting... (first startup may take longer)';
-            statusColor = theme.status.warning;
-            break;
-          case MCPServerStatus.DISCONNECTED:
-          default:
-            statusIndicator = '🔴';
-            statusText = 'Disconnected';
-            statusColor = theme.status.error;
-            break;
+        // Check enablement state
+        const serverEnablement = enablementState[serverName];
+        const isDisabled = serverEnablement && !serverEnablement.enabled;
+
+        if (isDisabled) {
+          statusIndicator = '⏸️';
+          statusText = serverEnablement.isSessionDisabled
+            ? 'Disabled (session)'
+            : 'Disabled';
+          statusColor = theme.text.secondary;
+        } else {
+          switch (status) {
+            case MCPServerStatus.CONNECTED:
+              statusIndicator = '🟢';
+              statusText = 'Ready';
+              statusColor = theme.status.success;
+              break;
+            case MCPServerStatus.CONNECTING:
+              statusIndicator = '🔄';
+              statusText = 'Starting... (first startup may take longer)';
+              statusColor = theme.status.warning;
+              break;
+            case MCPServerStatus.DISCONNECTED:
+            default:
+              statusIndicator = '🔴';
+              statusText = 'Disconnected';
+              statusColor = theme.status.error;
+              break;
+          }
         }
 
         let serverDisplayName = serverName;
@@ -178,6 +195,14 @@ export const McpStatus: React.FC<McpStatusProps> = ({
             )}
             {status === MCPServerStatus.DISCONNECTED && toolCount > 0 && (
               <Text> ({toolCount} tools cached)</Text>
+            )}
+
+            {errors[serverName] && (
+              <Box marginLeft={2}>
+                <Text color={theme.status.error}>
+                  Error: {errors[serverName]}
+                </Text>
+              </Box>
             )}
 
             {showDescriptions && server?.description && (
@@ -251,28 +276,40 @@ export const McpStatus: React.FC<McpStatusProps> = ({
             {serverResources.length > 0 && (
               <Box flexDirection="column" marginLeft={2}>
                 <Text color={theme.text.primary}>Resources:</Text>
-                {serverResources.map((resource, index) => {
-                  const label = resource.name || resource.uri || 'resource';
-                  return (
-                    <Box
-                      key={`${resource.serverName}-resource-${index}`}
-                      flexDirection="column"
-                    >
-                      <Text>
-                        - <Text color={theme.text.primary}>{label}</Text>
-                        {resource.uri ? ` (${resource.uri})` : ''}
-                        {resource.mimeType ? ` [${resource.mimeType}]` : ''}
-                      </Text>
-                      {showDescriptions && resource.description && (
-                        <Box marginLeft={2}>
-                          <Text color={theme.text.secondary}>
-                            {resource.description.trim()}
-                          </Text>
-                        </Box>
-                      )}
-                    </Box>
-                  );
-                })}
+                {serverResources
+                  .slice(0, MAX_MCP_RESOURCES_TO_SHOW)
+                  .map((resource, index) => {
+                    const label = resource.name || resource.uri || 'resource';
+                    return (
+                      <Box
+                        key={`${resource.serverName}-resource-${index}`}
+                        flexDirection="column"
+                      >
+                        <Text>
+                          - <Text color={theme.text.primary}>{label}</Text>
+                          {resource.uri ? ` (${resource.uri})` : ''}
+                          {resource.mimeType ? ` [${resource.mimeType}]` : ''}
+                        </Text>
+                        {showDescriptions && resource.description && (
+                          <Box marginLeft={2}>
+                            <Text color={theme.text.secondary}>
+                              {resource.description.trim()}
+                            </Text>
+                          </Box>
+                        )}
+                      </Box>
+                    );
+                  })}
+                {serverResources.length > MAX_MCP_RESOURCES_TO_SHOW && (
+                  <Text color={theme.text.secondary}>
+                    {'  '}...{' '}
+                    {serverResources.length - MAX_MCP_RESOURCES_TO_SHOW}{' '}
+                    {serverResources.length - MAX_MCP_RESOURCES_TO_SHOW === 1
+                      ? 'resource'
+                      : 'resources'}{' '}
+                    hidden
+                  </Text>
+                )}
               </Box>
             )}
           </Box>

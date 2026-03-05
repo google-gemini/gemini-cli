@@ -9,9 +9,31 @@ import {
   debugLogger,
   enableKittyKeyboardProtocol,
   disableKittyKeyboardProtocol,
+  enableModifyOtherKeys,
+  disableModifyOtherKeys,
+  enableBracketedPasteMode,
+  disableBracketedPasteMode,
 } from '@google/gemini-cli-core';
+import { parseColor } from '../themes/color-utils.js';
 
 export type TerminalBackgroundColor = string | undefined;
+
+const TERMINAL_CLEANUP_SEQUENCE = '\x1b[<u\x1b[>4;0m\x1b[?2004l';
+
+export function cleanupTerminalOnExit() {
+  try {
+    if (process.stdout?.fd !== undefined) {
+      fs.writeSync(process.stdout.fd, TERMINAL_CLEANUP_SEQUENCE);
+      return;
+    }
+  } catch (e) {
+    debugLogger.warn('Failed to synchronously cleanup terminal modes:', e);
+  }
+
+  disableKittyKeyboardProtocol();
+  disableModifyOtherKeys();
+  disableBracketedPasteMode();
+}
 
 export class TerminalCapabilityManager {
   private static instance: TerminalCapabilityManager | undefined;
@@ -20,6 +42,20 @@ export class TerminalCapabilityManager {
   private static readonly OSC_11_QUERY = '\x1b]11;?\x1b\\';
   private static readonly TERMINAL_NAME_QUERY = '\x1b[>q';
   private static readonly DEVICE_ATTRIBUTES_QUERY = '\x1b[c';
+  private static readonly MODIFY_OTHER_KEYS_QUERY = '\x1b[>4;?m';
+  private static readonly HIDDEN_MODE = '\x1b[8m';
+  private static readonly CLEAR_LINE_AND_RETURN = '\x1b[2K\r';
+  private static readonly RESET_ATTRIBUTES = '\x1b[0m';
+
+  /**
+   * Triggers a terminal background color query.
+   * @param stdout The stdout stream to write to.
+   */
+  static queryBackgroundColor(stdout: {
+    write: (data: string) => void | boolean;
+  }): void {
+    stdout.write(TerminalCapabilityManager.OSC_11_QUERY);
+  }
 
   // Kitty keyboard flags: CSI ? flags u
   // eslint-disable-next-line no-control-regex
@@ -31,14 +67,18 @@ export class TerminalCapabilityManager {
   // eslint-disable-next-line no-control-regex
   private static readonly DEVICE_ATTRIBUTES_REGEX = /\x1b\[\?(\d+)(;\d+)*c/;
   // OSC 11 response: OSC 11 ; rgb:rrrr/gggg/bbbb ST (or BEL)
-  private static readonly OSC_11_REGEX =
+  static readonly OSC_11_REGEX =
     // eslint-disable-next-line no-control-regex
-    /\x1b\]11;rgb:([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})(\x1b\\|\x07)?/;
+    /\x1b\]11;rgb:([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})(\x1b\\|\x07)/;
+  // modifyOtherKeys response: CSI > 4 ; level m
+  // eslint-disable-next-line no-control-regex
+  private static readonly MODIFY_OTHER_KEYS_REGEX = /\x1b\[>4;(\d+)m/;
 
+  private detectionComplete = false;
   private terminalBackgroundColor: TerminalBackgroundColor;
   private kittySupported = false;
   private kittyEnabled = false;
-  private detectionComplete = false;
+  private modifyOtherKeysSupported = false;
   private terminalName: string | undefined;
 
   private constructor() {}
@@ -67,6 +107,13 @@ export class TerminalCapabilityManager {
       return;
     }
 
+    process.off('exit', cleanupTerminalOnExit);
+    process.off('SIGTERM', cleanupTerminalOnExit);
+    process.off('SIGINT', cleanupTerminalOnExit);
+    process.on('exit', cleanupTerminalOnExit);
+    process.on('SIGTERM', cleanupTerminalOnExit);
+    process.on('SIGINT', cleanupTerminalOnExit);
+
     return new Promise((resolve) => {
       const originalRawMode = process.stdin.isRaw;
       if (!originalRawMode) {
@@ -78,6 +125,7 @@ export class TerminalCapabilityManager {
       let terminalNameReceived = false;
       let deviceAttributesReceived = false;
       let bgReceived = false;
+      let modifyOtherKeysReceived = false;
       // eslint-disable-next-line prefer-const
       let timeoutId: NodeJS.Timeout;
 
@@ -90,24 +138,12 @@ export class TerminalCapabilityManager {
           process.stdin.setRawMode(false);
         }
         this.detectionComplete = true;
-
-        // Auto-enable kitty if supported
-        if (this.kittySupported) {
-          this.enableKittyProtocol();
-          process.on('exit', () => this.disableKittyProtocol());
-          process.on('SIGTERM', () => this.disableKittyProtocol());
-        }
-
         resolve();
-      };
-
-      const onTimeout = () => {
-        cleanup();
       };
 
       // A somewhat long timeout is acceptable as all terminals should respond
       // to the device attributes query used as a sentinel.
-      timeoutId = setTimeout(onTimeout, 1000);
+      timeoutId = setTimeout(cleanup, 1000);
 
       const onData = (data: Buffer) => {
         buffer += data.toString();
@@ -117,7 +153,7 @@ export class TerminalCapabilityManager {
           const match = buffer.match(TerminalCapabilityManager.OSC_11_REGEX);
           if (match) {
             bgReceived = true;
-            this.terminalBackgroundColor = this.parseColor(
+            this.terminalBackgroundColor = parseColor(
               match[1],
               match[2],
               match[3],
@@ -134,6 +170,21 @@ export class TerminalCapabilityManager {
         ) {
           kittyKeyboardReceived = true;
           this.kittySupported = true;
+        }
+
+        // check for modifyOtherKeys support
+        if (!modifyOtherKeysReceived) {
+          const match = buffer.match(
+            TerminalCapabilityManager.MODIFY_OTHER_KEYS_REGEX,
+          );
+          if (match) {
+            modifyOtherKeysReceived = true;
+            const level = parseInt(match[1], 10);
+            this.modifyOtherKeysSupported = level >= 2;
+            debugLogger.log(
+              `Detected modifyOtherKeys support: ${this.modifyOtherKeysSupported} (level ${level})`,
+            );
+          }
         }
 
         // Check for Terminal Name/Version response.
@@ -168,16 +219,42 @@ export class TerminalCapabilityManager {
       try {
         fs.writeSync(
           process.stdout.fd,
-          TerminalCapabilityManager.KITTY_QUERY +
+          // Use hidden mode to prevent potential "m" character from being printed
+          // to the terminal during startup when querying for modifyOtherKeys.
+          // This can happen on some terminals that might echo the query or
+          // malform the response. We hide the output, send queries, then
+          // immediately clear the line and reset attributes.
+          TerminalCapabilityManager.HIDDEN_MODE +
+            TerminalCapabilityManager.KITTY_QUERY +
             TerminalCapabilityManager.OSC_11_QUERY +
             TerminalCapabilityManager.TERMINAL_NAME_QUERY +
-            TerminalCapabilityManager.DEVICE_ATTRIBUTES_QUERY,
+            TerminalCapabilityManager.MODIFY_OTHER_KEYS_QUERY +
+            TerminalCapabilityManager.DEVICE_ATTRIBUTES_QUERY +
+            TerminalCapabilityManager.CLEAR_LINE_AND_RETURN +
+            TerminalCapabilityManager.RESET_ATTRIBUTES,
         );
       } catch (e) {
         debugLogger.warn('Failed to write terminal capability queries:', e);
         cleanup();
       }
     });
+  }
+
+  enableSupportedModes() {
+    try {
+      if (this.kittySupported) {
+        debugLogger.log('Enabling Kitty keyboard protocol');
+        enableKittyKeyboardProtocol();
+        this.kittyEnabled = true;
+      } else if (this.modifyOtherKeysSupported) {
+        debugLogger.log('Enabling modifyOtherKeys');
+        enableModifyOtherKeys();
+      }
+      // Always enable bracketed paste since it'll be ignored if unsupported.
+      enableBracketedPasteMode();
+    } catch (e) {
+      debugLogger.warn('Failed to enable keyboard protocols:', e);
+    }
   }
 
   getTerminalBackgroundColor(): TerminalBackgroundColor {
@@ -192,44 +269,30 @@ export class TerminalCapabilityManager {
     return this.kittyEnabled;
   }
 
-  enableKittyProtocol(): void {
-    try {
-      if (this.kittySupported) {
-        enableKittyKeyboardProtocol();
-        this.kittyEnabled = true;
-      }
-    } catch (e) {
-      debugLogger.warn('Failed to enable Kitty protocol:', e);
+  supportsOsc9Notifications(env: NodeJS.ProcessEnv = process.env): boolean {
+    if (env['WT_SESSION']) {
+      return false;
     }
+
+    return (
+      this.hasOsc9TerminalSignature(this.getTerminalName()) ||
+      this.hasOsc9TerminalSignature(env['TERM_PROGRAM']) ||
+      this.hasOsc9TerminalSignature(env['TERM'])
+    );
   }
 
-  disableKittyProtocol(): void {
-    try {
-      if (this.kittyEnabled) {
-        disableKittyKeyboardProtocol();
-        this.kittyEnabled = false;
-      }
-    } catch (e) {
-      debugLogger.warn('Failed to disable Kitty protocol:', e);
+  private hasOsc9TerminalSignature(value: string | undefined): boolean {
+    if (!value) {
+      return false;
     }
-  }
 
-  private parseColor(rHex: string, gHex: string, bHex: string): string {
-    const parseComponent = (hex: string) => {
-      const val = parseInt(hex, 16);
-      if (hex.length === 1) return (val / 15) * 255;
-      if (hex.length === 2) return val;
-      if (hex.length === 3) return (val / 4095) * 255;
-      if (hex.length === 4) return (val / 65535) * 255;
-      return val;
-    };
-
-    const r = parseComponent(rHex);
-    const g = parseComponent(gHex);
-    const b = parseComponent(bHex);
-
-    const toHex = (c: number) => Math.round(c).toString(16).padStart(2, '0');
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    const normalized = value.toLowerCase();
+    return (
+      normalized.includes('wezterm') ||
+      normalized.includes('ghostty') ||
+      normalized.includes('iterm') ||
+      normalized.includes('kitty')
+    );
   }
 }
 

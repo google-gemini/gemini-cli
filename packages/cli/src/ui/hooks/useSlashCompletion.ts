@@ -212,7 +212,10 @@ function useCommandSuggestions(
           return;
         }
 
-        setIsLoading(true);
+        const showLoading = leafCommand.showCompletionLoading !== false;
+        if (showLoading) {
+          setIsLoading(true);
+        }
         try {
           const rawParts = [...commandPathParts];
           if (partial) rawParts.push(partial);
@@ -268,6 +271,7 @@ function useCommandSuggestions(
           const fzfInstance = getFzfForCommands(commandsToSearch);
           if (fzfInstance) {
             try {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               const fzfResults = await fzfInstance.fzf.find(partial);
               if (signal.aborted) return;
               const uniqueCommands = new Set<SlashCommand>();

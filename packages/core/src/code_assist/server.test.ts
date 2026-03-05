@@ -9,8 +9,15 @@ import { CodeAssistServer } from './server.js';
 import { OAuth2Client } from 'google-auth-library';
 import { UserTierId, ActionStatus } from './types.js';
 import { FinishReason } from '@google/genai';
+import { LlmRole } from '../telemetry/types.js';
+import { logInvalidChunk } from '../telemetry/loggers.js';
+import { makeFakeConfig } from '../test-utils/config.js';
 
 vi.mock('google-auth-library');
+vi.mock('../telemetry/loggers.js', () => ({
+  logBillingEvent: vi.fn(),
+  logInvalidChunk: vi.fn(),
+}));
 
 function createTestServer(headers: Record<string, string> = {}) {
   const mockRequest = vi.fn();
@@ -69,6 +76,7 @@ describe('CodeAssistServer', () => {
         contents: [{ role: 'user', parts: [{ text: 'request' }] }],
       },
       'user-prompt-id',
+      LlmRole.MAIN,
     );
 
     expect(mockRequest).toHaveBeenCalledWith({
@@ -81,6 +89,16 @@ describe('CodeAssistServer', () => {
       responseType: 'json',
       body: expect.any(String),
       signal: undefined,
+      retryConfig: {
+        retryDelay: 1000,
+        retry: 3,
+        noResponseRetries: 3,
+        statusCodesToRetry: [
+          [429, 429],
+          [499, 499],
+          [500, 599],
+        ],
+      },
     });
 
     const requestBody = JSON.parse(mockRequest.mock.calls[0][0].body);
@@ -104,7 +122,7 @@ describe('CodeAssistServer', () => {
               role: 'model',
               parts: [
                 { text: 'response' },
-                { functionCall: { name: 'test', args: {} } },
+                { functionCall: { name: 'replace', args: {} } },
               ],
             },
             finishReason: FinishReason.SAFETY,
@@ -126,6 +144,7 @@ describe('CodeAssistServer', () => {
         contents: [{ role: 'user', parts: [{ text: 'request' }] }],
       },
       'user-prompt-id',
+      LlmRole.MAIN,
     );
 
     expect(recordConversationOfferedSpy).toHaveBeenCalledWith(
@@ -147,7 +166,7 @@ describe('CodeAssistServer', () => {
               role: 'model',
               parts: [
                 { text: 'response' },
-                { functionCall: { name: 'test', args: {} } },
+                { functionCall: { name: 'replace', args: {} } },
               ],
             },
             finishReason: FinishReason.STOP,
@@ -170,6 +189,7 @@ describe('CodeAssistServer', () => {
         contents: [{ role: 'user', parts: [{ text: 'request' }] }],
       },
       'user-prompt-id',
+      LlmRole.MAIN,
     );
 
     expect(server.recordCodeAssistMetrics).toHaveBeenCalledWith(
@@ -184,6 +204,9 @@ describe('CodeAssistServer', () => {
                 firstMessageLatency: expect.stringMatching(/\d+s/),
               }),
             }),
+            timestamp: expect.stringMatching(
+              /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/,
+            ),
           }),
         ]),
       }),
@@ -205,6 +228,7 @@ describe('CodeAssistServer', () => {
         contents: [{ role: 'user', parts: [{ text: 'request' }] }],
       },
       'user-prompt-id',
+      LlmRole.MAIN,
     );
 
     const mockResponseData = {
@@ -215,7 +239,7 @@ describe('CodeAssistServer', () => {
             content: {
               parts: [
                 { text: 'chunk' },
-                { functionCall: { name: 'test', args: {} } },
+                { functionCall: { name: 'replace', args: {} } },
               ],
             },
           },
@@ -244,6 +268,9 @@ describe('CodeAssistServer', () => {
             conversationOffered: expect.objectContaining({
               traceId: 'stream-trace-id',
             }),
+            timestamp: expect.stringMatching(
+              /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/,
+            ),
           }),
         ]),
       }),
@@ -266,6 +293,9 @@ describe('CodeAssistServer', () => {
         metrics: expect.arrayContaining([
           expect.objectContaining({
             conversationInteraction: interaction,
+            timestamp: expect.stringMatching(
+              /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/,
+            ),
           }),
         ]),
       }),
@@ -318,6 +348,22 @@ describe('CodeAssistServer', () => {
       const url = server.getMethodUrl('testMethod');
       expect(url).toBe('https://custom-endpoint.com/v1internal:testMethod');
     });
+
+    it('should use the CODE_ASSIST_API_VERSION environment variable if set', () => {
+      process.env['CODE_ASSIST_API_VERSION'] = 'v2beta';
+      const server = new CodeAssistServer({} as never);
+      const url = server.getMethodUrl('testMethod');
+      expect(url).toBe('https://cloudcode-pa.googleapis.com/v2beta:testMethod');
+    });
+
+    it('should use default value if CODE_ASSIST_API_VERSION env var is empty', () => {
+      process.env['CODE_ASSIST_API_VERSION'] = '';
+      const server = new CodeAssistServer({} as never);
+      const url = server.getMethodUrl('testMethod');
+      expect(url).toBe(
+        'https://cloudcode-pa.googleapis.com/v1internal:testMethod',
+      );
+    });
   });
 
   it('should call the generateContentStream endpoint and parse SSE', async () => {
@@ -344,6 +390,7 @@ describe('CodeAssistServer', () => {
         contents: [{ role: 'user', parts: [{ text: 'request' }] }],
       },
       'user-prompt-id',
+      LlmRole.MAIN,
     );
 
     // Push SSE data to the stream
@@ -370,11 +417,54 @@ describe('CodeAssistServer', () => {
         'Content-Type': 'application/json',
       },
       signal: undefined,
+      retry: false,
     });
 
     expect(results).toHaveLength(2);
     expect(results[0].candidates?.[0].content?.parts?.[0].text).toBe('Hello');
     expect(results[1].candidates?.[0].content?.parts?.[0].text).toBe(' World');
+  });
+
+  it('should handle Web ReadableStream in generateContentStream', async () => {
+    const { server, mockRequest } = createTestServer();
+
+    // Create a mock Web ReadableStream
+    const mockWebStream = new ReadableStream({
+      start(controller) {
+        const mockResponseData = {
+          response: {
+            candidates: [{ content: { parts: [{ text: 'Hello Web' }] } }],
+          },
+        };
+        controller.enqueue(
+          new TextEncoder().encode(
+            'data: ' + JSON.stringify(mockResponseData) + '\n\n',
+          ),
+        );
+        controller.close();
+      },
+    });
+
+    mockRequest.mockResolvedValue({ data: mockWebStream });
+
+    const stream = await server.generateContentStream(
+      {
+        model: 'test-model',
+        contents: [{ role: 'user', parts: [{ text: 'request' }] }],
+      },
+      'user-prompt-id',
+      LlmRole.MAIN,
+    );
+
+    const results = [];
+    for await (const res of stream) {
+      results.push(res);
+    }
+
+    expect(results).toHaveLength(1);
+    expect(results[0].candidates?.[0].content?.parts?.[0].text).toBe(
+      'Hello Web',
+    );
   });
 
   it('should ignore malformed SSE data', async () => {
@@ -421,6 +511,31 @@ describe('CodeAssistServer', () => {
       expect.any(Object),
     );
     expect(response.name).toBe('operations/123');
+  });
+
+  it('should call the getOperation endpoint', async () => {
+    const { server } = createTestServer();
+
+    const mockResponse = {
+      name: 'operations/123',
+      done: true,
+      response: {
+        cloudaicompanionProject: {
+          id: 'test-project',
+          name: 'projects/test-project',
+        },
+      },
+    };
+    vi.spyOn(server, 'requestGetOperation').mockResolvedValue(mockResponse);
+
+    const response = await server.getOperation('operations/123');
+
+    expect(server.requestGetOperation).toHaveBeenCalledWith('operations/123');
+    expect(response.name).toBe('operations/123');
+    expect(response.response?.cloudaicompanionProject?.id).toBe('test-project');
+    expect(response.response?.cloudaicompanionProject?.name).toBe(
+      'projects/test-project',
+    );
   });
 
   it('should call the loadCodeAssist endpoint', async () => {
@@ -561,5 +676,243 @@ describe('CodeAssistServer', () => {
 
     expect(requestPostSpy).toHaveBeenCalledWith('retrieveUserQuota', req);
     expect(response).toEqual(mockResponse);
+  });
+
+  describe('robustness testing', () => {
+    it('should not crash on random error objects in loadCodeAssist (isVpcScAffectedUser)', async () => {
+      const { server } = createTestServer();
+      const errors = [
+        null,
+        undefined,
+        'string error',
+        123,
+        { some: 'object' },
+        new Error('standard error'),
+        { response: {} },
+        { response: { data: {} } },
+      ];
+
+      for (const err of errors) {
+        vi.spyOn(server, 'requestPost').mockRejectedValueOnce(err);
+        try {
+          await server.loadCodeAssist({ metadata: {} });
+        } catch (e) {
+          expect(e).toBe(err);
+        }
+      }
+    });
+
+    it('should handle randomly fragmented SSE streams gracefully', async () => {
+      const { server, mockRequest } = createTestServer();
+      const { Readable } = await import('node:stream');
+
+      const fragmentedCases = [
+        {
+          chunks: ['d', 'ata: {"foo":', ' "bar"}\n\n'],
+          expected: [{ foo: 'bar' }],
+        },
+        {
+          chunks: ['data: {"foo": "bar"}\n', '\n'],
+          expected: [{ foo: 'bar' }],
+        },
+        {
+          chunks: ['data: ', '{"foo": "bar"}', '\n\n'],
+          expected: [{ foo: 'bar' }],
+        },
+        {
+          chunks: ['data: {"foo": "bar"}\n\n', 'data: {"baz": 1}\n\n'],
+          expected: [{ foo: 'bar' }, { baz: 1 }],
+        },
+      ];
+
+      for (const { chunks, expected } of fragmentedCases) {
+        const mockStream = new Readable({
+          read() {
+            for (const chunk of chunks) {
+              this.push(chunk);
+            }
+            this.push(null);
+          },
+        });
+        mockRequest.mockResolvedValueOnce({ data: mockStream });
+
+        const stream = await server.requestStreamingPost('testStream', {});
+        const results = [];
+        for await (const res of stream) {
+          results.push(res);
+        }
+        expect(results).toEqual(expected);
+      }
+    });
+
+    it('should correctly parse valid JSON split across multiple data lines', async () => {
+      const { server, mockRequest } = createTestServer();
+      const { Readable } = await import('node:stream');
+      const jsonObj = {
+        complex: { structure: [1, 2, 3] },
+        bool: true,
+        str: 'value',
+      };
+      const jsonString = JSON.stringify(jsonObj, null, 2);
+      const lines = jsonString.split('\n');
+      const ssePayload = lines.map((line) => `data: ${line}\n`).join('') + '\n';
+
+      const mockStream = new Readable({
+        read() {
+          this.push(ssePayload);
+          this.push(null);
+        },
+      });
+      mockRequest.mockResolvedValueOnce({ data: mockStream });
+
+      const stream = await server.requestStreamingPost('testStream', {});
+      const results = [];
+      for await (const res of stream) {
+        results.push(res);
+      }
+      expect(results).toHaveLength(1);
+      expect(results[0]).toEqual(jsonObj);
+    });
+
+    it('should not crash on objects partially matching VPC SC error structure', async () => {
+      const { server } = createTestServer();
+      const partialErrors = [
+        { response: { data: { error: { details: [{ reason: 'OTHER' }] } } } },
+        { response: { data: { error: { details: [] } } } },
+        { response: { data: { error: {} } } },
+        { response: { data: {} } },
+      ];
+
+      for (const err of partialErrors) {
+        vi.spyOn(server, 'requestPost').mockRejectedValueOnce(err);
+        try {
+          await server.loadCodeAssist({ metadata: {} });
+        } catch (e) {
+          expect(e).toBe(err);
+        }
+      }
+    });
+
+    it('should correctly ignore arbitrary SSE comments and ID lines and empty lines before data', async () => {
+      const { server, mockRequest } = createTestServer();
+      const { Readable } = await import('node:stream');
+      const jsonObj = { foo: 'bar' };
+      const jsonString = JSON.stringify(jsonObj);
+
+      const ssePayload = `id: 123
+:comment
+retry: 100
+
+data: ${jsonString}
+
+`;
+
+      const mockStream = new Readable({
+        read() {
+          this.push(ssePayload);
+          this.push(null);
+        },
+      });
+      mockRequest.mockResolvedValueOnce({ data: mockStream });
+
+      const stream = await server.requestStreamingPost('testStream', {});
+      const results = [];
+      for await (const res of stream) {
+        results.push(res);
+      }
+      expect(results).toHaveLength(1);
+      expect(results[0]).toEqual(jsonObj);
+    });
+
+    it('should log InvalidChunkEvent when SSE chunk is not valid JSON', async () => {
+      const config = makeFakeConfig();
+      const mockRequest = vi.fn();
+      const client = { request: mockRequest } as unknown as OAuth2Client;
+      const server = new CodeAssistServer(
+        client,
+        'test-project',
+        {},
+        'test-session',
+        UserTierId.FREE,
+        undefined,
+        undefined,
+        config,
+      );
+
+      const { Readable } = await import('node:stream');
+      const mockStream = new Readable({
+        read() {},
+      });
+
+      mockRequest.mockResolvedValue({ data: mockStream });
+
+      const stream = await server.requestStreamingPost('testStream', {});
+
+      setTimeout(() => {
+        mockStream.push('data: { "invalid": json }\n\n');
+        mockStream.push(null);
+      }, 0);
+
+      const results = [];
+      for await (const res of stream) {
+        results.push(res);
+      }
+
+      expect(results).toHaveLength(0);
+      expect(logInvalidChunk).toHaveBeenCalledWith(
+        config,
+        expect.objectContaining({
+          error_message: 'Malformed JSON chunk',
+        }),
+      );
+    });
+
+    it('should safely process random response streams in generateContentStream (consumed/remaining credits)', async () => {
+      const { mockRequest, client } = createTestServer();
+      const testServer = new CodeAssistServer(
+        client,
+        'test-project',
+        {},
+        'test-session',
+        UserTierId.FREE,
+        undefined,
+        { id: 'test-tier', name: 'tier', availableCredits: [] },
+      );
+      const { Readable } = await import('node:stream');
+
+      const streamResponses = [
+        {
+          traceId: '1',
+          consumedCredits: [{ creditType: 'A', creditAmount: '10' }],
+        },
+        { traceId: '2', remainingCredits: [{ creditType: 'B' }] },
+        { traceId: '3' },
+        { traceId: '4', consumedCredits: null, remainingCredits: undefined },
+      ];
+
+      const mockStream = new Readable({
+        read() {
+          for (const resp of streamResponses) {
+            this.push(`data: ${JSON.stringify(resp)}\n\n`);
+          }
+          this.push(null);
+        },
+      });
+      mockRequest.mockResolvedValueOnce({ data: mockStream });
+      vi.spyOn(testServer, 'recordCodeAssistMetrics').mockResolvedValue(
+        undefined,
+      );
+
+      const stream = await testServer.generateContentStream(
+        { model: 'test-model', contents: [] },
+        'user-prompt-id',
+        LlmRole.MAIN,
+      );
+
+      for await (const _ of stream) {
+        // Drain stream
+      }
+      // Should not crash
+    });
   });
 });

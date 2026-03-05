@@ -5,16 +5,26 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { spawn, exec, execSync } from 'node:child_process';
+import { spawn, exec, execFile, execSync } from 'node:child_process';
 import os from 'node:os';
 import fs from 'node:fs';
 import { start_sandbox } from './sandbox.js';
 import { FatalSandboxError, type SandboxConfig } from '@google/gemini-cli-core';
 import { EventEmitter } from 'node:events';
 
-vi.mock('../config/settings.js', () => ({
-  USER_SETTINGS_DIR: '/home/user/.gemini',
+const { mockedHomedir, mockedGetContainerPath } = vi.hoisted(() => ({
+  mockedHomedir: vi.fn().mockReturnValue('/home/user'),
+  mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
 }));
+
+vi.mock('./sandboxUtils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./sandboxUtils.js')>();
+  return {
+    ...actual,
+    getContainerPath: mockedGetContainerPath,
+  };
+});
+
 vi.mock('node:child_process');
 vi.mock('node:os');
 vi.mock('node:fs');
@@ -40,10 +50,31 @@ vi.mock('node:util', async (importOriginal) => {
           return { stdout: '', stderr: '' };
         };
       }
+      if (fn === execFile) {
+        return async (file: string, args: string[]) => {
+          if (file === 'lxc' && args[0] === 'list') {
+            const output = process.env['TEST_LXC_LIST_OUTPUT'];
+            if (output === 'throw') {
+              throw new Error('lxc command not found');
+            }
+            return { stdout: output ?? '[]', stderr: '' };
+          }
+          if (
+            file === 'lxc' &&
+            args[0] === 'config' &&
+            args[1] === 'device' &&
+            args[2] === 'add'
+          ) {
+            return { stdout: '', stderr: '' };
+          }
+          return { stdout: '', stderr: '' };
+        };
+      }
       return actual.promisify(fn);
     },
   };
 });
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -64,7 +95,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       }
     },
     GEMINI_DIR: '.gemini',
-    USER_SETTINGS_DIR: '/home/user/.gemini',
+    homedir: mockedHomedir,
   };
 });
 
@@ -341,13 +372,70 @@ describe('sandbox', () => {
 
       await start_sandbox(config);
 
-      expect(spawn).toHaveBeenCalledWith(
+      // The first call is 'docker images -q ...'
+      expect(spawn).toHaveBeenNthCalledWith(
+        1,
+        'docker',
+        expect.arrayContaining(['images', '-q']),
+      );
+
+      // The second call is 'docker run ...'
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
         'docker',
         expect.arrayContaining([
+          'run',
           '--volume',
           '/host/path:/container/path:ro',
           '--volume',
-          expect.stringContaining('/home/user/.gemini'),
+          expect.stringMatching(/[\\/]home[\\/]user[\\/]\.gemini/),
+        ]),
+        expect.any(Object),
+      );
+    });
+
+    it('should pass through GOOGLE_GEMINI_BASE_URL and GOOGLE_VERTEX_BASE_URL', async () => {
+      const config: SandboxConfig = {
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      };
+      process.env['GOOGLE_GEMINI_BASE_URL'] = 'http://gemini.proxy';
+      process.env['GOOGLE_VERTEX_BASE_URL'] = 'http://vertex.proxy';
+
+      // Mock image check to return true
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      expect(spawn).toHaveBeenCalledWith(
+        'docker',
+        expect.arrayContaining([
+          '--env',
+          'GOOGLE_GEMINI_BASE_URL=http://gemini.proxy',
+          '--env',
+          'GOOGLE_VERTEX_BASE_URL=http://vertex.proxy',
         ]),
         expect.any(Object),
       );
@@ -404,6 +492,138 @@ describe('sandbox', () => {
       expect(entrypointCmd).toContain('groupadd');
       expect(entrypointCmd).toContain('useradd');
       expect(entrypointCmd).toContain('su -p gemini');
+    });
+
+    describe('LXC sandbox', () => {
+      const LXC_RUNNING = JSON.stringify([
+        { name: 'gemini-sandbox', status: 'Running' },
+      ]);
+      const LXC_STOPPED = JSON.stringify([
+        { name: 'gemini-sandbox', status: 'Stopped' },
+      ]);
+
+      beforeEach(() => {
+        delete process.env['TEST_LXC_LIST_OUTPUT'];
+      });
+
+      it('should run lxc exec with correct args for a running container', async () => {
+        process.env['TEST_LXC_LIST_OUTPUT'] = LXC_RUNNING;
+        const config: SandboxConfig = {
+          command: 'lxc',
+          image: 'gemini-sandbox',
+        };
+
+        const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >;
+        mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+          if (event === 'close') {
+            setTimeout(() => cb(0), 10);
+          }
+          return mockSpawnProcess;
+        });
+
+        vi.mocked(spawn).mockImplementation((cmd) => {
+          if (cmd === 'lxc') {
+            return mockSpawnProcess;
+          }
+          return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+        });
+
+        const promise = start_sandbox(config, [], undefined, ['arg1']);
+        await expect(promise).resolves.toBe(0);
+
+        expect(spawn).toHaveBeenCalledWith(
+          'lxc',
+          expect.arrayContaining(['exec', 'gemini-sandbox', '--cwd']),
+          expect.objectContaining({ stdio: 'inherit' }),
+        );
+      });
+
+      it('should throw FatalSandboxError if lxc list fails', async () => {
+        process.env['TEST_LXC_LIST_OUTPUT'] = 'throw';
+        const config: SandboxConfig = {
+          command: 'lxc',
+          image: 'gemini-sandbox',
+        };
+
+        await expect(start_sandbox(config)).rejects.toThrow(
+          /Failed to query LXC container/,
+        );
+      });
+
+      it('should throw FatalSandboxError if container is not running', async () => {
+        process.env['TEST_LXC_LIST_OUTPUT'] = LXC_STOPPED;
+        const config: SandboxConfig = {
+          command: 'lxc',
+          image: 'gemini-sandbox',
+        };
+
+        await expect(start_sandbox(config)).rejects.toThrow(/is not running/);
+      });
+
+      it('should throw FatalSandboxError if container is not found in list', async () => {
+        process.env['TEST_LXC_LIST_OUTPUT'] = '[]';
+        const config: SandboxConfig = {
+          command: 'lxc',
+          image: 'gemini-sandbox',
+        };
+
+        await expect(start_sandbox(config)).rejects.toThrow(/not found/);
+      });
+    });
+  });
+
+  describe('gVisor (runsc)', () => {
+    it('should use docker with --runtime=runsc on Linux', async () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      const config: SandboxConfig = {
+        command: 'runsc',
+        image: 'gemini-cli-sandbox',
+      };
+
+      // Mock image check
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      // Mock docker run
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config, [], undefined, ['arg1']);
+
+      // Verify docker (not runsc) is called for image check
+      expect(spawn).toHaveBeenNthCalledWith(
+        1,
+        'docker',
+        expect.arrayContaining(['images', '-q', 'gemini-cli-sandbox']),
+      );
+
+      // Verify docker run includes --runtime=runsc
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
+        'docker',
+        expect.arrayContaining(['run', '--runtime=runsc']),
+        expect.objectContaining({ stdio: 'inherit' }),
+      );
     });
   });
 });

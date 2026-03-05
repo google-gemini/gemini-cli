@@ -1,25 +1,25 @@
 # Gemini 3 Pro and Gemini 3 Flash on Gemini CLI
 
-Gemini 3 Pro and Gemini 3 Flash are now available on Gemini CLI! Currently, most
-paid customers of Gemini CLI will have access to both Gemini 3 Pro and Gemini 3
-Flash, including the following subscribers:
+Gemini 3 Pro and Gemini 3 Flash are available on Gemini CLI for all users!
 
-- Google AI Pro and Google AI Ultra (excluding business customers).
-- Gemini Code Assist Standard and Enterprise (requires
-  [administrative enablement](#administrator-instructions)).
-- Paid Gemini API and Vertex API key holders.
-
-For free tier users:
-
-- If you signed up for the waitlist, please check your email for details. We’ve
-  onboarded everyone who signed up to the previously available waitlist.
-- If you were not on our waitlist, we’re rolling out additional access gradually
-  to ensure the experience remains fast and reliable. Stay tuned for more
-  details.
+> **Note:** Gemini 3.1 Pro Preview is rolling out. To determine whether you have
+> access to Gemini 3.1, use the `/model` command and select **Manual**. If you
+> have access, you will see `gemini-3.1-pro-preview`.
+>
+> If you have access to Gemini 3.1, it will be included in model routing when
+> you select **Auto (Gemini 3)**. You can also launch the Gemini 3.1 model
+> directly using the `-m` flag:
+>
+> ```
+> gemini -m gemini-3.1-pro-preview
+> ```
+>
+> Learn more about [models](../cli/model.md) and
+> [model routing](../cli/model-routing.md).
 
 ## How to get started with Gemini 3 on Gemini CLI
 
-Get started by upgrading Gemini CLI to the latest version (0.21.1):
+Get started by upgrading Gemini CLI to the latest version:
 
 ```bash
 npm install -g @google/gemini-cli@latest
@@ -27,9 +27,8 @@ npm install -g @google/gemini-cli@latest
 
 After you’ve confirmed your version is 0.21.1 or later:
 
-1. Use the `/settings` command in Gemini CLI.
-2. Toggle **Preview Features** to `true`.
-3. Run `/model` and select **Auto (Gemini 3)**.
+1. Run `/model`.
+2. Select **Auto (Gemini 3)**.
 
 For more information, see [Gemini CLI model selection](../cli/model.md).
 
@@ -39,6 +38,10 @@ Gemini CLI will tell you when you reach your Gemini 3 Pro daily usage limit.
 When you encounter that limit, you’ll be given the option to switch to Gemini
 2.5 Pro, upgrade for higher limits, or stop. You’ll also be told when your usage
 limit resets and Gemini 3 Pro can be used again.
+
+> **Note:** Looking to upgrade for higher limits? To compare subscription
+> options and find the right quota for your needs, see our
+> [Plans page](/plans/).
 
 Similarly, when you reach your daily usage limit for Gemini 2.5 Pro, you’ll see
 a message prompting fallback to Gemini 2.5 Flash.

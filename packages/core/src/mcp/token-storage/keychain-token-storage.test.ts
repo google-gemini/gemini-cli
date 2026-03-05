@@ -25,15 +25,20 @@ vi.mock('keytar', () => ({
   default: mockKeytar,
 }));
 
-vi.mock('node:crypto', () => ({
-  randomBytes: vi.fn(() => ({
-    toString: vi.fn(() => mockCryptoRandomBytesString),
-  })),
-}));
+vi.mock('node:crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:crypto')>();
+  return {
+    ...actual,
+    randomBytes: vi.fn(() => ({
+      toString: vi.fn(() => mockCryptoRandomBytesString),
+    })),
+  };
+});
 
 vi.mock('../../utils/events.js', () => ({
   coreEvents: {
     emitFeedback: vi.fn(),
+    emitTelemetryKeychainAvailability: vi.fn(),
   },
 }));
 

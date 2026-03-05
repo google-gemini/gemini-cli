@@ -124,7 +124,6 @@ describe('settings-validation', () => {
         },
         tools: {
           sandbox: 'inherit',
-          autoAccept: false,
         },
       };
 
@@ -219,6 +218,60 @@ describe('settings-validation', () => {
       }
     });
 
+    it('should validate mcpServers with type field for all transport types', () => {
+      const validSettings = {
+        mcpServers: {
+          'sse-server': {
+            url: 'https://example.com/sse',
+            type: 'sse',
+            headers: { 'X-API-Key': 'key' },
+          },
+          'http-server': {
+            url: 'https://example.com/mcp',
+            type: 'http',
+          },
+          'stdio-server': {
+            command: '/usr/bin/mcp-server',
+            type: 'stdio',
+          },
+        },
+      };
+
+      const result = validateSettings(validSettings);
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject invalid type values in mcpServers', () => {
+      const invalidSettings = {
+        mcpServers: {
+          'bad-server': {
+            url: 'https://example.com/mcp',
+            type: 'invalid-type',
+          },
+        },
+      };
+
+      const result = validateSettings(invalidSettings);
+      expect(result.success).toBe(false);
+    });
+
+    it('should validate mcpServers without type field', () => {
+      const validSettings = {
+        mcpServers: {
+          'stdio-server': {
+            command: '/usr/bin/mcp-server',
+            args: ['--port', '8080'],
+          },
+          'url-server': {
+            url: 'https://example.com/mcp',
+          },
+        },
+      };
+
+      const result = validateSettings(validSettings);
+      expect(result.success).toBe(true);
+    });
+
     it('should validate complex nested customThemes configuration', () => {
       const invalidSettings = {
         ui: {
@@ -269,11 +322,9 @@ describe('settings-validation', () => {
         expect(formatted).toContain('/path/to/settings.json');
         expect(formatted).toContain('model.name');
         expect(formatted).toContain('Expected: string, but received: object');
+        expect(formatted).toContain('Please fix the configuration.');
         expect(formatted).toContain(
-          'Please fix the configuration and try again.',
-        );
-        expect(formatted).toContain(
-          'https://github.com/google-gemini/gemini-cli',
+          'https://geminicli.com/docs/reference/configuration/',
         );
       }
     });
@@ -313,9 +364,8 @@ describe('settings-validation', () => {
         const formatted = formatValidationError(result.error, 'test.json');
 
         expect(formatted).toContain(
-          'https://github.com/google-gemini/gemini-cli',
+          'https://geminicli.com/docs/reference/configuration/',
         );
-        expect(formatted).toContain('configuration.md');
       }
     });
 

@@ -11,7 +11,7 @@ import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { debugState } from '../debug.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { coreEvents, CoreEvent, debugLogger } from '@google/gemini-cli-core';
 
 // Frames that render at least this far before or after an action are considered
 // idle frames.
@@ -160,9 +160,43 @@ export const DebugProfiler = () => {
     stdin.on('data', handler);
     stdout.on('resize', handler);
 
+    // Register handlers for all core and app events to ensure they are
+    // considered "actions" and don't trigger spurious idle frame warnings.
+    // These events are expected to trigger UI renders.
+    for (const eventName of Object.values(CoreEvent)) {
+      coreEvents.on(eventName, handler);
+    }
+
+    for (const eventName of Object.values(AppEvent)) {
+      appEvents.on(eventName, handler);
+    }
+
+    // Register handlers for extension lifecycle events emitted on coreEvents
+    // but not part of the CoreEvent enum, to prevent false-positive idle warnings.
+    const extensionEvents = [
+      'extensionsStarting',
+      'extensionsStopping',
+    ] as const;
+    for (const eventName of extensionEvents) {
+      coreEvents.on(eventName, handler);
+    }
+
     return () => {
       stdin.off('data', handler);
       stdout.off('resize', handler);
+
+      for (const eventName of Object.values(CoreEvent)) {
+        coreEvents.off(eventName, handler);
+      }
+
+      for (const eventName of Object.values(AppEvent)) {
+        appEvents.off(eventName, handler);
+      }
+
+      for (const eventName of extensionEvents) {
+        coreEvents.off(eventName, handler);
+      }
+
       profiler.profilersActive--;
     };
   }, []);

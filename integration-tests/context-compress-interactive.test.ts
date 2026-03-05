@@ -32,7 +32,7 @@ describe('Interactive Mode', () => {
     await run.sendKeys(
       'Write a 200 word story about a robot. The story MUST end with the text THE_END followed by a period.',
     );
-    await run.sendKeys('\r');
+    await run.type('\r');
 
     // Wait for the specific end marker.
     await run.expectText('THE_END.', 30000);

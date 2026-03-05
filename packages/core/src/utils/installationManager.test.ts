@@ -4,14 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mock } from 'vitest';
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { InstallationManager } from './installationManager.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { GEMINI_DIR } from './paths.js';
+import { GEMINI_DIR, homedir as pathsHomedir } from './paths.js';
 import { debugLogger } from './debugLogger.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -23,19 +30,27 @@ vi.mock('node:fs', async (importOriginal) => {
   } as typeof actual;
 });
 
-vi.mock('os', async (importOriginal) => {
-  const os = await importOriginal<typeof import('os')>();
+vi.mock('node:os', async (importOriginal) => {
+  const os = await importOriginal<typeof import('node:os')>();
   return {
     ...os,
     homedir: vi.fn(),
   };
 });
 
-vi.mock('crypto', async (importOriginal) => {
-  const crypto = await importOriginal<typeof import('crypto')>();
+vi.mock('node:crypto', async (importOriginal) => {
+  const crypto = await importOriginal<typeof import('node:crypto')>();
   return {
     ...crypto,
     randomUUID: vi.fn(),
+  };
+});
+
+vi.mock('./paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./paths.js')>();
+  return {
+    ...actual,
+    homedir: vi.fn(),
   };
 });
 
@@ -49,6 +64,7 @@ describe('InstallationManager', () => {
     tempHomeDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
+    (pathsHomedir as Mock).mockReturnValue(tempHomeDir);
     (os.homedir as Mock).mockReturnValue(tempHomeDir);
     installationManager = new InstallationManager();
   });

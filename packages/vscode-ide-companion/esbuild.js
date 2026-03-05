@@ -49,11 +49,14 @@ async function main() {
     define: {
       'import.meta.url': 'import_meta.url',
     },
+    alias: {
+      punycode: 'punycode/',
+    },
     plugins: [
       /* add to the end of plugins array */
       esbuildProblemMatcherPlugin,
     ],
-    loader: { '.node': 'file' },
+    loader: { '.node': 'file', '.wasm': 'binary' },
   });
   if (watch) {
     await ctx.watch();

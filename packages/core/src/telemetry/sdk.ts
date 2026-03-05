@@ -53,6 +53,15 @@ import {
 import { TelemetryTarget } from './index.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { authEvents } from '../code_assist/oauth2.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
+import {
+  logKeychainAvailability,
+  logTokenStorageInitialization,
+} from './loggers.js';
+import type {
+  KeychainAvailabilityEvent,
+  TokenStorageInitializationEvent,
+} from './types.js';
 
 // For troubleshooting, set the log level to DiagLogLevel.DEBUG
 class DiagLoggerAdapter {
@@ -86,6 +95,12 @@ let telemetryInitialized = false;
 let callbackRegistered = false;
 let authListener: ((newCredentials: JWTInput) => Promise<void>) | undefined =
   undefined;
+let keychainAvailabilityListener:
+  | ((event: KeychainAvailabilityEvent) => void)
+  | undefined = undefined;
+let tokenStorageTypeListener:
+  | ((event: TokenStorageInitializationEvent) => void)
+  | undefined = undefined;
 const telemetryBuffer: Array<() => void | Promise<void>> = [];
 let activeTelemetryEmail: string | undefined;
 
@@ -157,7 +172,6 @@ export async function initializeTelemetry(
     ) {
       const message = `Telemetry credentials have changed (from ${activeTelemetryEmail} to ${credentials.client_email}), but telemetry cannot be re-initialized in this process. Please restart the CLI to use the new account for telemetry.`;
       debugLogger.error(message);
-      console.error(message);
     }
     return;
   }
@@ -196,6 +210,26 @@ export async function initializeTelemetry(
     [SemanticResourceAttributes.SERVICE_VERSION]: process.version,
     'session.id': config.getSessionId(),
   });
+
+  if (!keychainAvailabilityListener) {
+    keychainAvailabilityListener = (event: KeychainAvailabilityEvent) => {
+      logKeychainAvailability(config, event);
+    };
+    coreEvents.on(
+      CoreEvent.TelemetryKeychainAvailability,
+      keychainAvailabilityListener,
+    );
+  }
+
+  if (!tokenStorageTypeListener) {
+    tokenStorageTypeListener = (event: TokenStorageInitializationEvent) => {
+      logTokenStorageInitialization(config, event);
+    };
+    coreEvents.on(
+      CoreEvent.TelemetryTokenStorageType,
+      tokenStorageTypeListener,
+    );
+  }
 
   const otlpEndpoint = config.getTelemetryOtlpEndpoint();
   const otlpProtocol = config.getTelemetryOtlpProtocol();
@@ -309,7 +343,7 @@ export async function initializeTelemetry(
     initializeMetrics(config);
     void flushTelemetryBuffer();
   } catch (error) {
-    console.error('Error starting OpenTelemetry SDK:', error);
+    debugLogger.error('Error starting OpenTelemetry SDK:', error);
   }
 
   // Note: We don't use process.on('exit') here because that callback is synchronous
@@ -343,7 +377,7 @@ export async function flushTelemetry(config: Config): Promise<void> {
       debugLogger.log('OpenTelemetry SDK flushed successfully.');
     }
   } catch (error) {
-    console.error('Error flushing SDK:', error);
+    debugLogger.error('Error flushing SDK:', error);
   }
 }
 
@@ -361,7 +395,7 @@ export async function shutdownTelemetry(
       debugLogger.log('OpenTelemetry SDK shut down successfully.');
     }
   } catch (error) {
-    console.error('Error shutting down SDK:', error);
+    debugLogger.error('Error shutting down SDK:', error);
   } finally {
     telemetryInitialized = false;
     sdk = undefined;
@@ -376,6 +410,20 @@ export async function shutdownTelemetry(
     if (authListener) {
       authEvents.off('post_auth', authListener);
       authListener = undefined;
+    }
+    if (keychainAvailabilityListener) {
+      coreEvents.off(
+        CoreEvent.TelemetryKeychainAvailability,
+        keychainAvailabilityListener,
+      );
+      keychainAvailabilityListener = undefined;
+    }
+    if (tokenStorageTypeListener) {
+      coreEvents.off(
+        CoreEvent.TelemetryTokenStorageType,
+        tokenStorageTypeListener,
+      );
+      tokenStorageTypeListener = undefined;
     }
     callbackRegistered = false;
     activeTelemetryEmail = undefined;

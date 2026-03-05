@@ -4,8 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mock } from 'vitest';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { GeminiClient } from '../core/client.js';
 import { Config } from '../config/config.js';
 import {
@@ -19,6 +26,7 @@ import type {
   ResolvedModelConfig,
 } from '../services/modelConfigService.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import { debugLogger } from './debugLogger.js';
 
 // Mock GeminiClient and Config constructor
 vi.mock('../core/client.js');
@@ -58,11 +66,11 @@ describe('summarizers', () => {
     (mockGeminiClient.generateContent as Mock) = vi.fn();
 
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
-    (console.error as Mock).mockRestore();
+    vi.restoreAllMocks();
   });
 
   describe('summarizeToolOutput', () => {

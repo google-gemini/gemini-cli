@@ -200,7 +200,7 @@ describe('mcp server with cyclic tool schema is detected', () => {
     const run = await rig.runInteractive();
 
     await run.type('/mcp list');
-    await run.sendKeys('\r');
+    await run.type('\r');
 
     await run.expectText('tool_with_cyclic_schema');
   });

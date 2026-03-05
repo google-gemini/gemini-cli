@@ -4,55 +4,57 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
-import os, { EOL } from 'node:os';
+import os from 'node:os';
 import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
-import { debugLogger, type AnyToolInvocation } from '../index.js';
+import { debugLogger } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
-import type {
-  ToolInvocation,
-  ToolResult,
-  ToolCallConfirmationDetails,
-  ToolExecuteConfirmationDetails,
-} from './tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
+  type ToolInvocation,
+  type ToolResult,
+  type ToolCallConfirmationDetails,
+  type ToolExecuteConfirmationDetails,
   type PolicyUpdateOptions,
+  type ToolLiveOutput,
 } from './tools.js';
-import { ApprovalMode } from '../policy/types.js';
 
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
-import type {
-  ShellExecutionConfig,
-  ShellOutputEvent,
+import {
+  ShellExecutionService,
+  type ShellExecutionConfig,
+  type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
-import { ShellExecutionService } from '../services/shellExecutionService.js';
-import { formatMemoryUsage } from '../utils/formatters.js';
+import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
   initializeShellParsers,
   stripShellWrapper,
+  parseCommandDetails,
+  hasRedirection,
 } from '../utils/shell-utils.js';
-import {
-  isCommandAllowed,
-  isShellInvocationAllowlisted,
-} from '../utils/shell-permissions.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { getShellDefinition } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+
+// Delay so user does not see the output of the process before the process is moved to the background.
+const BACKGROUND_DELAY_MS = 200;
 
 export interface ShellToolParams {
   command: string;
   description?: string;
   dir_path?: string;
+  is_background?: boolean;
 }
 
 export class ShellToolInvocation extends BaseToolInvocation<
@@ -62,8 +64,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: ShellToolParams,
-    private readonly allowlist: Set<string>,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
@@ -83,13 +84,24 @@ export class ShellToolInvocation extends BaseToolInvocation<
     if (this.params.description) {
       description += ` (${this.params.description.replace(/\n/g, ' ')})`;
     }
+    if (this.params.is_background) {
+      description += ' [background]';
+    }
     return description;
   }
 
   protected override getPolicyUpdateOptions(
     outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
-    if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
+    if (
+      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave ||
+      outcome === ToolConfirmationOutcome.ProceedAlways
+    ) {
+      const command = stripShellWrapper(this.params.command);
+      const rootCommands = [...new Set(getCommandRoots(command))];
+      if (rootCommands.length > 0) {
+        return { commandPrefix: rootCommands };
+      }
       return { commandPrefix: this.params.command };
     }
     return undefined;
@@ -99,44 +111,36 @@ export class ShellToolInvocation extends BaseToolInvocation<
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
+
+    const parsed = parseCommandDetails(command);
+    let rootCommandDisplay = '';
+
+    if (!parsed || parsed.hasError || parsed.details.length === 0) {
+      // Fallback if parser fails
+      const fallback = command.trim().split(/\s+/)[0];
+      rootCommandDisplay = fallback || 'shell command';
+      if (hasRedirection(command)) {
+        rootCommandDisplay += ', redirection';
+      }
+    } else {
+      rootCommandDisplay = parsed.details
+        .map((detail) => detail.name)
+        .join(', ');
+    }
+
     const rootCommands = [...new Set(getCommandRoots(command))];
 
-    // In non-interactive mode, we need to prevent the tool from hanging while
-    // waiting for user input. If a tool is not fully allowed (e.g. via
-    // --allowed-tools="ShellTool(wc)"), we should throw an error instead of
-    // prompting for confirmation. This check is skipped in YOLO mode.
-    if (
-      !this.config.isInteractive() &&
-      this.config.getApprovalMode() !== ApprovalMode.YOLO
-    ) {
-      if (this.isInvocationAllowlisted(command)) {
-        // If it's an allowed shell command, we don't need to confirm execution.
-        return false;
-      }
-
-      throw new Error(
-        `Command "${command}" is not in the list of allowed tools for non-interactive mode.`,
-      );
-    }
-
-    const commandsToConfirm = rootCommands.filter(
-      (command) => !this.allowlist.has(command),
-    );
-
-    if (commandsToConfirm.length === 0) {
-      return false; // already approved and allowlisted
-    }
-
+    // Rely entirely on PolicyEngine for interactive confirmation.
+    // If we are here, it means PolicyEngine returned ASK_USER (or no message bus),
+    // so we must provide confirmation details.
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Shell Command',
       command: this.params.command,
-      rootCommand: commandsToConfirm.join(', '),
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          commandsToConfirm.forEach((command) => this.allowlist.add(command));
-        }
-        await this.publishPolicyUpdate(outcome);
+      rootCommand: rootCommandDisplay,
+      rootCommands,
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Policy updates are now handled centrally by the scheduler
       },
     };
     return confirmationDetails;
@@ -144,7 +148,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
   async execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
     setPidCallback?: (pid: number) => void,
   ): Promise<ToolResult> {
@@ -187,6 +191,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
         ? path.resolve(this.config.getTargetDir(), this.params.dir_path)
         : this.config.getTargetDir();
 
+      const validationError = this.config.validatePathAccess(cwd);
+      if (validationError) {
+        return {
+          llmContent: validationError,
+          returnDisplay: 'Path not in workspace.',
+          error: {
+            message: validationError,
+            type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+          },
+        };
+      }
       let cumulativeOutput: string | AnsiOutput = '';
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
@@ -235,41 +250,64 @@ export class ShellToolInvocation extends BaseToolInvocation<
                 break;
               case 'binary_progress':
                 isBinaryStream = true;
-                cumulativeOutput = `[Receiving binary output... ${formatMemoryUsage(
+                cumulativeOutput = `[Receiving binary output... ${formatBytes(
                   event.bytesReceived,
                 )} received]`;
                 if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
                   shouldUpdate = true;
                 }
                 break;
+              case 'exit':
+                break;
               default: {
                 throw new Error('An unhandled ShellOutputEvent was found.');
               }
             }
 
-            if (shouldUpdate) {
+            if (shouldUpdate && !this.params.is_background) {
               updateOutput(cumulativeOutput);
               lastUpdateTime = Date.now();
             }
           },
           combinedController.signal,
           this.config.getEnableInteractiveShell(),
-          { ...shellExecutionConfig, pager: 'cat' },
+          {
+            ...shellExecutionConfig,
+            pager: 'cat',
+            sanitizationConfig:
+              shellExecutionConfig?.sanitizationConfig ??
+              this.config.sanitizationConfig,
+          },
         );
 
-      if (pid && setPidCallback) {
-        setPidCallback(pid);
+      if (pid) {
+        if (setPidCallback) {
+          setPidCallback(pid);
+        }
+
+        // If the model requested to run in the background, do so after a short delay.
+        if (this.params.is_background) {
+          setTimeout(() => {
+            ShellExecutionService.background(pid);
+          }, BACKGROUND_DELAY_MS);
+        }
       }
 
       const result = await resultPromise;
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
-        if (fs.existsSync(tempFilePath)) {
-          const pgrepLines = fs
-            .readFileSync(tempFilePath, 'utf8')
-            .split(EOL)
-            .filter(Boolean);
+        let tempFileExists = false;
+        try {
+          await fsPromises.access(tempFilePath);
+          tempFileExists = true;
+        } catch {
+          tempFileExists = false;
+        }
+
+        if (tempFileExists) {
+          const pgrepContent = await fsPromises.readFile(tempFilePath, 'utf8');
+          const pgrepLines = pgrepContent.split(os.EOL).filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
               debugLogger.error(`pgrep: ${line}`);
@@ -280,11 +318,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
           }
         } else {
-          if (!signal.aborted) {
+          if (!signal.aborted && !result.backgrounded) {
             debugLogger.error('missing pgrep output');
           }
         }
       }
+
+      let data: Record<string, unknown> | undefined;
 
       let llmContent = '';
       let timeoutMessage = '';
@@ -303,41 +343,60 @@ export class ShellToolInvocation extends BaseToolInvocation<
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
+      } else if (this.params.is_background || result.backgrounded) {
+        llmContent = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+        data = {
+          pid: result.pid,
+          command: this.params.command,
+          initialOutput: result.output,
+        };
       } else {
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
-        const finalError = result.error
-          ? result.error.message.replace(commandToExecute, this.params.command)
-          : '(none)';
+        const llmContentParts = [`Output: ${result.output || '(empty)'}`];
 
-        llmContent = [
-          `Command: ${this.params.command}`,
-          `Directory: ${this.params.dir_path || '(root)'}`,
-          `Output: ${result.output || '(empty)'}`,
-          `Error: ${finalError}`, // Use the cleaned error string.
-          `Exit Code: ${result.exitCode ?? '(none)'}`,
-          `Signal: ${result.signal ?? '(none)'}`,
-          `Background PIDs: ${
-            backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'
-          }`,
-          `Process Group PGID: ${result.pid ?? '(none)'}`,
-        ].join('\n');
+        if (result.error) {
+          const finalError = result.error.message.replaceAll(
+            commandToExecute,
+            this.params.command,
+          );
+          llmContentParts.push(`Error: ${finalError}`);
+        }
+
+        if (result.exitCode !== null && result.exitCode !== 0) {
+          llmContentParts.push(`Exit Code: ${result.exitCode}`);
+        }
+
+        if (result.signal) {
+          llmContentParts.push(`Signal: ${result.signal}`);
+        }
+        if (backgroundPIDs.length) {
+          llmContentParts.push(`Background PIDs: ${backgroundPIDs.join(', ')}`);
+        }
+        if (result.pid) {
+          llmContentParts.push(`Process Group PGID: ${result.pid}`);
+        }
+
+        llmContent = llmContentParts.join('\n');
       }
 
       let returnDisplayMessage = '';
       if (this.config.getDebugMode()) {
         returnDisplayMessage = llmContent;
       } else {
-        if (result.output.trim()) {
+        if (this.params.is_background || result.backgrounded) {
+          returnDisplayMessage = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+        } else if (result.aborted) {
+          const cancelMsg = timeoutMessage || 'Command cancelled by user.';
+          if (result.output.trim()) {
+            returnDisplayMessage = `${cancelMsg}\n\nOutput before cancellation:\n${result.output}`;
+          } else {
+            returnDisplayMessage = cancelMsg;
+          }
+        } else if (result.output.trim()) {
           returnDisplayMessage = result.output;
         } else {
-          if (result.aborted) {
-            if (timeoutMessage) {
-              returnDisplayMessage = timeoutMessage;
-            } else {
-              returnDisplayMessage = 'Command cancelled by user.';
-            }
-          } else if (result.signal) {
+          if (result.signal) {
             returnDisplayMessage = `Command terminated by signal: ${result.signal}`;
           } else if (result.error) {
             returnDisplayMessage = `Command failed: ${getErrorMessage(
@@ -378,56 +437,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return {
         llmContent,
         returnDisplay: returnDisplayMessage,
+        data,
         ...executionError,
       };
     } finally {
       if (timeoutTimer) clearTimeout(timeoutTimer);
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
-      if (fs.existsSync(tempFilePath)) {
-        fs.unlinkSync(tempFilePath);
+      try {
+        await fsPromises.unlink(tempFilePath);
+      } catch {
+        // Ignore errors during unlink
       }
     }
-  }
-
-  private isInvocationAllowlisted(command: string): boolean {
-    const allowedTools = this.config.getAllowedTools() || [];
-    if (allowedTools.length === 0) {
-      return false;
-    }
-
-    const invocation = { params: { command } } as unknown as AnyToolInvocation;
-    return isShellInvocationAllowlisted(invocation, allowedTools);
-  }
-}
-
-function getShellToolDescription(): string {
-  const returnedInfo = `
-
-      The following information is returned:
-
-      Command: Executed command.
-      Directory: Directory where command was executed, or \`(root)\`.
-      Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Error: Error or \`(none)\` if no error was reported for the subprocess.
-      Exit Code: Exit code or \`(none)\` if terminated by signal.
-      Signal: Signal number or \`(none)\` if no signal was received.
-      Background PIDs: List of background processes started or \`(none)\`.
-      Process Group PGID: Process group started or \`(none)\``;
-
-  if (os.platform() === 'win32') {
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.${returnedInfo}`;
-  } else {
-    return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
-  }
-}
-
-function getCommandDescription(): string {
-  if (os.platform() === 'win32') {
-    return 'Exact command to execute as `powershell.exe -NoProfile -Command <command>`';
-  } else {
-    return 'Exact bash command to execute as `bash -c <command>`';
   }
 }
 
@@ -437,43 +459,26 @@ export class ShellTool extends BaseDeclarativeTool<
 > {
   static readonly Name = SHELL_TOOL_NAME;
 
-  private allowlist: Set<string> = new Set();
-
   constructor(
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     void initializeShellParsers().catch(() => {
       // Errors are surfaced when parsing commands.
     });
+    const definition = getShellDefinition(
+      config.getEnableInteractiveShell(),
+      config.getEnableShellOutputEfficiency(),
+    );
     super(
       ShellTool.Name,
       'Shell',
-      getShellToolDescription(),
+      definition.base.description!,
       Kind.Execute,
-      {
-        type: 'object',
-        properties: {
-          command: {
-            type: 'string',
-            description: getCommandDescription(),
-          },
-          description: {
-            type: 'string',
-            description:
-              'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
-          },
-          dir_path: {
-            type: 'string',
-            description:
-              '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
-          },
-        },
-        required: ['command'],
-      },
+      definition.base.parametersJsonSchema,
+      messageBus,
       false, // output is not markdown
       true, // output can be updated
-      messageBus,
     );
   }
 
@@ -484,45 +489,36 @@ export class ShellTool extends BaseDeclarativeTool<
       return 'Command cannot be empty.';
     }
 
-    const commandCheck = isCommandAllowed(params.command, this.config);
-    if (!commandCheck.allowed) {
-      if (!commandCheck.reason) {
-        debugLogger.error(
-          'Unexpected: isCommandAllowed returned false without a reason',
-        );
-        return `Command is not allowed: ${params.command}`;
-      }
-      return commandCheck.reason;
-    }
-    if (getCommandRoots(params.command).length === 0) {
-      return 'Could not identify command root to obtain permission from user.';
-    }
     if (params.dir_path) {
       const resolvedPath = path.resolve(
         this.config.getTargetDir(),
         params.dir_path,
       );
-      const workspaceContext = this.config.getWorkspaceContext();
-      if (!workspaceContext.isPathWithinWorkspace(resolvedPath)) {
-        return `Directory '${resolvedPath}' is not within any of the registered workspace directories.`;
-      }
+      return this.config.validatePathAccess(resolvedPath);
     }
     return null;
   }
 
   protected createInvocation(
     params: ShellToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<ShellToolParams, ToolResult> {
     return new ShellToolInvocation(
       this.config,
       params,
-      this.allowlist,
       messageBus,
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    const definition = getShellDefinition(
+      this.config.getEnableInteractiveShell(),
+      this.config.getEnableShellOutputEfficiency(),
+    );
+    return resolveToolDeclaration(definition, modelId);
   }
 }

@@ -5,63 +5,61 @@
  */
 
 import { act } from 'react';
-import { render } from '../../test-utils/render.js';
+import type { EventEmitter } from 'node:events';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { ConfigInitDisplay } from './ConfigInitDisplay.js';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AppEvent } from '../../utils/events.js';
-import { MCPServerStatus, type McpClient } from '@google/gemini-cli-core';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type MockInstance,
+} from 'vitest';
+import {
+  CoreEvent,
+  MCPServerStatus,
+  type McpClient,
+  coreEvents,
+} from '@google/gemini-cli-core';
 import { Text } from 'ink';
 
 // Mock GeminiSpinner
-vi.mock('./GeminiRespondingSpinner.js', () => ({
+vi.mock('./GeminiSpinner.js', () => ({
   GeminiSpinner: () => <Text>Spinner</Text>,
 }));
 
-// Mock appEvents
-const { mockOn, mockOff, mockEmit } = vi.hoisted(() => ({
-  mockOn: vi.fn(),
-  mockOff: vi.fn(),
-  mockEmit: vi.fn(),
-}));
-
-vi.mock('../../utils/events.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../utils/events.js')>();
-  return {
-    ...actual,
-    appEvents: {
-      on: mockOn,
-      off: mockOff,
-      emit: mockEmit,
-    },
-  };
-});
-
 describe('ConfigInitDisplay', () => {
+  let onSpy: MockInstance<EventEmitter['on']>;
+
   beforeEach(() => {
-    mockOn.mockClear();
-    mockOff.mockClear();
-    mockEmit.mockClear();
+    onSpy = vi.spyOn(coreEvents as EventEmitter, 'on');
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('renders initial state', () => {
-    const { lastFrame } = render(<ConfigInitDisplay />);
+  it('renders initial state', async () => {
+    const { lastFrame, waitUntilReady } = renderWithProviders(
+      <ConfigInitDisplay />,
+    );
+    await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('updates message on McpClientUpdate event', async () => {
     let listener: ((clients?: Map<string, McpClient>) => void) | undefined;
-    mockOn.mockImplementation((event, fn) => {
-      if (event === AppEvent.McpClientUpdate) {
-        listener = fn;
+    onSpy.mockImplementation((event: unknown, fn: unknown) => {
+      if (event === CoreEvent.McpClientUpdate) {
+        listener = fn as (clients?: Map<string, McpClient>) => void;
       }
+      return coreEvents;
     });
 
-    const { lastFrame } = render(<ConfigInitDisplay />);
+    const { lastFrame } = renderWithProviders(<ConfigInitDisplay />);
 
     // Wait for listener to be registered
     await waitFor(() => {
@@ -92,13 +90,14 @@ describe('ConfigInitDisplay', () => {
 
   it('truncates list of waiting servers if too many', async () => {
     let listener: ((clients?: Map<string, McpClient>) => void) | undefined;
-    mockOn.mockImplementation((event, fn) => {
-      if (event === AppEvent.McpClientUpdate) {
-        listener = fn;
+    onSpy.mockImplementation((event: unknown, fn: unknown) => {
+      if (event === CoreEvent.McpClientUpdate) {
+        listener = fn as (clients?: Map<string, McpClient>) => void;
       }
+      return coreEvents;
     });
 
-    const { lastFrame } = render(<ConfigInitDisplay />);
+    const { lastFrame } = renderWithProviders(<ConfigInitDisplay />);
 
     await waitFor(() => {
       if (!listener) throw new Error('Listener not registered yet');
@@ -127,13 +126,14 @@ describe('ConfigInitDisplay', () => {
 
   it('handles empty clients map', async () => {
     let listener: ((clients?: Map<string, McpClient>) => void) | undefined;
-    mockOn.mockImplementation((event, fn) => {
-      if (event === AppEvent.McpClientUpdate) {
-        listener = fn;
+    onSpy.mockImplementation((event: unknown, fn: unknown) => {
+      if (event === CoreEvent.McpClientUpdate) {
+        listener = fn as (clients?: Map<string, McpClient>) => void;
       }
+      return coreEvents;
     });
 
-    const { lastFrame } = render(<ConfigInitDisplay />);
+    const { lastFrame } = renderWithProviders(<ConfigInitDisplay />);
 
     await waitFor(() => {
       if (!listener) throw new Error('Listener not registered yet');

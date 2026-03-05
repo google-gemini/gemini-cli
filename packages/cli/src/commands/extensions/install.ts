@@ -5,18 +5,29 @@
  */
 
 import type { CommandModule } from 'yargs';
+import * as path from 'node:path';
+import chalk from 'chalk';
 import {
   debugLogger,
-  type ExtensionInstallMetadata,
+  FolderTrustDiscoveryService,
+  getRealPath,
 } from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
-import { stat } from 'node:fs/promises';
 import {
   INSTALL_WARNING_MESSAGE,
+  promptForConsentNonInteractive,
   requestConsentNonInteractive,
 } from '../../config/extensions/consent.js';
-import { ExtensionManager } from '../../config/extension-manager.js';
+import {
+  ExtensionManager,
+  inferInstallMetadata,
+} from '../../config/extension-manager.js';
 import { loadSettings } from '../../config/settings.js';
+import {
+  isWorkspaceTrusted,
+  loadTrustedFolders,
+  TrustLevel,
+} from '../../config/trustedFolders.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
 
@@ -30,35 +41,100 @@ interface InstallArgs {
 
 export async function handleInstall(args: InstallArgs) {
   try {
-    let installMetadata: ExtensionInstallMetadata;
     const { source } = args;
-    if (
-      source.startsWith('http://') ||
-      source.startsWith('https://') ||
-      source.startsWith('git@') ||
-      source.startsWith('sso://')
-    ) {
-      installMetadata = {
-        source,
-        type: 'git',
-        ref: args.ref,
-        autoUpdate: args.autoUpdate,
-        allowPreRelease: args.allowPreRelease,
-      };
-    } else {
-      if (args.ref || args.autoUpdate) {
-        throw new Error(
-          '--ref and --auto-update are not applicable for local extensions.',
+    const installMetadata = await inferInstallMetadata(source, {
+      ref: args.ref,
+      autoUpdate: args.autoUpdate,
+      allowPreRelease: args.allowPreRelease,
+    });
+
+    const workspaceDir = process.cwd();
+    const settings = loadSettings(workspaceDir).merged;
+
+    if (installMetadata.type === 'local' || installMetadata.type === 'link') {
+      const absolutePath = path.resolve(source);
+      const realPath = getRealPath(absolutePath);
+      installMetadata.source = absolutePath;
+      const trustResult = isWorkspaceTrusted(settings, absolutePath);
+      if (trustResult.isTrusted !== true) {
+        const discoveryResults =
+          await FolderTrustDiscoveryService.discover(realPath);
+
+        const hasDiscovery =
+          discoveryResults.commands.length > 0 ||
+          discoveryResults.mcps.length > 0 ||
+          discoveryResults.hooks.length > 0 ||
+          discoveryResults.skills.length > 0 ||
+          discoveryResults.settings.length > 0;
+
+        const promptLines = [
+          '',
+          chalk.bold('Do you trust the files in this folder?'),
+          '',
+          `The extension source at "${absolutePath}" is not trusted.`,
+          '',
+          'Trusting a folder allows Gemini CLI to load its local configurations,',
+          'including custom commands, hooks, MCP servers, agent skills, and',
+          'settings. These configurations could execute code on your behalf or',
+          'change the behavior of the CLI.',
+          '',
+        ];
+
+        if (discoveryResults.discoveryErrors.length > 0) {
+          promptLines.push(chalk.red('❌ Discovery Errors:'));
+          for (const error of discoveryResults.discoveryErrors) {
+            promptLines.push(chalk.red(`  • ${error}`));
+          }
+          promptLines.push('');
+        }
+
+        if (discoveryResults.securityWarnings.length > 0) {
+          promptLines.push(chalk.yellow('⚠️  Security Warnings:'));
+          for (const warning of discoveryResults.securityWarnings) {
+            promptLines.push(chalk.yellow(`  • ${warning}`));
+          }
+          promptLines.push('');
+        }
+
+        if (hasDiscovery) {
+          promptLines.push(chalk.bold('This folder contains:'));
+          const groups = [
+            { label: 'Commands', items: discoveryResults.commands },
+            { label: 'MCP Servers', items: discoveryResults.mcps },
+            { label: 'Hooks', items: discoveryResults.hooks },
+            { label: 'Skills', items: discoveryResults.skills },
+            { label: 'Setting overrides', items: discoveryResults.settings },
+          ].filter((g) => g.items.length > 0);
+
+          for (const group of groups) {
+            promptLines.push(
+              `  • ${chalk.bold(group.label)} (${group.items.length}):`,
+            );
+            for (const item of group.items) {
+              promptLines.push(`    - ${item}`);
+            }
+          }
+          promptLines.push('');
+        }
+
+        promptLines.push(
+          chalk.yellow(
+            'Do you want to trust this folder and continue with the installation? [y/N]: ',
+          ),
         );
-      }
-      try {
-        await stat(source);
-        installMetadata = {
-          source,
-          type: 'local',
-        };
-      } catch {
-        throw new Error('Install source not found.');
+
+        const confirmed = await promptForConsentNonInteractive(
+          promptLines.join('\n'),
+          false,
+        );
+        if (confirmed) {
+          const trustedFolders = loadTrustedFolders();
+          await trustedFolders.setValue(realPath, TrustLevel.TRUST_FOLDER);
+        } else {
+          throw new Error(
+            `Installation aborted: Folder "${absolutePath}" is not trusted.`,
+          );
+        }
       }
     }
 
@@ -70,12 +146,11 @@ export async function handleInstall(args: InstallArgs) {
       debugLogger.log(INSTALL_WARNING_MESSAGE);
     }
 
-    const workspaceDir = process.cwd();
     const extensionManager = new ExtensionManager({
       workspaceDir,
       requestConsent,
       requestSetting: promptForSetting,
-      settings: loadSettings(workspaceDir).merged,
+      settings,
     });
     await extensionManager.loadExtensions();
     const extension =
@@ -125,10 +200,15 @@ export const installCommand: CommandModule = {
       }),
   handler: async (argv) => {
     await handleInstall({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       source: argv['source'] as string,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       ref: argv['ref'] as string | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       autoUpdate: argv['auto-update'] as boolean | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       allowPreRelease: argv['pre-release'] as boolean | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       consent: argv['consent'] as boolean | undefined,
     });
     await exitCli();

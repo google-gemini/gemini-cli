@@ -16,6 +16,8 @@ import {
   FatalCancellationError,
   FatalToolExecutionError,
   isFatalToolError,
+  debugLogger,
+  coreEvents,
 } from '@google/gemini-cli-core';
 import { runSyncCleanup } from './cleanup.js';
 
@@ -36,6 +38,7 @@ interface ErrorWithCode extends Error {
  * Extracts the appropriate error code from an error object.
  */
 function extractErrorCode(error: unknown): string | number {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const errorWithCode = error as ErrorWithCode;
 
   // Prioritize exitCode for FatalError types, fall back to other codes
@@ -103,11 +106,10 @@ export function handleError(
       config.getSessionId(),
     );
 
-    console.error(formattedError);
+    coreEvents.emitFeedback('error', formattedError);
     runSyncCleanup();
     process.exit(getNumericExitCode(errorCode));
   } else {
-    console.error(errorMessage);
     throw error;
   }
 }
@@ -155,16 +157,16 @@ export function handleToolError(
         errorType ?? toolExecutionError.exitCode,
         config.getSessionId(),
       );
-      console.error(formattedError);
+      coreEvents.emitFeedback('error', formattedError);
     } else {
-      console.error(errorMessage);
+      coreEvents.emitFeedback('error', errorMessage);
     }
     runSyncCleanup();
     process.exit(toolExecutionError.exitCode);
   }
 
   // Non-fatal: log and continue
-  console.error(errorMessage);
+  debugLogger.warn(errorMessage);
 }
 
 /**
@@ -196,11 +198,11 @@ export function handleCancellationError(config: Config): never {
       config.getSessionId(),
     );
 
-    console.error(formattedError);
+    coreEvents.emitFeedback('error', formattedError);
     runSyncCleanup();
     process.exit(cancellationError.exitCode);
   } else {
-    console.error(cancellationError.message);
+    coreEvents.emitFeedback('error', cancellationError.message);
     runSyncCleanup();
     process.exit(cancellationError.exitCode);
   }
@@ -237,11 +239,11 @@ export function handleMaxTurnsExceededError(config: Config): never {
       config.getSessionId(),
     );
 
-    console.error(formattedError);
+    coreEvents.emitFeedback('error', formattedError);
     runSyncCleanup();
     process.exit(maxTurnsError.exitCode);
   } else {
-    console.error(maxTurnsError.message);
+    coreEvents.emitFeedback('error', maxTurnsError.message);
     runSyncCleanup();
     process.exit(maxTurnsError.exitCode);
   }

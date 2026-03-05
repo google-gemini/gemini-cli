@@ -6,9 +6,11 @@
 
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { PrepareLabel, MAX_WIDTH } from './PrepareLabel.js';
+import { ExpandableText, MAX_WIDTH } from './shared/ExpandableText.js';
 import { CommandKind } from '../commands/types.js';
 import { Colors } from '../colors.js';
+import { sanitizeForDisplay } from '../utils/textUtils.js';
+
 export interface Suggestion {
   label: string;
   value: string;
@@ -60,8 +62,13 @@ export function SuggestionsDisplay({
   );
   const visibleSuggestions = suggestions.slice(startIndex, endIndex);
 
+  const COMMAND_KIND_SUFFIX: Partial<Record<CommandKind, string>> = {
+    [CommandKind.MCP_PROMPT]: ' [MCP]',
+    [CommandKind.AGENT]: ' [Agent]',
+  };
+
   const getFullLabel = (s: Suggestion) =>
-    s.label + (s.commandKind === CommandKind.MCP_PROMPT ? ' [MCP]' : '');
+    s.label + (s.commandKind ? (COMMAND_KIND_SUFFIX[s.commandKind] ?? '') : '');
 
   const maxLabelLength = Math.max(
     ...suggestions.map((s) => getFullLabel(s).length),
@@ -77,10 +84,10 @@ export function SuggestionsDisplay({
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
         const isExpanded = originalIndex === expandedIndex;
-        const textColor = isActive ? theme.text.accent : theme.text.secondary;
+        const textColor = isActive ? theme.ui.focus : theme.text.secondary;
         const isLong = suggestion.value.length >= MAX_WIDTH;
         const labelElement = (
-          <PrepareLabel
+          <ExpandableText
             label={suggestion.value}
             matchedIndex={suggestion.matchedIndex}
             userInput={userInput}
@@ -90,7 +97,11 @@ export function SuggestionsDisplay({
         );
 
         return (
-          <Box key={`${suggestion.value}-${originalIndex}`} flexDirection="row">
+          <Box
+            key={`${suggestion.value}-${originalIndex}`}
+            flexDirection="row"
+            backgroundColor={isActive ? theme.background.focus : undefined}
+          >
             <Box
               {...(mode === 'slash'
                 ? { width: commandColumnWidth, flexShrink: 0 as const }
@@ -98,16 +109,19 @@ export function SuggestionsDisplay({
             >
               <Box>
                 {labelElement}
-                {suggestion.commandKind === CommandKind.MCP_PROMPT && (
-                  <Text color={textColor}> [MCP]</Text>
-                )}
+                {suggestion.commandKind &&
+                  COMMAND_KIND_SUFFIX[suggestion.commandKind] && (
+                    <Text color={textColor}>
+                      {COMMAND_KIND_SUFFIX[suggestion.commandKind]}
+                    </Text>
+                  )}
               </Box>
             </Box>
 
             {suggestion.description && (
               <Box flexGrow={1} paddingLeft={3}>
                 <Text color={textColor} wrap="truncate">
-                  {suggestion.description}
+                  {sanitizeForDisplay(suggestion.description, 100)}
                 </Text>
               </Box>
             )}

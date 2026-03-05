@@ -5,17 +5,14 @@
  */
 
 import type { Config } from '../../config/config.js';
-import {
-  DEFAULT_GEMINI_MODEL_AUTO,
-  getEffectiveModel,
-  PREVIEW_GEMINI_MODEL_AUTO,
-} from '../../config/models.js';
+import { isAutoModel, resolveModel } from '../../config/models.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type {
   RoutingContext,
   RoutingDecision,
   RoutingStrategy,
 } from '../routingStrategy.js';
+import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 
 /**
  * Handles cases where the user explicitly specifies a model (override).
@@ -24,22 +21,24 @@ export class OverrideStrategy implements RoutingStrategy {
   readonly name = 'override';
 
   async route(
-    _context: RoutingContext,
+    context: RoutingContext,
     config: Config,
     _baseLlmClient: BaseLlmClient,
+    _localLiteRtLmClient: LocalLiteRtLmClient,
   ): Promise<RoutingDecision | null> {
-    const overrideModel = config.getModel();
+    const overrideModel = context.requestedModel ?? config.getModel();
 
     // If the model is 'auto' we should pass to the next strategy.
-    if (
-      overrideModel === DEFAULT_GEMINI_MODEL_AUTO ||
-      overrideModel === PREVIEW_GEMINI_MODEL_AUTO
-    )
+    if (isAutoModel(overrideModel)) {
       return null;
+    }
 
     // Return the overridden model name.
     return {
-      model: getEffectiveModel(overrideModel, config.getPreviewFeatures()),
+      model: resolveModel(
+        overrideModel,
+        config.getGemini31LaunchedSync?.() ?? false,
+      ),
       metadata: {
         source: this.name,
         latencyMs: 0,

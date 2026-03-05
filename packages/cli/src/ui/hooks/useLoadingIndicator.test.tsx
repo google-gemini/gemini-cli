@@ -15,6 +15,8 @@ import {
 } from './usePhraseCycler.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
+import type { RetryAttemptPayload } from '@google/gemini-cli-core';
+import type { LoadingPhrasesMode } from '../../config/settings.js';
 
 describe('useLoadingIndicator', () => {
   beforeEach(() => {
@@ -30,32 +32,41 @@ describe('useLoadingIndicator', () => {
 
   const renderLoadingIndicatorHook = (
     initialStreamingState: StreamingState,
-    initialIsInteractiveShellWaiting: boolean = false,
-    initialLastOutputTime: number = 0,
+    initialShouldShowFocusHint: boolean = false,
+    initialRetryStatus: RetryAttemptPayload | null = null,
+    loadingPhrasesMode: LoadingPhrasesMode = 'all',
+    initialErrorVerbosity: 'low' | 'full' = 'full',
   ) => {
     let hookResult: ReturnType<typeof useLoadingIndicator>;
     function TestComponent({
       streamingState,
-      isInteractiveShellWaiting,
-      lastOutputTime,
+      shouldShowFocusHint,
+      retryStatus,
+      mode,
+      errorVerbosity,
     }: {
       streamingState: StreamingState;
-      isInteractiveShellWaiting?: boolean;
-      lastOutputTime?: number;
+      shouldShowFocusHint?: boolean;
+      retryStatus?: RetryAttemptPayload | null;
+      mode?: LoadingPhrasesMode;
+      errorVerbosity: 'low' | 'full';
     }) {
-      hookResult = useLoadingIndicator(
+      hookResult = useLoadingIndicator({
         streamingState,
-        undefined,
-        isInteractiveShellWaiting,
-        lastOutputTime,
-      );
+        shouldShowFocusHint: !!shouldShowFocusHint,
+        retryStatus: retryStatus || null,
+        loadingPhrasesMode: mode,
+        errorVerbosity,
+      });
       return null;
     }
     const { rerender } = render(
       <TestComponent
         streamingState={initialStreamingState}
-        isInteractiveShellWaiting={initialIsInteractiveShellWaiting}
-        lastOutputTime={initialLastOutputTime}
+        shouldShowFocusHint={initialShouldShowFocusHint}
+        retryStatus={initialRetryStatus}
+        mode={loadingPhrasesMode}
+        errorVerbosity={initialErrorVerbosity}
       />,
     );
     return {
@@ -66,9 +77,18 @@ describe('useLoadingIndicator', () => {
       },
       rerender: (newProps: {
         streamingState: StreamingState;
-        isInteractiveShellWaiting?: boolean;
-        lastOutputTime?: number;
-      }) => rerender(<TestComponent {...newProps} />),
+        shouldShowFocusHint?: boolean;
+        retryStatus?: RetryAttemptPayload | null;
+        mode?: LoadingPhrasesMode;
+        errorVerbosity?: 'low' | 'full';
+      }) =>
+        rerender(
+          <TestComponent
+            mode={loadingPhrasesMode}
+            errorVerbosity={initialErrorVerbosity}
+            {...newProps}
+          />,
+        ),
     };
   };
 
@@ -76,17 +96,14 @@ describe('useLoadingIndicator', () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result } = renderLoadingIndicatorHook(StreamingState.Idle);
     expect(result.current.elapsedTime).toBe(0);
-    expect(WITTY_LOADING_PHRASES).toContain(
-      result.current.currentLoadingPhrase,
-    );
+    expect(result.current.currentLoadingPhrase).toBeUndefined();
   });
 
-  it('should show interactive shell waiting phrase when isInteractiveShellWaiting is true after 5s', async () => {
+  it('should show interactive shell waiting phrase when shouldShowFocusHint is true', async () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
-    const { result } = renderLoadingIndicatorHook(
+    const { result, rerender } = renderLoadingIndicatorHook(
       StreamingState.Responding,
-      true,
-      1,
+      false,
     );
 
     // Initially should be witty phrase or tip
@@ -95,7 +112,10 @@ describe('useLoadingIndicator', () => {
     );
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000);
+      rerender({
+        streamingState: StreamingState.Responding,
+        shouldShowFocusHint: true,
+      });
     });
 
     expect(result.current.currentLoadingPhrase).toBe(
@@ -196,14 +216,80 @@ describe('useLoadingIndicator', () => {
     });
 
     expect(result.current.elapsedTime).toBe(0);
-    expect(WITTY_LOADING_PHRASES).toContain(
-      result.current.currentLoadingPhrase,
-    );
+    expect(result.current.currentLoadingPhrase).toBeUndefined();
 
     // Timer should not advance
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
     expect(result.current.elapsedTime).toBe(0);
+  });
+
+  it('should reflect retry status in currentLoadingPhrase when provided', () => {
+    const retryStatus = {
+      model: 'gemini-pro',
+      attempt: 2,
+      maxAttempts: 3,
+      delayMs: 1000,
+    };
+    const { result } = renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      retryStatus,
+    );
+
+    expect(result.current.currentLoadingPhrase).toContain('Trying to reach');
+    expect(result.current.currentLoadingPhrase).toContain('Attempt 3/3');
+  });
+
+  it('should hide low-verbosity retry status for early retry attempts', () => {
+    const retryStatus = {
+      model: 'gemini-pro',
+      attempt: 1,
+      maxAttempts: 5,
+      delayMs: 1000,
+    };
+    const { result } = renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      retryStatus,
+      'all',
+      'low',
+    );
+
+    expect(result.current.currentLoadingPhrase).not.toBe(
+      "This is taking a bit longer, we're still on it.",
+    );
+  });
+
+  it('should show a generic retry phrase in low error verbosity mode for later retries', () => {
+    const retryStatus = {
+      model: 'gemini-pro',
+      attempt: 2,
+      maxAttempts: 5,
+      delayMs: 1000,
+    };
+    const { result } = renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      retryStatus,
+      'all',
+      'low',
+    );
+
+    expect(result.current.currentLoadingPhrase).toBe(
+      "This is taking a bit longer, we're still on it.",
+    );
+  });
+
+  it('should show no phrases when loadingPhrasesMode is "off"', () => {
+    const { result } = renderLoadingIndicatorHook(
+      StreamingState.Responding,
+      false,
+      null,
+      'off',
+    );
+
+    expect(result.current.currentLoadingPhrase).toBeUndefined();
   });
 });
