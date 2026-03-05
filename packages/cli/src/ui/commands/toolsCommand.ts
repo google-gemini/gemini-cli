@@ -11,68 +11,85 @@ import {
 } from './types.js';
 import { MessageType, type HistoryItemToolsList } from '../types.js';
 
+const getToolsList = (context: CommandContext, showDescriptions: boolean) => {
+  const toolRegistry = context.services.config?.getToolRegistry();
+  if (!toolRegistry) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Could not retrieve tool registry.',
+    });
+    return null;
+  }
+
+  const tools = toolRegistry.getAllTools();
+  // Filter out MCP tools by checking for the absence of a serverName property
+  const geminiTools = tools.filter((tool) => !('serverName' in tool));
+
+  const toolsListItem: HistoryItemToolsList = {
+    type: MessageType.TOOLS_LIST,
+    tools: geminiTools.map((tool) => ({
+      name: tool.name,
+      displayName: tool.displayName,
+      description: tool.description,
+    })),
+    showDescriptions,
+  };
+
+  return toolsListItem;
+};
+
+const listSubCommand: SlashCommand = {
+  name: 'list',
+  description: 'List available Gemini CLI tools',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: async (context: CommandContext): Promise<void> => {
+    const item = getToolsList(context, false);
+    if (item) {
+      context.ui.addItem(item);
+    }
+  },
+};
+
+const descSubCommand: SlashCommand = {
+  name: 'desc',
+  description: 'List available Gemini CLI tools with descriptions',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: async (context: CommandContext): Promise<void> => {
+    const item = getToolsList(context, true);
+    if (item) {
+      context.ui.addItem(item);
+    }
+  },
+};
+
 export const toolsCommand: SlashCommand = {
   name: 'tools',
-  description: 'List available Gemini CLI tools. Usage: /tools [desc|search]',
+  description: 'List available Gemini CLI tools',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  subCommands: [listSubCommand, descSubCommand],
   action: async (context: CommandContext, args?: string): Promise<void> => {
     const subCommand = args?.trim();
 
-    // Default to NOT showing descriptions. The user must opt in with an argument.
-    let useShowDescriptions = false;
-    let searchTerm = '';
-
-    if (subCommand === 'desc' || subCommand === 'descriptions') {
-      useShowDescriptions = true;
-    } else if (subCommand) {
-      searchTerm = subCommand.toLowerCase();
+    if (subCommand === 'desc') {
+      const item = getToolsList(context, true);
+      if (item) {
+        context.ui.addItem(item);
+      }
+    } else if (!subCommand || subCommand === 'list') {
+      const item = getToolsList(context, false);
+      if (item) {
+        context.ui.addItem(item);
+      }
+    } else {
+      // For any other argument, default to list or let the UI handle it if it was a subcommand.
+      // But since we want to be strict and simple:
+      const item = getToolsList(context, false);
+      if (item) {
+        context.ui.addItem(item);
+      }
     }
-
-    const toolRegistry = context.services.config?.getToolRegistry();
-    if (!toolRegistry) {
-      context.ui.addItem({
-        type: MessageType.ERROR,
-        text: 'Could not retrieve tool registry.',
-      });
-      return;
-    }
-
-    const tools = toolRegistry.getAllTools();
-    // Filter out MCP tools by checking for the absence of a serverName property
-    let geminiTools = tools.filter((tool) => !('serverName' in tool));
-
-    if (searchTerm) {
-      geminiTools = geminiTools.filter(
-        (tool) =>
-          tool.name.toLowerCase().includes(searchTerm) ||
-          tool.displayName.toLowerCase().includes(searchTerm) ||
-          tool.description.toLowerCase().includes(searchTerm),
-      );
-      // When searching, it's often more useful to see descriptions too.
-      useShowDescriptions = true;
-    }
-
-    const toolsListItem: HistoryItemToolsList = {
-      type: MessageType.TOOLS_LIST,
-      tools: geminiTools.map((tool) => ({
-        name: tool.name,
-        displayName: tool.displayName,
-        description: tool.description,
-      })),
-      showDescriptions: useShowDescriptions,
-    };
-
-    context.ui.addItem(toolsListItem);
-  },
-  completion: (context: CommandContext, partialArg: string) => {
-    const toolRegistry = context.services.config?.getToolRegistry();
-    const suggestions = ['desc', 'descriptions'];
-    if (toolRegistry) {
-      const tools = toolRegistry.getAllTools();
-      const geminiTools = tools.filter((tool) => !('serverName' in tool));
-      suggestions.push(...geminiTools.map((t) => t.name));
-    }
-    return suggestions.filter((s) => s.startsWith(partialArg));
   },
 };

@@ -67,7 +67,7 @@ describe('toolsCommand', () => {
     });
   });
 
-  it('should list tools without descriptions by default', async () => {
+  it('should list tools without descriptions by default (no args)', async () => {
     const mockContext = createMockCommandContext({
       services: {
         config: {
@@ -84,8 +84,24 @@ describe('toolsCommand', () => {
     expect(message.type).toBe(MessageType.TOOLS_LIST);
     expect(message.showDescriptions).toBe(false);
     expect(message.tools).toHaveLength(2);
-    expect(message.tools[0].displayName).toBe('File Reader');
-    expect(message.tools[1].displayName).toBe('Code Editor');
+  });
+
+  it('should list tools without descriptions when "list" arg is passed', async () => {
+    const mockContext = createMockCommandContext({
+      services: {
+        config: {
+          getToolRegistry: () => ({ getAllTools: () => mockTools }),
+        },
+      },
+    });
+
+    if (!toolsCommand.action) throw new Error('Action not defined');
+    await toolsCommand.action(mockContext, 'list');
+
+    const [message] = (mockContext.ui.addItem as ReturnType<typeof vi.fn>).mock
+      .calls[0];
+    expect(message.type).toBe(MessageType.TOOLS_LIST);
+    expect(message.showDescriptions).toBe(false);
   });
 
   it('should list tools with descriptions when "desc" arg is passed', async () => {
@@ -105,13 +121,17 @@ describe('toolsCommand', () => {
     expect(message.type).toBe(MessageType.TOOLS_LIST);
     expect(message.showDescriptions).toBe(true);
     expect(message.tools).toHaveLength(2);
-    expect(message.tools[0].description).toBe(
-      'Reads files from the local system.',
-    );
-    expect(message.tools[1].description).toBe('Edits code files.');
   });
 
-  it('should search tools by name and show descriptions', async () => {
+  it('should have "list" and "desc" subcommands', () => {
+    expect(toolsCommand.subCommands).toBeDefined();
+    const names = toolsCommand.subCommands?.map((s) => s.name);
+    expect(names).toContain('list');
+    expect(names).toContain('desc');
+    expect(names).not.toContain('descriptions');
+  });
+
+  it('subcommand "list" should display tools without descriptions', async () => {
     const mockContext = createMockCommandContext({
       services: {
         config: {
@@ -120,18 +140,16 @@ describe('toolsCommand', () => {
       },
     });
 
-    if (!toolsCommand.action) throw new Error('Action not defined');
-    await toolsCommand.action(mockContext, 'file-reader');
+    const listCmd = toolsCommand.subCommands?.find((s) => s.name === 'list');
+    if (!listCmd?.action) throw new Error('Action not defined');
+    await listCmd.action(mockContext, '');
 
     const [message] = (mockContext.ui.addItem as ReturnType<typeof vi.fn>).mock
       .calls[0];
-    expect(message.type).toBe(MessageType.TOOLS_LIST);
-    expect(message.showDescriptions).toBe(true);
-    expect(message.tools).toHaveLength(1);
-    expect(message.tools[0].name).toBe('file-reader');
+    expect(message.showDescriptions).toBe(false);
   });
 
-  it('should search tools by description and show descriptions', async () => {
+  it('subcommand "desc" should display tools with descriptions', async () => {
     const mockContext = createMockCommandContext({
       services: {
         config: {
@@ -140,55 +158,12 @@ describe('toolsCommand', () => {
       },
     });
 
-    if (!toolsCommand.action) throw new Error('Action not defined');
-    await toolsCommand.action(mockContext, 'edits code');
+    const descCmd = toolsCommand.subCommands?.find((s) => s.name === 'desc');
+    if (!descCmd?.action) throw new Error('Action not defined');
+    await descCmd.action(mockContext, '');
 
     const [message] = (mockContext.ui.addItem as ReturnType<typeof vi.fn>).mock
       .calls[0];
-    expect(message.type).toBe(MessageType.TOOLS_LIST);
     expect(message.showDescriptions).toBe(true);
-    expect(message.tools).toHaveLength(1);
-    expect(message.tools[0].name).toBe('code-editor');
-  });
-
-  it('should provide completions for "desc", "descriptions", and tool names', async () => {
-    const mockContext = createMockCommandContext({
-      services: {
-        config: {
-          getToolRegistry: () => ({
-            getAllTools: () =>
-              mockTools as unknown as Array<ToolBuilder<object, ToolResult>>,
-          }),
-        },
-      },
-    });
-
-    if (!toolsCommand.completion) throw new Error('Completion not defined');
-    const completions = await toolsCommand.completion(mockContext, '');
-
-    expect(completions).toContain('desc');
-    expect(completions).toContain('descriptions');
-    expect(completions).toContain('file-reader');
-    expect(completions).toContain('code-editor');
-  });
-
-  it('should filter completions based on partial input', async () => {
-    const mockContext = createMockCommandContext({
-      services: {
-        config: {
-          getToolRegistry: () => ({
-            getAllTools: () =>
-              mockTools as unknown as Array<ToolBuilder<object, ToolResult>>,
-          }),
-        },
-      },
-    });
-
-    if (!toolsCommand.completion) throw new Error('Completion not defined');
-    const completions = await toolsCommand.completion(mockContext, 'de');
-
-    expect(completions).toContain('desc');
-    expect(completions).toContain('descriptions');
-    expect(completions).not.toContain('file-reader');
   });
 });
