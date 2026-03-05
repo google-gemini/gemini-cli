@@ -263,70 +263,77 @@ ${output.result}
         llmContent: [{ text: resultContent }],
         returnDisplay: displayContent,
       };
-} catch (error) {
-  const errorMessage =
-    error instanceof Error ? error.message : String(error);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
 
-  const isAbort =
-    (error instanceof Error && error.name === 'AbortError') ||
-    errorMessage.includes('Aborted');
+      const isAbort =
+        (error instanceof Error && error.name === 'AbortError') ||
+        errorMessage.includes('Aborted');
 
-  // Mark any running items as error/cancelled
-  for (const item of recentActivity) {
-    if (item.status === 'running') {
-      item.status = isAbort ? 'cancelled' : 'error';
-    }
-  }
-
-  if (!isAbort) {
-    const lastActivity = recentActivity[recentActivity.length - 1];
-    if (!lastActivity || lastActivity.status !== 'error') {
-      recentActivity.push({
-        id: randomUUID(),
-        type: 'thought',
-        content: `Error: ${errorMessage}`,
-        status: 'error',
-      });
-
-      if (recentActivity.length > MAX_RECENT_ACTIVITY) {
-        recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
+      // Mark any running items as error/cancelled
+      for (const item of recentActivity) {
+        if (item.status === 'running') {
+          item.status = isAbort ? 'cancelled' : 'error';
+        }
       }
+
+      // Ensure the error is reflected in the recent activity for display
+      // But only if it's NOT an abort, or if we want to show "Cancelled" as a thought
+      if (!isAbort) {
+        const lastActivity = recentActivity[recentActivity.length - 1];
+        if (!lastActivity || lastActivity.status !== 'error') {
+          recentActivity.push({
+            id: randomUUID(),
+            type: 'thought',
+            content: `Error: ${errorMessage}`,
+            status: 'error',
+          });
+          // Maintain size limit
+          if (recentActivity.length > MAX_RECENT_ACTIVITY) {
+            recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
+          }
+        }
+      }
+
+      const progress: SubagentProgress = {
+        isSubagentProgress: true,
+        agentName: this.definition.name,
+        recentActivity: [...recentActivity],
+        state: isAbort ? 'cancelled' : 'error',
+      };
+
+      if (updateOutput) {
+        updateOutput(progress);
+      }
+
+      if (isAbort) {
+        throw error;
+      }
+
+      function hasStatus(error: unknown): error is { status: number } {
+        if (typeof error !== 'object' || error === null) {
+          return false;
+        }
+        if (!('status' in error)) {
+          return false;
+        }
+        const status = (error as { status: unknown }).status;
+        return typeof status === 'number';
+      }
+
+      const isApiError = hasStatus(error) && error.status === 400;
+
+      const apiHint = isApiError
+        ? '\nNote: This failure may be due to a Gemini API INVALID_ARGUMENT response. The agent may need to retry with a different tool or smaller task.'
+        : '';
+
+      return {
+        llmContent: `Subagent '${this.definition.name}' failed. Error: ${errorMessage}${apiHint}`,
+        returnDisplay: progress,
+        // We omit the 'error' property so that the UI renders our rich returnDisplay
+        // instead of the raw error message. The llmContent still informs the agent of the failure.
+      };
     }
-  }
-
-  const progress: SubagentProgress = {
-    isSubagentProgress: true,
-    agentName: this.definition.name,
-    recentActivity: [...recentActivity],
-    state: isAbort ? 'cancelled' : 'error',
-  };
-
-  if (updateOutput) {
-    updateOutput(progress);
-  }
-
-  if (isAbort) {
-    throw error;
-  }
-
-  function hasStatus(error: unknown): error is { status: number } {
-    if (typeof error !== 'object' || error === null) return false;
-    if (!('status' in error)) return false;
-
-    const status = (error as { status: unknown }).status;
-    return typeof status === 'number';
-  }
-
-  const isApiError = hasStatus(error) && error.status === 400;
-
-  const apiHint = isApiError
-    ? '\nNote: This failure may be due to a Gemini API INVALID_ARGUMENT response.'
-    : '';
-
-  return {
-    llmContent: `Subagent '${this.definition.name}' failed. Error: ${errorMessage}${apiHint}`,
-    returnDisplay: progress,
-  };
-  }
   }
 }

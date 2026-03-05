@@ -546,16 +546,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             const errorMessage = getErrorMessage(error);
 
             let isApiError = false;
-            let errorCode: number | undefined;
-
-            if (error && typeof error === 'object') {
-              const e = error as {
-                status?: number;
-                code?: number;
-                message?: string;
-              };
-
-              errorCode = e.status ?? e.code;
+            if (typeof error === 'object' && error !== null) {
+              const status = (error as { status?: unknown }).status;
+              const code = (error as { code?: unknown }).code;
+              const errorCode =
+                typeof status === 'number'
+                  ? status
+                  : typeof code === 'number'
+                    ? code
+                    : undefined;
 
               if (errorCode === 400) {
                 isApiError = true;
@@ -569,9 +568,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
             terminateReason = AgentTerminateMode.ERROR;
 
+            const safeErrorMessage =
+              errorMessage.length > 2000
+                ? errorMessage.slice(0, 2000) + '... [truncated]'
+                : errorMessage;
+
             finalResult = isApiError
-              ? `The Gemini API returned an Invalid Argument error (400). This usually happens when the conversation context is too large or malformed.\n\nDetails: ${errorMessage}`
-              : `Subagent execution failed due to an unexpected error: ${errorMessage}`;
+              ? `The Gemini API returned an Invalid Argument error (400). This usually happens when the conversation context is too large or malformed.\n\nDetails: <error_details>${safeErrorMessage}</error_details>`
+              : `Subagent execution failed due to an unexpected error: <error_details>${safeErrorMessage}</error_details>`;
 
             break;
           }
