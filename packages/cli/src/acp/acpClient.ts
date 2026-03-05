@@ -207,6 +207,11 @@ export class GeminiAgent {
         if (result.success) {
           baseUrl = result.data.baseUrl;
           headers = result.data.headers;
+        } else {
+          throw new acp.RequestError(
+            -32602,
+            `Malformed gateway payload: ${result.error.message}`,
+          );
         }
       }
 
