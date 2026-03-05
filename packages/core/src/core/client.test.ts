@@ -28,6 +28,7 @@ import {
   GeminiEventType,
   Turn,
   type ChatCompressionInfo,
+  type ServerGeminiStreamEvent,
 } from './turn.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { DEFAULT_GEMINI_MODEL_AUTO } from '../config/models.js';
@@ -1116,6 +1117,54 @@ ${JSON.stringify(
       expect(countTokensSpy).not.toHaveBeenCalled();
 
       // The actual token calculation is unit tested in tokenCalculation.test.ts
+    });
+
+    it('should cleanly abort and return Turn on LoopDetected without unhandled promise rejections', async () => {
+      // Arrange
+      const mockStream = (async function* () {
+        // Yield an event that will trigger the loop detector
+        yield { type: 'content', value: 'Looping content' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      // Mock loop detector to return count > 1 on the first event (loop detected)
+      vi.spyOn(client['loopDetector'], 'addAndCheck').mockReturnValue({
+        count: 2,
+      });
+
+      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-1',
+      );
+
+      const events: ServerGeminiStreamEvent[] = [];
+      let finalResult: Turn | undefined;
+
+      while (true) {
+        const result = await stream.next();
+        if (result.done) {
+          finalResult = result.value;
+          break;
+        }
+        events.push(result.value);
+      }
+
+      // Assert
+      expect(events).toContainEqual({ type: GeminiEventType.LoopDetected });
+      expect(abortSpy).toHaveBeenCalled();
+      expect(finalResult).toBeInstanceOf(Turn);
     });
 
     it('should return the turn instance after the stream is complete', async () => {

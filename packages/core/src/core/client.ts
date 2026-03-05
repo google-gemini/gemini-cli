@@ -708,27 +708,22 @@ export class GeminiClient {
     let isError = false;
     let isInvalidStream = false;
 
+    let loopDetectedAbort = false;
+    let loopRecoverResult: { detail?: string } | undefined;
     for await (const event of resultStream) {
       const loopResult = this.loopDetector.addAndCheck(event);
       if (loopResult.count > 1) {
         yield { type: GeminiEventType.LoopDetected };
-        controller.abort();
-        return turn;
+        loopDetectedAbort = true;
+        break;
       } else if (loopResult.count === 1) {
         if (boundedTurns <= 1) {
           yield { type: GeminiEventType.MaxSessionTurns };
-          controller.abort();
-          return turn;
+          loopDetectedAbort = true;
+          break;
         }
-        return yield* this._recoverFromLoop(
-          loopResult,
-          signal,
-          prompt_id,
-          boundedTurns,
-          isInvalidStreamRetry,
-          displayContent,
-          controller,
-        );
+        loopRecoverResult = loopResult;
+        break;
       }
       yield event;
 
@@ -740,6 +735,23 @@ export class GeminiClient {
       if (event.type === GeminiEventType.Error) {
         isError = true;
       }
+    }
+
+    if (loopDetectedAbort) {
+      controller.abort();
+      return turn;
+    }
+
+    if (loopRecoverResult) {
+      return yield* this._recoverFromLoop(
+        loopRecoverResult,
+        signal,
+        prompt_id,
+        boundedTurns,
+        isInvalidStreamRetry,
+        displayContent,
+        controller,
+      );
     }
 
     if (isError) {
