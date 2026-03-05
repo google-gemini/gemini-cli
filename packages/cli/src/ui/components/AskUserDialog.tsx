@@ -105,6 +105,10 @@ const initialState: AskUserDialogState = {
   submitted: false,
 };
 
+// Persists in-progress answers across process suspend/resume cycles.
+// Keyed by the text of the first question (unique per AskUser invocation).
+const draftStore = new Map<string, AskUserDialogState>();
+
 function askUserDialogReducerLogic(
   state: AskUserDialogState,
   action: AskUserDialogAction,
@@ -941,8 +945,18 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       ? uiState?.availableTerminalHeight
       : undefined);
 
-  const [state, dispatch] = useReducer(askUserDialogReducerLogic, initialState);
+  const draftKey = questions[0]?.question ?? '';
+  const [state, dispatch] = useReducer(
+    askUserDialogReducerLogic,
+    draftStore.get(draftKey) ?? initialState,
+  );
   const { answers, isEditingCustomOption, submitted } = state;
+
+  useEffect(() => {
+    if (!submitted) {
+      draftStore.set(draftKey, state);
+    }
+  });
 
   const reviewTabIndex = questions.length;
   const tabCount =
@@ -972,10 +986,12 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     (key: Key) => {
       if (submitted) return false;
       if (keyMatchers[Command.ESCAPE](key)) {
+        draftStore.delete(draftKey);
         onCancel();
         return true;
       } else if (keyMatchers[Command.QUIT](key)) {
         if (!isEditingCustomOption) {
+          draftStore.delete(draftKey);
           onCancel();
         }
         // Return false to let ctrl-C bubble up to AppContainer for exit flow
@@ -983,7 +999,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       }
       return false;
     },
-    [onCancel, submitted, isEditingCustomOption],
+    [draftKey, onCancel, submitted, isEditingCustomOption],
   );
 
   useKeypress(handleCancel, {
@@ -1025,9 +1041,10 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
 
   useEffect(() => {
     if (submitted) {
+      draftStore.delete(draftKey);
       onSubmit(answers);
     }
-  }, [submitted, answers, onSubmit]);
+  }, [submitted, answers, draftKey, onSubmit]);
 
   const handleAnswer = useCallback(
     (answer: string) => {
