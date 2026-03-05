@@ -21,6 +21,7 @@ import { loadInstallMetadata } from '../extension.js';
 import * as fs from 'node:fs';
 import type { ExtensionManager } from '../extension-manager.js';
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import { IntegrityStatus } from './integrity.js';
 
 // Mock dependencies
 vi.mock('./storage.js', () => ({
@@ -68,7 +69,7 @@ describe('Extension Update Logic', () => {
       loadExtensionConfig: vi.fn(),
       installOrUpdateExtension: vi.fn(),
       integrityManager: {
-        verifyIntegrity: vi.fn().mockResolvedValue(true),
+        verifyIntegrity: vi.fn().mockResolvedValue(IntegrityStatus.AUTHENTIC),
         storeIntegrity: vi.fn().mockResolvedValue(undefined),
       },
     } as unknown as ExtensionManager;

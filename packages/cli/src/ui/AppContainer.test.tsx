@@ -98,6 +98,7 @@ import ansiEscapes from 'ansi-escapes';
 import { mergeSettings, type LoadedSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
+import { IntegrityStatus } from '../config/extensions/integrity.js';
 import { StreamingState } from './types.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import {
@@ -466,7 +467,7 @@ describe('AppContainer State Management', () => {
       setRequestSetting: vi.fn(),
       start: vi.fn(),
       integrityManager: {
-        verifyIntegrity: vi.fn().mockResolvedValue(true),
+        verifyIntegrity: vi.fn().mockResolvedValue(IntegrityStatus.AUTHENTIC),
         storeIntegrity: vi.fn().mockResolvedValue(undefined),
       },
     } as unknown as ExtensionManager);

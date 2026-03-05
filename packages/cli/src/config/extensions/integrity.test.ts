@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ExtensionIntegrityManager } from './integrity.js';
+import { ExtensionIntegrityManager, IntegrityStatus } from './integrity.js';
 import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
 
 // Mock KeystoreService
@@ -126,10 +126,15 @@ describe('ExtensionIntegrityManager', () => {
     it('should store and verify integrity correctly', async () => {
       await manager.storeIntegrity('ext-name', metadata);
       const result = await manager.verifyIntegrity('ext-name', metadata);
-      expect(result).toBe(true);
+      expect(result).toBe(IntegrityStatus.AUTHENTIC);
     });
 
-    it('should fail verification if metadata changes', async () => {
+    it('should return NOT_FOUND if metadata is missing from store', async () => {
+      const result = await manager.verifyIntegrity('unknown-ext', metadata);
+      expect(result).toBe(IntegrityStatus.NOT_FOUND);
+    });
+
+    it('should return TAMPERED if metadata changes', async () => {
       await manager.storeIntegrity('ext-name', metadata);
       const tamperedMetadata: ExtensionInstallMetadata = {
         ...metadata,
@@ -139,19 +144,18 @@ describe('ExtensionIntegrityManager', () => {
         'ext-name',
         tamperedMetadata,
       );
-      expect(result).toBe(false);
+      expect(result).toBe(IntegrityStatus.TAMPERED);
     });
 
-    it('should fail verification if store signature is tampered with', async () => {
+    it('should return TAMPERED if store signature is tampered with', async () => {
       await manager.storeIntegrity('ext-name', metadata);
 
       const data = JSON.parse(storedContent);
       data.signature = 'tampered-signature';
       storedContent = JSON.stringify(data);
 
-      await expect(
-        manager.verifyIntegrity('ext-name', metadata),
-      ).rejects.toThrow('Extension integrity store has been tampered with!');
+      const result = await manager.verifyIntegrity('ext-name', metadata);
+      expect(result).toBe(IntegrityStatus.TAMPERED);
     });
 
     it('should throw error in storeIntegrity if existing store is corrupted', async () => {

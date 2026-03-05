@@ -6,7 +6,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createHash, createHmac, randomBytes } from 'node:crypto';
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+} from 'node:crypto';
 import {
   homedir,
   GEMINI_DIR,
@@ -34,6 +39,12 @@ const SECRET_KEY_ACCOUNT = 'secret-key';
 export type IntegrityData = z.infer<typeof IntegrityDataSchema>;
 export type ExtensionIntegrityStore = z.infer<typeof IntegrityStoreSchema>;
 export type IntegrityStoreFile = z.infer<typeof IntegrityStoreFileSchema>;
+
+export enum IntegrityStatus {
+  AUTHENTIC = 'authentic',
+  NOT_FOUND = 'not_found',
+  TAMPERED = 'tampered',
+}
 
 /**
  * Manages the integrity of installed extensions by cryptographically signing
@@ -148,18 +159,18 @@ export class ExtensionIntegrityManager {
    * recorded integrity data.
    *
    * @throws Error if the centralized integrity store signature is invalid.
-   * @returns true if the metadata is authentic, false otherwise.
+   * @returns IntegrityStatus indicating the result of the verification.
    */
   async verifyIntegrity(
     extensionName: string,
     metadata: ExtensionInstallMetadata | undefined,
-  ): Promise<boolean> {
+  ): Promise<IntegrityStatus> {
     if (!metadata) {
-      return false;
+      return IntegrityStatus.NOT_FOUND;
     }
 
     if (!fs.existsSync(this.integrityFilePath)) {
-      return false;
+      return IntegrityStatus.NOT_FOUND;
     }
 
     try {
@@ -168,7 +179,7 @@ export class ExtensionIntegrityManager {
       const { store, signature } = data;
 
       if (!store || !signature || !store[extensionName]) {
-        return false;
+        return IntegrityStatus.NOT_FOUND;
       }
 
       const secretKey = await this.getSecretKey();
@@ -178,7 +189,12 @@ export class ExtensionIntegrityManager {
         .update(JSON.stringify(store))
         .digest('hex');
 
-      if (signature !== expectedStoreSignature) {
+      if (
+        !timingSafeEqual(
+          Buffer.from(signature, 'hex'),
+          Buffer.from(expectedStoreSignature, 'hex'),
+        )
+      ) {
         throw new Error('Extension integrity store has been tampered with!');
       }
 
@@ -189,14 +205,25 @@ export class ExtensionIntegrityManager {
         .update(metadataContent)
         .digest('hex');
 
-      if (currentHash !== integrity.hash) {
-        return false;
+      if (
+        !timingSafeEqual(
+          Buffer.from(currentHash, 'hex'),
+          Buffer.from(integrity.hash, 'hex'),
+        )
+      ) {
+        return IntegrityStatus.TAMPERED;
       }
 
       const expectedSignature = createHmac('sha256', secretKey)
         .update(currentHash)
         .digest('hex');
-      return integrity.signature === expectedSignature;
+
+      const isAuthentic = timingSafeEqual(
+        Buffer.from(integrity.signature, 'hex'),
+        Buffer.from(expectedSignature, 'hex'),
+      );
+
+      return isAuthentic ? IntegrityStatus.AUTHENTIC : IntegrityStatus.TAMPERED;
     } catch (e) {
       if (
         e instanceof Error &&
@@ -204,7 +231,7 @@ export class ExtensionIntegrityManager {
       ) {
         throw e;
       }
-      return false;
+      return IntegrityStatus.TAMPERED;
     }
   }
 }

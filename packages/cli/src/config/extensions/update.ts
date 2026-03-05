@@ -16,6 +16,7 @@ import * as fs from 'node:fs';
 import { getErrorMessage } from '../../utils/errors.js';
 import { copyExtension, type ExtensionManager } from '../extension-manager.js';
 import { ExtensionStorage } from './storage.js';
+import { IntegrityStatus } from './integrity.js';
 
 export interface ExtensionUpdateInfo {
   name: string;
@@ -51,13 +52,12 @@ export async function updateExtension(
 
   try {
     if (extensionManager.integrityManager) {
-      const isAuthentic =
-        await extensionManager.integrityManager.verifyIntegrity(
-          extension.name,
-          installMetadata,
-        );
+      const status = await extensionManager.integrityManager.verifyIntegrity(
+        extension.name,
+        installMetadata,
+      );
 
-      if (!isAuthentic) {
+      if (status === IntegrityStatus.NOT_FOUND) {
         // File/entry is missing - treat as "needs initialization".
         debugLogger.warn(
           `No integrity data found for ${extension.name}. Initializing integrity record.`,
@@ -65,6 +65,10 @@ export async function updateExtension(
         await extensionManager.integrityManager.storeIntegrity(
           extension.name,
           installMetadata,
+        );
+      } else if (status === IntegrityStatus.TAMPERED) {
+        throw new Error(
+          `Integrity verification failed for ${extension.name}. Metadata has been tampered with!`,
         );
       }
     }

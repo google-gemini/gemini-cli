@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { AppContainer } from '../ui/AppContainer.js';
+import { IntegrityStatus } from '../config/extensions/integrity.js';
 import { renderWithProviders } from './render.js';
 import {
   makeFakeConfig,
@@ -116,7 +117,7 @@ class MockExtensionManager extends ExtensionLoader {
   setRequestConsent = vi.fn();
   setRequestSetting = vi.fn();
   integrityManager = {
-    verifyIntegrity: vi.fn().mockResolvedValue(true),
+    verifyIntegrity: vi.fn().mockResolvedValue(IntegrityStatus.AUTHENTIC),
     storeIntegrity: vi.fn().mockResolvedValue(undefined),
   };
 }

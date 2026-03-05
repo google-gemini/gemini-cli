@@ -9,7 +9,10 @@ import * as path from 'node:path';
 import { stat } from 'node:fs/promises';
 import chalk from 'chalk';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
-import { ExtensionIntegrityManager } from './extensions/integrity.js';
+import {
+  ExtensionIntegrityManager,
+  IntegrityStatus,
+} from './extensions/integrity.js';
 import { type MergedSettings, SettingScope } from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { loadInstallMetadata, type ExtensionConfig } from './extension.js';
@@ -625,6 +628,26 @@ Would you like to attempt to install via "git clone" instead?`,
     }
 
     const installMetadata = loadInstallMetadata(extensionDir);
+
+    // Verify integrity before loading
+    try {
+      const status = await this.integrityManager.verifyIntegrity(
+        path.basename(extensionDir),
+        installMetadata,
+      );
+      if (status === IntegrityStatus.TAMPERED) {
+        debugLogger.error(
+          `Failed to load extension ${extensionDir}. Metadata has been tampered with!`,
+        );
+        return null;
+      }
+    } catch (e) {
+      debugLogger.error(
+        `Failed to verify integrity for extension ${extensionDir}: ${getErrorMessage(e)}`,
+      );
+      return null;
+    }
+
     let effectiveExtensionPath = extensionDir;
     if ((this.settings.security?.allowedExtensions?.length ?? 0) > 0) {
       if (!installMetadata?.source) {
