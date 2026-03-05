@@ -64,7 +64,7 @@ describe('BrowserAgentInvocation', () => {
       publish: vi.fn().mockResolvedValue(undefined),
       subscribe: vi.fn(),
       unsubscribe: vi.fn(),
-    } as unknown as MessageBus;
+    } as unknown as LocalAgentExecutor<z.ZodTypeAny>;
 
     mockParams = {
       task: 'Navigate to example.com and click the button',
@@ -153,17 +153,18 @@ describe('BrowserAgentInvocation', () => {
       };
 
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
+        // @ts-expect-error - Partial mock for testing
         definition: {
           name: 'browser_agent',
           toolConfig: { tools: [] },
-        } as unknown as LocalAgentExecutor<z.ZodTypeAny>['definition'],
-        browserManager: {} as unknown as NonNullable<
-          Awaited<ReturnType<typeof createBrowserAgentDefinition>>
-        >['browserManager'],
+        },
+        // @ts-expect-error - Partial mock for testing
+        browserManager: {},
       });
 
       vi.mocked(LocalAgentExecutor.create).mockResolvedValue(
-        mockExecutor as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+        // @ts-expect-error - Partial mock for testing
+        mockExecutor,
       );
 
       const invocation = new BrowserAgentInvocation(
@@ -208,17 +209,18 @@ describe('BrowserAgentInvocation', () => {
               terminate_reason: AgentTerminateMode.GOAL,
               result: 'Success',
             }),
-          } as unknown as LocalAgentExecutor<z.ZodTypeAny>;
+            // @ts-expect-error - Partial mock for testing
+          };
         },
       );
 
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
+        // @ts-expect-error - Partial mock for testing
         definition: {
           name: 'browser_agent',
-        } as unknown as LocalAgentExecutor<z.ZodTypeAny>['definition'],
-        browserManager: {} as unknown as NonNullable<
-          Awaited<ReturnType<typeof createBrowserAgentDefinition>>
-        >['browserManager'],
+        },
+        // @ts-expect-error - Partial mock for testing
+        browserManager: {},
       });
 
       const invocation = new BrowserAgentInvocation(
@@ -264,17 +266,16 @@ describe('BrowserAgentInvocation', () => {
               terminate_reason: AgentTerminateMode.GOAL,
               result: 'Success',
             }),
-          } as unknown as LocalAgentExecutor<z.ZodTypeAny>;
+            // @ts-expect-error - Partial mock for testing
+          };
         },
       );
 
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
         definition: {
           name: 'browser_agent',
-        } as unknown as LocalAgentExecutor<z.ZodTypeAny>['definition'],
-        browserManager: {} as unknown as NonNullable<
-          Awaited<ReturnType<typeof createBrowserAgentDefinition>>
-        >['browserManager'],
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+        browserManager: {} as unknown as LocalAgentExecutor<z.ZodTypeAny>,
       });
 
       const invocation = new BrowserAgentInvocation(
@@ -339,10 +340,8 @@ describe('BrowserAgentInvocation', () => {
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
         definition: {
           name: 'browser_agent',
-        } as unknown as LocalAgentExecutor<z.ZodTypeAny>['definition'],
-        browserManager: {} as unknown as NonNullable<
-          Awaited<ReturnType<typeof createBrowserAgentDefinition>>
-        >['browserManager'],
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+        browserManager: {} as unknown as LocalAgentExecutor<z.ZodTypeAny>,
       });
 
       const invocation = new BrowserAgentInvocation(
@@ -425,10 +424,8 @@ describe('BrowserAgentInvocation', () => {
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
         definition: {
           name: 'browser_agent',
-        } as unknown as LocalAgentExecutor<z.ZodTypeAny>['definition'],
-        browserManager: {} as unknown as NonNullable<
-          Awaited<ReturnType<typeof createBrowserAgentDefinition>>
-        >['browserManager'],
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+        browserManager: {} as unknown as LocalAgentExecutor<z.ZodTypeAny>,
       });
 
       const invocation = new BrowserAgentInvocation(
@@ -509,10 +506,8 @@ describe('BrowserAgentInvocation', () => {
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
         definition: {
           name: 'browser_agent',
-        } as unknown as LocalAgentExecutor<z.ZodTypeAny>['definition'],
-        browserManager: {} as unknown as NonNullable<
-          Awaited<ReturnType<typeof createBrowserAgentDefinition>>
-        >['browserManager'],
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+        browserManager: {} as unknown as LocalAgentExecutor<z.ZodTypeAny>,
       });
 
       const invocation = new BrowserAgentInvocation(
@@ -563,10 +558,8 @@ describe('BrowserAgentInvocation', () => {
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
         definition: {
           name: 'browser_agent',
-        } as unknown as LocalAgentExecutor<z.ZodTypeAny>['definition'],
-        browserManager: {} as unknown as NonNullable<
-          Awaited<ReturnType<typeof createBrowserAgentDefinition>>
-        >['browserManager'],
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+        browserManager: {} as unknown as LocalAgentExecutor<z.ZodTypeAny>,
       });
 
       const invocation = new BrowserAgentInvocation(
@@ -657,10 +650,8 @@ describe('BrowserAgentInvocation', () => {
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
         definition: {
           name: 'browser_agent',
-        } as unknown as LocalAgentExecutor<z.ZodTypeAny>['definition'],
-        browserManager: {} as unknown as NonNullable<
-          Awaited<ReturnType<typeof createBrowserAgentDefinition>>
-        >['browserManager'],
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+        browserManager: {} as unknown as LocalAgentExecutor<z.ZodTypeAny>,
       });
 
       const invocation = new BrowserAgentInvocation(
@@ -715,6 +706,200 @@ describe('BrowserAgentInvocation', () => {
       expect(errorMsg).not.toContain('sk-secret123');
       expect(errorMsg).not.toContain('jwt.token.here');
       expect(errorMsg).toContain('[REDACTED]');
+    });
+
+    it('should handle concurrent tool calls correctly using callId', async () => {
+      const updateOutput = vi.fn();
+      let activityCallback:
+        | ((activity: SubagentActivityEvent) => void)
+        | undefined;
+
+      vi.mocked(LocalAgentExecutor.create).mockImplementation(
+        async (_def, _config, onActivity) => {
+          activityCallback = onActivity;
+          return {
+            run: vi.fn().mockResolvedValue({
+              terminate_reason: AgentTerminateMode.GOAL,
+              result: 'Success',
+            }),
+          } as unknown as LocalAgentExecutor<z.ZodTypeAny>;
+        },
+      );
+
+      vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
+        definition: {
+          name: 'browser_agent',
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+        browserManager: {} as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+      });
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      await invocation.execute(new AbortController().signal, updateOutput);
+
+      // Start tool instance 1
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'TOOL_CALL_START',
+        data: { name: 'readFile', args: { path: 'file1.txt' }, callId: 'id1' },
+      });
+
+      // Start tool instance 2 (same name, different callId)
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'TOOL_CALL_START',
+        data: { name: 'readFile', args: { path: 'file2.txt' }, callId: 'id2' },
+      });
+
+      // End tool instance 2 first
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'TOOL_CALL_END',
+        data: { name: 'readFile', id: 'id2' },
+      });
+
+      let lastProgress = updateOutput.mock.calls[
+        updateOutput.mock.calls.length - 1
+      ][0] as SubagentProgress;
+
+      const item1 = lastProgress.recentActivity.find((i) => i.id === 'id1');
+      const item2 = lastProgress.recentActivity.find((i) => i.id === 'id2');
+
+      expect(item1?.status).toBe('running');
+      expect(item2?.status).toBe('completed');
+
+      // End tool instance 1
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'TOOL_CALL_END',
+        data: { name: 'readFile', id: 'id1' },
+      });
+
+      lastProgress = updateOutput.mock.calls[
+        updateOutput.mock.calls.length - 1
+      ][0] as SubagentProgress;
+
+      const updatedItem1 = lastProgress.recentActivity.find(
+        (i) => i.id === 'id1',
+      );
+      expect(updatedItem1?.status).toBe('completed');
+    });
+
+    it('should redact secrets with spaces in unquoted values', async () => {
+      const updateOutput = vi.fn();
+      let activityCallback:
+        | ((activity: SubagentActivityEvent) => void)
+        | undefined;
+
+      vi.mocked(LocalAgentExecutor.create).mockImplementation(
+        async (_def, _config, onActivity) => {
+          activityCallback = onActivity;
+          return {
+            run: vi.fn().mockResolvedValue({
+              terminate_reason: AgentTerminateMode.GOAL,
+              result: 'Success',
+            }),
+          } as unknown as LocalAgentExecutor<z.ZodTypeAny>;
+        },
+      );
+
+      vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
+        definition: {
+          name: 'browser_agent',
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+        browserManager: {} as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+      });
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      await invocation.execute(new AbortController().signal, updateOutput);
+
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'ERROR',
+        data: {
+          error: 'Failed with api_key=my secret value here and more text',
+        },
+      });
+
+      const lastProgress = updateOutput.mock.calls[
+        updateOutput.mock.calls.length - 1
+      ][0] as SubagentProgress;
+      const errorThought = lastProgress.recentActivity.find(
+        (item) => item.type === 'thought' && item.status === 'error',
+      );
+      expect(errorThought!.content).toContain('api_key=[REDACTED]');
+      expect(errorThought!.content).not.toContain('my secret value');
+    });
+
+    it('should handle URL-encoded sensitive keys in tool arguments', async () => {
+      const updateOutput = vi.fn();
+      let activityCallback:
+        | ((activity: SubagentActivityEvent) => void)
+        | undefined;
+
+      vi.mocked(LocalAgentExecutor.create).mockImplementation(
+        async (_def, _config, onActivity) => {
+          activityCallback = onActivity;
+          return {
+            run: vi.fn().mockResolvedValue({
+              terminate_reason: AgentTerminateMode.GOAL,
+              result: 'Success',
+            }),
+          } as unknown as LocalAgentExecutor<z.ZodTypeAny>;
+        },
+      );
+
+      vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
+        definition: {
+          name: 'browser_agent',
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+        browserManager: {} as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+      });
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      await invocation.execute(new AbortController().signal, updateOutput);
+
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'TOOL_CALL_START',
+        data: {
+          name: 'testTool',
+          args: {
+            'api%5fkey': 'secret-value',
+            'auth%2dtoken': 'token-value',
+          },
+        },
+      });
+
+      const lastProgress = updateOutput.mock.calls[
+        updateOutput.mock.calls.length - 1
+      ][0] as SubagentProgress;
+      const toolCall = lastProgress.recentActivity.find(
+        (item) => item.type === 'tool_call',
+      );
+      const argsObj = JSON.parse(toolCall!.args!);
+      expect(argsObj['api%5fkey']).toBe('[REDACTED]');
+      expect(argsObj['auth%2dtoken']).toBe('[REDACTED]');
     });
   });
 

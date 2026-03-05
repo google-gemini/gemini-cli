@@ -74,7 +74,14 @@ function sanitizeToolArgs(args: unknown): unknown {
   const sanitized: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(args)) {
-    const keyNormalized = key.toLowerCase().replace(/[-_]/g, '');
+    // Decode key to handle URL-encoded sensitive keys (e.g., api%5fkey)
+    let decodedKey = key;
+    try {
+      decodedKey = decodeURIComponent(key);
+    } catch {
+      // Ignore decoding errors
+    }
+    const keyNormalized = decodedKey.toLowerCase().replace(/[-_]/g, '');
     const isSensitive = SENSITIVE_KEY_PATTERNS.some((pattern) =>
       keyNormalized.includes(pattern.replace(/[-_]/g, '')),
     );
@@ -97,24 +104,18 @@ function sanitizeToolArgs(args: unknown): unknown {
 function sanitizeErrorMessage(message: string): string {
   return message
     .replace(
-      /api[_-]?key[s]?[:=]\s*['"]?[^\s,'"&;]+['"]?/gi,
+      /api[_-]?key[s]?[:=]\s*['"]?[^,'"&;]+['"]?/gi,
       'api_key=[REDACTED]',
     )
-    .replace(/token[:=]\s*['"]?[^\s,'"&;]+['"]?/gi, 'token=[REDACTED]')
-    .replace(/password[:=]\s*['"]?[^\s,'"&;]+['"]?/gi, 'password=[REDACTED]')
-    .replace(/pwd[:=]\s*['"]?[^\s,'"&;]+['"]?/gi, 'pwd=[REDACTED]')
-    .replace(/secret[:=]\s*['"]?[^\s,'"&;]+['"]?/gi, 'secret=[REDACTED]')
+    .replace(/token[:=]\s*['"]?[^,'"&;]+['"]?/gi, 'token=[REDACTED]')
+    .replace(/password[:=]\s*['"]?[^,'"&;]+['"]?/gi, 'password=[REDACTED]')
+    .replace(/pwd[:=]\s*['"]?[^,'"&;]+['"]?/gi, 'pwd=[REDACTED]')
+    .replace(/secret[:=]\s*['"]?[^,'"&;]+['"]?/gi, 'secret=[REDACTED]')
+    .replace(/credential[:=]\s*['"]?[^,'"&;]+['"]?/gi, 'credential=[REDACTED]')
+    .replace(/auth[:=]\s*['"]?[^,'"&;]+['"]?/gi, 'auth=[REDACTED]')
+    .replace(/passphrase[:=]\s*['"]?[^,'"&;]+['"]?/gi, 'passphrase=[REDACTED]')
     .replace(
-      /credential[:=]\s*['"]?[^\s,'"&;]+['"]?/gi,
-      'credential=[REDACTED]',
-    )
-    .replace(/auth[:=]\s*['"]?[^\s,'"&;]+['"]?/gi, 'auth=[REDACTED]')
-    .replace(
-      /passphrase[:=]\s*['"]?[^\s,'"&;]+['"]?/gi,
-      'passphrase=[REDACTED]',
-    )
-    .replace(
-      /private[_-]?key[:=]\s*['"]?[^\s,'"&;]+['"]?/gi,
+      /private[_-]?key[:=]\s*['"]?[^,'"&;]+['"]?/gi,
       'private_key=[REDACTED]',
     )
     .replace(
@@ -269,8 +270,11 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             const args = JSON.stringify(
               sanitizeToolArgs(activity.data['args']),
             );
+            const callId = activity.data['callId']
+              ? String(activity.data['callId'])
+              : randomUUID();
             recentActivity.push({
-              id: randomUUID(),
+              id: callId,
               type: 'tool_call',
               content: name,
               displayName,
@@ -282,12 +286,17 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             break;
           }
           case 'TOOL_CALL_END': {
+            const callId = activity.data['id']
+              ? String(activity.data['id'])
+              : undefined;
             const name = String(activity.data['name']);
-            // Find the last running tool call with this name
+            // Find the tool call by ID or the last running tool call with this name
             for (let i = recentActivity.length - 1; i >= 0; i--) {
               if (
                 recentActivity[i].type === 'tool_call' &&
-                recentActivity[i].content === name &&
+                (callId
+                  ? recentActivity[i].id === callId
+                  : recentActivity[i].content === name) &&
                 recentActivity[i].status === 'running'
               ) {
                 recentActivity[i].status = 'completed';
@@ -303,14 +312,19 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             const toolName = activity.data['name']
               ? String(activity.data['name'])
               : undefined;
+            const callId = activity.data['callId']
+              ? String(activity.data['callId'])
+              : undefined;
             const newStatus = isCancellation ? 'cancelled' : 'error';
 
-            if (toolName) {
+            if (callId || toolName) {
               // Mark the specific tool as error/cancelled
               for (let i = recentActivity.length - 1; i >= 0; i--) {
                 if (
                   recentActivity[i].type === 'tool_call' &&
-                  recentActivity[i].content === toolName &&
+                  (callId
+                    ? recentActivity[i].id === callId
+                    : recentActivity[i].content === toolName) &&
                   recentActivity[i].status === 'running'
                 ) {
                   recentActivity[i].status = newStatus;

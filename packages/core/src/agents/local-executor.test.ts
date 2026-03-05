@@ -930,11 +930,11 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'ERROR',
-          data: {
+          data: expect.objectContaining({
             context: 'tool_call',
             name: TASK_COMPLETE_TOOL_NAME,
             error: expectedError,
-          },
+          }),
         }),
       );
 
@@ -1216,11 +1216,11 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'ERROR',
-          data: {
+          data: expect.objectContaining({
             context: 'tool_call',
             name: TASK_COMPLETE_TOOL_NAME,
             error: expect.stringContaining('Output validation failed'),
-          },
+          }),
         }),
       );
 
@@ -1341,11 +1341,11 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'ERROR',
-          data: {
+          data: expect.objectContaining({
             context: 'tool_call',
             name: LS_TOOL_NAME,
             error: toolErrorMessage,
-          },
+          }),
         }),
       );
 
@@ -1702,15 +1702,17 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: {
+          data: expect.objectContaining({
             text: 'Execution limit reached (MAX_TURNS). Attempting one final recovery turn with a grace period.',
-          },
+          }),
         }),
       );
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: { text: 'Graceful recovery succeeded.' },
+          data: expect.objectContaining({
+            text: 'Graceful recovery succeeded.',
+          }),
         }),
       );
     });
@@ -1787,9 +1789,9 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: {
+          data: expect.objectContaining({
             text: 'Execution limit reached (ERROR_NO_COMPLETE_TASK_CALL). Attempting one final recovery turn with a grace period.',
-          },
+          }),
         }),
       );
     });
@@ -1885,9 +1887,9 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: {
+          data: expect.objectContaining({
             text: 'Execution limit reached (TIMEOUT). Attempting one final recovery turn with a grace period.',
-          },
+          }),
         }),
       );
     });
