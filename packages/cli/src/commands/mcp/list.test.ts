@@ -346,4 +346,31 @@ describe('mcp list command', () => {
     );
     expect(mockedCreateTransport).not.toHaveBeenCalled();
   });
+
+  it('should display disabled status for servers disabled via enablement manager', async () => {
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+    mockedLoadSettings.mockReturnValue({
+      merged: {
+        ...defaultMergedSettings,
+        mcpServers: {
+          'disabled-server': { command: '/test/server' },
+        },
+      },
+      isTrusted: true,
+    });
+
+    vi.spyOn(
+      McpServerEnablementManager.prototype,
+      'isFileEnabled',
+    ).mockResolvedValue(false);
+
+    await listMcpServers();
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'disabled-server: /test/server  (stdio) - Disabled',
+      ),
+    );
+    expect(mockedCreateTransport).not.toHaveBeenCalled();
+  });
 });
