@@ -123,6 +123,7 @@ export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
 export * from './services/trackerService.js';
 export * from './services/trackerTypes.js';
+export * from './services/keystore.js';
 export * from './skills/skillManager.js';
 export * from './skills/skillLoader.js';
 
