@@ -38,6 +38,8 @@ export const BINARY_FILE_PATTERNS: string[] = [
   '**/*.db',
   '**/*.mdb',
   '**/*.sqlite',
+  '**/*.sqlite-journal',
+  '**/*.sqlite-wal',
   // Disk images
   '**/*.dmg',
   '**/*.img',
