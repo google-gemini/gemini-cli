@@ -20,6 +20,7 @@ import {
 } from '@google/gemini-cli-core';
 import { INTEGRITY_FILENAME, INTEGRITY_KEY_FILENAME } from './variables.js';
 import { z } from 'zod';
+import stableStringify from 'json-stable-stringify';
 
 const IntegrityDataSchema = z.object({
   hash: z.string(),
@@ -98,7 +99,7 @@ export class ExtensionIntegrityManager {
   async generateIntegrity(
     metadata: ExtensionInstallMetadata,
   ): Promise<IntegrityData> {
-    const content = this.canonicalStringify(metadata);
+    const content = stableStringify(metadata);
     const hash = createHash('sha256').update(content).digest('hex');
     const secretKey = await this.getSecretKey();
     const signature = createHmac('sha256', secretKey)
@@ -138,7 +139,7 @@ export class ExtensionIntegrityManager {
     store[extensionName] = integrity;
 
     const secretKey = await this.getSecretKey();
-    const storeContent = this.canonicalStringify(store);
+    const storeContent = stableStringify(store);
     const storeSignature = createHmac('sha256', secretKey)
       .update(storeContent)
       .digest('hex');
@@ -186,7 +187,7 @@ export class ExtensionIntegrityManager {
 
       // 1. Verify that the integrity store itself hasn't been modified
       const expectedStoreSignature = createHmac('sha256', secretKey)
-        .update(this.canonicalStringify(store))
+        .update(stableStringify(store))
         .digest('hex');
 
       if (
@@ -200,7 +201,7 @@ export class ExtensionIntegrityManager {
 
       // 2. Verify that the extension's metadata matches its recorded signature
       const integrity = store[extensionName];
-      const metadataContent = this.canonicalStringify(metadata);
+      const metadataContent = stableStringify(metadata);
       const currentHash = createHash('sha256')
         .update(metadataContent)
         .digest('hex');
@@ -233,32 +234,5 @@ export class ExtensionIntegrityManager {
       }
       return IntegrityStatus.TAMPERED;
     }
-  }
-
-  /**
-   * Creates a canonical string representation of an object by sorting keys.
-   * This ensures consistent hashing and signing regardless of property order.
-   */
-  private canonicalStringify(obj: unknown): string {
-    if (obj === null || typeof obj !== 'object') {
-      return JSON.stringify(obj);
-    }
-
-    if (Array.isArray(obj)) {
-      return '[' + obj.map((v) => this.canonicalStringify(v)).join(',') + ']';
-    }
-
-    const sortedKeys = Object.keys(obj).sort();
-    return (
-      '{' +
-      sortedKeys
-        .map((k) => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
-          const value = (obj as Record<string, any>)[k];
-          return `${JSON.stringify(k)}:${this.canonicalStringify(value)}`;
-        })
-        .join(',') +
-      '}'
-    );
   }
 }
