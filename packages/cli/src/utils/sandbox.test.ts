@@ -494,6 +494,49 @@ describe('sandbox', () => {
       expect(entrypointCmd).toContain('su -p gemini');
     });
 
+    it('should normalize udocker long flags before image token', async () => {
+      const config: SandboxConfig = {
+        command: 'udocker',
+        image: 'gemini-cli-sandbox:latest',
+      };
+      process.env['SANDBOX_FLAGS'] = '--device /dev/fuse --privileged';
+
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit(
+            'data',
+            Buffer.from('REPOSITORY TAG\n gemini-cli-sandbox latest\n'),
+          );
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockRunProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockRunProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockRunProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockRunProcess);
+
+      await start_sandbox(config);
+
+      const runArgs = vi.mocked(spawn).mock.calls[1][1] as string[];
+      expect(runArgs).toContain('--device=/dev/fuse');
+      expect(runArgs).toContain('--privileged');
+      expect(runArgs).toContain('gemini-cli-sandbox:latest');
+      expect(runArgs).not.toContain('--privileged=gemini-cli-sandbox:latest');
+    });
+
     describe('LXC sandbox', () => {
       const LXC_RUNNING = JSON.stringify([
         { name: 'gemini-sandbox', status: 'Running' },

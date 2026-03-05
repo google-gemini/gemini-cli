@@ -783,21 +783,26 @@ export async function start_sandbox(
       }
     }
 
-    // udocker's parser fails on space-separated flags like `--volume /src:/dst`. Combine them into `--volume=/src:/dst`
+    // udocker's parser fails on space-separated flags like `--volume /src:/dst`.
+    // Normalize long flags to `--flag=value` for all option args before the image token.
     if (config.command === 'udocker') {
       const combinedArgs: string[] = [];
+      const imageIndex = args.indexOf(image);
       for (let i = 0; i < args.length; i++) {
-        if (
-          ['--workdir', '--volume', '--env', '--user', '--publish'].includes(
-            args[i],
-          ) &&
-          i + 1 < args.length &&
-          !args[i + 1].startsWith('-')
-        ) {
-          combinedArgs.push(`${args[i]}=${args[i + 1]}`);
+        const currentArg = args[i];
+        const nextArg = args[i + 1];
+        const canCombine =
+          currentArg.startsWith('--') &&
+          nextArg &&
+          !nextArg.startsWith('-') &&
+          imageIndex !== -1 &&
+          i + 1 < imageIndex;
+
+        if (canCombine) {
+          combinedArgs.push(`${currentArg}=${nextArg}`);
           i++;
         } else {
-          combinedArgs.push(args[i]);
+          combinedArgs.push(currentArg);
         }
       }
       args.splice(0, args.length, ...combinedArgs);
