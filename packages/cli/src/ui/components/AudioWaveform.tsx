@@ -34,8 +34,9 @@ function getBlock(amplitude: number): string {
 export const AudioWaveform: React.FC<AudioWaveformProps> = ({
     state,
     amplitudes = [],
-    width = 40,
+    width: propsWidth = 40,
 }) => {
+    const width = Math.max(0, Math.floor(propsWidth));
     const rendered = useMemo(() => {
         if (state === 'idle') {
             return null;
