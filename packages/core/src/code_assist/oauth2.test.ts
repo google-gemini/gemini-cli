@@ -95,7 +95,12 @@ const mockConfig = {
   getNoBrowser: () => false,
   getProxy: () => 'http://test.proxy.com:8080',
   isBrowserLaunchSuppressed: () => false,
+<<<<<<< HEAD
   getExperimentalZedIntegration: () => false,
+=======
+  getAcpMode: () => false,
+  isInteractive: () => true,
+>>>>>>> 0135b03c8 (fix(acp): rename --experimental-acp to --acp & remove Zed-specific refrences (#21171))
 } as unknown as Config;
 
 // Mock fetch globally
