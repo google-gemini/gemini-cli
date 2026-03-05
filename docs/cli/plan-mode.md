@@ -354,8 +354,8 @@ those files are not automatically deleted and must be managed manually.
 [MCP tools]: /docs/tools/mcp-server.md
 [`save_memory`]: /docs/tools/memory.md
 [`activate_skill`]: /docs/cli/skills.md
-[`codebase_investigator`]: /docs/core/subagents.md#codebase_investigator
-[`cli_help`]: /docs/core/subagents.md#cli_help
+[`codebase_investigator`]: /docs/core/subagents.md#codebase-investigator
+[`cli_help`]: /docs/core/subagents.md#cli-help-agent
 [subagents]: /docs/core/subagents.md
 [custom subagents]: /docs/core/subagents.md#creating-custom-subagents
 [policy engine]: /docs/reference/policy-engine.md
@@ -365,7 +365,7 @@ those files are not automatically deleted and must be managed manually.
 [YOLO mode]: /docs/reference/configuration.md#command-line-arguments
 [`plan.toml`]:
   https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/policy/policies/plan.toml
-[auto model]: /docs/reference/configuration.md#model-settings
+[auto model]: /docs/reference/configuration.md#model
 [model routing]: /docs/cli/telemetry.md#model-routing
 [preferred external editor]: /docs/reference/configuration.md#general
 [session retention]: /docs/cli/session-management.md#session-retention
