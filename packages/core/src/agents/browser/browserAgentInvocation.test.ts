@@ -404,7 +404,7 @@ describe('BrowserAgentInvocation', () => {
       expect(toolCall2?.status).toBe('cancelled');
     });
 
-    it('should redact snake_case and kebab-case sensitive keys', async () => {
+    it('should redact sensitive keys and recursively sanitize string values in tool arguments', async () => {
       const updateOutput = vi.fn();
       let activityCallback:
         | ((activity: SubagentActivityEvent) => void)
@@ -445,12 +445,17 @@ describe('BrowserAgentInvocation', () => {
         type: 'TOOL_CALL_START',
         data: {
           name: 'configure',
+          displayName: 'Configure api_key=superSecret',
+          description: 'Setting up with token=jwt.token.abc',
           args: {
             api_key: 'sk-12345',
             'api-key': 'ak-67890',
             private_key: 'pk-abc',
             pwd: 'mypassword',
             hostname: 'example.com',
+            nestedConfig: {
+              regularUrl: 'https://api.com?apikey=secret_in_url&other=val',
+            },
           },
         },
       });
@@ -461,13 +466,26 @@ describe('BrowserAgentInvocation', () => {
       const toolCall = lastProgress.recentActivity.find(
         (item) => item.type === 'tool_call',
       );
+
+      // Check display name and description
+      expect(toolCall!.displayName).toContain('[REDACTED]');
+      expect(toolCall!.displayName).not.toContain('superSecret');
+      expect(toolCall!.description).toContain('[REDACTED]');
+      expect(toolCall!.description).not.toContain('jwt.token.abc');
+
       const argsObj = JSON.parse(toolCall!.args!);
 
+      // Check key-based redaction
       expect(argsObj.api_key).toBe('[REDACTED]');
       expect(argsObj['api-key']).toBe('[REDACTED]');
       expect(argsObj.private_key).toBe('[REDACTED]');
       expect(argsObj.pwd).toBe('[REDACTED]');
       expect(argsObj.hostname).toBe('example.com');
+
+      // Check value-based redaction (string scanning)
+      expect(argsObj.nestedConfig.regularUrl).toContain('[REDACTED]');
+      expect(argsObj.nestedConfig.regularUrl).not.toContain('secret_in_url');
+      expect(argsObj.nestedConfig.regularUrl).toContain('other=val');
     });
 
     it('should sanitize sensitive patterns in error messages', async () => {

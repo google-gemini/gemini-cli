@@ -80,6 +80,8 @@ function sanitizeToolArgs(args: unknown): unknown {
     );
     if (isSensitive) {
       sanitized[key] = '[REDACTED]';
+    } else if (typeof value === 'string') {
+      sanitized[key] = sanitizeErrorMessage(value);
     } else {
       sanitized[key] = sanitizeToolArgs(value);
     }
@@ -100,6 +102,7 @@ function sanitizeErrorMessage(message: string): string {
     )
     .replace(/token[:=]\s*['"]?[^\s,'"&;]+['"]?/gi, 'token=[REDACTED]')
     .replace(/password[:=]\s*['"]?[^\s,'"&;]+['"]?/gi, 'password=[REDACTED]')
+    .replace(/pwd[:=]\s*['"]?[^\s,'"&;]+['"]?/gi, 'pwd=[REDACTED]')
     .replace(/secret[:=]\s*['"]?[^\s,'"&;]+['"]?/gi, 'secret=[REDACTED]')
     .replace(
       /credential[:=]\s*['"]?[^\s,'"&;]+['"]?/gi,
@@ -258,10 +261,10 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
           case 'TOOL_CALL_START': {
             const name = String(activity.data['name']);
             const displayName = activity.data['displayName']
-              ? String(activity.data['displayName'])
+              ? sanitizeErrorMessage(String(activity.data['displayName']))
               : undefined;
             const description = activity.data['description']
-              ? String(activity.data['description'])
+              ? sanitizeErrorMessage(String(activity.data['description']))
               : undefined;
             const args = JSON.stringify(
               sanitizeToolArgs(activity.data['args']),
