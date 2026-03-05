@@ -9,6 +9,15 @@ import { format } from 'node:util';
 import { coreEvents } from '@google/gemini-cli-core';
 import { themeManager } from './src/ui/themes/theme-manager.js';
 
+// Mock terminal-image globally as it can cause test timeouts when UI
+// components that import it are rendered (e.g. AppContainer, AppRig).
+vi.mock('terminal-image', () => ({
+  default: {
+    file: vi.fn().mockResolvedValue('MOCKED_TERMINAL_IMAGE'),
+    buffer: vi.fn().mockResolvedValue('MOCKED_TERMINAL_IMAGE'),
+  },
+}));
+
 // Unset CI environment variable so that ink renders dynamically as it does in a real terminal
 if (process.env.CI !== undefined) {
   delete process.env.CI;

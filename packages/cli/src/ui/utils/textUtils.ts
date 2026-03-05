@@ -229,6 +229,11 @@ export function escapeAnsiCtrlCodes<T>(obj: T): T {
     return obj;
   }
 
+  // Skip Buffers properly to avoid iterating byte by byte
+  if (Buffer.isBuffer(obj) || obj instanceof Uint8Array) {
+    return obj;
+  }
+
   if (Array.isArray(obj)) {
     let newArr: unknown[] | null = null;
 
