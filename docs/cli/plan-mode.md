@@ -12,8 +12,7 @@ implementation. With Plan Mode, you can:
 > feedback is invaluable as we refine this feature. If you have ideas,
 > suggestions, or encounter issues:
 >
-> - [Open an issue](https://github.com/google-gemini/gemini-cli/issues) on
->   GitHub.
+> - [Open an issue] on GitHub.
 > - Use the **/bug** command within Gemini CLI to file an issue.
 
 ## How to enable Plan Mode
@@ -132,10 +131,10 @@ These are the only allowed tools:
 
 ### Custom planning with skills
 
-You can use [Agent Skills](./skills.md) to customize how Gemini CLI approaches
-planning for specific types of tasks. When a skill is activated during Plan
-Mode, its specialized instructions and procedural workflows will guide the
-research, design, and planning phases.
+You can use [Agent Skills] to customize how Gemini CLI approaches planning for
+specific types of tasks. When a skill is activated during Plan Mode, its
+specialized instructions and procedural workflows will guide the research,
+design, and planning phases.
 
 For example:
 
@@ -252,10 +251,59 @@ modes = ["plan"]
 argsPattern = "\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\""
 ```
 
+## Planning workflows
+
+Plan Mode provides building blocks for structured research and design. These are
+implemented as [extensions] using core planning tools like [`enter_plan_mode`],
+[`exit_plan_mode`], and [`ask_user`].
+
+### Built-in planning workflow
+
+The built-in planner uses an adaptive workflow to analyze your project, consult
+you on trade-offs via [`ask_user`], and draft a plan for your approval.
+
+### Custom planning workflows
+
+You can install or create specialized planners to suit your workflow.
+
+#### Conductor
+
+[Conductor] is designed for spec-driven development. It organizes work into
+"tracks" and stores persistent artifacts in your project's `conductor/`
+directory:
+
+- **Automate transitions:** Switches to read-only mode via [`enter_plan_mode`].
+- **Streamline decisions:** Uses [`ask_user`] for architectural choices.
+- **Maintain project context:** Stores artifacts in the project directory using
+  [custom plan directory and policies](#custom-plan-directory-and-policies).
+- **Handoff execution:** Transitions to implementation via [`exit_plan_mode`].
+
+#### Build your own
+
+Since Plan Mode is built on modular building blocks, you can develop your own
+custom planning workflow as an [extensions]. By leveraging core tools and
+[custom policies](#custom-policies), you can define how Gemini CLI researches
+and stores plans for your specific domain.
+
+To build a custom planning workflow, you can use:
+
+- **Tool usage:** Use core tools like [`enter_plan_mode`], [`ask_user`], and
+  [`exit_plan_mode`] to manage the research and design process.
+- **Customization:** Set your own storage locations and policy rules using
+  [custom plan directories](#custom-plan-directory-and-policies) and
+  [custom policies](#custom-policies).
+
+> **Note:** Use [Conductor] as a reference when building your own custom
+> planning workflow.
+
+By using Plan Mode as its execution environment, your custom methodology can
+enforce read-only safety during the design phase while benefiting from
+high-reasoning model routing.
+
 ## Automatic Model Routing
 
-When using an [**auto model**], Gemini CLI automatically optimizes [**model
-routing**] based on the current phase of your task:
+When using an [auto model], Gemini CLI automatically optimizes [model routing]
+based on the current phase of your task:
 
 1.  **Planning Phase:** While in Plan Mode, the CLI routes requests to a
     high-reasoning **Pro** model to ensure robust architectural decisions and
@@ -296,28 +344,32 @@ Manual deletion also removes all associated artifacts:
 If you use a [custom plans directory](#custom-plan-directory-and-policies),
 those files are not automatically deleted and must be managed manually.
 
-[`list_directory`]: /docs/tools/file-system.md#1-list_directory-readfolder
-[`read_file`]: /docs/tools/file-system.md#2-read_file-readfile
-[`grep_search`]: /docs/tools/file-system.md#5-grep_search-searchtext
-[`write_file`]: /docs/tools/file-system.md#3-write_file-writefile
-[`glob`]: /docs/tools/file-system.md#4-glob-findfiles
-[`google_web_search`]: /docs/tools/web-search.md
-[`replace`]: /docs/tools/file-system.md#6-replace-edit
-[MCP tools]: /docs/tools/mcp-server.md
-[`save_memory`]: /docs/tools/memory.md
-[`activate_skill`]: /docs/cli/skills.md
-[`codebase_investigator`]: /docs/core/subagents.md#codebase_investigator
-[`cli_help`]: /docs/core/subagents.md#cli_help
-[subagents]: /docs/core/subagents.md
-[custom subagents]: /docs/core/subagents.md#creating-custom-subagents
-[policy engine]: /docs/reference/policy-engine.md
-[`enter_plan_mode`]: /docs/tools/planning.md#1-enter_plan_mode-enterplanmode
-[`exit_plan_mode`]: /docs/tools/planning.md#2-exit_plan_mode-exitplanmode
-[`ask_user`]: /docs/tools/ask-user.md
-[YOLO mode]: /docs/reference/configuration.md#command-line-arguments
+[`list_directory`]: ../tools/file-system.md#1-list_directory-readfolder
+[`read_file`]: ../tools/file-system.md#2-read_file-readfile
+[`grep_search`]: ../tools/file-system.md#5-grep_search-searchtext
+[`write_file`]: ../tools/file-system.md#3-write_file-writefile
+[`glob`]: ../tools/file-system.md#4-glob-findfiles
+[`google_web_search`]: ../tools/web-search.md
+[`replace`]: ../tools/file-system.md#6-replace-edit
+[MCP tools]: ../tools/mcp-server.md
+[`save_memory`]: ../tools/memory.md
+[`activate_skill`]: ./skills.md
+[`codebase_investigator`]: ../core/subagents.md#codebase_investigator
+[`cli_help`]: ../core/subagents.md#cli_help
+[subagents]: ../core/subagents.md
+[custom subagents]: ../core/subagents.md#creating-custom-subagents
+[policy engine]: ../reference/policy-engine.md
+[`enter_plan_mode`]: ../tools/planning.md#1-enter_plan_mode-enterplanmode
+[`exit_plan_mode`]: ../tools/planning.md#2-exit_plan_mode-exitplanmode
+[`ask_user`]: ../tools/ask-user.md
+[YOLO mode]: ../reference/configuration.md#command-line-arguments
 [`plan.toml`]:
   https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/policy/policies/plan.toml
-[auto model]: /docs/reference/configuration.md#model-settings
-[model routing]: /docs/cli/telemetry.md#model-routing
-[preferred external editor]: /docs/reference/configuration.md#general
-[session retention]: /docs/cli/session-management.md#session-retention
+[auto model]: ../reference/configuration.md#model-settings
+[model routing]: ./telemetry.md#model-routing
+[preferred external editor]: ../reference/configuration.md#general
+[session retention]: ./session-management.md#session-retention
+[extensions]: ../extensions/index.md
+[Conductor]: https://github.com/gemini-cli-extensions/conductor
+[open an issue]: https://github.com/google-gemini/gemini-cli/issues
+[Agent Skills]: ./skills.md
