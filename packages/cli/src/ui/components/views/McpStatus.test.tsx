@@ -200,6 +200,39 @@ describe('McpStatus', () => {
     unmount();
   });
 
+  it('renders correctly with both blocked and unblocked servers', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
+      <McpStatus
+        {...baseProps}
+        servers={{
+          ...baseProps.servers,
+          'server-2': {
+            url: 'http://localhost:8081',
+            name: 'server-2',
+            description: 'A blocked server',
+          },
+        }}
+        blockedServers={[{ name: 'server-2', extensionName: 'test-extension' }]}
+      />,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders only blocked servers when no configured servers exist', async () => {
+    const { lastFrame, unmount, waitUntilReady } = render(
+      <McpStatus
+        {...baseProps}
+        servers={{}}
+        blockedServers={[{ name: 'server-1', extensionName: 'test-extension' }]}
+      />,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
+
   it('renders correctly with a connecting server', async () => {
     const { lastFrame, unmount, waitUntilReady } = render(
       <McpStatus {...baseProps} connectingServers={['server-1']} />,
