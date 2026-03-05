@@ -250,6 +250,16 @@ const SETTINGS_SCHEMA = {
           'Enable run-event notifications for action-required prompts and session completion. Currently macOS only.',
         showInDialog: true,
       },
+      soundscapes: {
+        type: 'boolean',
+        label: 'Enable Terminal Soundscapes',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable background audio sonification (lo-fi sounds or beeps) based on CLI system events (Developer Experience feature).',
+        showInDialog: true,
+      },
       checkpointing: {
         type: 'object',
         label: 'Checkpointing',

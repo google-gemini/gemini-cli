@@ -167,6 +167,7 @@ import { useTimedMessage } from './hooks/useTimedMessage.js';
 import { shouldDismissShortcutsHelpOnHotkey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
+import { useAudioNotifications } from './hooks/useAudioNotifications.js';
 import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
@@ -223,6 +224,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const settings = useSettings();
   const { reset } = useOverflowActions()!;
   const notificationsEnabled = isNotificationsEnabled(settings);
+  const soundscapesEnabled = settings.merged.general.soundscapes ?? false;
 
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
@@ -2073,6 +2075,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
     permissionConfirmationRequest,
     hasConfirmUpdateExtensionRequests,
     hasLoopDetectionConfirmationRequest,
+  });
+
+  useAudioNotifications({
+    enabled: soundscapesEnabled,
+    streamingState,
+    hasPendingActionRequired,
+    pendingHistoryItems,
   });
 
   const isPassiveShortcutsHelpState =
