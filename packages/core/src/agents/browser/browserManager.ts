@@ -283,7 +283,7 @@ export class BrowserManager {
     // stderr is piped (not inherited) to prevent MCP server banners and
     // warnings from corrupting the UI in alternate buffer mode.
     this.mcpTransport = new StdioClientTransport({
-      command: 'npx',
+      command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
       args: mcpArgs,
       stderr: 'pipe',
     });
