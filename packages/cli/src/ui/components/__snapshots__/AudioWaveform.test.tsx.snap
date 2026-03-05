@@ -1,0 +1,16 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<AudioWaveform /> > renders empty amplitudes with empty bars correctly 1`] = `
+"     
+"
+`;
+
+exports[`<AudioWaveform /> > renders listening state with mapped amplitudes 1`] = `
+" ▅█
+"
+`;
+
+exports[`<AudioWaveform /> > renders speaking state and truncates/resamples when width does not match amplitudes 1`] = `
+"██  ██
+"
+`;
