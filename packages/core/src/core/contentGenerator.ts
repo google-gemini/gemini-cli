@@ -4,20 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  CountTokensResponse,
-  GenerateContentResponse,
-  GenerateContentParameters,
-  CountTokensParameters,
-  EmbedContentResponse,
-  EmbedContentParameters,
+import {
+  GoogleGenAI,
+  type CountTokensResponse,
+  type GenerateContentResponse,
+  type GenerateContentParameters,
+  type CountTokensParameters,
+  type EmbedContentResponse,
+  type EmbedContentParameters,
 } from '@google/genai';
-import { GoogleGenAI } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import type { Config } from '../config/config.js';
 import { loadApiKey } from './apiKeyCredentialStorage.js';
 
-import type { UserTierId } from '../code_assist/types.js';
+import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { InstallationManager } from '../utils/installationManager.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
@@ -49,6 +49,8 @@ export interface ContentGenerator {
   userTier?: UserTierId;
 
   userTierName?: string;
+
+  paidTier?: GeminiUserTier;
 }
 
 export enum AuthType {

@@ -23,6 +23,7 @@ const githubLightColors: ColorsTheme = {
   Comment: '#998',
   Gray: '#999',
   DarkGray: interpolateColor('#999', '#f8f8f8', 0.5),
+  FocusColor: '#458', // AccentBlue for GitHub branding
   GradientColors: ['#458', '#008080'],
 };
 

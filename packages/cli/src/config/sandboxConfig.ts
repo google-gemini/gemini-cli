@@ -27,6 +27,7 @@ const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
   'docker',
   'podman',
   'sandbox-exec',
+  'lxc',
 ];
 
 function isSandboxCommand(value: string): value is SandboxConfig['command'] {
@@ -91,6 +92,9 @@ function getSandboxCommand(
   }
 
   return '';
+  // Note: 'lxc' is intentionally not auto-detected because it requires a
+  // pre-existing, running container managed by the user. Use
+  // GEMINI_SANDBOX=lxc or sandbox: "lxc" in settings to enable it.
 }
 
 export async function loadSandboxConfig(
@@ -102,7 +106,9 @@ export async function loadSandboxConfig(
 
   const packageJson = await getPackageJson(__dirname);
   const image =
-    process.env['GEMINI_SANDBOX_IMAGE'] ?? packageJson?.config?.sandboxImageUri;
+    process.env['GEMINI_SANDBOX_IMAGE'] ??
+    process.env['GEMINI_SANDBOX_IMAGE_DEFAULT'] ??
+    packageJson?.config?.sandboxImageUri;
 
   return command && image ? { command, image } : undefined;
 }
