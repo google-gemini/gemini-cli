@@ -31,7 +31,7 @@ vi.mock('./extensions/validate.js', () => ({
 }));
 
 // Mock gemini.js
-vi.mock('../gemini.js', () => ({
+vi.mock('../utils/outputListeners.js', () => ({
   initializeOutputListenersAndFlush: vi.fn(),
 }));
 

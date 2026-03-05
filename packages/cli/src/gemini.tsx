@@ -6,7 +6,6 @@
 
 import React from 'react';
 import { render } from 'ink';
-import { AppContainer } from './ui/AppContainer.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
@@ -44,9 +43,6 @@ import {
   WarningPriority,
   type Config,
   type ResumedSessionData,
-  type OutputPayload,
-  type ConsoleLogPayload,
-  type UserFeedbackPayload,
   sessionId,
   logUserPrompt,
   AuthType,
@@ -55,7 +51,6 @@ import {
   debugLogger,
   recordSlowRender,
   coreEvents,
-  CoreEvent,
   createWorkingStdio,
   patchStdio,
   writeToStdout,
@@ -110,6 +105,7 @@ import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 import { runDeferredCommand } from './deferred.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
+import { initializeOutputListenersAndFlush } from './utils/outputListeners.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -207,7 +203,10 @@ export async function startInteractiveUI(
     });
   }
 
-  const version = await getVersion();
+  const [{ AppContainer }, version] = await Promise.all([
+    import('./ui/AppContainer.js'),
+    getVersion(),
+  ]);
   setWindowTitle(basename(workspaceRoot), settings);
 
   const consolePatcher = new ConsolePatcher({
@@ -555,9 +554,9 @@ export async function main() {
       );
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
-    } else {
+    } else if (partialConfig.isInteractive()) {
       // Relaunch app so we always have a child process that can be internally
-      // restarted if needed.
+      // restarted if needed in interactive mode.
       await relaunchAppInChildProcess(memoryArgs, [], remoteAdminSettings);
     }
   }
@@ -657,41 +656,7 @@ export async function main() {
       });
     }
 
-    await setupTerminalAndTheme(config, settings);
-
-    const initAppHandle = startupProfiler.start('initialize_app');
-    const initializationResult = await initializeApp(config, settings);
-    initAppHandle?.end();
-
-    if (
-      settings.merged.security.auth.selectedType ===
-        AuthType.LOGIN_WITH_GOOGLE &&
-      config.isBrowserLaunchSuppressed()
-    ) {
-      // Do oauth before app renders to make copying the link possible.
-      await getOauthClient(settings.merged.security.auth.selectedType, config);
-    }
-
-    if (config.getExperimentalZedIntegration()) {
-      return runZedIntegration(config, settings, argv);
-    }
-
     let input = config.getQuestion();
-    const useAlternateBuffer = shouldEnterAlternateScreen(
-      isAlternateBufferEnabled(config),
-      config.getScreenReader(),
-    );
-    const rawStartupWarnings = await getStartupWarnings();
-    const startupWarnings: StartupWarning[] = [
-      ...rawStartupWarnings.map((message) => ({
-        id: `startup-${createHash('sha256').update(message).digest('hex').substring(0, 16)}`,
-        message,
-        priority: WarningPriority.High,
-      })),
-      ...(await getUserStartupWarnings(settings.merged, undefined, {
-        isAlternateBuffer: useAlternateBuffer,
-      })),
-    ];
 
     // Handle --resume flag
     let resumedSessionData: ResumedSessionData | undefined = undefined;
@@ -715,9 +680,60 @@ export async function main() {
       }
     }
 
+    const isInteractiveMode = config.isInteractive();
+    const requiresUiInitialization =
+      isInteractiveMode || config.getExperimentalZedIntegration();
+    let initializationResult: InitializationResult | undefined;
+
+    await setupTerminalAndTheme(config, settings);
+
+    if (requiresUiInitialization) {
+      const initAppHandle = startupProfiler.start('initialize_app');
+      initializationResult = await initializeApp(config, settings);
+      initAppHandle?.end();
+
+      if (
+        settings.merged.security.auth.selectedType ===
+          AuthType.LOGIN_WITH_GOOGLE &&
+        config.isBrowserLaunchSuppressed()
+      ) {
+        // Do oauth before app renders to make copying the link possible.
+        await getOauthClient(
+          settings.merged.security.auth.selectedType,
+          config,
+        );
+      }
+
+      if (config.getExperimentalZedIntegration()) {
+        return runZedIntegration(config, settings, argv);
+      }
+    }
+
     cliStartupHandle?.end();
     // Render UI, passing necessary config values. Check that there is no command line question.
-    if (config.isInteractive()) {
+    if (isInteractiveMode) {
+      if (!initializationResult) {
+        throw new Error(
+          'Interactive initialization result missing during startup.',
+        );
+      }
+
+      const useAlternateBuffer = shouldEnterAlternateScreen(
+        isAlternateBufferEnabled(config),
+        config.getScreenReader(),
+      );
+      const rawStartupWarnings = await getStartupWarnings();
+      const startupWarnings: StartupWarning[] = [
+        ...rawStartupWarnings.map((message) => ({
+          id: `startup-${createHash('sha256').update(message).digest('hex').substring(0, 16)}`,
+          message,
+          priority: WarningPriority.High,
+        })),
+        ...(await getUserStartupWarnings(settings.merged, undefined, {
+          isAlternateBuffer: useAlternateBuffer,
+        })),
+      ];
+
       await startInteractiveUI(
         config,
         settings,
@@ -835,41 +851,7 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
   }
 }
 
-export function initializeOutputListenersAndFlush() {
-  // If there are no listeners for output, make sure we flush so output is not
-  // lost.
-  if (coreEvents.listenerCount(CoreEvent.Output) === 0) {
-    // In non-interactive mode, ensure we drain any buffered output or logs to stderr
-    coreEvents.on(CoreEvent.Output, (payload: OutputPayload) => {
-      if (payload.isStderr) {
-        writeToStderr(payload.chunk, payload.encoding);
-      } else {
-        writeToStdout(payload.chunk, payload.encoding);
-      }
-    });
-
-    if (coreEvents.listenerCount(CoreEvent.ConsoleLog) === 0) {
-      coreEvents.on(CoreEvent.ConsoleLog, (payload: ConsoleLogPayload) => {
-        if (payload.type === 'error' || payload.type === 'warn') {
-          writeToStderr(payload.content);
-        } else {
-          writeToStdout(payload.content);
-        }
-      });
-    }
-
-    if (coreEvents.listenerCount(CoreEvent.UserFeedback) === 0) {
-      coreEvents.on(CoreEvent.UserFeedback, (payload: UserFeedbackPayload) => {
-        if (payload.severity === 'error' || payload.severity === 'warning') {
-          writeToStderr(payload.message);
-        } else {
-          writeToStdout(payload.message);
-        }
-      });
-    }
-  }
-  coreEvents.drainBacklogs();
-}
+export { initializeOutputListenersAndFlush };
 
 function setupAdminControlsListener() {
   let pendingSettings: AdminControlsSettings | undefined;
