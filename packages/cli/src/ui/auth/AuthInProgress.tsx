@@ -53,7 +53,7 @@ export function AuthInProgress({
       ) : (
         <Box>
           <Text>
-            <CliSpinner type="dots" /> Waiting for auth... (Press ESC or CTRL+C
+            <CliSpinner type="dots" /> Waiting for auth... (Press Esc or Ctrl+C
             to cancel)
           </Text>
         </Box>
