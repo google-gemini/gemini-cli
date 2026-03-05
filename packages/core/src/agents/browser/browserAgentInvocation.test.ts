@@ -12,6 +12,7 @@ import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import {
   type AgentInputs,
   type SubagentProgress,
+  type SubagentActivityEvent,
   AgentTerminateMode,
 } from '../types.js';
 import { LocalAgentExecutor } from '../local-executor.js';
@@ -154,14 +155,14 @@ describe('BrowserAgentInvocation', () => {
         definition: {
           name: 'browser_agent',
           toolConfig: { tools: [] },
-        } as unknown as LocalAgentExecutor['definition'],
+        } as unknown as LocalAgentExecutor<unknown>['definition'],
         browserManager: {} as unknown as NonNullable<
           Awaited<ReturnType<typeof createBrowserAgentDefinition>>
         >['browserManager'],
       });
 
       vi.mocked(LocalAgentExecutor.create).mockResolvedValue(
-        mockExecutor as unknown as LocalAgentExecutor,
+        mockExecutor as unknown as LocalAgentExecutor<unknown>,
       );
 
       const invocation = new BrowserAgentInvocation(
@@ -194,7 +195,9 @@ describe('BrowserAgentInvocation', () => {
 
     it('should handle activity events and update progress', async () => {
       const updateOutput = vi.fn();
-      let activityCallback: (activity: SubagentActivityEvent) => void;
+      let activityCallback:
+        | ((activity: SubagentActivityEvent) => void)
+        | undefined;
 
       vi.mocked(LocalAgentExecutor.create).mockImplementation(
         async (_def, _config, onActivity) => {
@@ -204,14 +207,14 @@ describe('BrowserAgentInvocation', () => {
               terminate_reason: AgentTerminateMode.GOAL,
               result: 'Success',
             }),
-          } as unknown as LocalAgentExecutor;
+          } as unknown as LocalAgentExecutor<unknown>;
         },
       );
 
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
         definition: {
           name: 'browser_agent',
-        } as unknown as LocalAgentExecutor['definition'],
+        } as unknown as LocalAgentExecutor<unknown>['definition'],
         browserManager: {} as unknown as NonNullable<
           Awaited<ReturnType<typeof createBrowserAgentDefinition>>
         >['browserManager'],
@@ -226,7 +229,7 @@ describe('BrowserAgentInvocation', () => {
       await invocation.execute(new AbortController().signal, updateOutput);
 
       // Trigger thoughts
-      activityCallback({
+      activityCallback!({
         isSubagentActivityEvent: true,
         agentName: 'browser_agent',
         type: 'THOUGHT_CHUNK',
