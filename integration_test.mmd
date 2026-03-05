@@ -1,0 +1,13 @@
+sequenceDiagram
+    participant User
+    participant CLI
+    participant Visualization
+    participant Puppeteer
+
+    User->>CLI: /visualize auth.mmd
+    CLI->>Visualization: runPipeline(spec)
+    Visualization->>Puppeteer: renderToPng()
+    Puppeteer-->>Visualization: PNG Buffer
+    Visualization-->>CLI: PNG Path
+    CLI->>Visualization: renderVisualArtifact(result)
+    Visualization-->>User: [Terminal Graphic]

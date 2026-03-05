@@ -1,0 +1,9 @@
+﻿
+A:\Desktop\GSoC\gemini-cli\packages\cli\src\ui\commands\visualizeCommand.ts
+   9:42  error  Prefer `node:fs` over `fs`                import/enforce-node-protocol-usage
+  10:25  error  Prefer `node:path` over `path`            import/enforce-node-protocol-usage
+  58:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+Γ£û 3 problems (3 errors, 0 warnings)
+  2 errors and 0 warnings potentially fixable with the `--fix` option.
+

@@ -1,0 +1,43 @@
+﻿
+[1m[46m RUN [49m[22m [36mv3.2.4 [39m[90mA:/Desktop/GSoC/gemini-cli/packages/core[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [31mΓ¥»[39m src/utils/filesearch/fileSearch.test.ts [2m([22m[2m29 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 225[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould use .geminiignore rules[32m 15[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould combine .gitignore and .geminiignore rules[32m 8[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould use ignoreDirs option[32m 5[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould handle negated directories[32m 8[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould filter results with a search pattern[32m 5[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould handle root-level file negation[32m 5[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould handle directory negation with glob[32m 8[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould correctly handle negated patterns in .gitignore[32m 7[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould initialize correctly when ignore files are missing[32m 4[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould respect maxResults option in search[32m 5[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould use fzf for fuzzy matching when pattern does not contain wildcards[32m 6[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould not use fzf for fuzzy matching when enableFuzzySearch is false[32m 5[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould use fzf for fuzzy matching when enableFuzzySearch is true[32m 4[2mms[22m[39m
+[31m   [31m├ù[31m FileSearch[2m > [22mshould prioritize filenames closer to the end of the path and shorter paths[39m[32m 14[2mms[22m[39m
+[31m     ΓåÆ expected 'src/hooks-dev/' to be 'src/hooks.ts' // Object.is equality[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould return empty array when no matches are found[32m 7[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould throw AbortError when filter is aborted[32m 3[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould throw an error if search is called before initialization[32m 2[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould handle empty or commented-only ignore files[32m 5[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould always ignore the .git directory[32m 4[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould respect default maxFiles budget of 20000 in RecursiveFileSearch[32m 5[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould be cancellable via AbortSignal[32m 64[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould leverage ResultCache for bestBaseQuery optimization[32m 6[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould be case-insensitive by default[32m 5[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mshould respect maxResults even when the cache returns an exact match[32m 4[2mms[22m[39m
+[31m   [31m├ù[31m FileSearch[2m > [22mshould handle file paths with special characters that need escaping[39m[32m 5[2mms[22m[39m
+[31m     ΓåÆ expected [] to deeply equal [ 'src/file with (special) chars.txt' ][39m
+   [32mΓ£ô[39m FileSearch[2m > [22mDirectoryFileSearch[2m > [22mshould search for files in the current directory[32m 4[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mDirectoryFileSearch[2m > [22mshould search for files in a subdirectory[32m 4[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mDirectoryFileSearch[2m > [22mshould list all files in a directory[32m 4[2mms[22m[39m
+   [32mΓ£ô[39m FileSearch[2m > [22mDirectoryFileSearch[2m > [22mshould respect ignore rules[32m 4[2mms[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m27 passed[39m[22m[90m (29)[39m
+[2m   Start at [22m 20:08:04
+[2m   Duration [22m 6.76s[2m (transform 1.23s, setup 58ms, collect 3.90s, tests 225ms, environment 0ms, prepare 100ms)[22m
+
+JUNIT report written to A:/Desktop/GSoC/gemini-cli/packages/core/junit.xml

@@ -15,7 +15,12 @@ import sharp from 'sharp';
 async function getSixelEncoder(): Promise<{ encode: (data: Uint8ClampedArray, width: number, height: number) => string }> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mod = await import('sixel') as any;
-    return mod.default ?? mod;
+    // Handle all possible export shapes: default with encode, top-level encode, or default is function
+    const candidate = mod.default ?? mod;
+    if (typeof candidate?.encode === 'function') return candidate;
+    if (typeof candidate === 'function') return { encode: candidate };
+    if (typeof mod.encode === 'function') return { encode: mod.encode };
+    throw new Error('sixel package does not export an encode function — check the installed version');
 }
 
 /**
