@@ -52,6 +52,11 @@ const SENSITIVE_KEY_PATTERNS = [
   'secret',
   'credential',
   'auth',
+  'authorization',
+  'access_token',
+  'refresh_token',
+  'session_id',
+  'cookie',
   'passphrase',
   'privatekey',
   'private_key',
@@ -103,35 +108,27 @@ function sanitizeToolArgs(args: unknown): unknown {
  * Uses [^\s'"]+ to catch JWTs, tokens with dots/slashes, and other complex values.
  */
 function sanitizeErrorMessage(message: string): string {
-  const valuePattern = `(?:"[^"]*"|'[^']*'|[^&;]*)`;
+  if (!message) return message;
+
+  const keyMatch = SENSITIVE_KEY_PATTERNS.join('|').replace(/[-_]/g, '[_-]?');
+  const valuePattern = `(?:"[^"]*"|'[^']*'|[^\\s]+)`;
+
+  // 1. Handle space-separated tokens/auth (e.g., "token eyJ...", "Bearer eyJ...", "Authorization: Bearer eyJ...")
+  // We handle this first to avoid partial redaction of "Authorization: Bearer" by the key-value regex
+  const spaceSeparated = new RegExp(
+    `\\b((?:token|bearer|authorization(?:\\s*:\\s*bearer)?)\\s+)${valuePattern}`,
+    'gi',
+  );
+
+  // 2. Handle key with delimiter (:, =) and optional quotes around key/value
+  const keyWithDelimiter = new RegExp(
+    `(("?(${keyMatch})"?)\\s*[:=]\\s*)${valuePattern}`,
+    'gi',
+  );
+
   return message
-    .replace(
-      new RegExp(`(api[_-]?key[s]?[:=]\\s*)${valuePattern}`, 'gi'),
-      '$1[REDACTED]',
-    )
-    .replace(new RegExp(`(token[:=]\\s*)${valuePattern}`, 'gi'), '$1[REDACTED]')
-    .replace(
-      new RegExp(`(password[:=]\\s*)${valuePattern}`, 'gi'),
-      '$1[REDACTED]',
-    )
-    .replace(new RegExp(`(pwd[:=]\\s*)${valuePattern}`, 'gi'), '$1[REDACTED]')
-    .replace(
-      new RegExp(`(secret[:=]\\s*)${valuePattern}`, 'gi'),
-      '$1[REDACTED]',
-    )
-    .replace(
-      new RegExp(`(credential[:=]\\s*)${valuePattern}`, 'gi'),
-      '$1[REDACTED]',
-    )
-    .replace(new RegExp(`(auth[:=]\\s*)${valuePattern}`, 'gi'), '$1[REDACTED]')
-    .replace(
-      new RegExp(`(passphrase[:=]\\s*)${valuePattern}`, 'gi'),
-      '$1[REDACTED]',
-    )
-    .replace(
-      new RegExp(`(private[_-]?key[:=]\\s*)${valuePattern}`, 'gi'),
-      '$1[REDACTED]',
-    )
+    .replace(spaceSeparated, '$1[REDACTED]')
+    .replace(keyWithDelimiter, '$1[REDACTED]')
     .replace(
       /\/[a-zA-Z0-9_\-/]*\/[a-zA-Z0-9_-]*\.(key|pem|p12|pfx)/gi,
       '/path/to/[REDACTED].key',

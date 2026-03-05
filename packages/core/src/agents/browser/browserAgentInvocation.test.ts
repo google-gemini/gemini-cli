@@ -482,7 +482,9 @@ describe('BrowserAgentInvocation', () => {
       // Check value-based redaction (string scanning)
       expect(argsObj.nestedConfig.regularUrl).toContain('[REDACTED]');
       expect(argsObj.nestedConfig.regularUrl).not.toContain('secret_in_url');
-      expect(argsObj.nestedConfig.regularUrl).toContain('other=val');
+      // Note: Full query string is redacted because we no longer assume & is a delimiter
+      // as part of strengthening redaction robustness for tokens that might contain &.
+      expect(argsObj.nestedConfig.regularUrl).not.toContain('other=val');
     });
 
     it('should sanitize sensitive patterns in error messages', async () => {
@@ -900,6 +902,129 @@ describe('BrowserAgentInvocation', () => {
       const argsObj = JSON.parse(toolCall!.args!);
       expect(argsObj['api%5fkey']).toBe('[REDACTED]');
       expect(argsObj['auth%2dtoken']).toBe('[REDACTED]');
+    });
+
+    it('should redact JSON-style keys and space-separated values', async () => {
+      const updateOutput = vi.fn();
+      let activityCallback:
+        | ((activity: SubagentActivityEvent) => void)
+        | undefined;
+
+      vi.mocked(LocalAgentExecutor.create).mockImplementation(
+        async (_def, _config, onActivity) => {
+          activityCallback = onActivity;
+          return {
+            run: vi.fn().mockResolvedValue({
+              terminate_reason: AgentTerminateMode.GOAL,
+              result: 'Success',
+            }),
+          } as unknown as LocalAgentExecutor<z.ZodTypeAny>;
+        },
+      );
+
+      vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
+        definition: {
+          name: 'browser_agent',
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+        browserManager: {} as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+      });
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      await invocation.execute(new AbortController().signal, updateOutput);
+
+      // JSON-style keys
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'ERROR',
+        data: {
+          error: 'Error: {"api_key": "secret123", "other": "val"}',
+        },
+      });
+
+      // Space-separated tokens
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'ERROR',
+        data: {
+          error:
+            'Connection failed: token eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        },
+      });
+
+      // Bearer token
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'ERROR',
+        data: {
+          error: 'Unauthorized: Bearer sk_test_51Mz...',
+        },
+      });
+
+      // Partial redaction with delimiters
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'ERROR',
+        data: {
+          error: 'Failed with api_key=foo&bar;token=baz',
+        },
+      });
+
+      const progressResults = updateOutput.mock.calls.map(
+        (c) => c[0] as SubagentProgress,
+      );
+
+      const jsonError = progressResults.find((p) =>
+        p.recentActivity.some((a) =>
+          a.content.includes('"api_key": [REDACTED]'),
+        ),
+      );
+      expect(jsonError).toBeDefined();
+      expect(
+        jsonError?.recentActivity.some((a) => a.content.includes('secret123')),
+      ).toBe(false);
+
+      const tokenError = progressResults.find((p) =>
+        p.recentActivity.some((a) => a.content.includes('token [REDACTED]')),
+      );
+      expect(tokenError).toBeDefined();
+      expect(
+        tokenError?.recentActivity.some((a) =>
+          a.content.includes('eyJhbGciOi'),
+        ),
+      ).toBe(false);
+
+      const bearerError = progressResults.find((p) =>
+        p.recentActivity.some((a) => a.content.includes('Bearer [REDACTED]')),
+      );
+      expect(bearerError).toBeDefined();
+      expect(
+        bearerError?.recentActivity.some((a) =>
+          a.content.includes('sk_test_51Mz'),
+        ),
+      ).toBe(false);
+
+      const delimiterError = progressResults.find((p) =>
+        p.recentActivity.some((a) => a.content.includes('api_key=[REDACTED]')),
+      );
+      expect(delimiterError).toBeDefined();
+      expect(
+        delimiterError?.recentActivity.some((a) => a.content.includes('foo')),
+      ).toBe(false);
+      expect(
+        delimiterError?.recentActivity.some((a) => a.content.includes('bar')),
+      ).toBe(false);
+      expect(
+        delimiterError?.recentActivity.some((a) => a.content.includes('baz')),
+      ).toBe(false);
     });
   });
 
