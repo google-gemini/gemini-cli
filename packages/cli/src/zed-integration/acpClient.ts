@@ -70,7 +70,7 @@ import { runExitCleanup } from '../utils/cleanup.js';
 import { SessionSelector } from '../utils/sessionUtils.js';
 
 import { CommandHandler } from './commandHandler.js';
-export async function runZedIntegration(
+export async function runAcpClient(
   config: Config,
   settings: LoadedSettings,
   argv: CliArgs,
