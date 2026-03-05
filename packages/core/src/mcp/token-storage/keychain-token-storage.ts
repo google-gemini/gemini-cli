@@ -61,12 +61,31 @@ export class KeychainTokenStorage
     };
 
     const data = JSON.stringify(updatedCredentials);
-    await this.keystoreService.setPassword(sanitizedName, data);
+    try {
+      await this.keystoreService.setPassword(sanitizedName, data);
+    } catch (error) {
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to set credentials in keychain',
+        error,
+      );
+      throw error;
+    }
   }
 
   async deleteCredentials(serverName: string): Promise<void> {
     const sanitizedName = this.sanitizeServerName(serverName);
-    const deleted = await this.keystoreService.deletePassword(sanitizedName);
+    let deleted = false;
+    try {
+      deleted = await this.keystoreService.deletePassword(sanitizedName);
+    } catch (error) {
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to delete credentials from keychain',
+        error,
+      );
+      throw error;
+    }
 
     if (!deleted) {
       throw new Error(`No credentials found for ${serverName}`);
@@ -187,23 +206,22 @@ export class KeychainTokenStorage
   }
 
   async deleteSecret(key: string): Promise<void> {
+    let deleted = false;
     try {
-      const deleted = await this.keystoreService.deletePassword(
+      deleted = await this.keystoreService.deletePassword(
         `${SECRET_PREFIX}${key}`,
       );
-      if (!deleted) {
-        throw new Error(`No secret found for key: ${key}`);
-      }
     } catch (error) {
-      if (error instanceof Error && error.message.includes('No secret found')) {
-        throw error;
-      }
       coreEvents.emitFeedback(
         'error',
         'Failed to delete secret from keychain',
         error,
       );
       throw error;
+    }
+
+    if (!deleted) {
+      throw new Error(`No secret found for key: ${key}`);
     }
   }
 
