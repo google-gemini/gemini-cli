@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
+import type { FC } from 'react';
 import { useMemo } from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
@@ -14,6 +14,8 @@ import {
   calculateTransformationsForLine,
   calculateTransformedLine,
 } from '../shared/text-buffer.js';
+import { unescapePath } from '@google/gemini-cli-core';
+import { MediaVisualizer } from '../MediaVisualizer.js';
 import { HalfLinePaddedBox } from '../shared/HalfLinePaddedBox.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 
@@ -22,7 +24,7 @@ interface UserMessageProps {
   width: number;
 }
 
-export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
+export const UserMessage: FC<UserMessageProps> = ({ text, width }) => {
   const prefix = '> ';
   const prefixWidth = prefix.length;
   const isSlashCommand = checkIsSlashCommand(text);
@@ -31,22 +33,32 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
 
   const textColor = isSlashCommand ? theme.text.accent : theme.text.secondary;
 
-  const displayText = useMemo(() => {
-    if (!text) return text;
-    return text
-      .split('\n')
-      .map((line) => {
-        const transformations = calculateTransformationsForLine(line);
-        // We pass a cursor position of [-1, -1] so that no transformations are expanded (e.g. images remain collapsed)
-        const { transformedLine } = calculateTransformedLine(
-          line,
-          0, // line index doesn't matter since cursor is [-1, -1]
-          [-1, -1],
-          transformations,
-        );
-        return transformedLine;
-      })
-      .join('\n');
+  const { displayText, imagePaths } = useMemo(() => {
+    if (!text) return { displayText: text, imagePaths: [] };
+    const paths = new Set<string>();
+    const displayLines = text.split('\n').map((line) => {
+      const transformations = calculateTransformationsForLine(line);
+      for (const t of transformations) {
+        if (t.type === 'image') {
+          const withoutAt = t.logicalText.startsWith('@')
+            ? t.logicalText.slice(1)
+            : t.logicalText;
+          paths.add(unescapePath(withoutAt));
+        }
+      }
+      // We pass a cursor position of [-1, -1] so that no transformations are expanded (e.g. images remain collapsed)
+      const { transformedLine } = calculateTransformedLine(
+        line,
+        0, // line index doesn't matter since cursor is [-1, -1]
+        [-1, -1],
+        transformations,
+      );
+      return transformedLine;
+    });
+    return {
+      displayText: displayLines.join('\n'),
+      imagePaths: Array.from(paths),
+    };
   }, [text]);
 
   return (
@@ -71,10 +83,19 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
             {prefix}
           </Text>
         </Box>
-        <Box flexGrow={1}>
+        <Box flexGrow={1} flexDirection="column">
           <Text wrap="wrap" color={textColor}>
             {displayText}
           </Text>
+          {imagePaths.length > 0 && (
+            <Box flexDirection="column" marginTop={1}>
+              {imagePaths.map((imagePath, index) => (
+                <Box key={imagePath + index} marginBottom={1}>
+                  <MediaVisualizer imagePath={imagePath} />
+                </Box>
+              ))}
+            </Box>
+          )}
         </Box>
       </Box>
     </HalfLinePaddedBox>

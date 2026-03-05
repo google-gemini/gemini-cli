@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import { type FC, memo, type ReactNode } from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { colorizeCode } from './CodeColorizer.js';
@@ -12,6 +12,9 @@ import { TableRenderer } from './TableRenderer.js';
 import { RenderInline } from './InlineMarkdownRenderer.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { unescapePath } from '@google/gemini-cli-core';
+import { MediaVisualizer } from '../components/MediaVisualizer.js';
+import { calculateTransformationsForLine } from '../components/shared/text-buffer.js';
 
 interface MarkdownDisplayProps {
   text: string;
@@ -28,7 +31,7 @@ const CODE_BLOCK_PREFIX_PADDING = 1;
 const LIST_ITEM_PREFIX_PADDING = 1;
 const LIST_ITEM_TEXT_FLEX_GROW = 1;
 
-const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
+const MarkdownDisplayInternal: FC<MarkdownDisplayProps> = ({
   text,
   isPending,
   availableTerminalHeight,
@@ -68,7 +71,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   const tableRowRegex = /^\s*\|(.+)\|\s*$/;
   const tableSeparatorRegex = /^\s*\|?\s*(:?-+:?)\s*(\|\s*(:?-+:?)\s*)+\|?\s*$/;
 
-  const contentBlocks: React.ReactNode[] = [];
+  const contentBlocks: ReactNode[] = [];
   let inCodeBlock = false;
   let lastLineEmpty = true;
   let codeBlockContent: string[] = [];
@@ -196,7 +199,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
     } else if (headerMatch) {
       const level = headerMatch[1].length;
       const headerText = headerMatch[2];
-      let headerNode: React.ReactNode = null;
+      let headerNode: ReactNode = null;
       switch (level) {
         case 1:
           headerNode = (
@@ -273,11 +276,32 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
           lastLineEmpty = true;
         }
       } else {
+        const transformations = calculateTransformationsForLine(line);
+        const imagePathsSet = new Set<string>();
+        for (const t of transformations) {
+          if (t.type === 'image') {
+            const withoutAt = t.logicalText.startsWith('@')
+              ? t.logicalText.slice(1)
+              : t.logicalText;
+            imagePathsSet.add(unescapePath(withoutAt));
+          }
+        }
+        const imagePaths = Array.from(imagePathsSet);
+
         addContentBlock(
-          <Box key={key}>
+          <Box key={key} flexDirection="column">
             <Text wrap="wrap" color={responseColor}>
               <RenderInline text={line} defaultColor={responseColor} />
             </Text>
+            {imagePaths.length > 0 && (
+              <Box flexDirection="column" marginTop={1}>
+                {imagePaths.map((path, idx) => (
+                  <Box key={`${path}-${idx}`} marginBottom={1}>
+                    <MediaVisualizer imagePath={path} />
+                  </Box>
+                ))}
+              </Box>
+            )}
           </Box>,
         );
       }
@@ -324,7 +348,7 @@ interface RenderCodeBlockProps {
   terminalWidth: number;
 }
 
-const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
+const RenderCodeBlockInternal: FC<RenderCodeBlockProps> = ({
   content,
   lang,
   isPending,
@@ -397,7 +421,7 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
   );
 };
 
-const RenderCodeBlock = React.memo(RenderCodeBlockInternal);
+const RenderCodeBlock = memo(RenderCodeBlockInternal);
 
 interface RenderListItemProps {
   itemText: string;
@@ -406,7 +430,7 @@ interface RenderListItemProps {
   leadingWhitespace?: string;
 }
 
-const RenderListItemInternal: React.FC<RenderListItemProps> = ({
+const RenderListItemInternal: FC<RenderListItemProps> = ({
   itemText,
   type,
   marker,
@@ -434,7 +458,7 @@ const RenderListItemInternal: React.FC<RenderListItemProps> = ({
   );
 };
 
-const RenderListItem = React.memo(RenderListItemInternal);
+const RenderListItem = memo(RenderListItemInternal);
 
 interface RenderTableProps {
   headers: string[];
@@ -442,7 +466,7 @@ interface RenderTableProps {
   terminalWidth: number;
 }
 
-const RenderTableInternal: React.FC<RenderTableProps> = ({
+const RenderTableInternal: FC<RenderTableProps> = ({
   headers,
   rows,
   terminalWidth,
@@ -450,6 +474,6 @@ const RenderTableInternal: React.FC<RenderTableProps> = ({
   <TableRenderer headers={headers} rows={rows} terminalWidth={terminalWidth} />
 );
 
-const RenderTable = React.memo(RenderTableInternal);
+const RenderTable = memo(RenderTableInternal);
 
-export const MarkdownDisplay = React.memo(MarkdownDisplayInternal);
+export const MarkdownDisplay = memo(MarkdownDisplayInternal);

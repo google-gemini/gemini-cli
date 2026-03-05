@@ -378,7 +378,14 @@ export type HistoryItemWithoutId =
   | HistoryItemMcpStatus
   | HistoryItemChatList
   | HistoryItemThinking
-  | HistoryItemHint;
+  | HistoryItemHint
+  | HistoryItemMedia;
+
+export type HistoryItemMedia = HistoryItemBase & {
+  type: 'media';
+  imagePath?: string;
+  imageBuffer?: Buffer;
+};
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 

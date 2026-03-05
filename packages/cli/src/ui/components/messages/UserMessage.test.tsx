@@ -4,14 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { type ReactElement } from 'react';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { UserMessage } from './UserMessage.js';
 import { describe, it, expect, vi } from 'vitest';
+import { MediaVisualizer } from '../MediaVisualizer.js';
 
 // Mock the commandUtils to control isSlashCommand behavior
 vi.mock('../../utils/commandUtils.js', () => ({
   isSlashCommand: vi.fn((text: string) => text.startsWith('/')),
 }));
+
+// Mock MediaVisualizer to avoid running actual terminal-image in tests
+vi.mock('../MediaVisualizer.js');
+vi.mocked(MediaVisualizer).mockReturnValue(null as unknown as ReactElement);
 
 describe('UserMessage', () => {
   it('renders normal user message with correct prefix', async () => {

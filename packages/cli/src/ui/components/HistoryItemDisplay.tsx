@@ -36,6 +36,7 @@ import { ModelMessage } from './messages/ModelMessage.js';
 import { ThinkingMessage } from './messages/ThinkingMessage.js';
 import { HintMessage } from './messages/HintMessage.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
+import { MediaVisualizer } from './MediaVisualizer.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 
 interface HistoryItemDisplayProps {
@@ -216,6 +217,13 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'chat_list' && (
         <ChatList chats={itemForDisplay.chats} />
+      )}
+      {itemForDisplay.type === 'media' && (
+        <MediaVisualizer
+          imagePath={itemForDisplay.imagePath}
+          imageBuffer={itemForDisplay.imageBuffer}
+          width={terminalWidth}
+        />
       )}
     </Box>
   );
