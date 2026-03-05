@@ -14,8 +14,11 @@ import {
   createUnauthorizedToolError,
   parseAgentMarkdown,
 } from '@google/gemini-cli-core';
+import type { EvalCategory } from './categories.js';
+import type { EvalRegistryEntry } from './scoring/types.js';
 
 export * from '@google/gemini-cli-test-utils';
+export type { EvalCategory } from './categories.js';
 
 // Indicates the consistency expectation for this test.
 // - ALWAYS_PASSES - Means that the test is expected to pass 100% of the time. These
@@ -35,7 +38,27 @@ export * from '@google/gemini-cli-test-utils';
 //   This may take a really long time and is not recommended.
 export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES';
 
+const REGISTRY_PATH = path.resolve(
+  process.cwd(),
+  'evals/logs/.eval-registry.ndjson',
+);
+
+function writeRegistryEntry(entry: EvalRegistryEntry) {
+  try {
+    fs.mkdirSync(path.dirname(REGISTRY_PATH), { recursive: true });
+    fs.appendFileSync(REGISTRY_PATH, JSON.stringify(entry) + '\n');
+  } catch {
+    // Non-fatal: registry is best-effort for scoring purposes.
+  }
+}
+
 export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
+  writeRegistryEntry({
+    name: evalCase.name,
+    category: evalCase.category ?? 'uncategorized',
+    tags: evalCase.tags ?? [],
+    policy,
+  });
   const fn = async () => {
     const rig = new TestRig();
     const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
@@ -198,7 +221,11 @@ export function symlinkNodeModules(testDir: string) {
 
 export interface EvalCase {
   name: string;
-  params?: Record<string, any>;
+  /** Broad category used for grouping in run reports. */
+  category?: EvalCategory;
+  /** Free-form tags for finer-grained filtering (e.g. 'typescript', 'async'). */
+  tags?: string[];
+  params?: Record<string, unknown>;
   prompt: string;
   timeout?: number;
   files?: Record<string, string>;

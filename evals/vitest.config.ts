@@ -16,10 +16,15 @@ export default defineConfig({
   },
   test: {
     testTimeout: 300000, // 5 minutes
-    reporters: ['default', 'json'],
+    reporters: [
+      'default',
+      'json',
+      path.resolve(__dirname, './scoring/reporter.ts'),
+    ],
     outputFile: {
       json: 'evals/logs/report.json',
     },
+    globalSetup: [path.resolve(__dirname, './scoring/global-setup.ts')],
     include: ['**/*.eval.ts'],
     environment: 'node',
     globals: true,
