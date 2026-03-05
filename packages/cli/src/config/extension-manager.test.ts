@@ -12,6 +12,13 @@ import { ExtensionManager } from './extension-manager.js';
 import { createTestMergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
+import {
+  TrustLevel,
+  loadTrustedFolders,
+  isWorkspaceTrusted,
+} from './trustedFolders.js';
+import { getRealPath } from '@google/gemini-cli-core';
+import type { MergedSettings } from './settings.js';
 
 const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
 
@@ -183,6 +190,159 @@ describe('ExtensionManager', () => {
       expect(names).toEqual(['ext1', 'ext2']);
 
       fs.rmSync(externalDir, { recursive: true, force: true });
+    });
+  });
+
+  describe('symlink handling', () => {
+    let extensionDir: string;
+    let symlinkDir: string;
+
+    beforeEach(() => {
+      extensionDir = path.join(tempHomeDir, 'extension');
+      symlinkDir = path.join(tempHomeDir, 'symlink-ext');
+
+      fs.mkdirSync(extensionDir, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(extensionDir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'test-ext', version: '1.0.0' }),
+      );
+
+      fs.symlinkSync(extensionDir, symlinkDir, 'dir');
+    });
+
+    it('preserves symlinks in installMetadata.source when linking', async () => {
+      const manager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        settings: {
+          security: {
+            folderTrust: { enabled: false }, // Disable trust for simplicity in this test
+          },
+          experimental: { extensionConfig: false },
+          admin: { extensions: { enabled: true }, mcp: { enabled: true } },
+          hooksConfig: { enabled: true },
+        } as unknown as MergedSettings,
+        requestConsent: () => Promise.resolve(true),
+        requestSetting: null,
+      });
+
+      // Trust the workspace to allow installation
+      const trustedFolders = loadTrustedFolders();
+      await trustedFolders.setValue(tempWorkspaceDir, TrustLevel.TRUST_FOLDER);
+
+      const installMetadata = {
+        source: symlinkDir,
+        type: 'link' as const,
+      };
+
+      await manager.loadExtensions();
+      const extension = await manager.installOrUpdateExtension(installMetadata);
+
+      // Desired behavior: it preserves symlinks (if they were absolute or relative as provided)
+      expect(extension.installMetadata?.source).toBe(symlinkDir);
+    });
+
+    it('works with the new install command logic (preserves symlink but trusts real path)', async () => {
+      // This simulates the logic in packages/cli/src/commands/extensions/install.ts
+      const absolutePath = path.resolve(symlinkDir);
+      const realPath = getRealPath(absolutePath);
+
+      const settings = {
+        security: {
+          folderTrust: { enabled: true },
+        },
+        experimental: { extensionConfig: false },
+        admin: { extensions: { enabled: true }, mcp: { enabled: true } },
+        hooksConfig: { enabled: true },
+      } as unknown as MergedSettings;
+
+      // Trust the REAL path
+      const trustedFolders = loadTrustedFolders();
+      await trustedFolders.setValue(realPath, TrustLevel.TRUST_FOLDER);
+
+      // Check trust of the symlink path
+      const trustResult = isWorkspaceTrusted(settings, absolutePath);
+      expect(trustResult.isTrusted).toBe(true);
+
+      const manager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        settings,
+        requestConsent: () => Promise.resolve(true),
+        requestSetting: null,
+      });
+
+      const installMetadata = {
+        source: absolutePath,
+        type: 'link' as const,
+      };
+
+      await manager.loadExtensions();
+      const extension = await manager.installOrUpdateExtension(installMetadata);
+
+      expect(extension.installMetadata?.source).toBe(absolutePath);
+      expect(extension.installMetadata?.source).not.toBe(realPath);
+    });
+
+    it('enforces allowedExtensions using the real path', async () => {
+      const absolutePath = path.resolve(symlinkDir);
+      const realPath = getRealPath(absolutePath);
+
+      const settings = {
+        security: {
+          folderTrust: { enabled: false },
+          // Only allow the real path, not the symlink path
+          allowedExtensions: [realPath.replace(/\\/g, '\\\\')],
+        },
+        experimental: { extensionConfig: false },
+        admin: { extensions: { enabled: true }, mcp: { enabled: true } },
+        hooksConfig: { enabled: true },
+      } as unknown as MergedSettings;
+
+      const manager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        settings,
+        requestConsent: () => Promise.resolve(true),
+        requestSetting: null,
+      });
+
+      const installMetadata = {
+        source: absolutePath,
+        type: 'link' as const,
+      };
+
+      await manager.loadExtensions();
+      // This should pass because realPath is allowed
+      const extension = await manager.installOrUpdateExtension(installMetadata);
+      expect(extension.name).toBe('test-ext');
+
+      // Now try with a settings that only allows the symlink path string
+      const settingsOnlySymlink = {
+        security: {
+          folderTrust: { enabled: false },
+          // Only allow the symlink path string explicitly
+          allowedExtensions: [absolutePath.replace(/\\/g, '\\\\')],
+        },
+        experimental: { extensionConfig: false },
+        admin: { extensions: { enabled: true }, mcp: { enabled: true } },
+        hooksConfig: { enabled: true },
+      } as unknown as MergedSettings;
+
+      const manager2 = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        settings: settingsOnlySymlink,
+        requestConsent: () => Promise.resolve(true),
+        requestSetting: null,
+      });
+
+      // This should FAIL because it checks the real path against the pattern
+      // (Unless symlinkDir === extensionDir, which shouldn't happen in this test setup)
+      if (absolutePath !== realPath) {
+        await expect(
+          manager2.installOrUpdateExtension(installMetadata),
+        ).rejects.toThrow(
+          /is not allowed by the "allowedExtensions" security setting/,
+        );
+      }
     });
   });
 });
