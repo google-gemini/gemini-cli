@@ -158,13 +158,37 @@ describe('ExtensionIntegrityManager', () => {
       expect(result).toBe(IntegrityStatus.TAMPERED);
     });
 
+    it('should return TAMPERED in verifyIntegrity if store is tampered, even for missing extension', async () => {
+      await manager.storeIntegrity('ext-name', metadata);
+
+      const data = JSON.parse(storedContent);
+      data.signature = 'tampered-signature';
+      storedContent = JSON.stringify(data);
+
+      const result = await manager.verifyIntegrity('other-ext', metadata);
+      expect(result).toBe(IntegrityStatus.TAMPERED);
+    });
+
+    it('should throw error in storeIntegrity if existing store is tampered with', async () => {
+      await manager.storeIntegrity('ext-name', metadata);
+
+      // Tamper with the store content
+      const data = JSON.parse(storedContent);
+      data.store['tampered-ext'] = { hash: 'fake', signature: 'fake' };
+      storedContent = JSON.stringify(data);
+
+      await expect(
+        manager.storeIntegrity('other-ext', metadata),
+      ).rejects.toThrow('Extension integrity store has been tampered with!');
+    });
+
     it('should throw error in storeIntegrity if existing store is corrupted', async () => {
       storedContent = 'not-json';
       vi.mocked(fs.existsSync).mockReturnValue(true);
 
       await expect(
         manager.storeIntegrity('other-ext', metadata),
-      ).rejects.toThrow('Failed to parse extension integrity store');
+      ).rejects.toThrow('Failed to parse or verify extension integrity store');
     });
   });
 });

@@ -124,13 +124,28 @@ export class ExtensionIntegrityManager {
       try {
         const content = fs.readFileSync(this.integrityFilePath, 'utf-8');
         const data = IntegrityStoreFileSchema.parse(JSON.parse(content));
-        store = data.store || {};
+        const { store: existingStore, signature } = data;
+
+        const secretKey = await this.getSecretKey();
+        const expectedSignature = createHmac('sha256', secretKey)
+          .update(stableStringify(existingStore))
+          .digest('hex');
+
+        if (
+          !timingSafeEqual(
+            Buffer.from(signature, 'hex'),
+            Buffer.from(expectedSignature, 'hex'),
+          )
+        ) {
+          throw new Error('Extension integrity store has been tampered with!');
+        }
+
+        store = existingStore || {};
       } catch (e) {
-        // Fail-closed: If the existing integrity store is corrupted, we must not
-        // silently ignore it and start fresh, as that could allow an attacker
-        // to overwrite existing legitimate signatures with a new key.
+        // Fail-closed: If the existing integrity store is corrupted or tampered,
+        // we must not silently ignore it.
         throw new Error(
-          `Failed to parse extension integrity store: ${e instanceof Error ? e.message : 'Unknown error'}. ` +
+          `Failed to parse or verify extension integrity store: ${e instanceof Error ? e.message : 'Unknown error'}. ` +
             'The integrity store may be corrupted or tampered with.',
         );
       }
@@ -179,10 +194,6 @@ export class ExtensionIntegrityManager {
       const data = IntegrityStoreFileSchema.parse(JSON.parse(content));
       const { store, signature } = data;
 
-      if (!store || !signature || !store[extensionName]) {
-        return IntegrityStatus.NOT_FOUND;
-      }
-
       const secretKey = await this.getSecretKey();
 
       // 1. Verify that the integrity store itself hasn't been modified
@@ -197,6 +208,10 @@ export class ExtensionIntegrityManager {
         )
       ) {
         throw new Error('Extension integrity store has been tampered with!');
+      }
+
+      if (!store || !signature || !store[extensionName]) {
+        return IntegrityStatus.NOT_FOUND;
       }
 
       // 2. Verify that the extension's metadata matches its recorded signature
