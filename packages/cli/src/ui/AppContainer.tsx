@@ -399,12 +399,23 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
   const [planModeUIHistoryStartIndex, setPlanModeUIHistoryStartIndex] =
-    useState<number | null>(null);
+    useState<number | null>(() => 
+      // Initialize if starting in PLAN mode (e.g. session resume)
+       config.getApprovalMode() === ApprovalMode.PLAN ? 0 : null
+    );
 
   useEffect(() => {
     const handleApprovalModeChanged = ({ mode }: { mode: ApprovalMode }) => {
       if (mode === ApprovalMode.PLAN) {
-        setPlanModeUIHistoryStartIndex(historyManager.history.length);
+        // Only set the start index if we aren't already tracking one.
+        // This ensures that if we are already in PLAN mode and another
+        // event fires, we don't accidentally move the start index forward.
+        setPlanModeUIHistoryStartIndex((prev) =>
+          prev === null ? historyManager.history.length : prev,
+        );
+      } else {
+        // Reset the index when leaving PLAN mode
+        setPlanModeUIHistoryStartIndex(null);
       }
     };
     coreEvents.on(CoreEvent.ApprovalModeChanged, handleApprovalModeChanged);
@@ -1367,6 +1378,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         planModeUIHistoryStartIndex,
       );
       historyManager.loadHistory(newHistory);
+      setPlanModeUIHistoryStartIndex(null);
       refreshStatic();
     }
   }, [planModeUIHistoryStartIndex, historyManager, refreshStatic]);

@@ -163,6 +163,8 @@ Implement a comprehensive authentication system with multiple providers.
             writeTextFile: vi.fn(),
           }),
           getUseAlternateBuffer: () => options?.useAlternateBuffer ?? true,
+          getClearContextOnPlanApproval: () => undefined,
+          setClearContextOnPlanApprovalSessionOverride: vi.fn(),
         } as unknown as import('@google/gemini-cli-core').Config,
       },
     );
@@ -207,6 +209,16 @@ Implement a comprehensive authentication system with multiple providers.
         writeKey(stdin, '\r');
 
         await waitFor(() => {
+          expect(lastFrame()).toContain('Clear conversation context');
+        });
+
+        // Select 'No' option (index 3)
+        writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\r');
+
+        await waitFor(() => {
           expect(onApprove).toHaveBeenCalledWith(ApprovalMode.AUTO_EDIT, false);
         });
       });
@@ -222,6 +234,15 @@ Implement a comprehensive authentication system with multiple providers.
           expect(lastFrame()).toContain('Add user authentication');
         });
 
+        writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\r');
+
+        await waitFor(() => {
+          expect(lastFrame()).toContain('Clear conversation context');
+        });
+
+        // Select 'No' option (index 3)
+        writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\r');
@@ -350,8 +371,15 @@ Implement a comprehensive authentication system with multiple providers.
           expect(lastFrame()).toContain('Add user authentication');
         });
 
-        // Press '3' to select third option directly
-        writeKey(stdin, '3');
+        // Press '2' to select second option directly (Manual)
+        writeKey(stdin, '2');
+
+        await waitFor(() => {
+          expect(lastFrame()).toContain('Clear conversation context');
+        });
+
+        // Press '4' to select fourth option directly (No)
+        writeKey(stdin, '4');
 
         await waitFor(() => {
           expect(onApprove).toHaveBeenCalledWith(ApprovalMode.DEFAULT, false);
@@ -370,8 +398,6 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         // Navigate to feedback option and start typing
-        writeKey(stdin, '\x1b[B'); // Down arrow
-        writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\r'); // Select to focus input
@@ -443,6 +469,8 @@ Implement a comprehensive authentication system with multiple providers.
                 writeTextFile: vi.fn(),
               }),
               getUseAlternateBuffer: () => useAlternateBuffer ?? true,
+              getClearContextOnPlanApproval: () => undefined,
+              setClearContextOnPlanApprovalSessionOverride: vi.fn(),
             } as unknown as import('@google/gemini-cli-core').Config,
           },
         );
@@ -499,8 +527,6 @@ Implement a comprehensive authentication system with multiple providers.
         // Focus feedback option
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
-        writeKey(stdin, '\x1b[B'); // Down arrow
-        writeKey(stdin, '\x1b[B'); // Down arrow
 
         // Press Enter without typing anything
         writeKey(stdin, '\r');
@@ -528,8 +554,6 @@ Implement a comprehensive authentication system with multiple providers.
         // Navigate to feedback option and start typing
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
-        writeKey(stdin, '\x1b[B'); // Down arrow
-        writeKey(stdin, '\x1b[B'); // Down arrow
 
         // Type some feedback
         for (const char of 'test') {
@@ -538,9 +562,18 @@ Implement a comprehensive authentication system with multiple providers.
 
         // Now use up arrow to navigate back to a different option
         writeKey(stdin, '\x1b[A'); // Up arrow
-        writeKey(stdin, '\x1b[A'); // Up arrow
 
         // Press Enter to select the manually accept edits option
+        writeKey(stdin, '\r');
+
+        await waitFor(() => {
+          expect(lastFrame()).toContain('Clear conversation context');
+        });
+
+        // Select 'No' option (index 3)
+        writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\x1b[B'); // Down arrow
+        writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\r');
 
         await waitFor(() => {

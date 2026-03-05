@@ -19,6 +19,8 @@ import {
 } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import { useConfig } from '../contexts/ConfigContext.js';
+import { useSettingsStore } from '../contexts/SettingsContext.js';
+import { SettingScope } from '../../config/settings.js';
 import { AskUserDialog } from './AskUserDialog.js';
 import { openFileInEditor } from '../utils/editorUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -41,6 +43,11 @@ enum PlanStatus {
   Error = 'error',
 }
 
+enum ApprovalStep {
+  PLAN_APPROVAL = 'plan_approval',
+  CONTEXT_CHOICE = 'context_choice',
+}
+
 interface PlanContentState {
   status: PlanStatus;
   content?: string;
@@ -50,9 +57,14 @@ interface PlanContentState {
 
 enum ApprovalOption {
   Auto = 'Yes, automatically accept edits',
-  AutoClear = 'Yes, automatically accept edits & clear conversation',
   Manual = 'Yes, manually accept edits',
-  ManualClear = 'Yes, manually accept edits & clear conversation',
+}
+
+enum ContextOption {
+  Once = 'Allow once',
+  Session = 'Allow for this session',
+  Always = 'Allow for all future sessions',
+  No = 'No',
 }
 
 /**
@@ -154,6 +166,10 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   const planState = usePlanContent(planPath, config);
   const { refresh } = planState;
   const [showLoading, setShowLoading] = useState(false);
+  const [step, setStep] = useState<ApprovalStep>(ApprovalStep.PLAN_APPROVAL);
+  const [selectedApprovalMode, setSelectedApprovalMode] =
+    useState<ApprovalMode | null>(null);
+  const { setSetting } = useSettingsStore();
 
   const handleOpenEditor = useCallback(async () => {
     try {
@@ -227,64 +243,133 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
 
   const editHint = formatCommand(Command.OPEN_EXTERNAL_EDITOR);
 
-  return (
-    <Box flexDirection="column" width={width}>
-      <AskUserDialog
-        questions={[
-          {
-            type: QuestionType.CHOICE,
-            header: 'Approval',
-            question: planContent,
-            options: [
-              {
-                label: ApprovalOption.Auto,
-                description:
-                  'Approves plan and allows tools to run automatically',
-              },
-              {
-                label: ApprovalOption.AutoClear,
-                description:
-                  'Approves plan, runs automatically, and clears prior conversation context',
-              },
-              {
-                label: ApprovalOption.Manual,
-                description:
-                  'Approves plan but requires confirmation for each tool',
-              },
-              {
-                label: ApprovalOption.ManualClear,
-                description:
-                  'Approves plan, requires confirmation, and clears prior conversation context',
-              },
-            ],
-            placeholder: 'Type your feedback...',
-            multiSelect: false,
-          },
-        ]}
-        onSubmit={(answers) => {
-          const answer = answers['0'];
-          const clearConversation =
-            answer === ApprovalOption.AutoClear ||
-            answer === ApprovalOption.ManualClear;
-          if (
-            answer === ApprovalOption.Auto ||
-            answer === ApprovalOption.AutoClear
-          ) {
-            onApprove(ApprovalMode.AUTO_EDIT, clearConversation);
-          } else if (
-            answer === ApprovalOption.Manual ||
-            answer === ApprovalOption.ManualClear
-          ) {
-            onApprove(ApprovalMode.DEFAULT, clearConversation);
-          } else if (answer) {
-            onFeedback(answer);
-          }
-        }}
-        onCancel={onCancel}
-        width={width}
-        availableHeight={availableHeight}
-        extraParts={[`${editHint} to edit plan`]}
-      />
-    </Box>
-  );
+  if (step === ApprovalStep.PLAN_APPROVAL) {
+    return (
+      <Box flexDirection="column" width={width}>
+        <AskUserDialog
+          key="plan-approval"
+          questions={[
+            {
+              type: QuestionType.CHOICE,
+              header: 'Approval',
+              question: planContent,
+              options: [
+                {
+                  label: ApprovalOption.Auto,
+                  description:
+                    'Approves plan and allows tools to run automatically',
+                },
+                {
+                  label: ApprovalOption.Manual,
+                  description:
+                    'Approves plan but requires confirmation for each tool',
+                },
+              ],
+              placeholder: 'Type your feedback...',
+              multiSelect: false,
+            },
+          ]}
+          onSubmit={(answers) => {
+            const answer = answers['0'];
+            let nextMode: ApprovalMode | null = null;
+            if (answer === ApprovalOption.Auto) {
+              nextMode = ApprovalMode.AUTO_EDIT;
+            } else if (answer === ApprovalOption.Manual) {
+              nextMode = ApprovalMode.DEFAULT;
+            } else if (answer) {
+              onFeedback(answer);
+              return;
+            }
+
+            if (nextMode) {
+              const clearContext = config.getClearContextOnPlanApproval();
+              if (clearContext !== undefined) {
+                onApprove(nextMode, clearContext);
+              } else {
+                setSelectedApprovalMode(nextMode);
+                setStep(ApprovalStep.CONTEXT_CHOICE);
+              }
+            }
+          }}
+          onCancel={onCancel}
+          width={width}
+          availableHeight={availableHeight}
+          extraParts={[`${editHint} to edit plan`]}
+        />
+      </Box>
+    );
+  }
+
+  if (step === ApprovalStep.CONTEXT_CHOICE) {
+    return (
+      <Box flexDirection="column" width={width}>
+        <AskUserDialog
+          key="context-choice"
+          questions={[
+            {
+              type: QuestionType.CHOICE,
+              header: 'Context',
+              question:
+                'Clear conversation context before implementing? (Keeps pre-plan history)',
+              options: [
+                {
+                  label: ContextOption.Once,
+                  description: 'Clear context this time only',
+                },
+                {
+                  label: ContextOption.Session,
+                  description: 'Clear context for this entire session',
+                },
+                {
+                  label: ContextOption.Always,
+                  description: 'Always clear context on plan approval',
+                },
+                { label: ContextOption.No, description: 'Keep context' },
+              ],
+              multiSelect: false,
+              allowCustomOption: false,
+            },
+          ]}
+          onSubmit={(answers) => {
+            const answer = answers['0'];
+            let clearConversation = false;
+
+            if (answer === ContextOption.Once) {
+              clearConversation = true;
+            } else if (answer === ContextOption.Session) {
+              clearConversation = true;
+              config.setClearContextOnPlanApprovalSessionOverride(true);
+            } else if (answer === ContextOption.Always) {
+              clearConversation = true;
+              setSetting(
+                SettingScope.User,
+                'general.plan.clearContextOnApproval',
+                true,
+              );
+            } else if (answer === ContextOption.No) {
+              clearConversation = false;
+              setSetting(
+                SettingScope.User,
+                'general.plan.clearContextOnApproval',
+                false,
+              );
+            }
+
+            if (selectedApprovalMode) {
+              // Wrap in setTimeout to avoid 'Maximum update depth exceeded'
+              // when setSetting triggers a re-render of the parent.
+              setTimeout(() => {
+                onApprove(selectedApprovalMode, clearConversation);
+              }, 0);
+            }
+          }}
+          onCancel={() => setStep(ApprovalStep.PLAN_APPROVAL)}
+          width={width}
+          availableHeight={availableHeight}
+        />
+      </Box>
+    );
+  }
+
+  return null;
 };

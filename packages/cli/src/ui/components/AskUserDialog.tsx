@@ -689,8 +689,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       },
     );
 
-    // Only add custom option for choice type, not yesno
-    if (question.type !== 'yesno') {
+    // Add custom option for choice type if allowed
+    const allowCustom = question.allowCustomOption ?? true;
+    if (question.type === 'choice' && allowCustom) {
       const otherItem: OptionItem = {
         key: 'other',
         label: customOptionText || '',
@@ -713,7 +714,13 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     }
 
     return list;
-  }, [questionOptions, question.multiSelect, question.type, customOptionText]);
+  }, [
+    questionOptions,
+    question.allowCustomOption,
+    question.type,
+    question.multiSelect,
+    customOptionText,
+  ]);
 
   const handleHighlight = useCallback(
     (itemValue: OptionItem) => {

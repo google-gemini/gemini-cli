@@ -173,6 +173,7 @@ export interface SummarizeToolOutputSettings {
 export interface PlanSettings {
   directory?: string;
   modelRouting?: boolean;
+  clearContextOnApproval?: boolean;
 }
 
 export interface TelemetrySettings {
@@ -796,6 +797,9 @@ export class Config implements McpContext {
   private readonly planEnabled: boolean;
   private readonly trackerEnabled: boolean;
   private readonly planModeRoutingEnabled: boolean;
+  private readonly clearContextOnPlanApproval?: boolean;
+  private clearContextOnPlanApprovalSessionOverride: boolean | undefined =
+    undefined;
   private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
@@ -887,6 +891,8 @@ export class Config implements McpContext {
     this.planEnabled = params.plan ?? false;
     this.trackerEnabled = params.tracker ?? false;
     this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
+    this.clearContextOnPlanApproval =
+      params.planSettings?.clearContextOnApproval;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
@@ -2465,6 +2471,21 @@ export class Config implements McpContext {
 
   async getPlanModeRoutingEnabled(): Promise<boolean> {
     return this.planModeRoutingEnabled;
+  }
+
+  getClearContextOnPlanApproval(): boolean | undefined {
+    return (
+      this.clearContextOnPlanApprovalSessionOverride ??
+      this.clearContextOnPlanApproval
+    );
+  }
+
+  isClearContextOnPlanApprovalEnabled(): boolean {
+    return this.getClearContextOnPlanApproval() ?? true;
+  }
+
+  setClearContextOnPlanApprovalSessionOverride(value: boolean): void {
+    this.clearContextOnPlanApprovalSessionOverride = value;
   }
 
   async getNumericalRoutingEnabled(): Promise<boolean> {

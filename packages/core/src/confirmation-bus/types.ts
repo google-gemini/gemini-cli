@@ -160,6 +160,8 @@ export interface Question {
   options?: QuestionOption[];
   /** Allow multiple selections. Only applies when type='choice'. */
   multiSelect?: boolean;
+  /** Whether to allow a custom 'Other' option for 'choice' types. Defaults to true. */
+  allowCustomOption?: boolean;
   /** Placeholder hint text. For type='text', shown in the input field. For type='choice', shown in the "Other" custom input. */
   placeholder?: string;
 }

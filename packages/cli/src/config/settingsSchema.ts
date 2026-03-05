@@ -299,6 +299,16 @@ const SETTINGS_SCHEMA = {
               'Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.',
             showInDialog: true,
           },
+          clearContextOnApproval: {
+            type: 'boolean',
+            label: 'Clear Context on Plan Approval',
+            category: 'General',
+            requiresRestart: false,
+            default: undefined as boolean | undefined,
+            description:
+              'Automatically clear conversation context after a plan is approved and implementation begins.',
+            showInDialog: true,
+          },
         },
       },
       retryFetchErrors: {
