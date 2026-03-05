@@ -6,13 +6,17 @@
 
 import { CommandKind, type SlashCommand } from './types.js';
 import { MessageType } from '../types.js';
-import { runPipeline, renderVisualArtifact } from '../../visualization/index.js';
+import {
+  runPipeline,
+  renderVisualArtifact,
+} from '../../visualization/index.js';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 export const visualizeCommand: SlashCommand = {
   name: 'visualize',
-  description: 'Render a Mermaid diagram (or other supported graphics) inline in the terminal',
+  description:
+    'Render a Mermaid diagram (or other supported graphics) inline in the terminal',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, args) => {
@@ -48,21 +52,30 @@ export const visualizeCommand: SlashCommand = {
       // 2. Render the artifact
       // We'll capture the ASCII fallback specifically to show it via addItem if needed,
       // as direct stdout writes can be cleared by Ink's rendering loop.
-      const caps = (await import('../../visualization/caps/detect.js')).detectTerminalCaps();
-      
+      const caps = (
+        await import('../../visualization/caps/detect.js')
+      ).detectTerminalCaps();
+
       if (caps.protocol === 'ascii') {
-        const ascii = (await import('../../visualization/render/ascii.js')).renderMermaidAscii(spec, caps.columns);
+        const ascii = (
+          await import('../../visualization/render/ascii.js')
+        ).renderMermaidAscii(spec, caps.columns);
         context.ui.addItem({
           type: MessageType.INFO,
           text: `\n${ascii}\n\nSuccessfully rendered ASCII visualization for \`${fileArg}\`.`,
         });
       } else {
-        // For graphics protocols, we still write to stdout, but we also provide a confirmation
-        await renderVisualArtifact(result, { spec, showMeta: true });
-        context.ui.addItem({
-          type: MessageType.INFO,
-          text: `Successfully rendered ${caps.protocol.toUpperCase()} visualization for \`${fileArg}\`.`,
+        // For graphics protocols, we inject the raw escape sequences directly into the UI list
+        const graphicOutput = await renderVisualArtifact(result, {
+          spec,
+          showMeta: true,
         });
+        if (graphicOutput) {
+          context.ui.addItem({
+            type: MessageType.INFO,
+            text: `\n${graphicOutput}\n\nSuccessfully rendered ${caps.protocol.toUpperCase()} visualization for \`${fileArg}\`.`,
+          });
+        }
       }
     } catch (err: unknown) {
       context.ui.addItem({

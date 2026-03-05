@@ -52,7 +52,7 @@ describe('CrawlCache', () => {
 
     it('should write and read data from the cache', () => {
       const key = 'test-key';
-      const data = ['foo', 'bar'];
+      const data = { files: ['foo', 'bar'], truncated: false };
       write(key, data, 10000); // 10 second TTL
       const cachedData = read(key);
       expect(cachedData).toEqual(data);
@@ -65,7 +65,7 @@ describe('CrawlCache', () => {
 
     it('should clear the cache', () => {
       const key = 'test-key';
-      const data = ['foo', 'bar'];
+      const data = { files: ['foo', 'bar'], truncated: false };
       write(key, data, 10000);
       clear();
       const cachedData = read(key);
@@ -75,7 +75,7 @@ describe('CrawlCache', () => {
     it('should automatically evict a cache entry after its TTL expires', async () => {
       vi.useFakeTimers();
       const key = 'ttl-key';
-      const data = ['foo'];
+      const data = { files: ['foo'], truncated: false };
       const ttl = 5000; // 5 seconds
 
       write(key, data, ttl);
@@ -95,8 +95,8 @@ describe('CrawlCache', () => {
     it('should reset the timer when an entry is updated', async () => {
       vi.useFakeTimers();
       const key = 'update-key';
-      const initialData = ['initial'];
-      const updatedData = ['updated'];
+      const initialData = { files: ['initial'], truncated: false };
+      const updatedData = { files: ['updated'], truncated: false };
       const ttl = 5000; // 5 seconds
 
       // Write initial data
