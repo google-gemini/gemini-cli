@@ -704,7 +704,7 @@ export const useGeminiStream = (
 
   useKeypress(
     (key) => {
-      if (key.name === 'escape' && !isShellFocused) {
+      if (key.name === 'escape' && !isShellFocused && !shellModeActive) {
         cancelOngoingRequest();
       }
     },
@@ -1799,7 +1799,6 @@ export const useGeminiStream = (
       addItem,
       registerBackgroundShell,
       consumeUserHint,
-      config,
       isLowErrorVerbosity,
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,

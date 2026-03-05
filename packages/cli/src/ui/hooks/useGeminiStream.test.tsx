@@ -1421,6 +1421,46 @@ describe('useGeminiStream', () => {
       expect(cancelSubmitSpy).toHaveBeenCalledWith(false);
     });
 
+    it('should not cancel when escape is pressed in shell mode', async () => {
+      const cancelSubmitSpy = vi.fn();
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Part 1' };
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderHookWithProviders(() =>
+        useGeminiStream(
+          mockConfig.getGeminiClient(),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          true,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          cancelSubmitSpy,
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      await act(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        result.current.submitQuery('test query');
+      });
+
+      simulateEscapeKeyPress();
+
+      expect(cancelSubmitSpy).not.toHaveBeenCalled();
+    });
+
     it('should call setShellInputFocused(false) when escape is pressed', async () => {
       const setShellInputFocusedSpy = vi.fn();
       const mockStream = (async function* () {
