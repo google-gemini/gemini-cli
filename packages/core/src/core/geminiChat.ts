@@ -691,12 +691,6 @@ export class GeminiChat {
     const history = curated
       ? extractCuratedHistory(this.history)
       : this.history;
-    // Return a shallow copy of the array to prevent callers from mutating
-    // the internal history array (push/pop/splice). Content objects are
-    // shared references — callers MUST NOT mutate them in place.
-    // This replaces a prior structuredClone() which deep-copied the entire
-    // conversation on every call, causing O(n) memory pressure per turn
-    // that compounded into OOM crashes in long-running sessions.
     return [...history];
   }
 
