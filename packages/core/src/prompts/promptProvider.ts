@@ -48,6 +48,12 @@ export class PromptProvider {
       process.env['GEMINI_SYSTEM_MD'],
     );
 
+    // Detect platform for operational guidelines (Windows vs Linux/Mac)
+    const isWindows = process.platform === 'win32';
+    const platformInstruction = isWindows
+      ? "CRITICAL: You are running on Windows. You MUST use PowerShell or CMD syntax. Use 'dir', 'findstr', 'del', 'type'. DO NOT use 'ls', 'grep', 'rm', 'cat'."
+      : 'You are running on Linux/macOS. Use Bash/Zsh syntax.';
+
     const interactiveMode = interactiveOverride ?? config.isInteractive();
     const approvalMode = config.getApprovalMode?.() ?? ApprovalMode.DEFAULT;
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
@@ -177,6 +183,7 @@ export class PromptProvider {
             interactive: interactiveMode,
             enableShellEfficiency: config.getEnableShellOutputEfficiency(),
             interactiveShellEnabled: config.isInteractiveShellEnabled(),
+            platformContext: platformInstruction,
           }),
         ),
         sandbox: this.withSection('sandbox', () => getSandboxMode()),

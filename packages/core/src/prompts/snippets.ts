@@ -71,6 +71,7 @@ export interface PrimaryWorkflowsOptions {
 export interface OperationalGuidelinesOptions {
   interactive: boolean;
   interactiveShellEnabled: boolean;
+  platformContext?: string;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
@@ -325,8 +326,14 @@ export function renderOperationalGuidelines(
   options?: OperationalGuidelinesOptions,
 ): string {
   if (!options) return '';
+
+  const platformHeader = options.platformContext
+    ? `## Platform Awareness\n${options.platformContext}\n`
+    : '';
   return `
 # Operational Guidelines
+
+${platformHeader}
 
 ## Tone and Style
 
