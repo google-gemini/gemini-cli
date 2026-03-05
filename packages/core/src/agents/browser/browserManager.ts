@@ -456,12 +456,11 @@ export class BrowserManager {
     const existingHandler = this.rawMcpClient.fallbackNotificationHandler;
     this.rawMcpClient.fallbackNotificationHandler = async (notification: {
       method: string;
+      params?: unknown;
     }) => {
       // Chain with any existing handler first.
       if (existingHandler) {
-        await (
-          existingHandler as (n: { method: string }) => Promise<void> | void
-        )(notification);
+        await existingHandler(notification);
       }
 
       // Only re-inject on resource update notifications which indicate
