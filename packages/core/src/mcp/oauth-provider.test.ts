@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 // Mock dependencies AT THE TOP
 const mockOpenBrowserSecurely = vi.hoisted(() => vi.fn());
@@ -54,15 +54,14 @@ vi.mock('node:readline', () => ({
   })),
 }));
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
-import type {
-  MCPOAuthConfig,
-  OAuthTokenResponse,
-  OAuthClientRegistrationResponse,
+import {
+  MCPOAuthProvider,
+  type MCPOAuthConfig,
+  type OAuthTokenResponse,
+  type OAuthClientRegistrationResponse,
 } from './oauth-provider.js';
-import { MCPOAuthProvider } from './oauth-provider.js';
 import { getConsentForOauth } from '../utils/authConsent.js';
 import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';

@@ -35,7 +35,8 @@ import {
   CoreEvent,
   CoreToolCallStatus,
   buildUserSteeringHintPrompt,
-  generateSteeringAckMessage,
+  GeminiCliOperation,
+  getPlanModeExitMessage,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -104,6 +105,11 @@ enum StreamProcessingStatus {
   UserCancelled,
   Error,
 }
+
+const SUPPRESSED_TOOL_ERRORS_NOTE =
+  'Some internal tool attempts failed before this final error. Press F12 for diagnostics, or run /settings and change "Error Verbosity" to full for details.';
+const LOW_VERBOSITY_FAILURE_NOTE =
+  'This request failed. Press F12 for diagnostics, or run /settings and change "Error Verbosity" to full for full details.';
 
 function isShellToolData(data: unknown): data is ShellToolData {
   if (typeof data !== 'object' || data === null) {
@@ -200,9 +206,16 @@ export const useGeminiStream = (
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
     null,
   );
+  const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
+  const suppressedToolErrorCountRef = useRef(0);
+  const suppressedToolErrorNoteShownRef = useRef(false);
+  const lowVerbosityFailureNoteShownRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
+  const previousApprovalModeRef = useRef<ApprovalMode>(
+    config.getApprovalMode(),
+  );
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [thought, thoughtRef, setThought] =
     useStateAndRef<ThoughtSummary | null>(null);
@@ -554,6 +567,54 @@ export const useGeminiStream = (
     }
   }, [isResponding]);
 
+  const maybeAddSuppressedToolErrorNote = useCallback(
+    (userMessageTimestamp?: number) => {
+      if (!isLowErrorVerbosity) {
+        return;
+      }
+      if (suppressedToolErrorCountRef.current === 0) {
+        return;
+      }
+      if (suppressedToolErrorNoteShownRef.current) {
+        return;
+      }
+
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: SUPPRESSED_TOOL_ERRORS_NOTE,
+        },
+        userMessageTimestamp,
+      );
+      suppressedToolErrorNoteShownRef.current = true;
+    },
+    [addItem, isLowErrorVerbosity],
+  );
+
+  const maybeAddLowVerbosityFailureNote = useCallback(
+    (userMessageTimestamp?: number) => {
+      if (!isLowErrorVerbosity || config.getDebugMode()) {
+        return;
+      }
+      if (
+        lowVerbosityFailureNoteShownRef.current ||
+        suppressedToolErrorNoteShownRef.current
+      ) {
+        return;
+      }
+
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: LOW_VERBOSITY_FAILURE_NOTE,
+        },
+        userMessageTimestamp,
+      );
+      lowVerbosityFailureNoteShownRef.current = true;
+    },
+    [addItem, config, isLowErrorVerbosity],
+  );
+
   const cancelOngoingRequest = useCallback(() => {
     if (
       streamingState !== StreamingState.Responding &&
@@ -903,6 +964,7 @@ export const useGeminiStream = (
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
       }
+      maybeAddSuppressedToolErrorNote(userMessageTimestamp);
       addItem(
         {
           type: MessageType.ERROR,
@@ -916,9 +978,18 @@ export const useGeminiStream = (
         },
         userMessageTimestamp,
       );
+      maybeAddLowVerbosityFailureNote(userMessageTimestamp);
       setThought(null); // Reset thought when there's an error
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem, config, setThought],
+    [
+      addItem,
+      pendingHistoryItemRef,
+      setPendingHistoryItem,
+      config,
+      setThought,
+      maybeAddSuppressedToolErrorNote,
+      maybeAddLowVerbosityFailureNote,
+    ],
   );
 
   const handleCitationEvent = useCallback(
@@ -996,16 +1067,27 @@ export const useGeminiStream = (
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
       }
-      return addItem({
-        type: 'info',
-        text:
-          `IMPORTANT: This conversation exceeded the compress threshold. ` +
-          `A compressed context will be sent for future messages (compressed from: ` +
-          `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
-          `${eventValue?.newTokenCount ?? 'unknown'} tokens).`,
-      });
+
+      const limit = tokenLimit(config.getModel());
+      const originalPercentage = Math.round(
+        ((eventValue?.originalTokenCount ?? 0) / limit) * 100,
+      );
+      const newPercentage = Math.round(
+        ((eventValue?.newTokenCount ?? 0) / limit) * 100,
+      );
+
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: `Context compressed from ${originalPercentage}% to ${newPercentage}%.`,
+          secondaryText: `Change threshold in /settings.`,
+          color: theme.status.warning,
+          marginBottom: 1,
+        } as HistoryItemInfo,
+        userMessageTimestamp,
+      );
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, config],
   );
 
   const handleMaxSessionTurnsEvent = useCallback(
@@ -1025,12 +1107,12 @@ export const useGeminiStream = (
 
       const limit = tokenLimit(config.getModel());
 
-      const isLessThan75Percent =
+      const isMoreThan25PercentUsed =
         limit > 0 && remainingTokenCount < limit * 0.75;
 
-      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the remaining context window limit (${remainingTokenCount} tokens).`;
+      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the context window limit (${remainingTokenCount.toLocaleString()} tokens left).`;
 
-      if (isLessThan75Percent) {
+      if (isMoreThan25PercentUsed) {
         text +=
           ' Please try reducing the size of your message or use the `/compress` command to compress the chat history.';
       }
@@ -1081,6 +1163,7 @@ export const useGeminiStream = (
         },
         userMessageTimestamp,
       );
+      maybeAddLowVerbosityFailureNote(userMessageTimestamp);
       if (contextCleared) {
         addItem(
           {
@@ -1092,7 +1175,13 @@ export const useGeminiStream = (
       }
       setIsResponding(false);
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem, setIsResponding],
+    [
+      addItem,
+      pendingHistoryItemRef,
+      setPendingHistoryItem,
+      setIsResponding,
+      maybeAddLowVerbosityFailureNote,
+    ],
   );
 
   const handleAgentExecutionBlockedEvent = useCallback(
@@ -1113,6 +1202,7 @@ export const useGeminiStream = (
         },
         userMessageTimestamp,
       );
+      maybeAddLowVerbosityFailureNote(userMessageTimestamp);
       if (contextCleared) {
         addItem(
           {
@@ -1123,7 +1213,12 @@ export const useGeminiStream = (
         );
       }
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+    [
+      addItem,
+      pendingHistoryItemRef,
+      setPendingHistoryItem,
+      maybeAddLowVerbosityFailureNote,
+    ],
   );
 
   const processGeminiStreamEvents = useCallback(
@@ -1258,7 +1353,11 @@ export const useGeminiStream = (
       prompt_id?: string,
     ) =>
       runInDevTraceSpan(
-        { name: 'submitQuery' },
+        {
+          operation: options?.isContinuation
+            ? GeminiCliOperation.SystemPrompt
+            : GeminiCliOperation.UserPrompt,
+        },
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
 
@@ -1277,6 +1376,9 @@ export const useGeminiStream = (
           if (!options?.isContinuation) {
             setModelSwitchedFromQuotaError(false);
             config.setQuotaErrorOccurred(false);
+            suppressedToolErrorCountRef.current = 0;
+            suppressedToolErrorNoteShownRef.current = false;
+            lowVerbosityFailureNoteShownRef.current = false;
           }
 
           abortControllerRef.current = new AbortController();
@@ -1393,6 +1495,7 @@ export const useGeminiStream = (
               ) {
                 // Error was handled by validation dialog, don't display again
               } else if (!isNodeError(error) || error.name !== 'AbortError') {
+                maybeAddSuppressedToolErrorNote(userMessageTimestamp);
                 addItem(
                   {
                     type: MessageType.ERROR,
@@ -1406,6 +1509,7 @@ export const useGeminiStream = (
                   },
                   userMessageTimestamp,
                 );
+                maybeAddLowVerbosityFailureNote(userMessageTimestamp);
               }
             } finally {
               if (activeQueryIdRef.current === queryId) {
@@ -1430,11 +1534,41 @@ export const useGeminiStream = (
       startNewPrompt,
       getPromptCount,
       setThought,
+      maybeAddSuppressedToolErrorNote,
+      maybeAddLowVerbosityFailureNote,
     ],
   );
 
   const handleApprovalModeChange = useCallback(
     async (newApprovalMode: ApprovalMode) => {
+      if (
+        previousApprovalModeRef.current === ApprovalMode.PLAN &&
+        newApprovalMode !== ApprovalMode.PLAN &&
+        streamingState === StreamingState.Idle
+      ) {
+        if (geminiClient) {
+          try {
+            await geminiClient.addHistory({
+              role: 'user',
+              parts: [
+                {
+                  text: getPlanModeExitMessage(newApprovalMode, true),
+                },
+              ],
+            });
+          } catch (error) {
+            onDebugMessage(
+              `Failed to notify model of Plan Mode exit: ${getErrorMessage(error)}`,
+            );
+            addItem({
+              type: MessageType.ERROR,
+              text: 'Failed to update the model about exiting Plan Mode. The model might be out of sync. Please consider restarting the session if you see unexpected behavior.',
+            });
+          }
+        }
+      }
+      previousApprovalModeRef.current = newApprovalMode;
+
       // Auto-approve pending tool calls when switching to auto-approval modes
       if (
         newApprovalMode === ApprovalMode.YOLO ||
@@ -1473,7 +1607,7 @@ export const useGeminiStream = (
         }
       }
     },
-    [config, toolCalls],
+    [config, toolCalls, geminiClient, streamingState, addItem, onDebugMessage],
   );
 
   const handleCompletedTools = useCallback(
@@ -1550,6 +1684,13 @@ export const useGeminiStream = (
         (t) => !t.request.isClientInitiated,
       );
 
+      if (isLowErrorVerbosity) {
+        // Low-mode suppression applies only to model-initiated tool failures.
+        suppressedToolErrorCountRef.current += geminiTools.filter(
+          (tc) => tc.status === CoreToolCallStatus.Error,
+        ).length;
+      }
+
       if (geminiTools.length === 0) {
         return;
       }
@@ -1560,10 +1701,12 @@ export const useGeminiStream = (
       );
 
       if (stopExecutionTool && stopExecutionTool.response.error) {
+        maybeAddSuppressedToolErrorNote();
         addItem({
           type: MessageType.INFO,
           text: `Agent execution stopped: ${stopExecutionTool.response.error.message}`,
         });
+        maybeAddLowVerbosityFailureNote();
         setIsResponding(false);
 
         const callIdsToMarkAsSubmitted = geminiTools.map(
@@ -1620,18 +1763,6 @@ export const useGeminiStream = (
           responsesToSend.unshift({
             text: buildUserSteeringHintPrompt(hintText),
           });
-          void generateSteeringAckMessage(
-            config.getBaseLlmClient(),
-            hintText,
-          ).then((ackText) => {
-            addItem({
-              type: 'info',
-              icon: '· ',
-              color: theme.text.secondary,
-              marginBottom: 1,
-              text: ackText,
-            } as HistoryItemInfo);
-          });
         }
       }
 
@@ -1669,6 +1800,9 @@ export const useGeminiStream = (
       registerBackgroundShell,
       consumeUserHint,
       config,
+      isLowErrorVerbosity,
+      maybeAddSuppressedToolErrorNote,
+      maybeAddLowVerbosityFailureNote,
     ],
   );
 

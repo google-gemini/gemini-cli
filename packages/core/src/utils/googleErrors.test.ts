@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseGoogleApiError } from './googleErrors.js';
-import type { QuotaFailure } from './googleErrors.js';
+import { parseGoogleApiError, type QuotaFailure } from './googleErrors.js';
 
 describe('parseGoogleApiError', () => {
   it('should return null for non-gaxios errors', () => {

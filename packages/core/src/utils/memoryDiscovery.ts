@@ -11,8 +11,10 @@ import { bfsFileSearch } from './bfsFileSearch.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { processImports } from './memoryImportProcessor.js';
-import type { FileFilteringOptions } from '../config/constants.js';
-import { DEFAULT_MEMORY_FILE_FILTERING_OPTIONS } from '../config/constants.js';
+import {
+  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+  type FileFilteringOptions,
+} from '../config/constants.js';
 import { GEMINI_DIR, homedir, normalizePath } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
@@ -127,6 +129,7 @@ async function getGeminiMdFilePathsInternal(
         result.value.global.forEach((p) => globalPaths.add(p));
         result.value.project.forEach((p) => projectPaths.add(p));
       } else {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const error = result.reason;
         const message = error instanceof Error ? error.message : String(error);
         logger.error(`Error discovering files in directory: ${message}`);
@@ -299,6 +302,7 @@ export async function readGeminiMdFiles(
       } else {
         // This case shouldn't happen since we catch all errors above,
         // but handle it for completeness
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const error = result.reason;
         const message = error instanceof Error ? error.message : String(error);
         logger.error(`Unexpected error processing file: ${message}`);

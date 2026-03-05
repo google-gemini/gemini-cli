@@ -32,6 +32,8 @@ import {
   registerSyncCleanup,
   runExitCleanup,
   registerTelemetryConfig,
+  setupSignalHandlers,
+  setupTtyCheck,
 } from './utils/cleanup.js';
 import {
   cleanupToolOutputFiles,
@@ -100,8 +102,9 @@ import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
-import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 import { TerminalProvider } from './ui/contexts/TerminalContext.js';
+import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
+import { OverflowProvider } from './ui/contexts/OverflowContext.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
@@ -193,7 +196,7 @@ export async function startInteractiveUI(
   // and the Ink alternate buffer mode requires line wrapping harmful to
   // screen readers.
   const useAlternateBuffer = shouldEnterAlternateScreen(
-    isAlternateBufferEnabled(settings),
+    isAlternateBufferEnabled(config),
     config.getScreenReader(),
   );
   const mouseEventsEnabled = useAlternateBuffer;
@@ -238,17 +241,19 @@ export async function startInteractiveUI(
           >
             <TerminalProvider>
               <ScrollProvider>
-                <SessionStatsProvider>
-                  <VimModeProvider settings={settings}>
-                    <AppContainer
-                      config={config}
-                      startupWarnings={startupWarnings}
-                      version={version}
-                      resumedSessionData={resumedSessionData}
-                      initializationResult={initializationResult}
-                    />
-                  </VimModeProvider>
-                </SessionStatsProvider>
+                <OverflowProvider>
+                  <SessionStatsProvider>
+                    <VimModeProvider>
+                      <AppContainer
+                        config={config}
+                        startupWarnings={startupWarnings}
+                        version={version}
+                        resumedSessionData={resumedSessionData}
+                        initializationResult={initializationResult}
+                      />
+                    </VimModeProvider>
+                  </SessionStatsProvider>
+                </OverflowProvider>
               </ScrollProvider>
             </TerminalProvider>
           </MouseProvider>
@@ -316,6 +321,8 @@ export async function startInteractiveUI(
     });
 
   registerCleanup(() => instance.unmount());
+
+  registerCleanup(setupTtyCheck());
 }
 
 export async function main() {
@@ -336,6 +343,8 @@ export async function main() {
   });
 
   setupUnhandledRejectionHandler();
+
+  setupSignalHandlers();
 
   const slashCommandConflictHandler = new SlashCommandConflictHandler();
   slashCommandConflictHandler.start();
@@ -583,7 +592,7 @@ export async function main() {
 
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, config.storage);
 
     // Register SessionEnd hook to fire on graceful exit
     // This runs before telemetry shutdown in runExitCleanup()
@@ -643,10 +652,7 @@ export async function main() {
       process.stdin.setRawMode(true);
 
       // This cleanup isn't strictly needed but may help in certain situations.
-      process.on('SIGTERM', () => {
-        process.stdin.setRawMode(wasRaw);
-      });
-      process.on('SIGINT', () => {
+      registerSyncCleanup(() => {
         process.stdin.setRawMode(wasRaw);
       });
     }
@@ -672,7 +678,7 @@ export async function main() {
 
     let input = config.getQuestion();
     const useAlternateBuffer = shouldEnterAlternateScreen(
-      isAlternateBufferEnabled(settings),
+      isAlternateBufferEnabled(config),
       config.getScreenReader(),
     );
     const rawStartupWarnings = await getStartupWarnings();

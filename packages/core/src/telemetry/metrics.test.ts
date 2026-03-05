@@ -27,6 +27,7 @@ import {
   TokenStorageInitializationEvent,
 } from './types.js';
 import { AgentTerminateMode } from '../agents/types.js';
+import { ApprovalMode } from '../policy/types.js';
 
 const mockCounterAddFn: Mock<
   (value: number, attributes?: Attributes, context?: Context) => void
@@ -104,6 +105,7 @@ describe('Telemetry Metrics', () => {
   let recordPlanExecutionModule: typeof import('./metrics.js').recordPlanExecution;
   let recordKeychainAvailabilityModule: typeof import('./metrics.js').recordKeychainAvailability;
   let recordTokenStorageInitializationModule: typeof import('./metrics.js').recordTokenStorageInitialization;
+  let recordInvalidChunkModule: typeof import('./metrics.js').recordInvalidChunk;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -153,6 +155,7 @@ describe('Telemetry Metrics', () => {
       metricsJsModule.recordKeychainAvailability;
     recordTokenStorageInitializationModule =
       metricsJsModule.recordTokenStorageInitialization;
+    recordInvalidChunkModule = metricsJsModule.recordInvalidChunk;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -490,6 +493,7 @@ describe('Telemetry Metrics', () => {
         'test-reason',
         false,
         undefined,
+        ApprovalMode.DEFAULT,
       );
       recordModelRoutingMetricsModule(mockConfig, event);
       expect(mockHistogramRecordFn).not.toHaveBeenCalled();
@@ -505,6 +509,7 @@ describe('Telemetry Metrics', () => {
         'test-reason',
         false,
         undefined,
+        ApprovalMode.DEFAULT,
       );
       recordModelRoutingMetricsModule(mockConfig, event);
 
@@ -516,6 +521,7 @@ describe('Telemetry Metrics', () => {
         'routing.decision_source': 'default',
         'routing.failed': false,
         'routing.reasoning': 'test-reason',
+        'routing.approval_mode': ApprovalMode.DEFAULT,
       });
       // The session counter is called once on init
       expect(mockCounterAddFn).toHaveBeenCalledTimes(1);
@@ -530,6 +536,7 @@ describe('Telemetry Metrics', () => {
         'test-reason',
         true,
         'test-error',
+        ApprovalMode.DEFAULT,
       );
       recordModelRoutingMetricsModule(mockConfig, event);
 
@@ -541,6 +548,7 @@ describe('Telemetry Metrics', () => {
         'routing.decision_source': 'Classifier',
         'routing.failed': true,
         'routing.reasoning': 'test-reason',
+        'routing.approval_mode': ApprovalMode.DEFAULT,
       });
 
       expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
@@ -552,6 +560,7 @@ describe('Telemetry Metrics', () => {
         'routing.decision_source': 'Classifier',
         'routing.failed': true,
         'routing.reasoning': 'test-reason',
+        'routing.approval_mode': ApprovalMode.DEFAULT,
         'routing.error_message': 'test-error',
       });
     });
@@ -1545,6 +1554,28 @@ describe('Telemetry Metrics', () => {
           'user.email': 'test@example.com',
           type: 'keychain',
           forced: true,
+        });
+      });
+    });
+
+    describe('recordInvalidChunk', () => {
+      it('should not record metrics if not initialized', () => {
+        const config = makeFakeConfig({});
+        recordInvalidChunkModule(config);
+        expect(mockCounterAddFn).not.toHaveBeenCalled();
+      });
+
+      it('should record invalid chunk when initialized', () => {
+        const config = makeFakeConfig({});
+        initializeMetricsModule(config);
+        mockCounterAddFn.mockClear();
+
+        recordInvalidChunkModule(config);
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
         });
       });
     });

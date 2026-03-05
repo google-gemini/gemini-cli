@@ -7,19 +7,16 @@
 import type { Config } from '../config/config.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
-import { Type } from '@google/genai';
-import type {
-  Content,
-  Part,
-  FunctionCall,
-  FunctionDeclaration,
-  Schema,
+import {
+  Type,
+  type Content,
+  type Part,
+  type FunctionCall,
+  type FunctionDeclaration,
+  type Schema,
 } from '@google/genai';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import {
-  DiscoveredMCPTool,
-  MCP_QUALIFIED_NAME_SEPARATOR,
-} from '../tools/mcp-tool.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
@@ -33,20 +30,20 @@ import {
 import {
   AgentStartEvent,
   AgentFinishEvent,
+  LlmRole,
   RecoveryAttemptEvent,
 } from '../telemetry/types.js';
-import type {
-  LocalAgentDefinition,
-  AgentInputs,
-  OutputObject,
-  SubagentActivityEvent,
-} from './types.js';
 import {
   AgentTerminateMode,
   DEFAULT_QUERY_STRING,
   DEFAULT_MAX_TURNS,
   DEFAULT_MAX_TIME_MINUTES,
+  type LocalAgentDefinition,
+  type AgentInputs,
+  type OutputObject,
+  type SubagentActivityEvent,
 } from './types.js';
+import { getErrorMessage } from '../utils/errors.js';
 import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
@@ -59,7 +56,6 @@ import { getVersion } from '../utils/version.js';
 import { getToolCallContext } from '../utils/toolCallContext.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
 import { DeadlineTimer } from '../utils/deadlineTimer.js';
-import { LlmRole } from '../telemetry/types.js';
 import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
 
 /** A callback function to report on agent activity. */
@@ -141,15 +137,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       // registry and register it with the agent's isolated registry.
       const tool = parentToolRegistry.getTool(toolName);
       if (tool) {
-        if (
-          tool instanceof DiscoveredMCPTool &&
-          !toolName.includes(MCP_QUALIFIED_NAME_SEPARATOR)
-        ) {
-          throw new Error(
-            `MCP tool '${toolName}' must be requested with its server prefix (e.g., '${tool.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${toolName}') in agent '${definition.name}'.`,
-          );
+        if (tool instanceof DiscoveredMCPTool) {
+          // Subagents MUST use fully qualified names for MCP tools to ensure
+          // unambiguous tool calls and to comply with policy requirements.
+          // We automatically "upgrade" any MCP tool to its qualified version.
+          agentToolRegistry.registerTool(tool.asFullyQualifiedTool());
+        } else {
+          agentToolRegistry.registerTool(tool);
         }
-        agentToolRegistry.registerTool(tool);
       }
     };
 
@@ -268,13 +263,22 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       };
     }
 
-    const { nextMessage, submittedOutput, taskCompleted } =
+    const { nextMessage, submittedOutput, taskCompleted, aborted } =
       await this.processFunctionCalls(
         functionCalls,
         combinedSignal,
         promptId,
         onWaitingForConfirmation,
       );
+
+    if (aborted) {
+      return {
+        status: 'stop',
+        terminateReason: AgentTerminateMode.ABORTED,
+        finalResult: null,
+      };
+    }
+
     if (taskCompleted) {
       const finalResult = submittedOutput ?? 'Task completed successfully.';
       return {
@@ -826,16 +830,19 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         systemInstruction,
         [{ functionDeclarations: tools }],
         startHistory,
+        undefined,
+        undefined,
+        'subagent',
       );
-    } catch (error) {
+    } catch (e: unknown) {
       await reportError(
-        error,
+        e,
         `Error initializing Gemini chat for agent ${this.definition.name}.`,
         startHistory,
         'startChat',
       );
       // Re-throw as a more specific error after reporting.
-      throw new Error(`Failed to create chat object: ${error}`);
+      throw new Error(`Failed to create chat object: ${getErrorMessage(e)}`);
     }
   }
 
@@ -853,6 +860,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     nextMessage: Content;
     submittedOutput: string | null;
     taskCompleted: boolean;
+    aborted: boolean;
   }> {
     const allowedToolNames = new Set(this.toolRegistry.getAllToolNames());
     // Always allow the completion tool
@@ -860,6 +868,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     let submittedOutput: string | null = null;
     let taskCompleted = false;
+    let aborted = false;
 
     // We'll separate complete_task from other tools
     const toolRequests: ToolCallRequestInfo[] = [];
@@ -874,8 +883,24 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const toolName = functionCall.name as string;
 
+      let displayName = toolName;
+      let description: string | undefined = undefined;
+
+      try {
+        const tool = this.toolRegistry.getTool(toolName);
+        if (tool) {
+          displayName = tool.displayName ?? toolName;
+          const invocation = tool.build(args);
+          description = invocation.getDescription();
+        }
+      } catch {
+        // Ignore errors during formatting for activity emission
+      }
+
       this.emitActivity('TOOL_CALL_START', {
         name: toolName,
+        displayName,
+        description,
         args,
       });
 
@@ -925,6 +950,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               continue;
             }
 
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             const validatedOutput = validationResult.data;
             if (this.definition.processOutput) {
               submittedOutput = this.definition.processOutput(validatedOutput);
@@ -1072,8 +1098,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           this.emitActivity('ERROR', {
             context: 'tool_call',
             name: toolName,
-            error: 'Tool call was cancelled.',
+            error: 'Request cancelled.',
           });
+          aborted = true;
         }
 
         // Add result to syncResults to preserve order later
@@ -1106,6 +1133,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       nextMessage: { role: 'user', parts: toolResponseParts },
       submittedOutput,
       taskCompleted,
+      aborted,
     };
   }
 

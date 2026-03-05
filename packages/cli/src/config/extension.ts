@@ -33,6 +33,15 @@ export interface ExtensionConfig {
    * These themes will be registered when the extension is activated.
    */
   themes?: CustomTheme[];
+  /**
+   * Planning features configuration contributed by this extension.
+   */
+  plan?: {
+    /**
+     * The directory where planning artifacts are stored.
+     */
+    directory?: string;
+  };
 }
 
 export interface ExtensionUpdateInfo {

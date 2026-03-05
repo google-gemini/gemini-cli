@@ -81,7 +81,9 @@ export class ExtensionRegistryClient {
         `${ext.extensionName} ${ext.extensionDescription} ${ext.fullName}`,
       fuzzy: true,
     });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const results = await fzf.find(query);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return results.map((r: { item: RegistryExtension }) => r.item);
   }
 

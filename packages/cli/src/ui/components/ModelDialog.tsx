@@ -94,7 +94,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       {
         value: 'Manual',
         title: manualModelSelected
-          ? `Manual (${manualModelSelected})`
+          ? `Manual (${getDisplayString(manualModelSelected)})`
           : 'Manual',
         description: 'Manually select a model',
         key: 'Manual',
@@ -118,17 +118,17 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     const list = [
       {
         value: DEFAULT_GEMINI_MODEL,
-        title: DEFAULT_GEMINI_MODEL,
+        title: getDisplayString(DEFAULT_GEMINI_MODEL),
         key: DEFAULT_GEMINI_MODEL,
       },
       {
         value: DEFAULT_GEMINI_FLASH_MODEL,
-        title: DEFAULT_GEMINI_FLASH_MODEL,
+        title: getDisplayString(DEFAULT_GEMINI_FLASH_MODEL),
         key: DEFAULT_GEMINI_FLASH_MODEL,
       },
       {
         value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-        title: DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        title: getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL),
         key: DEFAULT_GEMINI_FLASH_LITE_MODEL,
       },
     ];
@@ -145,12 +145,12 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       list.unshift(
         {
           value: previewProValue,
-          title: previewProModel,
+          title: getDisplayString(previewProModel),
           key: previewProModel,
         },
         {
           value: PREVIEW_GEMINI_FLASH_MODEL,
-          title: PREVIEW_GEMINI_FLASH_MODEL,
+          title: getDisplayString(PREVIEW_GEMINI_FLASH_MODEL),
           key: PREVIEW_GEMINI_FLASH_MODEL,
         },
       );
