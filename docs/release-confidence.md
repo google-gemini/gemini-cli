@@ -85,7 +85,7 @@ manually run through this checklist.
     - [ ] Vertex AI
 
 - **Basic prompting:**
-  - [ ] Run `gemini "Tell me a joke"` and verify a sensible response.
+  - [ ] Run `gemini -p "Tell me a joke"` and verify a sensible response.
   - [ ] Run in interactive mode: `gemini`. Ask a follow-up question to test
         context.
 
