@@ -40,7 +40,6 @@ export const BINARY_FILE_PATTERNS: string[] = [
   '**/*.sqlite',
   // Disk images
   '**/*.dmg',
-  '**/*.img',
   '**/*.iso',
   // Executables & libraries
   '**/*.bin',
