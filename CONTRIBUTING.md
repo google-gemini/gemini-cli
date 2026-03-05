@@ -297,7 +297,7 @@ fi
 
 #### Formatting
 
-To separately format the code in this project by running the following command
+To separately format the code in this project, run the following command
 from the root directory:
 
 ```bash
@@ -334,7 +334,7 @@ npm run lint
   - `a2a-server`: A2A server implementation for the Gemini CLI. (Experimental)
   - `cli/`: The command-line interface.
   - `core/`: The core backend logic for the Gemini CLI.
-  - `test-utils` Utilities for creating and cleaning temporary file systems for
+  - `test-utils`: Utilities for creating and cleaning temporary file systems for
     testing.
   - `vscode-ide-companion/`: The Gemini CLI Companion extension pairs with
     Gemini CLI.
