@@ -138,9 +138,6 @@ export class TerminalCapabilityManager {
           process.stdin.setRawMode(false);
         }
         this.detectionComplete = true;
-
-        this.enableSupportedModes();
-
         resolve();
       };
 
@@ -246,9 +243,11 @@ export class TerminalCapabilityManager {
   enableSupportedModes() {
     try {
       if (this.kittySupported) {
+        debugLogger.log('Enabling Kitty keyboard protocol');
         enableKittyKeyboardProtocol();
         this.kittyEnabled = true;
       } else if (this.modifyOtherKeysSupported) {
+        debugLogger.log('Enabling modifyOtherKeys');
         enableModifyOtherKeys();
       }
       // Always enable bracketed paste since it'll be ignored if unsupported.
