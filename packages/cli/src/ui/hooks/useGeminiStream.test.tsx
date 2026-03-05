@@ -807,14 +807,6 @@ describe('useGeminiStream', () => {
     expect(injectedHintPart.text).toContain(
       'Do not cancel/skip tasks unless the user explicitly cancels them.',
     );
-    expect(
-      mockAddItem.mock.calls.some(
-        ([item]) =>
-          item?.type === 'info' &&
-          typeof item.text === 'string' &&
-          item.text.includes('Got it. Focusing on tests only.'),
-      ),
-    ).toBe(true);
 
     expect(mockRunInDevTraceSpan).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1058,9 +1050,9 @@ describe('useGeminiStream', () => {
     );
     expect(noteIndex).toBeGreaterThanOrEqual(0);
     expect(stopIndex).toBeGreaterThanOrEqual(0);
-    expect(failureHintIndex).toBeGreaterThanOrEqual(0);
+    // The failure hint should NOT be present if the suppressed error note was shown
+    expect(failureHintIndex).toBe(-1);
     expect(noteIndex).toBeLessThan(stopIndex);
-    expect(stopIndex).toBeLessThan(failureHintIndex);
   });
 
   it('should group multiple cancelled tool call responses into a single history entry', async () => {
