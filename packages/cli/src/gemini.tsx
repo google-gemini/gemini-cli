@@ -107,8 +107,8 @@ import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
-import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 import { TerminalProvider } from './ui/contexts/TerminalContext.js';
+import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 import { OverflowProvider } from './ui/contexts/OverflowContext.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
@@ -201,7 +201,7 @@ export async function startInteractiveUI(
   // and the Ink alternate buffer mode requires line wrapping harmful to
   // screen readers.
   const useAlternateBuffer = shouldEnterAlternateScreen(
-    isAlternateBufferEnabled(settings),
+    isAlternateBufferEnabled(config),
     config.getScreenReader(),
   );
   const mouseEventsEnabled = useAlternateBuffer;
@@ -248,7 +248,7 @@ export async function startInteractiveUI(
               <ScrollProvider>
                 <OverflowProvider>
                   <SessionStatsProvider>
-                    <VimModeProvider settings={settings}>
+                    <VimModeProvider>
                       <AppContainer
                         config={config}
                         startupWarnings={startupWarnings}
@@ -671,7 +671,7 @@ export async function main() {
 
     let input = config.getQuestion();
     const useAlternateBuffer = shouldEnterAlternateScreen(
-      isAlternateBufferEnabled(settings),
+      isAlternateBufferEnabled(config),
       config.getScreenReader(),
     );
     const rawStartupWarnings = await getStartupWarnings();

@@ -18,9 +18,11 @@ import { type LoadedSettings } from '../config/settings.js';
 import { performInitialAuth } from './auth.js';
 import { validateTheme } from './theme.js';
 import { loadAuthState, parseAuthType } from '../config/authState.js';
+import type { AccountSuspensionInfo } from '../ui/contexts/UIStateContext.js';
 
 export interface InitializationResult {
   authError: string | null;
+  accountSuspensionInfo: AccountSuspensionInfo | null;
   themeError: string | null;
   shouldOpenAuthDialog: boolean;
   geminiMdFileCount: number;
@@ -39,7 +41,11 @@ export async function initializeApp(
 ): Promise<InitializationResult> {
   const selectedAuthType = parseAuthType(loadAuthState().selectedType);
   const authHandle = startupProfiler.start('authenticate');
-  const authError = await performInitialAuth(config, selectedAuthType);
+  const selectedAuthType = parseAuthType(loadAuthState().selectedType);
+  const { authError, accountSuspensionInfo } = await performInitialAuth(
+    config,
+    selectedAuthType,
+  );
   authHandle?.end();
   const themeError = validateTheme(settings);
 
@@ -58,6 +64,7 @@ export async function initializeApp(
 
   return {
     authError,
+    accountSuspensionInfo,
     themeError,
     shouldOpenAuthDialog,
     geminiMdFileCount: config.getGeminiMdFileCount(),

@@ -185,9 +185,6 @@ export interface SessionRetentionSettings {
 
   /** Minimum retention period (safety limit, defaults to "1d") */
   minRetention?: string;
-
-  /** INTERNAL: Whether the user has acknowledged the session retention warning */
-  warningAcknowledged?: boolean;
 }
 
 export interface SettingsError {
@@ -799,14 +796,13 @@ export function loadSettings(
 /**
  * Migrates deprecated settings to their new counterparts.
  *
- * TODO: After a couple of weeks (around early Feb 2026), we should start removing
- * the deprecated settings from the settings files by default.
+ * Deprecated settings are removed from settings files by default.
  *
  * @returns true if any changes were made and need to be saved.
  */
 export function migrateDeprecatedSettings(
   loadedSettings: LoadedSettings,
-  removeDeprecated = false,
+  removeDeprecated = true,
 ): boolean {
   let anyModified = false;
   const systemWarnings: Map<LoadableSettingScope, string[]> = new Map();
