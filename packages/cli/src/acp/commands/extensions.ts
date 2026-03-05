@@ -320,20 +320,20 @@ export class UninstallExtensionCommand implements Command {
     }
 
     const all = args.includes('--all');
-    const name = args.find((a) => !a.startsWith('--'))?.trim();
+    const names = args.filter((a) => !a.startsWith('--')).map((a) => a.trim());
 
-    if (!all && !name) {
+    if (!all && names.length === 0) {
       return {
         name: this.name,
-        data: `Usage: /extensions uninstall <extension-name>|--all`,
+        data: `Usage: /extensions uninstall <extension-names...>|--all`,
       };
     }
 
     let namesToUninstall: string[] = [];
     if (all) {
       namesToUninstall = extensionLoader.getExtensions().map((ext) => ext.name);
-    } else if (name) {
-      namesToUninstall = [name];
+    } else {
+      namesToUninstall = names;
     }
 
     if (namesToUninstall.length === 0) {

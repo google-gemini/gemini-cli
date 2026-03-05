@@ -596,12 +596,12 @@ async function uninstallAction(context: CommandContext, args: string) {
 
   const uninstallArgs = args.split(' ').filter((value) => value.length > 0);
   const all = uninstallArgs.includes('--all');
-  const name = uninstallArgs.find((a) => !a.startsWith('--'))?.trim();
+  const names = uninstallArgs.filter((a) => !a.startsWith('--'));
 
-  if (!all && !name) {
+  if (!all && names.length === 0) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Usage: /extensions uninstall <extension-name>|--all`,
+      text: `Usage: /extensions uninstall <extension-names...>|--all`,
     });
     return;
   }
@@ -609,8 +609,8 @@ async function uninstallAction(context: CommandContext, args: string) {
   let namesToUninstall: string[] = [];
   if (all) {
     namesToUninstall = extensionLoader.getExtensions().map((ext) => ext.name);
-  } else if (name) {
-    namesToUninstall = [name];
+  } else {
+    namesToUninstall = names;
   }
 
   if (namesToUninstall.length === 0) {
