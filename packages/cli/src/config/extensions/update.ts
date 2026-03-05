@@ -58,13 +58,8 @@ export async function updateExtension(
       );
 
       if (status === IntegrityStatus.NOT_FOUND) {
-        // File/entry is missing - treat as "needs initialization".
-        debugLogger.warn(
-          `No integrity data found for ${extension.name}. Initializing integrity record.`,
-        );
-        await extensionManager.integrityManager.storeIntegrity(
-          extension.name,
-          installMetadata,
+        throw new Error(
+          `No integrity data found for ${extension.name}. To establish trust, please reinstall this extension.`,
         );
       } else if (status === IntegrityStatus.TAMPERED) {
         throw new Error(

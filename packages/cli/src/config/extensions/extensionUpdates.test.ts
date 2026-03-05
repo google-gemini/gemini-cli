@@ -351,7 +351,7 @@ describe('extensionUpdates', () => {
       verifyIntegritySpy.mockRestore();
     });
 
-    it('should initialize integrity if missing (trust on first update)', async () => {
+    it('should fail update and instruct to reinstall if integrity is missing', async () => {
       const extension = {
         name: 'new-ext',
         path: '/mock/extensions/new-ext',
@@ -371,50 +371,30 @@ describe('extensionUpdates', () => {
         type: 'local',
       });
 
-      vi.spyOn(manager, 'getExtensions').mockReturnValue([
-        {
-          name: 'new-ext',
-          version: '1.0.0',
-          path: '/mock/extensions/new-ext',
-          isActive: true,
-        } as GeminiCLIExtension,
-      ]);
-
       // Returns NOT_FOUND for missing integrity data
       const verifyIntegritySpy = vi
         .spyOn(ExtensionIntegrityManager.prototype, 'verifyIntegrity')
         .mockResolvedValue(IntegrityStatus.NOT_FOUND);
-      const storeIntegritySpy = vi
-        .spyOn(ExtensionIntegrityManager.prototype, 'storeIntegrity')
-        .mockResolvedValue(undefined);
-
-      // Mock installOrUpdateExtension to just return successfully
-      vi.spyOn(manager, 'installOrUpdateExtension').mockResolvedValue({
-        name: 'new-ext',
-        version: '1.1.0',
-      } as GeminiCLIExtension);
-
-      vi.spyOn(manager, 'loadExtensionConfig').mockResolvedValue({
-        name: 'new-ext',
-        version: '1.0.0',
-      });
 
       const dispatch = vi.fn();
 
-      await updateExtension(
-        extension,
-        manager,
-        ExtensionUpdateState.UPDATE_AVAILABLE,
-        dispatch,
+      await expect(
+        updateExtension(
+          extension,
+          manager,
+          ExtensionUpdateState.UPDATE_AVAILABLE,
+          dispatch,
+        ),
+      ).rejects.toThrow(
+        'Security Alert: No integrity data found for new-ext. To establish trust, please reinstall this extension.',
       );
 
-      expect(debugLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('No integrity data found for new-ext'),
-      );
-      expect(storeIntegritySpy).toHaveBeenCalled();
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: { name: 'new-ext', state: ExtensionUpdateState.ERROR },
+      });
 
       verifyIntegritySpy.mockRestore();
-      storeIntegritySpy.mockRestore();
     });
   });
 });

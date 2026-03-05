@@ -376,6 +376,12 @@ Would you like to attempt to install via "git clone" instead?`,
         );
         await fs.promises.writeFile(metadataPath, metadataString);
 
+        // Establish trust at point of installation
+        await this.integrityManager.storeIntegrity(
+          newExtensionConfig.name,
+          installMetadata,
+        );
+
         // TODO: Gracefully handle this call failing, we should back up the old
         // extension prior to overwriting it and then restore and restart it.
         extension = await this.loadExtension(destinationPath);
