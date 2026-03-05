@@ -27,6 +27,7 @@ const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
   'docker',
   'podman',
   'sandbox-exec',
+  'runsc',
   'lxc',
 ];
 
@@ -64,17 +65,30 @@ function getSandboxCommand(
         )}`,
       );
     }
-    // confirm that specified command exists
-    if (commandExists.sync(sandbox)) {
-      return sandbox;
+    // runsc (gVisor) is only supported on Linux
+    if (sandbox === 'runsc' && os.platform() !== 'linux') {
+      throw new FatalSandboxError(
+        'gVisor (runsc) sandboxing is only supported on Linux',
+      );
     }
-    throw new FatalSandboxError(
-      `Missing sandbox command '${sandbox}' (from GEMINI_SANDBOX)`,
-    );
+    // confirm that specified command exists
+    if (!commandExists.sync(sandbox)) {
+      throw new FatalSandboxError(
+        `Missing sandbox command '${sandbox}' (from GEMINI_SANDBOX)`,
+      );
+    }
+    // runsc uses Docker with --runtime=runsc; both must be available (prioritize runsc when explicitly chosen)
+    if (sandbox === 'runsc' && !commandExists.sync('docker')) {
+      throw new FatalSandboxError(
+        "runsc (gVisor) requires Docker. Install Docker, or use sandbox: 'docker'.",
+      );
+    }
+    return sandbox;
   }
 
   // look for seatbelt, docker, or podman, in that order
   // for container-based sandboxing, require sandbox to be enabled explicitly
+  // note: runsc is NOT auto-detected, it must be explicitly specified
   if (os.platform() === 'darwin' && commandExists.sync('sandbox-exec')) {
     return 'sandbox-exec';
   } else if (commandExists.sync('docker') && sandbox === true) {
