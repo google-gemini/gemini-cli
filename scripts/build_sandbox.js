@@ -130,6 +130,12 @@ const isWindows = os.platform() === 'win32';
 const shellToUse = isWindows ? 'powershell.exe' : '/bin/bash';
 
 function buildImage(imageName, dockerfile) {
+  if (sandboxCommand === 'udocker') {
+    console.log(
+      `Skipping build for udocker. Please pull the image manually using 'udocker pull <image>'.`,
+    );
+    return;
+  }
   console.log(`building ${imageName} ... (can be slow first time)`);
 
   let buildCommandArgs = '';

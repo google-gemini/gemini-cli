@@ -77,14 +77,41 @@ export function parseImageName(image: string): string {
   return tag ? `${name}-${tag}` : name;
 }
 
+function sanitizePort(value: string): string | undefined {
+  const trimmedValue = value.trim();
+  if (!/^\d{1,5}$/.test(trimmedValue)) {
+    return undefined;
+  }
+  const port = Number(trimmedValue);
+  return port >= 1 && port <= 65535 ? trimmedValue : undefined;
+}
+
 export function ports(): string[] {
   return (process.env['SANDBOX_PORTS'] ?? '')
     .split(',')
-    .filter((p) => p.trim())
-    .map((p) => p.trim());
+    .map((port) => sanitizePort(port))
+    .filter((port): port is string => Boolean(port));
 }
 
-export function entrypoint(workdir: string, cliArgs: string[]): string[] {
+export function sanitizeDebugPort(value: string | undefined): string {
+  if (!value) {
+    return '9229';
+  }
+
+  const trimmedValue = value.trim();
+  if (!/^\d{1,5}$/.test(trimmedValue)) {
+    return '9229';
+  }
+
+  const port = Number(trimmedValue);
+  return port >= 1 && port <= 65535 ? trimmedValue : '9229';
+}
+
+export function entrypoint(
+  workdir: string,
+  cliArgs: string[],
+  isDirectCommand = false,
+): string[] {
   const isWindows = os.platform() === 'win32';
   const containerWorkdir = getContainerPath(workdir);
   const shellCmds = [];
@@ -133,18 +160,21 @@ export function entrypoint(workdir: string, cliArgs: string[]): string[] {
     ),
   );
 
-  const quotedCliArgs = cliArgs.slice(2).map((arg) => quote([arg]));
+  const quotedCliArgs = (isDirectCommand ? cliArgs : cliArgs.slice(2)).map(
+    (arg) => quote([arg]),
+  );
   const isDebugMode =
     process.env['DEBUG'] === 'true' || process.env['DEBUG'] === '1';
-  const cliCmd =
-    process.env['NODE_ENV'] === 'development'
+  const cliCmd = isDirectCommand
+    ? ''
+    : process.env['NODE_ENV'] === 'development'
       ? isDebugMode
         ? 'npm run debug --'
         : 'npm rebuild && npm run start --'
       : isDebugMode
-        ? `node --inspect-brk=0.0.0.0:${process.env['DEBUG_PORT'] || '9229'} $(which gemini)`
+        ? `node --inspect-brk=0.0.0.0:${sanitizeDebugPort(process.env['DEBUG_PORT'])} $(which gemini)`
         : 'gemini';
 
-  const args = [...shellCmds, cliCmd, ...quotedCliArgs];
+  const args = [...shellCmds, cliCmd, ...quotedCliArgs].filter(Boolean);
   return ['bash', '-c', args.join(' ')];
 }

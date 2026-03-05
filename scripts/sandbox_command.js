@@ -96,9 +96,11 @@ if (['1', 'true'].includes(geminiSandbox)) {
     command = 'docker';
   } else if (commandExists('podman')) {
     command = 'podman';
+  } else if (commandExists('udocker')) {
+    command = 'udocker';
   } else {
     console.error(
-      'ERROR: install docker or podman or specify command in GEMINI_SANDBOX',
+      'ERROR: install docker, podman, udocker, or specify command in GEMINI_SANDBOX',
     );
     process.exit(1);
   }

@@ -28,6 +28,7 @@ const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
   'podman',
   'sandbox-exec',
   'lxc',
+  'udocker',
 ];
 
 function isSandboxCommand(value: string): value is SandboxConfig['command'] {
@@ -81,6 +82,8 @@ function getSandboxCommand(
     return 'docker';
   } else if (commandExists.sync('podman') && sandbox === true) {
     return 'podman';
+  } else if (commandExists.sync('udocker') && sandbox === true) {
+    return 'udocker';
   }
 
   // throw an error if user requested sandbox but no command was found
