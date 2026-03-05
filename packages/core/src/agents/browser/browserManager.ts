@@ -26,6 +26,16 @@ import { Storage } from '../../config/storage.js';
 import { injectInputBlocker } from './inputBlocker.js';
 import * as path from 'node:path';
 import { injectAutomationOverlay } from './automationOverlay.js';
+import { recordBrowserAgentConnectionMetrics } from '../../telemetry/metrics.js';
+
+function categorizeConnectionError(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes('already running')) return 'profile_locked';
+  if (lower.includes('timed out')) return 'timeout';
+  if (lower.includes('connection refused') || lower.includes('econnrefused'))
+    return 'connection_refused';
+  return 'unknown';
+}
 
 // Pin chrome-devtools-mcp version for reproducibility.
 const CHROME_DEVTOOLS_MCP_VERSION = '0.17.1';
@@ -258,7 +268,32 @@ export class BrowserManager {
     if (this.rawMcpClient) {
       return;
     }
-    await this.connectMcp();
+
+    const connectStart = Date.now();
+    const browserConfig = this.config.getBrowserAgentConfig();
+    const sessionMode = browserConfig.customConfig.sessionMode ?? 'isolated';
+    const headless = browserConfig.customConfig.headless ?? false;
+
+    try {
+      await this.connectMcp();
+      recordBrowserAgentConnectionMetrics(this.config, {
+        durationMs: Date.now() - connectStart,
+        sessionMode,
+        headless,
+        success: true,
+      });
+    } catch (error) {
+      recordBrowserAgentConnectionMetrics(this.config, {
+        durationMs: Date.now() - connectStart,
+        sessionMode,
+        headless,
+        success: false,
+        errorType: categorizeConnectionError(
+          error instanceof Error ? error.message : String(error),
+        ),
+      });
+      throw error;
+    }
   }
 
   /**

@@ -48,10 +48,21 @@ vi.mock('../../utils/debugLogger.js', () => ({
   },
 }));
 
+vi.mock('../../telemetry/metrics.js', () => ({
+  recordBrowserAgentToolDiscoveryMetrics: vi.fn(),
+  recordBrowserAgentVisionStatus: vi.fn(),
+  recordBrowserAgentCleanupMetrics: vi.fn(),
+}));
+
 import {
   buildBrowserSystemPrompt,
   BROWSER_AGENT_NAME,
 } from './browserAgentDefinition.js';
+import {
+  recordBrowserAgentToolDiscoveryMetrics,
+  recordBrowserAgentVisionStatus,
+  recordBrowserAgentCleanupMetrics,
+} from '../../telemetry/metrics.js';
 
 describe('browserAgentFactory', () => {
   let mockConfig: Config;
@@ -93,6 +104,10 @@ describe('browserAgentFactory', () => {
       subscribe: vi.fn(),
       unsubscribe: vi.fn(),
     } as unknown as MessageBus;
+
+    vi.mocked(recordBrowserAgentToolDiscoveryMetrics).mockClear();
+    vi.mocked(recordBrowserAgentVisionStatus).mockClear();
+    vi.mocked(recordBrowserAgentCleanupMetrics).mockClear();
   });
 
   afterEach(() => {
@@ -137,6 +152,25 @@ describe('browserAgentFactory', () => {
       expect(definition.name).toBe(BROWSER_AGENT_NAME);
       // 5 MCP tools + 1 type_text composite tool (no analyze_screenshot without visualModel)
       expect(definition.toolConfig?.tools).toHaveLength(6);
+
+      // Verify tool discovery metrics
+      expect(recordBrowserAgentToolDiscoveryMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          toolCount: 6, // 5 MCP tools + 1 custom tool (type_text)
+          sessionMode: 'persistent', // Default config
+          missingSemanticTools: expect.any(Array),
+        }),
+      );
+
+      // Verify vision status metrics (disabled in mockConfig)
+      expect(recordBrowserAgentVisionStatus).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          enabled: false,
+          disabledReason: 'no_visual_model',
+        }),
+      );
     });
 
     it('should return browser manager for cleanup', async () => {
@@ -237,6 +271,14 @@ describe('browserAgentFactory', () => {
           )
           .map((t) => t.name) ?? [];
       expect(toolNames).toContain('analyze_screenshot');
+
+      // Verify vision status metric recorded as enabled
+      expect(recordBrowserAgentVisionStatus).toHaveBeenCalledWith(
+        configWithVision,
+        expect.objectContaining({
+          enabled: true,
+        }),
+      );
     });
 
     it('should include domain restrictions in system prompt when configured', async () => {
@@ -302,9 +344,20 @@ describe('browserAgentFactory', () => {
     it('should call close on browser manager', async () => {
       await cleanupBrowserAgent(
         mockBrowserManager as unknown as BrowserManager,
+        mockConfig,
+        'isolated',
       );
 
       expect(mockBrowserManager.close).toHaveBeenCalled();
+
+      expect(recordBrowserAgentCleanupMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          success: true,
+          sessionMode: 'isolated',
+          durationMs: expect.any(Number),
+        }),
+      );
     });
 
     it('should handle errors during cleanup gracefully', async () => {
@@ -313,7 +366,18 @@ describe('browserAgentFactory', () => {
       } as unknown as BrowserManager;
 
       // Should not throw
-      await expect(cleanupBrowserAgent(errorManager)).resolves.toBeUndefined();
+      await expect(
+        cleanupBrowserAgent(errorManager, mockConfig, 'persistent'),
+      ).resolves.toBeUndefined();
+
+      expect(recordBrowserAgentCleanupMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          success: false,
+          sessionMode: 'persistent',
+          durationMs: expect.any(Number),
+        }),
+      );
     });
   });
 });

@@ -33,10 +33,13 @@ import {
 } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import {
+import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';
 import { removeInputBlocker } from './inputBlocker.js';
+import { recordBrowserAgentTaskMetrics } from '../../telemetry/metrics.js';
+import { AgentTerminateMode } from '../types.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -228,8 +231,15 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
+    const invocationStart = Date.now();
+    const browserConfig = this.config.getBrowserAgentConfig();
+    const sessionMode = browserConfig.customConfig.sessionMode ?? 'isolated';
+    const headless = browserConfig.customConfig.headless ?? false;
+
     let browserManager;
     let recentActivity: SubagentActivityItem[] = [];
+    let taskSuccess = false;
+    let visionEnabled = false;
 
     try {
       if (updateOutput) {
@@ -274,6 +284,19 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       const { definition } = result;
       browserManager = result.browserManager;
 
+      visionEnabled =
+        definition.toolConfig?.tools.some((t) => {
+          if (typeof t === 'string') return t === 'analyze_screenshot';
+          if (typeof t === 'object' && 'name' in t)
+            return t.name === 'analyze_screenshot';
+          return false;
+        }) ?? false;
+
+      if (updateOutput) {
+        updateOutput(
+          `🌐 Browser connected. Tools: ${definition.toolConfig?.tools.length ?? 0}\n`,
+        );
+      }
       // Create activity callback for streaming output
       const onActivity = (activity: SubagentActivityEvent): void => {
         if (!updateOutput) return;
@@ -421,6 +444,17 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
 
       const output = await executor.run(this.params, signal);
 
+      try {
+        const parsed: unknown = JSON.parse(output.result);
+        taskSuccess =
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          'success' in parsed &&
+          (parsed as { success: unknown }).success === true;
+      } catch {
+        taskSuccess = output.terminate_reason === AgentTerminateMode.GOAL;
+      }
+
       const displayResult = safeJsonToMarkdown(output.result);
 
       const resultContent = `Browser agent finished.
@@ -489,10 +523,18 @@ ${displayResult}
         },
       };
     } finally {
+      recordBrowserAgentTaskMetrics(this.config, {
+        success: taskSuccess,
+        sessionMode,
+        visionEnabled,
+        headless,
+        durationMs: Date.now() - invocationStart,
+      });
+
       // Always cleanup browser resources
       if (browserManager) {
         await removeInputBlocker(browserManager);
-        await cleanupBrowserAgent(browserManager);
+        await cleanupBrowserAgent(browserManager, this.config, sessionMode);
       }
     }
   }

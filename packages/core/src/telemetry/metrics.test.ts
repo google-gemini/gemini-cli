@@ -106,6 +106,11 @@ describe('Telemetry Metrics', () => {
   let recordKeychainAvailabilityModule: typeof import('./metrics.js').recordKeychainAvailability;
   let recordTokenStorageInitializationModule: typeof import('./metrics.js').recordTokenStorageInitialization;
   let recordInvalidChunkModule: typeof import('./metrics.js').recordInvalidChunk;
+  let recordBrowserAgentConnectionMetricsModule: typeof import('./metrics.js').recordBrowserAgentConnectionMetrics;
+  let recordBrowserAgentToolDiscoveryMetricsModule: typeof import('./metrics.js').recordBrowserAgentToolDiscoveryMetrics;
+  let recordBrowserAgentVisionStatusModule: typeof import('./metrics.js').recordBrowserAgentVisionStatus;
+  let recordBrowserAgentTaskMetricsModule: typeof import('./metrics.js').recordBrowserAgentTaskMetrics;
+  let recordBrowserAgentCleanupMetricsModule: typeof import('./metrics.js').recordBrowserAgentCleanupMetrics;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -156,6 +161,16 @@ describe('Telemetry Metrics', () => {
     recordTokenStorageInitializationModule =
       metricsJsModule.recordTokenStorageInitialization;
     recordInvalidChunkModule = metricsJsModule.recordInvalidChunk;
+    recordBrowserAgentConnectionMetricsModule =
+      metricsJsModule.recordBrowserAgentConnectionMetrics;
+    recordBrowserAgentToolDiscoveryMetricsModule =
+      metricsJsModule.recordBrowserAgentToolDiscoveryMetrics;
+    recordBrowserAgentVisionStatusModule =
+      metricsJsModule.recordBrowserAgentVisionStatus;
+    recordBrowserAgentTaskMetricsModule =
+      metricsJsModule.recordBrowserAgentTaskMetrics;
+    recordBrowserAgentCleanupMetricsModule =
+      metricsJsModule.recordBrowserAgentCleanupMetrics;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -1576,6 +1591,247 @@ describe('Telemetry Metrics', () => {
           'session.id': 'test-session-id',
           'installation.id': 'test-installation-id',
           'user.email': 'test@example.com',
+        });
+      });
+    });
+  });
+
+  describe('Browser Agent Metrics', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getTelemetryEnabled: () => true,
+    } as unknown as Config;
+
+    describe('recordBrowserAgentConnectionMetrics', () => {
+      it('should not record metrics if not initialized', () => {
+        recordBrowserAgentConnectionMetricsModule(mockConfig, {
+          durationMs: 1000,
+          sessionMode: 'isolated',
+          headless: true,
+          success: true,
+        });
+        expect(mockHistogramRecordFn).not.toHaveBeenCalled();
+      });
+
+      it('should record connection duration histogram on success', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+        mockCounterAddFn.mockClear();
+
+        recordBrowserAgentConnectionMetricsModule(mockConfig, {
+          durationMs: 1200,
+          sessionMode: 'persistent',
+          headless: false,
+          success: true,
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(1200, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          session_mode: 'persistent',
+          headless: false,
+          success: true,
+        });
+        // Counter shouldn't be called on success
+        expect(mockCounterAddFn).not.toHaveBeenCalled();
+      });
+
+      it('should record connection duration histogram AND failure counter on failure', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+        mockCounterAddFn.mockClear();
+
+        recordBrowserAgentConnectionMetricsModule(mockConfig, {
+          durationMs: 500,
+          sessionMode: 'existing',
+          headless: true,
+          success: false,
+          errorType: 'connection_refused',
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(500, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          session_mode: 'existing',
+          headless: true,
+          success: false,
+        });
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          session_mode: 'existing',
+          headless: true,
+          error_type: 'connection_refused',
+        });
+      });
+    });
+
+    describe('recordBrowserAgentToolDiscoveryMetrics', () => {
+      it('should not record metrics if not initialized', () => {
+        recordBrowserAgentToolDiscoveryMetricsModule(mockConfig, {
+          toolCount: 5,
+          sessionMode: 'isolated',
+          missingSemanticTools: ['click'],
+        });
+        expect(mockCounterAddFn).not.toHaveBeenCalled();
+      });
+
+      it('should record tools_discovered counter and missing_semantic counter', () => {
+        initializeMetricsModule(mockConfig);
+        mockCounterAddFn.mockClear();
+
+        recordBrowserAgentToolDiscoveryMetricsModule(mockConfig, {
+          toolCount: 15,
+          sessionMode: 'isolated',
+          missingSemanticTools: ['click', 'fill'],
+        });
+
+        // 1 for tool count, 2 for missing tools
+        expect(mockCounterAddFn).toHaveBeenCalledTimes(3);
+
+        expect(mockCounterAddFn).toHaveBeenNthCalledWith(1, 15, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          session_mode: 'isolated',
+        });
+
+        expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          tool_name: 'click',
+        });
+
+        expect(mockCounterAddFn).toHaveBeenNthCalledWith(3, 1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          tool_name: 'fill',
+        });
+      });
+    });
+
+    describe('recordBrowserAgentVisionStatus', () => {
+      it('should record enabled=true with empty disabled_reason', () => {
+        initializeMetricsModule(mockConfig);
+        mockCounterAddFn.mockClear();
+
+        recordBrowserAgentVisionStatusModule(mockConfig, {
+          enabled: true,
+        });
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          enabled: true,
+          disabled_reason: '',
+        });
+      });
+
+      it('should record enabled=false with specific disabled_reason', () => {
+        initializeMetricsModule(mockConfig);
+        mockCounterAddFn.mockClear();
+
+        recordBrowserAgentVisionStatusModule(mockConfig, {
+          enabled: false,
+          disabledReason: 'no_visual_model',
+        });
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          enabled: false,
+          disabled_reason: 'no_visual_model',
+        });
+      });
+    });
+
+    describe('recordBrowserAgentTaskMetrics', () => {
+      it('should record task_outcome counter and task_duration histogram', () => {
+        initializeMetricsModule(mockConfig);
+        mockCounterAddFn.mockClear();
+        mockHistogramRecordFn.mockClear();
+
+        recordBrowserAgentTaskMetricsModule(mockConfig, {
+          success: true,
+          sessionMode: 'isolated',
+          visionEnabled: true,
+          headless: false,
+          durationMs: 45000,
+        });
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          success: true,
+          session_mode: 'isolated',
+          vision_enabled: true,
+          headless: false,
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(45000, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          success: true,
+          session_mode: 'isolated',
+        });
+      });
+    });
+
+    describe('recordBrowserAgentCleanupMetrics', () => {
+      it('should record cleanup_duration histogram on success', () => {
+        initializeMetricsModule(mockConfig);
+        mockCounterAddFn.mockClear();
+        mockHistogramRecordFn.mockClear();
+
+        recordBrowserAgentCleanupMetricsModule(mockConfig, {
+          durationMs: 250,
+          sessionMode: 'persistent',
+          success: true,
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(250, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          session_mode: 'persistent',
+        });
+
+        expect(mockCounterAddFn).not.toHaveBeenCalled();
+      });
+
+      it('should record cleanup_duration histogram AND cleanup_failure counter on failure', () => {
+        initializeMetricsModule(mockConfig);
+        mockCounterAddFn.mockClear();
+        mockHistogramRecordFn.mockClear();
+
+        recordBrowserAgentCleanupMetricsModule(mockConfig, {
+          durationMs: 1500,
+          sessionMode: 'isolated',
+          success: false,
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(1500, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          session_mode: 'isolated',
+        });
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          session_mode: 'isolated',
         });
       });
     });
