@@ -16,6 +16,11 @@
 
 # Note: .gemini-clipboard/ is NOT in gitignore so Gemini can access pasted images
 
+# Arch Linux build artifacts
+/src/
+/pkg/
+*.pkg.tar.*
+
 # Dependency directory
 node_modules
 bower_components

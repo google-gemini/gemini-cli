@@ -15,6 +15,7 @@ import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
 import os from 'node:os';
+import { getEventListeners } from 'node:events';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import type { Config } from '../config/config.js';
@@ -246,6 +247,27 @@ describe('GlobTool', () => {
       const invocation = globTool.build(params);
       const result = await invocation.execute(abortSignal);
       expect(result.error?.type).toBe(ToolErrorType.GLOB_EXECUTION_ERROR);
+    }, 30000);
+
+    it('should not accumulate abort listeners on a reused parent signal', async () => {
+      const controller = new AbortController();
+      const listenerCountBefore = getEventListeners(
+        controller.signal,
+        'abort',
+      ).length;
+      const params: GlobToolParams = { pattern: '*.txt' };
+
+      for (let i = 0; i < 15; i++) {
+        const invocation = globTool.build(params);
+        await invocation.execute(controller.signal);
+      }
+
+      const listenerCountAfter = getEventListeners(
+        controller.signal,
+        'abort',
+      ).length;
+
+      expect(listenerCountAfter).toBe(listenerCountBefore);
     }, 30000);
   });
 

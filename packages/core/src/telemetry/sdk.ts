@@ -103,9 +103,22 @@ let tokenStorageTypeListener:
   | undefined = undefined;
 const telemetryBuffer: Array<() => void | Promise<void>> = [];
 let activeTelemetryEmail: string | undefined;
+let sigtermHandler: (() => void) | undefined;
+let sigintHandler: (() => void) | undefined;
 
 export function isTelemetrySdkInitialized(): boolean {
   return telemetryInitialized;
+}
+
+function cleanupProcessSignalHandlers(): void {
+  if (sigtermHandler) {
+    process.off('SIGTERM', sigtermHandler);
+    sigtermHandler = undefined;
+  }
+  if (sigintHandler) {
+    process.off('SIGINT', sigintHandler);
+    sigintHandler = undefined;
+  }
 }
 
 export function bufferTelemetryEvent(fn: () => void | Promise<void>): void {
@@ -349,14 +362,22 @@ export async function initializeTelemetry(
   // Note: We don't use process.on('exit') here because that callback is synchronous
   // and won't wait for the async shutdownTelemetry() to complete.
   // Instead, telemetry shutdown is handled in runExitCleanup() in cleanup.ts
-  process.on('SIGTERM', () => {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    shutdownTelemetry(config);
-  });
-  process.on('SIGINT', () => {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    shutdownTelemetry(config);
-  });
+  if (telemetryInitialized) {
+    if (!sigtermHandler) {
+      sigtermHandler = () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        shutdownTelemetry(config);
+      };
+      process.on('SIGTERM', sigtermHandler);
+    }
+    if (!sigintHandler) {
+      sigintHandler = () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        shutdownTelemetry(config);
+      };
+      process.on('SIGINT', sigintHandler);
+    }
+  }
 }
 
 /**
@@ -386,6 +407,7 @@ export async function shutdownTelemetry(
   fromProcessExit = true,
 ): Promise<void> {
   if (!telemetryInitialized || !sdk) {
+    cleanupProcessSignalHandlers();
     return;
   }
   try {
@@ -397,6 +419,7 @@ export async function shutdownTelemetry(
   } catch (error) {
     debugLogger.error('Error shutting down SDK:', error);
   } finally {
+    cleanupProcessSignalHandlers();
     telemetryInitialized = false;
     sdk = undefined;
     // Fully reset the global APIs to allow for re-initialization.

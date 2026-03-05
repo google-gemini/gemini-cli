@@ -342,6 +342,23 @@ describe('Telemetry SDK', () => {
     });
   });
 
+  it('should remove process signal listeners on shutdown', async () => {
+    const sigtermListenerCountBefore = process.listenerCount('SIGTERM');
+    const sigintListenerCountBefore = process.listenerCount('SIGINT');
+
+    await initializeTelemetry(mockConfig);
+
+    expect(process.listenerCount('SIGTERM')).toBe(
+      sigtermListenerCountBefore + 1,
+    );
+    expect(process.listenerCount('SIGINT')).toBe(sigintListenerCountBefore + 1);
+
+    await shutdownTelemetry(mockConfig, false);
+
+    expect(process.listenerCount('SIGTERM')).toBe(sigtermListenerCountBefore);
+    expect(process.listenerCount('SIGINT')).toBe(sigintListenerCountBefore);
+  });
+
   describe('bufferTelemetryEvent', () => {
     it('should execute immediately if SDK is initialized', async () => {
       await initializeTelemetry(mockConfig);

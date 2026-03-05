@@ -91,6 +91,29 @@ export interface GlobToolParams {
   respect_gemini_ignore?: boolean;
 }
 
+function createScopedAbortSignal(parentSignal: AbortSignal): {
+  signal: AbortSignal;
+  cleanup: () => void;
+} {
+  const controller = new AbortController();
+  const abortFromParent = () => {
+    controller.abort();
+  };
+
+  if (parentSignal.aborted) {
+    abortFromParent();
+  } else {
+    parentSignal.addEventListener('abort', abortFromParent, { once: true });
+  }
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      parentSignal.removeEventListener('abort', abortFromParent);
+    },
+  };
+}
+
 class GlobToolInvocation extends BaseToolInvocation<
   GlobToolParams,
   ToolResult
@@ -162,6 +185,8 @@ class GlobToolInvocation extends BaseToolInvocation<
           pattern = escape(pattern);
         }
 
+        const { signal: scopedSignal, cleanup } =
+          createScopedAbortSignal(signal);
         const entries = (await glob(pattern, {
           cwd: searchDir,
           withFileTypes: true,
@@ -171,8 +196,8 @@ class GlobToolInvocation extends BaseToolInvocation<
           dot: true,
           ignore: this.config.getFileExclusions().getGlobExcludes(),
           follow: false,
-          signal,
-        })) as GlobPath[];
+          signal: scopedSignal,
+        }).finally(cleanup)) as GlobPath[];
 
         allEntries.push(...entries);
       }
