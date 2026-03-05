@@ -15,17 +15,16 @@ import {
   type Mock,
 } from 'vitest';
 
-import type {
-  GenerateContentOptions,
-  GenerateJsonOptions,
+import {
+  BaseLlmClient,
+  type GenerateContentOptions,
+  type GenerateJsonOptions,
 } from './baseLlmClient.js';
-import { BaseLlmClient } from './baseLlmClient.js';
-import type { ContentGenerator } from './contentGenerator.js';
+import { AuthType, type ContentGenerator } from './contentGenerator.js';
 import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import type { GenerateContentResponse } from '@google/genai';
 import type { Config } from '../config/config.js';
-import { AuthType } from './contentGenerator.js';
 import { reportError } from '../utils/errorReporting.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { retryWithBackoff } from '../utils/retry.js';

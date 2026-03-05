@@ -9,16 +9,14 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { inspect } from 'node:util';
 import process from 'node:process';
-import type {
-  ContentGenerator,
-  ContentGeneratorConfig,
-} from '../core/contentGenerator.js';
-import type { OverageStrategy } from '../billing/billing.js';
 import {
   AuthType,
   createContentGenerator,
   createContentGeneratorConfig,
+  type ContentGenerator,
+  type ContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import type { OverageStrategy } from '../billing/billing.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
@@ -44,12 +42,12 @@ import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
-import type { TelemetryTarget } from '../telemetry/index.js';
 import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
+  type TelemetryTarget,
 } from '../telemetry/index.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
@@ -69,8 +67,18 @@ import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
-import type { FileSystemService } from '../services/fileSystemService.js';
-import { StandardFileSystemService } from '../services/fileSystemService.js';
+import {
+  StandardFileSystemService,
+  type FileSystemService,
+} from '../services/fileSystemService.js';
+import {
+  TrackerCreateTaskTool,
+  TrackerUpdateTaskTool,
+  TrackerGetTaskTool,
+  TrackerListTasksTool,
+  TrackerAddDependencyTool,
+  TrackerVisualizeTool,
+} from '../tools/trackerTools.js';
 import {
   logRipgrepFallback,
   logFlashFallback,
@@ -90,13 +98,14 @@ import type {
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
-import type {
-  ModelConfig,
-  ModelConfigServiceConfig,
+import {
+  ModelConfigService,
+  type ModelConfig,
+  type ModelConfigServiceConfig,
 } from '../services/modelConfigService.js';
-import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
+import { TrackerService } from '../services/trackerService.js';
 import type { GenerateContentParameters } from '@google/genai';
 
 // Re-export OAuth config type
@@ -124,12 +133,14 @@ import type {
 } from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
-import type { Experiments } from '../code_assist/experiments/experiments.js';
+import {
+  getExperiments,
+  type Experiments,
+} from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentTool } from '../agents/subagent-tool.js';
-import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
@@ -251,11 +262,12 @@ export interface CustomTheme {
   };
   border?: {
     default?: string;
-    focused?: string;
   };
   ui?: {
     comment?: string;
     symbol?: string;
+    active?: string;
+    focus?: string;
     gradient?: string[];
   };
   status?: {
@@ -340,6 +352,15 @@ export interface GeminiCLIExtension {
    * Safety checkers contributed by this extension.
    */
   checkers?: SafetyCheckerRule[];
+  /**
+   * Planning features configuration contributed by this extension.
+   */
+  plan?: {
+    /**
+     * The directory where planning artifacts are stored.
+     */
+    directory?: string;
+  };
 }
 
 export interface ExtensionInstallMetadata {
@@ -352,10 +373,10 @@ export interface ExtensionInstallMetadata {
 }
 
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
-import type { FileFilteringOptions } from './constants.js';
 import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+  type FileFilteringOptions,
 } from './constants.js';
 import {
   DEFAULT_TOOL_PROTECTION_THRESHOLD,
@@ -371,10 +392,6 @@ import { McpClientManager } from '../tools/mcp-client-manager.js';
 import { type McpContext } from '../tools/mcp-client.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getErrorMessage } from '../utils/errors.js';
-import {
-  ENTER_PLAN_MODE_TOOL_NAME,
-  EXIT_PLAN_MODE_TOOL_NAME,
-} from '../tools/tool-names.js';
 
 export type { FileFilteringOptions };
 export {
@@ -430,7 +447,7 @@ export enum AuthProviderType {
 }
 
 export interface SandboxConfig {
-  command: 'docker' | 'podman' | 'sandbox-exec';
+  command: 'docker' | 'podman' | 'sandbox-exec' | 'lxc';
   image: string;
 }
 
@@ -565,6 +582,7 @@ export interface ConfigParameters {
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
+  tracker?: boolean;
   planSettings?: PlanSettings;
   modelSteering?: boolean;
   onModelChange?: (model: string) => void;
@@ -598,6 +616,7 @@ export class Config implements McpContext {
   private sessionId: string;
   private clientVersion: string;
   private fileSystemService: FileSystemService;
+  private trackerService?: TrackerService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
   readonly modelConfigService: ModelConfigService;
@@ -717,6 +736,7 @@ export class Config implements McpContext {
   private compressionTruncationCounter = 0;
   private initialized = false;
   private initPromise: Promise<void> | undefined;
+  private mcpInitializationPromise: Promise<void> | null = null;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
@@ -775,6 +795,7 @@ export class Config implements McpContext {
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private readonly trackerEnabled: boolean;
   private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
@@ -865,6 +886,7 @@ export class Config implements McpContext {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
+    this.trackerEnabled = params.tracker ?? false;
     this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
@@ -1097,8 +1119,15 @@ export class Config implements McpContext {
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
       const plansDir = this.storage.getPlansDir();
-      await fs.promises.mkdir(plansDir, { recursive: true });
-      this.workspaceContext.addDirectory(plansDir);
+      try {
+        await fs.promises.access(plansDir);
+        this.workspaceContext.addDirectory(plansDir);
+      } catch {
+        // Directory does not exist yet, so we don't add it to the workspace context.
+        // It will be created when the first plan is written. Since custom plan
+        // directories must be within the project root, they are automatically
+        // covered by the project-wide file discovery once created.
+      }
     }
 
     // Initialize centralized FileDiscoveryService
@@ -1125,7 +1154,7 @@ export class Config implements McpContext {
     );
     // We do not await this promise so that the CLI can start up even if
     // MCP servers are slow to connect.
-    const mcpInitialization = Promise.allSettled([
+    this.mcpInitializationPromise = Promise.allSettled([
       this.mcpClientManager.startConfiguredMcpServers(),
       this.getExtensionLoader().start(this),
     ]).then((results) => {
@@ -1137,7 +1166,7 @@ export class Config implements McpContext {
     });
 
     if (!this.interactive || this.experimentalZedIntegration) {
-      await mcpInitialization;
+      await this.mcpInitializationPromise;
     }
 
     if (this.skillsSupport) {
@@ -1172,7 +1201,6 @@ export class Config implements McpContext {
     }
 
     await this.geminiClient.initialize();
-    this.syncPlanModeTools();
     this.initialized = true;
   }
 
@@ -1376,9 +1404,9 @@ export class Config implements McpContext {
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
-      if (this.onModelChange && !isTemporary) {
-        this.onModelChange(newModel);
-      }
+    }
+    if (this.onModelChange && !isTemporary) {
+      this.onModelChange(newModel);
     }
     this.modelAvailabilityService.reset();
   }
@@ -1998,49 +2026,12 @@ export class Config implements McpContext {
       (currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO);
 
     if (isPlanModeTransition || isYoloModeTransition) {
-      this.syncPlanModeTools();
+      if (this.geminiClient?.isInitialized()) {
+        this.geminiClient.setTools().catch((err) => {
+          debugLogger.error('Failed to update tools', err);
+        });
+      }
       this.updateSystemInstructionIfInitialized();
-    }
-  }
-
-  /**
-   * Synchronizes enter/exit plan mode tools based on current mode.
-   */
-  syncPlanModeTools(): void {
-    const registry = this.getToolRegistry();
-    if (!registry) {
-      return;
-    }
-    const approvalMode = this.getApprovalMode();
-    const isPlanMode = approvalMode === ApprovalMode.PLAN;
-    const isYoloMode = approvalMode === ApprovalMode.YOLO;
-
-    if (isPlanMode) {
-      if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-        registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
-      }
-      if (!registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
-        registry.registerTool(new ExitPlanModeTool(this, this.messageBus));
-      }
-    } else {
-      if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
-        registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
-      }
-      if (this.planEnabled && !isYoloMode) {
-        if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-          registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
-        }
-      } else {
-        if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-          registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
-        }
-      }
-    }
-
-    if (this.geminiClient?.isInitialized()) {
-      this.geminiClient.setTools().catch((err) => {
-        debugLogger.error('Failed to update tools', err);
-      });
     }
   }
 
@@ -2216,6 +2207,15 @@ export class Config implements McpContext {
     return this.bugCommand;
   }
 
+  getTrackerService(): TrackerService {
+    if (!this.trackerService) {
+      this.trackerService = new TrackerService(
+        this.storage.getProjectTempTrackerDir(),
+      );
+    }
+    return this.trackerService;
+  }
+
   getFileService(): FileDiscoveryService {
     if (!this.fileDiscoveryService) {
       this.fileDiscoveryService = new FileDiscoveryService(this.targetDir, {
@@ -2233,6 +2233,12 @@ export class Config implements McpContext {
 
   getExperimentalZedIntegration(): boolean {
     return this.experimentalZedIntegration;
+  }
+
+  async waitForMcpInit(): Promise<void> {
+    if (this.mcpInitializationPromise) {
+      await this.mcpInitializationPromise;
+    }
   }
 
   getListExtensions(): boolean {
@@ -2275,6 +2281,10 @@ export class Config implements McpContext {
 
   isPlanEnabled(): boolean {
     return this.planEnabled;
+  }
+
+  isTrackerEnabled(): boolean {
+    return this.trackerEnabled;
   }
 
   getApprovedPlanPath(): string | undefined {
@@ -2842,6 +2852,29 @@ export class Config implements McpContext {
       );
       maybeRegister(EnterPlanModeTool, () =>
         registry.registerTool(new EnterPlanModeTool(this, this.messageBus)),
+      );
+    }
+
+    if (this.isTrackerEnabled()) {
+      maybeRegister(TrackerCreateTaskTool, () =>
+        registry.registerTool(new TrackerCreateTaskTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerUpdateTaskTool, () =>
+        registry.registerTool(new TrackerUpdateTaskTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerGetTaskTool, () =>
+        registry.registerTool(new TrackerGetTaskTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerListTasksTool, () =>
+        registry.registerTool(new TrackerListTasksTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerAddDependencyTool, () =>
+        registry.registerTool(
+          new TrackerAddDependencyTool(this, this.messageBus),
+        ),
+      );
+      maybeRegister(TrackerVisualizeTool, () =>
+        registry.registerTool(new TrackerVisualizeTool(this, this.messageBus)),
       );
     }
 

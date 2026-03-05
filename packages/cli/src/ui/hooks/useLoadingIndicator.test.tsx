@@ -49,7 +49,7 @@ describe('useLoadingIndicator', () => {
       shouldShowFocusHint?: boolean;
       retryStatus?: RetryAttemptPayload | null;
       mode?: LoadingPhrasesMode;
-      errorVerbosity?: 'low' | 'full';
+      errorVerbosity: 'low' | 'full';
     }) {
       hookResult = useLoadingIndicator({
         streamingState,
