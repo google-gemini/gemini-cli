@@ -236,6 +236,9 @@ describe('GeminiAgent', () => {
 
     expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
       AuthType.LOGIN_WITH_GOOGLE,
+      AuthType.LOGIN_WITH_GOOGLE,
+      undefined,
+      undefined,
       undefined,
     );
     expect(mockSettings.setValue).toHaveBeenCalledWith(
@@ -255,7 +258,10 @@ describe('GeminiAgent', () => {
 
     expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
       AuthType.USE_GEMINI,
+      AuthType.USE_GEMINI,
       'test-api-key',
+      undefined,
+      undefined,
     );
     expect(mockSettings.setValue).toHaveBeenCalledWith(
       SettingScope.User,
