@@ -300,4 +300,38 @@ describe('convertSessionToHistoryFormats', () => {
       ],
     });
   });
+
+  it('should render compression_marker as info message in UI history', () => {
+    const messages: MessageRecord[] = [
+      { type: 'user', content: 'Hello' } as MessageRecord,
+      { type: 'gemini', content: 'Hi there' } as MessageRecord,
+      {
+        type: 'compression_marker',
+        content: 'Context was compressed.',
+        compressedHistory: [
+          { role: 'user', parts: [{ text: 'Summary' }] },
+          { role: 'model', parts: [{ text: 'Got it' }] },
+        ],
+      } as MessageRecord,
+      { type: 'user', content: 'New message' } as MessageRecord,
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    // Compression marker should appear as an info message
+    expect(result.uiHistory).toHaveLength(4);
+    expect(result.uiHistory[0]).toMatchObject({ type: 'user', text: 'Hello' });
+    expect(result.uiHistory[1]).toMatchObject({
+      type: 'gemini',
+      text: 'Hi there',
+    });
+    expect(result.uiHistory[2]).toMatchObject({
+      type: 'info',
+      text: 'Context was compressed.',
+    });
+    expect(result.uiHistory[3]).toMatchObject({
+      type: 'user',
+      text: 'New message',
+    });
+  });
 });

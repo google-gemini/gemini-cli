@@ -26,14 +26,51 @@ function ensurePartArray(content: PartListUnion): Part[] {
 
 /**
  * Converts session/conversation data into Gemini client history formats.
+ *
+ * If the messages contain compression markers (recorded when context compression
+ * occurs), the last marker's compressedHistory is used as the base, and only
+ * messages after that marker are converted. This ensures resumed sessions
+ * reconstruct the compressed state rather than replaying the full uncompressed
+ * history.
  */
 export function convertSessionToClientHistory(
   messages: ConversationRecord['messages'],
 ): Array<{ role: 'user' | 'model'; parts: Part[] }> {
   const clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }> = [];
 
-  for (const msg of messages) {
-    if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
+  // Find the last compression marker to determine the resume boundary.
+  let lastCompressionMarkerIndex = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].type === 'compression_marker') {
+      lastCompressionMarkerIndex = i;
+      break;
+    }
+  }
+
+  // If a compression marker exists, use its compressed history as the base
+  // and only process messages that came after it.
+  if (lastCompressionMarkerIndex >= 0) {
+    const marker = messages[lastCompressionMarkerIndex];
+    if (marker.type === 'compression_marker') {
+      for (const entry of marker.compressedHistory) {
+        clientHistory.push({
+          role: entry.role === 'model' ? 'model' : 'user',
+          parts: entry.parts ? ensurePartArray(entry.parts) : [],
+        });
+      }
+    }
+  }
+
+  // Process messages after the compression marker (or all messages if no marker).
+  const startIndex = lastCompressionMarkerIndex + 1;
+  for (let i = startIndex; i < messages.length; i++) {
+    const msg = messages[i];
+    if (
+      msg.type === 'info' ||
+      msg.type === 'error' ||
+      msg.type === 'warning' ||
+      msg.type === 'compression_marker'
+    ) {
       continue;
     }
 

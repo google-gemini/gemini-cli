@@ -560,6 +560,9 @@ export function convertSessionToHistoryFormats(
         case 'gemini':
           messageType = MessageType.GEMINI;
           break;
+        case 'compression_marker':
+          messageType = MessageType.INFO;
+          break;
         default:
           checkExhaustive(msg);
           messageType = MessageType.GEMINI;

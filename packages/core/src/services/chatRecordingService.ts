@@ -83,6 +83,11 @@ export type ConversationRecordExtra =
       thoughts?: Array<ThoughtSummary & { timestamp: string }>;
       tokens?: TokensSummary | null;
       model?: string;
+    }
+  | {
+      type: 'compression_marker';
+      /** The compressed API history (Content[]) at the point of compression. */
+      compressedHistory: Content[];
     };
 
 /**
@@ -222,7 +227,7 @@ export class ChatRecordingService {
   }
 
   private newMessage(
-    type: ConversationRecordExtra['type'],
+    type: Exclude<ConversationRecordExtra['type'], 'compression_marker'>,
     content: PartListUnion,
     displayContent?: PartListUnion,
   ): MessageRecord {
@@ -240,7 +245,7 @@ export class ChatRecordingService {
    */
   recordMessage(message: {
     model: string | undefined;
-    type: ConversationRecordExtra['type'];
+    type: Exclude<ConversationRecordExtra['type'], 'compression_marker'>;
     content: PartListUnion;
     displayContent?: PartListUnion;
   }): void {
@@ -271,6 +276,38 @@ export class ChatRecordingService {
     } catch (error) {
       debugLogger.error('Error saving message to chat history.', error);
       throw error;
+    }
+  }
+
+  /**
+   * Records a compression boundary marker in the conversation.
+   *
+   * When context compression occurs, this marker captures the compressed API history
+   * so that session resume can reconstruct the correct post-compression state
+   * instead of replaying all pre-compression messages.
+   *
+   * @param compressedHistory The compressed API history (Content[]) after compression.
+   */
+  recordCompressionMarker(compressedHistory: Content[]): void {
+    if (!this.conversationFile) return;
+
+    try {
+      this.updateConversation((conversation) => {
+        conversation.messages.push({
+          id: randomUUID(),
+          timestamp: new Date().toISOString(),
+          type: 'compression_marker',
+          content: 'Context was compressed.',
+          compressedHistory,
+        });
+      });
+    } catch (error) {
+      debugLogger.error(
+        'Error saving compression marker to chat history.',
+        error,
+      );
+      // Don't throw - compression markers are best-effort; the session
+      // will still work, just without the optimization on resume.
     }
   }
 

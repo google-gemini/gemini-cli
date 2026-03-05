@@ -413,6 +413,7 @@ describe('Gemini Client (client.ts)', () => {
         getChatRecordingService: vi.fn().mockReturnValue({
           getConversation: vi.fn().mockReturnValue(null),
           getConversationFilePath: vi.fn().mockReturnValue(null),
+          recordCompressionMarker: vi.fn(),
         }),
       };
       client['chat'] = mockOriginalChat as GeminiChat;
@@ -647,6 +648,7 @@ describe('Gemini Client (client.ts)', () => {
       const mockRecordingService = {
         getConversation: vi.fn().mockReturnValue(mockConversation),
         getConversationFilePath: vi.fn().mockReturnValue(mockFilePath),
+        recordCompressionMarker: vi.fn(),
       };
       vi.mocked(mockOriginalChat.getChatRecordingService!).mockReturnValue(
         mockRecordingService as unknown as ChatRecordingService,
@@ -661,6 +663,31 @@ describe('Gemini Client (client.ts)', () => {
           filePath: mockFilePath,
         },
       );
+    });
+
+    it('should record a compression marker when compression succeeds', async () => {
+      const { client, mockOriginalChat } = setup({
+        compressionStatus: CompressionStatus.COMPRESSED,
+      });
+
+      const mockRecordCompressionMarker = vi.fn();
+      const mockRecordingService = {
+        getConversation: vi.fn().mockReturnValue({ some: 'conversation' }),
+        getConversationFilePath: vi.fn().mockReturnValue('/tmp/session.json'),
+        recordCompressionMarker: mockRecordCompressionMarker,
+      };
+      vi.mocked(mockOriginalChat.getChatRecordingService!).mockReturnValue(
+        mockRecordingService as unknown as ChatRecordingService,
+      );
+
+      await client.tryCompressChat('prompt-id', false);
+
+      // Verify that recordCompressionMarker was called with the new history
+      expect(mockRecordCompressionMarker).toHaveBeenCalledTimes(1);
+      expect(mockRecordCompressionMarker).toHaveBeenCalledWith([
+        { role: 'user', parts: [{ text: 'Summary' }] },
+        { role: 'model', parts: [{ text: 'Got it' }] },
+      ]);
     });
   });
 

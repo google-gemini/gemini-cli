@@ -164,6 +164,52 @@ describe('ChatRecordingService', () => {
     });
   });
 
+  describe('recordCompressionMarker', () => {
+    beforeEach(() => {
+      chatRecordingService.initialize();
+    });
+
+    it('should record a compression marker with the compressed history', () => {
+      // First record a user message so the file gets created
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Hello',
+        model: 'gemini-pro',
+      });
+
+      const compressedHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'Summary of conversation' }] },
+        {
+          role: 'model',
+          parts: [{ text: 'Got it. Thanks for the additional context!' }],
+        },
+      ];
+
+      chatRecordingService.recordCompressionMarker(compressedHistory);
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+
+      expect(conversation.messages).toHaveLength(2);
+      const marker = conversation.messages[1];
+      expect(marker.type).toBe('compression_marker');
+      expect(marker.content).toBe('Context was compressed.');
+      if (marker.type === 'compression_marker') {
+        expect(marker.compressedHistory).toEqual(compressedHistory);
+      }
+    });
+
+    it('should not throw when conversationFile is null', () => {
+      const service = new ChatRecordingService(mockConfig);
+      // Don't initialize - conversationFile is null
+      expect(() => {
+        service.recordCompressionMarker([]);
+      }).not.toThrow();
+    });
+  });
+
   describe('recordThought', () => {
     it('should queue a thought', () => {
       chatRecordingService.initialize();
