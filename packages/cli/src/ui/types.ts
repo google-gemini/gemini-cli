@@ -15,6 +15,7 @@ import {
   type SkillDefinition,
   type AgentDefinition,
   type ApprovalMode,
+  type PerfSnapshot,
   CoreToolCallStatus,
   checkExhaustive,
 } from '@google/gemini-cli-core';
@@ -221,6 +222,21 @@ export type HistoryItemModel = HistoryItemBase & {
   model: string;
 };
 
+export type HistoryItemPerfLatency = HistoryItemBase & {
+  type: MessageType.PERF_LATENCY;
+  data: PerfSnapshot;
+};
+
+export type HistoryItemPerfMemory = HistoryItemBase & {
+  type: MessageType.PERF_MEMORY;
+  data: PerfSnapshot;
+};
+
+export type HistoryItemPerfStartup = HistoryItemBase & {
+  type: MessageType.PERF_STARTUP;
+  data: PerfSnapshot;
+};
+
 export type HistoryItemQuit = HistoryItemBase & {
   type: 'quit';
   duration: string;
@@ -368,6 +384,9 @@ export type HistoryItemWithoutId =
   | HistoryItemStats
   | HistoryItemModelStats
   | HistoryItemToolStats
+  | HistoryItemPerfLatency
+  | HistoryItemPerfMemory
+  | HistoryItemPerfStartup
   | HistoryItemModel
   | HistoryItemQuit
   | HistoryItemCompression
@@ -393,6 +412,9 @@ export enum MessageType {
   STATS = 'stats',
   MODEL_STATS = 'model_stats',
   TOOL_STATS = 'tool_stats',
+  PERF_LATENCY = 'perf_latency',
+  PERF_MEMORY = 'perf_memory',
+  PERF_STARTUP = 'perf_startup',
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',
