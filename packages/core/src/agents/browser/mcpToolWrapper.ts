@@ -36,6 +36,18 @@ import {
 } from './cursorAnimations.js';
 
 /**
+ * Maps keyboard keys to scroll directions for animation injection.
+ */
+const SCROLL_KEY_DIRECTIONS: Readonly<Record<string, 'up' | 'down'>> = {
+  PageUp: 'up',
+  ArrowUp: 'up',
+  Home: 'up',
+  PageDown: 'down',
+  ArrowDown: 'down',
+  End: 'down',
+};
+
+/**
  * Tool invocation that dispatches to BrowserManager's isolated MCP client.
  */
 class McpToolInvocation extends BaseToolInvocation<
@@ -172,32 +184,15 @@ class McpToolInvocation extends BaseToolInvocation<
         }
       } else if (this.toolName === 'press_key') {
         const key = String(this.params['key']);
-        if (this.isScrollKey(key)) {
-          await this.injectScrollAnimation(
-            this.getScrollDirection(key),
-            signal,
-          );
+        const direction = SCROLL_KEY_DIRECTIONS[key];
+        if (direction) {
+          await this.injectScrollAnimation(direction, signal);
         }
       }
     } catch (error) {
       // Ignore animation injection errors so they don't fail the main action
       debugLogger.warn(`Failed to inject cursor animation: ${error}`);
     }
-  }
-
-  private isScrollKey(key: string): boolean {
-    return [
-      'PageDown',
-      'PageUp',
-      'ArrowDown',
-      'ArrowUp',
-      'End',
-      'Home',
-    ].includes(key);
-  }
-
-  private getScrollDirection(key: string): 'up' | 'down' {
-    return ['PageUp', 'ArrowUp', 'Home'].includes(key) ? 'up' : 'down';
   }
 
   private async injectClickAnimation(

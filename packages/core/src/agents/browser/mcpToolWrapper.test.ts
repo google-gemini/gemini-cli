@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createMcpDeclarativeTools } from './mcpToolWrapper.js';
 import type { BrowserManager, McpToolCallResult } from './browserManager.js';
+import type { Config } from '../../config/config.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
 
@@ -70,7 +71,7 @@ describe('mcpToolWrapper', () => {
           headless: false,
         },
       }),
-    };
+    } as unknown as Config;
 
     // Setup mock browser manager
     mockBrowserManager = {
@@ -242,10 +243,8 @@ describe('mcpToolWrapper', () => {
         getBrowserAgentConfig: vi.fn().mockReturnValue({
           customConfig: { showCursorAnimations: true, headless: true },
         }),
-      };
-      vi.mocked(mockBrowserManager.getConfig).mockReturnValue(
-        headlessConfig as ReturnType<typeof mockBrowserManager.getConfig>,
-      );
+      } as unknown as Config;
+      vi.mocked(mockBrowserManager.getConfig).mockReturnValue(headlessConfig);
 
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
@@ -264,10 +263,8 @@ describe('mcpToolWrapper', () => {
         getBrowserAgentConfig: vi.fn().mockReturnValue({
           customConfig: { showCursorAnimations: false, headless: false },
         }),
-      };
-      vi.mocked(mockBrowserManager.getConfig).mockReturnValue(
-        noAnimConfig as ReturnType<typeof mockBrowserManager.getConfig>,
-      );
+      } as unknown as Config;
+      vi.mocked(mockBrowserManager.getConfig).mockReturnValue(noAnimConfig);
 
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,

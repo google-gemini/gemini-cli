@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+const MAX_Z_INDEX = 2147483647; // Max signed 32-bit integer
+
 /**
  * Generates JavaScript code to inject a click animation at given coordinates.
  * Uses static keyframes and element-level positioning to avoid race conditions.
@@ -21,7 +23,7 @@ export function generateClickAnimationScript(x: number, y: number): string {
         width: 24px; height: 24px; border-radius: 50%;
         background: rgba(66, 133, 244, 0.5);
         border: 2px solid rgba(66, 133, 244, 0.8);
-        pointer-events: none; z-index: 2147483647;
+        pointer-events: none; z-index: ${MAX_Z_INDEX};
         animation: __gemini_click 0.6s ease-out forwards;
       \`;
       document.body.appendChild(dot);
@@ -47,7 +49,7 @@ export function generateScrollAnimationScript(
         transform: translateY(-50%);
         width: 6px; height: 60px; border-radius: 3px;
         background: rgba(66, 133, 244, 0.4);
-        pointer-events: none; z-index: 2147483647;
+        pointer-events: none; z-index: ${MAX_Z_INDEX};
         animation: __gemini_scroll_${direction} 0.5s ease-out forwards;
       \`;
       document.body.appendChild(indicator);
