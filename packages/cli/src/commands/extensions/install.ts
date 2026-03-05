@@ -5,6 +5,7 @@
  */
 
 import type { CommandModule } from 'yargs';
+import * as path from 'node:path';
 import chalk from 'chalk';
 import {
   debugLogger,
@@ -51,12 +52,13 @@ export async function handleInstall(args: InstallArgs) {
     const settings = loadSettings(workspaceDir).merged;
 
     if (installMetadata.type === 'local' || installMetadata.type === 'link') {
-      const resolvedPath = getRealPath(source);
-      installMetadata.source = resolvedPath;
-      const trustResult = isWorkspaceTrusted(settings, resolvedPath);
+      const absolutePath = path.resolve(source);
+      const realPath = getRealPath(absolutePath);
+      installMetadata.source = absolutePath;
+      const trustResult = isWorkspaceTrusted(settings, absolutePath);
       if (trustResult.isTrusted !== true) {
         const discoveryResults =
-          await FolderTrustDiscoveryService.discover(resolvedPath);
+          await FolderTrustDiscoveryService.discover(realPath);
 
         const hasDiscovery =
           discoveryResults.commands.length > 0 ||
@@ -69,7 +71,7 @@ export async function handleInstall(args: InstallArgs) {
           '',
           chalk.bold('Do you trust the files in this folder?'),
           '',
-          `The extension source at "${resolvedPath}" is not trusted.`,
+          `The extension source at "${absolutePath}" is not trusted.`,
           '',
           'Trusting a folder allows Gemini CLI to load its local configurations,',
           'including custom commands, hooks, MCP servers, agent skills, and',
@@ -127,10 +129,10 @@ export async function handleInstall(args: InstallArgs) {
         );
         if (confirmed) {
           const trustedFolders = loadTrustedFolders();
-          await trustedFolders.setValue(resolvedPath, TrustLevel.TRUST_FOLDER);
+          await trustedFolders.setValue(realPath, TrustLevel.TRUST_FOLDER);
         } else {
           throw new Error(
-            `Installation aborted: Folder "${resolvedPath}" is not trusted.`,
+            `Installation aborted: Folder "${absolutePath}" is not trusted.`,
           );
         }
       }
