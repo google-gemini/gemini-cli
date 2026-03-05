@@ -12,15 +12,35 @@
 import sharp from 'sharp';
 
 // Dynamic import of sixel (ESM-only package)
-async function getSixelEncoder(): Promise<{ encode: (data: Uint8ClampedArray, width: number, height: number) => string }> {
+// Handles both v1 API (encode function) and v2 API (SixelEncoder class)
+async function encodeSixelData(rgbaData: Uint8ClampedArray, width: number, height: number): Promise<string> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mod = await import('sixel') as any;
-    // Handle all possible export shapes: default with encode, top-level encode, or default is function
     const candidate = mod.default ?? mod;
-    if (typeof candidate?.encode === 'function') return candidate;
-    if (typeof candidate === 'function') return { encode: candidate };
-    if (typeof mod.encode === 'function') return { encode: mod.encode };
-    throw new Error('sixel package does not export an encode function — check the installed version');
+
+    // v1 API: mod.encode or mod.default.encode is a function
+    if (typeof candidate?.encode === 'function') {
+        return candidate.encode(rgbaData, width, height);
+    }
+    if (typeof mod.encode === 'function') {
+        return mod.encode(rgbaData, width, height);
+    }
+
+    // v2 API: SixelEncoder class
+    const EncoderClass = candidate?.SixelEncoder ?? mod.SixelEncoder;
+    if (EncoderClass) {
+        const encoder = new EncoderClass();
+        encoder.init(width, height, undefined, undefined, true);
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const i = (y * width + x) * 4;
+                encoder.addPixel(x, rgbaData[i]!, rgbaData[i + 1]!, rgbaData[i + 2]!, rgbaData[i + 3]!);
+            }
+        }
+        return encoder.toString();
+    }
+
+    throw new Error('sixel package API not recognized — try: npm install sixel@1 -w packages/cli');
 }
 
 /**
@@ -55,7 +75,6 @@ export async function encodeSixel(pngBuffer: Buffer, cols = 80, maxHeight = 600)
         rgbaData = new Uint8ClampedArray(rgba.buffer);
     }
 
-    const encoder = await getSixelEncoder();
-    const sixelOutput = encoder.encode(rgbaData, width, height);
+    const sixelOutput = await encodeSixelData(rgbaData, width, height);
     return sixelOutput + '\n';
 }

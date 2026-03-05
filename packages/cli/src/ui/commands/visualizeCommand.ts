@@ -69,6 +69,7 @@ export const visualizeCommand: SlashCommand = {
         const graphicOutput = await renderVisualArtifact(result, {
           spec,
           showMeta: true,
+          forceProtocol: caps.protocol as 'kitty' | 'iterm2' | 'sixel',
         });
         if (graphicOutput) {
           context.ui.addItem({
