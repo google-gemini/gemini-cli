@@ -34,11 +34,17 @@ vi.mock('../local-executor.js', () => ({
   },
 }));
 
+vi.mock('../../telemetry/metrics.js', () => ({
+  recordBrowserAgentTaskMetrics: vi.fn(),
+}));
+
 import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';
 import { LocalAgentExecutor } from '../local-executor.js';
+import { recordBrowserAgentTaskMetrics } from '../../telemetry/metrics.js';
+import { AgentTerminateMode } from '../types.js';
 import type { ToolLiveOutput } from '../../tools/tools.js';
 
 describe('BrowserAgentInvocation', () => {
@@ -176,23 +182,24 @@ describe('BrowserAgentInvocation', () => {
           promptConfig: { query: '', systemPrompt: '' },
           toolConfig: { tools: ['analyze_screenshot', 'click'] },
         },
-        browserManager: {} as never,
+        browserManager: {} as never, // Mock browserManager
       });
 
       mockExecutor = {
         run: vi.fn().mockResolvedValue({
           result: JSON.stringify({ success: true }),
-          terminate_reason: 'GOAL',
+          terminate_reason: AgentTerminateMode.GOAL,
         }),
       };
 
       vi.mocked(LocalAgentExecutor.create).mockResolvedValue(
         mockExecutor as never,
       );
+      vi.mocked(recordBrowserAgentTaskMetrics).mockClear();
       vi.mocked(cleanupBrowserAgent).mockClear();
     });
 
-    it('should return result text and call cleanup on success', async () => {
+    it('should record successful task metrics and call cleanup', async () => {
       const invocation = new BrowserAgentInvocation(
         mockConfig,
         mockParams,
@@ -209,6 +216,23 @@ describe('BrowserAgentInvocation', () => {
         'Browser agent finished',
       );
       expect(cleanupBrowserAgent).toHaveBeenCalled();
+
+      expect(recordBrowserAgentTaskMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          success: true,
+          sessionMode: 'isolated',
+          visionEnabled: true,
+          headless: false,
+          durationMs: expect.any(Number),
+        }),
+      );
+
+      expect(cleanupBrowserAgent).toHaveBeenCalledWith(
+        expect.anything(),
+        mockConfig,
+        'isolated',
+      );
     });
 
     it('should work without updateOutput (fire-and-forget)', async () => {
@@ -239,6 +263,47 @@ describe('BrowserAgentInvocation', () => {
 
       expect(result.error).toBeDefined();
       expect(cleanupBrowserAgent).toHaveBeenCalled();
+    });
+
+    it('should record failed task metrics if success flag is false', async () => {
+      mockExecutor.run.mockResolvedValue({
+        result: JSON.stringify({ success: false, error: 'Failed' }),
+        terminate_reason: AgentTerminateMode.GOAL,
+      });
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      const controller = new AbortController();
+      const result = await invocation.execute(controller.signal);
+
+      expect(result.error).toBeDefined();
+      expect(cleanupBrowserAgent).toHaveBeenCalled();
+    });
+
+    it('should determine success from terminate_reason if result is not JSON', async () => {
+      mockExecutor.run.mockResolvedValue({
+        result: 'Crash',
+        terminate_reason: AgentTerminateMode.ERROR,
+      });
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      await invocation.execute(new AbortController().signal);
+
+      expect(recordBrowserAgentTaskMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          success: false,
+        }),
+      );
     });
 
     // ─── Structured SubagentProgress emission tests ───────────────────────
