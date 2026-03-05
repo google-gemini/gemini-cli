@@ -64,7 +64,7 @@ describe('BrowserAgentInvocation', () => {
       publish: vi.fn().mockResolvedValue(undefined),
       subscribe: vi.fn(),
       unsubscribe: vi.fn(),
-    } as unknown as LocalAgentExecutor<z.ZodTypeAny>;
+    } as unknown as MessageBus;
 
     mockParams = {
       task: 'Navigate to example.com and click the button',
