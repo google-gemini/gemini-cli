@@ -28,6 +28,8 @@ import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';
+import { recordBrowserAgentTaskMetrics } from '../../telemetry/metrics.js';
+import { AgentTerminateMode } from '../types.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -87,7 +89,14 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
+    const invocationStart = Date.now();
+    const browserConfig = this.config.getBrowserAgentConfig();
+    const sessionMode = browserConfig.customConfig.sessionMode ?? 'isolated';
+    const headless = browserConfig.customConfig.headless ?? false;
+
     let browserManager;
+    let taskSuccess = false;
+    let visionEnabled = false;
 
     try {
       if (updateOutput) {
@@ -106,6 +115,14 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       );
       const { definition } = result;
       browserManager = result.browserManager;
+
+      visionEnabled =
+        definition.toolConfig?.tools.some((t) => {
+          if (typeof t === 'string') return t === 'analyze_screenshot';
+          if (typeof t === 'object' && 'name' in t)
+            return t.name === 'analyze_screenshot';
+          return false;
+        }) ?? false;
 
       if (updateOutput) {
         updateOutput(
@@ -133,6 +150,17 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       );
 
       const output = await executor.run(this.params, signal);
+
+      try {
+        const parsed: unknown = JSON.parse(output.result);
+        taskSuccess =
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          'success' in parsed &&
+          (parsed as { success: unknown }).success === true;
+      } catch {
+        taskSuccess = output.terminate_reason === AgentTerminateMode.GOAL;
+      }
 
       const resultContent = `Browser agent finished.
 Termination Reason: ${output.terminate_reason}
@@ -165,9 +193,17 @@ ${output.result}
         },
       };
     } finally {
+      recordBrowserAgentTaskMetrics(this.config, {
+        success: taskSuccess,
+        sessionMode,
+        visionEnabled,
+        headless,
+        durationMs: Date.now() - invocationStart,
+      });
+
       // Always cleanup browser resources
       if (browserManager) {
-        await cleanupBrowserAgent(browserManager);
+        await cleanupBrowserAgent(browserManager, this.config, sessionMode);
       }
     }
   }

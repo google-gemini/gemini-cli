@@ -42,8 +42,13 @@ vi.mock('../../utils/debugLogger.js', () => ({
   },
 }));
 
+vi.mock('../../telemetry/metrics.js', () => ({
+  recordBrowserAgentConnectionMetrics: vi.fn(),
+}));
+
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { recordBrowserAgentConnectionMetrics } from '../../telemetry/metrics.js';
 
 describe('BrowserManager', () => {
   let mockConfig: Config;
@@ -84,6 +89,8 @@ describe('BrowserManager', () => {
           }),
         }) as unknown as InstanceType<typeof Client>,
     );
+
+    vi.mocked(recordBrowserAgentConnectionMetrics).mockClear();
   });
 
   afterEach(() => {
@@ -164,6 +171,16 @@ describe('BrowserManager', () => {
       expect(args).toContain('--userDataDir');
       const userDataDirIndex = args.indexOf('--userDataDir');
       expect(args[userDataDirIndex + 1]).toMatch(/cli-browser-profile$/);
+
+      expect(recordBrowserAgentConnectionMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          sessionMode: 'persistent',
+          headless: false,
+          success: true,
+          durationMs: expect.any(Number),
+        }),
+      );
     });
 
     it('should pass headless flag when configured', async () => {
@@ -297,6 +314,17 @@ describe('BrowserManager', () => {
       await expect(manager2.ensureConnection()).rejects.toThrow(
         /chrome:\/\/inspect\/#remote-debugging/,
       );
+
+      expect(recordBrowserAgentConnectionMetrics).toHaveBeenCalledWith(
+        existingConfig,
+        expect.objectContaining({
+          sessionMode: 'existing',
+          headless: false,
+          success: false,
+          errorType: 'connection_refused',
+          durationMs: expect.any(Number),
+        }),
+      );
     });
 
     it('should throw profile-lock remediation when persistent mode hits "already running"', async () => {
@@ -326,6 +354,17 @@ describe('BrowserManager', () => {
       await expect(manager2.ensureConnection()).rejects.toThrow(
         /Set sessionMode to "isolated"/,
       );
+
+      expect(recordBrowserAgentConnectionMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          sessionMode: 'persistent',
+          headless: false,
+          success: false,
+          errorType: 'profile_locked',
+          durationMs: expect.any(Number),
+        }),
+      );
     });
 
     it('should throw timeout-specific remediation for persistent mode', async () => {
@@ -347,6 +386,17 @@ describe('BrowserManager', () => {
 
       await expect(manager.ensureConnection()).rejects.toThrow(
         /Chrome is not installed/,
+      );
+
+      expect(recordBrowserAgentConnectionMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          sessionMode: 'persistent',
+          headless: false,
+          success: false,
+          errorType: 'timeout',
+          durationMs: expect.any(Number),
+        }),
       );
     });
 

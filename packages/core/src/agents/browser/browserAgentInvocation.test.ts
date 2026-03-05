@@ -19,6 +19,30 @@ vi.mock('../../utils/debugLogger.js', () => ({
   },
 }));
 
+vi.mock('./browserAgentFactory.js', () => ({
+  createBrowserAgentDefinition: vi.fn(),
+  cleanupBrowserAgent: vi.fn(),
+}));
+
+vi.mock('../local-executor.js', () => ({
+  LocalAgentExecutor: {
+    create: vi.fn(),
+  },
+}));
+
+vi.mock('../../telemetry/metrics.js', () => ({
+  recordBrowserAgentTaskMetrics: vi.fn(),
+}));
+
+import {
+  createBrowserAgentDefinition,
+  cleanupBrowserAgent,
+} from './browserAgentFactory.js';
+import { LocalAgentExecutor } from '../local-executor.js';
+import { recordBrowserAgentTaskMetrics } from '../../telemetry/metrics.js';
+import { AgentTerminateMode } from '../types.js';
+import type { ToolLiveOutput } from '../../tools/tools.js';
+
 describe('BrowserAgentInvocation', () => {
   let mockConfig: Config;
   let mockMessageBus: MessageBus;
@@ -134,6 +158,122 @@ describe('BrowserAgentInvocation', () => {
       const locations = invocation.toolLocations();
 
       expect(locations).toEqual([]);
+    });
+  });
+
+  describe('execute', () => {
+    let mockExecutor: { run: ReturnType<typeof vi.fn> };
+
+    beforeEach(() => {
+      vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
+        definition: {
+          name: 'browser_agent',
+          description: 'mock definition',
+          kind: 'local',
+          inputConfig: {} as never,
+          outputConfig: {} as never,
+          processOutput: () => '',
+          modelConfig: { model: 'test' },
+          runConfig: {},
+          promptConfig: { query: '', systemPrompt: '' },
+          toolConfig: { tools: ['analyze_screenshot', 'click'] },
+        },
+        browserManager: {} as never, // Mock browserManager
+      });
+
+      mockExecutor = {
+        run: vi.fn().mockResolvedValue({
+          result: JSON.stringify({ success: true }),
+          terminate_reason: AgentTerminateMode.GOAL,
+        }),
+      };
+
+      vi.mocked(LocalAgentExecutor.create).mockResolvedValue(
+        mockExecutor as never,
+      );
+      vi.mocked(recordBrowserAgentTaskMetrics).mockClear();
+      vi.mocked(cleanupBrowserAgent).mockClear();
+    });
+
+    it('should record successful task metrics and call cleanup', async () => {
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      const controller = new AbortController();
+      const updateOutput: (output: ToolLiveOutput) => void = vi.fn();
+
+      const result = await invocation.execute(controller.signal, updateOutput);
+
+      expect(Array.isArray(result.llmContent)).toBe(true);
+      expect((result.llmContent as Array<{ text: string }>)[0].text).toContain(
+        'Browser agent finished',
+      );
+
+      expect(recordBrowserAgentTaskMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          success: true,
+          sessionMode: 'isolated',
+          visionEnabled: true,
+          headless: false,
+          durationMs: expect.any(Number),
+        }),
+      );
+
+      expect(cleanupBrowserAgent).toHaveBeenCalledWith(
+        expect.anything(),
+        mockConfig,
+        'isolated',
+      );
+    });
+
+    it('should record failed task metrics if success flag is false', async () => {
+      mockExecutor.run.mockResolvedValue({
+        result: JSON.stringify({ success: false, error: 'Failed' }),
+        terminate_reason: AgentTerminateMode.GOAL,
+      });
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      const controller = new AbortController();
+      await invocation.execute(controller.signal);
+
+      expect(recordBrowserAgentTaskMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          success: false,
+        }),
+      );
+    });
+
+    it('should determine success from terminate_reason if result is not JSON', async () => {
+      mockExecutor.run.mockResolvedValue({
+        result: 'Crash',
+        terminate_reason: AgentTerminateMode.ERROR,
+      });
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      const controller = new AbortController();
+      await invocation.execute(controller.signal);
+
+      expect(recordBrowserAgentTaskMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          success: false,
+        }),
+      );
     });
   });
 });
