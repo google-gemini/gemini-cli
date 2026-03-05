@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 172
+  // Next ID: 176
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -53,6 +53,22 @@ export enum EventMetadataKey {
 
   // Logs the output format of the session.
   GEMINI_CLI_START_SESSION_OUTPUT_FORMAT = 94,
+
+  // ==========================================================================
+  // Startup Stats Event Keys
+  // ==========================================================================
+
+  // Logs the array of startup phases.
+  GEMINI_CLI_STARTUP_PHASES = 172,
+
+  // Logs the OS platform for startup stats.
+  GEMINI_CLI_STARTUP_OS_PLATFORM = 173,
+
+  // Logs the OS release for startup stats.
+  GEMINI_CLI_STARTUP_OS_RELEASE = 174,
+
+  // Logs whether the CLI is running in docker for startup stats.
+  GEMINI_CLI_STARTUP_IS_DOCKER = 175,
 
   // ==========================================================================
   // User Prompt Event Keys

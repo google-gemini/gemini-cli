@@ -49,6 +49,7 @@ import type {
   ToolOutputMaskingEvent,
   KeychainAvailabilityEvent,
   TokenStorageInitializationEvent,
+  StartupStatsEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -117,6 +118,7 @@ export enum EventNames {
   TOKEN_STORAGE_INITIALIZATION = 'token_storage_initialization',
   CONSECA_POLICY_GENERATION = 'conseca_policy_generation',
   CONSECA_VERDICT = 'conseca_verdict',
+  STARTUP_STATS = 'startup_stats',
 }
 
 export interface LogResponse {
@@ -1688,6 +1690,30 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.TOKEN_STORAGE_INITIALIZATION, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logStartupStatsEvent(event: StartupStatsEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_PHASES,
+        value: JSON.stringify(event.phases),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_OS_PLATFORM,
+        value: event.os_platform,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_OS_RELEASE,
+        value: event.os_release,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_IS_DOCKER,
+        value: JSON.stringify(event.is_docker),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.STARTUP_STATS, data));
     this.flushIfNeeded();
   }
 
