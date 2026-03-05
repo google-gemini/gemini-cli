@@ -46,7 +46,7 @@ describe('<FooterConfigDialog />', () => {
     });
 
     await waitFor(() => {
-      expect(lastFrame()).toContain('[ ] workspace (/directory)');
+      expect(lastFrame()).toContain('[ ] workspace');
     });
 
     act(() => {
@@ -54,7 +54,7 @@ describe('<FooterConfigDialog />', () => {
     });
 
     await waitFor(() => {
-      expect(lastFrame()).toContain('[✓] workspace (/directory)');
+      expect(lastFrame()).toContain('[✓] workspace');
     });
   });
 
@@ -66,23 +66,23 @@ describe('<FooterConfigDialog />', () => {
     );
 
     await waitUntilReady();
-    // Initial order: workspace (/directory), branch, ...
+    // Initial order: workspace, branch, ...
     const output = lastFrame();
-    const cwdIdx = output.indexOf('] workspace (/directory)');
-    const branchIdx = output.indexOf('] branch');
+    const cwdIdx = output.indexOf('] workspace');
+    const branchIdx = output.indexOf('] git-branch');
     expect(cwdIdx).toBeGreaterThan(-1);
     expect(branchIdx).toBeGreaterThan(-1);
     expect(cwdIdx).toBeLessThan(branchIdx);
 
-    // Move workspace (/directory) down (right arrow)
+    // Move workspace down (right arrow)
     act(() => {
       stdin.write('\u001b[C'); // Right arrow
     });
 
     await waitFor(() => {
       const outputAfter = lastFrame();
-      const cwdIdxAfter = outputAfter.indexOf('] workspace (/directory)');
-      const branchIdxAfter = outputAfter.indexOf('] branch');
+      const cwdIdxAfter = outputAfter.indexOf('] workspace');
+      const branchIdxAfter = outputAfter.indexOf('] git-branch');
       expect(cwdIdxAfter).toBeGreaterThan(-1);
       expect(branchIdxAfter).toBeGreaterThan(-1);
       expect(branchIdxAfter).toBeLessThan(cwdIdxAfter);

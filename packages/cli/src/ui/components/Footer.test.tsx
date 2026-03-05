@@ -16,6 +16,40 @@ const normalizeFrame = (frame: string | undefined) => {
   return frame.replace(/\\/g, '/');
 };
 
+let mockIsDevelopment = false;
+
+vi.mock('../../utils/installationInfo.js', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('../../utils/installationInfo.js')>();
+  return {
+    ...original,
+    get isDevelopment() {
+      return mockIsDevelopment;
+    },
+  };
+});
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...original,
+    shortenPath: (p: string, len: number) => {
+      if (p.length > len) {
+        return '...' + p.slice(p.length - len + 3);
+      }
+      return p;
+    },
+  };
+});
+
+const defaultProps = {
+  model: 'gemini-pro',
+  targetDir:
+    '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long',
+  branchName: 'main',
+};
+
 const mockSessionStats = {
   sessionId: 'test-session-id',
   sessionStartTime: new Date(),
@@ -61,14 +95,6 @@ const mockSessionStats = {
       },
     },
   },
-};
-
-const defaultProps = {
-  model: 'gemini-pro',
-  targetDir: '/long/path/to/some/deeply/nested/directories/to/make/it/long',
-  debugMode: false,
-  branchName: 'main',
-  errorCount: 0,
 };
 
 describe('<Footer />', () => {
@@ -182,7 +208,7 @@ describe('<Footer />', () => {
     );
     await waitUntilReady();
     expect(lastFrame()).toContain(defaultProps.model);
-    expect(lastFrame()).toMatch(/\d+% left/);
+    expect(lastFrame()).toMatch(/\d+% used/);
     unmount();
   });
 
@@ -237,7 +263,7 @@ describe('<Footer />', () => {
       },
     );
     await waitUntilReady();
-    expect(lastFrame()).not.toContain('Usage remaining');
+    expect(normalizeFrame(lastFrame())).not.toContain('used');
     expect(normalizeFrame(lastFrame())).toMatchSnapshot();
     unmount();
   });
@@ -270,7 +296,7 @@ describe('<Footer />', () => {
     unmount();
   });
 
-  it('displays the model name and abbreviated context percentage', async () => {
+  it('displays the model name and abbreviated context used label on narrow terminals', async () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <Footer />,
       {
@@ -288,6 +314,7 @@ describe('<Footer />', () => {
     await waitUntilReady();
     expect(lastFrame()).toContain(defaultProps.model);
     expect(lastFrame()).toMatch(/\d+%/);
+    expect(lastFrame()).not.toContain('context used');
     unmount();
   });
 
@@ -491,7 +518,7 @@ describe('<Footer />', () => {
       );
       await waitUntilReady();
       expect(lastFrame()).toContain(defaultProps.model);
-      expect(lastFrame()).not.toMatch(/\d+% left/);
+      expect(lastFrame()).not.toMatch(/\d+% used/);
       unmount();
     });
     it('shows the context percentage when hideContextPercentage is false', async () => {
@@ -511,7 +538,7 @@ describe('<Footer />', () => {
       );
       await waitUntilReady();
       expect(lastFrame()).toContain(defaultProps.model);
-      expect(lastFrame()).toMatch(/\d+% left/);
+      expect(lastFrame()).toMatch(/\d+% used/);
       unmount();
     });
     it('renders complete footer in narrow terminal (baseline narrow)', async () => {
@@ -605,6 +632,79 @@ describe('<Footer />', () => {
     });
   });
 
+  describe('error summary visibility', () => {
+    beforeEach(() => {
+      mockIsDevelopment = false;
+    });
+
+    afterEach(() => {
+      mockIsDevelopment = false;
+    });
+
+    it('hides error summary in low verbosity mode out of dev mode', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            errorCount: 2,
+            showErrorDetails: false,
+          },
+          settings: createMockSettings({
+            merged: { ui: { errorVerbosity: 'low' } },
+          }),
+        },
+      );
+      await waitUntilReady();
+      expect(lastFrame()).not.toContain('F12 for details');
+      unmount();
+    });
+
+    it('shows error summary in low verbosity mode in dev mode', async () => {
+      mockIsDevelopment = true;
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            errorCount: 2,
+            showErrorDetails: false,
+          },
+          settings: createMockSettings({
+            merged: { ui: { errorVerbosity: 'low' } },
+          }),
+        },
+      );
+      await waitUntilReady();
+      expect(lastFrame()).toContain('F12 for details');
+      expect(lastFrame()).toContain('2 errors');
+      unmount();
+    });
+
+    it('shows error summary in full verbosity mode', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            errorCount: 2,
+            showErrorDetails: false,
+          },
+          settings: createMockSettings({
+            merged: { ui: { errorVerbosity: 'full' } },
+          }),
+        },
+      );
+      await waitUntilReady();
+      expect(lastFrame()).toContain('F12 for details');
+      expect(lastFrame()).toContain('2 errors');
+      unmount();
+    });
+  });
+
   describe('Footer Custom Items', () => {
     it('renders items in the specified order', async () => {
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
@@ -618,7 +718,7 @@ describe('<Footer />', () => {
           settings: createMockSettings({
             ui: {
               footer: {
-                items: ['model-name', 'cwd'],
+                items: ['model-name', 'workspace'],
               },
             },
           }),
@@ -648,7 +748,7 @@ describe('<Footer />', () => {
             },
             ui: {
               footer: {
-                items: ['cwd', 'git-branch', 'sandbox-status', 'model-name'],
+                items: ['workspace', 'git-branch', 'sandbox', 'model-name'],
               },
             },
           }),
@@ -704,7 +804,7 @@ describe('<Footer />', () => {
           settings: createMockSettings({
             ui: {
               footer: {
-                items: ['cwd', 'git-branch', 'model-name'],
+                items: ['workspace', 'git-branch', 'model-name'],
               },
             },
           }),

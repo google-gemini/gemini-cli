@@ -8,7 +8,7 @@ import type { MergedSettings } from './settings.js';
 
 export const ALL_ITEMS = [
   {
-    id: 'cwd',
+    id: 'workspace',
     header: 'workspace (/directory)',
     description: 'Current working directory',
   },
@@ -18,7 +18,7 @@ export const ALL_ITEMS = [
     description: 'Current git branch name (not shown when unavailable)',
   },
   {
-    id: 'sandbox-status',
+    id: 'sandbox',
     header: 'sandbox',
     description: 'Sandbox type and trust indicator',
   },
@@ -28,9 +28,9 @@ export const ALL_ITEMS = [
     description: 'Current model identifier',
   },
   {
-    id: 'context-remaining',
+    id: 'context-used',
     header: 'context',
-    description: 'Percentage of context window remaining',
+    description: 'Percentage of context window used',
   },
   {
     id: 'quota',
@@ -62,11 +62,11 @@ export const ALL_ITEMS = [
 export type FooterItemId = (typeof ALL_ITEMS)[number]['id'];
 
 export const DEFAULT_ORDER = [
-  'cwd',
+  'workspace',
   'git-branch',
-  'sandbox-status',
+  'sandbox',
   'model-name',
-  'context-remaining',
+  'context-used',
   'quota',
   'memory-usage',
   'session-id',
@@ -78,9 +78,9 @@ export function deriveItemsFromLegacySettings(
   settings: MergedSettings,
 ): string[] {
   const defaults = [
-    'cwd',
+    'workspace',
     'git-branch',
-    'sandbox-status',
+    'sandbox',
     'model-name',
     'quota',
   ];
@@ -91,20 +91,20 @@ export function deriveItemsFromLegacySettings(
     if (idx !== -1) arr.splice(idx, 1);
   };
 
-  if (settings.ui.footer.hideCWD) remove(items, 'cwd');
-  if (settings.ui.footer.hideSandboxStatus) remove(items, 'sandbox-status');
+  if (settings.ui.footer.hideCWD) remove(items, 'workspace');
+  if (settings.ui.footer.hideSandboxStatus) remove(items, 'sandbox');
   if (settings.ui.footer.hideModelInfo) {
     remove(items, 'model-name');
-    remove(items, 'context-remaining');
+    remove(items, 'context-used');
     remove(items, 'quota');
   }
   if (
     !settings.ui.footer.hideContextPercentage &&
-    !items.includes('context-remaining')
+    !items.includes('context-used')
   ) {
     const modelIdx = items.indexOf('model-name');
-    if (modelIdx !== -1) items.splice(modelIdx + 1, 0, 'context-remaining');
-    else items.push('context-remaining');
+    if (modelIdx !== -1) items.splice(modelIdx + 1, 0, 'context-used');
+    else items.push('context-used');
   }
   if (settings.ui.showMemoryUsage) items.push('memory-usage');
 

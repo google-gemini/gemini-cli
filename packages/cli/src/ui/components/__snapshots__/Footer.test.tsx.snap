@@ -13,14 +13,14 @@ exports[`<Footer /> > displays the usage indicator when usage is low 1`] = `
 `;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders complete footer in narrow terminal (baseline narrow) > complete-footer-narrow 1`] = `
-" workspace (/directory)              sandbox      /model       context
- ~/.../directories/to/make/it/long   no sandbox   gemini-pro   86%
+" workspace (/directory)                   sandbox      /model       context
+ ...me/more/directories/to/make/it/long   no sandbox   gemini-pro   14%
 "
 `;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders complete footer with all sections visible (baseline) > complete-footer-wide 1`] = `
 " workspace (/directory)                                        sandbox      /model       context
- ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   86% left
+ ~/project/foo/bar/and/some/more/directories/to/make/it/long   no sandbox   gemini-pro   14% used
 "
 `;
 

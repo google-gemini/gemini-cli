@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type ColorsTheme, Theme } from './theme.js';
+import { type ColorsTheme, Theme, interpolateColor } from './theme.js';
 import { type SemanticColors } from './semantic-tokens.js';
+import { DEFAULT_SELECTION_OPACITY } from '../constants.js';
 
 const solarizedLightColors: ColorsTheme = {
   type: 'light',
@@ -38,6 +39,7 @@ const semanticColors: SemanticColors = {
     primary: '#fdf6e3',
     message: '#eee8d5',
     input: '#eee8d5',
+    focus: interpolateColor('#fdf6e3', '#859900', DEFAULT_SELECTION_OPACITY),
     diff: {
       added: '#d7f2d7',
       removed: '#f2d7d7',
@@ -45,13 +47,14 @@ const semanticColors: SemanticColors = {
   },
   border: {
     default: '#eee8d5',
-    focused: '#93a1a1',
   },
   ui: {
     comment: '#93a1a1',
     symbol: '#586e75',
+    active: '#268bd2',
     dark: '#eee8d5',
-    gradient: ['#268bd2', '#2aa198'],
+    focus: '#859900',
+    gradient: ['#268bd2', '#2aa198', '#859900'],
   },
   status: {
     success: '#859900',

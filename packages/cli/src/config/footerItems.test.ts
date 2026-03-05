@@ -15,49 +15,49 @@ describe('deriveItemsFromLegacySettings', () => {
     }).merged;
     const items = deriveItemsFromLegacySettings(settings);
     expect(items).toEqual([
-      'cwd',
+      'workspace',
       'git-branch',
-      'sandbox-status',
+      'sandbox',
       'model-name',
       'quota',
     ]);
   });
 
-  it('removes cwd when hideCWD is true', () => {
+  it('removes workspace when hideCWD is true', () => {
     const settings = createMockSettings({
       ui: { footer: { hideCWD: true, hideContextPercentage: true } },
     }).merged;
     const items = deriveItemsFromLegacySettings(settings);
-    expect(items).not.toContain('cwd');
+    expect(items).not.toContain('workspace');
   });
 
-  it('removes sandbox-status when hideSandboxStatus is true', () => {
+  it('removes sandbox when hideSandboxStatus is true', () => {
     const settings = createMockSettings({
       ui: { footer: { hideSandboxStatus: true, hideContextPercentage: true } },
     }).merged;
     const items = deriveItemsFromLegacySettings(settings);
-    expect(items).not.toContain('sandbox-status');
+    expect(items).not.toContain('sandbox');
   });
 
-  it('removes model-name, context-remaining, and quota when hideModelInfo is true', () => {
+  it('removes model-name, context-used, and quota when hideModelInfo is true', () => {
     const settings = createMockSettings({
       ui: { footer: { hideModelInfo: true, hideContextPercentage: true } },
     }).merged;
     const items = deriveItemsFromLegacySettings(settings);
     expect(items).not.toContain('model-name');
-    expect(items).not.toContain('context-remaining');
+    expect(items).not.toContain('context-used');
     expect(items).not.toContain('quota');
   });
 
-  it('includes context-remaining when hideContextPercentage is false', () => {
+  it('includes context-used when hideContextPercentage is false', () => {
     const settings = createMockSettings({
       ui: { footer: { hideContextPercentage: false } },
     }).merged;
     const items = deriveItemsFromLegacySettings(settings);
-    expect(items).toContain('context-remaining');
+    expect(items).toContain('context-used');
     // Should be after model-name
     const modelIdx = items.indexOf('model-name');
-    const contextIdx = items.indexOf('context-remaining');
+    const contextIdx = items.indexOf('context-used');
     expect(contextIdx).toBe(modelIdx + 1);
   });
 
@@ -83,8 +83,8 @@ describe('deriveItemsFromLegacySettings', () => {
     const items = deriveItemsFromLegacySettings(settings);
     expect(items).toEqual([
       'git-branch',
-      'sandbox-status',
-      'context-remaining',
+      'sandbox',
+      'context-used',
       'memory-usage',
     ]);
   });

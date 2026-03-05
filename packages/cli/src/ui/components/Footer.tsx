@@ -28,6 +28,7 @@ import {
   type FooterItemId,
   deriveItemsFromLegacySettings,
 } from '../../config/footerItems.js';
+import { isDevelopment } from '../../utils/installationInfo.js';
 
 interface CwdIndicatorProps {
   targetDir: string;
@@ -115,7 +116,7 @@ export const FooterRow: React.FC<{
   items.forEach((item, idx) => {
     if (idx > 0 && !showLabels) {
       elements.push(
-        <Box key={`sep-${item.key}`}>
+        <Box key={`sep-${item.key}`} height={1}>
           <Text color={theme.ui.comment}> · </Text>
         </Box>,
       );
@@ -124,11 +125,11 @@ export const FooterRow: React.FC<{
     elements.push(
       <Box key={item.key} flexDirection="column">
         {showLabels && (
-          <Box>
+          <Box height={1}>
             <Text color={theme.ui.comment}>{item.header}</Text>
           </Box>
         )}
-        <Box>{item.element}</Box>
+        <Box height={1}>{item.element}</Box>
       </Box>,
     );
   });
@@ -136,7 +137,7 @@ export const FooterRow: React.FC<{
   return (
     <Box
       flexDirection="row"
-      flexWrap="wrap"
+      flexWrap="nowrap"
       columnGap={showLabels ? COLUMN_GAP : 0}
     >
       {elements}
@@ -190,6 +191,11 @@ export const Footer: React.FC = () => {
     quotaStats: uiState.quota.stats,
   };
 
+  const isFullErrorVerbosity = settings.merged.ui.errorVerbosity === 'full';
+  const showErrorSummary =
+    !showErrorDetails &&
+    errorCount > 0 &&
+    (isFullErrorVerbosity || debugMode || isDevelopment);
   const displayVimMode = vimEnabled ? vimMode : undefined;
   const items =
     settings.merged.ui.footer.items ??
@@ -237,7 +243,7 @@ export const Footer: React.FC = () => {
     const header = itemConfig?.header ?? id;
 
     switch (id) {
-      case 'cwd': {
+      case 'workspace': {
         const fullPath = tildeifyPath(targetDir);
         const debugSuffix = debugMode ? ' ' + (debugMessage || '--debug') : '';
         addCol(
@@ -267,7 +273,7 @@ export const Footer: React.FC = () => {
         }
         break;
       }
-      case 'sandbox-status': {
+      case 'sandbox': {
         let str = 'no sandbox';
         const sandbox = process.env['SANDBOX'];
         if (isTrustedFolder === false) str = 'untrusted';
@@ -293,7 +299,7 @@ export const Footer: React.FC = () => {
         );
         break;
       }
-      case 'context-remaining': {
+      case 'context-used': {
         addCol(
           id,
           header,
@@ -302,10 +308,9 @@ export const Footer: React.FC = () => {
               promptTokenCount={promptTokenCount}
               model={model}
               terminalWidth={terminalWidth}
-              color={itemColor}
             />
           ),
-          10, // "100% left" is 9 chars
+          10, // "100% used" is 9 chars
         );
         break;
       }
@@ -392,7 +397,7 @@ export const Footer: React.FC = () => {
 
   // 3. Transients
   if (corgiMode) addCol('corgi', '', () => <CorgiIndicator />, 5);
-  if (!showErrorDetails && errorCount > 0) {
+  if (showErrorSummary) {
     addCol(
       'error-count',
       '',
@@ -403,14 +408,37 @@ export const Footer: React.FC = () => {
   }
 
   // --- Width Fitting Logic ---
-  // Sum up fixed widths to see how much is left for CWD
-  const nonCwdWidth = potentialColumns
-    .filter((c) => c.id !== 'cwd')
-    .reduce((sum, c) => sum + c.width + (showLabels ? COLUMN_GAP : 3), 0);
-  const cwdBudget = Math.max(20, terminalWidth - nonCwdWidth - 4);
+  let currentWidth = 2; // Initial padding
+  const columnsToRender: FooterColumn[] = [];
+  let droppedAny = false;
 
-  const rowItems: FooterRowItem[] = potentialColumns.map((col) => {
-    const maxWidth = col.id === 'cwd' ? cwdBudget : col.width;
+  for (let i = 0; i < potentialColumns.length; i++) {
+    const col = potentialColumns[i];
+    const gap = columnsToRender.length > 0 ? (showLabels ? COLUMN_GAP : 3) : 0; // Use 3 for dot separator width
+    const budgetWidth = col.id === 'workspace' ? 20 : col.width;
+
+    if (
+      col.isHighPriority ||
+      currentWidth + gap + budgetWidth <= terminalWidth - 2
+    ) {
+      columnsToRender.push(col);
+      currentWidth += gap + budgetWidth;
+    } else {
+      droppedAny = true;
+    }
+  }
+
+  const totalBudgeted = columnsToRender.reduce(
+    (sum, c, idx) =>
+      sum +
+      (c.id === 'workspace' ? 20 : c.width) +
+      (idx > 0 ? (showLabels ? COLUMN_GAP : 3) : 0),
+    2,
+  );
+  const excessSpace = Math.max(0, terminalWidth - totalBudgeted);
+
+  const rowItems: FooterRowItem[] = columnsToRender.map((col) => {
+    const maxWidth = col.id === 'workspace' ? 20 + excessSpace : col.width;
     return {
       key: col.id,
       header: col.header,
@@ -418,8 +446,16 @@ export const Footer: React.FC = () => {
     };
   });
 
+  if (droppedAny) {
+    rowItems.push({
+      key: 'ellipsis',
+      header: '',
+      element: <Text color={theme.ui.comment}>…</Text>,
+    });
+  }
+
   return (
-    <Box width={terminalWidth} paddingX={1} overflow="hidden" flexWrap="wrap">
+    <Box width={terminalWidth} paddingX={1} overflow="hidden" flexWrap="nowrap">
       <FooterRow items={rowItems} showLabels={showLabels} />
     </Box>
   );

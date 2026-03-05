@@ -146,7 +146,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
           if (!item) return null;
           return {
             key: id,
-            label: item.header,
+            label: item.id,
             description: item.description as string,
           };
         })
@@ -274,16 +274,16 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
 
     // Mock data for preview (headers come from ALL_ITEMS)
     const mockData: Record<string, React.ReactNode> = {
-      cwd: <Text color={getColor('cwd', itemColor)}>~/project/path</Text>,
-      'git-branch': <Text color={getColor('git-branch', itemColor)}>main</Text>,
-      'sandbox-status': (
-        <Text color={getColor('sandbox-status', 'green')}>docker</Text>
+      workspace: (
+        <Text color={getColor('workspace', itemColor)}>~/project/path</Text>
       ),
+      'git-branch': <Text color={getColor('git-branch', itemColor)}>main</Text>,
+      sandbox: <Text color={getColor('sandbox', 'green')}>docker</Text>,
       'model-name': (
         <Text color={getColor('model-name', itemColor)}>gemini-2.5-pro</Text>
       ),
-      'context-remaining': (
-        <Text color={getColor('context-remaining', itemColor)}>85% left</Text>
+      'context-used': (
+        <Text color={getColor('context-used', itemColor)}>85% used</Text>
       ),
       quota: <Text color={getColor('quota', itemColor)}>97%</Text>,
       'memory-usage': (
