@@ -786,6 +786,8 @@ export function KeypressProvider({
   );
 
   useEffect(() => {
+    terminalCapabilityManager.enableSupportedModes();
+
     const wasRaw = stdin.isRaw;
     if (wasRaw === false) {
       setRawMode(true);
