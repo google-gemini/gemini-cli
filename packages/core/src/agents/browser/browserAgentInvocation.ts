@@ -90,20 +90,32 @@ function sanitizeToolArgs(args: unknown): unknown {
 
 /**
  * Sanitizes error messages by redacting potential sensitive data patterns.
+ * Uses [^\s'"]+ to catch JWTs, tokens with dots/slashes, and other complex values.
  */
 function sanitizeErrorMessage(message: string): string {
   return message
-    .replace(
-      /api[_-]?key[s]?[:=]\s*['"]?[a-zA-Z0-9_-]+['"]?/gi,
-      'api_key=[REDACTED]',
-    )
-    .replace(/token[:=]\s*['"]?[a-zA-Z0-9_-]+['"]?/gi, 'token=[REDACTED]')
+    .replace(/api[_-]?key[s]?[:=]\s*['"]?[^\s'"]+['"]?/gi, 'api_key=[REDACTED]')
+    .replace(/token[:=]\s*['"]?[^\s'"]+['"]?/gi, 'token=[REDACTED]')
     .replace(/password[:=]\s*['"]?[^\s'"]+['"]?/gi, 'password=[REDACTED]')
-    .replace(/secret[:=]\s*['"]?[a-zA-Z0-9_-]+['"]?/gi, 'secret=[REDACTED]')
+    .replace(/secret[:=]\s*['"]?[^\s'"]+['"]?/gi, 'secret=[REDACTED]')
+    .replace(/credential[:=]\s*['"]?[^\s'"]+['"]?/gi, 'credential=[REDACTED]')
+    .replace(/auth[:=]\s*['"]?[^\s'"]+['"]?/gi, 'auth=[REDACTED]')
+    .replace(/passphrase[:=]\s*['"]?[^\s'"]+['"]?/gi, 'passphrase=[REDACTED]')
+    .replace(
+      /private[_-]?key[:=]\s*['"]?[^\s'"]+['"]?/gi,
+      'private_key=[REDACTED]',
+    )
     .replace(
       /\/[a-zA-Z0-9_\-/]*\/[a-zA-Z0-9_-]*\.(key|pem|p12|pfx)/gi,
       '/path/to/[REDACTED].key',
     );
+}
+
+/**
+ * Sanitizes LLM thought content by redacting sensitive data patterns.
+ */
+function sanitizeThoughtContent(text: string): string {
+  return sanitizeErrorMessage(text);
 }
 
 /**
@@ -215,18 +227,19 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
         switch (activity.type) {
           case 'THOUGHT_CHUNK': {
             const text = String(activity.data['text']);
+            const sanitizedText = sanitizeThoughtContent(text);
             const lastItem = recentActivity[recentActivity.length - 1];
             if (
               lastItem &&
               lastItem.type === 'thought' &&
               lastItem.status === 'running'
             ) {
-              lastItem.content += text;
+              lastItem.content += sanitizedText;
             } else {
               recentActivity.push({
                 id: randomUUID(),
                 type: 'thought',
-                content: text,
+                content: sanitizedText,
                 status: 'running',
               });
             }
@@ -372,11 +385,12 @@ ${output.result}
         returnDisplay: displayContent,
       };
     } catch (error) {
-      const errorMessage =
+      const rawErrorMessage =
         error instanceof Error ? error.message : String(error);
       const isAbort =
         (error instanceof Error && error.name === 'AbortError') ||
-        errorMessage.includes('Aborted');
+        rawErrorMessage.includes('Aborted');
+      const errorMessage = sanitizeErrorMessage(rawErrorMessage);
 
       // Mark any running items as error/cancelled
       for (const item of recentActivity) {
@@ -396,8 +410,12 @@ ${output.result}
         updateOutput(progress);
       }
 
+      const llmContent = isAbort
+        ? 'Browser agent execution was aborted.'
+        : `Browser agent failed. Error: ${errorMessage}`;
+
       return {
-        llmContent: `Browser agent failed. Error: ${errorMessage}`,
+        llmContent,
         returnDisplay: progress,
         error: {
           message: errorMessage,

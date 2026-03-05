@@ -617,6 +617,87 @@ describe('BrowserAgentInvocation', () => {
         updateOutput.mock.calls[updateOutput.mock.calls.length - 1][0];
       expect(lastCall.state).toBe('error');
     });
+
+    it('should sanitize sensitive data in LLM thought content', async () => {
+      const updateOutput = vi.fn();
+      let activityCallback:
+        | ((activity: SubagentActivityEvent) => void)
+        | undefined;
+
+      vi.mocked(LocalAgentExecutor.create).mockImplementation(
+        async (_def, _config, onActivity) => {
+          activityCallback = onActivity;
+          return {
+            run: vi.fn().mockResolvedValue({
+              terminate_reason: AgentTerminateMode.GOAL,
+              result: 'Success',
+            }),
+          } as unknown as LocalAgentExecutor<z.ZodTypeAny>;
+        },
+      );
+
+      vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
+        definition: {
+          name: 'browser_agent',
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>['definition'],
+        browserManager: {} as unknown as NonNullable<
+          Awaited<ReturnType<typeof createBrowserAgentDefinition>>
+        >['browserManager'],
+      });
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      await invocation.execute(new AbortController().signal, updateOutput);
+
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'THOUGHT_CHUNK',
+        data: {
+          text: 'Using token=eyJhbGciOi.payload.signature to authenticate',
+        },
+      });
+
+      const lastProgress = updateOutput.mock.calls[
+        updateOutput.mock.calls.length - 1
+      ][0] as SubagentProgress;
+      const thought = lastProgress.recentActivity.find(
+        (item) => item.type === 'thought' && item.status === 'running',
+      );
+      expect(thought).toBeDefined();
+      expect(thought!.content).not.toContain('eyJhbGciOi');
+      expect(thought!.content).toContain('[REDACTED]');
+    });
+
+    it('should sanitize error messages in catch block', async () => {
+      const updateOutput = vi.fn();
+      vi.mocked(createBrowserAgentDefinition).mockRejectedValue(
+        new Error(
+          'Connection failed with api_key=sk-secret123 and token=jwt.token.here',
+        ),
+      );
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      const result = await invocation.execute(
+        new AbortController().signal,
+        updateOutput,
+      );
+
+      expect(result.error).toBeDefined();
+      const errorMsg = result.error!.message;
+      expect(errorMsg).not.toContain('sk-secret123');
+      expect(errorMsg).not.toContain('jwt.token.here');
+      expect(errorMsg).toContain('[REDACTED]');
+    });
   });
 
   describe('toolLocations', () => {
