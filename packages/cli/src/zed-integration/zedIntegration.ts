@@ -99,6 +99,7 @@ export class GeminiAgent {
   private clientCapabilities: acp.ClientCapabilities | undefined;
   private apiKey: string | undefined;
   private baseUrl: string | undefined;
+  private headers: Record<string, string> | undefined;
 
   constructor(
     private config: Config,
@@ -173,7 +174,7 @@ export class GeminiAgent {
   async authenticate(req: acp.AuthenticateRequest): Promise<void> {
     const methodId = req.methodId;
     let method = AuthType.USE_GEMINI;
-    if (methodId === 'gemini-custom-url') {
+    if (methodId === 'gemini-custom-url' || methodId === 'gateway') {
       method = AuthType.USE_GEMINI;
     } else {
       method = z.nativeEnum(AuthType).parse(methodId);
@@ -221,6 +222,9 @@ export class GeminiAgent {
       if (baseUrl) {
         this.baseUrl = baseUrl;
       }
+      if (headers) {
+        this.headers = headers;
+      }
       await this.config.refreshAuth(
         method,
         apiKey ?? this.apiKey,
@@ -256,7 +260,12 @@ export class GeminiAgent {
     let isAuthenticated = false;
     let authErrorMessage = '';
     try {
-      await config.refreshAuth(authType, this.apiKey, this.baseUrl);
+      await config.refreshAuth(
+        authType,
+        this.apiKey,
+        this.baseUrl,
+        this.headers,
+      );
       isAuthenticated = true;
 
       // Extra validation for Gemini API key
@@ -418,7 +427,12 @@ export class GeminiAgent {
     // This satisfies the security requirement to verify the user before executing
     // potentially unsafe server definitions.
     try {
-      await config.refreshAuth(selectedAuthType, this.apiKey);
+      await config.refreshAuth(
+        selectedAuthType,
+        this.apiKey,
+        this.baseUrl,
+        this.headers,
+      );
     } catch (e) {
       debugLogger.error(`Authentication failed: ${e}`);
       throw acp.RequestError.authRequired();
