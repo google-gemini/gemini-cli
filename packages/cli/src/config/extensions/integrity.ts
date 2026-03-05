@@ -109,7 +109,7 @@ export class ExtensionIntegrityManager {
   async generateIntegrity(
     metadata: ExtensionInstallMetadata,
   ): Promise<IntegrityData> {
-    const content = stableStringify(metadata);
+    const content = stableStringify(metadata) ?? '';
     const hash = createHash('sha256').update(content).digest('hex');
     const secretKey = await this.getSecretKey();
     const signature = createHmac('sha256', secretKey)
@@ -138,7 +138,7 @@ export class ExtensionIntegrityManager {
 
         const secretKey = await this.getSecretKey();
         const expectedSignature = createHmac('sha256', secretKey)
-          .update(stableStringify(existingStore))
+          .update(stableStringify(existingStore) ?? '')
           .digest('hex');
 
         if (
@@ -167,7 +167,7 @@ export class ExtensionIntegrityManager {
     store[extensionName] = integrity;
 
     const secretKey = await this.getSecretKey();
-    const storeContent = stableStringify(store);
+    const storeContent = stableStringify(store) ?? '';
     const storeSignature = createHmac('sha256', secretKey)
       .update(storeContent)
       .digest('hex');
@@ -211,7 +211,7 @@ export class ExtensionIntegrityManager {
 
       // 1. Verify that the integrity store itself hasn't been modified
       const expectedStoreSignature = createHmac('sha256', secretKey)
-        .update(stableStringify(store))
+        .update(stableStringify(store) ?? '')
         .digest('hex');
 
       if (
@@ -229,7 +229,7 @@ export class ExtensionIntegrityManager {
 
       // 2. Verify that the extension's metadata matches its recorded signature
       const integrity = store[extensionName];
-      const metadataContent = stableStringify(metadata);
+      const metadataContent = stableStringify(metadata) ?? '';
       const currentHash = createHash('sha256')
         .update(metadataContent)
         .digest('hex');
