@@ -630,11 +630,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
-      if (
-        key.name === 'escape' &&
-        (streamingState === StreamingState.Responding ||
-          streamingState === StreamingState.WaitingForConfirmation)
-      ) {
+      const isGenerating =
+        streamingState === StreamingState.Responding ||
+        streamingState === StreamingState.WaitingForConfirmation;
+
+      // Only skip Escape handling during generation if we are NOT in shell mode
+      // If we are in shell mode, we still need to process Escape to exit shell mode.
+      if (key.name === 'escape' && isGenerating && !shellModeActive) {
         return false;
       }
 

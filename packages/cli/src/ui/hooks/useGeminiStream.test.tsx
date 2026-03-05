@@ -1469,6 +1469,37 @@ describe('useGeminiStream', () => {
       expect(setShellInputFocusedSpy).toHaveBeenCalledWith(false);
     });
 
+    it('should not cancel an in-progress stream when escape is pressed in shell mode', async () => {
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Part 1' };
+        await new Promise(() => {}); // Keep stream open
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderHookWithDefaults({ shellModeActive: true });
+
+      // Start a query
+      await act(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        result.current.submitQuery('test query');
+      });
+
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      simulateEscapeKeyPress();
+
+      // No cancellation should occur
+      expect(mockCancelAllToolCalls).not.toHaveBeenCalled();
+      expect(mockAddItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: 'Request cancelled.',
+        }),
+      );
+      expect(result.current.streamingState).toBe(StreamingState.Responding);
+    });
+
     it('should not do anything if escape is pressed when not responding', () => {
       const { result } = renderTestHook();
 
