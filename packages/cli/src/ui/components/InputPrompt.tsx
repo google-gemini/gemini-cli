@@ -37,6 +37,7 @@ import {
 import type { Key } from '../hooks/useKeypress.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
+import { formatCommand } from '../utils/keybindingUtils.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { ApprovalMode, coreEvents, debugLogger } from '@google/gemini-cli-core';
@@ -494,7 +495,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         buffer.insert(textToInsert, { paste: true });
         if (isLargePaste(textToInsert)) {
           appEvents.emit(AppEvent.TransientMessage, {
-            message: 'Press Ctrl+O to expand pasted text',
+            message: `Press ${formatCommand(Command.EXPAND_PASTE)} to expand pasted text`,
             type: TransientMessageType.Hint,
           });
         }
@@ -730,7 +731,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         buffer.handleInput(key);
         if (key.sequence && isLargePaste(key.sequence)) {
           appEvents.emit(AppEvent.TransientMessage, {
-            message: 'Press Ctrl+O to expand pasted text',
+            message: `Press ${formatCommand(Command.EXPAND_PASTE)} to expand pasted text`,
             type: TransientMessageType.Hint,
           });
         }
