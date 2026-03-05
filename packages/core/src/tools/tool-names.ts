@@ -160,7 +160,6 @@ export const EDIT_DISPLAY_NAME = 'Edit';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
 export const READ_FILE_DISPLAY_NAME = 'ReadFile';
 export const GLOB_DISPLAY_NAME = 'FindFiles';
-export const TRACKER_INIT_TOOL_NAME = 'tracker_init';
 export const TRACKER_CREATE_TASK_TOOL_NAME = 'tracker_create_task';
 export const TRACKER_UPDATE_TASK_TOOL_NAME = 'tracker_update_task';
 export const TRACKER_GET_TASK_TOOL_NAME = 'tracker_get_task';
