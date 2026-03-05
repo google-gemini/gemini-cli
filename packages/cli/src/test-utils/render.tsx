@@ -17,6 +17,7 @@ import { vi } from 'vitest';
 import stripAnsi from 'strip-ansi';
 import { act, useState } from 'react';
 import os from 'node:os';
+import path from 'node:path';
 import { LoadedSettings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
@@ -502,7 +503,22 @@ const configProxy = new Proxy({} as Config, {
   get(_target, prop) {
     if (prop === 'getTargetDir') {
       return () =>
-        '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long';
+        path.join(
+          path.parse(process.cwd()).root,
+          'Users',
+          'test',
+          'project',
+          'foo',
+          'bar',
+          'and',
+          'some',
+          'more',
+          'directories',
+          'to',
+          'make',
+          'it',
+          'long',
+        );
     }
     if (prop === 'getUseBackgroundColor') {
       return () => true;
