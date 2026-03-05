@@ -294,18 +294,6 @@ export async function start_sandbox(
         (f): f is string => typeof f === 'string',
       );
 
-      // friendly reminder about native runsc support
-      if (config.command === 'docker') {
-        const hasRunscFlag = flags.some(
-          (f) => f === '--runtime=runsc' || f.startsWith('--runtime=runsc'),
-        );
-        if (hasRunscFlag) {
-          debugLogger.log(
-            'ℹ️  Tip: You can now use sandbox: "runsc" for native gVisor support with automatic validation!',
-          );
-        }
-      }
-
       args.push(...flags);
     }
 
