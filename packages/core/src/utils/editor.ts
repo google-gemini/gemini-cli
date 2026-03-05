@@ -17,6 +17,16 @@ const GUI_EDITORS = [
   'cursor',
   'zed',
   'antigravity',
+  'intellij',
+  'webstorm',
+  'pycharm',
+  'goland',
+  'androidstudio',
+  'clion',
+  'rustrover',
+  'datagrip',
+  'phpstorm',
+  'rubymine',
 ] as const;
 const TERMINAL_EDITORS = ['vim', 'neovim', 'emacs', 'hx'] as const;
 const EDITORS = [...GUI_EDITORS, ...TERMINAL_EDITORS] as const;
@@ -55,6 +65,16 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   emacs: 'Emacs',
   antigravity: 'Antigravity',
   hx: 'Helix',
+  intellij: 'IntelliJ IDEA',
+  webstorm: 'WebStorm',
+  pycharm: 'PyCharm',
+  goland: 'GoLand',
+  androidstudio: 'Android Studio',
+  clion: 'CLion',
+  rustrover: 'RustRover',
+  datagrip: 'DataGrip',
+  phpstorm: 'PhpStorm',
+  rubymine: 'RubyMine',
 };
 
 export function getEditorDisplayName(editor: EditorType): string {
@@ -125,6 +145,19 @@ const editorCommands: Record<
     default: ['agy', 'antigravity'],
   },
   hx: { win32: ['hx'], default: ['hx'] },
+  intellij: { win32: ['idea64.exe'], default: ['idea', 'idea.sh'] },
+  webstorm: { win32: ['webstorm64.exe'], default: ['webstorm', 'webstorm.sh'] },
+  pycharm: { win32: ['pycharm64.exe'], default: ['pycharm', 'pycharm.sh'] },
+  goland: { win32: ['goland64.exe'], default: ['goland', 'goland.sh'] },
+  androidstudio: { win32: ['studio64.exe'], default: ['studio', 'studio.sh'] },
+  clion: { win32: ['clion64.exe'], default: ['clion', 'clion.sh'] },
+  rustrover: {
+    win32: ['rustrover64.exe'],
+    default: ['rustrover', 'rustrover.sh'],
+  },
+  datagrip: { win32: ['datagrip64.exe'], default: ['datagrip', 'datagrip.sh'] },
+  phpstorm: { win32: ['phpstorm64.exe'], default: ['phpstorm', 'phpstorm.sh'] },
+  rubymine: { win32: ['rubymine64.exe'], default: ['rubymine', 'rubymine.sh'] },
 };
 
 function getEditorCommands(editor: EditorType): string[] {
@@ -279,6 +312,17 @@ export function getDiffCommand(
         command: 'hx',
         args: ['--vsplit', '--', oldPath, newPath],
       };
+    case 'intellij':
+    case 'webstorm':
+    case 'pycharm':
+    case 'goland':
+    case 'androidstudio':
+    case 'clion':
+    case 'rustrover':
+    case 'datagrip':
+    case 'phpstorm':
+    case 'rubymine':
+      return { command, args: ['diff', oldPath, newPath] };
     default:
       return null;
   }
