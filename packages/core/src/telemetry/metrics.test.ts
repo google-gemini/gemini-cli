@@ -105,6 +105,7 @@ describe('Telemetry Metrics', () => {
   let recordPlanExecutionModule: typeof import('./metrics.js').recordPlanExecution;
   let recordKeychainAvailabilityModule: typeof import('./metrics.js').recordKeychainAvailability;
   let recordTokenStorageInitializationModule: typeof import('./metrics.js').recordTokenStorageInitialization;
+  let recordInvalidChunkModule: typeof import('./metrics.js').recordInvalidChunk;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -154,6 +155,7 @@ describe('Telemetry Metrics', () => {
       metricsJsModule.recordKeychainAvailability;
     recordTokenStorageInitializationModule =
       metricsJsModule.recordTokenStorageInitialization;
+    recordInvalidChunkModule = metricsJsModule.recordInvalidChunk;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -1552,6 +1554,28 @@ describe('Telemetry Metrics', () => {
           'user.email': 'test@example.com',
           type: 'keychain',
           forced: true,
+        });
+      });
+    });
+
+    describe('recordInvalidChunk', () => {
+      it('should not record metrics if not initialized', () => {
+        const config = makeFakeConfig({});
+        recordInvalidChunkModule(config);
+        expect(mockCounterAddFn).not.toHaveBeenCalled();
+      });
+
+      it('should record invalid chunk when initialized', () => {
+        const config = makeFakeConfig({});
+        initializeMetricsModule(config);
+        mockCounterAddFn.mockClear();
+
+        recordInvalidChunkModule(config);
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
         });
       });
     });

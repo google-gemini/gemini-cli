@@ -10,7 +10,6 @@ import {
   getToolSuggestion,
   shouldHideToolCall,
 } from './tool-utils.js';
-import type { AnyToolInvocation, Config } from '../index.js';
 import {
   ReadFileTool,
   ApprovalMode,
@@ -19,6 +18,8 @@ import {
   WRITE_FILE_DISPLAY_NAME,
   EDIT_DISPLAY_NAME,
   READ_FILE_DISPLAY_NAME,
+  type AnyToolInvocation,
+  type Config,
 } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
@@ -98,6 +99,17 @@ describe('shouldHideToolCall', () => {
       ).toBe(!visible);
     },
   );
+
+  it('hides tool calls with a parentCallId', () => {
+    expect(
+      shouldHideToolCall({
+        displayName: 'any_tool',
+        status: CoreToolCallStatus.Success,
+        hasResultDisplay: true,
+        parentCallId: 'some-parent',
+      }),
+    ).toBe(true);
+  });
 });
 
 describe('getToolSuggestion', () => {
