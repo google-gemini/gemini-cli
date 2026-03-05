@@ -1218,7 +1218,6 @@ included directory memory
     const mockConfig = {
       getWorkingDir: vi.fn().mockReturnValue(cwd),
       shouldLoadMemoryFromIncludeDirectories: vi.fn().mockReturnValue(false),
-      getDebugMode: vi.fn().mockReturnValue(false),
       getFileService: vi
         .fn()
         .mockReturnValue(new FileDiscoveryService(projectRoot)),

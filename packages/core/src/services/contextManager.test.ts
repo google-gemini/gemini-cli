@@ -34,7 +34,6 @@ describe('ContextManager', () => {
 
   beforeEach(() => {
     mockConfig = {
-      getDebugMode: vi.fn().mockReturnValue(false),
       getWorkingDir: vi.fn().mockReturnValue('/app'),
       getImportFormat: vi.fn().mockReturnValue('tree'),
       getWorkspaceContext: vi.fn().mockReturnValue({
@@ -82,13 +81,11 @@ describe('ContextManager', () => {
       await contextManager.refresh();
 
       expect(memoryDiscovery.getGlobalMemoryPaths).toHaveBeenCalled();
-      expect(memoryDiscovery.getEnvironmentMemoryPaths).toHaveBeenCalledWith(
-        ['/app'],
-        false,
-      );
+      expect(memoryDiscovery.getEnvironmentMemoryPaths).toHaveBeenCalledWith([
+        '/app',
+      ]);
       expect(memoryDiscovery.readGeminiMdFiles).toHaveBeenCalledWith(
         expect.arrayContaining([...globalPaths, ...envPaths]),
-        false,
         'tree',
       );
 
@@ -171,11 +168,9 @@ describe('ContextManager', () => {
           '/app/gemini.md',
           '/app/GEMINI.md',
         ]),
-        false,
       );
       expect(memoryDiscovery.readGeminiMdFiles).toHaveBeenCalledWith(
         ['/home/user/.gemini/GEMINI.md', '/app/gemini.md'],
-        false,
         'tree',
       );
       expect(contextManager.getEnvironmentMemory()).toContain(
@@ -201,7 +196,6 @@ describe('ContextManager', () => {
         '/app/src/file.ts',
         ['/app'],
         expect.any(Set),
-        false,
         expect.any(Set),
       );
       expect(result).toMatch(/--- Context from: src[\\/]GEMINI\.md ---/);
