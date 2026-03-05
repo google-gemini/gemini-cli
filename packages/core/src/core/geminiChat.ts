@@ -255,7 +255,7 @@ export class GeminiChat {
   ) {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(config);
-    this.chatRecordingService.initialize(resumedSessionData, kind);
+    this.chatRecordingService.initialize(resumedSessionData, kind, history);
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.history.flatMap((c) => c.parts || []),
     );

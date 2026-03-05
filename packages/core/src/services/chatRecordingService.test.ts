@@ -122,6 +122,50 @@ describe('ChatRecordingService', () => {
       const conversation = JSON.parse(fs.readFileSync(sessionFile, 'utf8'));
       expect(conversation.sessionId).toBe('old-session-id');
     });
+
+    it('should overwrite existing messages if initialHistory is provided', () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'session-overwrite.json');
+      const initialData = {
+        sessionId: 'test-session-id',
+        projectHash: 'test-project-hash',
+        messages: [
+          {
+            id: 'msg-1',
+            type: 'user',
+            content: 'Old Message',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      };
+      fs.writeFileSync(sessionFile, JSON.stringify(initialData));
+
+      const newHistory: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'Compressed Summary' }],
+        },
+      ];
+
+      chatRecordingService.initialize(
+        {
+          filePath: sessionFile,
+          conversation: initialData as ConversationRecord,
+        },
+        'main',
+        newHistory,
+      );
+
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+      expect(conversation.messages).toHaveLength(1);
+      expect(conversation.messages[0].content).toEqual([
+        { text: 'Compressed Summary' },
+      ]);
+      expect(conversation.messages[0].type).toBe('user');
+    });
   });
 
   describe('recordMessage', () => {

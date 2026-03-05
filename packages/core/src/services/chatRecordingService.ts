@@ -147,10 +147,14 @@ export class ChatRecordingService {
    *
    * @param resumedSessionData Data from a previous session to resume from.
    * @param kind The kind of conversation (main or subagent).
+   * @param initialHistory The starting history for this session. If provided when resuming an
+   * existing session (e.g., after chat compression), this will overwrite the messages currently
+   * stored on disk to ensure the file reflects the new session state.
    */
   initialize(
     resumedSessionData?: ResumedSessionData,
     kind?: 'main' | 'subagent',
+    initialHistory?: Content[],
   ): void {
     try {
       this.kind = kind;
@@ -163,6 +167,10 @@ export class ChatRecordingService {
         // Update the session ID in the existing file
         this.updateConversation((conversation) => {
           conversation.sessionId = this.sessionId;
+          if (initialHistory) {
+            conversation.messages =
+              this.apiContentToMessageRecords(initialHistory);
+          }
         });
 
         // Clear any cached data to force fresh reads
@@ -190,7 +198,7 @@ export class ChatRecordingService {
           projectHash: this.projectHash,
           startTime: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),
-          messages: [],
+          messages: this.apiContentToMessageRecords(initialHistory || []),
           kind: this.kind,
         });
       }
@@ -213,6 +221,24 @@ export class ChatRecordingService {
       debugLogger.error('Error initializing chat recording service:', error);
       throw error;
     }
+  }
+
+  /**
+   * Converts API Content array to storage-compatible MessageRecord array.
+   */
+  private apiContentToMessageRecords(history: Content[]): MessageRecord[] {
+    return history.map((content) => {
+      const type = content.role === 'model' ? 'gemini' : 'user';
+      const record = {
+        id: randomUUID(),
+        timestamp: new Date().toISOString(),
+        type,
+        content: content.parts,
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return record as MessageRecord;
+    });
   }
 
   private getLastMessage(
