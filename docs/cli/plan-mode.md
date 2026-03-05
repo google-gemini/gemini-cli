@@ -369,7 +369,7 @@ those files are not automatically deleted and must be managed manually.
 [model routing]: /docs/cli/telemetry.md#model-routing
 [preferred external editor]: /docs/reference/configuration.md#general
 [session retention]: /docs/cli/session-management.md#session-retention
-[extensions]: /docs/extensions/index.md
+[extensions]: /docs/extensions/
 [Conductor]: https://github.com/gemini-cli-extensions/conductor
 [open an issue]: https://github.com/google-gemini/gemini-cli/issues
 [Agent Skills]: /docs/cli/skills.md
