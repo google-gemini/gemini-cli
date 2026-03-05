@@ -14,6 +14,7 @@
  * The MCP tools are only available in the browser agent's isolated registry.
  */
 
+import { randomUUID } from 'node:crypto';
 import type { Config } from '../../config/config.js';
 import { LocalAgentExecutor } from '../local-executor.js';
 import {
@@ -22,7 +23,12 @@ import {
   type ToolLiveOutput,
 } from '../../tools/tools.js';
 import { ToolErrorType } from '../../tools/tool-error.js';
-import type { AgentInputs, SubagentActivityEvent } from '../types.js';
+import {
+  type AgentInputs,
+  type SubagentActivityEvent,
+  type SubagentProgress,
+  type SubagentActivityItem,
+} from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import {
   createBrowserAgentDefinition,
@@ -31,6 +37,7 @@ import {
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
+const MAX_RECENT_ACTIVITY = 20;
 
 /**
  * Browser agent invocation with async tool setup.
@@ -88,15 +95,40 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
     updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
     let browserManager;
+    let recentActivity: SubagentActivityItem[] = [];
 
     try {
       if (updateOutput) {
-        updateOutput('🌐 Starting browser agent...\n');
+        // Send initial state
+        const initialProgress: SubagentProgress = {
+          isSubagentProgress: true,
+          agentName: this['_toolName'] ?? 'browser_agent',
+          recentActivity: [],
+          state: 'running',
+        };
+        updateOutput(initialProgress);
       }
 
       // Create definition with MCP tools
+      // Note: printOutput is used for low-level connection logs before agent starts
       const printOutput = updateOutput
-        ? (msg: string) => updateOutput(`🌐 ${msg}\n`)
+        ? (msg: string) => {
+            recentActivity.push({
+              id: randomUUID(),
+              type: 'thought',
+              content: msg,
+              status: 'completed',
+            });
+            if (recentActivity.length > MAX_RECENT_ACTIVITY) {
+              recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
+            }
+            updateOutput({
+              isSubagentProgress: true,
+              agentName: this['_toolName'] ?? 'browser_agent',
+              recentActivity: [...recentActivity],
+              state: 'running',
+            } as SubagentProgress);
+          }
         : undefined;
 
       const result = await createBrowserAgentDefinition(
@@ -107,21 +139,116 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       const { definition } = result;
       browserManager = result.browserManager;
 
-      if (updateOutput) {
-        updateOutput(
-          `🌐 Browser connected. Tools: ${definition.toolConfig?.tools.length ?? 0}\n`,
-        );
-      }
-
       // Create activity callback for streaming output
       const onActivity = (activity: SubagentActivityEvent): void => {
         if (!updateOutput) return;
 
-        if (
-          activity.type === 'THOUGHT_CHUNK' &&
-          typeof activity.data['text'] === 'string'
-        ) {
-          updateOutput(`🌐💭 ${activity.data['text']}`);
+        let updated = false;
+
+        switch (activity.type) {
+          case 'THOUGHT_CHUNK': {
+            const text = String(activity.data['text']);
+            const lastItem = recentActivity[recentActivity.length - 1];
+            if (
+              lastItem &&
+              lastItem.type === 'thought' &&
+              lastItem.status === 'running'
+            ) {
+              lastItem.content += text;
+            } else {
+              recentActivity.push({
+                id: randomUUID(),
+                type: 'thought',
+                content: text,
+                status: 'running',
+              });
+            }
+            updated = true;
+            break;
+          }
+          case 'TOOL_CALL_START': {
+            const name = String(activity.data['name']);
+            const displayName = activity.data['displayName']
+              ? String(activity.data['displayName'])
+              : undefined;
+            const description = activity.data['description']
+              ? String(activity.data['description'])
+              : undefined;
+            const args = JSON.stringify(activity.data['args']);
+            recentActivity.push({
+              id: randomUUID(),
+              type: 'tool_call',
+              content: name,
+              displayName,
+              description,
+              args,
+              status: 'running',
+            });
+            updated = true;
+            break;
+          }
+          case 'TOOL_CALL_END': {
+            const name = String(activity.data['name']);
+            // Find the last running tool call with this name
+            for (let i = recentActivity.length - 1; i >= 0; i--) {
+              if (
+                recentActivity[i].type === 'tool_call' &&
+                recentActivity[i].content === name &&
+                recentActivity[i].status === 'running'
+              ) {
+                recentActivity[i].status = 'completed';
+                updated = true;
+                break;
+              }
+            }
+            break;
+          }
+          case 'ERROR': {
+            const error = String(activity.data['error']);
+            const isCancellation = error === 'Request cancelled.';
+            const toolName = activity.data['name']
+              ? String(activity.data['name'])
+              : undefined;
+
+            if (toolName && isCancellation) {
+              for (let i = recentActivity.length - 1; i >= 0; i--) {
+                if (
+                  recentActivity[i].type === 'tool_call' &&
+                  recentActivity[i].content === toolName &&
+                  recentActivity[i].status === 'running'
+                ) {
+                  recentActivity[i].status = 'cancelled';
+                  updated = true;
+                  break;
+                }
+              }
+            }
+
+            recentActivity.push({
+              id: randomUUID(),
+              type: 'thought',
+              content: isCancellation ? error : `Error: ${error}`,
+              status: isCancellation ? 'cancelled' : 'error',
+            });
+            updated = true;
+            break;
+          }
+          default:
+            break;
+        }
+
+        if (updated) {
+          if (recentActivity.length > MAX_RECENT_ACTIVITY) {
+            recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
+          }
+
+          const progress: SubagentProgress = {
+            isSubagentProgress: true,
+            agentName: this['_toolName'] ?? 'browser_agent',
+            recentActivity: [...recentActivity],
+            state: 'running',
+          };
+          updateOutput(progress);
         }
       };
 
@@ -148,6 +275,15 @@ Result:
 ${output.result}
 `;
 
+      if (updateOutput) {
+        updateOutput({
+          isSubagentProgress: true,
+          agentName: this['_toolName'] ?? 'browser_agent',
+          recentActivity: [...recentActivity],
+          state: 'completed',
+        } as SubagentProgress);
+      }
+
       return {
         llmContent: [{ text: resultContent }],
         returnDisplay: displayContent,
@@ -155,10 +291,31 @@ ${output.result}
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
+      const isAbort =
+        (error instanceof Error && error.name === 'AbortError') ||
+        errorMessage.includes('Aborted');
+
+      // Mark any running items as error/cancelled
+      for (const item of recentActivity) {
+        if (item.status === 'running') {
+          item.status = isAbort ? 'cancelled' : 'error';
+        }
+      }
+
+      const progress: SubagentProgress = {
+        isSubagentProgress: true,
+        agentName: this['_toolName'] ?? 'browser_agent',
+        recentActivity: [...recentActivity],
+        state: isAbort ? 'cancelled' : 'error',
+      };
+
+      if (updateOutput) {
+        updateOutput(progress);
+      }
 
       return {
         llmContent: `Browser agent failed. Error: ${errorMessage}`,
-        returnDisplay: `Browser Agent Failed\nError: ${errorMessage}`,
+        returnDisplay: progress,
         error: {
           message: errorMessage,
           type: ToolErrorType.EXECUTION_FAILED,
