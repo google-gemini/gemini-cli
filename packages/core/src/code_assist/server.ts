@@ -86,8 +86,6 @@ export class CodeAssistServer implements ContentGenerator {
     readonly config?: Config,
   ) {}
 
-  private lastCreditsNotificationPromptId: string | null = null;
-
   async generateContentStream(
     req: GenerateContentParameters,
     userPromptId: string,
@@ -103,11 +101,8 @@ export class CodeAssistServer implements ContentGenerator {
     const modelIsEligible = isOverageEligibleModel(req.model);
     const shouldEnableCredits = modelIsEligible && autoUse;
 
-    if (
-      shouldEnableCredits &&
-      this.lastCreditsNotificationPromptId !== userPromptId
-    ) {
-      this.lastCreditsNotificationPromptId = userPromptId;
+    if (shouldEnableCredits && !this.config?.getCreditsNotificationShown()) {
+      this.config?.setCreditsNotificationShown(true);
       coreEvents.emitFeedback('info', 'Using AI Credits for this request.');
     }
 
