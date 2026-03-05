@@ -41,6 +41,24 @@ exports[`ToolConfirmationQueue > does not render expansion hint when constrainHe
 "
 `;
 
+exports[`ToolConfirmationQueue > hides side borders when a code snippet is detected in ask_user 1`] = `
+"────────────────────────────────────────────────────────────────────────────────
+ Answer Questions
+
+  Does this code look correct?
+   1 print("hello")
+
+  ● 1.  Yes                                                                   
+        Looks good                                                            
+    2.  No
+        Needs changes
+    3.  Enter a custom value
+
+  Enter to select · ↑/↓ to navigate · Esc to cancel
+────────────────────────────────────────────────────────────────────────────────
+"
+`;
+
 exports[`ToolConfirmationQueue > provides more height for ask_user by subtracting less overhead 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ Answer Questions                                                             │
