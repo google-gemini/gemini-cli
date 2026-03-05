@@ -174,7 +174,6 @@ describe('createContentGenerator', () => {
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
           'X-Test-Header': 'test-value',
-          'Another-Header': 'another value',
         }),
       },
       AuthType.LOGIN_WITH_GOOGLE,
@@ -474,6 +473,64 @@ describe('createContentGenerator', () => {
       }),
       apiVersion: 'v1alpha',
     });
+  });
+
+  it('should include config.headers for Gemini auth but not for others', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+
+    // Test USE_GEMINI gets headers
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+        headers: { 'X-Custom-Config-Header': 'custom-value' },
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          headers: expect.objectContaining({
+            'X-Custom-Config-Header': 'custom-value',
+          }),
+        }),
+      }),
+    );
+
+    // Test LOGIN_WITH_GOOGLE does NOT get headers (unless they were in baseHeaders, which they are not)
+    const mockCodeAssistGenerator = {} as unknown as ContentGenerator;
+    vi.mocked(createCodeAssistContentGenerator).mockResolvedValue(
+      mockCodeAssistGenerator as never,
+    );
+
+    await createContentGenerator(
+      {
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+        headers: { 'X-Should-Not-Be-Here': 'nope' },
+      },
+      mockConfig,
+    );
+
+    expect(createCodeAssistContentGenerator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: expect.not.objectContaining({
+          'X-Should-Not-Be-Here': 'nope',
+        }),
+      }),
+      AuthType.LOGIN_WITH_GOOGLE,
+      mockConfig,
+      undefined,
+    );
   });
 });
 

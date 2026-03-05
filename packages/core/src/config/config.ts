@@ -1126,7 +1126,12 @@ export class Config {
     return this.contentGenerator;
   }
 
-  async refreshAuth(authMethod: AuthType, apiKey?: string, baseUrl?: string) {
+  async refreshAuth(
+    authMethod: AuthType,
+    apiKey?: string,
+    baseUrl?: string,
+    headers?: Record<string, string>,
+  ) {
     // Reset availability service when switching auth
     this.modelAvailabilityService.reset();
 
@@ -1154,6 +1159,7 @@ export class Config {
       authMethod,
       apiKey,
       baseUrl,
+      headers,
     );
     this.contentGenerator = await createContentGenerator(
       newContentGeneratorConfig,

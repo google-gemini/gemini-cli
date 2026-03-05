@@ -207,7 +207,7 @@ describe('GeminiAgent', () => {
     });
 
     expect(response.protocolVersion).toBe(acp.PROTOCOL_VERSION);
-    expect(response.authMethods).toHaveLength(3);
+    expect(response.authMethods).toHaveLength(4);
     const geminiAuth = response.authMethods?.find(
       (m) => m.id === AuthType.USE_GEMINI,
     );
@@ -226,6 +226,8 @@ describe('GeminiAgent', () => {
 
     expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
       AuthType.LOGIN_WITH_GOOGLE,
+      undefined,
+      undefined,
       undefined,
     );
     expect(mockSettings.setValue).toHaveBeenCalledWith(
@@ -246,6 +248,8 @@ describe('GeminiAgent', () => {
     expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
       AuthType.USE_GEMINI,
       'test-api-key',
+      undefined,
+      undefined,
     );
     expect(mockSettings.setValue).toHaveBeenCalledWith(
       SettingScope.User,
@@ -267,6 +271,37 @@ describe('GeminiAgent', () => {
       AuthType.USE_GEMINI,
       'test-api-key',
       'https://custom.api.endpoint',
+      undefined,
+    );
+    expect(mockSettings.setValue).toHaveBeenCalledWith(
+      SettingScope.User,
+      'security.auth.selectedType',
+      AuthType.USE_GEMINI,
+    );
+  });
+
+  it('should authenticate correctly with gateway method', async () => {
+    await agent.authenticate({
+      methodId: 'gateway',
+      _meta: {
+        gateway: {
+          baseUrl: 'https://gateway.example.com',
+          headers: {
+            Authorization: 'Bearer test-token',
+            'X-Custom-Header': 'custom-value',
+          },
+        },
+      },
+    } as unknown as acp.AuthenticateRequest);
+
+    expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
+      AuthType.USE_GEMINI,
+      undefined,
+      'https://gateway.example.com',
+      {
+        Authorization: 'Bearer test-token',
+        'X-Custom-Header': 'custom-value',
+      },
     );
     expect(mockSettings.setValue).toHaveBeenCalledWith(
       SettingScope.User,

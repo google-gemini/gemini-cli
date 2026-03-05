@@ -86,6 +86,7 @@ export type ContentGeneratorConfig = {
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
+  headers?: Record<string, string>;
 };
 
 export async function createContentGeneratorConfig(
@@ -93,6 +94,7 @@ export async function createContentGeneratorConfig(
   authType: AuthType | undefined,
   apiKey?: string,
   baseUrl?: string,
+  headers?: Record<string, string>,
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey =
     apiKey ||
@@ -109,6 +111,7 @@ export async function createContentGeneratorConfig(
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
     proxy: config?.getProxy(),
+    headers,
   };
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
@@ -200,7 +203,10 @@ export async function createContentGenerator(
       config.authType === AuthType.USE_GEMINI ||
       config.authType === AuthType.USE_VERTEX_AI
     ) {
-      let headers: Record<string, string> = { ...baseHeaders };
+      let headers: Record<string, string> = {
+        ...baseHeaders,
+        ...config.headers,
+      };
       if (gcConfig?.getUsageStatisticsEnabled()) {
         const installationManager = new InstallationManager();
         const installationId = installationManager.getInstallationId();

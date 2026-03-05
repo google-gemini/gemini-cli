@@ -117,14 +117,14 @@ export class GeminiAgent {
         },
       },
       {
-        id: 'gemini-custom-url',
-        name: 'Gemini API (Custom URL)',
-        description: 'Use an API key and custom base URL',
+        id: 'gateway',
+        name: 'AI API Gateway',
+        description: 'Use a custom AI API Gateway',
         _meta: {
-          'api-key': {
-            provider: 'google',
+          gateway: {
+            protocol: 'google',
+            restartRequired: 'false',
           },
-          'base-url': {},
         },
       },
       {
@@ -177,8 +177,28 @@ export class GeminiAgent {
     const meta = hasMeta(req) ? req._meta : undefined;
     const apiKey =
       typeof meta?.['api-key'] === 'string' ? meta['api-key'] : undefined;
-    const baseUrl =
+    let baseUrl =
       typeof meta?.['base-url'] === 'string' ? meta['base-url'] : undefined;
+    let headers: Record<string, string> | undefined;
+
+    if (methodId === 'gateway') {
+      method = AuthType.USE_GEMINI;
+      // Gateway specific handling
+      const gatewaySchema = z
+        .object({
+          baseUrl: z.string().optional(),
+          headers: z.record(z.string()).optional(),
+        })
+        .optional();
+      const gatewayParams = gatewaySchema.parse(meta?.['gateway']);
+
+      if (gatewayParams?.baseUrl) {
+        baseUrl = gatewayParams.baseUrl;
+      }
+      if (gatewayParams?.headers) {
+        headers = gatewayParams.headers;
+      }
+    }
 
     // Refresh auth with the requested method
     // This will reuse existing credentials if they're valid,
@@ -194,6 +214,7 @@ export class GeminiAgent {
         method,
         apiKey ?? this.apiKey,
         baseUrl ?? this.baseUrl,
+        headers,
       );
     } catch (e) {
       throw new acp.RequestError(-32000, getAcpErrorMessage(e));
