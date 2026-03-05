@@ -292,6 +292,20 @@ describe('GeminiAgent', () => {
     );
   });
 
+  it('should throw acp.RequestError when gateway payload is malformed', async () => {
+    await expect(
+      agent.authenticate({
+        methodId: AuthType.GATEWAY,
+        _meta: {
+          gateway: {
+            // Missing baseUrl
+            headers: { Authorization: 'Bearer token' },
+          },
+        },
+      } as unknown as acp.AuthenticateRequest),
+    ).rejects.toThrow(/Malformed gateway payload/);
+  });
+
   it('should create a new session', async () => {
     vi.useFakeTimers();
     mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
