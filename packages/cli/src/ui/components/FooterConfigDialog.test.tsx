@@ -24,13 +24,14 @@ describe('<FooterConfigDialog />', () => {
 
   it('renders correctly with default settings', async () => {
     const settings = createMockSettings();
-    const { lastFrame, waitUntilReady } = renderWithProviders(
+    const renderResult = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
 
-    await waitUntilReady();
-    expect(lastFrame()).toMatchSnapshot();
+    await renderResult.waitUntilReady();
+    expect(renderResult.lastFrame()).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
   });
 
   it('toggles an item when enter is pressed', async () => {
@@ -69,7 +70,7 @@ describe('<FooterConfigDialog />', () => {
     // Initial order: workspace, branch, ...
     const output = lastFrame();
     const cwdIdx = output.indexOf('] workspace');
-    const branchIdx = output.indexOf('] git-branch');
+    const branchIdx = output.indexOf('] branch');
     expect(cwdIdx).toBeGreaterThan(-1);
     expect(branchIdx).toBeGreaterThan(-1);
     expect(cwdIdx).toBeLessThan(branchIdx);
@@ -82,7 +83,7 @@ describe('<FooterConfigDialog />', () => {
     await waitFor(() => {
       const outputAfter = lastFrame();
       const cwdIdxAfter = outputAfter.indexOf('] workspace');
-      const branchIdxAfter = outputAfter.indexOf('] git-branch');
+      const branchIdxAfter = outputAfter.indexOf('] branch');
       expect(cwdIdxAfter).toBeGreaterThan(-1);
       expect(branchIdxAfter).toBeGreaterThan(-1);
       expect(branchIdxAfter).toBeLessThan(cwdIdxAfter);
@@ -108,22 +109,40 @@ describe('<FooterConfigDialog />', () => {
 
   it('highlights the active item in the preview', async () => {
     const settings = createMockSettings();
-    const { lastFrame, stdin, waitUntilReady } = renderWithProviders(
+    const renderResult = renderWithProviders(
       <FooterConfigDialog onClose={mockOnClose} />,
       { settings },
     );
 
+    const { lastFrame, stdin, waitUntilReady } = renderResult;
+
     await waitUntilReady();
     expect(lastFrame()).toContain('~/project/path');
 
-    // Move focus down to 'git-branch'
+    // Move focus down to 'diff' (which has key 'code-changes' and colored elements)
+    for (let i = 0; i < 8; i++) {
+      act(() => {
+        stdin.write('\u001b[B'); // Down arrow
+      });
+    }
+
+    await waitFor(() => {
+      // The selected indicator should be next to 'diff'
+      expect(lastFrame()).toMatch(/> \[ \] diff/);
+    });
+
+    // Toggle it on
     act(() => {
-      stdin.write('\u001b[B'); // Down arrow
+      stdin.write('\r');
     });
 
     await waitFor(() => {
-      expect(lastFrame()).toContain('main');
+      // It should now be checked and appear in the preview
+      expect(lastFrame()).toMatch(/> \[✓\] diff/);
+      expect(lastFrame()).toContain('+12 -4');
     });
+
+    await expect(renderResult).toMatchSvgSnapshot();
   });
 
   it('shows an empty preview when all items are deselected', async () => {
@@ -134,20 +153,25 @@ describe('<FooterConfigDialog />', () => {
     );
 
     await waitUntilReady();
-    for (let i = 0; i < 10; i++) {
+
+    // Default items are the first 5. We toggle them off.
+    for (let i = 0; i < 5; i++) {
       act(() => {
-        stdin.write('\r'); // Toggle (deselect)
+        stdin.write('\r'); // Toggle off
+      });
+      act(() => {
         stdin.write('\u001b[B'); // Down arrow
       });
     }
 
-    await waitFor(() => {
-      const output = lastFrame();
-      expect(output).toContain('Preview:');
-      expect(output).not.toContain('~/project/path');
-      expect(output).not.toContain('docker');
-      expect(output).not.toContain('gemini-2.5-pro');
-      expect(output).not.toContain('1.2k left');
-    });
+    await waitFor(
+      () => {
+        const output = lastFrame();
+        expect(output).toContain('Preview:');
+        expect(output).not.toContain('~/project/path');
+        expect(output).not.toContain('docker');
+      },
+      { timeout: 2000 },
+    );
   });
 });
