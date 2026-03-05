@@ -110,6 +110,8 @@ interface AgentConfigDialogProps {
   settings: LoadedSettings;
   onClose: () => void;
   onSave?: () => void;
+  /** Available terminal height for dynamic windowing */
+  availableTerminalHeight?: number;
 }
 
 /**
@@ -192,6 +194,7 @@ export function AgentConfigDialog({
   settings,
   onClose,
   onSave,
+  availableTerminalHeight,
 }: AgentConfigDialogProps): React.JSX.Element {
   // Scope selector state (User by default)
   const [selectedScope, setSelectedScope] = useState<LoadableSettingScope>(
@@ -410,6 +413,7 @@ export function AgentConfigDialog({
       selectedScope={selectedScope}
       onScopeChange={handleScopeChange}
       maxItemsToShow={maxItemsToShow}
+      availableHeight={availableTerminalHeight}
       maxLabelWidth={maxLabelWidth}
       onItemToggle={handleItemToggle}
       onEditCommit={handleEditCommit}
