@@ -677,6 +677,13 @@ describe('fileUtils', () => {
       { type: 'pdf', file: 'file.pdf', mime: 'application/pdf' },
       { type: 'binary', file: 'archive.zip', mime: 'application/zip' },
       { type: 'binary', file: 'app.exe', mime: 'application/octet-stream' },
+      {
+        type: 'binary',
+        file: 'database.sqlite',
+        mime: 'application/vnd.sqlite3',
+      },
+      { type: 'binary', file: 'font.woff2', mime: 'font/woff2' },
+      { type: 'binary', file: 'archive.xz', mime: 'application/x-xz' },
     ])(
       'should detect $type type for $file by extension',
       async ({ file, mime, type }) => {
