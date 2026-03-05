@@ -845,6 +845,7 @@ export async function loadCliConfig(
     interactive,
     trustedFolder,
     useBackgroundColor: settings.ui?.useBackgroundColor,
+    useAlternateBuffer: settings.ui?.useAlternateBuffer,
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
@@ -858,9 +859,11 @@ export async function loadCliConfig(
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
+    gemmaModelRouter: settings.experimental?.gemmaModelRouter,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
+    maxAttempts: settings.general?.maxAttempts,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     rawOutput: argv.rawOutput,
@@ -880,6 +883,7 @@ export async function loadCliConfig(
         agents: refreshedSettings.merged.agents,
       };
     },
+    enableConseca: settings.security?.enableConseca,
   });
 }
 

@@ -12,11 +12,17 @@ vi.mock('../../utils/skillUtils.js', () => ({
   uninstallSkill: mockUninstallSkill,
 }));
 
+const { debugLogger, emitConsoleLog } = await vi.hoisted(async () => {
+  const { createMockDebugLogger } = await import(
+    '../../test-utils/mockDebugLogger.js'
+  );
+  return createMockDebugLogger({ stripAnsi: true });
+});
+
 vi.mock('@google/gemini-cli-core', () => ({
-  debugLogger: { log: vi.fn(), error: vi.fn() },
+  debugLogger,
 }));
 
-import { debugLogger } from '@google/gemini-cli-core';
 import { handleUninstall, uninstallCommand } from './uninstall.js';
 
 describe('skill uninstall command', () => {
@@ -45,10 +51,12 @@ describe('skill uninstall command', () => {
     });
 
     expect(mockUninstallSkill).toHaveBeenCalledWith('test-skill', 'user');
-    expect(debugLogger.log).toHaveBeenCalledWith(
+    expect(emitConsoleLog).toHaveBeenCalledWith(
+      'log',
       expect.stringContaining('Successfully uninstalled skill: test-skill'),
     );
-    expect(debugLogger.log).toHaveBeenCalledWith(
+    expect(emitConsoleLog).toHaveBeenCalledWith(
+      'log',
       expect.stringContaining('location: /mock/user/skills/test-skill'),
     );
   });
@@ -71,7 +79,8 @@ describe('skill uninstall command', () => {
 
     await handleUninstall({ name: 'test-skill' });
 
-    expect(debugLogger.error).toHaveBeenCalledWith(
+    expect(emitConsoleLog).toHaveBeenCalledWith(
+      'error',
       'Skill "test-skill" is not installed in the user scope.',
     );
   });
@@ -81,7 +90,7 @@ describe('skill uninstall command', () => {
 
     await handleUninstall({ name: 'test-skill' });
 
-    expect(debugLogger.error).toHaveBeenCalledWith('Uninstall failed');
+    expect(emitConsoleLog).toHaveBeenCalledWith('error', 'Uninstall failed');
     expect(process.exit).toHaveBeenCalledWith(1);
   });
 });
