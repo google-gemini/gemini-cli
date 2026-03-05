@@ -35,11 +35,27 @@ const RESPONSE_SCHEMA: Record<string, unknown> = {
   required: ['reasoning', 'next_speaker'],
 };
 
+/**
+ * Structured response from the next-speaker check LLM call.
+ */
 export interface NextSpeakerResponse {
   reasoning: string;
   next_speaker: 'user' | 'model';
 }
 
+/**
+ * Determines who should speak next in the conversation by asking the model
+ * to analyze its own last response.
+ *
+ * Returns `null` when the next speaker cannot be determined (e.g. empty
+ * history, last turn was not from the model, or the LLM call fails).
+ *
+ * @param chat - The current {@link GeminiChat} session providing conversation history.
+ * @param baseLlmClient - LLM client used to make the next-speaker check request.
+ * @param abortSignal - Signal used to cancel the underlying LLM request.
+ * @param promptId - Identifier for the originating prompt, used for telemetry.
+ * @returns A {@link NextSpeakerResponse} indicating who speaks next, or `null`.
+ */
 export async function checkNextSpeaker(
   chat: GeminiChat,
   baseLlmClient: BaseLlmClient,
