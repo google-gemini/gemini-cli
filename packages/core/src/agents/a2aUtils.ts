@@ -16,6 +16,8 @@ import type {
 } from '@a2a-js/sdk';
 import type { SendMessageResult } from './a2a-client-manager.js';
 
+export const AUTH_REQUIRED_MSG = `[Authorization Required] The agent has indicated it requires authorization to proceed. Please follow the agent's instructions.`;
+
 /**
  * Reassembles incremental A2A streaming updates into a coherent result.
  * Shows sequential status/messages followed by all reassembled artifacts.
@@ -33,6 +35,7 @@ export class A2AResultReassembler {
 
     switch (chunk.kind) {
       case 'status-update':
+        this.appendStateInstructions(chunk.status?.state);
         this.pushMessage(chunk.status?.message);
         break;
 
@@ -65,6 +68,7 @@ export class A2AResultReassembler {
         break;
 
       case 'task':
+        this.appendStateInstructions(chunk.status?.state);
         this.pushMessage(chunk.status?.message);
         if (chunk.artifacts) {
           for (const art of chunk.artifacts) {
@@ -72,6 +76,26 @@ export class A2AResultReassembler {
             this.artifactChunks.set(art.artifactId, [
               extractPartsText(art.parts, ''),
             ]);
+          }
+        }
+        // History Fallback: Some agent implementations do not populate the
+        // status.message in their final terminal response, instead archiving
+        // the final answer in the task's history array. To ensure we don't
+        // present an empty result, we fallback to the most recent agent message
+        // in the history only when the task is terminal and no other content
+        // (message log or artifacts) has been reassembled.
+        if (
+          isTerminalState(chunk.status?.state) &&
+          this.messageLog.length === 0 &&
+          this.artifacts.size === 0 &&
+          chunk.history &&
+          chunk.history.length > 0
+        ) {
+          const lastAgentMsg = [...chunk.history]
+            .reverse()
+            .find((m) => m.role?.toLowerCase().includes('agent'));
+          if (lastAgentMsg) {
+            this.pushMessage(lastAgentMsg);
           }
         }
         break;
@@ -83,6 +107,17 @@ export class A2AResultReassembler {
 
       default:
         break;
+    }
+  }
+
+  private appendStateInstructions(state: TaskState | undefined) {
+    if (state !== 'auth-required') {
+      return;
+    }
+
+    // Prevent duplicate instructions if multiple chunks report auth-required
+    if (!this.messageLog.includes(AUTH_REQUIRED_MSG)) {
+      this.messageLog.push(AUTH_REQUIRED_MSG);
     }
   }
 
@@ -126,7 +161,7 @@ export class A2AResultReassembler {
  * Handles Text, Data (JSON), and File parts.
  */
 export function extractMessageText(message: Message | undefined): string {
-  if (!message) {
+  if (!message || !message.parts || !Array.isArray(message.parts)) {
     return '';
   }
 
@@ -158,7 +193,6 @@ function extractPartText(part: Part): string {
   }
 
   if (isDataPart(part)) {
-    // Attempt to format known data types if metadata exists, otherwise JSON stringify
     return `Data: ${JSON.stringify(part.data)}`;
   }
 
