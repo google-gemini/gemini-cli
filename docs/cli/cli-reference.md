@@ -55,6 +55,9 @@ and parameters.
 
 Use `gemini --voice` to run the current voice-mode scaffold.
 
+Note: This feature is experimental and under active development. See issue
+#21252 for roadmap discussion.
+
 - It currently accepts text input in the terminal as a placeholder for spoken
   input.
 - Responses are steered toward concise, voice-friendly output.

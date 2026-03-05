@@ -7,6 +7,21 @@
 const VOICE_FRIENDLY_INSTRUCTION =
   'You are in a voice conversation. Respond concisely in short, spoken sentences. Do not use markdown, especially tables or code blocks.';
 
-export function createVoicePrompt(text: string): string {
-  return `${VOICE_FRIENDLY_INSTRUCTION}\n\nUser request:\n${text}`;
+export interface VoicePrompt {
+  system: string;
+  user: string;
+}
+
+/**
+ * Creates a voice-mode prompt using structured fields.
+ *
+ * User input is intentionally separated from system instructions to prevent
+ * prompt injection vulnerabilities. Never concatenate untrusted user text
+ * directly with system prompts.
+ */
+export function createVoicePrompt(text: string): VoicePrompt {
+  return {
+    system: VOICE_FRIENDLY_INSTRUCTION,
+    user: text.trim(),
+  };
 }
