@@ -20,8 +20,8 @@ import {
   type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
-import { DefaultLight } from '../ui/themes/default-light.js';
-import { DefaultDark } from '../ui/themes/default.js';
+import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
+import { DefaultDark } from '../ui/themes/builtin/dark/default-dark.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import {
   type Settings,
@@ -796,14 +796,13 @@ export function loadSettings(
 /**
  * Migrates deprecated settings to their new counterparts.
  *
- * TODO: After a couple of weeks (around early Feb 2026), we should start removing
- * the deprecated settings from the settings files by default.
+ * Deprecated settings are removed from settings files by default.
  *
  * @returns true if any changes were made and need to be saved.
  */
 export function migrateDeprecatedSettings(
   loadedSettings: LoadedSettings,
-  removeDeprecated = false,
+  removeDeprecated = true,
 ): boolean {
   let anyModified = false;
   const systemWarnings: Map<LoadableSettingScope, string[]> = new Map();
