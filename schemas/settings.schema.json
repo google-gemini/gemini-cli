@@ -321,10 +321,26 @@
           "default": {},
           "type": "object",
           "properties": {
+            "items": {
+              "title": "Footer Items",
+              "description": "List of item IDs to display in the footer. Rendered in order",
+              "markdownDescription": "List of item IDs to display in the footer. Rendered in order\n\n- Category: `UI`\n- Requires restart: `no`",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "showLabels": {
+              "title": "Show Footer Labels",
+              "description": "Display a second line above the footer items with descriptive headers (e.g., /model).",
+              "markdownDescription": "Display a second line above the footer items with descriptive headers (e.g., /model).\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
             "hideCWD": {
               "title": "Hide CWD",
-              "description": "Hide the current working directory path in the footer.",
-              "markdownDescription": "Hide the current working directory path in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+              "description": "Hide the current working directory in the footer.",
+              "markdownDescription": "Hide the current working directory in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             },
@@ -344,8 +360,8 @@
             },
             "hideContextPercentage": {
               "title": "Hide Context Window Percentage",
-              "description": "Hides the context window remaining percentage.",
-              "markdownDescription": "Hides the context window remaining percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+              "description": "Hides the context window usage percentage.",
+              "markdownDescription": "Hides the context window usage percentage.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             }
@@ -570,7 +586,7 @@
           }
         },
         "compressionThreshold": {
-          "title": "Compression Threshold",
+          "title": "Context Compression Threshold",
           "description": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).",
           "markdownDescription": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `0.5`",
           "default": 0.5,
@@ -1271,8 +1287,8 @@
       "properties": {
         "sandbox": {
           "title": "Sandbox",
-          "description": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.",
-          "markdownDescription": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.\n\n- Category: `Tools`\n- Requires restart: `yes`",
+          "description": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").",
+          "markdownDescription": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").\n\n- Category: `Tools`\n- Requires restart: `yes`",
           "$ref": "#/$defs/BooleanOrString"
         },
         "shell": {
@@ -1698,6 +1714,13 @@
           "title": "Plan",
           "description": "Enable planning features (Plan Mode and tools).",
           "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "taskTracker": {
+          "title": "Task Tracker",
+          "description": "Enable task tracker tools.",
+          "markdownDescription": "Enable task tracker tools.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
