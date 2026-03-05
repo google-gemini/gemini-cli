@@ -12,7 +12,6 @@ import type {
 } from '../scheduler/types.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { EditorType } from '../utils/editor.js';
-import type { ApprovalMode } from '../policy/types.js';
 
 /**
  * Options for scheduling agent tools.
@@ -61,12 +60,12 @@ export async function scheduleAgentTools(
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const agentConfig: Config = Object.create(config);
   agentConfig.getToolRegistry = () => toolRegistry;
-  
+
   // Apply any subagent-specific approval mode override, fallback to the main config mode.
-  const override = config.getAgentsSettings()?.overrides?.[agentName];
-  if (override?.approvalMode) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    agentConfig.getApprovalMode = () => override.approvalMode as ApprovalMode;
+  const overrideMode =
+    config.getAgentsSettings()?.overrides?.[agentName]?.approvalMode;
+  if (overrideMode) {
+    agentConfig.getApprovalMode = () => overrideMode;
   } else {
     // Subagents follow the global approval mode by default.
     agentConfig.getApprovalMode = () => config.getApprovalMode();
