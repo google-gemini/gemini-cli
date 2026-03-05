@@ -250,6 +250,160 @@ describe('BrowserAgentInvocation', () => {
       );
     });
 
+    it('should sanitize sensitive data in tool arguments', async () => {
+      const updateOutput = vi.fn();
+      let activityCallback:
+        | ((activity: SubagentActivityEvent) => void)
+        | undefined;
+
+      vi.mocked(LocalAgentExecutor.create).mockImplementation(
+        async (_def, _config, onActivity) => {
+          activityCallback = onActivity;
+          return {
+            run: vi.fn().mockResolvedValue({
+              terminate_reason: AgentTerminateMode.GOAL,
+              result: 'Success',
+            }),
+          } as unknown as LocalAgentExecutor<z.ZodTypeAny>;
+        },
+      );
+
+      vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
+        definition: {
+          name: 'browser_agent',
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>['definition'],
+        browserManager: {} as unknown as NonNullable<
+          Awaited<ReturnType<typeof createBrowserAgentDefinition>>
+        >['browserManager'],
+      });
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      await invocation.execute(new AbortController().signal, updateOutput);
+
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'TOOL_CALL_START',
+        data: {
+          name: 'fill',
+          args: {
+            username: 'testuser',
+            password: 'supersecretpassword',
+            nested: {
+              apiKey: 'my-api-key',
+              publicData: 'hello',
+            },
+          },
+        },
+      });
+
+      const lastProgress = updateOutput.mock.calls[
+        updateOutput.mock.calls.length - 1
+      ][0] as SubagentProgress;
+
+      const toolCall = lastProgress.recentActivity.find(
+        (item) => item.type === 'tool_call',
+      );
+      expect(toolCall).toBeDefined();
+
+      const argsObj = JSON.parse(toolCall!.args!);
+      expect(argsObj.username).toBe('testuser');
+      expect(argsObj.password).toBe('[REDACTED]');
+      expect(argsObj.nested.apiKey).toBe('[REDACTED]');
+      expect(argsObj.nested.publicData).toBe('hello');
+    });
+
+    it('should correctly set error and cancelled status for tools', async () => {
+      const updateOutput = vi.fn();
+      let activityCallback:
+        | ((activity: SubagentActivityEvent) => void)
+        | undefined;
+
+      vi.mocked(LocalAgentExecutor.create).mockImplementation(
+        async (_def, _config, onActivity) => {
+          activityCallback = onActivity;
+          return {
+            run: vi.fn().mockResolvedValue({
+              terminate_reason: AgentTerminateMode.GOAL,
+              result: 'Success',
+            }),
+          } as unknown as LocalAgentExecutor<z.ZodTypeAny>;
+        },
+      );
+
+      vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
+        definition: {
+          name: 'browser_agent',
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>['definition'],
+        browserManager: {} as unknown as NonNullable<
+          Awaited<ReturnType<typeof createBrowserAgentDefinition>>
+        >['browserManager'],
+      });
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      await invocation.execute(new AbortController().signal, updateOutput);
+
+      // Start tool 1
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'TOOL_CALL_START',
+        data: { name: 'tool1', args: {} },
+      });
+
+      // Error for tool 1
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'ERROR',
+        data: { name: 'tool1', error: 'Some error' },
+      });
+
+      let lastProgress = updateOutput.mock.calls[
+        updateOutput.mock.calls.length - 1
+      ][0] as SubagentProgress;
+
+      const toolCall1 = lastProgress.recentActivity.find(
+        (item) => item.type === 'tool_call' && item.content === 'tool1',
+      );
+      expect(toolCall1?.status).toBe('error');
+
+      // Start tool 2
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'TOOL_CALL_START',
+        data: { name: 'tool2', args: {} },
+      });
+
+      // Cancellation for tool 2
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'ERROR',
+        data: { name: 'tool2', error: 'Request cancelled.' },
+      });
+
+      lastProgress = updateOutput.mock.calls[
+        updateOutput.mock.calls.length - 1
+      ][0] as SubagentProgress;
+
+      const toolCall2 = lastProgress.recentActivity.find(
+        (item) => item.type === 'tool_call' && item.content === 'tool2',
+      );
+      expect(toolCall2?.status).toBe('cancelled');
+    });
+
     it('should emit error state on failure', async () => {
       const updateOutput = vi.fn();
       vi.mocked(createBrowserAgentDefinition).mockRejectedValue(

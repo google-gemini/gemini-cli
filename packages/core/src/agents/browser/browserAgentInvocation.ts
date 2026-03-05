@@ -40,6 +40,45 @@ const DESCRIPTION_MAX_LENGTH = 200;
 const MAX_RECENT_ACTIVITY = 20;
 
 /**
+ * Sanitizes tool arguments by redacting sensitive fields.
+ */
+function sanitizeToolArgs(args: unknown): unknown {
+  if (typeof args !== 'object' || args === null) {
+    return args;
+  }
+
+  if (Array.isArray(args)) {
+    return args.map(sanitizeToolArgs);
+  }
+
+  const sensitiveKeys = [
+    'password',
+    'apikey',
+    'token',
+    'secret',
+    'credential',
+    'auth',
+    'passphrase',
+    'privatekey',
+  ];
+
+  const sanitized: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(args)) {
+    const isSensitive = sensitiveKeys.some((sensitiveKey) =>
+      key.toLowerCase().includes(sensitiveKey.toLowerCase()),
+    );
+    if (isSensitive) {
+      sanitized[key] = '[REDACTED]';
+    } else {
+      sanitized[key] = sanitizeToolArgs(value);
+    }
+  }
+
+  return sanitized;
+}
+
+/**
  * Browser agent invocation with async tool setup.
  *
  * This invocation handles the browser agent's special requirements:
@@ -174,7 +213,9 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             const description = activity.data['description']
               ? String(activity.data['description'])
               : undefined;
-            const args = JSON.stringify(activity.data['args']);
+            const args = JSON.stringify(
+              sanitizeToolArgs(activity.data['args']),
+            );
             recentActivity.push({
               id: randomUUID(),
               type: 'tool_call',
@@ -210,14 +251,16 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
               ? String(activity.data['name'])
               : undefined;
 
-            if (toolName && isCancellation) {
+            if (toolName) {
               for (let i = recentActivity.length - 1; i >= 0; i--) {
                 if (
                   recentActivity[i].type === 'tool_call' &&
                   recentActivity[i].content === toolName &&
                   recentActivity[i].status === 'running'
                 ) {
-                  recentActivity[i].status = 'cancelled';
+                  recentActivity[i].status = isCancellation
+                    ? 'cancelled'
+                    : 'error';
                   updated = true;
                   break;
                 }
