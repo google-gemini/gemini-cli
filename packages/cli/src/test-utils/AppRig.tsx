@@ -122,6 +122,7 @@ vi.mock('../utils/persistentState.ts', async () => {
     },
   };
 });
+
 // A minimal mock ExtensionManager to satisfy AppContainer's forceful cast
 class MockExtensionManager extends ExtensionLoader {
   getExtensions = vi.fn().mockReturnValue([]);
