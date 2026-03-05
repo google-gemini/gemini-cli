@@ -76,9 +76,8 @@ describe('compress-then-resume', () => {
       args: ['--resume', 'latest', 'What did we talk about?'],
     });
 
-    // The resumed session should work without errors
-    // (no context overflow, no crash)
-    expect(result).toBeDefined();
-    expect(result.length).toBeGreaterThan(0);
+    // The resumed session should recall context from the compressed history
+    expect(result).toContain('robot');
+    expect(result).toContain('Unit 734');
   });
 });
