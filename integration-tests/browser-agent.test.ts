@@ -17,8 +17,13 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig, assertModelHasOutput } from './test-helper.js';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const chromeAvailable = (() => {
   try {
@@ -35,7 +40,17 @@ const chromeAvailable = (() => {
         { stdio: 'ignore' },
       );
     } else if (process.platform === 'win32') {
-      execSync('where chrome || where chromium', { stdio: 'ignore' });
+      // Check standard Windows installation paths using Node.js fs
+      const chromePaths = [
+        'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+        `${process.env['LOCALAPPDATA'] ?? ''}\\Google\\Chrome\\Application\\chrome.exe`,
+      ];
+      const found = chromePaths.some((p) => existsSync(p));
+      if (!found) {
+        // Fall back to PATH check
+        execSync('where chrome || where chromium', { stdio: 'ignore' });
+      }
     } else {
       return false;
     }
@@ -57,7 +72,7 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
   it('should navigate to a page and capture accessibility tree', async () => {
     rig.setup('browser-navigate-and-snapshot', {
       fakeResponsesPath: join(
-        import.meta.dirname,
+        __dirname,
         'browser-agent.navigate-snapshot.responses',
       ),
       settings: {
@@ -88,10 +103,7 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
   it('should take screenshots of web pages', async () => {
     rig.setup('browser-screenshot', {
-      fakeResponsesPath: join(
-        import.meta.dirname,
-        'browser-agent.screenshot.responses',
-      ),
+      fakeResponsesPath: join(__dirname, 'browser-agent.screenshot.responses'),
       settings: {
         agents: {
           browser_agent: {
@@ -117,10 +129,7 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
   it('should interact with page elements', async () => {
     rig.setup('browser-interaction', {
-      fakeResponsesPath: join(
-        import.meta.dirname,
-        'browser-agent.interaction.responses',
-      ),
+      fakeResponsesPath: join(__dirname, 'browser-agent.interaction.responses'),
       settings: {
         agents: {
           browser_agent: {
@@ -149,10 +158,7 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
   it('should clean up browser processes after completion', async () => {
     rig.setup('browser-cleanup', {
-      fakeResponsesPath: join(
-        import.meta.dirname,
-        'browser-agent.cleanup.responses',
-      ),
+      fakeResponsesPath: join(__dirname, 'browser-agent.cleanup.responses'),
       settings: {
         agents: {
           browser_agent: {
@@ -173,10 +179,7 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
 
   it('should handle multiple browser operations in sequence', async () => {
     rig.setup('browser-sequential', {
-      fakeResponsesPath: join(
-        import.meta.dirname,
-        'browser-agent.sequential.responses',
-      ),
+      fakeResponsesPath: join(__dirname, 'browser-agent.sequential.responses'),
       settings: {
         agents: {
           browser_agent: {

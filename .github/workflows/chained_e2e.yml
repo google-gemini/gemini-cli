@@ -164,13 +164,6 @@ jobs:
         if: "${{matrix.sandbox == 'sandbox:docker'}}"
         uses: 'docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435' # ratchet:docker/setup-buildx-action@v3
 
-      - name: 'Ensure Chrome is available'
-        run: |
-          if ! command -v google-chrome &> /dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y google-chrome-stable
-          fi
-          google-chrome --version
 
       - name: 'Run E2E tests'
         env:
@@ -271,6 +264,27 @@ jobs:
       - name: 'Build project'
         run: 'npm run build'
         shell: 'pwsh'
+
+      - name: 'Ensure Chrome is available'
+        shell: 'pwsh'
+        run: |
+          $chromePaths = @(
+            "${env:ProgramFiles}\Google\Chrome\Application\chrome.exe",
+            "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe"
+          )
+          $chromeExists = $chromePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $chromeExists) {
+            Write-Host 'Chrome not found, installing via Chocolatey...'
+            choco install googlechrome -y --no-progress --ignore-checksums
+          }
+          $installed = $chromePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if ($installed) {
+            Write-Host "Chrome found at: $installed"
+            & $installed --version
+          } else {
+            Write-Error 'Chrome installation failed'
+            exit 1
+          }
 
       - name: 'Run E2E tests'
         env:
