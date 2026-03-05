@@ -11,6 +11,8 @@ import {
   isTerminalState,
   A2AResultReassembler,
   AUTH_REQUIRED_MSG,
+  normalizeAgentCard,
+  getProtocolVersion,
 } from './a2aUtils.js';
 import type { SendMessageResult } from './a2a-client-manager.js';
 import type {
@@ -225,6 +227,81 @@ describe('a2aUtils', () => {
     });
   });
 
+  describe('normalizeAgentCard', () => {
+    it('should preserve unknown fields while providing defaults for mandatory ones', () => {
+      const raw = {
+        name: 'my-agent',
+        customField: 'keep-me',
+      };
+
+      const normalized = normalizeAgentCard(raw);
+
+      expect(normalized.name).toBe('my-agent');
+      // @ts-expect-error - testing dynamic preservation
+      expect(normalized.customField).toBe('keep-me');
+      expect(normalized.description).toBe('');
+      expect(normalized.skills).toEqual([]);
+      expect(normalized.defaultInputModes).toEqual([]);
+    });
+
+    it('should normalize additionalInterfaces while preserving protocolVersion', () => {
+      const raw = {
+        name: 'test',
+        additionalInterfaces: [
+          {
+            url: 'grpc://test',
+            protocolBinding: 'GRPC',
+            protocolVersion: '1.0',
+          },
+        ],
+      };
+
+      const normalized = normalizeAgentCard(raw);
+      const intf = normalized.additionalInterfaces?.[0] as unknown as Record<
+        string,
+        unknown
+      >;
+
+      expect(intf['transport']).toBe('GRPC');
+      expect(intf['url']).toBe('grpc://test');
+      expect(intf['protocolVersion']).toBe('1.0');
+    });
+
+    it('should fallback to supportedInterfaces if additionalInterfaces is missing', () => {
+      const raw = {
+        name: 'test',
+        supportedInterfaces: [{ url: 'http://test', transport: 'REST' }],
+      };
+
+      const normalized = normalizeAgentCard(raw);
+      expect(normalized.additionalInterfaces).toHaveLength(1);
+      expect(normalized.additionalInterfaces?.[0].transport).toBe('REST');
+    });
+  });
+
+  describe('getProtocolVersion', () => {
+    it('should resolve version from specific interface URL', () => {
+      const card = {
+        additionalInterfaces: [
+          { url: 'v1-url', protocolVersion: '1.1' },
+          { url: 'v0-url', protocolVersion: '0.1' },
+        ],
+      };
+
+      expect(getProtocolVersion(card, 'v1-url')).toBe('1.1');
+      expect(getProtocolVersion(card, 'v0-url')).toBe('0.1');
+    });
+
+    it('should fallback to top-level protocolVersion', () => {
+      const card = {
+        protocolVersion: '1.5',
+        additionalInterfaces: [{ url: 'some-url' }],
+      };
+
+      expect(getProtocolVersion(card, 'some-url')).toBe('1.5');
+    });
+  });
+
   describe('A2AResultReassembler', () => {
     it('should reassemble sequential messages and incremental artifacts', () => {
       const reassembler = new A2AResultReassembler();
@@ -233,6 +310,7 @@ describe('a2aUtils', () => {
       reassembler.update({
         kind: 'status-update',
         taskId: 't1',
+        contextId: 'ctx1',
         status: {
           state: 'working',
           message: {
@@ -247,6 +325,7 @@ describe('a2aUtils', () => {
       reassembler.update({
         kind: 'artifact-update',
         taskId: 't1',
+        contextId: 'ctx1',
         append: false,
         artifact: {
           artifactId: 'a1',
@@ -259,6 +338,7 @@ describe('a2aUtils', () => {
       reassembler.update({
         kind: 'status-update',
         taskId: 't1',
+        contextId: 'ctx1',
         status: {
           state: 'working',
           message: {
@@ -273,6 +353,7 @@ describe('a2aUtils', () => {
       reassembler.update({
         kind: 'artifact-update',
         taskId: 't1',
+        contextId: 'ctx1',
         append: true,
         artifact: {
           artifactId: 'a1',
@@ -291,6 +372,7 @@ describe('a2aUtils', () => {
 
       reassembler.update({
         kind: 'status-update',
+        contextId: 'ctx1',
         status: {
           state: 'auth-required',
           message: {
@@ -310,6 +392,7 @@ describe('a2aUtils', () => {
 
       reassembler.update({
         kind: 'status-update',
+        contextId: 'ctx1',
         status: {
           state: 'auth-required',
         },
@@ -323,6 +406,7 @@ describe('a2aUtils', () => {
 
       const chunk = {
         kind: 'status-update',
+        contextId: 'ctx1',
         status: {
           state: 'auth-required',
           message: {
@@ -351,6 +435,8 @@ describe('a2aUtils', () => {
 
       reassembler.update({
         kind: 'task',
+        id: 'task-1',
+        contextId: 'ctx1',
         status: { state: 'completed' },
         history: [
           {
@@ -369,6 +455,8 @@ describe('a2aUtils', () => {
 
       reassembler.update({
         kind: 'task',
+        id: 'task-1',
+        contextId: 'ctx1',
         status: { state: 'working' },
         history: [
           {
@@ -387,6 +475,8 @@ describe('a2aUtils', () => {
 
       reassembler.update({
         kind: 'task',
+        id: 'task-1',
+        contextId: 'ctx1',
         status: { state: 'completed' },
         artifacts: [
           {

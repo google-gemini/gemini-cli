@@ -874,6 +874,31 @@ describe('AgentRegistry', () => {
       );
     });
 
+    it('should maintain registration under canonical name even if overrides are applied', async () => {
+      const originalName = 'my-agent';
+      const definition = { ...MOCK_AGENT_V1, name: originalName };
+
+      // Mock overrides in settings
+      vi.spyOn(mockConfig, 'getAgentsSettings').mockReturnValue({
+        overrides: {
+          [originalName]: {
+            enabled: true,
+            modelConfig: { model: 'overridden-model' },
+          },
+        },
+      });
+
+      await registry.testRegisterAgent(definition);
+
+      const registered = registry.getDefinition(originalName);
+      expect(registered).toBeDefined();
+      expect((registered as LocalAgentDefinition).modelConfig.model).toBe(
+        'overridden-model',
+      );
+      // Ensure it is NOT registered under some other key
+      expect(registry.getAllAgentNames()).toEqual([originalName]);
+    });
+
     it('should reject an agent definition missing a name', async () => {
       const invalidAgent = { ...MOCK_AGENT_V1, name: '' };
       const debugWarnSpy = vi

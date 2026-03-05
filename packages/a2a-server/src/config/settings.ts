@@ -14,6 +14,7 @@ import {
   getErrorMessage,
   type TelemetrySettings,
   homedir,
+  type AgentSettings,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 
@@ -45,6 +46,10 @@ export interface Settings {
     enableRecursiveFileSearch?: boolean;
     customIgnoreFilePaths?: string[];
   };
+  experimental?: {
+    enableAgents?: boolean;
+  };
+  agents?: AgentSettings;
 }
 
 export interface SettingsError {
