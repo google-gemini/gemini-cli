@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   ApprovalMode,
   PolicyDecision,
@@ -29,6 +29,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 describe('Policy Engine Integration Tests', () => {
+  beforeEach(() => vi.stubEnv('GEMINI_SYSTEM_MD', ''));
+
+  afterEach(() => vi.unstubAllEnvs());
+
   describe('Policy configuration produces valid PolicyEngine config', () => {
     it('should create a working PolicyEngine from basic settings', async () => {
       const settings: Settings = {
