@@ -129,8 +129,6 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
     5,
     terminalHeight - DIALOG_PADDING - HEADER_HEIGHT - CONTROLS_HEIGHT - 2,
   );
-
-  // FIX #5: maxItemsToShow used in both visual and accessible views
   const maxItemsToShow = Math.max(1, Math.floor(listHeight / 4));
 
   if (selectedMessageId) {
@@ -160,8 +158,6 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
       (m) => m.id === selectedMessageId,
     );
     return (
-      // FIX #3: RewindConfirmation now receives isScreenReaderEnabled
-      // so it can render an accessible view for the confirmation step
       <RewindConfirmation
         stats={confirmationStats}
         terminalWidth={terminalWidth}
@@ -194,7 +190,6 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
           items={items}
           initialIndex={items.length - 1}
           isFocused={true}
-          // FIX #4: use showNumbers={true} instead of manually prepending numbers
           showNumbers={true}
           wrapAround={false}
           onSelect={(item: MessageRecord) => {
@@ -212,14 +207,9 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
               item.id === 'current-position'
                 ? 'Stay at current position'
                 : getCleanedRewindText(item);
-            return (
-              // FIX #2: aria-state tied to index via showNumbers={true},
-              // so screen readers will announce selection changes correctly
-              <Text>{text}</Text>
-            );
+            return <Text>{text}</Text>;
           }}
         />
-        {/* FIX #6: use theme.text.secondary for navigation instructions */}
         <Text color={theme.text.secondary}>
           Press Esc to exit, Enter to select, arrow keys to navigate.
         </Text>

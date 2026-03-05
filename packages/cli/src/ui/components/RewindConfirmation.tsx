@@ -50,8 +50,6 @@ interface RewindConfirmationProps {
   onConfirm: (outcome: RewindOutcome) => void;
   terminalWidth: number;
   timestamp?: string;
-  // FIX #3: accept isScreenReaderEnabled to render accessible confirmation view
-  isScreenReaderEnabled?: boolean;
 }
 
 export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
@@ -86,8 +84,6 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
         option.value !== RewindOutcome.RevertOnly,
     );
   }, [stats]);
-
-  // FIX #3: accessible plain-text confirmation view for screen reader users
   if (isScreenReaderEnabled) {
     return (
       <Box flexDirection="column" width={terminalWidth}>
@@ -123,7 +119,6 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
         )}
 
         <Text>Select an action:</Text>
-        {/* FIX #6: use theme.text.secondary for navigation hint */}
         <Text color={theme.text.secondary}>
           Use arrow keys to navigate, Enter to confirm, Esc to cancel.
         </Text>

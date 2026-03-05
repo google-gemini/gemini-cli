@@ -77,6 +77,16 @@ describe('RewindViewer', () => {
   });
 
   describe('Screen Reader Accessibility', () => {
+    beforeEach(async () => {
+      const { useIsScreenReaderEnabled } = await import('ink');
+      vi.mocked(useIsScreenReaderEnabled).mockReturnValue(true);
+    });
+
+    afterEach(async () => {
+      const { useIsScreenReaderEnabled } = await import('ink');
+      vi.mocked(useIsScreenReaderEnabled).mockReturnValue(false);
+    });
+
     it('renders the rewind viewer with conversation items', async () => {
       const conversation = createConversation([
         { type: 'user', content: 'Hello', id: '1', timestamp: '1' },
