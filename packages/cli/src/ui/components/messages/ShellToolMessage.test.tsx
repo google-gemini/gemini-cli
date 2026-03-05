@@ -138,6 +138,14 @@ describe('<ShellToolMessage />', () => {
         undefined,
       ],
       [
+        'renders in Cancelled state with partial output',
+        {
+          status: CoreToolCallStatus.Cancelled,
+          resultDisplay: 'Partial output before cancellation',
+        },
+        undefined,
+      ],
+      [
         'renders in Alternate Buffer mode while focused',
         {
           status: CoreToolCallStatus.Executing,
