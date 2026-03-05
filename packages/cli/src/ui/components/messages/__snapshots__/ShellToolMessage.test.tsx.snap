@@ -309,6 +309,14 @@ exports[`<ShellToolMessage /> > Snapshots > renders in Alternate Buffer mode whi
 "
 `;
 
+exports[`<ShellToolMessage /> > Snapshots > renders in Cancelled state with partial output 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ -  Shell Command A shell command                                             │
+│                                                                              │
+│ Partial output before cancellation                                           │
+"
+`;
+
 exports[`<ShellToolMessage /> > Snapshots > renders in Error state 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ x  Shell Command A shell command                                             │
