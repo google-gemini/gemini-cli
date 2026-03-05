@@ -12,6 +12,8 @@ import {
   ActionStatus,
   type LoadCodeAssistResponse,
   type GeminiUserTier,
+  type SetCodeAssistGlobalUserSettingRequest,
+  type CodeAssistGlobalUserSettingResponse,
 } from './types.js';
 import { FinishReason } from '@google/genai';
 import { LlmRole } from '../telemetry/types.js';
@@ -699,7 +701,9 @@ describe('CodeAssistServer', () => {
 
   it('should call getCodeAssistGlobalUserSetting endpoint', async () => {
     const { server } = createTestServer();
-    const mockResponse = { settings: {} };
+    const mockResponse: CodeAssistGlobalUserSettingResponse = {
+      freeTierDataCollectionOptin: true,
+    };
     const requestGetSpy = vi
       .spyOn(server, 'requestGet')
       .mockResolvedValue(mockResponse);
@@ -714,12 +718,16 @@ describe('CodeAssistServer', () => {
 
   it('should call setCodeAssistGlobalUserSetting endpoint', async () => {
     const { server } = createTestServer();
-    const mockResponse = { settings: {} };
+    const mockResponse: CodeAssistGlobalUserSettingResponse = {
+      freeTierDataCollectionOptin: true,
+    };
     const requestPostSpy = vi
       .spyOn(server, 'requestPost')
       .mockResolvedValue(mockResponse);
 
-    const req = { settings: {} };
+    const req: SetCodeAssistGlobalUserSettingRequest = {
+      freeTierDataCollectionOptin: true,
+    };
     const response = await server.setCodeAssistGlobalUserSetting(req);
 
     expect(requestPostSpy).toHaveBeenCalledWith(
