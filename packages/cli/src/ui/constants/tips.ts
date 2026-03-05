@@ -96,7 +96,7 @@ export const INFORMATIVE_TIPS = [
   'Navigate your prompt history with the Up and Down arrows…',
   'You can also use Ctrl+P (up) and Ctrl+N (down) for history…',
   'Search through command history with Ctrl+R…',
-  'Accept an autocomplete suggestion with Tab or Enter…',
+  'Accept an autocomplete suggestion with Tab/Enter, or word-by-word with Ctrl+Right…',
   'Move to the start of the line with Ctrl+A or Home…',
   'Move to the end of the line with Ctrl+E or End…',
   'Move one character left or right with Ctrl+B/F or the arrow keys…',
