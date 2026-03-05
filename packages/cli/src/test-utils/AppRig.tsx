@@ -115,6 +115,10 @@ class MockExtensionManager extends ExtensionLoader {
   getExtensions = vi.fn().mockReturnValue([]);
   setRequestConsent = vi.fn();
   setRequestSetting = vi.fn();
+  integrityManager = {
+    verifyIntegrity: vi.fn().mockResolvedValue(true),
+    storeIntegrity: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 // Mock GeminiRespondingSpinner to disable animations (avoiding 'act()' warnings) without triggering screen reader mode.

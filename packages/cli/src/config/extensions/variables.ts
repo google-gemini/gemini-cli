@@ -12,6 +12,8 @@ export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
 export const EXTENSION_SETTINGS_FILENAME = '.env';
+export const INTEGRITY_FILENAME = 'extension_integrity.json';
+export const INTEGRITY_KEY_FILENAME = 'integrity.key';
 
 export type JsonObject = { [key: string]: JsonValue };
 export type JsonArray = JsonValue[];

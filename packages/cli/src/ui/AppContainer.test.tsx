@@ -465,6 +465,10 @@ describe('AppContainer State Management', () => {
       setRequestConsent: vi.fn(),
       setRequestSetting: vi.fn(),
       start: vi.fn(),
+      integrityManager: {
+        verifyIntegrity: vi.fn().mockResolvedValue(true),
+        storeIntegrity: vi.fn().mockResolvedValue(undefined),
+      },
     } as unknown as ExtensionManager);
     vi.spyOn(mockConfig, 'getExtensionLoader').mockReturnValue(
       mockExtensionManager,

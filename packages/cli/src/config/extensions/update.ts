@@ -48,6 +48,35 @@ export async function updateExtension(
       `Extension ${extension.name} cannot be updated, type is unknown.`,
     );
   }
+
+  try {
+    if (extensionManager.integrityManager) {
+      const isAuthentic =
+        await extensionManager.integrityManager.verifyIntegrity(
+          extension.name,
+          installMetadata,
+        );
+
+      if (!isAuthentic) {
+        // File/entry is missing - treat as "needs initialization".
+        debugLogger.warn(
+          `No integrity data found for ${extension.name}. Initializing integrity record.`,
+        );
+        await extensionManager.integrityManager.storeIntegrity(
+          extension.name,
+          installMetadata,
+        );
+      }
+    }
+  } catch (e) {
+    // Error thrown when tampering is suspected.
+    dispatchExtensionStateUpdate({
+      type: 'SET_STATE',
+      payload: { name: extension.name, state: ExtensionUpdateState.ERROR },
+    });
+    throw new Error(`Security Alert: ${getErrorMessage(e)}`);
+  }
+
   if (installMetadata?.type === 'link') {
     dispatchExtensionStateUpdate({
       type: 'SET_STATE',

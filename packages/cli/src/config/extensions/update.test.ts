@@ -67,6 +67,10 @@ describe('Extension Update Logic', () => {
     mockExtensionManager = {
       loadExtensionConfig: vi.fn(),
       installOrUpdateExtension: vi.fn(),
+      integrityManager: {
+        verifyIntegrity: vi.fn().mockResolvedValue(true),
+        storeIntegrity: vi.fn().mockResolvedValue(undefined),
+      },
     } as unknown as ExtensionManager;
     mockDispatch = vi.fn();
 
