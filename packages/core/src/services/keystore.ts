@@ -130,11 +130,11 @@ export class KeystoreService {
 
   /**
    * Retrieves a secret from the keystore for the given account.
+   * @throws Error if the keystore is unavailable.
    */
   async getPassword(account: string): Promise<string | null> {
-    if (!(await this.isAvailable())) return null;
-    const keystore = await this.getKeystore();
-    return keystore?.getPassword(this.serviceName, account) ?? null;
+    const keystore = await this.ensureAvailable();
+    return keystore.getPassword(this.serviceName, account);
   }
 
   /**
@@ -142,13 +142,7 @@ export class KeystoreService {
    * @throws Error if the keystore is unavailable.
    */
   async setPassword(account: string, value: string): Promise<void> {
-    if (!(await this.isAvailable())) {
-      throw new Error('Keystore is not available');
-    }
-    const keystore = await this.getKeystore();
-    if (!keystore) {
-      throw new Error('Keystore module not found');
-    }
+    const keystore = await this.ensureAvailable();
     await keystore.setPassword(this.serviceName, account, value);
   }
 
@@ -158,6 +152,26 @@ export class KeystoreService {
    * @returns true if the secret was deleted, false otherwise.
    */
   async deletePassword(account: string): Promise<boolean> {
+    const keystore = await this.ensureAvailable();
+    return keystore.deletePassword(this.serviceName, account);
+  }
+
+  /**
+   * Lists all account/secret pairs stored under this service.
+   * @throws Error if the keystore is unavailable.
+   */
+  async listCredentials(): Promise<
+    Array<{ account: string; password: string }>
+  > {
+    const keystore = await this.ensureAvailable();
+    return keystore.findCredentials(this.serviceName);
+  }
+
+  /**
+   * Internal helper to verify keystore availability and return the module.
+   * @throws Error if the keystore is unavailable or the module is missing.
+   */
+  private async ensureAvailable(): Promise<Keystore> {
     if (!(await this.isAvailable())) {
       throw new Error('Keystore is not available');
     }
@@ -165,17 +179,6 @@ export class KeystoreService {
     if (!keystore) {
       throw new Error('Keystore module not found');
     }
-    return keystore.deletePassword(this.serviceName, account);
-  }
-
-  /**
-   * Lists all account/secret pairs stored under this service.
-   */
-  async listCredentials(): Promise<
-    Array<{ account: string; password: string }>
-  > {
-    if (!(await this.isAvailable())) return [];
-    const keystore = await this.getKeystore();
-    return keystore?.findCredentials(this.serviceName) ?? [];
+    return keystore;
   }
 }

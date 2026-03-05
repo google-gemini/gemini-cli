@@ -26,15 +26,15 @@ export class KeychainTokenStorage
   }
 
   async getCredentials(serverName: string): Promise<OAuthCredentials | null> {
-    const data = await this.keystoreService.getPassword(
-      this.sanitizeServerName(serverName),
-    );
-
-    if (!data) {
-      return null;
-    }
-
     try {
+      const data = await this.keystoreService.getPassword(
+        this.sanitizeServerName(serverName),
+      );
+
+      if (!data) {
+        return null;
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const credentials = JSON.parse(data) as OAuthCredentials;
 
@@ -44,10 +44,12 @@ export class KeychainTokenStorage
 
       return credentials;
     } catch (error) {
-      if (error instanceof SyntaxError) {
-        throw new Error(`Failed to parse stored credentials for ${serverName}`);
-      }
-      throw error;
+      coreEvents.emitFeedback(
+        'error',
+        `Failed to get credentials for ${serverName}`,
+        error,
+      );
+      return null;
     }
   }
 
@@ -75,21 +77,11 @@ export class KeychainTokenStorage
 
   async deleteCredentials(serverName: string): Promise<void> {
     const sanitizedName = this.sanitizeServerName(serverName);
-    let deleted = false;
-    try {
-      deleted = await this.keystoreService.deletePassword(sanitizedName);
-    } catch (error) {
-      coreEvents.emitFeedback(
-        'error',
-        'Failed to delete credentials from keychain',
-        error,
-      );
-      throw error;
-    }
-
-    if (!deleted) {
-      throw new Error(`No credentials found for ${serverName}`);
-    }
+    await this.handleDelete(
+      sanitizedName,
+      `No credentials found for ${serverName}`,
+      'Failed to delete credentials from keychain',
+    );
   }
 
   async listServers(): Promise<string[]> {
@@ -148,30 +140,45 @@ export class KeychainTokenStorage
   }
 
   async clearAll(): Promise<void> {
-    const servers = await this.keystoreService
-      .listCredentials()
-      .then((creds) => creds.map((c) => c.account))
-      .catch((error: Error) => {
-        throw new Error(
-          `Failed to list servers for clearing: ${error.message}`,
-        );
-      });
-
-    const errors: Error[] = [];
-
-    for (const server of servers) {
-      try {
-        await this.deleteCredentials(server);
-      } catch (error) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        errors.push(error as Error);
-      }
+    if (!(await this.isAvailable())) {
+      throw new Error('Keystore is not available');
     }
 
-    if (errors.length > 0) {
-      throw new Error(
-        `Failed to clear some credentials: ${errors.map((e) => e.message).join(', ')}`,
+    try {
+      const credentials = await this.keystoreService.listCredentials();
+      const errors: Error[] = [];
+
+      for (const cred of credentials) {
+        try {
+          await this.handleDelete(
+            cred.account,
+            `No credentials found for account: ${cred.account}`,
+          );
+        } catch (error) {
+          errors.push(
+            error instanceof Error ? error : new Error(String(error)),
+          );
+        }
+      }
+
+      if (errors.length > 0) {
+        throw new Error(
+          `Failed to clear some credentials: ${errors.map((e) => e.message).join(', ')}`,
+        );
+      }
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes('Failed to clear some credentials')
+      ) {
+        throw error;
+      }
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to clear credentials from keychain',
+        error,
       );
+      throw error;
     }
   }
 
@@ -206,23 +213,11 @@ export class KeychainTokenStorage
   }
 
   async deleteSecret(key: string): Promise<void> {
-    let deleted = false;
-    try {
-      deleted = await this.keystoreService.deletePassword(
-        `${SECRET_PREFIX}${key}`,
-      );
-    } catch (error) {
-      coreEvents.emitFeedback(
-        'error',
-        'Failed to delete secret from keychain',
-        error,
-      );
-      throw error;
-    }
-
-    if (!deleted) {
-      throw new Error(`No secret found for key: ${key}`);
-    }
+    await this.handleDelete(
+      `${SECRET_PREFIX}${key}`,
+      `No secret found for key: ${key}`,
+      'Failed to delete secret from keychain',
+    );
   }
 
   async listSecrets(): Promise<string[]> {
@@ -238,6 +233,27 @@ export class KeychainTokenStorage
         error,
       );
       return [];
+    }
+  }
+
+  private async handleDelete(
+    account: string,
+    notFoundMessage: string,
+    errorMessage?: string,
+  ): Promise<void> {
+    try {
+      const deleted = await this.keystoreService.deletePassword(account);
+      if (!deleted) {
+        throw new Error(notFoundMessage);
+      }
+    } catch (error) {
+      const isNotFound =
+        error instanceof Error && error.message === notFoundMessage;
+
+      if (errorMessage && !isNotFound) {
+        coreEvents.emitFeedback('error', errorMessage, error);
+      }
+      throw error;
     }
   }
 }

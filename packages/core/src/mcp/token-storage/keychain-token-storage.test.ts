@@ -4,15 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  vi,
-  type MockInstance,
-} from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { KeychainTokenStorage } from './keychain-token-storage.js';
 import type { OAuthCredentials } from './types.js';
 import { KeystoreService } from '../../services/keystore.js';
@@ -22,22 +14,8 @@ describe('KeychainTokenStorage', () => {
   let storage: KeychainTokenStorage;
   const mockServiceName = 'service-name';
 
-  let isAvailableSpy: MockInstance;
-  let getPasswordSpy: MockInstance;
-  let setPasswordSpy: MockInstance;
-  let deletePasswordSpy: MockInstance;
-  let listCredentialsSpy: MockInstance;
-
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Spy on the prototype methods of KeystoreService
-    isAvailableSpy = vi.spyOn(KeystoreService.prototype, 'isAvailable');
-    getPasswordSpy = vi.spyOn(KeystoreService.prototype, 'getPassword');
-    setPasswordSpy = vi.spyOn(KeystoreService.prototype, 'setPassword');
-    deletePasswordSpy = vi.spyOn(KeystoreService.prototype, 'deletePassword');
-    listCredentialsSpy = vi.spyOn(KeystoreService.prototype, 'listCredentials');
-
     storage = new KeychainTokenStorage(mockServiceName);
   });
 
@@ -58,12 +36,16 @@ describe('KeychainTokenStorage', () => {
 
   describe('with keychain available', () => {
     beforeEach(() => {
-      isAvailableSpy.mockResolvedValue(true);
+      vi.spyOn(KeystoreService.prototype, 'isAvailable').mockResolvedValue(
+        true,
+      );
     });
 
     describe('getCredentials', () => {
       it('should return credentials if found and not expired', async () => {
-        getPasswordSpy.mockResolvedValue(JSON.stringify(validCredentials));
+        vi.spyOn(KeystoreService.prototype, 'getPassword').mockResolvedValue(
+          JSON.stringify(validCredentials),
+        );
         const result = await storage.getCredentials('test-server');
         expect(result).toEqual(validCredentials);
       });
@@ -73,23 +55,28 @@ describe('KeychainTokenStorage', () => {
           ...validCredentials,
           token: { ...validCredentials.token, expiresAt: Date.now() - 1000 },
         };
-        getPasswordSpy.mockResolvedValue(JSON.stringify(expiredCreds));
+        vi.spyOn(KeystoreService.prototype, 'getPassword').mockResolvedValue(
+          JSON.stringify(expiredCreds),
+        );
         const result = await storage.getCredentials('test-server');
         expect(result).toBeNull();
       });
 
-      it('should throw if stored data is corrupted JSON', async () => {
-        getPasswordSpy.mockResolvedValue('not-json');
-        await expect(storage.getCredentials('test-server')).rejects.toThrow(
-          'Failed to parse stored credentials for test-server',
+      it('should return null if stored data is corrupted JSON', async () => {
+        vi.spyOn(KeystoreService.prototype, 'getPassword').mockResolvedValue(
+          'not-json',
         );
+        const result = await storage.getCredentials('test-server');
+        expect(result).toBeNull();
       });
     });
 
     describe('setCredentials', () => {
       it('should save credentials to keychain', async () => {
         vi.useFakeTimers();
-        setPasswordSpy.mockResolvedValue(undefined);
+        const setPasswordSpy = vi
+          .spyOn(KeystoreService.prototype, 'setPassword')
+          .mockResolvedValue(undefined);
         await storage.setCredentials(validCredentials);
         expect(setPasswordSpy).toHaveBeenCalledWith(
           'test-server',
@@ -98,7 +85,9 @@ describe('KeychainTokenStorage', () => {
       });
 
       it('should throw if saving to keychain fails', async () => {
-        setPasswordSpy.mockRejectedValue(new Error('keychain write error'));
+        vi.spyOn(KeystoreService.prototype, 'setPassword').mockRejectedValue(
+          new Error('keychain write error'),
+        );
         await expect(storage.setCredentials(validCredentials)).rejects.toThrow(
           'keychain write error',
         );
@@ -107,13 +96,17 @@ describe('KeychainTokenStorage', () => {
 
     describe('deleteCredentials', () => {
       it('should delete credentials from keychain', async () => {
-        deletePasswordSpy.mockResolvedValue(true);
+        const deletePasswordSpy = vi
+          .spyOn(KeystoreService.prototype, 'deletePassword')
+          .mockResolvedValue(true);
         await storage.deleteCredentials('test-server');
         expect(deletePasswordSpy).toHaveBeenCalledWith('test-server');
       });
 
       it('should throw if no credentials were found to delete', async () => {
-        deletePasswordSpy.mockResolvedValue(false);
+        vi.spyOn(KeystoreService.prototype, 'deletePassword').mockResolvedValue(
+          false,
+        );
         await expect(storage.deleteCredentials('test-server')).rejects.toThrow(
           'No credentials found for test-server',
         );
@@ -122,7 +115,10 @@ describe('KeychainTokenStorage', () => {
 
     describe('listServers', () => {
       it('should return a list of server names and filter internal keys', async () => {
-        listCredentialsSpy.mockResolvedValue([
+        vi.spyOn(
+          KeystoreService.prototype,
+          'listCredentials',
+        ).mockResolvedValue([
           { account: 'server1', password: '' },
           { account: '__keychain_test__abc', password: '' },
           { account: 'server2', password: '' },
@@ -141,7 +137,10 @@ describe('KeychainTokenStorage', () => {
           token: { ...validCredentials.token, expiresAt: Date.now() - 1000 },
         };
 
-        listCredentialsSpy.mockResolvedValue([
+        vi.spyOn(
+          KeystoreService.prototype,
+          'listCredentials',
+        ).mockResolvedValue([
           {
             account: 'test-server',
             password: JSON.stringify(validCredentials),
@@ -160,11 +159,16 @@ describe('KeychainTokenStorage', () => {
 
     describe('clearAll', () => {
       it('should delete all credentials for the service', async () => {
-        listCredentialsSpy.mockResolvedValue([
+        vi.spyOn(
+          KeystoreService.prototype,
+          'listCredentials',
+        ).mockResolvedValue([
           { account: 'server1', password: '' },
           { account: 'server2', password: '' },
         ]);
-        deletePasswordSpy.mockResolvedValue(true);
+        const deletePasswordSpy = vi
+          .spyOn(KeystoreService.prototype, 'deletePassword')
+          .mockResolvedValue(true);
 
         await storage.clearAll();
 
@@ -176,8 +180,12 @@ describe('KeychainTokenStorage', () => {
 
     describe('Secrets', () => {
       it('should set and get a secret', async () => {
-        setPasswordSpy.mockResolvedValue(undefined);
-        getPasswordSpy.mockResolvedValue('secret-value');
+        const setPasswordSpy = vi
+          .spyOn(KeystoreService.prototype, 'setPassword')
+          .mockResolvedValue(undefined);
+        const getPasswordSpy = vi
+          .spyOn(KeystoreService.prototype, 'getPassword')
+          .mockResolvedValue('secret-value');
 
         await storage.setSecret('secret-key', 'secret-value');
         const value = await storage.getSecret('secret-key');
@@ -191,13 +199,18 @@ describe('KeychainTokenStorage', () => {
       });
 
       it('should delete a secret', async () => {
-        deletePasswordSpy.mockResolvedValue(true);
+        const deletePasswordSpy = vi
+          .spyOn(KeystoreService.prototype, 'deletePassword')
+          .mockResolvedValue(true);
         await storage.deleteSecret('secret-key');
         expect(deletePasswordSpy).toHaveBeenCalledWith('__secret__secret-key');
       });
 
       it('should list secrets', async () => {
-        listCredentialsSpy.mockResolvedValue([
+        vi.spyOn(
+          KeystoreService.prototype,
+          'listCredentials',
+        ).mockResolvedValue([
           { account: '__secret__secret1', password: '' },
           { account: '__secret__secret2', password: '' },
           { account: 'server1', password: '' },
@@ -208,92 +221,130 @@ describe('KeychainTokenStorage', () => {
     });
   });
 
-  describe('with keychain unavailable', () => {
-    beforeEach(() => {
-      isAvailableSpy.mockResolvedValue(false);
-      setPasswordSpy.mockRejectedValue(new Error('Keystore is not available'));
-      deletePasswordSpy.mockRejectedValue(
-        new Error('Keystore is not available'),
-      );
-    });
+  describe('unavailability and error handling', () => {
+    it.each([
+      {
+        method: 'setCredentials',
+        args: [validCredentials],
+        mockMethod: 'setPassword',
+        expectedError: 'Keystore is not available',
+        setup: () =>
+          vi
+            .spyOn(KeystoreService.prototype, 'isAvailable')
+            .mockResolvedValue(false),
+      },
+      {
+        method: 'deleteCredentials',
+        args: ['test-server'],
+        mockMethod: 'deletePassword',
+        expectedError: 'Keystore is not available',
+        setup: () =>
+          vi
+            .spyOn(KeystoreService.prototype, 'isAvailable')
+            .mockResolvedValue(false),
+      },
+      {
+        method: 'setSecret',
+        args: ['key', 'val'],
+        mockMethod: 'setPassword',
+        expectedError: 'Keystore is not available',
+        setup: () =>
+          vi
+            .spyOn(KeystoreService.prototype, 'isAvailable')
+            .mockResolvedValue(false),
+      },
+      {
+        method: 'deleteSecret',
+        args: ['key'],
+        mockMethod: 'deletePassword',
+        expectedError: 'Keystore is not available',
+        setup: () =>
+          vi
+            .spyOn(KeystoreService.prototype, 'isAvailable')
+            .mockResolvedValue(false),
+      },
+    ])(
+      '$method should throw when unavailable',
+      async ({ method, args, mockMethod, expectedError, setup }) => {
+        setup();
+        vi.spyOn(
+          KeystoreService.prototype,
+          mockMethod as keyof KeystoreService,
+        ).mockRejectedValue(new Error(expectedError));
+        await expect(
+          (
+            storage as unknown as Record<
+              string,
+              (...args: unknown[]) => unknown
+            >
+          )[method](...args),
+        ).rejects.toThrow(expectedError);
+      },
+    );
 
-    it('setCredentials should throw', async () => {
-      await expect(storage.setCredentials(validCredentials)).rejects.toThrow(
+    it('clearAll should throw when unavailable', async () => {
+      vi.spyOn(KeystoreService.prototype, 'isAvailable').mockResolvedValue(
+        false,
+      );
+      await expect(storage.clearAll()).rejects.toThrow(
         'Keystore is not available',
       );
     });
 
-    it('deleteCredentials should throw', async () => {
-      await expect(storage.deleteCredentials('test-server')).rejects.toThrow(
-        'Keystore is not available',
-      );
-    });
+    it.each([
+      {
+        method: 'listServers',
+        mockMethod: 'listCredentials',
+        expectedResult: [],
+        expectedFeedback: 'Failed to list servers from keychain',
+      },
+      {
+        method: 'getAllCredentials',
+        mockMethod: 'listCredentials',
+        expectedResult: new Map(),
+        expectedFeedback: 'Failed to get all credentials from keychain',
+      },
+      {
+        method: 'listSecrets',
+        mockMethod: 'listCredentials',
+        expectedResult: [],
+        expectedFeedback: 'Failed to list secrets from keychain',
+      },
+      {
+        method: 'getSecret',
+        args: ['my-key'],
+        mockMethod: 'getPassword',
+        expectedResult: null,
+        expectedFeedback: 'Failed to get secret from keychain',
+      },
+    ])(
+      '$method should emit error feedback on failure',
+      async ({
+        method,
+        args = [],
+        mockMethod,
+        expectedResult,
+        expectedFeedback,
+      }) => {
+        vi.spyOn(KeystoreService.prototype, 'isAvailable').mockResolvedValue(
+          true,
+        );
+        vi.spyOn(
+          KeystoreService.prototype,
+          mockMethod as keyof KeystoreService,
+        ).mockRejectedValue(new Error('low-level error'));
+        const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
 
-    it('clearAll should not throw and do nothing', async () => {
-      await expect(storage.clearAll()).resolves.not.toThrow();
-      expect(deletePasswordSpy).not.toHaveBeenCalled();
-    });
-
-    it('secrets methods should handle unavailability', async () => {
-      await expect(storage.setSecret('key', 'val')).rejects.toThrow(
-        'Keystore is not available',
-      );
-      await expect(storage.deleteSecret('key')).rejects.toThrow(
-        'Keystore is not available',
-      );
-    });
-  });
-
-  describe('error handling and feedback', () => {
-    let emitFeedbackSpy: MockInstance;
-
-    beforeEach(() => {
-      isAvailableSpy.mockResolvedValue(true);
-      emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
-    });
-
-    it('listServers should emit error feedback when listCredentials fails', async () => {
-      listCredentialsSpy.mockRejectedValue(new Error('list error'));
-      const result = await storage.listServers();
-      expect(result).toEqual([]);
-      expect(emitFeedbackSpy).toHaveBeenCalledWith(
-        'error',
-        'Failed to list servers from keychain',
-        expect.any(Error),
-      );
-    });
-
-    it('getAllCredentials should emit error feedback when listCredentials fails', async () => {
-      listCredentialsSpy.mockRejectedValue(new Error('list error'));
-      const result = await storage.getAllCredentials();
-      expect(result.size).toBe(0);
-      expect(emitFeedbackSpy).toHaveBeenCalledWith(
-        'error',
-        'Failed to get all credentials from keychain',
-        expect.any(Error),
-      );
-    });
-
-    it('listSecrets should emit error feedback when listCredentials fails', async () => {
-      listCredentialsSpy.mockRejectedValue(new Error('list error'));
-      const result = await storage.listSecrets();
-      expect(result).toEqual([]);
-      expect(emitFeedbackSpy).toHaveBeenCalledWith(
-        'error',
-        'Failed to list secrets from keychain',
-        expect.any(Error),
-      );
-    });
-
-    it('getSecret should emit error feedback when getPassword fails', async () => {
-      getPasswordSpy.mockRejectedValue(new Error('read error'));
-      const result = await storage.getSecret('my-key');
-      expect(result).toBeNull();
-      expect(emitFeedbackSpy).toHaveBeenCalledWith(
-        'error',
-        'Failed to get secret from keychain',
-        expect.any(Error),
-      );
-    });
+        const result = await (
+          storage as unknown as Record<string, (...args: unknown[]) => unknown>
+        )[method](...args);
+        expect(result).toEqual(expectedResult);
+        expect(emitFeedbackSpy).toHaveBeenCalledWith(
+          'error',
+          expectedFeedback,
+          expect.any(Error),
+        );
+      },
+    );
   });
 });

@@ -60,7 +60,14 @@ describe('KeystoreService', () => {
       delete passwords[acc];
       return Promise.resolve(exists);
     });
-    mockKeytar.findCredentials.mockResolvedValue([]);
+    mockKeytar.findCredentials.mockImplementation(() =>
+      Promise.resolve(
+        Object.entries(passwords).map(([account, password]) => ({
+          account,
+          password,
+        })),
+      ),
+    );
   });
 
   describe('getKeystore', () => {
@@ -165,9 +172,10 @@ describe('KeystoreService', () => {
       mockKeytar.setPassword.mockRejectedValue(new Error('Unavailable'));
     });
 
-    it('getPassword should return null', async () => {
-      const result = await service.getPassword('acc');
-      expect(result).toBeNull();
+    it('getPassword should throw an error', async () => {
+      await expect(service.getPassword('acc')).rejects.toThrow(
+        'Keystore is not available',
+      );
     });
 
     it('setPassword should throw an error', async () => {
@@ -182,9 +190,10 @@ describe('KeystoreService', () => {
       );
     });
 
-    it('listCredentials should return empty array', async () => {
-      const result = await service.listCredentials();
-      expect(result).toEqual([]);
+    it('listCredentials should throw an error', async () => {
+      await expect(service.listCredentials()).rejects.toThrow(
+        'Keystore is not available',
+      );
     });
   });
 });
