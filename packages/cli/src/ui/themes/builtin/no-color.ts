@@ -1,12 +1,12 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ColorsTheme } from './theme.js';
-import { Theme } from './theme.js';
-import type { SemanticColors } from './semantic-tokens.js';
+import type { ColorsTheme } from '../theme.js';
+import { Theme } from '../theme.js';
+import type { SemanticColors } from '../semantic-tokens.js';
 
 const noColorColorsTheme: ColorsTheme = {
   type: 'ansi',
