@@ -692,21 +692,49 @@ export async function start_sandbox(
     let cleanupProxyHandlers: (() => void) | undefined = undefined;
 
     if (proxyCommand) {
-      // run proxyCommand in its own container
-      let proxyContainerCommand = `${config.command} run --rm --init ${userFlag} --name ${SANDBOX_PROXY_NAME} --network ${SANDBOX_PROXY_NAME} -p 8877:8877 -v ${process.cwd()}:${workdir} --workdir ${workdir} ${image} ${proxyCommand}`;
+      const parsedProxyCommand = parse(proxyCommand, process.env).filter(
+        (token): token is string => typeof token === 'string',
+      );
+      if (parsedProxyCommand.length === 0) {
+        throw new FatalSandboxError(
+          'GEMINI_SANDBOX_PROXY_COMMAND is empty or invalid',
+        );
+      }
+
+      const proxyContainerArgs = ['run', '--rm'];
+      const proxyUser = userFlag.replace(/^--user\s+/, '').trim();
+      if (proxyUser) {
+        if (config.command === 'udocker') {
+          proxyContainerArgs.push(`--user=${proxyUser}`);
+        } else {
+          proxyContainerArgs.push('--user', proxyUser);
+        }
+      }
+
       if (config.command === 'udocker') {
         // udocker doesn't support --init or --network
-        proxyContainerCommand = `${config.command} run --rm ${userFlag} --publish=8877:8877 --volume=${process.cwd()}:${workdir} --workdir=${workdir} ${image} ${proxyCommand}`;
+        proxyContainerArgs.push(`--publish=8877:8877`);
+        proxyContainerArgs.push(`--volume=${process.cwd()}:${workdir}`);
+        proxyContainerArgs.push(`--workdir=${workdir}`);
+      } else {
+        proxyContainerArgs.push('--init');
+        proxyContainerArgs.push('--name', SANDBOX_PROXY_NAME);
+        proxyContainerArgs.push('--network', SANDBOX_PROXY_NAME);
+        proxyContainerArgs.push('-p', '8877:8877');
+        proxyContainerArgs.push('-v', `${process.cwd()}:${workdir}`);
+        proxyContainerArgs.push('--workdir', workdir);
       }
-      proxyProcess = spawn(proxyContainerCommand, {
+
+      proxyContainerArgs.push(image, ...parsedProxyCommand);
+
+      proxyProcess = spawn(config.command, proxyContainerArgs, {
         stdio: ['ignore', 'pipe', 'pipe'],
-        shell: true,
         detached: true,
       });
       // install handlers to stop proxy on exit/signal
       const stopProxy = () => {
         debugLogger.log('stopping proxy container ...');
-        execSync(`${config.command} rm -f ${SANDBOX_PROXY_NAME}`);
+        execFileSync(config.command, ['rm', '-f', SANDBOX_PROXY_NAME]);
       };
 
       cleanupProxyHandlers = setupProcessExitHandlers(stopProxy);
@@ -726,7 +754,7 @@ export async function start_sandbox(
           process.kill(-sandboxProcess.pid, 'SIGTERM');
         }
         throw new FatalSandboxError(
-          `Proxy container command '${proxyContainerCommand}' exited with code ${code}, signal ${signal}`,
+          `Proxy container command exited with code ${code}, signal ${signal}`,
         );
       });
       debugLogger.log('waiting for proxy to start ...');
@@ -735,9 +763,11 @@ export async function start_sandbox(
       );
       // connect proxy container to sandbox network
       // (workaround for older versions of docker that don't support multiple --network args)
-      await execAsync(
-        `${config.command} network connect ${SANDBOX_NETWORK_NAME} ${SANDBOX_PROXY_NAME}`,
-      );
+      if (config.command !== 'udocker') {
+        await execAsync(
+          `${config.command} network connect ${SANDBOX_NETWORK_NAME} ${SANDBOX_PROXY_NAME}`,
+        );
+      }
     }
 
     // udocker's parser fails on space-separated flags like `--volume /src:/dst`. Combine them into `--volume=/src:/dst`
@@ -748,7 +778,8 @@ export async function start_sandbox(
           ['--workdir', '--volume', '--env', '--user', '--publish'].includes(
             args[i],
           ) &&
-          i + 1 < args.length
+          i + 1 < args.length &&
+          !args[i + 1].startsWith('-')
         ) {
           combinedArgs.push(`${args[i]}=${args[i + 1]}`);
           i++;
@@ -1021,7 +1052,28 @@ async function imageExists(sandbox: string, image: string): Promise<boolean> {
         // console.warn(`'${sandbox} images -q ${image}' exited with code ${code}.`);
       }
       if (sandbox === 'udocker') {
-        resolve(stdoutData.includes(image));
+        const [targetRepo, targetTag = 'latest'] = image.split(':');
+        const targetImage = `${targetRepo}:${targetTag}`;
+        const lines = stdoutData
+          .trim()
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean);
+
+        const imageFound = lines.some((line) => {
+          if (line.toLowerCase().startsWith('repository')) {
+            return false;
+          }
+          const parts = line.split(/\s+/);
+          if (parts.length === 1) {
+            return parts[0] === image || parts[0] === targetImage;
+          }
+          const repo = parts[0];
+          const tag = parts[1] || 'latest';
+          return `${repo}:${tag}` === targetImage;
+        });
+
+        resolve(imageFound);
       } else {
         resolve(stdoutData.trim() !== '');
       }
