@@ -21,6 +21,7 @@ import { debugLogger } from './debugLogger.js';
 import type { Config } from '../config/config.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { CoreEvent, coreEvents } from './events.js';
+import { getErrorMessage } from './errors.js';
 
 // Simple console logger, similar to the one previously in CLI's config.ts
 // TODO: Integrate with a more robust server-side logger if available/appropriate.
@@ -106,9 +107,7 @@ export async function deduplicatePathsByFileIdentity(
       if (result.status === 'fulfilled') {
         results.push(result.value);
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const error = result.reason;
-        const message = error instanceof Error ? error.message : String(error);
+        const message = getErrorMessage(result.reason);
         if (debugMode) {
           logger.debug(
             `unexpected error during deduplication stat: ${message}`,
