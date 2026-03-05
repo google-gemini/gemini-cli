@@ -386,7 +386,7 @@ describe('useToolScheduler', () => {
     expect(toolCalls2.every((t) => t.responseSubmittedToGemini)).toBe(true);
   });
 
-  it('ignores TOOL_CALLS_UPDATE from non-root schedulers when no tools await approval', () => {
+  it('ignores TOOL_CALLS_UPDATE from non-root schedulers when no tools await approval and no interactive shell is active', () => {
     const { result } = renderHook(() =>
       useToolScheduler(
         vi.fn().mockResolvedValue(undefined),
@@ -418,6 +418,44 @@ describe('useToolScheduler', () => {
     });
 
     expect(result.current[0]).toHaveLength(0);
+  });
+
+  it('shows first-seen executing subagent tools when they expose a pid', () => {
+    const { result } = renderHook(() =>
+      useToolScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
+
+    const interactiveShellCall = {
+      status: CoreToolCallStatus.Executing as const,
+      request: {
+        callId: 'call-sub-shell',
+        name: 'shell',
+        args: { command: 'npm init' },
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: createMockTool(),
+      invocation: createMockInvocation(),
+      schedulerId: 'subagent-1',
+      pid: 12345,
+    } as ExecutingToolCall;
+
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [interactiveShellCall],
+        schedulerId: 'subagent-1',
+      } as ToolCallsUpdateMessage);
+    });
+
+    const [toolCalls] = result.current;
+    expect(toolCalls).toHaveLength(1);
+    expect(toolCalls[0].request.callId).toBe('call-sub-shell');
+    expect(toolCalls[0].status).toBe(CoreToolCallStatus.Executing);
   });
 
   it('allows TOOL_CALLS_UPDATE from non-root schedulers when tools are awaiting approval', () => {
