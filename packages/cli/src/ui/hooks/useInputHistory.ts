@@ -120,8 +120,16 @@ export function useInputHistory({
   const navigateUp = useCallback(() => {
     if (!isActive) return false;
 
-    if (historyIndex === -1 && !currentQuery.trim() && draftRef.current) {
+    const shouldRestoreDraft =
+      historyIndex === -1 &&
+      draftRef.current &&
+      (!currentQuery.trim() || currentQuery === draftRef.current.text);
+
+    if (shouldRestoreDraft) {
       const draft = draftRef.current;
+      if (!draft) {
+        return false;
+      }
       draftRef.current = null;
       onChange(draft.text, draft.offset);
       return true;
