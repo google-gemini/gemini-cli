@@ -65,7 +65,7 @@ vi.mock('../themes/theme-manager.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../themes/default-light.js', () => ({
+vi.mock('../themes/builtin/light/default-light.js', () => ({
   DefaultLight: { name: 'default-light' },
 }));
 

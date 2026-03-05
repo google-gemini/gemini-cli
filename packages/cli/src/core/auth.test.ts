@@ -9,6 +9,7 @@ import { performInitialAuth } from './auth.js';
 import {
   type Config,
   ValidationRequiredError,
+  ProjectIdRequiredError,
   AuthType,
 } from '@google/gemini-cli-core';
 
@@ -112,6 +113,24 @@ describe('auth', () => {
         appealLinkText: 'Appeal Here',
       },
     });
+    expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+  });
+
+  it('should return ProjectIdRequiredError message without "Failed to login" prefix', async () => {
+    const projectIdError = new ProjectIdRequiredError();
+    vi.mocked(mockConfig.refreshAuth).mockRejectedValue(projectIdError);
+    const result = await performInitialAuth(
+      mockConfig,
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+    expect(result).toEqual({
+      authError:
+        'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://goo.gle/gemini-cli-auth-docs#workspace-gca',
+      accountSuspensionInfo: null,
+    });
+    expect(result.authError).not.toContain('Failed to login');
     expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
       AuthType.LOGIN_WITH_GOOGLE,
     );

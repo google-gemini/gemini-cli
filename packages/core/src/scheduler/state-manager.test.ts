@@ -6,17 +6,18 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SchedulerStateManager } from './state-manager.js';
-import type {
-  ValidatingToolCall,
-  WaitingToolCall,
-  SuccessfulToolCall,
-  ErroredToolCall,
-  CancelledToolCall,
-  ExecutingToolCall,
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
+import {
+  CoreToolCallStatus,
+  ROOT_SCHEDULER_ID,
+  type ValidatingToolCall,
+  type WaitingToolCall,
+  type SuccessfulToolCall,
+  type ErroredToolCall,
+  type CancelledToolCall,
+  type ExecutingToolCall,
+  type ToolCallRequestInfo,
+  type ToolCallResponseInfo,
 } from './types.js';
-import { CoreToolCallStatus, ROOT_SCHEDULER_ID } from './types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
