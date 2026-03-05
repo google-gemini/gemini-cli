@@ -4,7 +4,38 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type Mock,
+} from 'vitest';
+
+// --- Mocks (Hoisted) ---
+
+const { MockExtensionStorage } = vi.hoisted(() => ({
+  MockExtensionStorage: class {
+    constructor(public name: string) {}
+    getExtensionDir() {
+      return `/mock/extensions/${this.name}`;
+    }
+    static getUserExtensionsDir() {
+      return '/mock/extensions';
+    }
+    static async createTmpDir() {
+      return '/mock/tmp';
+    }
+  },
+}));
+
+vi.mock('./storage.js', () => ({
+  ExtensionStorage: MockExtensionStorage,
+}));
+
+// Now we can import the rest
 import * as fs from 'node:fs';
 import { getMissingSettings } from './extensionSettings.js';
 import type { ExtensionConfig } from '../extension.js';
@@ -16,8 +47,13 @@ import {
 } from '@google/gemini-cli-core';
 import { ExtensionManager } from '../extension-manager.js';
 import { createTestMergedSettings } from '../settings.js';
+import { updateExtension } from './update.js';
+import { ExtensionUpdateState } from '../../ui/state/extensions.js';
+import * as extensionModule from '../extension.js';
+import { ExtensionIntegrityManager } from './integrity.js';
+import * as trustedFolders from '../trustedFolders.js';
 
-// --- Mocks ---
+// --- Other Mocks ---
 
 vi.mock('node:fs', async (importOriginal) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,17 +63,20 @@ vi.mock('node:fs', async (importOriginal) => {
     default: {
       ...actual.default,
       existsSync: vi.fn(),
+      readFileSync: vi.fn(),
       statSync: vi.fn(),
       lstatSync: vi.fn(),
       realpathSync: vi.fn((p) => p),
     },
     existsSync: vi.fn(),
+    readFileSync: vi.fn(),
     statSync: vi.fn(),
     lstatSync: vi.fn(),
     realpathSync: vi.fn((p) => p),
     promises: {
       ...actual.promises,
       mkdir: vi.fn(),
+      readdir: vi.fn(),
       writeFile: vi.fn(),
       rm: vi.fn(),
       cp: vi.fn(),
@@ -52,6 +91,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     KeychainTokenStorage: vi.fn(),
+    applyAdminAllowlist: vi.fn().mockResolvedValue({
+      blockedServerNames: [],
+    }),
     debugLogger: {
       warn: vi.fn(),
       error: vi.fn(),
@@ -64,9 +106,15 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       emitConsoleLog: vi.fn(),
     },
     loadSkillsFromDir: vi.fn().mockResolvedValue([]),
-    loadAgentsFromDirectory: vi
-      .fn()
-      .mockResolvedValue({ agents: [], errors: [] }),
+    loadExtensionPolicies: vi.fn().mockResolvedValue({
+      rules: [],
+      checkers: [],
+      errors: [],
+    }),
+    loadAgentsFromDirectory: vi.fn().mockResolvedValue({
+      agents: [],
+      errors: [],
+    }),
     logExtensionInstallEvent: vi.fn().mockResolvedValue(undefined),
     logExtensionUpdateEvent: vi.fn().mockResolvedValue(undefined),
     logExtensionUninstall: vi.fn().mockResolvedValue(undefined),
@@ -88,33 +136,25 @@ vi.mock('./extensionSettings.js', async (importOriginal) => {
   return {
     ...actual,
     getEnvContents: vi.fn().mockResolvedValue({}),
-    getMissingSettings: vi.fn(), // We will mock this implementation per test
+    getMissingSettings: vi.fn(),
   };
 });
 
-vi.mock('../trustedFolders.js', () => ({
-  isWorkspaceTrusted: vi.fn().mockReturnValue({ isTrusted: true }), // Default to trusted to simplify flow
-  loadTrustedFolders: vi.fn().mockReturnValue({
-    setValue: vi.fn().mockResolvedValue(undefined),
-  }),
-  TrustLevel: { TRUST_FOLDER: 'TRUST_FOLDER' },
-}));
+vi.mock('../trustedFolders.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../trustedFolders.js')>();
+  return {
+    ...actual,
+    isWorkspaceTrusted: vi.fn(),
+  };
+});
 
-// Mock ExtensionStorage to avoid real FS paths
-vi.mock('./storage.js', () => ({
-  ExtensionStorage: class {
-    constructor(public name: string) {}
-    getExtensionDir() {
-      return `/mock/extensions/${this.name}`;
-    }
-    static getUserExtensionsDir() {
-      return '/mock/extensions';
-    }
-    static createTmpDir() {
-      return Promise.resolve('/mock/tmp');
-    }
-  },
-}));
+vi.mock('../extension.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../extension.js')>();
+  return {
+    ...actual,
+    loadInstallMetadata: vi.fn(),
+  };
+});
 
 vi.mock('os', async (importOriginal) => {
   const mockedOs = await importOriginal<typeof import('node:os')>();
@@ -131,17 +171,33 @@ describe('extensionUpdates', () => {
     vi.clearAllMocks();
     // Default fs mocks
     vi.mocked(fs.promises.mkdir).mockResolvedValue(undefined);
+    vi.mocked(fs.promises.readdir).mockResolvedValue([]);
     vi.mocked(fs.promises.writeFile).mockResolvedValue(undefined);
     vi.mocked(fs.promises.rm).mockResolvedValue(undefined);
     vi.mocked(fs.promises.cp).mockResolvedValue(undefined);
+    vi.mocked(fs.readFileSync).mockReturnValue('');
 
     // Allow directories to exist by default to satisfy Config/WorkspaceContext checks
-    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      if (
+        typeof p === 'string' &&
+        (p.endsWith('integrity.key') || p.endsWith('extension_integrity.json'))
+      ) {
+        return false;
+      }
+      return true;
+    });
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(fs.lstatSync).mockReturnValue({ isDirectory: () => true } as any);
     vi.mocked(fs.realpathSync).mockImplementation((p) => p as string);
+
+    vi.mocked(trustedFolders.isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: 'mock' as trustedFolders.TrustResult['source'],
+    });
 
     tempWorkspaceDir = '/mock/workspace';
   });
@@ -183,6 +239,7 @@ describe('extensionUpdates', () => {
       });
 
       // 3. Mock Internal Manager Methods
+      await manager.loadExtensions();
       vi.spyOn(manager, 'loadExtensionConfig').mockResolvedValue(newConfig);
       vi.spyOn(manager, 'getExtensions').mockReturnValue([
         {
@@ -190,27 +247,30 @@ describe('extensionUpdates', () => {
           version: '1.0.0',
           installMetadata,
           path: '/mock/extensions/test-ext',
-          contextFiles: [],
-          mcpServers: {},
-          hooks: undefined,
           isActive: true,
-          id: 'test-id',
-          settings: [],
-          resolvedSettings: [],
-          skills: [],
-        } as unknown as GeminiCLIExtension,
+        } as GeminiCLIExtension,
       ]);
       vi.spyOn(manager, 'uninstallExtension').mockResolvedValue(undefined);
-      // Mock loadExtension to return something so the method doesn't crash at the end
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.spyOn(manager as any, 'loadExtension').mockResolvedValue({
-        name: 'test-ext',
-        version: '1.1.0',
-      } as GeminiCLIExtension);
+
+      // Mock installOrUpdateExtension to simulate the side effects we want to test
+      vi.spyOn(manager, 'installOrUpdateExtension').mockImplementation(
+        async () => {
+          debugLogger.warn('Extension "test-ext" has missing settings: s1');
+          coreEvents.emitFeedback(
+            'warning',
+            'Please run "gemini extensions config test-ext [setting-name]"',
+          );
+          return { name: 'test-ext', version: '1.1.0' } as GeminiCLIExtension;
+        },
+      );
+
+      // Mock storeIntegrity to prevent errors
+      vi.spyOn(
+        ExtensionIntegrityManager.prototype,
+        'storeIntegrity',
+      ).mockResolvedValue(undefined);
 
       // 4. Mock External Helpers
-      // This is the key fix: we explicitly mock `getMissingSettings` to return
-      // the result we expect, avoiding any real FS or logic execution during the update.
       vi.mocked(getMissingSettings).mockResolvedValue([
         {
           name: 's1',
@@ -219,7 +279,13 @@ describe('extensionUpdates', () => {
         },
       ]);
 
-      // 5. Execute
+      // 5. Execute (bypass some internal FS checks)
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue(['test-ext']);
+
       await manager.installOrUpdateExtension(installMetadata, previousConfig);
 
       // 6. Assert
@@ -234,6 +300,121 @@ describe('extensionUpdates', () => {
           'Please run "gemini extensions config test-ext [setting-name]"',
         ),
       );
+    });
+  });
+
+  describe('updateExtension integrity', () => {
+    it('should throw security alert if integrity verification fails due to tampering', async () => {
+      const extension = {
+        name: 'tampered-ext',
+        path: '/mock/extensions/tampered-ext',
+        version: '1.0.0',
+      } as GeminiCLIExtension;
+
+      const manager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        settings: createTestMergedSettings(),
+        requestConsent: vi.fn(),
+        requestSetting: null,
+      });
+      await manager.loadExtensions();
+
+      vi.mocked(extensionModule.loadInstallMetadata).mockReturnValue({
+        source: '/mock/source',
+        type: 'local',
+      });
+
+      const verifyIntegritySpy = vi
+        .spyOn(ExtensionIntegrityManager.prototype, 'verifyIntegrity')
+        .mockRejectedValue(
+          new Error('Extension integrity store has been tampered with!'),
+        );
+
+      const dispatch = vi.fn();
+
+      await expect(
+        updateExtension(
+          extension,
+          manager,
+          ExtensionUpdateState.UPDATE_AVAILABLE,
+          dispatch,
+        ),
+      ).rejects.toThrow(
+        'Security Alert: Extension integrity store has been tampered with!',
+      );
+
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: { name: 'tampered-ext', state: ExtensionUpdateState.ERROR },
+      });
+
+      verifyIntegritySpy.mockRestore();
+    });
+
+    it('should initialize integrity if missing (trust on first update)', async () => {
+      const extension = {
+        name: 'new-ext',
+        path: '/mock/extensions/new-ext',
+        version: '1.0.0',
+      } as GeminiCLIExtension;
+
+      const manager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        settings: createTestMergedSettings(),
+        requestConsent: vi.fn(),
+        requestSetting: null,
+      });
+      await manager.loadExtensions();
+
+      vi.mocked(extensionModule.loadInstallMetadata).mockReturnValue({
+        source: '/mock/source',
+        type: 'local',
+      });
+
+      vi.spyOn(manager, 'getExtensions').mockReturnValue([
+        {
+          name: 'new-ext',
+          version: '1.0.0',
+          path: '/mock/extensions/new-ext',
+          isActive: true,
+        } as GeminiCLIExtension,
+      ]);
+
+      // Returns false for missing integrity data
+      const verifyIntegritySpy = vi
+        .spyOn(ExtensionIntegrityManager.prototype, 'verifyIntegrity')
+        .mockResolvedValue(false);
+      const storeIntegritySpy = vi
+        .spyOn(ExtensionIntegrityManager.prototype, 'storeIntegrity')
+        .mockResolvedValue(undefined);
+
+      // Mock installOrUpdateExtension to just return successfully
+      vi.spyOn(manager, 'installOrUpdateExtension').mockResolvedValue({
+        name: 'new-ext',
+        version: '1.1.0',
+      } as GeminiCLIExtension);
+
+      vi.spyOn(manager, 'loadExtensionConfig').mockResolvedValue({
+        name: 'new-ext',
+        version: '1.0.0',
+      });
+
+      const dispatch = vi.fn();
+
+      await updateExtension(
+        extension,
+        manager,
+        ExtensionUpdateState.UPDATE_AVAILABLE,
+        dispatch,
+      );
+
+      expect(debugLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('No integrity data found for new-ext'),
+      );
+      expect(storeIntegritySpy).toHaveBeenCalled();
+
+      verifyIntegritySpy.mockRestore();
+      storeIntegritySpy.mockRestore();
     });
   });
 });
