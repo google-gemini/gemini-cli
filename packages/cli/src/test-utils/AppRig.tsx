@@ -110,18 +110,30 @@ vi.mock('../ui/auth/useAuth.js', () => ({
   validateAuthMethodWithSettings: () => null,
 }));
 
-vi.mock('../utils/persistentState.ts', async () => {
-  const mockState: Record<string, boolean> = {
+const { mockedPersistentState } = vi.hoisted(() => ({
+  mockedPersistentState: {
+    data: { terminalSetupPromptShown: true } as Record<string, unknown>,
+  },
+}));
+
+export function setMockPersistentState(newData: Record<string, unknown>) {
+  mockedPersistentState.data = newData;
+}
+
+export function resetMockPersistentState() {
+  mockedPersistentState.data = {
     terminalSetupPromptShown: true,
   };
+}
 
-  return {
-    persistentState: {
-      get: vi.fn((key: string) => mockState[key]),
-      set: vi.fn(),
-    },
-  };
-});
+vi.mock('../utils/persistentState.ts', () => ({
+  persistentState: {
+    get: vi.fn((key: string) => mockedPersistentState.data[key]),
+    set: vi.fn((key: string, value: unknown) => {
+      mockedPersistentState.data[key] = value;
+    }),
+  },
+}));
 
 // A minimal mock ExtensionManager to satisfy AppContainer's forceful cast
 class MockExtensionManager extends ExtensionLoader {
