@@ -8,7 +8,6 @@ import { CommandKind, type SlashCommand } from './types.js';
 import { MessageType } from '../types.js';
 import {
   runPipeline,
-  renderVisualArtifact,
 } from '../../visualization/index.js';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -65,20 +64,16 @@ export const visualizeCommand: SlashCommand = {
           text: `\n${ascii}\n\nSuccessfully rendered ASCII visualization for \`${fileArg}\`.`,
         });
       } else {
-        // For graphics protocols, bypass Ink entirely — Ink escapes raw terminal sequences.
-        // Write image escape codes directly to stderr, which the terminal interprets
-        // identically to stdout but Ink doesn't control.
-        const graphicOutput = await renderVisualArtifact(result, {
-          spec,
-          showMeta: false,
-          forceProtocol: caps.protocol as 'kitty' | 'iterm2' | 'sixel',
-        });
-        if (graphicOutput) {
-          process.stderr.write('\n' + graphicOutput + '\n');
-        }
+        // For graphics protocols, Ink escapes raw terminal escape sequences,
+        // so we open the rendered PNG directly with the system image viewer.
+        const { exec } = await import('node:child_process');
+        const openCmd = process.platform === 'darwin' ? 'open'
+          : process.platform === 'win32' ? 'start'
+          : 'xdg-open';
+        exec(`${openCmd} "${result.pngPath}"`);
         context.ui.addItem({
           type: MessageType.INFO,
-          text: `Successfully rendered ${caps.protocol.toUpperCase()} visualization for \`${fileArg}\`.`,
+          text: `Rendered ${caps.protocol.toUpperCase()} visualization for \`${fileArg}\`.\nPNG saved to: ${result.pngPath}\nOpening in system viewer...`,
         });
       }
     } catch (err: unknown) {
