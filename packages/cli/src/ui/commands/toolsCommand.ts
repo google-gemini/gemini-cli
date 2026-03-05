@@ -13,7 +13,7 @@ import { MessageType, type HistoryItemToolsList } from '../types.js';
 
 export const toolsCommand: SlashCommand = {
   name: 'tools',
-  description: 'List available Gemini CLI tools. Usage: /tools [desc]',
+  description: 'List available Gemini CLI tools. Usage: /tools [desc|search]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context: CommandContext, args?: string): Promise<void> => {
@@ -21,8 +21,12 @@ export const toolsCommand: SlashCommand = {
 
     // Default to NOT showing descriptions. The user must opt in with an argument.
     let useShowDescriptions = false;
+    let searchTerm = '';
+
     if (subCommand === 'desc' || subCommand === 'descriptions') {
       useShowDescriptions = true;
+    } else if (subCommand) {
+      searchTerm = subCommand.toLowerCase();
     }
 
     const toolRegistry = context.services.config?.getToolRegistry();
@@ -36,7 +40,18 @@ export const toolsCommand: SlashCommand = {
 
     const tools = toolRegistry.getAllTools();
     // Filter out MCP tools by checking for the absence of a serverName property
-    const geminiTools = tools.filter((tool) => !('serverName' in tool));
+    let geminiTools = tools.filter((tool) => !('serverName' in tool));
+
+    if (searchTerm) {
+      geminiTools = geminiTools.filter(
+        (tool) =>
+          tool.name.toLowerCase().includes(searchTerm) ||
+          tool.displayName.toLowerCase().includes(searchTerm) ||
+          tool.description.toLowerCase().includes(searchTerm),
+      );
+      // When searching, it's often more useful to see descriptions too.
+      useShowDescriptions = true;
+    }
 
     const toolsListItem: HistoryItemToolsList = {
       type: MessageType.TOOLS_LIST,
@@ -49,5 +64,15 @@ export const toolsCommand: SlashCommand = {
     };
 
     context.ui.addItem(toolsListItem);
+  },
+  completion: (context: CommandContext, partialArg: string) => {
+    const toolRegistry = context.services.config?.getToolRegistry();
+    const suggestions = ['desc', 'descriptions'];
+    if (toolRegistry) {
+      const tools = toolRegistry.getAllTools();
+      const geminiTools = tools.filter((tool) => !('serverName' in tool));
+      suggestions.push(...geminiTools.map((t) => t.name));
+    }
+    return suggestions.filter((s) => s.startsWith(partialArg));
   },
 };
