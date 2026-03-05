@@ -87,7 +87,6 @@ export async function checkNextSpeaker(
     lastComprehensiveMessage.parts &&
     lastComprehensiveMessage.parts.length === 0
   ) {
-    lastComprehensiveMessage.parts.push({ text: '' });
     return {
       reasoning:
         'The last message was a filler model message with no content (nothing for user to act on), model should speak next.',
