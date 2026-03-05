@@ -413,4 +413,45 @@ describe('ToolConfirmationQueue', () => {
     expect(stickyHeaderProps.borderColor).toBe(theme.status.success);
     unmount();
   });
+
+  it('renders a multiline shell command with syntax highlighting and redirection warning (SVG snapshot)', async () => {
+    const confirmingTool = {
+      tool: {
+        callId: 'call-1',
+        name: 'run_shell_command',
+        description:
+          "cat << 'EOF' > foo.txtRoses are red,Violets are blue,The CLI is fast,And helpful too...",
+        status: CoreToolCallStatus.AwaitingApproval,
+        confirmationDetails: {
+          type: 'exec' as const,
+          title: 'Confirm execution',
+          command:
+            'cat << \'EOF\' > foo.txt\nRoses are red,\nViolets are blue,\nThe CLI is fast,\nAnd helpful too.\nEnd of the poem.\nEOF\necho "Poem successfully written to foo.txt"',
+          rootCommand: 'cat, heredoc (<<), redirection (>), echo',
+          rootCommands: ['cat', 'echo'],
+        },
+      },
+      index: 1,
+      total: 1,
+    };
+
+    const renderResult = renderWithProviders(
+      <ToolConfirmationQueue
+        confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+      />,
+      {
+        config: mockConfig,
+        uiState: {
+          terminalWidth: 80,
+          terminalHeight: 40,
+          constrainHeight: true,
+          streamingState: StreamingState.WaitingForConfirmation,
+        },
+      },
+    );
+    await renderResult.waitUntilReady();
+
+    await expect(renderResult).toMatchSvgSnapshot();
+    renderResult.unmount();
+  });
 });
