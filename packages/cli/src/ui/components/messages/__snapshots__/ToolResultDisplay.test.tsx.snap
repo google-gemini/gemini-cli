@@ -37,7 +37,7 @@ exports[`ToolResultDisplay > renders string result as plain text when renderOutp
 `;
 
 exports[`ToolResultDisplay > truncates very long string results 1`] = `
-"... first 248 lines hidden ...
+"... 248 hidden (Ctrl+O) ...
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

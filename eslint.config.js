@@ -25,6 +25,18 @@ const __dirname = path.dirname(__filename);
 const projectRoot = __dirname;
 const currentYear = new Date().getFullYear();
 
+const commonRestrictedSyntaxRules = [
+  {
+    selector: 'CallExpression[callee.name="require"]',
+    message: 'Avoid using require(). Use ES6 imports instead.',
+  },
+  {
+    selector: 'ThrowStatement > Literal:not([value=/^\\w+Error:/])',
+    message:
+      'Do not throw string literals or non-Error objects. Throw new Error("...") instead.',
+  },
+];
+
 export default tseslint.config(
   {
     // Global ignores
@@ -55,26 +67,8 @@ export default tseslint.config(
     },
   },
   {
-    // Import specific config
-    files: ['packages/*/src/**/*.{ts,tsx}'], // Target all TS/TSX in the packages
-    plugins: {
-      import: importPlugin,
-    },
-    settings: {
-      'import/resolver': {
-        node: true,
-      },
-    },
-    rules: {
-      ...importPlugin.configs.recommended.rules,
-      ...importPlugin.configs.typescript.rules,
-      'import/no-default-export': 'warn',
-      'import/no-unresolved': 'off', // Disable for now, can be noisy with monorepos/paths
-    },
-  },
-  {
-    // General overrides and rules for the project (TS/TSX files)
-    files: ['packages/*/src/**/*.{ts,tsx}'], // Target only TS/TSX in the cli package
+    // Rules for packages/*/src (TS/TSX)
+    files: ['packages/*/src/**/*.{ts,tsx}'],
     plugins: {
       import: importPlugin,
     },
@@ -95,6 +89,11 @@ export default tseslint.config(
       },
     },
     rules: {
+      ...importPlugin.configs.recommended.rules,
+      ...importPlugin.configs.typescript.rules,
+      'import/no-default-export': 'warn',
+      'import/no-unresolved': 'off',
+      'import/no-duplicates': 'error',
       // General Best Practice Rules (subset adapted for flat config)
       '@typescript-eslint/array-type': ['error', { default: 'array-simple' }],
       'arrow-body-style': ['error', 'as-needed'],
@@ -133,18 +132,7 @@ export default tseslint.config(
       'no-cond-assign': 'error',
       'no-debugger': 'error',
       'no-duplicate-case': 'error',
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: 'CallExpression[callee.name="require"]',
-          message: 'Avoid using require(). Use ES6 imports instead.',
-        },
-        {
-          selector: 'ThrowStatement > Literal:not([value=/^\\w+Error:/])',
-          message:
-            'Do not throw string literals or non-Error objects. Throw new Error("...") instead.',
-        },
-      ],
+      'no-restricted-syntax': ['error', ...commonRestrictedSyntaxRules],
       'no-unsafe-finally': 'error',
       'no-unused-expressions': 'off', // Disable base rule
       '@typescript-eslint/no-unused-expressions': [
@@ -180,6 +168,28 @@ export default tseslint.config(
                 'Please use the helpers from @google/gemini-cli-core instead of os homedir()/tmpdir() to ensure strict environment isolation.',
             },
           ],
+        },
+      ],
+    },
+  },
+  {
+    // API Response Optionality enforcement for Code Assist
+    files: ['packages/core/src/code_assist/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...commonRestrictedSyntaxRules,
+        {
+          selector:
+            'TSInterfaceDeclaration[id.name=/.+Response$/] TSPropertySignature:not([optional=true])',
+          message:
+            'All fields in API response interfaces (*Response) must be marked as optional (?) to prevent developers from accidentally assuming a field will always be present based on current backend behavior.',
+        },
+        {
+          selector:
+            'TSTypeAliasDeclaration[id.name=/.+Response$/] TSPropertySignature:not([optional=true])',
+          message:
+            'All fields in API response types (*Response) must be marked as optional (?) to prevent developers from accidentally assuming a field will always be present based on current backend behavior.',
         },
       ],
     },

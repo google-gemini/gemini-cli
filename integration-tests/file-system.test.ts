@@ -55,8 +55,8 @@ describe('file-system', () => {
     });
   });
 
-  it('should be able to write a file', async () => {
-    await rig.setup('should be able to write a file', {
+  it('should be able to write a hello world message to a file', async () => {
+    await rig.setup('should be able to write a hello world message to a file', {
       settings: { tools: { core: ['write_file', 'replace', 'read_file'] } },
     });
     rig.createFile('test.txt', '');
