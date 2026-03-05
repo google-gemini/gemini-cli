@@ -4,7 +4,7 @@
   </style>
   <rect width="920" height="71" fill="#000000" />
   <g transform="translate(10, 10)">
-    <text x="0" y="2" fill="#ffffff" textLength="900" lengthAdjust="spacingAndGlyphs">Value                                                                                               </text>
+    <text x="0" y="2" fill="#ffffff" textLength="45" lengthAdjust="spacingAndGlyphs" font-weight="bold">Value</text>
     <text x="0" y="19" fill="#3d3f51" textLength="900" lengthAdjust="spacingAndGlyphs">────────────────────────────────────────────────────────────────────────────────────────────────────</text>
     <text x="0" y="36" fill="#00cd00" textLength="18" lengthAdjust="spacingAndGlyphs">20</text>
   </g>
