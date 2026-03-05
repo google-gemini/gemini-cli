@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { KeychainTokenStorage } from './keychain-token-storage.js';
 import type { OAuthCredentials } from './types.js';
-import { KeystoreService } from '../../services/keystore.js';
+import { KeystoreService } from '../../services/keystoreService.js';
 import { coreEvents } from '../../utils/events.js';
 
 describe('KeychainTokenStorage', () => {

@@ -7,10 +7,8 @@
 import { BaseTokenStorage } from './base-token-storage.js';
 import type { OAuthCredentials, SecretStorage } from './types.js';
 import { coreEvents } from '../../utils/events.js';
-import {
-  KeystoreService,
-  KEYCHAIN_TEST_PREFIX,
-} from '../../services/keystore.js';
+import { KeystoreService } from '../../services/keystoreService.js';
+import { KEYCHAIN_TEST_PREFIX } from '../../services/keystoreTypes.js';
 
 const SECRET_PREFIX = '__secret__';
 
