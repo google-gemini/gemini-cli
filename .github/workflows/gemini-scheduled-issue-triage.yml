@@ -63,7 +63,7 @@ jobs:
 
           echo '🔍 Finding issues missing area labels...'
           NO_AREA_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
-            --search 'is:open is:issue -label:area/core -label:area/agent -label:area/enterprise -label:area/non-interactive -label:area/security -label:area/platform -label:area/extensions -label:area/unknown' --limit 100 --json number,title,body)"
+            --search 'is:open is:issue -label:area/core -label:area/agent -label:area/enterprise -label:area/non-interactive -label:area/security -label:area/platform -label:area/extensions -label:area/documentation -label:area/unknown' --limit 100 --json number,title,body)"
 
           echo '🔍 Finding issues missing kind labels...'
           NO_KIND_ISSUES="$(gh issue list --repo "${GITHUB_REPOSITORY}" \
@@ -204,6 +204,7 @@ jobs:
             Categorization Guidelines (Area):
             area/agent: Core Agent, Tools, Memory, Sub-Agents, Hooks, Agent Quality
             area/core: User Interface, OS Support, Core Functionality
+            area/documentation: End-user and contributor-facing documentation, website-related
             area/enterprise: Telemetry, Policy, Quota / Licensing
             area/extensions: Gemini CLI extensions capability
             area/non-interactive: GitHub Actions, SDK, 3P Integrations, Shell Scripting, Command line automation
