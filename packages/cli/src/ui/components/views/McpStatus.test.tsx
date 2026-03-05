@@ -16,7 +16,6 @@ describe('McpStatus', () => {
     servers: {
       'server-1': {
         url: 'http://localhost:8080',
-        name: 'server-1',
         description: 'A test server',
       },
     },
@@ -208,7 +207,6 @@ describe('McpStatus', () => {
           ...baseProps.servers,
           'server-2': {
             url: 'http://localhost:8081',
-            name: 'server-2',
             description: 'A blocked server',
           },
         }}

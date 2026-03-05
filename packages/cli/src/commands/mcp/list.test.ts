@@ -14,7 +14,11 @@ import {
   type Mock,
 } from 'vitest';
 import { listMcpServers } from './list.js';
-import { loadSettings, mergeSettings } from '../../config/settings.js';
+import {
+  loadSettings,
+  mergeSettings,
+  type LoadedSettings,
+} from '../../config/settings.js';
 import { createTransport, debugLogger } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionStorage } from '../../config/extensions/storage.js';
@@ -275,7 +279,10 @@ describe('mcp list command', () => {
     mockClient.connect.mockResolvedValue(undefined);
     mockClient.ping.mockResolvedValue(undefined);
 
-    await listMcpServers(settingsWithAllowlist);
+    await listMcpServers({
+      merged: settingsWithAllowlist,
+      isTrusted: true,
+    } as unknown as LoadedSettings);
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining('allowed-server'),
