@@ -65,18 +65,21 @@ export const visualizeCommand: SlashCommand = {
           text: `\n${ascii}\n\nSuccessfully rendered ASCII visualization for \`${fileArg}\`.`,
         });
       } else {
-        // For graphics protocols, we inject the raw escape sequences directly into the UI list
+        // For graphics protocols, bypass Ink entirely — Ink escapes raw terminal sequences.
+        // Write image escape codes directly to stderr, which the terminal interprets
+        // identically to stdout but Ink doesn't control.
         const graphicOutput = await renderVisualArtifact(result, {
           spec,
-          showMeta: true,
+          showMeta: false,
           forceProtocol: caps.protocol as 'kitty' | 'iterm2' | 'sixel',
         });
         if (graphicOutput) {
-          context.ui.addItem({
-            type: MessageType.INFO,
-            text: `\n${graphicOutput}\n\nSuccessfully rendered ${caps.protocol.toUpperCase()} visualization for \`${fileArg}\`.`,
-          });
+          process.stderr.write('\n' + graphicOutput + '\n');
         }
+        context.ui.addItem({
+          type: MessageType.INFO,
+          text: `Successfully rendered ${caps.protocol.toUpperCase()} visualization for \`${fileArg}\`.`,
+        });
       }
     } catch (err: unknown) {
       context.ui.addItem({
