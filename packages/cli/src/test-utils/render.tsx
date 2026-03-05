@@ -17,6 +17,7 @@ import { vi } from 'vitest';
 import stripAnsi from 'strip-ansi';
 import { act, useState } from 'react';
 import os from 'node:os';
+import path from 'node:path';
 import { LoadedSettings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
@@ -49,7 +50,7 @@ import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
 import { createMockSettings } from './settings.js';
 import { SessionStatsProvider } from '../ui/contexts/SessionContext.js';
 import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
-import { DefaultLight } from '../ui/themes/default-light.js';
+import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
 import { pickDefaultThemeName } from '../ui/themes/theme.js';
 import { generateSvgForTerminal } from './svg.js';
 
@@ -502,7 +503,22 @@ const configProxy = new Proxy({} as Config, {
   get(_target, prop) {
     if (prop === 'getTargetDir') {
       return () =>
-        '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long';
+        path.join(
+          path.parse(process.cwd()).root,
+          'Users',
+          'test',
+          'project',
+          'foo',
+          'bar',
+          'and',
+          'some',
+          'more',
+          'directories',
+          'to',
+          'make',
+          'it',
+          'long',
+        );
     }
     if (prop === 'getUseBackgroundColor') {
       return () => true;

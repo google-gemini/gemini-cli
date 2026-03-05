@@ -28,7 +28,7 @@ describe('ContextUsageDisplay', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('50% context used');
+    expect(output).toContain('50% used');
     unmount();
   });
 
@@ -42,7 +42,7 @@ describe('ContextUsageDisplay', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('0% context used');
+    expect(output).toContain('0% used');
     unmount();
   });
 
@@ -72,7 +72,7 @@ describe('ContextUsageDisplay', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('80% context used');
+    expect(output).toContain('80% used');
     unmount();
   });
 
@@ -86,7 +86,7 @@ describe('ContextUsageDisplay', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('100% context used');
+    expect(output).toContain('100% used');
     unmount();
   });
 });

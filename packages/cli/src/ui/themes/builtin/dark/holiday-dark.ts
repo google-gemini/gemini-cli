@@ -1,11 +1,11 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type ColorsTheme, Theme } from './theme.js';
-import { interpolateColor } from './color-utils.js';
+import { type ColorsTheme, Theme } from '../../theme.js';
+import { interpolateColor } from '../../color-utils.js';
 
 const holidayColors: ColorsTheme = {
   type: 'dark',
@@ -23,6 +23,7 @@ const holidayColors: ColorsTheme = {
   Comment: '#8FBC8F',
   Gray: '#D7F5D3',
   DarkGray: interpolateColor('#D7F5D3', '#151B18', 0.5),
+  FocusColor: '#33F9FF', // AccentCyan for neon pop
   GradientColors: ['#FF0000', '#FFFFFF', '#008000'],
 };
 

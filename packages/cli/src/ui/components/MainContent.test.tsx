@@ -8,7 +8,7 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { MainContent } from './MainContent.js';
 import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Box, Text } from 'ink';
 import { act, useState, type JSX } from 'react';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
@@ -54,10 +54,6 @@ vi.mock('./AppHeader.js', () => ({
   AppHeader: ({ showDetails = true }: { showDetails?: boolean }) => (
     <Text>{showDetails ? 'AppHeader(full)' : 'AppHeader(minimal)'}</Text>
   ),
-}));
-
-vi.mock('./ShowMoreLines.js', () => ({
-  ShowMoreLines: () => <Text>ShowMoreLines</Text>,
 }));
 
 vi.mock('./shared/ScrollableList.js', () => ({
@@ -203,7 +199,7 @@ describe('getToolGroupBorderAppearance', () => {
     });
   });
 
-  it('returns symbol border for executing shell commands', () => {
+  it('returns active border for executing shell commands', () => {
     const item = {
       type: 'tool_group' as const,
       tools: [
@@ -219,7 +215,37 @@ describe('getToolGroupBorderAppearance', () => {
       ],
       id: 1,
     };
-    // While executing shell commands, it's dim false, border symbol
+    // While executing shell commands, it's dim false, border active
+    const result = getToolGroupBorderAppearance(
+      item,
+      activeShellPtyId,
+      false,
+      [],
+      mockBackgroundShells,
+    );
+    expect(result).toEqual({
+      borderColor: theme.ui.active,
+      borderDimColor: true,
+    });
+  });
+
+  it('returns focus border for focused executing shell commands', () => {
+    const item = {
+      type: 'tool_group' as const,
+      tools: [
+        {
+          callId: '1',
+          name: SHELL_COMMAND_NAME,
+          description: '',
+          status: CoreToolCallStatus.Executing,
+          ptyId: activeShellPtyId,
+          resultDisplay: undefined,
+          confirmationDetails: undefined,
+        } as IndividualToolCallDisplay,
+      ],
+      id: 1,
+    };
+    // When focused, it's dim false, border focus
     const result = getToolGroupBorderAppearance(
       item,
       activeShellPtyId,
@@ -228,12 +254,12 @@ describe('getToolGroupBorderAppearance', () => {
       mockBackgroundShells,
     );
     expect(result).toEqual({
-      borderColor: theme.ui.symbol,
+      borderColor: theme.ui.focus,
       borderDimColor: false,
     });
   });
 
-  it('returns symbol border and dims color for background executing shell command when another shell is active', () => {
+  it('returns active border and dims color for background executing shell command when another shell is active', () => {
     const item = {
       type: 'tool_group' as const,
       tools: [
@@ -257,7 +283,7 @@ describe('getToolGroupBorderAppearance', () => {
       mockBackgroundShells,
     );
     expect(result).toEqual({
-      borderColor: theme.ui.symbol,
+      borderColor: theme.ui.active,
       borderDimColor: true,
     });
   });
@@ -275,7 +301,7 @@ describe('getToolGroupBorderAppearance', () => {
     );
     // Since there are no tools to inspect, it falls back to empty pending, but isCurrentlyInShellTurn=true
     // so it counts as pending shell.
-    expect(result.borderColor).toEqual(theme.ui.symbol);
+    expect(result.borderColor).toEqual(theme.ui.focus);
     // It shouldn't be dim because there are no tools to say it isEmbeddedShellFocused = false
     expect(result.borderDimColor).toBe(false);
   });
@@ -307,6 +333,10 @@ describe('MainContent', () => {
 
   beforeEach(() => {
     vi.mocked(useAlternateBuffer).mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('renders in normal buffer mode', async () => {
@@ -424,6 +454,60 @@ describe('MainContent', () => {
     expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
     expect(output).toContain('Hi there');
+    unmount();
+  });
+
+  it('renders multiple history items with single line padding between them', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+    const uiState = {
+      ...defaultMockUiState,
+      history: [
+        { id: 1, type: 'gemini', text: 'Gemini message 1\n'.repeat(10) },
+        { id: 2, type: 'gemini', text: 'Gemini message 2\n'.repeat(10) },
+      ],
+      constrainHeight: true,
+      staticAreaMaxItemHeight: 5,
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <MainContent />,
+      {
+        uiState: uiState as Partial<UIState>,
+        useAlternateBuffer: true,
+      },
+    );
+
+    await waitUntilReady();
+
+    const output = lastFrame();
+    expect(output).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders mixed history items (user + gemini) with single line padding between them', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+    const uiState = {
+      ...defaultMockUiState,
+      history: [
+        { id: 1, type: 'user', text: 'User message' },
+        { id: 2, type: 'gemini', text: 'Gemini response\n'.repeat(10) },
+      ],
+      constrainHeight: true,
+      staticAreaMaxItemHeight: 5,
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <MainContent />,
+      {
+        uiState: uiState as unknown as Partial<UIState>,
+        useAlternateBuffer: true,
+      },
+    );
+
+    await waitUntilReady();
+
+    const output = lastFrame();
+    expect(output).toMatchSnapshot();
     unmount();
   });
 
