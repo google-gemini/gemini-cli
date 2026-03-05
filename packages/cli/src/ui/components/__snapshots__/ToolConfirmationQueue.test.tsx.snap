@@ -90,6 +90,33 @@ exports[`ToolConfirmationQueue > renders ExitPlanMode tool confirmation with Suc
 "
 `;
 
+exports[`ToolConfirmationQueue > renders a multiline shell command with syntax highlighting and redirection warning (SVG snapshot) 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Action Required                                                                                  │
+│                                                                                                  │
+│ ?  run_shell_command cat << 'EOF' > foo.txtRoses are red,Violets are blue,The CLI is fast,And h… │
+│                                                                                                  │
+│ cat << 'EOF' > foo.txt                                                                           │
+│ Roses are red,                                                                                   │
+│ Violets are blue,                                                                                │
+│ The CLI is fast,                                                                                 │
+│ And helpful too.                                                                                 │
+│ End of the poem.                                                                                 │
+│ EOF                                                                                              │
+│ echo "Poem successfully written to foo.txt"                                                      │
+│                                                                                                  │
+│ Note: Command contains redirection which can be undesirable.                                     │
+│ Tip:  Toggle auto-edit (Shift+Tab) to allow redirection in the future.                           │
+│ Allow execution of: 'cat, heredoc (<<), redirection (>), echo'?                                  │
+│                                                                                                  │
+│ ● 1. Allow once                                                                                  │
+│   2. Allow for this session                                                                      │
+│   3. Allow for all future sessions                                                               │
+│   4. No, suggest changes (esc)                                                                   │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
 exports[`ToolConfirmationQueue > renders expansion hint when content is long and constrained 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ Action Required                                                              │

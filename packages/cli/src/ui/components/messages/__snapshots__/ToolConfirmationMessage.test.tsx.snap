@@ -2,7 +2,9 @@
 
 exports[`ToolConfirmationMessage > should display multiple commands for exec type when provided 1`] = `
 "echo "hello"
+
 ls -la
+
 whoami
 Allow execution of 3 commands?
 
@@ -28,6 +30,19 @@ Do you want to proceed?
 exports[`ToolConfirmationMessage > should not display urls if prompt and url are the same 1`] = `
 "https://example.com
 Do you want to proceed?
+
+● 1. Allow once               
+  2. Allow for this session
+  3. No, suggest changes (esc)
+"
+`;
+
+exports[`ToolConfirmationMessage > should render multiline shell scripts with correct newlines and syntax highlighting (SVG snapshot) 1`] = `
+"echo "hello"
+for i in 1 2 3; do
+  echo $i
+done
+Allow execution of: 'echo'?
 
 ● 1. Allow once               
   2. Allow for this session
