@@ -41,8 +41,8 @@ class McpToolInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly browserManager: BrowserManager,
-    private readonly toolName: string,
+    protected readonly browserManager: BrowserManager,
+    protected readonly toolName: string,
     params: Record<string, unknown>,
     messageBus: MessageBus,
   ) {
@@ -133,6 +133,29 @@ class McpToolInvocation extends BaseToolInvocation<
         error: { message: errorMsg },
       };
     }
+  }
+}
+
+/**
+ * Tool invocation for navigation tools that re-injects the automation overlay.
+ */
+class NavigationalMcpToolInvocation extends McpToolInvocation {
+  override async execute(signal: AbortSignal): Promise<ToolResult> {
+    const result = await super.execute(signal);
+
+    // Re-inject overlay after navigation if successful
+    if (!result.error) {
+      try {
+        await injectAutomationOverlay(this.browserManager, signal);
+      } catch (error) {
+        debugLogger.warn(
+          'Failed to re-inject overlay after navigation:',
+          error,
+        );
+      }
+    }
+
+    return result;
   }
 }
 
@@ -282,11 +305,11 @@ class McpDeclarativeTool extends DeclarativeTool<
   ToolResult
 > {
   constructor(
-    private readonly browserManager: BrowserManager,
+    protected readonly browserManager: BrowserManager,
     name: string,
     description: string,
     parameterSchema: unknown,
-    messageBus: MessageBus,
+    protected readonly messageBus: MessageBus,
   ) {
     super(
       name,
@@ -304,6 +327,22 @@ class McpDeclarativeTool extends DeclarativeTool<
     params: Record<string, unknown>,
   ): ToolInvocation<Record<string, unknown>, ToolResult> {
     return new McpToolInvocation(
+      this.browserManager,
+      this.name,
+      params,
+      this.messageBus,
+    );
+  }
+}
+
+/**
+ * DeclarativeTool for navigation tools that returns NavigationalMcpToolInvocation.
+ */
+class NavigationalMcpDeclarativeTool extends McpDeclarativeTool {
+  override build(
+    params: Record<string, unknown>,
+  ): ToolInvocation<Record<string, unknown>, ToolResult> {
+    return new NavigationalMcpToolInvocation(
       this.browserManager,
       this.name,
       params,
@@ -415,48 +454,35 @@ export async function createMcpDeclarativeTools(
   // Add custom composite tools
   tools.push(new TypeTextDeclarativeTool(browserManager, messageBus));
 
-  // Wrap navigation tools to re-inject overlay after page changes
+  // Determine if we should use navigational wrappers
   const navigationTools = ['navigate_page', 'new_page'];
   const browserConfig = config.getBrowserAgentConfig();
   const shouldInjectOverlay = !browserConfig?.customConfig?.headless;
 
-  for (const tool of tools) {
+  const finalTools: Array<
+    | McpDeclarativeTool
+    | TypeTextDeclarativeTool
+    | NavigationalMcpDeclarativeTool
+  > = tools.map((tool) => {
     if (navigationTools.includes(tool.name) && shouldInjectOverlay) {
-      // Wrap the original build method
-      const originalBuild = tool.build.bind(tool);
-      tool.build = function (params: Record<string, unknown>) {
-        const originalInvocation = originalBuild(params);
-        const originalExecute =
-          originalInvocation.execute.bind(originalInvocation);
-
-        originalInvocation.execute = async function (signal: AbortSignal) {
-          const result = await originalExecute(signal);
-
-          // Re-inject overlay after navigation if successful
-          if (!result.error) {
-            try {
-              await injectAutomationOverlay(browserManager, signal);
-            } catch (error) {
-              debugLogger.warn(
-                'Failed to re-inject overlay after navigation:',
-                error,
-              );
-            }
-          }
-
-          return result;
-        };
-
-        return originalInvocation;
-      };
+      // Use the navigational wrapper for these tools
+      const schema = mcpTools.find((t) => t.name === tool.name)?.inputSchema;
+      return new NavigationalMcpDeclarativeTool(
+        browserManager,
+        tool.name,
+        tool.description,
+        schema ?? { type: 'object', properties: {} },
+        messageBus,
+      );
     }
-  }
+    return tool;
+  });
 
   debugLogger.log(
-    `Total tools registered: ${tools.length} (${mcpTools.length} MCP + 1 custom)`,
+    `Total tools registered: ${finalTools.length} (${mcpTools.length} MCP + 1 custom)`,
   );
 
-  return tools;
+  return finalTools;
 }
 
 /**
