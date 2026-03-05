@@ -48,6 +48,16 @@ export enum IntegrityStatus {
 }
 
 /**
+ * Error thrown when the extension integrity store itself has been tampered with.
+ */
+export class ExtensionIntegrityTamperedError extends Error {
+  constructor(message = 'Extension integrity store has been tampered with!') {
+    super(message);
+    this.name = 'ExtensionIntegrityTamperedError';
+  }
+}
+
+/**
  * Manages the integrity of installed extensions by cryptographically signing
  * their installation metadata.
  *
@@ -137,13 +147,16 @@ export class ExtensionIntegrityManager {
             Buffer.from(expectedSignature, 'hex'),
           )
         ) {
-          throw new Error('Extension integrity store has been tampered with!');
+          throw new ExtensionIntegrityTamperedError();
         }
 
         store = existingStore || {};
       } catch (e) {
         // Fail-closed: If the existing integrity store is corrupted or tampered,
         // we must not silently ignore it.
+        if (e instanceof ExtensionIntegrityTamperedError) {
+          throw e;
+        }
         throw new Error(
           `Failed to parse or verify extension integrity store: ${e instanceof Error ? e.message : 'Unknown error'}. ` +
             'The integrity store may be corrupted or tampered with.',
@@ -207,7 +220,7 @@ export class ExtensionIntegrityManager {
           Buffer.from(expectedStoreSignature, 'hex'),
         )
       ) {
-        throw new Error('Extension integrity store has been tampered with!');
+        throw new ExtensionIntegrityTamperedError();
       }
 
       if (!store || !signature || !store[extensionName]) {
@@ -241,10 +254,7 @@ export class ExtensionIntegrityManager {
 
       return isAuthentic ? IntegrityStatus.AUTHENTIC : IntegrityStatus.TAMPERED;
     } catch (e) {
-      if (
-        e instanceof Error &&
-        e.message === 'Extension integrity store has been tampered with!'
-      ) {
+      if (e instanceof ExtensionIntegrityTamperedError) {
         throw e;
       }
       return IntegrityStatus.TAMPERED;

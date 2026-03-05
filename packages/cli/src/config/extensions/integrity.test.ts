@@ -7,7 +7,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ExtensionIntegrityManager, IntegrityStatus } from './integrity.js';
+import {
+  ExtensionIntegrityManager,
+  IntegrityStatus,
+  ExtensionIntegrityTamperedError,
+} from './integrity.js';
 import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
 
 // Mock KeystoreService
@@ -179,7 +183,7 @@ describe('ExtensionIntegrityManager', () => {
 
       await expect(
         manager.storeIntegrity('other-ext', metadata),
-      ).rejects.toThrow('Extension integrity store has been tampered with!');
+      ).rejects.toThrow(ExtensionIntegrityTamperedError);
     });
 
     it('should throw error in storeIntegrity if existing store is corrupted', async () => {
