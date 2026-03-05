@@ -12,9 +12,6 @@ import {
   type ResourceMetrics,
 } from '@opentelemetry/sdk-metrics';
 
-/* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-
 // Local exporter to maintain a rolling window of cumulative metrics in memory.
 export const localMetricExporter = new InMemoryMetricExporter(
   AggregationTemporality.CUMULATIVE,
@@ -59,8 +56,10 @@ function isHistogramValue(value: unknown): value is HistogramValue {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
-  const record = value as Record<string, unknown>;
 
+  // Keep this single inline disable to inspect the external object!
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const record = value as Record<string, unknown>;
   return (
     typeof record['count'] === 'number' && typeof record['sum'] === 'number'
   );
@@ -73,9 +72,9 @@ function simplifyMetrics(
   resourceMetricsArray: ResourceMetrics[] | undefined,
 ): PerfSnapshot {
   const snapshot: PerfSnapshot = {
-    // Creates safe objects with no prototype chain
-    counters: Object.create(null),
-    histograms: Object.create(null),
+    // Reverted to standard objects so the strict linter doesn't throw errors
+    counters: {},
+    histograms: {},
   };
 
   if (!resourceMetricsArray || resourceMetricsArray.length === 0) {
@@ -87,26 +86,44 @@ function simplifyMetrics(
       for (const metric of sm.metrics) {
         const name = metric.descriptor.name;
 
+        // Security: Prevent prototype pollution without breaking strict TypeScript typing
+        if (
+          name === '__proto__' ||
+          name === 'constructor' ||
+          name === 'prototype'
+        ) {
+          continue;
+        }
+
+        // 1. Handle regular Counters (SUM)
         if (metric.dataPointType === DataPointType.SUM) {
           let total = 0;
           for (const dp of metric.dataPoints) {
-            total += dp.value;
+             
+            const rawValue: unknown = dp.value;
+            if (typeof rawValue === 'number') {
+              total += rawValue;
+            }
           }
           snapshot.counters[name] = total;
-        } else if (metric.dataPointType === DataPointType.HISTOGRAM) {
+        }
+
+        // 2. Handle complex Latency/Memory distributions (HISTOGRAM)
+        else if (metric.dataPointType === DataPointType.HISTOGRAM) {
           let count = 0;
           let sum = 0;
           let min = Infinity;
           let max = -Infinity;
 
           for (const dp of metric.dataPoints) {
-            if (isHistogramValue(dp.value)) {
-              const val = dp.value as HistogramValue;
+             
+            const rawValue: unknown = dp.value;
 
-              count += val.count;
-              sum += val.sum;
-              if (val.min !== undefined) min = Math.min(min, val.min);
-              if (val.max !== undefined) max = Math.max(max, val.max);
+            if (isHistogramValue(rawValue)) {
+              count += rawValue.count;
+              sum += rawValue.sum;
+              if (rawValue.min !== undefined) min = Math.min(min, rawValue.min);
+              if (rawValue.max !== undefined) max = Math.max(max, rawValue.max);
             }
           }
 
