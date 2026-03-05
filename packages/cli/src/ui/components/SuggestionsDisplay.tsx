@@ -84,7 +84,7 @@ export function SuggestionsDisplay({
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
         const isExpanded = originalIndex === expandedIndex;
-        const textColor = isActive ? theme.text.accent : theme.text.secondary;
+        const textColor = isActive ? theme.ui.focus : theme.text.secondary;
         const isLong = suggestion.value.length >= MAX_WIDTH;
         const labelElement = (
           <ExpandableText
@@ -97,7 +97,11 @@ export function SuggestionsDisplay({
         );
 
         return (
-          <Box key={`${suggestion.value}-${originalIndex}`} flexDirection="row">
+          <Box
+            key={`${suggestion.value}-${originalIndex}`}
+            flexDirection="row"
+            backgroundColor={isActive ? theme.background.focus : undefined}
+          >
             <Box
               {...(mode === 'slash'
                 ? { width: commandColumnWidth, flexShrink: 0 as const }
