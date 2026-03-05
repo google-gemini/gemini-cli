@@ -77,11 +77,20 @@ export function parseImageName(image: string): string {
   return tag ? `${name}-${tag}` : name;
 }
 
+function sanitizePort(value: string): string | undefined {
+  const trimmedValue = value.trim();
+  if (!/^\d{1,5}$/.test(trimmedValue)) {
+    return undefined;
+  }
+  const port = Number(trimmedValue);
+  return port >= 1 && port <= 65535 ? trimmedValue : undefined;
+}
+
 export function ports(): string[] {
   return (process.env['SANDBOX_PORTS'] ?? '')
     .split(',')
-    .filter((p) => p.trim())
-    .map((p) => p.trim());
+    .map((port) => sanitizePort(port))
+    .filter((port): port is string => Boolean(port));
 }
 
 export function sanitizeDebugPort(value: string | undefined): string {

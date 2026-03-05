@@ -173,9 +173,17 @@ export async function start_sandbox(
           sandboxEnv['NO_PROXY'] = noProxy;
           sandboxEnv['no_proxy'] = noProxy;
         }
-        proxyProcess = spawn(proxyCommand, {
+        const parsedProxyCommand = parse(proxyCommand, process.env).filter(
+          (token): token is string => typeof token === 'string',
+        );
+        if (parsedProxyCommand.length === 0) {
+          throw new FatalSandboxError(
+            'GEMINI_SANDBOX_PROXY_COMMAND is empty or invalid',
+          );
+        }
+        const [proxyCmd, ...proxyCmdArgs] = parsedProxyCommand;
+        proxyProcess = spawn(proxyCmd, proxyCmdArgs, {
           stdio: ['ignore', 'pipe', 'pipe'],
-          shell: true,
           detached: true,
         });
         // install handlers to stop proxy on exit/signal

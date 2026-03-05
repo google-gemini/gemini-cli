@@ -12,6 +12,7 @@ import {
   getContainerPath,
   parseImageName,
   ports,
+  sanitizeDebugPort,
   entrypoint,
   shouldUseCurrentUserInSandbox,
 } from './sandboxUtils.js';
@@ -84,6 +85,26 @@ describe('sandboxUtils', () => {
     it('should parse comma-separated ports', () => {
       process.env['SANDBOX_PORTS'] = '8080, 3000 , 9000';
       expect(ports()).toEqual(['8080', '3000', '9000']);
+    });
+
+    it('should ignore invalid ports', () => {
+      process.env['SANDBOX_PORTS'] = '8080, abc, 70000, -1, 9000';
+      expect(ports()).toEqual(['8080', '9000']);
+    });
+  });
+
+  describe('sanitizeDebugPort', () => {
+    it('should return default for invalid values', () => {
+      expect(sanitizeDebugPort(undefined)).toBe('9229');
+      expect(sanitizeDebugPort('')).toBe('9229');
+      expect(sanitizeDebugPort('9229; touch /tmp/pwned')).toBe('9229');
+      expect(sanitizeDebugPort('70000')).toBe('9229');
+      expect(sanitizeDebugPort('-1')).toBe('9229');
+    });
+
+    it('should return valid debug port', () => {
+      expect(sanitizeDebugPort('9229')).toBe('9229');
+      expect(sanitizeDebugPort(' 3000 ')).toBe('3000');
     });
   });
 
