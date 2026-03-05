@@ -16,6 +16,7 @@ import {
 import { KeychainTokenStorage } from './keychain-token-storage.js';
 import type { OAuthCredentials } from './types.js';
 import { KeystoreService } from '../../services/keystore.js';
+import { coreEvents } from '../../utils/events.js';
 
 describe('KeychainTokenStorage', () => {
   let storage: KeychainTokenStorage;
@@ -291,6 +292,59 @@ describe('KeychainTokenStorage', () => {
         'Keystore is not available',
       );
       expect(await storage.listSecrets()).toEqual([]);
+    });
+  });
+
+  describe('error handling and feedback', () => {
+    let emitFeedbackSpy: MockInstance;
+
+    beforeEach(() => {
+      isAvailableSpy.mockResolvedValue(true);
+      emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+    });
+
+    it('listServers should emit error feedback when listCredentials fails', async () => {
+      listCredentialsSpy.mockRejectedValue(new Error('list error'));
+      const result = await storage.listServers();
+      expect(result).toEqual([]);
+      expect(emitFeedbackSpy).toHaveBeenCalledWith(
+        'error',
+        'Failed to list servers from keychain',
+        expect.any(Error),
+      );
+    });
+
+    it('getAllCredentials should emit error feedback when listCredentials fails', async () => {
+      listCredentialsSpy.mockRejectedValue(new Error('list error'));
+      const result = await storage.getAllCredentials();
+      expect(result.size).toBe(0);
+      expect(emitFeedbackSpy).toHaveBeenCalledWith(
+        'error',
+        'Failed to get all credentials from keychain',
+        expect.any(Error),
+      );
+    });
+
+    it('listSecrets should emit error feedback when listCredentials fails', async () => {
+      listCredentialsSpy.mockRejectedValue(new Error('list error'));
+      const result = await storage.listSecrets();
+      expect(result).toEqual([]);
+      expect(emitFeedbackSpy).toHaveBeenCalledWith(
+        'error',
+        'Failed to list secrets from keychain',
+        expect.any(Error),
+      );
+    });
+
+    it('getSecret should emit error feedback when getPassword fails', async () => {
+      getPasswordSpy.mockRejectedValue(new Error('read error'));
+      const result = await storage.getSecret('my-key');
+      expect(result).toBeNull();
+      expect(emitFeedbackSpy).toHaveBeenCalledWith(
+        'error',
+        'Failed to get secret from keychain',
+        expect.any(Error),
+      );
     });
   });
 });

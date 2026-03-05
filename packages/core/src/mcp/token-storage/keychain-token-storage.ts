@@ -161,19 +161,49 @@ export class KeychainTokenStorage
   }
 
   async setSecret(key: string, value: string): Promise<void> {
-    await this.keystoreService.setPassword(`${SECRET_PREFIX}${key}`, value);
+    try {
+      await this.keystoreService.setPassword(`${SECRET_PREFIX}${key}`, value);
+    } catch (error) {
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to set secret in keychain',
+        error,
+      );
+      throw error;
+    }
   }
 
   async getSecret(key: string): Promise<string | null> {
-    return this.keystoreService.getPassword(`${SECRET_PREFIX}${key}`);
+    try {
+      return await this.keystoreService.getPassword(`${SECRET_PREFIX}${key}`);
+    } catch (error) {
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to get secret from keychain',
+        error,
+      );
+      return null;
+    }
   }
 
   async deleteSecret(key: string): Promise<void> {
-    const deleted = await this.keystoreService.deletePassword(
-      `${SECRET_PREFIX}${key}`,
-    );
-    if (!deleted) {
-      throw new Error(`No secret found for key: ${key}`);
+    try {
+      const deleted = await this.keystoreService.deletePassword(
+        `${SECRET_PREFIX}${key}`,
+      );
+      if (!deleted) {
+        throw new Error(`No secret found for key: ${key}`);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('No secret found')) {
+        throw error;
+      }
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to delete secret from keychain',
+        error,
+      );
+      throw error;
     }
   }
 
