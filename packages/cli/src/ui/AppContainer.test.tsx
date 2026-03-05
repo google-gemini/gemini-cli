@@ -202,6 +202,10 @@ vi.mock('../utils/events.js');
 vi.mock('../utils/handleAutoUpdate.js');
 vi.mock('./utils/ConsolePatcher.js');
 vi.mock('../utils/cleanup.js');
+vi.mock('./utils/terminalSetup.js', () => ({
+  shouldPromptForTerminalSetup: vi.fn().mockResolvedValue(false),
+  useTerminalSetupPrompt: vi.fn(),
+}));
 
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';

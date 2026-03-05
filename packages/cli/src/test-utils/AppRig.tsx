@@ -131,6 +131,11 @@ vi.mock('../ui/components/GeminiRespondingSpinner.js', async () => {
   };
 });
 
+vi.mock('../ui/utils/terminalSetup.js', () => ({
+  shouldPromptForTerminalSetup: vi.fn().mockResolvedValue(false),
+  useTerminalSetupPrompt: vi.fn(),
+}));
+
 export interface AppRigOptions {
   fakeResponsesPath?: string;
   terminalWidth?: number;
