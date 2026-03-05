@@ -118,6 +118,8 @@ documentation.
   reflects existing code.
 - **Structure:** Apply "Structure (New Docs)" rules (BLUF, headings, etc.) when 
   adding new sections to existing pages.
+- **Headers**: If you change a header, you must check for links that lead to
+  that header and update them.
 - **Tone:** Ensure the tone is active and engaging. Use "you" and contractions.
 - **Clarity:** Correct awkward wording, spelling, and grammar. Rephrase
   sentences to make them easier for users to understand.
@@ -133,7 +135,8 @@ and that all links are functional.
   technical behavior.
 2.  **Self-review:** Re-read changes for formatting, correctness, and flow.
 3.  **Link check:** Verify all new and existing links leading to or from modified
-    pages.
+    pages. If you changed a header, ensure that any links that lead to it are
+    updated.
 4.  **Format:** Once all changes are complete, ask to execute `npm run format`
     to ensure consistent formatting across the project. If the user confirms,
     execute the command.
