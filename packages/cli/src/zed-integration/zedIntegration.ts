@@ -98,6 +98,8 @@ export class GeminiAgent {
   private sessions: Map<string, Session> = new Map();
   private clientCapabilities: acp.ClientCapabilities | undefined;
   private apiKey: string | undefined;
+  private baseUrl: string | undefined;
+  private customHeaders: Record<string, string> | undefined;
 
   constructor(
     private config: Config,
@@ -130,6 +132,17 @@ export class GeminiAgent {
         id: AuthType.USE_VERTEX_AI,
         name: 'Vertex AI',
         description: 'Use an API key with Vertex AI GenAI API',
+      },
+      {
+        id: AuthType.GATEWAY,
+        name: 'AI API Gateway',
+        description: 'Use a custom AI API Gateway',
+        _meta: {
+          gateway: {
+            protocol: 'google',
+            restartRequired: 'false',
+          },
+        },
       },
     ];
 
@@ -179,7 +192,42 @@ export class GeminiAgent {
       if (apiKey) {
         this.apiKey = apiKey;
       }
-      await this.config.refreshAuth(method, apiKey ?? this.apiKey);
+
+      // Extract gateway details if present
+      const gatewaySchema = z.object({
+        baseUrl: z.string().optional(),
+        headers: z.record(z.string()).optional(),
+      });
+
+      let baseUrl: string | undefined;
+      let headers: Record<string, string> | undefined;
+
+      if (meta?.['gateway']) {
+        const result = gatewaySchema.safeParse(meta['gateway']);
+        if (result.success) {
+          baseUrl = result.data.baseUrl;
+          headers = result.data.headers;
+        }
+      }
+
+      // Extract token from headers if available, or use apiKey
+      // Zed might pass the token in headers.Authorization
+      const finalApiKey = apiKey ?? this.apiKey;
+      if (
+        headers?.['Authorization'] &&
+        headers['Authorization'].startsWith('Bearer ')
+      ) {
+        // If we have a bearer token, we might want to use it as the apiKey if that's how the inner sdk expects it
+        // Or just pass the headers. The contentGenerator will check apiKeyAuthMechanism.
+        // If the user provided a token in the headers, we should probably respect it.
+        // But config.refreshAuth takes apiKey as 2nd arg.
+        // Let's pass the headers to refreshAuth and let contentGenerator handle it.
+      }
+
+      this.baseUrl = baseUrl;
+      this.customHeaders = headers;
+
+      await this.config.refreshAuth(method, finalApiKey, baseUrl, headers);
     } catch (e) {
       throw new acp.RequestError(-32000, getAcpErrorMessage(e));
     }
@@ -209,7 +257,12 @@ export class GeminiAgent {
     let isAuthenticated = false;
     let authErrorMessage = '';
     try {
-      await config.refreshAuth(authType, this.apiKey);
+      await config.refreshAuth(
+        authType,
+        this.apiKey,
+        this.baseUrl,
+        this.customHeaders,
+      );
       isAuthenticated = true;
 
       // Extra validation for Gemini API key
@@ -371,7 +424,12 @@ export class GeminiAgent {
     // This satisfies the security requirement to verify the user before executing
     // potentially unsafe server definitions.
     try {
-      await config.refreshAuth(selectedAuthType, this.apiKey);
+      await config.refreshAuth(
+        selectedAuthType,
+        this.apiKey,
+        this.baseUrl,
+        this.customHeaders,
+      );
     } catch (e) {
       debugLogger.error(`Authentication failed: ${e}`);
       throw acp.RequestError.authRequired();

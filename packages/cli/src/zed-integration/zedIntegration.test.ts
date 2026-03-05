@@ -208,7 +208,16 @@ describe('GeminiAgent', () => {
     });
 
     expect(response.protocolVersion).toBe(acp.PROTOCOL_VERSION);
-    expect(response.authMethods).toHaveLength(3);
+    expect(response.authMethods).toHaveLength(4);
+    const gatewayAuth = response.authMethods?.find(
+      (m) => m.id === AuthType.GATEWAY,
+    );
+    expect(gatewayAuth?._meta).toEqual({
+      gateway: {
+        protocol: 'google',
+        restartRequired: 'false',
+      },
+    });
     const geminiAuth = response.authMethods?.find(
       (m) => m.id === AuthType.USE_GEMINI,
     );
@@ -252,6 +261,30 @@ describe('GeminiAgent', () => {
       SettingScope.User,
       'security.auth.selectedType',
       AuthType.USE_GEMINI,
+    );
+  });
+
+  it('should authenticate correctly with gateway method', async () => {
+    await agent.authenticate({
+      methodId: AuthType.GATEWAY,
+      _meta: {
+        gateway: {
+          baseUrl: 'https://example.com',
+          headers: { Authorization: 'Bearer token' },
+        },
+      },
+    } as unknown as acp.AuthenticateRequest);
+
+    expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
+      AuthType.GATEWAY,
+      undefined,
+      'https://example.com',
+      { Authorization: 'Bearer token' },
+    );
+    expect(mockSettings.setValue).toHaveBeenCalledWith(
+      SettingScope.User,
+      'security.auth.selectedType',
+      AuthType.GATEWAY,
     );
   });
 
