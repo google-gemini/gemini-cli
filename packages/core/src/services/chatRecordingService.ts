@@ -569,6 +569,13 @@ export class ChatRecordingService {
         fs.unlinkSync(sessionPath);
       }
 
+      // Cleanup Activity logs in the project logs directory
+      const logsDir = path.join(tempDir, 'logs');
+      const logPath = path.join(logsDir, `session-${sessionId}.jsonl`);
+      if (fs.existsSync(logPath)) {
+        fs.unlinkSync(logPath);
+      }
+
       // Cleanup tool outputs for this session
       const safeSessionId = sanitizeFilenamePart(sessionId);
       const toolOutputDir = path.join(
@@ -584,6 +591,13 @@ export class ChatRecordingService {
         toolOutputDir.startsWith(toolOutputsBase)
       ) {
         fs.rmSync(toolOutputDir, { recursive: true, force: true });
+      }
+
+      // ALSO cleanup the session-specific directory (contains plans, tasks, etc.)
+      const sessionDir = path.join(tempDir, safeSessionId);
+      // Robustness: Ensure the path is strictly within the temp root
+      if (fs.existsSync(sessionDir) && sessionDir.startsWith(tempDir)) {
+        fs.rmSync(sessionDir, { recursive: true, force: true });
       }
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);
