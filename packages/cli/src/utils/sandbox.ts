@@ -48,6 +48,7 @@ export async function start_sandbox(
   nodeArgs: string[] = [],
   cliConfig?: Config,
   cliArgs: string[] = [],
+  isDirectCommand = false,
 ): Promise<number> {
   const patcher = new ConsolePatcher({
     debugMode: cliConfig?.getDebugMode() || !!process.env['DEBUG'],
@@ -141,6 +142,7 @@ export async function start_sandbox(
       const proxyCommand = process.env['GEMINI_SANDBOX_PROXY_COMMAND'];
       let proxyProcess: ChildProcess | undefined = undefined;
       let sandboxProcess: ChildProcess | undefined = undefined;
+      let cleanupProxyHandlers: (() => void) | undefined = undefined;
       const sandboxEnv = { ...process.env };
       if (proxyCommand) {
         const proxy =
@@ -170,11 +172,15 @@ export async function start_sandbox(
             process.kill(-proxyProcess.pid, 'SIGTERM');
           }
         };
-        process.off('exit', stopProxy);
+
+        cleanupProxyHandlers = () => {
+          process.off('exit', stopProxy);
+          process.off('SIGINT', stopProxy);
+          process.off('SIGTERM', stopProxy);
+        };
+
         process.on('exit', stopProxy);
-        process.off('SIGINT', stopProxy);
         process.on('SIGINT', stopProxy);
-        process.off('SIGTERM', stopProxy);
         process.on('SIGTERM', stopProxy);
 
         // commented out as it disrupts ink rendering
@@ -185,6 +191,9 @@ export async function start_sandbox(
           debugLogger.debug(`[PROXY STDERR]: ${data.toString().trim()}`);
         });
         proxyProcess.on('close', (code, signal) => {
+          if (typeof cleanupProxyHandlers === 'function') {
+            cleanupProxyHandlers();
+          }
           if (sandboxProcess?.pid) {
             process.kill(-sandboxProcess.pid, 'SIGTERM');
           }
@@ -203,8 +212,16 @@ export async function start_sandbox(
         stdio: 'inherit',
       });
       return await new Promise((resolve, reject) => {
-        sandboxProcess?.on('error', reject);
+        sandboxProcess?.on('error', (err) => {
+          if (typeof cleanupProxyHandlers === 'function') {
+            cleanupProxyHandlers();
+          }
+          reject(err);
+        });
         sandboxProcess?.on('close', (code) => {
+          if (typeof cleanupProxyHandlers === 'function') {
+            cleanupProxyHandlers();
+          }
           process.stdin.resume();
           resolve(code ?? 1);
         });
@@ -280,7 +297,10 @@ export async function start_sandbox(
 
     // use interactive mode and auto-remove container on exit
     // run init binary inside container to forward signals & reap zombies
-    const args = ['run', '-i', '--rm', '--init', '--workdir', containerWorkdir];
+    const args = ['run', '-i', '--rm', '--workdir', containerWorkdir];
+    if (config.command !== 'udocker') {
+      args.push('--init');
+    }
 
     // add custom flags from SANDBOX_FLAGS
     if (process.env['SANDBOX_FLAGS']) {
@@ -291,12 +311,14 @@ export async function start_sandbox(
     }
 
     // add TTY only if stdin is TTY as well, i.e. for piped input don't init TTY in container
-    if (process.stdin.isTTY) {
+    if (process.stdin.isTTY && config.command !== 'udocker') {
       args.push('-t');
     }
 
-    // allow access to host.docker.internal
-    args.push('--add-host', 'host.docker.internal:host-gateway');
+    // allow access to host.docker.internal (not supported by udocker)
+    if (config.command !== 'udocker') {
+      args.push('--add-host', 'host.docker.internal:host-gateway');
+    }
 
     // mount current directory as working directory in sandbox (set via --workdir)
     args.push('--volume', `${workdir}:${containerWorkdir}`);
@@ -419,8 +441,8 @@ export async function start_sandbox(
         args.push('--env', `no_proxy=${noProxy}`);
       }
 
-      // if using proxy, switch to internal networking through proxy
-      if (proxy) {
+      // if using proxy, switch to internal networking through proxy (not supported by udocker natively)
+      if (proxy && config.command !== 'udocker') {
         execSync(
           `${config.command} network inspect ${SANDBOX_NETWORK_NAME} || ${config.command} network create --internal ${SANDBOX_NETWORK_NAME}`,
         );
@@ -441,10 +463,10 @@ export async function start_sandbox(
     const isIntegrationTest =
       process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true';
     let containerName;
-    if (isIntegrationTest) {
-      containerName = `gemini-cli-integration-test-${randomBytes(4).toString(
-        'hex',
-      )}`;
+    if (isIntegrationTest || config.command === 'udocker') {
+      containerName = `gemini-cli-${
+        isIntegrationTest ? 'integration-test' : 'sandbox'
+      }-${randomBytes(4).toString('hex')}`;
       debugLogger.log(`ContainerName: ${containerName}`);
     } else {
       let index = 0;
@@ -457,7 +479,9 @@ export async function start_sandbox(
       containerName = `${imageName}-${index}`;
       debugLogger.log(`ContainerName (regular): ${containerName}`);
     }
-    args.push('--name', containerName, '--hostname', containerName);
+    if (config.command !== 'udocker') {
+      args.push('--name', containerName, '--hostname', containerName);
+    }
 
     // copy GEMINI_CLI_TEST_VAR for integration tests
     if (process.env['GEMINI_CLI_TEST_VAR']) {
@@ -608,7 +632,7 @@ export async function start_sandbox(
     // Determine if the current user's UID/GID should be passed to the sandbox.
     // See shouldUseCurrentUserInSandbox for more details.
     let userFlag = '';
-    const finalEntrypoint = entrypoint(workdir, cliArgs);
+    const finalEntrypoint = entrypoint(workdir, cliArgs, isDirectCommand);
 
     if (process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true') {
       args.push('--user', 'root');
@@ -660,10 +684,15 @@ export async function start_sandbox(
     // start and set up proxy if GEMINI_SANDBOX_PROXY_COMMAND is set
     let proxyProcess: ChildProcess | undefined = undefined;
     let sandboxProcess: ChildProcess | undefined = undefined;
+    let cleanupProxyHandlers: (() => void) | undefined = undefined;
 
     if (proxyCommand) {
       // run proxyCommand in its own container
-      const proxyContainerCommand = `${config.command} run --rm --init ${userFlag} --name ${SANDBOX_PROXY_NAME} --network ${SANDBOX_PROXY_NAME} -p 8877:8877 -v ${process.cwd()}:${workdir} --workdir ${workdir} ${image} ${proxyCommand}`;
+      let proxyContainerCommand = `${config.command} run --rm --init ${userFlag} --name ${SANDBOX_PROXY_NAME} --network ${SANDBOX_PROXY_NAME} -p 8877:8877 -v ${process.cwd()}:${workdir} --workdir ${workdir} ${image} ${proxyCommand}`;
+      if (config.command === 'udocker') {
+        // udocker doesn't support --init or --network
+        proxyContainerCommand = `${config.command} run --rm ${userFlag} -p 8877:8877 -v ${process.cwd()}:${workdir} --workdir ${workdir} ${image} ${proxyCommand}`;
+      }
       proxyProcess = spawn(proxyContainerCommand, {
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: true,
@@ -674,11 +703,15 @@ export async function start_sandbox(
         debugLogger.log('stopping proxy container ...');
         execSync(`${config.command} rm -f ${SANDBOX_PROXY_NAME}`);
       };
-      process.off('exit', stopProxy);
+
+      cleanupProxyHandlers = () => {
+        process.off('exit', stopProxy);
+        process.off('SIGINT', stopProxy);
+        process.off('SIGTERM', stopProxy);
+      };
+
       process.on('exit', stopProxy);
-      process.off('SIGINT', stopProxy);
       process.on('SIGINT', stopProxy);
-      process.off('SIGTERM', stopProxy);
       process.on('SIGTERM', stopProxy);
 
       // commented out as it disrupts ink rendering
@@ -689,6 +722,9 @@ export async function start_sandbox(
         debugLogger.debug(`[PROXY STDERR]: ${data.toString().trim()}`);
       });
       proxyProcess.on('close', (code, signal) => {
+        if (typeof cleanupProxyHandlers === 'function') {
+          cleanupProxyHandlers();
+        }
         if (sandboxProcess?.pid) {
           process.kill(-sandboxProcess.pid, 'SIGTERM');
         }
@@ -707,19 +743,43 @@ export async function start_sandbox(
       );
     }
 
+    // udocker's parser fails on space-separated flags like `--volume /src:/dst`. Combine them into `--volume=/src:/dst`
+    if (config.command === 'udocker') {
+      const combinedArgs: string[] = [];
+      for (let i = 0; i < args.length; i++) {
+        if (
+          ['--workdir', '--volume', '--env', '--user'].includes(args[i]) &&
+          i + 1 < args.length
+        ) {
+          combinedArgs.push(`${args[i]}=${args[i + 1]}`);
+          i++;
+        } else {
+          combinedArgs.push(args[i]);
+        }
+      }
+      args.splice(0, args.length, ...combinedArgs);
+    }
+
     // spawn child and let it inherit stdio
     process.stdin.pause();
+    debugLogger.log(`Executing ${config.command} ` + args.join(' '));
     sandboxProcess = spawn(config.command, args, {
       stdio: 'inherit',
     });
 
     return await new Promise<number>((resolve, reject) => {
       sandboxProcess.on('error', (err) => {
+        if (typeof cleanupProxyHandlers === 'function') {
+          cleanupProxyHandlers();
+        }
         coreEvents.emitFeedback('error', 'Sandbox process error', err);
         reject(err);
       });
 
       sandboxProcess?.on('close', (code, signal) => {
+        if (typeof cleanupProxyHandlers === 'function') {
+          cleanupProxyHandlers();
+        }
         process.stdin.resume();
         if (code !== 0 && code !== null) {
           debugLogger.log(
@@ -939,7 +999,7 @@ async function start_lxc_sandbox(
 // Helper functions to ensure sandbox image is present
 async function imageExists(sandbox: string, image: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const args = ['images', '-q', image];
+    const args = sandbox === 'udocker' ? ['images'] : ['images', '-q', image];
     const checkProcess = spawn(sandbox, args);
 
     let stdoutData = '';
@@ -962,7 +1022,11 @@ async function imageExists(sandbox: string, image: string): Promise<boolean> {
       if (code !== 0) {
         // console.warn(`'${sandbox} images -q ${image}' exited with code ${code}.`);
       }
-      resolve(stdoutData.trim() !== '');
+      if (sandbox === 'udocker') {
+        resolve(stdoutData.includes(image));
+      } else {
+        resolve(stdoutData.trim() !== '');
+      }
     });
   });
 }

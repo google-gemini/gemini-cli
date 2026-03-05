@@ -84,7 +84,11 @@ export function ports(): string[] {
     .map((p) => p.trim());
 }
 
-export function entrypoint(workdir: string, cliArgs: string[]): string[] {
+export function entrypoint(
+  workdir: string,
+  cliArgs: string[],
+  isDirectCommand = false,
+): string[] {
   const isWindows = os.platform() === 'win32';
   const containerWorkdir = getContainerPath(workdir);
   const shellCmds = [];
@@ -133,11 +137,14 @@ export function entrypoint(workdir: string, cliArgs: string[]): string[] {
     ),
   );
 
-  const quotedCliArgs = cliArgs.slice(2).map((arg) => quote([arg]));
+  const quotedCliArgs = (isDirectCommand ? cliArgs : cliArgs.slice(2)).map(
+    (arg) => quote([arg]),
+  );
   const isDebugMode =
     process.env['DEBUG'] === 'true' || process.env['DEBUG'] === '1';
-  const cliCmd =
-    process.env['NODE_ENV'] === 'development'
+  const cliCmd = isDirectCommand
+    ? ''
+    : process.env['NODE_ENV'] === 'development'
       ? isDebugMode
         ? 'npm run debug --'
         : 'npm rebuild && npm run start --'
@@ -145,6 +152,6 @@ export function entrypoint(workdir: string, cliArgs: string[]): string[] {
         ? `node --inspect-brk=0.0.0.0:${process.env['DEBUG_PORT'] || '9229'} $(which gemini)`
         : 'gemini';
 
-  const args = [...shellCmds, cliCmd, ...quotedCliArgs];
+  const args = [...shellCmds, cliCmd, ...quotedCliArgs].filter(Boolean);
   return ['bash', '-c', args.join(' ')];
 }
