@@ -1135,8 +1135,10 @@ ${JSON.stringify(
       };
       client['chat'] = mockChat as GeminiChat;
 
-      // Mock loop detector to return true on the first event
-      vi.spyOn(client['loopDetector'], 'addAndCheck').mockReturnValue(true);
+      // Mock loop detector to return count > 1 on the first event (loop detected)
+      vi.spyOn(client['loopDetector'], 'addAndCheck').mockReturnValue({
+        count: 2,
+      });
 
       const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
 
