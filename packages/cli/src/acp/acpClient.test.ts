@@ -495,7 +495,7 @@ describe('GeminiAgent', () => {
     });
 
     expect(session.prompt).toHaveBeenCalled();
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
   it('should delegate setMode to session', async () => {
@@ -687,50 +687,110 @@ describe('Session', () => {
         content: { type: 'text', text: 'Hello' },
       },
     });
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
+  });
+
+  it('should accumulate token counts into _meta.quota.token_count and model_usage', async () => {
+    mockConfig.getModel.mockReturnValue('gemini-1.5-pro-test');
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          candidates: [{ content: { parts: [{ text: 'Answer 1' }] } }],
+          usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 20 },
+        },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(result).toEqual({
+      stopReason: 'end_turn',
+      _meta: {
+        quota: {
+          token_count: { input_tokens: 10, output_tokens: 20 },
+          model_usage: [
+            {
+              model: 'gemini-1.5-pro-test',
+              token_count: { input_tokens: 10, output_tokens: 20 },
+            },
+          ],
+        },
+      },
+    });
   });
 
   it('should handle /memory command', async () => {
-    const handleCommandSpy = vi
-      .spyOn(
-        (session as unknown as { commandHandler: CommandHandler })
-          .commandHandler,
-        'handleCommand',
-      )
-      .mockResolvedValue(true);
+    vi.spyOn(
+      (session as unknown as { commandHandler: CommandHandler }).commandHandler,
+      'handleCommand',
+    ).mockResolvedValue(true);
 
     const result = await session.prompt({
       sessionId: 'session-1',
       prompt: [{ type: 'text', text: '/memory view' }],
     });
 
-    expect(result).toEqual({ stopReason: 'end_turn' });
-    expect(handleCommandSpy).toHaveBeenCalledWith(
-      '/memory view',
-      expect.any(Object),
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_message_chunk',
+        }),
+      }),
     );
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
+  });
+  it('should handle /status command directly', async () => {
+    mockConfig.getActiveModel.mockReturnValue('gemini-1.5-pro-test');
+    const result = await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: '/status' }],
+    });
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_message_chunk',
+          content: expect.objectContaining({
+            type: 'text',
+            text: expect.stringContaining('gemini-1.5-pro-test'),
+          }),
+        }),
+      }),
+    );
+    expect(result).toEqual({ stopReason: 'end_turn' });
+    // Chat should not be called
     expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
   });
 
   it('should handle /extensions command', async () => {
-    const handleCommandSpy = vi
-      .spyOn(
-        (session as unknown as { commandHandler: CommandHandler })
-          .commandHandler,
-        'handleCommand',
-      )
-      .mockResolvedValue(true);
+    vi.spyOn(
+      (session as unknown as { commandHandler: CommandHandler }).commandHandler,
+      'handleCommand',
+    ).mockResolvedValue(true);
 
     const result = await session.prompt({
       sessionId: 'session-1',
       prompt: [{ type: 'text', text: '/extensions list' }],
     });
 
-    expect(result).toEqual({ stopReason: 'end_turn' });
-    expect(handleCommandSpy).toHaveBeenCalledWith(
-      '/extensions list',
-      expect.any(Object),
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'agent_message_chunk',
+          content: expect.objectContaining({
+            type: 'text',
+            text: expect.stringContaining('`test-mcp`'),
+          }),
+        }),
+      }),
     );
+    expect(result).toEqual({ stopReason: 'end_turn' });
     expect(mockChat.sendMessageStream).not.toHaveBeenCalled();
   });
 
@@ -843,7 +903,7 @@ describe('Session', () => {
         }),
       }),
     );
-    expect(result).toEqual({ stopReason: 'end_turn' });
+    expect(result).toMatchObject({ stopReason: 'end_turn' });
   });
 
   it('should handle tool call permission request', async () => {
