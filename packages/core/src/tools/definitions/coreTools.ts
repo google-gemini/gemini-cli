@@ -24,6 +24,7 @@ export {
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
+  MAP_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
@@ -117,6 +118,13 @@ export const LS_DEFINITION: ToolDefinition = {
     return DEFAULT_LEGACY_SET.list_directory;
   },
   overrides: (modelId) => getToolSet(modelId).list_directory,
+};
+
+export const MAP_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.map_project_structure;
+  },
+  overrides: (modelId) => getToolSet(modelId).map_project_structure,
 };
 
 export const WEB_FETCH_DEFINITION: ToolDefinition = {

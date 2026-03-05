@@ -14,6 +14,7 @@ import {
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
+  MAP_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
@@ -242,6 +243,22 @@ export const GEMINI_3_SET: CoreToolSet = {
         },
       },
       required: ['pattern'],
+    },
+  },
+
+  map_project_structure: {
+    name: MAP_TOOL_NAME,
+    description:
+      'Skims the project to provide a structured architectural map including dependencies, entry points, and top-level module imports. Used to help the model reason about the overall project structure before modifying unfamiliar codebases.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        dir_path: {
+          description:
+            'Optional: The path to the directory to map. If omitted, maps the workspace root.',
+          type: 'string',
+        },
+      },
     },
   },
 

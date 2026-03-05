@@ -483,6 +483,8 @@ export interface ConsoleMessageItem {
 export interface SubmitPromptResult {
   type: 'submit_prompt';
   content: PartListUnion;
+  systemPromptExtension?: string;
+  tools?: string[];
 }
 
 /**

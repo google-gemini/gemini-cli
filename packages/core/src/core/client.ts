@@ -79,6 +79,11 @@ type BeforeAgentHookReturn =
   | { additionalContext: string | undefined }
   | undefined;
 
+export interface SendMessageStreamOptions {
+  systemPromptExtension?: string;
+  tools?: string[];
+}
+
 export class GeminiClient {
   private chat?: GeminiChat;
   private sessionTurnCount = 0;
@@ -258,18 +263,23 @@ export class GeminiClient {
 
   private lastUsedModelId?: string;
 
-  async setTools(modelId?: string): Promise<void> {
+  async setTools(modelId?: string, allowedTools?: string[]): Promise<void> {
     if (!this.chat) {
       return;
     }
 
-    if (modelId && modelId === this.lastUsedModelId) {
+    if (modelId && modelId === this.lastUsedModelId && !allowedTools) {
       return;
     }
     this.lastUsedModelId = modelId;
 
     const toolRegistry = this.config.getToolRegistry();
-    const toolDeclarations = toolRegistry.getFunctionDeclarations(modelId);
+    let toolDeclarations = toolRegistry.getFunctionDeclarations(modelId);
+    if (allowedTools) {
+      toolDeclarations = toolDeclarations.filter(
+        (d) => typeof d.name === 'string' && allowedTools.includes(d.name),
+      );
+    }
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     this.getChat().setTools(tools);
   }
@@ -314,13 +324,16 @@ export class GeminiClient {
     });
   }
 
-  updateSystemInstruction(): void {
+  updateSystemInstruction(extension?: string): void {
     if (!this.isInitialized()) {
       return;
     }
 
     const systemMemory = this.config.getUserMemory();
-    const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
+    let systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
+    if (extension) {
+      systemInstruction += '\n\n' + extension;
+    }
     this.getChat().setSystemInstruction(systemInstruction);
   }
 
@@ -554,6 +567,7 @@ export class GeminiClient {
     boundedTurns: number,
     isInvalidStreamRetry: boolean,
     displayContent?: PartListUnion,
+    options?: SendMessageStreamOptions,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Re-initialize turn (it was empty before if in loop, or new instance)
     let turn = new Turn(this.getChat(), prompt_id);
@@ -676,7 +690,11 @@ export class GeminiClient {
     this.currentSequenceModel = modelToUse;
 
     // Update tools with the final modelId to ensure model-dependent descriptions are used.
-    await this.setTools(modelToUse);
+    await this.setTools(modelToUse, options?.tools);
+
+    if (options?.systemPromptExtension) {
+      this.updateSystemInstruction(options.systemPromptExtension);
+    }
 
     const resultStream = turn.run(
       modelConfigKey,
@@ -745,6 +763,7 @@ export class GeminiClient {
           boundedTurns - 1,
           true,
           displayContent,
+          options,
         );
         return turn;
       }
@@ -778,6 +797,7 @@ export class GeminiClient {
             boundedTurns - 1,
             false, // isInvalidStreamRetry is false
             displayContent,
+            options,
           );
           return turn;
         }
@@ -793,6 +813,7 @@ export class GeminiClient {
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
     displayContent?: PartListUnion,
+    options?: SendMessageStreamOptions,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
@@ -849,6 +870,7 @@ export class GeminiClient {
         boundedTurns,
         isInvalidStreamRetry,
         displayContent,
+        options,
       );
 
       // Fire AfterAgent hook if we have a turn and no pending tools
@@ -902,6 +924,7 @@ export class GeminiClient {
             boundedTurns - 1,
             false,
             displayContent,
+            options,
           );
         }
       }
@@ -917,6 +940,19 @@ export class GeminiClient {
           if (!isPendingTools || isAborted) {
             this.hookStateMap.delete(prompt_id);
           }
+        }
+      }
+
+      // Reset configurations applied for this turn if we are exiting the outermost call
+      const activeCalls = this.hookStateMap.get(prompt_id)?.activeCalls || 0;
+      if (activeCalls === 0) {
+        if (options?.systemPromptExtension) {
+          this.updateSystemInstruction();
+        }
+        if (options?.tools) {
+          // Because setTools triggers async fetch, we must await it or fire and forget
+          // But finally implies synchronous or await. We can skip await if it's fine.
+          void this.setTools();
         }
       }
     }

@@ -1,0 +1,9 @@
+﻿src/ui/commands/mapCommand.ts(12,15): error TS2724: '"@google/gemini-cli-core"' has no exported member named 'ActionReturn'. Did you mean 'ToolActionReturn'?
+src/ui/commands/mapCommand.ts(17,21): error TS2339: Property 'DEFAULT' does not exist on type 'typeof CommandKind'.
+src/ui/commands/mapCommand.ts(19,3): error TS2322: Type '(_context: CommandContext, _args: string[]) => Promise<ActionReturn>' is not assignable to type '(context: CommandContext, args: string) => void | SlashCommandActionReturn | Promise<void | SlashCommandActionReturn>'.
+  Types of parameters '_args' and 'args' are incompatible.
+    Type 'string' is not assignable to type 'string[]'.
+src/ui/hooks/slashCommandProcessor.ts(553,51): error TS2339: Property 'systemPromptExtension' does not exist on type 'SubmitPromptActionReturn'.
+src/ui/hooks/slashCommandProcessor.ts(554,35): error TS2339: Property 'tools' does not exist on type 'SubmitPromptActionReturn'.
+src/ui/hooks/useGeminiStream.ts(1429,17): error TS2554: Expected 3-6 arguments, but got 7.
+src/ui/themes/theme.ts(460,36): error TS2339: Property 'focused' does not exist on type '{ default?: string | undefined; }'.

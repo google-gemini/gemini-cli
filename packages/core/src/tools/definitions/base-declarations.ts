@@ -16,6 +16,7 @@
 export const GLOB_TOOL_NAME = 'glob';
 export const GREP_TOOL_NAME = 'grep_search';
 export const LS_TOOL_NAME = 'list_directory';
+export const MAP_TOOL_NAME = 'map_project_structure';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const SHELL_TOOL_NAME = 'run_shell_command';
 export const WRITE_FILE_TOOL_NAME = 'write_file';
