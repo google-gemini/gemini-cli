@@ -52,7 +52,9 @@ describe('KeystoreService', () => {
       passwords[acc] = val;
       return Promise.resolve();
     });
-    mockKeytar.getPassword.mockImplementation((_svc, acc) => Promise.resolve(passwords[acc] || null));
+    mockKeytar.getPassword.mockImplementation((_svc, acc) =>
+      Promise.resolve(passwords[acc] || null),
+    );
     mockKeytar.deletePassword.mockImplementation((_svc, acc) => {
       const exists = !!passwords[acc];
       delete passwords[acc];
