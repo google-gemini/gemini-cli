@@ -721,6 +721,7 @@ export async function start_sandbox(
 
       if (config.command === 'udocker') {
         // udocker doesn't support --init or --network
+        proxyContainerArgs.push(`--name=${SANDBOX_PROXY_NAME}`);
         proxyContainerArgs.push(`--publish=8877:8877`);
         proxyContainerArgs.push(`--volume=${process.cwd()}:${workdir}`);
         proxyContainerArgs.push(`--workdir=${workdir}`);
@@ -742,7 +743,11 @@ export async function start_sandbox(
       // install handlers to stop proxy on exit/signal
       const stopProxy = () => {
         debugLogger.log('stopping proxy container ...');
-        execFileSync(config.command, ['rm', '-f', SANDBOX_PROXY_NAME]);
+        const removeArgs =
+          config.command === 'udocker'
+            ? ['rm', SANDBOX_PROXY_NAME]
+            : ['rm', '-f', SANDBOX_PROXY_NAME];
+        execFileSync(config.command, removeArgs);
       };
 
       cleanupProxyHandlers = setupProcessExitHandlers(stopProxy);
