@@ -153,6 +153,9 @@ export * from './agents/agentLoader.js';
 export * from './agents/local-executor.js';
 export * from './agents/agent-scheduler.js';
 
+// Export browser session management
+export { resetBrowserSession } from './agents/browser/browserAgentFactory.js';
+
 // Export specific tool logic
 export * from './tools/read-file.js';
 export * from './tools/ls.js';

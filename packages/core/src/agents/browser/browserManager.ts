@@ -34,6 +34,12 @@ const BROWSER_PROFILE_DIR = 'cli-browser-profile';
 // Default timeout for MCP operations
 const MCP_TIMEOUT_MS = 60_000;
 
+// Maximum reconnection attempts before giving up
+const MAX_RECONNECT_RETRIES = 3;
+
+// Base delay (ms) for exponential backoff between reconnection attempts
+const RECONNECT_BASE_DELAY_MS = 500;
+
 /**
  * Content item from an MCP tool call response.
  * Can be text or image (for take_screenshot).
@@ -65,10 +71,73 @@ export interface McpToolCallResult {
  * in the main ToolRegistry. Tools are kept local to the browser agent.
  */
 export class BrowserManager {
+  // --- Static singleton management ---
+  private static instances = new Map<string, BrowserManager>();
+
+  /**
+   * Returns the cache key for a given config.
+   * Uses `sessionMode:profilePath` so different profiles get separate instances.
+   */
+  private static getInstanceKey(config: Config): string {
+    const browserConfig = config.getBrowserAgentConfig();
+    const sessionMode = browserConfig.customConfig.sessionMode ?? 'persistent';
+    const profilePath = browserConfig.customConfig.profilePath ?? 'default';
+    return `${sessionMode}:${profilePath}`;
+  }
+
+  /**
+   * Returns an existing BrowserManager for the current config's session mode
+   * and profile, or creates a new one.
+   */
+  static getInstance(config: Config): BrowserManager {
+    const key = BrowserManager.getInstanceKey(config);
+    let instance = BrowserManager.instances.get(key);
+    if (!instance) {
+      instance = new BrowserManager(config);
+      BrowserManager.instances.set(key, instance);
+      debugLogger.log(`Created new BrowserManager singleton (key: ${key})`);
+    } else {
+      debugLogger.log(
+        `Reusing existing BrowserManager singleton (key: ${key})`,
+      );
+    }
+    return instance;
+  }
+
+  /**
+   * Closes all cached BrowserManager instances and clears the cache.
+   * Called on /clear commands and CLI exit.
+   */
+  static async resetAll(): Promise<void> {
+    const results = await Promise.allSettled(
+      Array.from(BrowserManager.instances.values()).map((instance) =>
+        instance.close(),
+      ),
+    );
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        debugLogger.error(
+          `Error during BrowserManager cleanup: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
+        );
+      }
+    }
+    BrowserManager.instances.clear();
+    debugLogger.log('All BrowserManager instances reset.');
+  }
+
+  /**
+   * Alias for resetAll — used by CLI exit cleanup for clarity.
+   */
+  static async closeAll(): Promise<void> {
+    await BrowserManager.resetAll();
+  }
+
+  // --- Instance state ---
   // Raw MCP SDK Client - NOT the wrapper McpClient
   private rawMcpClient: Client | undefined;
   private mcpTransport: StdioClientTransport | undefined;
   private discoveredTools: McpTool[] = [];
+  private disconnected = false;
 
   constructor(private config: Config) {}
 
@@ -172,13 +241,51 @@ export class BrowserManager {
   }
 
   /**
+   * Returns whether the MCP client is currently connected and healthy.
+   */
+  isConnected(): boolean {
+    return this.rawMcpClient !== undefined && !this.disconnected;
+  }
+
+  /**
    * Ensures browser and MCP client are connected.
+   * If a previous connection was lost (e.g., user closed the browser),
+   * this will reconnect with exponential backoff (up to MAX_RECONNECT_RETRIES).
    */
   async ensureConnection(): Promise<void> {
-    if (this.rawMcpClient) {
+    // Already connected and healthy — nothing to do
+    if (this.rawMcpClient && !this.disconnected) {
       return;
     }
-    await this.connectMcp();
+
+    // If previously connected but transport died, clean up before reconnecting
+    if (this.disconnected) {
+      debugLogger.log(
+        'Previous browser connection was lost. Cleaning up before reconnecting...',
+      );
+      await this.close();
+      this.disconnected = false;
+    }
+
+    // Connect with retry + exponential backoff
+    let lastError: Error | undefined;
+    for (let attempt = 0; attempt < MAX_RECONNECT_RETRIES; attempt++) {
+      try {
+        await this.connectMcp();
+        return;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        if (attempt < MAX_RECONNECT_RETRIES - 1) {
+          const delay = RECONNECT_BASE_DELAY_MS * Math.pow(2, attempt);
+          debugLogger.log(
+            `Connection attempt ${attempt + 1} failed, retrying in ${delay}ms...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    throw lastError!;
   }
 
   /**
@@ -303,7 +410,9 @@ export class BrowserManager {
         'chrome-devtools-mcp transport closed unexpectedly. ' +
           'The MCP server process may have crashed.',
       );
-      this.rawMcpClient = undefined;
+      // Mark as disconnected instead of nulling the client so
+      // ensureConnection() knows to reconnect next time.
+      this.disconnected = true;
     };
     this.mcpTransport.onerror = (error: Error) => {
       debugLogger.error(

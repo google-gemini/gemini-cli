@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
+  resetBrowserSession,
 } from './browserAgentFactory.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
@@ -31,9 +32,17 @@ const mockBrowserManager = {
 };
 
 // Mock dependencies
-vi.mock('./browserManager.js', () => ({
-  BrowserManager: vi.fn(() => mockBrowserManager),
-}));
+vi.mock('./browserManager.js', () => {
+  const instancesMap = new Map();
+  const MockBrowserManager = vi.fn() as unknown as Record<string, unknown>;
+  // Add static methods — use mockImplementation for lazy eval (hoisting-safe)
+  MockBrowserManager['getInstance'] = vi.fn();
+  MockBrowserManager['resetAll'] = vi.fn().mockResolvedValue(undefined);
+  MockBrowserManager['instances'] = instancesMap;
+  return {
+    BrowserManager: MockBrowserManager,
+  };
+});
 
 vi.mock('../../utils/debugLogger.js', () => ({
   debugLogger: {
@@ -52,8 +61,15 @@ describe('browserAgentFactory', () => {
   let mockConfig: Config;
   let mockMessageBus: MessageBus;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+
+    // Set up getInstance to return mockBrowserManager
+    // (Can't do this in vi.mock factory due to hoisting)
+    const { BrowserManager: MockBM } = await import('./browserManager.js');
+    (MockBM as unknown as Record<string, ReturnType<typeof vi.fn>>)[
+      'getInstance'
+    ].mockReturnValue(mockBrowserManager);
 
     // Reset mock implementations
     mockBrowserManager.ensureConnection.mockResolvedValue(undefined);
@@ -88,7 +104,7 @@ describe('browserAgentFactory', () => {
     } as unknown as MessageBus;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
   });
 
@@ -212,21 +228,32 @@ describe('browserAgentFactory', () => {
   });
 
   describe('cleanupBrowserAgent', () => {
-    it('should call close on browser manager', async () => {
+    it('should be a no-op for session persistence', async () => {
       await cleanupBrowserAgent(
         mockBrowserManager as unknown as BrowserManager,
       );
 
-      expect(mockBrowserManager.close).toHaveBeenCalled();
+      // close should NOT be called — sessions persist across invocations
+      expect(mockBrowserManager.close).not.toHaveBeenCalled();
     });
+  });
 
-    it('should handle errors during cleanup gracefully', async () => {
-      const errorManager = {
-        close: vi.fn().mockRejectedValue(new Error('Close failed')),
-      } as unknown as BrowserManager;
+  describe('resetBrowserSession', () => {
+    it('should delegate to BrowserManager.resetAll', async () => {
+      const { BrowserManager: MockBrowserManager } = await import(
+        './browserManager.js'
+      );
 
-      // Should not throw
-      await expect(cleanupBrowserAgent(errorManager)).resolves.toBeUndefined();
+      await resetBrowserSession();
+
+      expect(
+        (
+          MockBrowserManager as unknown as Record<
+            string,
+            ReturnType<typeof vi.fn>
+          >
+        )['resetAll'],
+      ).toHaveBeenCalled();
     });
   });
 });
