@@ -70,6 +70,18 @@ describe('isAbortError', () => {
     expect(isAbortError(null)).toBe(false);
     expect(isAbortError('AbortError')).toBe(false);
   });
+
+  it('should return true for TypeError: fetch failed with AbortError cause (Node.js fetch)', () => {
+    const cause = new DOMException('The operation was aborted', 'AbortError');
+    const fetchError = Object.assign(new TypeError('fetch failed'), { cause });
+    expect(isAbortError(fetchError)).toBe(true);
+  });
+
+  it('should return false for TypeError with non-abort cause', () => {
+    const cause = new Error('Network error');
+    const fetchError = Object.assign(new TypeError('fetch failed'), { cause });
+    expect(isAbortError(fetchError)).toBe(false);
+  });
 });
 
 describe('isAuthenticationError', () => {

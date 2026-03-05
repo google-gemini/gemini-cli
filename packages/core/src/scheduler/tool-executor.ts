@@ -40,6 +40,7 @@ import {
   GEN_AI_TOOL_DESCRIPTION,
   GEN_AI_TOOL_NAME,
 } from '../telemetry/constants.js';
+import { isAbortError } from '../utils/errors.js';
 
 export interface ToolExecutionContext {
   call: ToolCall;
@@ -155,12 +156,7 @@ export class ToolExecutor {
           }
         } catch (executionError: unknown) {
           spanMetadata.error = executionError;
-          const isAbortError =
-            executionError instanceof Error &&
-            (executionError.name === 'AbortError' ||
-              executionError.message.includes('Operation cancelled by user'));
-
-          if (signal.aborted || isAbortError) {
+          if (signal.aborted || isAbortError(executionError)) {
             completedToolCall = await this.createCancelledResult(
               call,
               'User cancelled tool execution.',

@@ -28,9 +28,19 @@ export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
 
 /**
  * Checks if an error is an AbortError.
+ *
+ * Handles two forms:
+ * 1. Direct AbortError / DOMException with name 'AbortError'.
+ * 2. Node.js's undici/fetch wraps aborted requests as
+ *    `TypeError: fetch failed` with `cause: DOMException (AbortError)`.
+ *    We inspect the cause so that ESC-cancellations during network I/O are
+ *    treated as graceful cancellations rather than unhandled errors.
  */
 export function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
+  if (!(error instanceof Error)) return false;
+  if (error.name === 'AbortError') return true;
+  const cause = (error as { cause?: unknown }).cause;
+  return cause instanceof Error && cause.name === 'AbortError';
 }
 
 export function getErrorMessage(error: unknown): string {
