@@ -13,7 +13,6 @@ import {
   type SafetyCheckerRule,
   InProcessCheckerType,
   ApprovalMode,
-  PRIORITY_SUBAGENT_TOOL,
 } from './types.js';
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
@@ -1595,7 +1594,7 @@ describe('PolicyEngine', () => {
         {
           toolName: 'unknown_subagent',
           decision: PolicyDecision.ALLOW,
-          priority: PRIORITY_SUBAGENT_TOOL,
+          priority: 1.05,
         },
       ];
 

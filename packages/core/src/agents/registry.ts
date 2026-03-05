@@ -23,7 +23,6 @@ import {
   type ModelConfig,
   ModelConfigService,
 } from '../services/modelConfigService.js';
-import { PolicyDecision, PRIORITY_SUBAGENT_TOOL } from '../policy/types.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -315,39 +314,6 @@ export class AgentRegistry {
     this.agents.set(mergedDefinition.name, mergedDefinition);
 
     this.registerModelConfigs(mergedDefinition);
-    this.addAgentPolicy(mergedDefinition);
-  }
-
-  private addAgentPolicy(definition: AgentDefinition<z.ZodTypeAny>): void {
-    const policyEngine = this.config.getPolicyEngine();
-    if (!policyEngine) {
-      return;
-    }
-
-    // If the user has explicitly defined a policy for this tool, respect it.
-    // ignoreDynamic=true means we only check for rules NOT added by this registry.
-    if (policyEngine.hasRuleForTool(definition.name, true)) {
-      if (this.config.getDebugMode()) {
-        debugLogger.log(
-          `[AgentRegistry] User policy exists for '${definition.name}', skipping dynamic registration.`,
-        );
-      }
-      return;
-    }
-
-    // Clean up any old dynamic policy for this tool (e.g. if we are overwriting an agent)
-    policyEngine.removeRulesForTool(definition.name, 'AgentRegistry (Dynamic)');
-
-    // Add the new dynamic policy
-    policyEngine.addRule({
-      toolName: definition.name,
-      decision:
-        definition.kind === 'local'
-          ? PolicyDecision.ALLOW
-          : PolicyDecision.ASK_USER,
-      priority: PRIORITY_SUBAGENT_TOOL,
-      source: 'AgentRegistry (Dynamic)',
-    });
   }
 
   private isAgentEnabled<TOutput extends z.ZodTypeAny>(
@@ -461,7 +427,6 @@ export class AgentRegistry {
         );
       }
       this.agents.set(definition.name, definition);
-      this.addAgentPolicy(definition);
     } catch (e) {
       const errorMessage = `Error loading A2A agent "${definition.name}": ${e instanceof Error ? e.message : String(e)}`;
       debugLogger.warn(`[AgentRegistry] ${errorMessage}`, e);

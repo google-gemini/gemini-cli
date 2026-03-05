@@ -52,6 +52,7 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
       messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
+      /* toolAnnotations */ { isSubagent: true, agentKind: definition.kind },
     );
   }
 

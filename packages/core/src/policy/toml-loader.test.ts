@@ -8,7 +8,6 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   PolicyDecision,
   ApprovalMode,
-  PRIORITY_SUBAGENT_TOOL,
 } from './types.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -911,12 +910,27 @@ priority = 100
 
     it('should override default subagent rules when in Plan Mode for unknown subagents', async () => {
       const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
-      const fileContent = await fs.readFile(planTomlPath, 'utf-8');
+      const planFileContent = await fs.readFile(planTomlPath, 'utf-8');
+
+      const subagentsTomlPath = path.resolve(
+        __dirname,
+        'policies',
+        'subagents.toml',
+      );
+      const subagentsFileContent = await fs.readFile(subagentsTomlPath, 'utf-8');
+
       const tempPolicyDir = await fs.mkdtemp(
         path.join(os.tmpdir(), 'plan-policy-test-'),
       );
       try {
-        await fs.writeFile(path.join(tempPolicyDir, 'plan.toml'), fileContent);
+        await fs.writeFile(
+          path.join(tempPolicyDir, 'plan.toml'),
+          planFileContent,
+        );
+        await fs.writeFile(
+          path.join(tempPolicyDir, 'subagents.toml'),
+          subagentsFileContent,
+        );
         const getPolicyTier = () => 1; // Default tier
 
         // 1. Load the actual Plan Mode policies
@@ -932,20 +946,14 @@ priority = 100
         });
 
         // 3. Simulate an unknown Subagent being registered (Dynamic Rule)
-        engine.addRule({
-          toolName: 'unknown_subagent',
-          decision: PolicyDecision.ALLOW,
-          priority: PRIORITY_SUBAGENT_TOOL,
-          source: 'AgentRegistry (Dynamic)',
-        });
+        // Now handled by subagents.toml policy using toolAnnotations
+        const checkResult = await engine.check(
+          { name: 'unknown_subagent' },
+          { isSubagent: true, agentKind: 'local' },
+        );
 
         // 4. Verify Behavior:
         // The Plan Mode "Catch-All Deny" (from plan.toml) should override the Subagent Allow
-        const checkResult = await engine.check(
-          { name: 'unknown_subagent' },
-          undefined,
-        );
-
         expect(
           checkResult.decision,
           'Unknown subagent should be DENIED in Plan Mode',

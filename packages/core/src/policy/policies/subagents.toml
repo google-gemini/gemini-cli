@@ -1,0 +1,11 @@
+# Default policy for dynamically registered local subagents
+[[rule]]
+toolAnnotations = { isSubagent = true, agentKind = "local" }
+decision = "allow"
+priority = 50
+
+# Default policy for dynamically registered remote subagents
+[[rule]]
+toolAnnotations = { isSubagent = true, agentKind = "remote" }
+decision = "ask_user"
+priority = 50
