@@ -50,7 +50,7 @@ import { createTestMergedSettings } from '../settings.js';
 import { updateExtension } from './update.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import * as extensionModule from '../extension.js';
-import { ExtensionIntegrityManager } from './integrity.js';
+import { ExtensionIntegrityManager, IntegrityStatus } from './integrity.js';
 import * as trustedFolders from '../trustedFolders.js';
 
 // --- Other Mocks ---
@@ -380,10 +380,10 @@ describe('extensionUpdates', () => {
         } as GeminiCLIExtension,
       ]);
 
-      // Returns false for missing integrity data
+      // Returns NOT_FOUND for missing integrity data
       const verifyIntegritySpy = vi
         .spyOn(ExtensionIntegrityManager.prototype, 'verifyIntegrity')
-        .mockResolvedValue(false);
+        .mockResolvedValue(IntegrityStatus.NOT_FOUND);
       const storeIntegritySpy = vi
         .spyOn(ExtensionIntegrityManager.prototype, 'storeIntegrity')
         .mockResolvedValue(undefined);

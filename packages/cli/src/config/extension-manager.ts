@@ -629,25 +629,6 @@ Would you like to attempt to install via "git clone" instead?`,
 
     const installMetadata = loadInstallMetadata(extensionDir);
 
-    // Verify integrity before loading
-    try {
-      const status = await this.integrityManager.verifyIntegrity(
-        path.basename(extensionDir),
-        installMetadata,
-      );
-      if (status === IntegrityStatus.TAMPERED) {
-        debugLogger.error(
-          `Failed to load extension ${extensionDir}. Metadata has been tampered with!`,
-        );
-        return null;
-      }
-    } catch (e) {
-      debugLogger.error(
-        `Failed to verify integrity for extension ${extensionDir}: ${getErrorMessage(e)}`,
-      );
-      return null;
-    }
-
     let effectiveExtensionPath = extensionDir;
     if ((this.settings.security?.allowedExtensions?.length ?? 0) > 0) {
       if (!installMetadata?.source) {
@@ -689,6 +670,25 @@ Would you like to attempt to install via "git clone" instead?`,
 
     try {
       let config = await this.loadExtensionConfig(effectiveExtensionPath);
+
+      // Verify integrity before further processing
+      try {
+        const status = await this.integrityManager.verifyIntegrity(
+          config.name,
+          installMetadata,
+        );
+        if (status === IntegrityStatus.TAMPERED) {
+          debugLogger.error(
+            `Failed to load extension ${config.name}. Metadata has been tampered with!`,
+          );
+          return null;
+        }
+      } catch (e) {
+        debugLogger.error(
+          `Failed to verify integrity for extension ${config.name}: ${getErrorMessage(e)}`,
+        );
+        return null;
+      }
 
       const extensionId = getExtensionId(config, installMetadata);
 
