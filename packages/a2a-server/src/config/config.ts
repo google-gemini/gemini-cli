@@ -117,7 +117,6 @@ export async function loadConfig(
     await loadServerHierarchicalMemory(
       workspaceDir,
       [workspaceDir],
-      false,
       fileService,
       extensionLoader,
       folderTrust,

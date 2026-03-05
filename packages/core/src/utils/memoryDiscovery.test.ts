@@ -912,7 +912,6 @@ included directory memory
           await loadServerHierarchicalMemory(
             cwd,
             [],
-            false,
             new FileDiscoveryService(projectRoot),
             new SimpleExtensionLoader([]),
             DEFAULT_FOLDER_TRUST,
