@@ -109,7 +109,7 @@ const mockConfig = {
   getNoBrowser: () => false,
   getProxy: () => 'http://test.proxy.com:8080',
   isBrowserLaunchSuppressed: () => false,
-  getExperimentalZedIntegration: () => false,
+  getAcpMode: () => false,
   isInteractive: () => true,
 } as unknown as Config;
 
