@@ -57,7 +57,22 @@ export const MediaVisualizer: React.FC<MediaVisualizerProps> = ({
         if (imageBuffer) {
           result = await terminalImage.buffer(imageBuffer, options);
         } else if (imagePath) {
-          result = await terminalImage.file(imagePath, options);
+          // LFI / Path Traversal Remediation
+          const { promises: fs } = await import('node:fs');
+          const path = await import('node:path');
+
+          let resolvedPath: string;
+          try {
+            resolvedPath = path.resolve(imagePath);
+            const stats = await fs.stat(resolvedPath);
+            if (!stats.isFile()) {
+              throw new Error('Not a direct file');
+            }
+          } catch (e) {
+            throw new Error(`Invalid or inaccessible image path: ${imagePath}`);
+          }
+
+          result = await terminalImage.file(resolvedPath, options);
         } else {
           return;
         }

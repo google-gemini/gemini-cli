@@ -12,9 +12,6 @@ import { TableRenderer } from './TableRenderer.js';
 import { RenderInline } from './InlineMarkdownRenderer.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { unescapePath } from '@google/gemini-cli-core';
-import { MediaVisualizer } from '../components/MediaVisualizer.js';
-import { calculateTransformationsForLine } from '../components/shared/text-buffer.js';
 
 interface MarkdownDisplayProps {
   text: string;
@@ -276,32 +273,11 @@ const MarkdownDisplayInternal: FC<MarkdownDisplayProps> = ({
           lastLineEmpty = true;
         }
       } else {
-        const transformations = calculateTransformationsForLine(line);
-        const imagePathsSet = new Set<string>();
-        for (const t of transformations) {
-          if (t.type === 'image') {
-            const withoutAt = t.logicalText.startsWith('@')
-              ? t.logicalText.slice(1)
-              : t.logicalText;
-            imagePathsSet.add(unescapePath(withoutAt));
-          }
-        }
-        const imagePaths = Array.from(imagePathsSet);
-
         addContentBlock(
           <Box key={key} flexDirection="column">
             <Text wrap="wrap" color={responseColor}>
               <RenderInline text={line} defaultColor={responseColor} />
             </Text>
-            {imagePaths.length > 0 && (
-              <Box flexDirection="column" marginTop={1}>
-                {imagePaths.map((path, idx) => (
-                  <Box key={`${path}-${idx}`} marginBottom={1}>
-                    <MediaVisualizer imagePath={path} />
-                  </Box>
-                ))}
-              </Box>
-            )}
           </Box>,
         );
       }

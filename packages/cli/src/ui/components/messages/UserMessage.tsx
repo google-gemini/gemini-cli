@@ -43,7 +43,8 @@ export const UserMessage: FC<UserMessageProps> = ({ text, width }) => {
           const withoutAt = t.logicalText.startsWith('@')
             ? t.logicalText.slice(1)
             : t.logicalText;
-          paths.add(unescapePath(withoutAt));
+          const candidatePath = unescapePath(withoutAt);
+          paths.add(candidatePath);
         }
       }
       // We pass a cursor position of [-1, -1] so that no transformations are expanded (e.g. images remain collapsed)

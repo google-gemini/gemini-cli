@@ -16,6 +16,24 @@ vi.mock('terminal-image', () => ({
     file: vi.fn() as unknown as typeof terminalImage.file,
   },
 }));
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    promises: {
+      ...actual.promises,
+      stat: vi.fn().mockResolvedValue({ isFile: () => true }),
+    },
+  };
+});
+
+vi.mock('node:path', async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    resolve: vi.fn((p: string) => `/mocked/path/to/${p}`),
+  };
+});
 
 describe('MediaVisualizer', () => {
   beforeEach(() => {
@@ -24,7 +42,7 @@ describe('MediaVisualizer', () => {
 
   it('renders loading state initially', async () => {
     // Mock to never resolve
-    (terminalImage.file as Mock).mockReturnValue(new Promise(() => {}));
+    (terminalImage.file as Mock).mockReturnValue(new Promise(() => { }));
 
     const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
       <MediaVisualizer imagePath="test.png" />,
@@ -57,11 +75,14 @@ describe('MediaVisualizer', () => {
     await waitUntilReady();
 
     expect(lastFrame()).toContain('MOCK_ANSI_IMAGE');
-    expect(terminalImage.file).toHaveBeenCalledWith('test.png', {
-      width: undefined,
-      height: undefined,
-      preserveAspectRatio: true,
-    });
+    expect(terminalImage.file).toHaveBeenCalledWith(
+      '/mocked/path/to/test.png',
+      {
+        width: undefined,
+        height: undefined,
+        preserveAspectRatio: true,
+      },
+    );
     unmount();
   });
 
