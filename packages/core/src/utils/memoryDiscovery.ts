@@ -89,13 +89,10 @@ export async function deduplicatePathsByFileIdentity(
           ino: stats.ino,
         };
       } catch (error: unknown) {
-        if (debugMode) {
-          const message =
-            error instanceof Error ? error.message : String(error);
-          logger.debug(
-            `could not stat file for deduplication: ${filePath}. error: ${message}`,
-          );
-        }
+        const message = error instanceof Error ? error.message : String(error);
+        logger.debug(
+          `could not stat file for deduplication: ${filePath}. error: ${message}`,
+        );
         return {
           path: filePath,
           dev: null,
