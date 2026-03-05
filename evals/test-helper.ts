@@ -101,6 +101,20 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
           );
         }
 
+        // Bypassing terminal keybindings setup prompt for interactive tests
+        const stateFilePath = path.join(rig.homeDir!, '.gemini', 'state.json');
+        let stateData: { terminalSetupPromptShown?: boolean } = {};
+        if (fs.existsSync(stateFilePath)) {
+          try {
+            stateData = JSON.parse(fs.readFileSync(stateFilePath, 'utf-8'));
+          } catch (e) {
+            console.warn(`Failed to parse state.json:`, e);
+          }
+        }
+        stateData.terminalSetupPromptShown = true;
+        fs.mkdirSync(path.dirname(stateFilePath), { recursive: true });
+        fs.writeFileSync(stateFilePath, JSON.stringify(stateData, null, 2));
+
         const execOptions = { cwd: rig.testDir!, stdio: 'inherit' as const };
         execSync('git init', execOptions);
         execSync('git config user.email "test@example.com"', execOptions);
@@ -117,14 +131,32 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         execSync('git commit --allow-empty -m "Initial commit"', execOptions);
       }
 
-      const result = await rig.run({
-        args: evalCase.prompt,
-        approvalMode: evalCase.approvalMode ?? 'yolo',
-        timeout: evalCase.timeout,
-        env: {
-          GEMINI_CLI_ACTIVITY_LOG_TARGET: activityLogFile,
-        },
-      });
+      let result = '';
+      if (evalCase.interactive) {
+        const run = await rig.runInteractive({
+          approvalMode: evalCase.approvalMode ?? 'yolo',
+          env: {
+            GEMINI_CLI_ACTIVITY_LOG_TARGET: activityLogFile,
+          },
+        });
+        await run.sendKeys(evalCase.prompt);
+        await run.type('\r');
+
+        // Let it process for a bit, then pull whatever output we have
+        await new Promise((resolve) =>
+          setTimeout(resolve, evalCase.timeout ?? 30000),
+        );
+        result = run.output;
+      } else {
+        result = await rig.run({
+          args: evalCase.prompt,
+          approvalMode: evalCase.approvalMode ?? 'yolo',
+          timeout: evalCase.timeout,
+          env: {
+            GEMINI_CLI_ACTIVITY_LOG_TARGET: activityLogFile,
+          },
+        });
+      }
 
       const unauthorizedErrorPrefix =
         createUnauthorizedToolError('').split("'")[0];
@@ -202,6 +234,7 @@ export interface EvalCase {
   params?: Record<string, any>;
   prompt: string;
   timeout?: number;
+  interactive?: boolean;
   files?: Record<string, string>;
   approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
   assert: (rig: TestRig, result: string) => Promise<void>;
