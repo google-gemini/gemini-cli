@@ -131,12 +131,30 @@ ${output.result}
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
+      function hasStatus(error: unknown): error is { status: number } {
+        if (typeof error !== 'object' || error === null) {
+          return false;
+        }
+
+        if (!('status' in error)) {
+          return false;
+        }
+
+        const status = (error as { status: unknown }).status;
+
+        return typeof status === 'number';
+      }
+
+      const isApiError = hasStatus(error) && error.status === 400;
+
       return {
-        llmContent: `Subagent '${this.definition.name}' failed. Error: ${errorMessage}`,
-        returnDisplay: `Subagent Failed: ${this.definition.name}\nError: ${errorMessage}`,
+        llmContent: `Subagent '${this.definition.name}' failed. Error: ${errorMessage}\n\nGuidance: The investigation performed by '${this.definition.name}' was interrupted. You should analyze the provided error and determine if you can continue based on the information already gathered, or if you need to try a different approach (e.g., using a different tool or breaking the task into smaller parts).`,
+        returnDisplay: `Subagent Failed: ${this.definition.name}\nError: ${errorMessage}\n\nNote: The subagent's progress was lost due to this error. The main agent has been notified and will attempt to recover or proceed differently.`,
         error: {
           message: errorMessage,
-          type: ToolErrorType.EXECUTION_FAILED,
+          type: isApiError
+            ? ToolErrorType.LLM_API_ERROR
+            : ToolErrorType.EXECUTION_FAILED,
         },
       };
     }

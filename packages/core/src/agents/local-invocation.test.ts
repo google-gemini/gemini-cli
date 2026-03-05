@@ -277,10 +277,10 @@ describe('LocalSubagentInvocation', () => {
         type: ToolErrorType.EXECUTION_FAILED,
       });
       expect(result.returnDisplay).toBe(
-        `Subagent Failed: MockAgent\nError: ${error.message}`,
+        `Subagent Failed: MockAgent\nError: ${error.message}\n\nNote: The subagent's progress was lost due to this error. The main agent has been notified and will attempt to recover or proceed differently.`,
       );
       expect(result.llmContent).toBe(
-        `Subagent 'MockAgent' failed. Error: ${error.message}`,
+        `Subagent 'MockAgent' failed. Error: ${error.message}\n\nGuidance: The investigation performed by 'MockAgent' was interrupted. You should analyze the provided error and determine if you can continue based on the information already gathered, or if you need to try a different approach (e.g., using a different tool or breaking the task into smaller parts).`,
       );
     });
 

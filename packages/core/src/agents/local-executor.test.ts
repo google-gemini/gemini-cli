@@ -1507,6 +1507,38 @@ describe('LocalAgentExecutor', () => {
       expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX + 1);
     });
 
+    it('should handle API errors (e.g. 400 INVALID_ARGUMENT) during turn execution without crashing', async () => {
+      const definition = createTestDefinition();
+      const inputs = { goal: 'find the bug' };
+
+      // Mock a realistic API error with structured status code
+      const apiError = Object.assign(
+        new Error('Request contains an invalid argument.'),
+        { status: 400 },
+      );
+
+      mockSendMessageStream.mockRejectedValueOnce(apiError);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      const output = await executor.run(inputs, signal);
+
+      expect(output.terminate_reason).toBe(AgentTerminateMode.ERROR);
+
+      expect(output.result).toContain('Invalid Argument');
+      expect(output.result).toContain('Details:');
+
+      // Verify that an ERROR activity was emitted
+      const errorActivity = activities.find((a) => a.type === 'ERROR');
+      expect(errorActivity).toBeDefined();
+      expect(errorActivity?.data['error']).toContain('Turn failed');
+      expect(errorActivity?.data['context']).toBe('api_error');
+    });
+
     it('should terminate with TIMEOUT if a model call takes too long', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME], {
         maxTimeMinutes: 0.5, // 30 seconds
