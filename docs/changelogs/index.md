@@ -533,7 +533,7 @@ on GitHub.
   [pr](https://github.com/google-gemini/gemini-cli/pull/11284) by
   [@abhipatel12](https://github.com/abhipatel12))
 - **Non-interactive MCP commands:** Users can now run MCP slash commands in
-  non-interactive mode `gemini "/some-mcp-prompt"`.
+  non-interactive mode `gemini -p "/some-mcp-prompt"`.
   ([pr](https://github.com/google-gemini/gemini-cli/pull/10194) by
   [@capachino](https://github.com/capachino))
 - **Removal of deprecated flags:** We’ve finally removed a number of deprecated
@@ -658,7 +658,7 @@ on GitHub.
   ([pr](https://github.com/google-gemini/gemini-cli/pull/8570) by
   [@scidomino](https://github.com/scidomino))
 - **Custom commands in Headless Mode:** Run custom slash commands directly from
-  the command line in non-interactive mode: `gemini "/joke Chuck Norris"`
+  the command line in non-interactive mode: `gemini -p "/joke Chuck Norris"`
   ([pr](https://github.com/google-gemini/gemini-cli/pull/8305) by
   [@capachino](https://github.com/capachino))
 - **Small features, polish, reliability & bug fixes:** A large amount of
