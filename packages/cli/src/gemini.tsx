@@ -376,6 +376,29 @@ export async function main() {
   const argv = await parseArguments(settings.merged);
   parseArgsHandle?.end();
 
+  const isClientMode =
+    argv.client ||
+    argv.serverPing ||
+    argv.serverStop ||
+    argv.clientListSessions;
+
+  if (isClientMode) {
+    const { runDaemonClient } = await import('./daemon/daemonClient.js');
+    await runDaemonClient({
+      socketPath: argv.serverSocket,
+      port: argv.serverPort,
+      session: argv.session,
+      prompt: argv.prompt,
+      listSessions: argv.clientListSessions,
+      stopServer: argv.serverStop,
+      ping: argv.serverPing,
+    });
+    await runExitCleanup();
+    process.exit(ExitCodes.SUCCESS);
+  }
+  if (argv.serverStart) {
+    process.env['GEMINI_CLI_NO_RELAUNCH'] = 'true';
+  }
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||
     (settings.merged.tools?.allowed && settings.merged.tools.allowed.length > 0)
@@ -716,7 +739,17 @@ export async function main() {
     }
 
     cliStartupHandle?.end();
-    // Render UI, passing necessary config values. Check that there is no command line question.
+    if (argv.serverStart) {
+      const { startDaemonServer } = await import('./daemon/daemonServer.js');
+      await startDaemonServer(
+        config,
+        settings,
+        argv.serverSocket,
+        argv.serverPort,
+      );
+      return;
+    }
+
     if (config.isInteractive()) {
       await startInteractiveUI(
         config,
