@@ -23,6 +23,7 @@ import {
 import { AuthState } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { waitFor } from '../../test-utils/async.js';
+import { loadAuthState } from '../../config/authState.js';
 
 // Mock dependencies
 const mockLoadApiKey = vi.fn();
@@ -41,11 +42,30 @@ vi.mock('../../config/auth.js', () => ({
   validateAuthMethod: (authType: AuthType) => mockValidateAuthMethod(authType),
 }));
 
+vi.mock('../../config/authState.js', () => ({
+  loadAuthState: vi.fn(() => ({})),
+  parseAuthType: vi.fn((value: unknown) => {
+    switch (value) {
+      case AuthType.LOGIN_WITH_GOOGLE:
+      case AuthType.USE_GEMINI:
+      case AuthType.USE_VERTEX_AI:
+      case AuthType.LEGACY_CLOUD_SHELL:
+      case AuthType.COMPUTE_ADC:
+        return value;
+      default:
+        return undefined;
+    }
+  }),
+}));
+
+const mockLoadAuthState = loadAuthState as Mock;
+
 describe('useAuth', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     delete process.env['GEMINI_API_KEY'];
     delete process.env['GEMINI_DEFAULT_AUTH_TYPE'];
+    mockLoadAuthState.mockReturnValue({});
   });
 
   afterEach(() => {
@@ -143,6 +163,9 @@ describe('useAuth', () => {
       }) as LoadedSettings;
 
     it('should initialize with Unauthenticated state', async () => {
+      mockLoadAuthState.mockReturnValue({
+        selectedType: AuthType.LOGIN_WITH_GOOGLE,
+      });
       const { result } = renderHook(() =>
         useAuthCommand(createSettings(AuthType.LOGIN_WITH_GOOGLE), mockConfig),
       );
@@ -181,6 +204,7 @@ describe('useAuth', () => {
     });
 
     it('should transition to AwaitingApiKeyInput if USE_GEMINI and no key found', async () => {
+      mockLoadAuthState.mockReturnValue({ selectedType: AuthType.USE_GEMINI });
       mockLoadApiKey.mockResolvedValue(null);
       const { result } = renderHook(() =>
         useAuthCommand(createSettings(AuthType.USE_GEMINI), mockConfig),
@@ -192,6 +216,7 @@ describe('useAuth', () => {
     });
 
     it('should authenticate if USE_GEMINI and key is found', async () => {
+      mockLoadAuthState.mockReturnValue({ selectedType: AuthType.USE_GEMINI });
       mockLoadApiKey.mockResolvedValue('stored-key');
       const { result } = renderHook(() =>
         useAuthCommand(createSettings(AuthType.USE_GEMINI), mockConfig),
@@ -207,6 +232,7 @@ describe('useAuth', () => {
     });
 
     it('should authenticate if USE_GEMINI and env key is found', async () => {
+      mockLoadAuthState.mockReturnValue({ selectedType: AuthType.USE_GEMINI });
       mockLoadApiKey.mockResolvedValue(null);
       process.env['GEMINI_API_KEY'] = 'env-key';
       const { result } = renderHook(() =>
@@ -223,6 +249,7 @@ describe('useAuth', () => {
     });
 
     it('should prioritize env key over stored key when both are present', async () => {
+      mockLoadAuthState.mockReturnValue({ selectedType: AuthType.USE_GEMINI });
       mockLoadApiKey.mockResolvedValue('stored-key');
       process.env['GEMINI_API_KEY'] = 'env-key';
       const { result } = renderHook(() =>
@@ -240,6 +267,9 @@ describe('useAuth', () => {
     });
 
     it('should set error if validation fails', async () => {
+      mockLoadAuthState.mockReturnValue({
+        selectedType: AuthType.LOGIN_WITH_GOOGLE,
+      });
       mockValidateAuthMethod.mockReturnValue('Validation Failed');
       const { result } = renderHook(() =>
         useAuthCommand(createSettings(AuthType.LOGIN_WITH_GOOGLE), mockConfig),
@@ -252,6 +282,9 @@ describe('useAuth', () => {
     });
 
     it('should set error if GEMINI_DEFAULT_AUTH_TYPE is invalid', async () => {
+      mockLoadAuthState.mockReturnValue({
+        selectedType: AuthType.LOGIN_WITH_GOOGLE,
+      });
       process.env['GEMINI_DEFAULT_AUTH_TYPE'] = 'INVALID_TYPE';
       const { result } = renderHook(() =>
         useAuthCommand(createSettings(AuthType.LOGIN_WITH_GOOGLE), mockConfig),
@@ -266,6 +299,9 @@ describe('useAuth', () => {
     });
 
     it('should authenticate successfully for valid auth type', async () => {
+      mockLoadAuthState.mockReturnValue({
+        selectedType: AuthType.LOGIN_WITH_GOOGLE,
+      });
       const { result } = renderHook(() =>
         useAuthCommand(createSettings(AuthType.LOGIN_WITH_GOOGLE), mockConfig),
       );
@@ -280,6 +316,9 @@ describe('useAuth', () => {
     });
 
     it('should handle refreshAuth failure', async () => {
+      mockLoadAuthState.mockReturnValue({
+        selectedType: AuthType.LOGIN_WITH_GOOGLE,
+      });
       (mockConfig.refreshAuth as Mock).mockRejectedValue(
         new Error('Auth Failed'),
       );

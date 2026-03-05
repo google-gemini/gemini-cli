@@ -10,6 +10,7 @@ import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
 import { IdeClient, getVersion } from '@google/gemini-cli-core';
+import { loadAuthState } from '../../config/authState.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -27,6 +28,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     getVersion: vi.fn(),
   };
 });
+
+vi.mock('../../config/authState.js', () => ({
+  loadAuthState: vi.fn(() => ({ selectedType: 'test-auth' })),
+}));
 
 describe('aboutCommand', () => {
   let mockContext: CommandContext;
@@ -57,6 +62,7 @@ describe('aboutCommand', () => {
     } as unknown as CommandContext);
 
     vi.mocked(getVersion).mockResolvedValue('test-version');
+    vi.mocked(loadAuthState).mockReturnValue({ selectedType: 'test-auth' });
     vi.spyOn(mockContext.services.config!, 'getModel').mockReturnValue(
       'test-model',
     );

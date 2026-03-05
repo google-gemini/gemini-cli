@@ -17,6 +17,7 @@ import {
 import { getErrorMessage } from '@google/gemini-cli-core';
 import { AuthState } from '../types.js';
 import { validateAuthMethod } from '../../config/auth.js';
+import { loadAuthState, parseAuthType } from '../../config/authState.js';
 
 export function validateAuthMethodWithSettings(
   authType: AuthType,
@@ -91,7 +92,7 @@ export const useAuthCommand = (
         return;
       }
 
-      const authType = settings.merged.security.auth.selectedType;
+      const authType = parseAuthType(loadAuthState().selectedType);
       if (!authType) {
         if (process.env['GEMINI_API_KEY']) {
           onAuthError(
@@ -118,11 +119,7 @@ export const useAuthCommand = (
       }
 
       const defaultAuthType = process.env['GEMINI_DEFAULT_AUTH_TYPE'];
-      if (
-        defaultAuthType &&
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        !Object.values(AuthType).includes(defaultAuthType as AuthType)
-      ) {
+      if (defaultAuthType && !parseAuthType(defaultAuthType)) {
         onAuthError(
           `Invalid value for GEMINI_DEFAULT_AUTH_TYPE: "${defaultAuthType}". ` +
             `Valid values are: ${Object.values(AuthType).join(', ')}.`,

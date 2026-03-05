@@ -11,7 +11,7 @@ import type {
 } from './types.js';
 import { CommandKind } from './types.js';
 import { clearCachedCredentialFile } from '@google/gemini-cli-core';
-import { SettingScope } from '../../config/settings.js';
+import { saveAuthState } from '../../config/authState.js';
 
 const authLoginCommand: SlashCommand = {
   name: 'login',
@@ -31,11 +31,7 @@ const authLogoutCommand: SlashCommand = {
   action: async (context, _args): Promise<LogoutActionReturn> => {
     await clearCachedCredentialFile();
     // Clear the selected auth type so user sees the auth selection menu
-    context.services.settings.setValue(
-      SettingScope.User,
-      'security.auth.selectedType',
-      undefined,
-    );
+    saveAuthState(undefined);
     // Strip thoughts from history instead of clearing completely
     context.services.config?.getGeminiClient()?.stripThoughtsFromHistory();
     // Return logout action to signal explicit state change

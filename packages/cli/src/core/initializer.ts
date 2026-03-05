@@ -17,6 +17,7 @@ import {
 import { type LoadedSettings } from '../config/settings.js';
 import { performInitialAuth } from './auth.js';
 import { validateTheme } from './theme.js';
+import { loadAuthState, parseAuthType } from '../config/authState.js';
 import type { AccountSuspensionInfo } from '../ui/contexts/UIStateContext.js';
 
 export interface InitializationResult {
@@ -38,16 +39,17 @@ export async function initializeApp(
   config: Config,
   settings: LoadedSettings,
 ): Promise<InitializationResult> {
+  const selectedAuthType = parseAuthType(loadAuthState().selectedType);
   const authHandle = startupProfiler.start('authenticate');
+  const selectedAuthType = parseAuthType(loadAuthState().selectedType);
   const { authError, accountSuspensionInfo } = await performInitialAuth(
     config,
-    settings.merged.security.auth.selectedType,
+    selectedAuthType,
   );
   authHandle?.end();
   const themeError = validateTheme(settings);
 
-  const shouldOpenAuthDialog =
-    settings.merged.security.auth.selectedType === undefined || !!authError;
+  const shouldOpenAuthDialog = selectedAuthType === undefined || !!authError;
 
   logCliConfiguration(
     config,

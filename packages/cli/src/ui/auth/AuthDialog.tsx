@@ -9,11 +9,7 @@ import { useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
-import type {
-  LoadableSettingScope,
-  LoadedSettings,
-} from '../../config/settings.js';
-import { SettingScope } from '../../config/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
 import {
   AuthType,
   clearCachedCredentialFile,
@@ -23,6 +19,11 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { AuthState } from '../types.js';
 import { validateAuthMethodWithSettings } from './useAuth.js';
 import { relaunchApp } from '../../utils/processUtils.js';
+import {
+  loadAuthState,
+  parseAuthType,
+  saveAuthState,
+} from '../../config/authState.js';
 
 interface AuthDialogProps {
   config: Config;
@@ -42,6 +43,9 @@ export function AuthDialog({
   setAuthContext,
 }: AuthDialogProps): React.JSX.Element {
   const [exiting, setExiting] = useState(false);
+  const [selectedAuthType, setSelectedAuthType] = useState<
+    AuthType | undefined
+  >(() => parseAuthType(loadAuthState().selectedType));
   let items = [
     {
       label: 'Login with Google',
@@ -95,8 +99,8 @@ export function AuthDialog({
   }
 
   let initialAuthIndex = items.findIndex((item) => {
-    if (settings.merged.security.auth.selectedType) {
-      return item.value === settings.merged.security.auth.selectedType;
+    if (selectedAuthType) {
+      return item.value === selectedAuthType;
     }
 
     if (defaultAuthType) {
@@ -114,7 +118,7 @@ export function AuthDialog({
   }
 
   const onSelect = useCallback(
-    async (authType: AuthType | undefined, scope: LoadableSettingScope) => {
+    async (authType: AuthType | undefined) => {
       if (exiting) {
         return;
       }
@@ -125,8 +129,8 @@ export function AuthDialog({
           setAuthContext({});
         }
         await clearCachedCredentialFile();
-
-        settings.setValue(scope, 'security.auth.selectedType', authType);
+        saveAuthState(authType);
+        setSelectedAuthType(authType);
         if (
           authType === AuthType.LOGIN_WITH_GOOGLE &&
           config.isBrowserLaunchSuppressed()
@@ -148,7 +152,7 @@ export function AuthDialog({
       }
       setAuthState(AuthState.Unauthenticated);
     },
-    [settings, config, setAuthState, exiting, setAuthContext],
+    [config, setAuthState, exiting, setAuthContext],
   );
 
   const handleAuthSelect = (authMethod: AuthType) => {
@@ -157,7 +161,7 @@ export function AuthDialog({
       onAuthError(error);
     } else {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      onSelect(authMethod, SettingScope.User);
+      onSelect(authMethod);
     }
   };
 
@@ -169,7 +173,7 @@ export function AuthDialog({
         if (authError) {
           return true;
         }
-        if (settings.merged.security.auth.selectedType === undefined) {
+        if (selectedAuthType === undefined) {
           // Prevent exiting if no auth method is set
           onAuthError(
             'You must select an auth method to proceed. Press Ctrl+C twice to exit.',
@@ -177,7 +181,7 @@ export function AuthDialog({
           return true;
         }
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        onSelect(undefined, SettingScope.User);
+        onSelect(undefined);
         return true;
       }
       return false;

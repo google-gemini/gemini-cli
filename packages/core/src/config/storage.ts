@@ -66,6 +66,10 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'settings.json');
   }
 
+  static getAuthStatePath(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'auth-state.json');
+  }
+
   static getInstallationIdPath(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'installation_id');
   }
