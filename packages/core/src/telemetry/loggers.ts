@@ -791,6 +791,7 @@ export function logStartupStats(
   config: Config,
   event: StartupStatsEvent,
 ): void {
+  ClearcutLogger.getInstance(config)?.logStartupStatsEvent(event);
   bufferTelemetryEvent(() => {
     // Wait for experiments to load before emitting so we capture experimentIds
     void config
