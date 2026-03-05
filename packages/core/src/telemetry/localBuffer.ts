@@ -12,6 +12,9 @@ import {
   type ResourceMetrics,
 } from '@opentelemetry/sdk-metrics';
 
+/* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+
 // Local exporter to maintain a rolling window of cumulative metrics in memory.
 export const localMetricExporter = new InMemoryMetricExporter(
   AggregationTemporality.CUMULATIVE,
@@ -41,8 +44,27 @@ export const getLocalMetricsSnapshot = async (): Promise<PerfSnapshot> => {
   await localMetricReader.forceFlush();
   // getMetrics() is synchronous, no await needed
   const resourceMetricsArray = localMetricExporter.getMetrics();
+  localMetricExporter.reset();
   return simplifyMetrics(resourceMetricsArray);
 };
+
+interface HistogramValue {
+  count: number;
+  sum: number;
+  min?: number;
+  max?: number;
+}
+
+function isHistogramValue(value: unknown): value is HistogramValue {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+
+  return (
+    typeof record['count'] === 'number' && typeof record['sum'] === 'number'
+  );
+}
 
 /**
  * Flattens OTel ResourceMetrics[] into a localized PerfSnapshot.
@@ -50,7 +72,11 @@ export const getLocalMetricsSnapshot = async (): Promise<PerfSnapshot> => {
 function simplifyMetrics(
   resourceMetricsArray: ResourceMetrics[] | undefined,
 ): PerfSnapshot {
-  const snapshot: PerfSnapshot = { counters: {}, histograms: {} };
+  const snapshot: PerfSnapshot = {
+    // Creates safe objects with no prototype chain
+    counters: Object.create(null),
+    histograms: Object.create(null),
+  };
 
   if (!resourceMetricsArray || resourceMetricsArray.length === 0) {
     return snapshot;
@@ -64,36 +90,31 @@ function simplifyMetrics(
         if (metric.dataPointType === DataPointType.SUM) {
           let total = 0;
           for (const dp of metric.dataPoints) {
-            // The linter knows this is already a number
             total += dp.value;
           }
           snapshot.counters[name] = total;
         } else if (metric.dataPointType === DataPointType.HISTOGRAM) {
           let count = 0;
           let sum = 0;
-          let min = Number.MAX_SAFE_INTEGER;
-          let max = Number.MIN_SAFE_INTEGER;
+          let min = Infinity;
+          let max = -Infinity;
 
           for (const dp of metric.dataPoints) {
-            // Match Google's internal style for bypassing strict object casts
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            const val = dp.value as {
-              count: number;
-              sum: number;
-              min?: number;
-              max?: number;
-            };
-            count += val.count;
-            sum += val.sum;
-            if (val.min !== undefined) min = Math.min(min, val.min);
-            if (val.max !== undefined) max = Math.max(max, val.max);
+            if (isHistogramValue(dp.value)) {
+              const val = dp.value as HistogramValue;
+
+              count += val.count;
+              sum += val.sum;
+              if (val.min !== undefined) min = Math.min(min, val.min);
+              if (val.max !== undefined) max = Math.max(max, val.max);
+            }
           }
 
           snapshot.histograms[name] = {
             count,
             sum,
-            min: min === Number.MAX_SAFE_INTEGER ? undefined : min,
-            max: max === Number.MIN_SAFE_INTEGER ? undefined : max,
+            min: min !== Infinity ? min : undefined,
+            max: max !== -Infinity ? max : undefined,
           };
         }
       }
