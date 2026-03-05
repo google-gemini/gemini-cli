@@ -344,32 +344,32 @@ Manual deletion also removes all associated artifacts:
 If you use a [custom plans directory](#custom-plan-directory-and-policies),
 those files are not automatically deleted and must be managed manually.
 
-[`list_directory`]: ../tools/file-system.md#1-list_directory-readfolder
-[`read_file`]: ../tools/file-system.md#2-read_file-readfile
-[`grep_search`]: ../tools/file-system.md#5-grep_search-searchtext
-[`write_file`]: ../tools/file-system.md#3-write_file-writefile
-[`glob`]: ../tools/file-system.md#4-glob-findfiles
-[`google_web_search`]: ../tools/web-search.md
-[`replace`]: ../tools/file-system.md#6-replace-edit
-[MCP tools]: ../tools/mcp-server.md
-[`save_memory`]: ../tools/memory.md
-[`activate_skill`]: ./skills.md
-[`codebase_investigator`]: ../core/subagents.md#codebase_investigator
-[`cli_help`]: ../core/subagents.md#cli_help
-[subagents]: ../core/subagents.md
-[custom subagents]: ../core/subagents.md#creating-custom-subagents
-[policy engine]: ../reference/policy-engine.md
-[`enter_plan_mode`]: ../tools/planning.md#1-enter_plan_mode-enterplanmode
-[`exit_plan_mode`]: ../tools/planning.md#2-exit_plan_mode-exitplanmode
-[`ask_user`]: ../tools/ask-user.md
-[YOLO mode]: ../reference/configuration.md#command-line-arguments
+[`list_directory`]: /docs/tools/file-system.md#1-list_directory-readfolder
+[`read_file`]: /docs/tools/file-system.md#2-read_file-readfile
+[`grep_search`]: /docs/tools/file-system.md#5-grep_search-searchtext
+[`write_file`]: /docs/tools/file-system.md#3-write_file-writefile
+[`glob`]: /docs/tools/file-system.md#4-glob-findfiles
+[`google_web_search`]: /docs/tools/web-search.md
+[`replace`]: /docs/tools/file-system.md#6-replace-edit
+[MCP tools]: /docs/tools/mcp-server.md
+[`save_memory`]: /docs/tools/memory.md
+[`activate_skill`]: /docs/cli/skills.md
+[`codebase_investigator`]: /docs/core/subagents.md#codebase-investigator
+[`cli_help`]: /docs/core/subagents.md#cli-help-agent
+[subagents]: /docs/core/subagents.md
+[custom subagents]: /docs/core/subagents.md#creating-custom-subagents
+[policy engine]: /docs/reference/policy-engine.md
+[`enter_plan_mode`]: /docs/tools/planning.md#1-enter_plan_mode-enterplanmode
+[`exit_plan_mode`]: /docs/tools/planning.md#2-exit_plan_mode-exitplanmode
+[`ask_user`]: /docs/tools/ask-user.md
+[YOLO mode]: /docs/reference/configuration.md#command-line-arguments
 [`plan.toml`]:
   https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/policy/policies/plan.toml
-[auto model]: ../reference/configuration.md#model-settings
-[model routing]: ./telemetry.md#model-routing
-[preferred external editor]: ../reference/configuration.md#general
-[session retention]: ./session-management.md#session-retention
-[extensions]: ../extensions/index.md
+[auto model]: /docs/reference/configuration.md#model
+[model routing]: /docs/cli/telemetry.md#model-routing
+[preferred external editor]: /docs/reference/configuration.md#general
+[session retention]: /docs/cli/session-management.md#session-retention
+[extensions]: /docs/extensions/index.md
 [Conductor]: https://github.com/gemini-cli-extensions/conductor
 [open an issue]: https://github.com/google-gemini/gemini-cli/issues
-[Agent Skills]: ./skills.md
+[Agent Skills]: /docs/cli/skills.md
