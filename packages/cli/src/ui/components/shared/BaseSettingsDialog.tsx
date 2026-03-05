@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
@@ -140,6 +140,7 @@ export function BaseSettingsDialog({
     dispatch: editDispatch,
     startEditing,
     commitEdit,
+    cursorVisible,
   } = useEditBuffer({
     onCommit: (key, value) => {
       const itemToCommit = items.find((i) => i.key === key);
@@ -160,17 +161,6 @@ export function BaseSettingsDialog({
   );
   const effectiveFocusSection =
     !showScopeSelector && focusSection === 'scope' ? 'settings' : focusSection;
-  const [cursorVisible, setCursorVisible] = useState(true);
-
-  // Cursor blink effect
-  useEffect(() => {
-    if (!editingKey) return;
-    setCursorVisible(true);
-    const interval = setInterval(() => {
-      setCursorVisible((v) => !v);
-    }, 500);
-    return () => clearInterval(interval);
-  }, [editingKey]);
 
   // Scope selector items
   const scopeItems = getScopeItems().map((item) => ({
@@ -297,7 +287,6 @@ export function BaseSettingsDialog({
               currentItem.editValue ??
               (rawVal !== undefined ? String(rawVal) : '');
             startEditing(currentItem.key, initialValue);
-            setCursorVisible(true);
           }
           return true;
         }
@@ -311,7 +300,6 @@ export function BaseSettingsDialog({
         // Number keys for quick edit on number fields
         if (currentItem?.type === 'number' && /^[0-9]$/.test(key.sequence)) {
           startEditing(currentItem.key, key.sequence);
-          setCursorVisible(true);
           return true;
         }
       }

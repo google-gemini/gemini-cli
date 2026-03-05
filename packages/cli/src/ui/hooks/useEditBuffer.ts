@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useReducer, useCallback } from 'react';
+import { useReducer, useCallback, useEffect, useState } from 'react';
 import { cpSlice, cpLen, stripUnsafeCharacters } from '../utils/textUtils.js';
 
 export interface EditBufferState {
@@ -117,6 +117,19 @@ export interface UseEditBufferProps {
 
 export function useEditBuffer({ onCommit }: UseEditBufferProps) {
   const [state, dispatch] = useReducer(editBufferReducer, initialState);
+  const [cursorVisible, setCursorVisible] = useState(true);
+
+  useEffect(() => {
+    if (!state.editingKey) {
+      setCursorVisible(true);
+      return;
+    }
+    setCursorVisible(true);
+    const interval = setInterval(() => {
+      setCursorVisible((v) => !v);
+    }, 500);
+    return () => clearInterval(interval);
+  }, [state.editingKey, state.buffer, state.cursorPos]);
 
   const startEditing = useCallback((key: string, initialValue: string) => {
     dispatch({ type: 'START_EDIT', key, initialValue });
@@ -134,5 +147,6 @@ export function useEditBuffer({ onCommit }: UseEditBufferProps) {
     dispatch,
     startEditing,
     commitEdit,
+    cursorVisible,
   };
 }
