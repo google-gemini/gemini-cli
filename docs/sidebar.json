@@ -55,7 +55,14 @@
             "label": "Set up an MCP server",
             "slug": "docs/cli/tutorials/mcp-setup"
           },
-          { "label": "Automate tasks", "slug": "docs/cli/tutorials/automation" }
+          {
+            "label": "Automate tasks",
+            "slug": "docs/cli/tutorials/automation"
+          },
+          {
+            "label": "Visualize architecture & diagrams",
+            "slug": "docs/visualize"
+          }
         ]
       },
       {

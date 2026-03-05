@@ -78,6 +78,7 @@ import {
   TrackerAddDependencyTool,
   TrackerVisualizeTool,
 } from '../tools/trackerTools.js';
+import { VisualizeTool } from '../tools/visualize.js';
 import {
   logRipgrepFallback,
   logFlashFallback,
@@ -2873,6 +2874,10 @@ export class Config implements McpContext {
         registry.registerTool(new TrackerVisualizeTool(this, this.messageBus)),
       );
     }
+
+    maybeRegister(VisualizeTool, () =>
+      registry.registerTool(new VisualizeTool(this, this.messageBus)),
+    );
 
     // Register Subagents as Tools
     this.registerSubAgentTools(registry);

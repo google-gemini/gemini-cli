@@ -56,6 +56,7 @@ import { skillsCommand } from '../ui/commands/skillsCommand.js';
 import { settingsCommand } from '../ui/commands/settingsCommand.js';
 import { shellsCommand } from '../ui/commands/shellsCommand.js';
 import { vimCommand } from '../ui/commands/vimCommand.js';
+import { visualizeCommand } from '../ui/commands/visualizeCommand.js';
 import { setupGithubCommand } from '../ui/commands/setupGithubCommand.js';
 import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';
 
@@ -183,6 +184,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       settingsCommand,
       shellsCommand,
       vimCommand,
+      visualizeCommand,
       setupGithubCommand,
       terminalSetupCommand,
     ];
