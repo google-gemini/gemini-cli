@@ -10,6 +10,8 @@ import { getPty } from '../utils/getPty.js';
 import { spawn as cpSpawn, type ChildProcess } from 'node:child_process';
 import { TextDecoder } from 'node:util';
 import os from 'node:os';
+import fs, { mkdirSync } from 'node:fs';
+import path from 'node:path';
 import type { IPty } from '@lydell/node-pty';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import {
@@ -19,6 +21,8 @@ import {
 } from '../utils/shell-utils.js';
 import { isBinary } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
+import { debugLogger } from '../utils/debugLogger.js';
+import { Storage } from '../config/storage.js';
 import {
   serializeTerminalToObject,
   type AnsiOutput,
@@ -142,6 +146,7 @@ interface ActivePty {
   ptyProcess: IPty;
   headlessTerminal: pkg.Terminal;
   maxSerializedLines?: number;
+  lastSyncedLine: number;
 }
 
 interface ActiveChildProcess {
@@ -150,23 +155,41 @@ interface ActiveChildProcess {
     output: string;
     truncated: boolean;
     outputChunks: Buffer[];
+    lastSyncedOffset: number;
   };
 }
 
-const getFullBufferText = (terminal: pkg.Terminal): string => {
+const findLastContentLine = (
+  buffer: pkg.IBuffer,
+  startLine: number,
+): number => {
+  const lineCount = buffer.length;
+  for (let i = lineCount - 1; i >= startLine; i--) {
+    const line = buffer.getLine(i);
+    if (line && line.translateToString(true).length > 0) {
+      return i;
+    }
+  }
+  return -1;
+};
+
+const getFullBufferText = (terminal: pkg.Terminal, startLine = 0): string => {
   const buffer = terminal.buffer.active;
   const lines: string[] = [];
-  for (let i = 0; i < buffer.length; i++) {
+
+  const lastContentLine = findLastContentLine(buffer, startLine);
+
+  if (lastContentLine === -1 || lastContentLine < startLine) return '';
+
+  for (let i = startLine; i <= lastContentLine; i++) {
     const line = buffer.getLine(i);
     if (!line) {
+      lines.push('');
       continue;
     }
-    // If the NEXT line is wrapped, it means it's a continuation of THIS line.
-    // We should not trim the right side of this line because trailing spaces
-    // might be significant parts of the wrapped content.
-    // If it's not wrapped, we trim normally.
+
     let trimRight = true;
-    if (i + 1 < buffer.length) {
+    if (i + 1 <= lastContentLine) {
       const nextLine = buffer.getLine(i + 1);
       if (nextLine?.isWrapped) {
         trimRight = false;
@@ -182,12 +205,53 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
     }
   }
 
-  // Remove trailing empty lines
-  while (lines.length > 0 && lines[lines.length - 1] === '') {
-    lines.pop();
+  return lines.join('\n');
+};
+
+const writeBufferToLogStream = (
+  terminal: pkg.Terminal,
+  stream: fs.WriteStream,
+  startLine = 0,
+): number => {
+  const buffer = terminal.buffer.active;
+  const lastContentLine = findLastContentLine(buffer, startLine);
+
+  if (lastContentLine === -1 || lastContentLine < startLine) return startLine;
+
+  for (let i = startLine; i <= lastContentLine; i++) {
+    const line = buffer.getLine(i);
+    if (!line) {
+      stream.write('\n');
+      continue;
+    }
+
+    let trimRight = true;
+    if (i + 1 <= lastContentLine) {
+      const nextLine = buffer.getLine(i + 1);
+      if (nextLine?.isWrapped) {
+        trimRight = false;
+      }
+    }
+
+    const lineContent = line.translateToString(trimRight);
+    const stripped = stripAnsi(lineContent);
+
+    if (line.isWrapped) {
+      stream.write(stripped);
+    } else {
+      if (i > startLine) {
+        stream.write('\n');
+      }
+      stream.write(stripped);
+    }
   }
 
-  return lines.join('\n');
+  // Ensure it ends with a newline if we wrote anything
+  if (lastContentLine >= startLine) {
+    stream.write('\n');
+  }
+
+  return lastContentLine + 1;
 };
 
 /**
@@ -199,10 +263,43 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
 export class ShellExecutionService {
   private static activePtys = new Map<number, ActivePty>();
   private static activeChildProcesses = new Map<number, ActiveChildProcess>();
+  private static backgroundLogPids = new Set<number>();
+  private static backgroundLogStreams = new Map<number, fs.WriteStream>();
   private static exitedPtyInfo = new Map<
     number,
     { exitCode: number; signal?: number }
   >();
+
+  static getLogDir(): string {
+    return path.join(Storage.getGlobalTempDir(), 'background-processes');
+  }
+
+  static getLogFilePath(pid: number): string {
+    return path.join(this.getLogDir(), `background-${pid}.log`);
+  }
+
+  private static syncBackgroundLog(pid: number, content: string): void {
+    if (!this.backgroundLogPids.has(pid)) return;
+
+    const stream = this.backgroundLogStreams.get(pid);
+    if (stream && content) {
+      // Strip ANSI escape codes before logging
+      stream.write(stripAnsi(content));
+    }
+  }
+
+  private static async cleanupLogStream(pid: number): Promise<void> {
+    const stream = this.backgroundLogStreams.get(pid);
+    if (stream) {
+      await new Promise<void>((resolve) => {
+        stream.end(() => resolve());
+      });
+      this.backgroundLogStreams.delete(pid);
+    }
+
+    this.backgroundLogPids.delete(pid);
+  }
+
   private static activeResolvers = new Map<
     number,
     (res: ShellExecutionResult) => void
@@ -326,6 +423,7 @@ export class ShellExecutionService {
         output: '',
         truncated: false,
         outputChunks: [] as Buffer[],
+        lastSyncedOffset: 0,
       };
 
       if (child.pid) {
@@ -395,7 +493,23 @@ export class ShellExecutionService {
                 chunk: decodedChunk,
               };
               onOutputEvent(event);
-              if (child.pid) ShellExecutionService.emitEvent(child.pid, event);
+              if (child.pid) {
+                ShellExecutionService.emitEvent(child.pid, event);
+                if (ShellExecutionService.backgroundLogPids.has(child.pid)) {
+                  const activeChild =
+                    ShellExecutionService.activeChildProcesses.get(child.pid);
+                  if (activeChild) {
+                    const delta = activeChild.state.output.substring(
+                      activeChild.state.lastSyncedOffset,
+                    );
+                    if (delta) {
+                      ShellExecutionService.syncBackgroundLog(child.pid, delta);
+                      activeChild.state.lastSyncedOffset =
+                        activeChild.state.output.length;
+                    }
+                  }
+                }
+              }
             }
           } else {
             const totalBytes = state.outputChunks.reduce(
@@ -431,17 +545,21 @@ export class ShellExecutionService {
           const exitSignal = signal ? os.constants.signals[signal] : null;
 
           if (child.pid) {
+            const pid = child.pid;
             const event: ShellOutputEvent = {
               type: 'exit',
               exitCode,
               signal: exitSignal,
             };
             onOutputEvent(event);
-            ShellExecutionService.emitEvent(child.pid, event);
+            ShellExecutionService.emitEvent(pid, event);
 
-            this.activeChildProcesses.delete(child.pid);
-            this.activeResolvers.delete(child.pid);
-            this.activeListeners.delete(child.pid);
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            ShellExecutionService.cleanupLogStream(pid).then(() => {
+              this.activeChildProcesses.delete(pid);
+              this.activeResolvers.delete(pid);
+              this.activeListeners.delete(pid);
+            });
           }
 
           resolve({
@@ -601,6 +719,7 @@ export class ShellExecutionService {
           ptyProcess,
           headlessTerminal,
           maxSerializedLines: shellExecutionConfig.maxSerializedLines,
+          lastSyncedLine: 0,
         });
 
         let processingChain = Promise.resolve();
@@ -696,6 +815,26 @@ export class ShellExecutionService {
             };
             onOutputEvent(event);
             ShellExecutionService.emitEvent(ptyProcess.pid, event);
+
+            if (ShellExecutionService.backgroundLogPids.has(ptyProcess.pid)) {
+              const activePty = ShellExecutionService.activePtys.get(
+                ptyProcess.pid,
+              );
+              const stream = ShellExecutionService.backgroundLogStreams.get(
+                ptyProcess.pid,
+              );
+              if (activePty && stream) {
+                const terminal = activePty.headlessTerminal;
+                const currentLine = terminal.buffer.active.length;
+                if (currentLine > activePty.lastSyncedLine) {
+                  activePty.lastSyncedLine = writeBufferToLogStream(
+                    terminal,
+                    stream,
+                    activePty.lastSyncedLine,
+                  );
+                }
+              }
+            }
           }
         };
 
@@ -789,7 +928,6 @@ export class ShellExecutionService {
           ({ exitCode, signal }: { exitCode: number; signal?: number }) => {
             exited = true;
             abortSignal.removeEventListener('abort', abortHandler);
-            this.activePtys.delete(ptyProcess.pid);
             // Attempt to destroy the PTY to ensure FD is closed
             try {
               // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -810,30 +948,35 @@ export class ShellExecutionService {
                 5 * 60 * 1000,
               ).unref();
 
-              this.activePtys.delete(ptyProcess.pid);
-              this.activeResolvers.delete(ptyProcess.pid);
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
+              ShellExecutionService.cleanupLogStream(ptyProcess.pid).then(
+                () => {
+                  this.activePtys.delete(ptyProcess.pid);
+                  this.activeResolvers.delete(ptyProcess.pid);
 
-              const event: ShellOutputEvent = {
-                type: 'exit',
-                exitCode,
-                signal: signal ?? null,
-              };
-              onOutputEvent(event);
-              ShellExecutionService.emitEvent(ptyProcess.pid, event);
-              this.activeListeners.delete(ptyProcess.pid);
+                  const event: ShellOutputEvent = {
+                    type: 'exit',
+                    exitCode,
+                    signal: signal ?? null,
+                  };
+                  onOutputEvent(event);
+                  ShellExecutionService.emitEvent(ptyProcess.pid, event);
+                  this.activeListeners.delete(ptyProcess.pid);
 
-              const finalBuffer = Buffer.concat(outputChunks);
+                  const finalBuffer = Buffer.concat(outputChunks);
 
-              resolve({
-                rawOutput: finalBuffer,
-                output: getFullBufferText(headlessTerminal),
-                exitCode,
-                signal: signal ?? null,
-                error,
-                aborted: abortSignal.aborted,
-                pid: ptyProcess.pid,
-                executionMethod: ptyInfo?.name ?? 'node-pty',
-              });
+                  resolve({
+                    rawOutput: finalBuffer,
+                    output: getFullBufferText(headlessTerminal),
+                    exitCode,
+                    signal: signal ?? null,
+                    error,
+                    aborted: abortSignal.aborted,
+                    pid: ptyProcess.pid,
+                    executionMethod: ptyInfo?.name ?? 'node-pty',
+                  });
+                },
+              );
             };
 
             if (abortSignal.aborted) {
@@ -994,9 +1137,11 @@ export class ShellExecutionService {
    *
    * @param pid The process ID to kill.
    */
-  static kill(pid: number): void {
+  static async kill(pid: number): Promise<void> {
     const activePty = this.activePtys.get(pid);
     const activeChild = this.activeChildProcesses.get(pid);
+
+    await this.cleanupLogStream(pid);
 
     if (activeChild) {
       killProcessGroup({ pid }).catch(() => {});
@@ -1018,44 +1163,55 @@ export class ShellExecutionService {
    */
   static background(pid: number): void {
     const resolve = this.activeResolvers.get(pid);
-    if (resolve) {
-      let output = '';
-      const rawOutput = Buffer.from('');
+    if (!resolve) return;
 
-      const activePty = this.activePtys.get(pid);
-      const activeChild = this.activeChildProcesses.get(pid);
+    const activePty = this.activePtys.get(pid);
+    const activeChild = this.activeChildProcesses.get(pid);
+    if (!activePty && !activeChild) return;
+
+    const output = activePty
+      ? getFullBufferText(activePty.headlessTerminal)
+      : (activeChild?.state.output ?? '');
+    const executionMethod = activePty ? 'node-pty' : 'child_process';
+
+    this.backgroundLogPids.add(pid);
+
+    const logPath = this.getLogFilePath(pid);
+    const logDir = this.getLogDir();
+    try {
+      mkdirSync(logDir, { recursive: true });
+      const stream = fs.createWriteStream(logPath, { flags: 'w' });
+      this.backgroundLogStreams.set(pid, stream);
 
       if (activePty) {
-        output = getFullBufferText(activePty.headlessTerminal);
-        resolve({
-          rawOutput,
-          output,
-          exitCode: null,
-          signal: null,
-          error: null,
-          aborted: false,
-          pid,
-          executionMethod: 'node-pty',
-          backgrounded: true,
-        });
+        activePty.lastSyncedLine = writeBufferToLogStream(
+          activePty.headlessTerminal,
+          stream,
+          0,
+        );
       } else if (activeChild) {
-        output = activeChild.state.output;
-
-        resolve({
-          rawOutput,
-          output,
-          exitCode: null,
-          signal: null,
-          error: null,
-          aborted: false,
-          pid,
-          executionMethod: 'child_process',
-          backgrounded: true,
-        });
+        if (output) {
+          stream.write(stripAnsi(output) + '\n');
+        }
+        activeChild.state.lastSyncedOffset = activeChild.state.output.length;
       }
-
-      this.activeResolvers.delete(pid);
+    } catch (e) {
+      debugLogger.warn('Failed to setup background logging:', e);
     }
+
+    resolve({
+      rawOutput: Buffer.from(''),
+      output,
+      exitCode: null,
+      signal: null,
+      error: null,
+      aborted: false,
+      pid,
+      executionMethod,
+      backgrounded: true,
+    });
+
+    this.activeResolvers.delete(pid);
   }
 
   static subscribe(
