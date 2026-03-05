@@ -23,3 +23,9 @@ exports[`ConfigInitDisplay > updates message on McpClientUpdate event 1`] = `
 Spinner Connecting to MCP servers... (1/2) - Waiting for: server2
 "
 `;
+
+exports[`ConfigInitDisplay > updates message on McpClientUpdate event 2`] = `
+"
+Spinner Connecting to MCP servers... (1/2) - Waiting for: server2
+"
+`;

@@ -103,13 +103,17 @@ export interface CliArgs {
 /**
  * Helper to coerce comma-separated or multiple flag values into a flat array.
  */
-const coerceCommaSeparated = (values: string[]): string[] =>
-  values.flatMap((v) =>
+const coerceCommaSeparated = (values: string[]): string[] => {
+  if (values.length === 1 && values[0] === '') {
+    return [''];
+  }
+  return values.flatMap((v) =>
     v
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
   );
+};
 
 export async function parseArguments(
   settings: MergedSettings,
