@@ -14,7 +14,7 @@ import {
   type Mock,
   type Mocked,
 } from 'vitest';
-import { GeminiAgent, Session } from './zedIntegration.js';
+import { GeminiAgent, Session } from './acpClient.js';
 import type { CommandHandler } from './commandHandler.js';
 import * as acp from '@agentclientprotocol/sdk';
 import {
