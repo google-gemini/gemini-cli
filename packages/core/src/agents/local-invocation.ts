@@ -6,18 +6,25 @@
 
 import type { Config } from '../config/config.js';
 import { LocalAgentExecutor } from './local-executor.js';
-import type { AnsiOutput } from '../utils/terminalSerializer.js';
-import { BaseToolInvocation, type ToolResult } from '../tools/tools.js';
-import { ToolErrorType } from '../tools/tool-error.js';
-import type {
-  LocalAgentDefinition,
-  AgentInputs,
-  SubagentActivityEvent,
+import {
+  BaseToolInvocation,
+  type ToolResult,
+  type ToolLiveOutput,
+} from '../tools/tools.js';
+import {
+  type LocalAgentDefinition,
+  type AgentInputs,
+  type SubagentActivityEvent,
+  type SubagentProgress,
+  type SubagentActivityItem,
+  AgentTerminateMode,
 } from './types.js';
+import { randomUUID } from 'node:crypto';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
+const MAX_RECENT_ACTIVITY = 3;
 
 /**
  * Represents a validated, executable instance of a subagent tool.
@@ -81,11 +88,20 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
    */
   async execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
+    let recentActivity: SubagentActivityItem[] = [];
+
     try {
       if (updateOutput) {
-        updateOutput('Subagent starting...\n');
+        // Send initial state
+        const initialProgress: SubagentProgress = {
+          isSubagentProgress: true,
+          agentName: this.definition.name,
+          recentActivity: [],
+          state: 'running',
+        };
+        updateOutput(initialProgress);
       }
 
       // Create an activity callback to bridge the executor's events to the
@@ -93,11 +109,114 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
       const onActivity = (activity: SubagentActivityEvent): void => {
         if (!updateOutput) return;
 
-        if (
-          activity.type === 'THOUGHT_CHUNK' &&
-          typeof activity.data['text'] === 'string'
-        ) {
-          updateOutput(`🤖💭 ${activity.data['text']}`);
+        let updated = false;
+
+        switch (activity.type) {
+          case 'THOUGHT_CHUNK': {
+            const text = String(activity.data['text']);
+            const lastItem = recentActivity[recentActivity.length - 1];
+            if (
+              lastItem &&
+              lastItem.type === 'thought' &&
+              lastItem.status === 'running'
+            ) {
+              lastItem.content += text;
+            } else {
+              recentActivity.push({
+                id: randomUUID(),
+                type: 'thought',
+                content: text,
+                status: 'running',
+              });
+            }
+            updated = true;
+            break;
+          }
+          case 'TOOL_CALL_START': {
+            const name = String(activity.data['name']);
+            const displayName = activity.data['displayName']
+              ? String(activity.data['displayName'])
+              : undefined;
+            const description = activity.data['description']
+              ? String(activity.data['description'])
+              : undefined;
+            const args = JSON.stringify(activity.data['args']);
+            recentActivity.push({
+              id: randomUUID(),
+              type: 'tool_call',
+              content: name,
+              displayName,
+              description,
+              args,
+              status: 'running',
+            });
+            updated = true;
+            break;
+          }
+          case 'TOOL_CALL_END': {
+            const name = String(activity.data['name']);
+            // Find the last running tool call with this name
+            for (let i = recentActivity.length - 1; i >= 0; i--) {
+              if (
+                recentActivity[i].type === 'tool_call' &&
+                recentActivity[i].content === name &&
+                recentActivity[i].status === 'running'
+              ) {
+                recentActivity[i].status = 'completed';
+                updated = true;
+                break;
+              }
+            }
+            break;
+          }
+          case 'ERROR': {
+            const error = String(activity.data['error']);
+            const isCancellation = error === 'Request cancelled.';
+            const toolName = activity.data['name']
+              ? String(activity.data['name'])
+              : undefined;
+
+            if (toolName && isCancellation) {
+              for (let i = recentActivity.length - 1; i >= 0; i--) {
+                if (
+                  recentActivity[i].type === 'tool_call' &&
+                  recentActivity[i].content === toolName &&
+                  recentActivity[i].status === 'running'
+                ) {
+                  recentActivity[i].status = 'cancelled';
+                  updated = true;
+                  break;
+                }
+              }
+            }
+
+            recentActivity.push({
+              id: randomUUID(),
+              type: 'thought', // Treat errors as thoughts for now, or add an error type
+              content: isCancellation ? error : `Error: ${error}`,
+              status: isCancellation ? 'cancelled' : 'error',
+            });
+            updated = true;
+            break;
+          }
+          default:
+            break;
+        }
+
+        if (updated) {
+          // Keep only the last N items
+          if (recentActivity.length > MAX_RECENT_ACTIVITY) {
+            recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
+          }
+
+          const progress: SubagentProgress = {
+            isSubagentProgress: true,
+            agentName: this.definition.name,
+            recentActivity: [...recentActivity], // Copy to avoid mutation issues
+            state: 'running',
+          };
+
+          updateOutput(progress);
         }
       };
 
@@ -108,6 +227,23 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
       );
 
       const output = await executor.run(this.params, signal);
+
+      if (output.terminate_reason === AgentTerminateMode.ABORTED) {
+        const progress: SubagentProgress = {
+          isSubagentProgress: true,
+          agentName: this.definition.name,
+          recentActivity: [...recentActivity],
+          state: 'cancelled',
+        };
+
+        if (updateOutput) {
+          updateOutput(progress);
+        }
+
+        const cancelError = new Error('Operation cancelled by user');
+        cancelError.name = 'AbortError';
+        throw cancelError;
+      }
 
       const resultContent = `Subagent '${this.definition.name}' finished.
 Termination Reason: ${output.terminate_reason}
@@ -127,36 +263,70 @@ ${output.result}
         llmContent: [{ text: resultContent }],
         returnDisplay: displayContent,
       };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+} catch (error) {
+  const errorMessage =
+    error instanceof Error ? error.message : String(error);
 
-      function hasStatus(error: unknown): error is { status: number } {
-        if (typeof error !== 'object' || error === null) {
-          return false;
-        }
+  const isAbort =
+    (error instanceof Error && error.name === 'AbortError') ||
+    errorMessage.includes('Aborted');
 
-        if (!('status' in error)) {
-          return false;
-        }
-
-        const status = (error as { status: unknown }).status;
-
-        return typeof status === 'number';
-      }
-
-      const isApiError = hasStatus(error) && error.status === 400;
-
-      return {
-        llmContent: `Subagent '${this.definition.name}' failed. Error: ${errorMessage}\n\nGuidance: The investigation performed by '${this.definition.name}' was interrupted. You should analyze the provided error and determine if you can continue based on the information already gathered, or if you need to try a different approach (e.g., using a different tool or breaking the task into smaller parts).`,
-        returnDisplay: `Subagent Failed: ${this.definition.name}\nError: ${errorMessage}\n\nNote: The subagent's progress was lost due to this error. The main agent has been notified and will attempt to recover or proceed differently.`,
-        error: {
-          message: errorMessage,
-          type: isApiError
-            ? ToolErrorType.LLM_API_ERROR
-            : ToolErrorType.EXECUTION_FAILED,
-        },
-      };
+  // Mark any running items as error/cancelled
+  for (const item of recentActivity) {
+    if (item.status === 'running') {
+      item.status = isAbort ? 'cancelled' : 'error';
     }
+  }
+
+  if (!isAbort) {
+    const lastActivity = recentActivity[recentActivity.length - 1];
+    if (!lastActivity || lastActivity.status !== 'error') {
+      recentActivity.push({
+        id: randomUUID(),
+        type: 'thought',
+        content: `Error: ${errorMessage}`,
+        status: 'error',
+      });
+
+      if (recentActivity.length > MAX_RECENT_ACTIVITY) {
+        recentActivity = recentActivity.slice(-MAX_RECENT_ACTIVITY);
+      }
+    }
+  }
+
+  const progress: SubagentProgress = {
+    isSubagentProgress: true,
+    agentName: this.definition.name,
+    recentActivity: [...recentActivity],
+    state: isAbort ? 'cancelled' : 'error',
+  };
+
+  if (updateOutput) {
+    updateOutput(progress);
+  }
+
+  if (isAbort) {
+    throw error;
+  }
+
+  function hasStatus(error: unknown): error is { status: number } {
+    if (typeof error !== 'object' || error === null) return false;
+    if (!('status' in error)) return false;
+
+    const status = (error as { status: unknown }).status;
+    return typeof status === 'number';
+  }
+
+  const isApiError = hasStatus(error) && error.status === 400;
+
+  const apiHint = isApiError
+    ? '\nNote: This failure may be due to a Gemini API INVALID_ARGUMENT response.'
+    : '';
+
+  return {
+    llmContent: `Subagent '${this.definition.name}' failed. Error: ${errorMessage}${apiHint}`,
+    returnDisplay: progress,
+  };
+  }
   }
 }

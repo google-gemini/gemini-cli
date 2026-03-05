@@ -7,6 +7,12 @@ is licensed under the
 When you use Gemini CLI to access or use Google’s services, the Terms of Service
 and Privacy Notices applicable to those services apply to such access and use.
 
+Directly accessing the services powering Gemini CLI (e.g., the Gemini Code
+Assist service) using third-party software, tools, or services (for example,
+using OpenClaw with Gemini CLI OAuth) is a violation of applicable terms and
+policies. Such actions may be grounds for suspension or termination of your
+account.
+
 Your Gemini CLI Usage Statistics are handled in accordance with Google's Privacy
 Policy.
 

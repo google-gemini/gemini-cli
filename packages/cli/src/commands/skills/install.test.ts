@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 const mockInstallSkill = vi.hoisted(() => vi.fn());
 const mockRequestConsentNonInteractive = vi.hoisted(() => vi.fn());
@@ -19,11 +19,17 @@ vi.mock('../../config/extensions/consent.js', () => ({
   skillsConsentString: mockSkillsConsentString,
 }));
 
+const { debugLogger, emitConsoleLog } = await vi.hoisted(async () => {
+  const { createMockDebugLogger } = await import(
+    '../../test-utils/mockDebugLogger.js'
+  );
+  return createMockDebugLogger({ stripAnsi: true });
+});
+
 vi.mock('@google/gemini-cli-core', () => ({
-  debugLogger: { log: vi.fn(), error: vi.fn() },
+  debugLogger,
 }));
 
-import { debugLogger } from '@google/gemini-cli-core';
 import { handleInstall, installCommand } from './install.js';
 
 describe('skill install command', () => {
@@ -63,10 +69,12 @@ describe('skill install command', () => {
       expect.any(Function),
       expect.any(Function),
     );
-    expect(debugLogger.log).toHaveBeenCalledWith(
+    expect(emitConsoleLog).toHaveBeenCalledWith(
+      'log',
       expect.stringContaining('Successfully installed skill: test-skill'),
     );
-    expect(debugLogger.log).toHaveBeenCalledWith(
+    expect(emitConsoleLog).toHaveBeenCalledWith(
+      'log',
       expect.stringContaining('location: /mock/user/skills/test-skill'),
     );
     expect(mockRequestConsentNonInteractive).toHaveBeenCalledWith(
@@ -86,10 +94,11 @@ describe('skill install command', () => {
     });
 
     expect(mockRequestConsentNonInteractive).not.toHaveBeenCalled();
-    expect(debugLogger.log).toHaveBeenCalledWith(
+    expect(emitConsoleLog).toHaveBeenCalledWith(
+      'log',
       'You have consented to the following:',
     );
-    expect(debugLogger.log).toHaveBeenCalledWith('Mock Consent String');
+    expect(emitConsoleLog).toHaveBeenCalledWith('log', 'Mock Consent String');
     expect(mockInstallSkill).toHaveBeenCalled();
   });
 
@@ -106,7 +115,8 @@ describe('skill install command', () => {
       source: 'https://example.com/repo.git',
     });
 
-    expect(debugLogger.error).toHaveBeenCalledWith(
+    expect(emitConsoleLog).toHaveBeenCalledWith(
+      'error',
       'Skill installation cancelled by user.',
     );
     expect(process.exit).toHaveBeenCalledWith(1);
@@ -137,7 +147,7 @@ describe('skill install command', () => {
 
     await handleInstall({ source: '/local/path' });
 
-    expect(debugLogger.error).toHaveBeenCalledWith('Install failed');
+    expect(emitConsoleLog).toHaveBeenCalledWith('error', 'Install failed');
     expect(process.exit).toHaveBeenCalledWith(1);
   });
 });
