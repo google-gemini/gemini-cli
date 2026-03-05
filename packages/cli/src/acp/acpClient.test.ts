@@ -298,7 +298,8 @@ describe('GeminiAgent', () => {
         methodId: AuthType.GATEWAY,
         _meta: {
           gateway: {
-            // Missing baseUrl
+            // Invalid baseUrl
+            baseUrl: 123,
             headers: { Authorization: 'Bearer token' },
           },
         },
