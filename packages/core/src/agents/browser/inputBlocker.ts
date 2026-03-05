@@ -62,7 +62,7 @@ const INPUT_BLOCKER_SCRIPT = `(() => {
   banner.textContent = '🤖 Gemini CLI is controlling this browser. Input is disabled during automation.';
 
   blocker.appendChild(banner);
-  if (document.body) document.body.appendChild(blocker);
+  (document.body || document.documentElement)?.appendChild(blocker);
 })();`;
 
 /**
