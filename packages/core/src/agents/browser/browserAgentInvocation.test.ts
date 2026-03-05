@@ -17,6 +17,7 @@ import {
 } from '../types.js';
 import { LocalAgentExecutor } from '../local-executor.js';
 import { createBrowserAgentDefinition } from './browserAgentFactory.js';
+import type { z } from 'zod';
 
 // Mock dependencies
 vi.mock('../../utils/debugLogger.js', () => ({
@@ -155,14 +156,14 @@ describe('BrowserAgentInvocation', () => {
         definition: {
           name: 'browser_agent',
           toolConfig: { tools: [] },
-        } as unknown as LocalAgentExecutor<unknown>['definition'],
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>['definition'],
         browserManager: {} as unknown as NonNullable<
           Awaited<ReturnType<typeof createBrowserAgentDefinition>>
         >['browserManager'],
       });
 
       vi.mocked(LocalAgentExecutor.create).mockResolvedValue(
-        mockExecutor as unknown as LocalAgentExecutor<unknown>,
+        mockExecutor as unknown as LocalAgentExecutor<z.ZodTypeAny>,
       );
 
       const invocation = new BrowserAgentInvocation(
@@ -207,14 +208,14 @@ describe('BrowserAgentInvocation', () => {
               terminate_reason: AgentTerminateMode.GOAL,
               result: 'Success',
             }),
-          } as unknown as LocalAgentExecutor<unknown>;
+          } as unknown as LocalAgentExecutor<z.ZodTypeAny>;
         },
       );
 
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
         definition: {
           name: 'browser_agent',
-        } as unknown as LocalAgentExecutor<unknown>['definition'],
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>['definition'],
         browserManager: {} as unknown as NonNullable<
           Awaited<ReturnType<typeof createBrowserAgentDefinition>>
         >['browserManager'],
