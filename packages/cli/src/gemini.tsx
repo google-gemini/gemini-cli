@@ -460,6 +460,10 @@ export async function main() {
       ) {
         const err = validateAuthMethod(
           settings.merged.security.auth.selectedType,
+          {
+            envLoadResult: settings.initialEnvLoadResult,
+            settings: settings.merged,
+          },
         );
         if (err) {
           throw new Error(err);

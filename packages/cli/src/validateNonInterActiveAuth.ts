@@ -42,7 +42,10 @@ export async function validateNonInteractiveAuth(
     const authType: AuthType = effectiveAuthType;
 
     if (!useExternalAuth) {
-      const err = validateAuthMethod(String(authType));
+      const err = validateAuthMethod(String(authType), {
+        envLoadResult: settings.initialEnvLoadResult,
+        settings: settings.merged,
+      });
       if (err != null) {
         throw new Error(err);
       }
