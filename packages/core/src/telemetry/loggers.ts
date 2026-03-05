@@ -4,60 +4,64 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { LogRecord } from '@opentelemetry/api-logs';
-import { logs } from '@opentelemetry/api-logs';
+import { logs, type LogRecord } from '@opentelemetry/api-logs';
 import type { Config } from '../config/config.js';
 import { SERVICE_NAME } from './constants.js';
 import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
   EVENT_TOOL_CALL,
-} from './types.js';
-import type {
-  ApiErrorEvent,
-  ApiRequestEvent,
-  ApiResponseEvent,
-  FileOperationEvent,
-  IdeConnectionEvent,
-  StartSessionEvent,
-  ToolCallEvent,
-  UserPromptEvent,
-  FlashFallbackEvent,
-  NextSpeakerCheckEvent,
-  LoopDetectedEvent,
-  LoopDetectionDisabledEvent,
-  SlashCommandEvent,
-  ConversationFinishedEvent,
-  ChatCompressionEvent,
-  MalformedJsonResponseEvent,
-  InvalidChunkEvent,
-  ContentRetryEvent,
-  ContentRetryFailureEvent,
-  RipgrepFallbackEvent,
-  ToolOutputTruncatedEvent,
-  ModelRoutingEvent,
-  ExtensionDisableEvent,
-  ExtensionEnableEvent,
-  ExtensionUninstallEvent,
-  ExtensionInstallEvent,
-  ModelSlashCommandEvent,
-  EditStrategyEvent,
-  EditCorrectionEvent,
-  AgentStartEvent,
-  AgentFinishEvent,
-  RecoveryAttemptEvent,
-  WebFetchFallbackAttemptEvent,
-  ExtensionUpdateEvent,
-  LlmLoopCheckEvent,
-  HookCallEvent,
-  StartupStatsEvent,
+  EVENT_REWIND,
+  type ApiErrorEvent,
+  type ApiRequestEvent,
+  type ApiResponseEvent,
+  type FileOperationEvent,
+  type IdeConnectionEvent,
+  type StartSessionEvent,
+  type ToolCallEvent,
+  type UserPromptEvent,
+  type FlashFallbackEvent,
+  type NextSpeakerCheckEvent,
+  type LoopDetectedEvent,
+  type LoopDetectionDisabledEvent,
+  type SlashCommandEvent,
+  type RewindEvent,
+  type ConversationFinishedEvent,
+  type ChatCompressionEvent,
+  type MalformedJsonResponseEvent,
+  type InvalidChunkEvent,
+  type ContentRetryEvent,
+  type ContentRetryFailureEvent,
+  type RipgrepFallbackEvent,
+  type ToolOutputTruncatedEvent,
+  type ModelRoutingEvent,
+  type ExtensionDisableEvent,
+  type ExtensionEnableEvent,
+  type ExtensionUninstallEvent,
+  type ExtensionInstallEvent,
+  type ModelSlashCommandEvent,
+  type EditStrategyEvent,
+  type EditCorrectionEvent,
+  type AgentStartEvent,
+  type AgentFinishEvent,
+  type RecoveryAttemptEvent,
+  type WebFetchFallbackAttemptEvent,
+  type ExtensionUpdateEvent,
+  type ApprovalModeSwitchEvent,
+  type ApprovalModeDurationEvent,
+  type HookCallEvent,
+  type StartupStatsEvent,
+  type LlmLoopCheckEvent,
+  type PlanExecutionEvent,
+  type ToolOutputMaskingEvent,
+  type KeychainAvailabilityEvent,
+  type TokenStorageInitializationEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
   recordToolCallMetrics,
   recordChatCompressionMetrics,
   recordFileOperationMetric,
-  recordInvalidChunk,
   recordContentRetry,
   recordContentRetryFailure,
   recordModelRoutingMetrics,
@@ -69,11 +73,16 @@ import {
   recordRecoveryAttemptMetrics,
   recordLinesChanged,
   recordHookCallMetrics,
+  recordPlanExecution,
+  recordKeychainAvailability,
+  recordTokenStorageInitialization,
+  recordInvalidChunk,
 } from './metrics.js';
 import { bufferTelemetryEvent } from './sdk.js';
-import type { UiEvent } from './uiTelemetry.js';
-import { uiTelemetryService } from './uiTelemetry.js';
+import { uiTelemetryService, type UiEvent } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import type { BillingTelemetryEvent } from './billingEvents.js';
 
 export function logCliConfiguration(
   config: Config,
@@ -81,12 +90,20 @@ export function logCliConfiguration(
 ): void {
   void ClearcutLogger.getInstance(config)?.logStartSessionEvent(event);
   bufferTelemetryEvent(() => {
-    const logger = logs.getLogger(SERVICE_NAME);
-    const logRecord: LogRecord = {
-      body: event.toLogBody(),
-      attributes: event.toOpenTelemetryAttributes(config),
-    };
-    logger.emit(logRecord);
+    // Wait for experiments to load before emitting so we capture experimentIds
+    void config
+      .getExperimentsAsync()
+      .then(() => {
+        const logger = logs.getLogger(SERVICE_NAME);
+        const logRecord: LogRecord = {
+          body: event.toLogBody(),
+          attributes: event.toOpenTelemetryAttributes(config),
+        };
+        logger.emit(logRecord);
+      })
+      .catch((e: unknown) => {
+        debugLogger.error('Failed to log telemetry event', e);
+      });
   });
 }
 
@@ -104,6 +121,7 @@ export function logUserPrompt(config: Config, event: UserPromptEvent): void {
 }
 
 export function logToolCall(config: Config, event: ToolCallEvent): void {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const uiEvent = {
     ...event,
     'event.name': EVENT_TOOL_CALL,
@@ -126,12 +144,14 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     });
 
     if (event.metadata) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const added = event.metadata['model_added_lines'];
       if (typeof added === 'number' && added > 0) {
         recordLinesChanged(config, added, 'added', {
           function_name: event.function_name,
         });
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const removed = event.metadata['model_removed_lines'];
       if (typeof removed === 'number' && removed > 0) {
         recordLinesChanged(config, removed, 'removed', {
@@ -147,6 +167,21 @@ export function logToolOutputTruncated(
   event: ToolOutputTruncatedEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logToolOutputTruncatedEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+  });
+}
+
+export function logToolOutputMasking(
+  config: Config,
+  event: ToolOutputMaskingEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logToolOutputMaskingEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -220,6 +255,7 @@ export function logRipgrepFallback(
 }
 
 export function logApiError(config: Config, event: ApiErrorEvent): void {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const uiEvent = {
     ...event,
     'event.name': EVENT_API_ERROR,
@@ -251,6 +287,7 @@ export function logApiError(config: Config, event: ApiErrorEvent): void {
 }
 
 export function logApiResponse(config: Config, event: ApiResponseEvent): void {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const uiEvent = {
     ...event,
     'event.name': EVENT_API_RESPONSE,
@@ -339,6 +376,25 @@ export function logSlashCommand(
   event: SlashCommandEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logSlashCommandEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+  });
+}
+
+export function logRewind(config: Config, event: RewindEvent): void {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const uiEvent = {
+    ...event,
+    'event.name': EVENT_REWIND,
+    'event.timestamp': new Date().toISOString(),
+  } as UiEvent;
+  uiTelemetryService.addEvent(uiEvent);
+  ClearcutLogger.getInstance(config)?.logRewindEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -671,6 +727,46 @@ export function logLlmLoopCheck(
   });
 }
 
+export function logApprovalModeSwitch(
+  config: Config,
+  event: ApprovalModeSwitchEvent,
+) {
+  ClearcutLogger.getInstance(config)?.logApprovalModeSwitchEvent(event);
+  bufferTelemetryEvent(() => {
+    logs.getLogger(SERVICE_NAME).emit({
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    });
+  });
+}
+
+export function logApprovalModeDuration(
+  config: Config,
+  event: ApprovalModeDurationEvent,
+) {
+  ClearcutLogger.getInstance(config)?.logApprovalModeDurationEvent(event);
+  bufferTelemetryEvent(() => {
+    logs.getLogger(SERVICE_NAME).emit({
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    });
+  });
+}
+
+export function logPlanExecution(config: Config, event: PlanExecutionEvent) {
+  ClearcutLogger.getInstance(config)?.logPlanExecutionEvent(event);
+  bufferTelemetryEvent(() => {
+    logs.getLogger(SERVICE_NAME).emit({
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    });
+
+    recordPlanExecution(config, {
+      approval_mode: event.approval_mode,
+    });
+  });
+}
+
 export function logHookCall(config: Config, event: HookCallEvent): void {
   ClearcutLogger.getInstance(config)?.logHookCallEvent(event);
   bufferTelemetryEvent(() => {
@@ -694,6 +790,63 @@ export function logHookCall(config: Config, event: HookCallEvent): void {
 export function logStartupStats(
   config: Config,
   event: StartupStatsEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logStartupStatsEvent(event);
+  bufferTelemetryEvent(() => {
+    // Wait for experiments to load before emitting so we capture experimentIds
+    void config
+      .getExperimentsAsync()
+      .then(() => {
+        const logger = logs.getLogger(SERVICE_NAME);
+        const logRecord: LogRecord = {
+          body: event.toLogBody(),
+          attributes: event.toOpenTelemetryAttributes(config),
+        };
+        logger.emit(logRecord);
+      })
+      .catch((e: unknown) => {
+        debugLogger.error('Failed to log telemetry event', e);
+      });
+  });
+}
+
+export function logKeychainAvailability(
+  config: Config,
+  event: KeychainAvailabilityEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logKeychainAvailabilityEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+
+    recordKeychainAvailability(config, event);
+  });
+}
+
+export function logTokenStorageInitialization(
+  config: Config,
+  event: TokenStorageInitializationEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logTokenStorageInitializationEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+
+    recordTokenStorageInitialization(config, event);
+  });
+}
+
+export function logBillingEvent(
+  config: Config,
+  event: BillingTelemetryEvent,
 ): void {
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);

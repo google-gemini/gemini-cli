@@ -9,27 +9,37 @@ import { InfoMessage } from './InfoMessage.js';
 import { describe, it, expect } from 'vitest';
 
 describe('InfoMessage', () => {
-  it('renders with the correct default prefix and text', () => {
-    const { lastFrame } = render(<InfoMessage text="Just so you know" />);
+  it('renders with the correct default prefix and text', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <InfoMessage text="Just so you know" />,
+    );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders with a custom icon', () => {
-    const { lastFrame } = render(
+  it('renders with a custom icon', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(
       <InfoMessage text="Custom icon test" icon="★" />,
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders multiline info messages', () => {
+  it('renders multiline info messages', async () => {
     const message = 'Info line 1\nInfo line 2';
-    const { lastFrame } = render(<InfoMessage text={message} />);
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <InfoMessage text={message} />,
+    );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+    unmount();
   });
 });

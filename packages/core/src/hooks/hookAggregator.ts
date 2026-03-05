@@ -5,19 +5,18 @@
  */
 
 import { FunctionCallingConfigMode } from '@google/genai';
-import type {
-  HookOutput,
-  HookExecutionResult,
-  BeforeToolSelectionOutput,
-} from './types.js';
 import {
   DefaultHookOutput,
   BeforeToolHookOutput,
   BeforeModelHookOutput,
   BeforeToolSelectionHookOutput,
   AfterModelHookOutput,
+  AfterAgentHookOutput,
+  HookEventName,
+  type HookOutput,
+  type HookExecutionResult,
+  type BeforeToolSelectionOutput,
 } from './types.js';
-import { HookEventName } from './types.js';
 
 /**
  * Aggregated hook result
@@ -101,6 +100,7 @@ export class HookAggregator {
 
       case HookEventName.BeforeToolSelection:
         return this.mergeToolSelectionOutputs(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           outputs as BeforeToolSelectionOutput[],
         );
 
@@ -158,11 +158,21 @@ export class HookAggregator {
         merged.suppressOutput = true;
       }
 
-      // Merge hookSpecificOutput
-      if (output.hookSpecificOutput) {
+      // Handle clearContext (any true wins) - for AfterAgent hooks
+      if (output.hookSpecificOutput?.['clearContext'] === true) {
         merged.hookSpecificOutput = {
           ...(merged.hookSpecificOutput || {}),
-          ...output.hookSpecificOutput,
+          clearContext: true,
+        };
+      }
+
+      // Merge hookSpecificOutput (excluding clearContext which is handled above)
+      if (output.hookSpecificOutput) {
+        const { clearContext: _clearContext, ...restSpecificOutput } =
+          output.hookSpecificOutput;
+        merged.hookSpecificOutput = {
+          ...(merged.hookSpecificOutput || {}),
+          ...restSpecificOutput,
         };
       }
 
@@ -323,6 +333,8 @@ export class HookAggregator {
         return new BeforeToolSelectionHookOutput(output);
       case HookEventName.AfterModel:
         return new AfterModelHookOutput(output);
+      case HookEventName.AfterAgent:
+        return new AfterAgentHookOutput(output);
       default:
         return new DefaultHookOutput(output);
     }

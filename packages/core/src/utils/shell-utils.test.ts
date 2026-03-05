@@ -18,6 +18,7 @@ import {
   getCommandRoots,
   getShellConfiguration,
   initializeShellParsers,
+  parseCommandDetails,
   stripShellWrapper,
   hasRedirection,
   resolveExecutable,
@@ -168,6 +169,20 @@ describe('getCommandRoots', () => {
     expect(result).toEqual(['echo', 'cat']);
   });
 
+  it('should correctly identify input redirection with explicit file descriptor', () => {
+    const result = parseCommandDetails('ls 2< input.txt');
+    const redirection = result?.details.find((d) =>
+      d.name.startsWith('redirection'),
+    );
+    expect(redirection?.name).toBe('redirection (<)');
+  });
+
+  it('should filter out all redirections from getCommandRoots', () => {
+    expect(getCommandRoots('cat < input.txt')).toEqual(['cat']);
+    expect(getCommandRoots('ls 2> error.log')).toEqual(['ls']);
+    expect(getCommandRoots('exec 3<&0')).toEqual(['exec']);
+  });
+
   it('should handle parser initialization failures gracefully', async () => {
     // Reset modules to clear singleton state
     vi.resetModules();
@@ -220,6 +235,11 @@ describe('hasRedirection', () => {
     expect(hasRedirection('cat < input')).toBe(true);
   });
 
+  it('should detect redirection with explicit file descriptor', () => {
+    expect(hasRedirection('ls 2> error.log')).toBe(true);
+    expect(hasRedirection('exec 3<&0')).toBe(true);
+  });
+
   it('should detect append redirection', () => {
     expect(hasRedirection('echo hello >> world')).toBe(true);
   });
@@ -241,6 +261,11 @@ describe('hasRedirection', () => {
     // However, the current implementation checks for 'redirected_statement' nodes.
     // A pipe is a 'pipeline' node.
     expect(hasRedirection('echo hello | cat')).toBe(false);
+  });
+
+  it('should return false when redirection characters are inside quotes in bash', () => {
+    mockPlatform.mockReturnValue('linux');
+    expect(hasRedirection('echo "a > b"')).toBe(false);
   });
 });
 

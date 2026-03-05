@@ -9,18 +9,30 @@ import clipboardy from 'clipboardy';
 import type { SlashCommand } from '../commands/types.js';
 import fs from 'node:fs';
 import type { Writable } from 'node:stream';
+import type { Settings } from '../../config/settingsSchema.js';
+import { AT_COMMAND_PATH_REGEX_SOURCE } from '../hooks/atCommandProcessor.js';
+
+// Pre-compiled regex for detecting @<path> patterns consistent with parseAllAtCommands.
+// Uses the same AT_COMMAND_PATH_REGEX_SOURCE so that isAtCommand is true whenever
+// parseAllAtCommands would find at least one atPath part.
+const AT_COMMAND_DETECT_REGEX = new RegExp(
+  `(?<!\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}`,
+);
 
 /**
  * Checks if a query string potentially represents an '@' command.
- * It triggers if the query starts with '@' or contains '@' preceded by whitespace
- * and followed by a non-whitespace character.
+ * Returns true if the query contains any '@<path>' pattern that would be
+ * recognised by the @ command processor, regardless of what character
+ * precedes the '@' sign. This ensures that prompts written in an external
+ * editor (where '@' may follow punctuation like ':' or '(') are correctly
+ * identified and their referenced files pre-loaded before the query is sent
+ * to the model.
  *
  * @param query The input query string.
  * @returns True if the query looks like an '@' command, false otherwise.
  */
 export const isAtCommand = (query: string): boolean =>
-  // Check if starts with @ OR has a space, then @
-  query.startsWith('@') || /\s@/.test(query);
+  AT_COMMAND_DETECT_REGEX.test(query);
 
 /**
  * Checks if a query string potentially represents an '/' command.
@@ -109,6 +121,18 @@ const pickTty = (): Promise<TtyTarget> =>
   });
 
 const getStdioTty = (): TtyTarget => {
+  // On Windows, prioritize stdout to prevent shell-specific formatting (e.g., PowerShell's
+  // red stderr) from corrupting the raw escape sequence payload.
+  if (process.platform === 'win32') {
+    if (process.stdout?.isTTY)
+      return { stream: process.stdout, closeAfter: false };
+    if (process.stderr?.isTTY)
+      return { stream: process.stderr, closeAfter: false };
+    return null;
+  }
+
+  // On non-Windows platforms, prioritize stderr to avoid polluting stdout,
+  // preserving it for potential redirection or piping.
   if (process.stderr?.isTTY)
     return { stream: process.stderr, closeAfter: false };
   if (process.stdout?.isTTY)
@@ -140,10 +164,18 @@ const isWSL = (): boolean =>
       process.env['WSL_INTEROP'],
   );
 
+const isWindowsTerminal = (): boolean =>
+  process.platform === 'win32' && Boolean(process.env['WT_SESSION']);
+
 const isDumbTerm = (): boolean => (process.env['TERM'] ?? '') === 'dumb';
 
-const shouldUseOsc52 = (tty: TtyTarget): boolean =>
-  Boolean(tty) && !isDumbTerm() && (isSSH() || isWSL());
+const shouldUseOsc52 = (tty: TtyTarget, settings?: Settings): boolean =>
+  Boolean(tty) &&
+  !isDumbTerm() &&
+  (settings?.experimental?.useOSC52Copy ||
+    isSSH() ||
+    isWSL() ||
+    isWindowsTerminal());
 
 const safeUtf8Truncate = (buf: Buffer, maxBytes: number): Buffer => {
   if (buf.length <= maxBytes) return buf;
@@ -176,8 +208,31 @@ const wrapForScreen = (seq: string): string => {
 
 const writeAll = (stream: Writable, data: string): Promise<void> =>
   new Promise<void>((resolve, reject) => {
+    // On Windows, writing directly to the underlying file descriptor bypasses
+    // application-level stream interception (e.g., by the Ink UI framework).
+    // This ensures the raw OSC-52 escape sequence reaches the terminal host uncorrupted.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const fd = (stream as unknown as { fd?: number }).fd;
+    if (
+      process.platform === 'win32' &&
+      typeof fd === 'number' &&
+      (stream === process.stdout || stream === process.stderr)
+    ) {
+      try {
+        fs.writeSync(fd, data);
+        resolve();
+        return;
+      } catch (e) {
+        debugLogger.warn(
+          'Direct write to TTY failed, falling back to stream write',
+          e,
+        );
+      }
+    }
+
     const onError = (err: unknown) => {
       cleanup();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       reject(err as Error);
     };
     const onDrain = () => {
@@ -199,12 +254,15 @@ const writeAll = (stream: Writable, data: string): Promise<void> =>
   });
 
 // Copies a string snippet to the clipboard with robust OSC-52 support.
-export const copyToClipboard = async (text: string): Promise<void> => {
+export const copyToClipboard = async (
+  text: string,
+  settings?: Settings,
+): Promise<void> => {
   if (!text) return;
 
   const tty = await pickTty();
 
-  if (shouldUseOsc52(tty)) {
+  if (shouldUseOsc52(tty, settings)) {
     const osc = buildOsc52(text);
     const payload = inTmux()
       ? wrapForTmux(osc)
@@ -215,6 +273,7 @@ export const copyToClipboard = async (text: string): Promise<void> => {
     await writeAll(tty!.stream, payload);
 
     if (tty!.closeAfter) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (tty!.stream as fs.WriteStream).end();
     }
     return;

@@ -28,7 +28,9 @@ export const LogoutConfirmationDialog: React.FC<
     (key) => {
       if (key.name === 'escape') {
         onSelect(LogoutChoice.EXIT);
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );
@@ -51,7 +53,7 @@ export const LogoutConfirmationDialog: React.FC<
       <Box
         flexDirection="column"
         borderStyle="round"
-        borderColor={theme.border.focused}
+        borderColor={theme.ui.focus}
         padding={1}
         flexGrow={1}
         marginLeft={1}

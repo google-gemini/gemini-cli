@@ -89,6 +89,10 @@ export type SafetyCheckResult =
        * This will be shown to the user.
        */
       reason?: string;
+      /**
+       * Optional error message if the decision was made due to a system failure (fail-open).
+       */
+      error?: string;
     }
   | {
       decision: SafetyCheckDecision.DENY;

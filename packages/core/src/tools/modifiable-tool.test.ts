@@ -5,13 +5,11 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type {
-  ModifyContext,
-  ModifiableDeclarativeTool,
-} from './modifiable-tool.js';
 import {
   modifyWithEditor,
   isModifiableDeclarativeTool,
+  type ModifyContext,
+  type ModifiableDeclarativeTool,
 } from './modifiable-tool.js';
 import { DEFAULT_GUI_EDITOR } from '../utils/editor.js';
 import fs from 'node:fs';
@@ -136,7 +134,7 @@ describe('modifyWithEditor', () => {
         'Proposed',
         expect.objectContaining({
           context: 3,
-          ignoreWhitespace: true,
+          ignoreWhitespace: false,
         }),
       );
 
@@ -205,7 +203,7 @@ describe('modifyWithEditor', () => {
       'Proposed',
       expect.objectContaining({
         context: 3,
-        ignoreWhitespace: true,
+        ignoreWhitespace: false,
       }),
     );
 
@@ -233,7 +231,7 @@ describe('modifyWithEditor', () => {
       'Proposed',
       expect.objectContaining({
         context: 3,
-        ignoreWhitespace: true,
+        ignoreWhitespace: false,
       }),
     );
 

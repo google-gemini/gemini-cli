@@ -6,8 +6,11 @@
 
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import type { SafetyCheckInput, SafetyCheckResult } from './protocol.js';
-import { SafetyCheckDecision } from './protocol.js';
+import {
+  SafetyCheckDecision,
+  type SafetyCheckInput,
+  type SafetyCheckResult,
+} from './protocol.js';
 import type { AllowedPathConfig } from '../policy/types.js';
 
 /**
@@ -23,6 +26,7 @@ export interface InProcessChecker {
 export class AllowedPathChecker implements InProcessChecker {
   async check(input: SafetyCheckInput): Promise<SafetyCheckResult> {
     const { toolCall, context } = input;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const config = input.config as AllowedPathConfig | undefined;
 
     // Build list of allowed directories

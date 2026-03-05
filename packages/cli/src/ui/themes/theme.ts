@@ -5,12 +5,158 @@
  */
 
 import type { CSSProperties } from 'react';
+
 import type { SemanticColors } from './semantic-tokens.js';
+
+import type { CustomTheme } from '@google/gemini-cli-core';
 import {
-  resolveColor,
-  interpolateColor,
-  getThemeTypeFromBackgroundColor,
-} from './color-utils.js';
+  DEFAULT_INPUT_BACKGROUND_OPACITY,
+  DEFAULT_SELECTION_OPACITY,
+  DEFAULT_BORDER_OPACITY,
+} from '../constants.js';
+import tinygradient from 'tinygradient';
+import tinycolor from 'tinycolor2';
+
+// Define the set of Ink's named colors for quick lookup
+export const INK_SUPPORTED_NAMES = new Set([
+  'black',
+  'red',
+  'green',
+  'yellow',
+  'blue',
+  'cyan',
+  'magenta',
+  'white',
+  'gray',
+  'grey',
+  'blackbright',
+  'redbright',
+  'greenbright',
+  'yellowbright',
+  'bluebright',
+  'cyanbright',
+  'magentabright',
+  'whitebright',
+]);
+
+// Use tinycolor's built-in names map for CSS colors, excluding ones Ink supports
+export const CSS_NAME_TO_HEX_MAP = Object.fromEntries(
+  Object.entries(tinycolor.names)
+    .filter(([name]) => !INK_SUPPORTED_NAMES.has(name))
+    .map(([name, hex]) => [name, `#${hex}`]),
+);
+
+// Mapping for ANSI bright colors that are not in tinycolor's standard CSS names
+export const INK_NAME_TO_HEX_MAP: Readonly<Record<string, string>> = {
+  blackbright: '#555555',
+  redbright: '#ff5555',
+  greenbright: '#55ff55',
+  yellowbright: '#ffff55',
+  bluebright: '#5555ff',
+  magentabright: '#ff55ff',
+  cyanbright: '#55ffff',
+  whitebright: '#ffffff',
+};
+
+/**
+ * Calculates the relative luminance of a color.
+ * See https://www.w3.org/TR/WCAG20/#relativeluminancedef
+ *
+ * @param color Color string (hex or Ink-supported name)
+ * @returns Luminance value (0-255)
+ */
+export function getLuminance(color: string): number {
+  const resolved = color.toLowerCase();
+  const hex = INK_NAME_TO_HEX_MAP[resolved] || resolved;
+
+  const colorObj = tinycolor(hex);
+  if (!colorObj.isValid()) {
+    return 0;
+  }
+
+  // tinycolor returns 0-1, we need 0-255
+  return colorObj.getLuminance() * 255;
+}
+
+/**
+ * Resolves a CSS color value (name or hex) into an Ink-compatible color string.
+ * @param colorValue The raw color string (e.g., 'blue', '#ff0000', 'darkkhaki').
+ * @returns An Ink-compatible color string (hex or name), or undefined if not resolvable.
+ */
+export function resolveColor(colorValue: string): string | undefined {
+  const lowerColor = colorValue.toLowerCase();
+
+  // 1. Check if it's already a hex code and valid
+  if (lowerColor.startsWith('#')) {
+    if (/^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(colorValue)) {
+      return lowerColor;
+    } else {
+      return undefined;
+    }
+  }
+
+  // Handle hex codes without #
+  if (/^[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(colorValue)) {
+    return `#${lowerColor}`;
+  }
+
+  // 2. Check if it's an Ink supported name (lowercase)
+  if (INK_SUPPORTED_NAMES.has(lowerColor)) {
+    return lowerColor; // Use Ink name directly
+  }
+
+  // 3. Check if it's a known CSS name we can map to hex
+  // We can't import CSS_NAME_TO_HEX_MAP here due to circular deps,
+  // but we can use tinycolor directly for named colors.
+  const colorObj = tinycolor(lowerColor);
+  if (colorObj.isValid()) {
+    return colorObj.toHexString();
+  }
+
+  // 4. Could not resolve
+  return undefined;
+}
+
+export function interpolateColor(
+  color1: string,
+  color2: string,
+  factor: number,
+) {
+  if (factor <= 0 && color1) {
+    return color1;
+  }
+  if (factor >= 1 && color2) {
+    return color2;
+  }
+  if (!color1 || !color2) {
+    return '';
+  }
+  try {
+    const gradient = tinygradient(color1, color2);
+    const color = gradient.rgbAt(factor);
+    return color.toHexString();
+  } catch (_e) {
+    return color1;
+  }
+}
+
+export function getThemeTypeFromBackgroundColor(
+  backgroundColor: string | undefined,
+): 'light' | 'dark' | undefined {
+  if (!backgroundColor) {
+    return undefined;
+  }
+
+  const resolvedColor = resolveColor(backgroundColor);
+  if (!resolvedColor) {
+    return undefined;
+  }
+
+  const luminance = getLuminance(resolvedColor);
+  return luminance > 128 ? 'light' : 'dark';
+}
+
+export type { CustomTheme };
 
 export type ThemeType = 'light' | 'dark' | 'ansi' | 'custom';
 
@@ -30,57 +176,10 @@ export interface ColorsTheme {
   Comment: string;
   Gray: string;
   DarkGray: string;
-  GradientColors?: string[];
-}
-
-export interface CustomTheme {
-  type: 'custom';
-  name: string;
-
-  text?: {
-    primary?: string;
-    secondary?: string;
-    link?: string;
-    accent?: string;
-    response?: string;
-  };
-  background?: {
-    primary?: string;
-    diff?: {
-      added?: string;
-      removed?: string;
-    };
-  };
-  border?: {
-    default?: string;
-    focused?: string;
-  };
-  ui?: {
-    comment?: string;
-    symbol?: string;
-    gradient?: string[];
-  };
-  status?: {
-    error?: string;
-    success?: string;
-    warning?: string;
-  };
-
-  // Legacy properties (all optional)
-  Background?: string;
-  Foreground?: string;
-  LightBlue?: string;
-  AccentBlue?: string;
-  AccentPurple?: string;
-  AccentCyan?: string;
-  AccentGreen?: string;
-  AccentYellow?: string;
-  AccentRed?: string;
-  DiffAdded?: string;
-  DiffRemoved?: string;
-  Comment?: string;
-  Gray?: string;
-  DarkGray?: string;
+  InputBackground?: string;
+  MessageBackground?: string;
+  FocusBackground?: string;
+  FocusColor?: string;
   GradientColors?: string[];
 }
 
@@ -99,7 +198,22 @@ export const lightTheme: ColorsTheme = {
   DiffRemoved: '#FFCCCC',
   Comment: '#008000',
   Gray: '#97a0b0',
-  DarkGray: interpolateColor('#97a0b0', '#FAFAFA', 0.5),
+  DarkGray: interpolateColor('#FAFAFA', '#97a0b0', DEFAULT_BORDER_OPACITY),
+  InputBackground: interpolateColor(
+    '#FAFAFA',
+    '#97a0b0',
+    DEFAULT_INPUT_BACKGROUND_OPACITY,
+  ),
+  MessageBackground: interpolateColor(
+    '#FAFAFA',
+    '#97a0b0',
+    DEFAULT_INPUT_BACKGROUND_OPACITY,
+  ),
+  FocusBackground: interpolateColor(
+    '#FAFAFA',
+    '#3CA84B',
+    DEFAULT_SELECTION_OPACITY,
+  ),
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
@@ -118,7 +232,22 @@ export const darkTheme: ColorsTheme = {
   DiffRemoved: '#430000',
   Comment: '#6C7086',
   Gray: '#6C7086',
-  DarkGray: interpolateColor('#6C7086', '#1E1E2E', 0.5),
+  DarkGray: interpolateColor('#1E1E2E', '#6C7086', DEFAULT_BORDER_OPACITY),
+  InputBackground: interpolateColor(
+    '#1E1E2E',
+    '#6C7086',
+    DEFAULT_INPUT_BACKGROUND_OPACITY,
+  ),
+  MessageBackground: interpolateColor(
+    '#1E1E2E',
+    '#6C7086',
+    DEFAULT_INPUT_BACKGROUND_OPACITY,
+  ),
+  FocusBackground: interpolateColor(
+    '#1E1E2E',
+    '#A6E3A1',
+    DEFAULT_SELECTION_OPACITY,
+  ),
   GradientColors: ['#4796E4', '#847ACE', '#C3677F'],
 };
 
@@ -138,6 +267,9 @@ export const ansiTheme: ColorsTheme = {
   Comment: 'gray',
   Gray: 'gray',
   DarkGray: 'gray',
+  InputBackground: 'black',
+  MessageBackground: 'black',
+  FocusBackground: 'black',
 };
 
 export class Theme {
@@ -175,19 +307,41 @@ export class Theme {
       },
       background: {
         primary: this.colors.Background,
+        message:
+          this.colors.MessageBackground ??
+          interpolateColor(
+            this.colors.Background,
+            this.colors.Gray,
+            DEFAULT_INPUT_BACKGROUND_OPACITY,
+          ),
+        input:
+          this.colors.InputBackground ??
+          interpolateColor(
+            this.colors.Background,
+            this.colors.Gray,
+            DEFAULT_INPUT_BACKGROUND_OPACITY,
+          ),
+        focus:
+          this.colors.FocusBackground ??
+          interpolateColor(
+            this.colors.Background,
+            this.colors.FocusColor ?? this.colors.AccentGreen,
+            DEFAULT_SELECTION_OPACITY,
+          ),
         diff: {
           added: this.colors.DiffAdded,
           removed: this.colors.DiffRemoved,
         },
       },
       border: {
-        default: this.colors.Gray,
-        focused: this.colors.AccentBlue,
+        default: this.colors.DarkGray,
       },
       ui: {
         comment: this.colors.Gray,
         symbol: this.colors.AccentCyan,
+        active: this.colors.AccentBlue,
         dark: this.colors.DarkGray,
+        focus: this.colors.FocusColor ?? this.colors.AccentGreen,
         gradient: this.colors.GradientColors,
       },
       status: {
@@ -282,10 +436,26 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
     DarkGray:
       customTheme.DarkGray ??
       interpolateColor(
-        customTheme.text?.secondary ?? customTheme.Gray ?? '',
         customTheme.background?.primary ?? customTheme.Background ?? '',
-        0.5,
+        customTheme.text?.secondary ?? customTheme.Gray ?? '',
+        DEFAULT_BORDER_OPACITY,
       ),
+    InputBackground: interpolateColor(
+      customTheme.background?.primary ?? customTheme.Background ?? '',
+      customTheme.text?.secondary ?? customTheme.Gray ?? '',
+      DEFAULT_INPUT_BACKGROUND_OPACITY,
+    ),
+    MessageBackground: interpolateColor(
+      customTheme.background?.primary ?? customTheme.Background ?? '',
+      customTheme.text?.secondary ?? customTheme.Gray ?? '',
+      DEFAULT_INPUT_BACKGROUND_OPACITY,
+    ),
+    FocusBackground: interpolateColor(
+      customTheme.background?.primary ?? customTheme.Background ?? '',
+      customTheme.status?.success ?? customTheme.AccentGreen ?? '#3CA84B', // Fallback to a default green if not found
+      DEFAULT_SELECTION_OPACITY,
+    ),
+    FocusColor: customTheme.ui?.focus ?? customTheme.AccentGreen,
     GradientColors: customTheme.ui?.gradient ?? customTheme.GradientColors,
   };
 
@@ -440,19 +610,23 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
     },
     background: {
       primary: customTheme.background?.primary ?? colors.Background,
+      message: colors.MessageBackground!,
+      input: colors.InputBackground!,
+      focus: colors.FocusBackground!,
       diff: {
         added: customTheme.background?.diff?.added ?? colors.DiffAdded,
         removed: customTheme.background?.diff?.removed ?? colors.DiffRemoved,
       },
     },
     border: {
-      default: customTheme.border?.default ?? colors.Gray,
-      focused: customTheme.border?.focused ?? colors.AccentBlue,
+      default: colors.DarkGray,
     },
     ui: {
       comment: customTheme.ui?.comment ?? colors.Comment,
       symbol: customTheme.ui?.symbol ?? colors.Gray,
+      active: customTheme.ui?.active ?? colors.AccentBlue,
       dark: colors.DarkGray,
+      focus: colors.FocusColor ?? colors.AccentGreen,
       gradient: customTheme.ui?.gradient ?? colors.GradientColors,
     },
     status: {

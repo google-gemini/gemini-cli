@@ -14,6 +14,7 @@ import {
   type MockInstance,
 } from 'vitest';
 import { SimpleExtensionLoader } from './extensionLoader.js';
+import { PolicyDecision } from '../policy/types.js';
 import type { Config, GeminiCLIExtension } from '../config/config.js';
 import { type McpClientManager } from '../tools/mcp-client-manager.js';
 import type { GeminiClient } from '../core/client.js';
@@ -36,6 +37,14 @@ describe('SimpleExtensionLoader', () => {
     typeof GeminiClient.prototype.setTools
   >;
   let mockHookSystemInit: MockInstance;
+  let mockAgentRegistryReload: MockInstance;
+  let mockSkillsReload: MockInstance;
+  let mockPolicyEngine: {
+    addRule: MockInstance;
+    addChecker: MockInstance;
+    removeRulesBySource: MockInstance;
+    removeCheckersBySource: MockInstance;
+  };
 
   const activeExtension: GeminiCLIExtension = {
     name: 'test-extension',
@@ -45,7 +54,22 @@ describe('SimpleExtensionLoader', () => {
     contextFiles: [],
     excludeTools: ['some-tool'],
     id: '123',
+    rules: [
+      {
+        toolName: 'test-tool',
+        decision: PolicyDecision.ALLOW,
+        source: 'Extension (test-extension): policies.toml',
+      },
+    ],
+    checkers: [
+      {
+        toolName: 'test-tool',
+        checker: { type: 'external', name: 'test-checker' },
+        source: 'Extension (test-extension): policies.toml',
+      },
+    ],
   };
+
   const inactiveExtension: GeminiCLIExtension = {
     name: 'test-extension',
     isActive: false,
@@ -63,6 +87,14 @@ describe('SimpleExtensionLoader', () => {
     extensionReloadingEnabled = false;
     mockGeminiClientSetTools = vi.fn();
     mockHookSystemInit = vi.fn();
+    mockAgentRegistryReload = vi.fn();
+    mockSkillsReload = vi.fn();
+    mockPolicyEngine = {
+      addRule: vi.fn(),
+      addChecker: vi.fn(),
+      removeRulesBySource: vi.fn(),
+      removeCheckersBySource: vi.fn(),
+    };
     mockConfig = {
       getMcpClientManager: () => mockMcpClientManager,
       getEnableExtensionReloading: () => extensionReloadingEnabled,
@@ -73,11 +105,39 @@ describe('SimpleExtensionLoader', () => {
       getHookSystem: () => ({
         initialize: mockHookSystemInit,
       }),
+      getAgentRegistry: () => ({
+        reload: mockAgentRegistryReload,
+      }),
+      reloadSkills: mockSkillsReload,
+      getPolicyEngine: () => mockPolicyEngine,
     } as unknown as Config;
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('should register policies when an extension starts', async () => {
+    const loader = new SimpleExtensionLoader([activeExtension]);
+    await loader.start(mockConfig);
+    expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+      activeExtension.rules![0],
+    );
+    expect(mockPolicyEngine.addChecker).toHaveBeenCalledWith(
+      activeExtension.checkers![0],
+    );
+  });
+
+  it('should unregister policies when an extension stops', async () => {
+    const loader = new TestingSimpleExtensionLoader([activeExtension]);
+    await loader.start(mockConfig);
+    await loader.stopExtension(activeExtension);
+    expect(mockPolicyEngine.removeRulesBySource).toHaveBeenCalledWith(
+      'Extension (test-extension): policies.toml',
+    );
+    expect(mockPolicyEngine.removeCheckersBySource).toHaveBeenCalledWith(
+      'Extension (test-extension): policies.toml',
+    );
   });
 
   it('should start active extensions', async () => {
@@ -132,15 +192,21 @@ describe('SimpleExtensionLoader', () => {
             expect(mockRefreshServerHierarchicalMemory).toHaveBeenCalledOnce();
             expect(mockHookSystemInit).toHaveBeenCalledOnce();
             expect(mockGeminiClientSetTools).toHaveBeenCalledOnce();
+            expect(mockAgentRegistryReload).toHaveBeenCalledOnce();
+            expect(mockSkillsReload).toHaveBeenCalledOnce();
           } else {
             expect(mockMcpClientManager.startExtension).not.toHaveBeenCalled();
             expect(mockRefreshServerHierarchicalMemory).not.toHaveBeenCalled();
             expect(mockHookSystemInit).not.toHaveBeenCalled();
             expect(mockGeminiClientSetTools).not.toHaveBeenCalledOnce();
+            expect(mockAgentRegistryReload).not.toHaveBeenCalled();
+            expect(mockSkillsReload).not.toHaveBeenCalled();
           }
           mockRefreshServerHierarchicalMemory.mockClear();
           mockHookSystemInit.mockClear();
           mockGeminiClientSetTools.mockClear();
+          mockAgentRegistryReload.mockClear();
+          mockSkillsReload.mockClear();
 
           await loader.unloadExtension(activeExtension);
           if (reloadingEnabled) {
@@ -150,11 +216,15 @@ describe('SimpleExtensionLoader', () => {
             expect(mockRefreshServerHierarchicalMemory).toHaveBeenCalledOnce();
             expect(mockHookSystemInit).toHaveBeenCalledOnce();
             expect(mockGeminiClientSetTools).toHaveBeenCalledOnce();
+            expect(mockAgentRegistryReload).toHaveBeenCalledOnce();
+            expect(mockSkillsReload).toHaveBeenCalledOnce();
           } else {
             expect(mockMcpClientManager.stopExtension).not.toHaveBeenCalled();
             expect(mockRefreshServerHierarchicalMemory).not.toHaveBeenCalled();
             expect(mockHookSystemInit).not.toHaveBeenCalled();
             expect(mockGeminiClientSetTools).not.toHaveBeenCalledOnce();
+            expect(mockAgentRegistryReload).not.toHaveBeenCalled();
+            expect(mockSkillsReload).not.toHaveBeenCalled();
           }
         });
 
@@ -175,6 +245,8 @@ describe('SimpleExtensionLoader', () => {
             ]);
             expect(mockRefreshServerHierarchicalMemory).toHaveBeenCalledOnce();
             expect(mockHookSystemInit).toHaveBeenCalledOnce();
+            expect(mockAgentRegistryReload).toHaveBeenCalledOnce();
+            expect(mockSkillsReload).toHaveBeenCalledOnce();
           },
         );
       },
@@ -190,6 +262,7 @@ describe('SimpleExtensionLoader', () => {
       await loader.restartExtension(activeExtension);
       expect(loader.stopExtension).toHaveBeenCalledWith(activeExtension);
       expect(loader.startExtension).toHaveBeenCalledWith(activeExtension);
+      expect(mockSkillsReload).toHaveBeenCalledTimes(2);
     });
   });
 });

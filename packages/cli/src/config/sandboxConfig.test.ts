@@ -25,11 +25,15 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-vi.mock('command-exists', () => ({
-  default: {
-    sync: vi.fn(),
-  },
-}));
+vi.mock('command-exists', () => {
+  const sync = vi.fn();
+  return {
+    sync,
+    default: {
+      sync,
+    },
+  };
+});
 
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal();
@@ -49,6 +53,8 @@ describe('loadSandboxConfig', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     process.env = { ...originalEnv };
+    delete process.env['SANDBOX'];
+    delete process.env['GEMINI_SANDBOX'];
     mockedGetPackageJson.mockResolvedValue({
       config: { sandboxImageUri: 'default/image' },
     });
@@ -91,7 +97,7 @@ describe('loadSandboxConfig', () => {
     it('should throw if GEMINI_SANDBOX is an invalid command', async () => {
       process.env['GEMINI_SANDBOX'] = 'invalid-command';
       await expect(loadSandboxConfig({}, {})).rejects.toThrow(
-        "Invalid sandbox command 'invalid-command'. Must be one of docker, podman, sandbox-exec",
+        "Invalid sandbox command 'invalid-command'. Must be one of docker, podman, sandbox-exec, runsc, lxc",
       );
     });
 
@@ -100,6 +106,22 @@ describe('loadSandboxConfig', () => {
       mockedCommandExistsSync.mockReturnValue(false);
       await expect(loadSandboxConfig({}, {})).rejects.toThrow(
         "Missing sandbox command 'docker' (from GEMINI_SANDBOX)",
+      );
+    });
+
+    it('should use lxc if GEMINI_SANDBOX=lxc and it exists', async () => {
+      process.env['GEMINI_SANDBOX'] = 'lxc';
+      mockedCommandExistsSync.mockReturnValue(true);
+      const config = await loadSandboxConfig({}, {});
+      expect(config).toEqual({ command: 'lxc', image: 'default/image' });
+      expect(mockedCommandExistsSync).toHaveBeenCalledWith('lxc');
+    });
+
+    it('should throw if GEMINI_SANDBOX=lxc but lxc command does not exist', async () => {
+      process.env['GEMINI_SANDBOX'] = 'lxc';
+      mockedCommandExistsSync.mockReturnValue(false);
+      await expect(loadSandboxConfig({}, {})).rejects.toThrow(
+        "Missing sandbox command 'lxc' (from GEMINI_SANDBOX)",
       );
     });
   });
@@ -172,7 +194,7 @@ describe('loadSandboxConfig', () => {
       await expect(
         loadSandboxConfig({}, { sandbox: 'invalid-command' }),
       ).rejects.toThrow(
-        "Invalid sandbox command 'invalid-command'. Must be one of docker, podman, sandbox-exec",
+        "Invalid sandbox command 'invalid-command'. Must be one of docker, podman, sandbox-exec, runsc, lxc",
       );
     });
   });
@@ -224,5 +246,93 @@ describe('loadSandboxConfig', () => {
         expect(config).toBeUndefined();
       },
     );
+  });
+
+  describe('with sandbox: runsc (gVisor)', () => {
+    beforeEach(() => {
+      mockedOsPlatform.mockReturnValue('linux');
+      mockedCommandExistsSync.mockReturnValue(true);
+    });
+
+    it('should use runsc via CLI argument on Linux', async () => {
+      const config = await loadSandboxConfig({}, { sandbox: 'runsc' });
+
+      expect(config).toEqual({ command: 'runsc', image: 'default/image' });
+      expect(mockedCommandExistsSync).toHaveBeenCalledWith('runsc');
+      expect(mockedCommandExistsSync).toHaveBeenCalledWith('docker');
+    });
+
+    it('should use runsc via GEMINI_SANDBOX environment variable', async () => {
+      process.env['GEMINI_SANDBOX'] = 'runsc';
+      const config = await loadSandboxConfig({}, {});
+
+      expect(config).toEqual({ command: 'runsc', image: 'default/image' });
+      expect(mockedCommandExistsSync).toHaveBeenCalledWith('runsc');
+      expect(mockedCommandExistsSync).toHaveBeenCalledWith('docker');
+    });
+
+    it('should use runsc via settings file', async () => {
+      const config = await loadSandboxConfig(
+        { tools: { sandbox: 'runsc' } },
+        {},
+      );
+
+      expect(config).toEqual({ command: 'runsc', image: 'default/image' });
+      expect(mockedCommandExistsSync).toHaveBeenCalledWith('runsc');
+      expect(mockedCommandExistsSync).toHaveBeenCalledWith('docker');
+    });
+
+    it('should prioritize GEMINI_SANDBOX over CLI and settings', async () => {
+      process.env['GEMINI_SANDBOX'] = 'runsc';
+      const config = await loadSandboxConfig(
+        { tools: { sandbox: 'docker' } },
+        { sandbox: 'podman' },
+      );
+
+      expect(config).toEqual({ command: 'runsc', image: 'default/image' });
+    });
+
+    it('should reject runsc on macOS (Linux-only)', async () => {
+      mockedOsPlatform.mockReturnValue('darwin');
+
+      await expect(loadSandboxConfig({}, { sandbox: 'runsc' })).rejects.toThrow(
+        'gVisor (runsc) sandboxing is only supported on Linux',
+      );
+    });
+
+    it('should reject runsc on Windows (Linux-only)', async () => {
+      mockedOsPlatform.mockReturnValue('win32');
+
+      await expect(loadSandboxConfig({}, { sandbox: 'runsc' })).rejects.toThrow(
+        'gVisor (runsc) sandboxing is only supported on Linux',
+      );
+    });
+
+    it('should throw if runsc binary not found', async () => {
+      mockedCommandExistsSync.mockReturnValue(false);
+
+      await expect(loadSandboxConfig({}, { sandbox: 'runsc' })).rejects.toThrow(
+        "Missing sandbox command 'runsc' (from GEMINI_SANDBOX)",
+      );
+    });
+
+    it('should throw if Docker not available (runsc requires Docker)', async () => {
+      mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'runsc');
+
+      await expect(loadSandboxConfig({}, { sandbox: 'runsc' })).rejects.toThrow(
+        "runsc (gVisor) requires Docker. Install Docker, or use sandbox: 'docker'.",
+      );
+    });
+
+    it('should NOT auto-detect runsc when both runsc and docker available', async () => {
+      mockedCommandExistsSync.mockImplementation(
+        (cmd) => cmd === 'runsc' || cmd === 'docker',
+      );
+
+      const config = await loadSandboxConfig({}, { sandbox: true });
+
+      expect(config?.command).toBe('docker');
+      expect(config?.command).not.toBe('runsc');
+    });
   });
 });

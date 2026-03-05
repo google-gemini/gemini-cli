@@ -10,6 +10,7 @@ import { partListUnionToString } from '../core/geminiRequest.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Content } from '@google/genai';
 import { getResponseText } from '../utils/partUtils.js';
+import { LlmRole } from '../telemetry/types.js';
 
 const DEFAULT_MAX_MESSAGES = 20;
 const DEFAULT_TIMEOUT_MS = 5000;
@@ -124,6 +125,7 @@ export class SessionSummaryService {
           contents,
           abortSignal: abortController.signal,
           promptId: 'session-summary-generation',
+          role: LlmRole.UTILITY_SUMMARIZER,
         });
 
         const summary = getResponseText(response);

@@ -33,14 +33,17 @@ describe('keyBindings config', () => {
           expect(binding.key.length).toBeGreaterThan(0);
 
           // Modifier properties should be boolean or undefined
-          if (binding.ctrl !== undefined) {
-            expect(typeof binding.ctrl).toBe('boolean');
-          }
           if (binding.shift !== undefined) {
             expect(typeof binding.shift).toBe('boolean');
           }
-          if (binding.command !== undefined) {
-            expect(typeof binding.command).toBe('boolean');
+          if (binding.alt !== undefined) {
+            expect(typeof binding.alt).toBe('boolean');
+          }
+          if (binding.ctrl !== undefined) {
+            expect(typeof binding.ctrl).toBe('boolean');
+          }
+          if (binding.cmd !== undefined) {
+            expect(typeof binding.cmd).toBe('boolean');
           }
         }
       }
@@ -54,28 +57,6 @@ describe('keyBindings config', () => {
       // Config should be readonly
       const config: KeyBindingConfig = defaultKeyBindings;
       expect(config[Command.HOME]).toBeDefined();
-    });
-
-    it('should have correct specific bindings', () => {
-      // Verify navigation ignores shift
-      const navUp = defaultKeyBindings[Command.NAVIGATION_UP];
-      expect(navUp).toContainEqual({ key: 'up', shift: false });
-
-      const navDown = defaultKeyBindings[Command.NAVIGATION_DOWN];
-      expect(navDown).toContainEqual({ key: 'down', shift: false });
-
-      // Verify dialog navigation
-      const dialogNavUp = defaultKeyBindings[Command.DIALOG_NAVIGATION_UP];
-      expect(dialogNavUp).toContainEqual({ key: 'up', shift: false });
-      expect(dialogNavUp).toContainEqual({ key: 'k', shift: false });
-
-      const dialogNavDown = defaultKeyBindings[Command.DIALOG_NAVIGATION_DOWN];
-      expect(dialogNavDown).toContainEqual({ key: 'down', shift: false });
-      expect(dialogNavDown).toContainEqual({ key: 'j', shift: false });
-
-      // Verify physical home/end keys
-      expect(defaultKeyBindings[Command.HOME]).toContainEqual({ key: 'home' });
-      expect(defaultKeyBindings[Command.END]).toContainEqual({ key: 'end' });
     });
   });
 

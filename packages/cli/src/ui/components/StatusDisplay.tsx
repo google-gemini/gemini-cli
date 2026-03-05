@@ -28,31 +28,10 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     return <Text color={theme.status.error}>|⌐■_■|</Text>;
   }
 
-  if (uiState.ctrlCPressedOnce) {
-    return (
-      <Text color={theme.status.warning}>Press Ctrl+C again to exit.</Text>
-    );
-  }
-
-  if (uiState.warningMessage) {
-    return <Text color={theme.status.warning}>{uiState.warningMessage}</Text>;
-  }
-
-  if (uiState.ctrlDPressedOnce) {
-    return (
-      <Text color={theme.status.warning}>Press Ctrl+D again to exit.</Text>
-    );
-  }
-
-  if (uiState.showEscapePrompt) {
-    return <Text color={theme.text.secondary}>Press Esc again to rewind.</Text>;
-  }
-
-  if (uiState.queueErrorMessage) {
-    return <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>;
-  }
-
-  if (uiState.activeHooks.length > 0 && settings.merged.hooks.notifications) {
+  if (
+    uiState.activeHooks.length > 0 &&
+    settings.merged.hooksConfig.notifications
+  ) {
     return <HookStatusDisplay activeHooks={uiState.activeHooks} />;
   }
 
@@ -67,6 +46,7 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
           config.getMcpClientManager()?.getBlockedMcpServers() ?? []
         }
         skillCount={config.getSkillManager().getDisplayableSkills().length}
+        backgroundProcessCount={uiState.backgroundShellCount}
       />
     );
   }

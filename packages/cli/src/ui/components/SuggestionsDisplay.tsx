@@ -6,9 +6,11 @@
 
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { PrepareLabel, MAX_WIDTH } from './PrepareLabel.js';
+import { ExpandableText, MAX_WIDTH } from './shared/ExpandableText.js';
 import { CommandKind } from '../commands/types.js';
 import { Colors } from '../colors.js';
+import { sanitizeForDisplay } from '../utils/textUtils.js';
+
 export interface Suggestion {
   label: string;
   value: string;
@@ -82,10 +84,10 @@ export function SuggestionsDisplay({
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
         const isExpanded = originalIndex === expandedIndex;
-        const textColor = isActive ? theme.text.accent : theme.text.secondary;
+        const textColor = isActive ? theme.ui.focus : theme.text.secondary;
         const isLong = suggestion.value.length >= MAX_WIDTH;
         const labelElement = (
-          <PrepareLabel
+          <ExpandableText
             label={suggestion.value}
             matchedIndex={suggestion.matchedIndex}
             userInput={userInput}
@@ -95,7 +97,11 @@ export function SuggestionsDisplay({
         );
 
         return (
-          <Box key={`${suggestion.value}-${originalIndex}`} flexDirection="row">
+          <Box
+            key={`${suggestion.value}-${originalIndex}`}
+            flexDirection="row"
+            backgroundColor={isActive ? theme.background.focus : undefined}
+          >
             <Box
               {...(mode === 'slash'
                 ? { width: commandColumnWidth, flexShrink: 0 as const }
@@ -115,7 +121,7 @@ export function SuggestionsDisplay({
             {suggestion.description && (
               <Box flexGrow={1} paddingLeft={3}>
                 <Text color={textColor} wrap="truncate">
-                  {suggestion.description}
+                  {sanitizeForDisplay(suggestion.description, 100)}
                 </Text>
               </Box>
             )}

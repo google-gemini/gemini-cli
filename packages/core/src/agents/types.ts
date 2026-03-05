@@ -12,6 +12,8 @@ import type { Content, FunctionDeclaration } from '@google/genai';
 import type { AnyDeclarativeTool } from '../tools/tools.js';
 import { type z } from 'zod';
 import type { ModelConfig } from '../services/modelConfigService.js';
+import type { AnySchema } from 'ajv';
+import type { A2AAuthConfig } from './auth-provider/types.js';
 
 /**
  * Describes the possible termination modes for an agent.
@@ -34,6 +36,21 @@ export interface OutputObject {
 }
 
 /**
+ * The default query string provided to an agent as input.
+ */
+export const DEFAULT_QUERY_STRING = 'Get Started!';
+
+/**
+ * The default maximum number of conversational turns for an agent.
+ */
+export const DEFAULT_MAX_TURNS = 15;
+
+/**
+ * The default maximum execution time for an agent in minutes.
+ */
+export const DEFAULT_MAX_TIME_MINUTES = 5;
+
+/**
  * Represents the validated input parameters passed to an agent upon invocation.
  * Used primarily for templating the system prompt. (Replaces ContextState)
  */
@@ -54,6 +71,32 @@ export interface SubagentActivityEvent {
   data: Record<string, unknown>;
 }
 
+export interface SubagentActivityItem {
+  id: string;
+  type: 'thought' | 'tool_call';
+  content: string;
+  displayName?: string;
+  description?: string;
+  args?: string;
+  status: 'running' | 'completed' | 'error' | 'cancelled';
+}
+
+export interface SubagentProgress {
+  isSubagentProgress: true;
+  agentName: string;
+  recentActivity: SubagentActivityItem[];
+  state?: 'running' | 'completed' | 'error' | 'cancelled';
+}
+
+export function isSubagentProgress(obj: unknown): obj is SubagentProgress {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'isSubagentProgress' in obj &&
+    obj.isSubagentProgress === true
+  );
+}
+
 /**
  * The base definition for an agent.
  * @template TOutput The specific Zod schema for the agent's final output object.
@@ -68,6 +111,10 @@ export interface BaseAgentDefinition<
   experimental?: boolean;
   inputConfig: InputConfig;
   outputConfig?: OutputConfig<TOutput>;
+  metadata?: {
+    hash?: string;
+    filePath?: string;
+  };
 }
 
 export interface LocalAgentDefinition<
@@ -98,6 +145,14 @@ export interface RemoteAgentDefinition<
 > extends BaseAgentDefinition<TOutput> {
   kind: 'remote';
   agentCardUrl: string;
+  /** The user-provided description, before any remote card merging. */
+  originalDescription?: string;
+  /**
+   * Optional authentication configuration for the remote agent.
+   * If not specified, the agent will try to use defaults based on the AgentCard's
+   * security requirements.
+   */
+  auth?: A2AAuthConfig;
 }
 
 export type AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> =
@@ -137,24 +192,7 @@ export interface ToolConfig {
  * Configures the expected inputs (parameters) for the agent.
  */
 export interface InputConfig {
-  /**
-   * Defines the parameters the agent accepts.
-   * This is vital for generating the tool wrapper schema.
-   */
-  inputs: Record<
-    string,
-    {
-      description: string;
-      type:
-        | 'string'
-        | 'number'
-        | 'boolean'
-        | 'integer'
-        | 'string[]'
-        | 'number[]';
-      required: boolean;
-    }
-  >;
+  inputSchema: AnySchema;
 }
 
 /**
@@ -183,8 +221,14 @@ export interface OutputConfig<T extends z.ZodTypeAny> {
  * Configures the execution environment and constraints for the agent.
  */
 export interface RunConfig {
-  /** The maximum execution time for the agent in minutes. */
-  maxTimeMinutes: number;
-  /** The maximum number of conversational turns. */
+  /**
+   * The maximum execution time for the agent in minutes.
+   * If not specified, defaults to DEFAULT_MAX_TIME_MINUTES (5).
+   */
+  maxTimeMinutes?: number;
+  /**
+   * The maximum number of conversational turns.
+   * If not specified, defaults to DEFAULT_MAX_TURNS (15).
+   */
   maxTurns?: number;
 }

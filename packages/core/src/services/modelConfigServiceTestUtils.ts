@@ -13,6 +13,7 @@ export const makeResolvedModelConfig = (
   model: string,
   overrides: Partial<ResolvedModelConfig['generateContentConfig']> = {},
 ): ResolvedModelConfig =>
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   ({
     model,
     generateContentConfig: {

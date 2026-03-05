@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S node --no-warnings=DEP0040
 
 /**
  * @license
@@ -11,8 +11,46 @@ import { FatalError, writeToStderr } from '@google/gemini-cli-core';
 import { runExitCleanup } from './src/utils/cleanup.js';
 
 // --- Global Entry Point ---
+
+// Suppress known race condition error in node-pty on Windows
+// Tracking bug: https://github.com/microsoft/node-pty/issues/827
+process.on('uncaughtException', (error) => {
+  if (
+    process.platform === 'win32' &&
+    error instanceof Error &&
+    error.message === 'Cannot resize a pty that has already exited'
+  ) {
+    // This error happens on Windows with node-pty when resizing a pty that has just exited.
+    // It is a race condition in node-pty that we cannot prevent, so we silence it.
+    return;
+  }
+
+  // For other errors, we rely on the default behavior, but since we attached a listener,
+  // we must manually replicate it.
+  if (error instanceof Error) {
+    writeToStderr(error.stack + '\n');
+  } else {
+    writeToStderr(String(error) + '\n');
+  }
+  process.exit(1);
+});
+
 main().catch(async (error) => {
-  await runExitCleanup();
+  // Set a timeout to force exit if cleanup hangs
+  const cleanupTimeout = setTimeout(() => {
+    writeToStderr('Cleanup timed out, forcing exit...\n');
+    process.exit(1);
+  }, 5000);
+
+  try {
+    await runExitCleanup();
+  } catch (cleanupError) {
+    writeToStderr(
+      `Error during final cleanup: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}\n`,
+    );
+  } finally {
+    clearTimeout(cleanupTimeout);
+  }
 
   if (error instanceof FatalError) {
     let errorMessage = error.message;
@@ -22,6 +60,7 @@ main().catch(async (error) => {
     writeToStderr(errorMessage + '\n');
     process.exit(error.exitCode);
   }
+
   writeToStderr('An unexpected critical error occurred:');
   if (error instanceof Error) {
     writeToStderr(error.stack + '\n');

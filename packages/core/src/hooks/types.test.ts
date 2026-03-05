@@ -14,15 +14,18 @@ import {
   HookEventName,
   HookType,
   BeforeToolHookOutput,
+  type HookDecision,
 } from './types.js';
-import { defaultHookTranslator } from './hookTranslator.js';
+import {
+  defaultHookTranslator,
+  type LLMRequest,
+  type LLMResponse,
+} from './hookTranslator.js';
 import type {
   GenerateContentParameters,
   GenerateContentResponse,
   ToolConfig,
 } from '@google/genai';
-import type { LLMRequest, LLMResponse } from './hookTranslator.js';
-import type { HookDecision } from './types.js';
 
 vi.mock('./hookTranslator.js', () => ({
   defaultHookTranslator: {
@@ -177,11 +180,22 @@ describe('Hook Output Classes', () => {
       expect(output.applyToolConfigModifications(target)).toBe(target);
     });
 
-    it('getAdditionalContext should return additionalContext if present', () => {
+    it('getAdditionalContext should return additional context if present', () => {
       const output = new DefaultHookOutput({
         hookSpecificOutput: { additionalContext: 'some context' },
       });
       expect(output.getAdditionalContext()).toBe('some context');
+    });
+
+    it('getAdditionalContext should sanitize context by escaping <', () => {
+      const output = new DefaultHookOutput({
+        hookSpecificOutput: {
+          additionalContext: 'context with <tag> and </hook_context>',
+        },
+      });
+      expect(output.getAdditionalContext()).toBe(
+        'context with &lt;tag&gt; and &lt;/hook_context&gt;',
+      );
     });
 
     it('getAdditionalContext should return undefined if additionalContext is not present', () => {

@@ -64,6 +64,7 @@ export const memoryCommand: SlashCommand = {
     },
     {
       name: 'refresh',
+      altNames: ['reload'],
       description: 'Refresh the memory from the source',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
@@ -93,6 +94,7 @@ export const memoryCommand: SlashCommand = {
           context.ui.addItem(
             {
               type: MessageType.ERROR,
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               text: `Error refreshing memory: ${(error as Error).message}`,
             },
             Date.now(),

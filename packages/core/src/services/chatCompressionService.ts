@@ -12,7 +12,7 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import { getCompressionPrompt } from '../core/prompts.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { logChatCompression } from '../telemetry/loggers.js';
-import { makeChatCompressionEvent } from '../telemetry/types.js';
+import { makeChatCompressionEvent, LlmRole } from '../telemetry/types.js';
 import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
@@ -29,6 +29,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
 } from '../config/models.js';
 import { PreCompressTrigger } from '../hooks/types.js';
 
@@ -36,23 +37,18 @@ import { PreCompressTrigger } from '../hooks/types.js';
  * Default threshold for compression token count as a fraction of the model's
  * token limit. If the chat history exceeds this threshold, it will be compressed.
  */
-export const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.5;
+const DEFAULT_COMPRESSION_TOKEN_THRESHOLD = 0.5;
 
 /**
  * The fraction of the latest chat history to keep. A value of 0.3
  * means that only the last 30% of the chat history will be kept after compression.
  */
-export const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
+const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
 /**
  * The budget for function response tokens in the preserved history.
  */
-export const COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET = 50_000;
-
-/**
- * The number of lines to keep when truncating a function response during compression.
- */
-export const COMPRESSION_TRUNCATE_LINES = 30;
+const COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET = 50_000;
 
 /**
  * Returns the index of the oldest item to keep when compressing. May return
@@ -105,6 +101,7 @@ export function findCompressSplitPoint(
 export function modelStringToModelConfigAlias(model: string): string {
   switch (model) {
     case PREVIEW_GEMINI_MODEL:
+    case PREVIEW_GEMINI_3_1_MODEL:
       return 'chat-compression-3-pro';
     case PREVIEW_GEMINI_FLASH_MODEL:
       return 'chat-compression-3-flash';
@@ -189,11 +186,10 @@ async function truncateHistoryToBudget(
                 config.storage.getProjectTempDir(),
               );
 
-              // Prepare a honest, readable snippet of the tail.
               const truncatedMessage = formatTruncatedToolOutput(
                 contentStr,
                 outputFile,
-                COMPRESSION_TRUNCATE_LINES,
+                config.getTruncateToolOutputThreshold(),
               );
 
               newParts.unshift({
@@ -240,14 +236,12 @@ export class ChatCompressionService {
     model: string,
     config: Config,
     hasFailedCompressionAttempt: boolean,
+    abortSignal?: AbortSignal,
   ): Promise<{ newHistory: Content[] | null; info: ChatCompressionInfo }> {
     const curatedHistory = chat.getHistory(true);
 
     // Regardless of `force`, don't do anything if the history is empty.
-    if (
-      curatedHistory.length === 0 ||
-      (hasFailedCompressionAttempt && !force)
-    ) {
+    if (curatedHistory.length === 0) {
       return {
         newHistory: null,
         info: {
@@ -289,6 +283,35 @@ export class ChatCompressionService {
       config,
     );
 
+    // If summarization previously failed (and not forced), we only rely on truncation.
+    // We do NOT attempt to invoke the LLM for summarization again to avoid repeated failures/costs.
+    if (hasFailedCompressionAttempt && !force) {
+      const truncatedTokenCount = estimateTokenCountSync(
+        truncatedHistory.flatMap((c) => c.parts || []),
+      );
+
+      // If truncation reduced the size, we consider it a successful "compression" (truncation only).
+      if (truncatedTokenCount < originalTokenCount) {
+        return {
+          newHistory: truncatedHistory,
+          info: {
+            originalTokenCount,
+            newTokenCount: truncatedTokenCount,
+            compressionStatus: CompressionStatus.CONTENT_TRUNCATED,
+          },
+        };
+      }
+
+      return {
+        newHistory: null,
+        info: {
+          originalTokenCount,
+          newTokenCount: originalTokenCount,
+          compressionStatus: CompressionStatus.NOOP,
+        },
+      };
+    }
+
     const splitPoint = findCompressSplitPoint(
       truncatedHistory,
       1 - COMPRESSION_PRESERVE_THRESHOLD,
@@ -319,6 +342,14 @@ export class ChatCompressionService {
         ? originalHistoryToCompress
         : historyToCompressTruncated;
 
+    const hasPreviousSnapshot = historyForSummarizer.some((c) =>
+      c.parts?.some((p) => p.text?.includes('<state_snapshot>')),
+    );
+
+    const anchorInstruction = hasPreviousSnapshot
+      ? 'A previous <state_snapshot> exists in the history. You MUST integrate all still-relevant information from that snapshot into the new one, updating it with the more recent events. Do not lose established constraints or critical knowledge.'
+      : 'Generate a new <state_snapshot> based on the provided history.';
+
     const summaryResponse = await config.getBaseLlmClient().generateContent({
       modelConfigKey: { model: modelStringToModelConfigAlias(model) },
       contents: [
@@ -327,22 +358,72 @@ export class ChatCompressionService {
           role: 'user',
           parts: [
             {
-              text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+              text: `${anchorInstruction}\n\nFirst, reason in your scratchpad. Then, generate the updated <state_snapshot>.`,
             },
           ],
         },
       ],
-      systemInstruction: { text: getCompressionPrompt() },
+      systemInstruction: { text: getCompressionPrompt(config) },
       promptId,
       // TODO(joshualitt): wire up a sensible abort signal,
-      abortSignal: new AbortController().signal,
+      abortSignal: abortSignal ?? new AbortController().signal,
+      role: LlmRole.UTILITY_COMPRESSOR,
     });
     const summary = getResponseText(summaryResponse) ?? '';
+
+    // Phase 3: The "Probe" Verification (Self-Correction)
+    // We perform a second lightweight turn to ensure no critical information was lost.
+    const verificationResponse = await config
+      .getBaseLlmClient()
+      .generateContent({
+        modelConfigKey: { model: modelStringToModelConfigAlias(model) },
+        contents: [
+          ...historyForSummarizer,
+          {
+            role: 'model',
+            parts: [{ text: summary }],
+          },
+          {
+            role: 'user',
+            parts: [
+              {
+                text: 'Critically evaluate the <state_snapshot> you just generated. Did you omit any specific technical details, file paths, tool results, or user constraints mentioned in the history? If anything is missing or could be more precise, generate a FINAL, improved <state_snapshot>. Otherwise, repeat the exact same <state_snapshot> again.',
+              },
+            ],
+          },
+        ],
+        systemInstruction: { text: getCompressionPrompt(config) },
+        promptId: `${promptId}-verify`,
+        role: LlmRole.UTILITY_COMPRESSOR,
+        abortSignal: abortSignal ?? new AbortController().signal,
+      });
+
+    const finalSummary = (
+      getResponseText(verificationResponse)?.trim() || summary
+    ).trim();
+
+    if (!finalSummary) {
+      logChatCompression(
+        config,
+        makeChatCompressionEvent({
+          tokens_before: originalTokenCount,
+          tokens_after: originalTokenCount, // No change since it failed
+        }),
+      );
+      return {
+        newHistory: null,
+        info: {
+          originalTokenCount,
+          newTokenCount: originalTokenCount,
+          compressionStatus: CompressionStatus.COMPRESSION_FAILED_EMPTY_SUMMARY,
+        },
+      };
+    }
 
     const extraHistory: Content[] = [
       {
         role: 'user',
-        parts: [{ text: summary }],
+        parts: [{ text: finalSummary }],
       },
       {
         role: 'model',

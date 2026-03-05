@@ -4,40 +4,47 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ToolCallRequestInfo,
-  ToolCallResponseInfo,
-  ToolResult,
-  Config,
-  AnsiOutput,
-} from '../index.js';
 import {
   ToolErrorType,
   ToolOutputTruncatedEvent,
   logToolOutputTruncated,
   runInDevTraceSpan,
+  type ToolCallRequestInfo,
+  type ToolCallResponseInfo,
+  type ToolResult,
+  type Config,
+  type ToolLiveOutput,
 } from '../index.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { ShellToolInvocation } from '../tools/shell.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
 } from '../utils/fileUtils.js';
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
-import type {
-  CompletedToolCall,
-  ToolCall,
-  ExecutingToolCall,
-  ErroredToolCall,
-  SuccessfulToolCall,
-  CancelledToolCall,
+import {
+  CoreToolCallStatus,
+  type CompletedToolCall,
+  type ToolCall,
+  type ExecutingToolCall,
+  type ErroredToolCall,
+  type SuccessfulToolCall,
+  type CancelledToolCall,
 } from './types.js';
+import type { PartListUnion, Part } from '@google/genai';
+import {
+  GeminiCliOperation,
+  GEN_AI_TOOL_CALL_ID,
+  GEN_AI_TOOL_DESCRIPTION,
+  GEN_AI_TOOL_NAME,
+} from '../telemetry/constants.js';
 
 export interface ToolExecutionContext {
   call: ToolCall;
   signal: AbortSignal;
-  outputUpdateHandler?: (callId: string, output: string | AnsiOutput) => void;
+  outputUpdateHandler?: (callId: string, output: ToolLiveOutput) => void;
   onUpdateToolCall: (updatedCall: ToolCall) => void;
 }
 
@@ -60,22 +67,26 @@ export class ToolExecutor {
     // Setup live output handling
     const liveOutputCallback =
       tool.canUpdateOutput && outputUpdateHandler
-        ? (outputChunk: string | AnsiOutput) => {
+        ? (outputChunk: ToolLiveOutput) => {
             outputUpdateHandler(callId, outputChunk);
           }
         : undefined;
 
     const shellExecutionConfig = this.config.getShellExecutionConfig();
-    const hooksEnabled = this.config.getEnableHooks();
-    const messageBus = this.config.getMessageBus();
 
     return runInDevTraceSpan(
       {
-        name: tool.name,
-        attributes: { type: 'tool-call' },
+        operation: GeminiCliOperation.ToolCall,
+        attributes: {
+          [GEN_AI_TOOL_NAME]: toolName,
+          [GEN_AI_TOOL_CALL_ID]: callId,
+          [GEN_AI_TOOL_DESCRIPTION]: tool.description,
+        },
       },
       async ({ metadata: spanMetadata }) => {
-        spanMetadata.input = { request };
+        spanMetadata.input = request;
+
+        let completedToolCall: CompletedToolCall;
 
         try {
           let promise: Promise<ToolResult>;
@@ -83,7 +94,7 @@ export class ToolExecutor {
             const setPidCallback = (pid: number) => {
               const executingCall: ExecutingToolCall = {
                 ...call,
-                status: 'executing',
+                status: CoreToolCallStatus.Executing,
                 tool,
                 invocation,
                 pid,
@@ -95,72 +106,179 @@ export class ToolExecutor {
               invocation,
               toolName,
               signal,
-              messageBus,
-              hooksEnabled,
               tool,
               liveOutputCallback,
               shellExecutionConfig,
               setPidCallback,
               this.config,
+              request.originalRequestName,
             );
           } else {
             promise = executeToolWithHooks(
               invocation,
               toolName,
               signal,
-              messageBus,
-              hooksEnabled,
               tool,
               liveOutputCallback,
               shellExecutionConfig,
               undefined,
               this.config,
+              request.originalRequestName,
             );
           }
 
           const toolResult: ToolResult = await promise;
-          spanMetadata.output = toolResult;
 
           if (signal.aborted) {
-            return this.createCancelledResult(
+            completedToolCall = await this.createCancelledResult(
               call,
               'User cancelled tool execution.',
+              toolResult,
             );
           } else if (toolResult.error === undefined) {
-            return await this.createSuccessResult(call, toolResult);
+            completedToolCall = await this.createSuccessResult(
+              call,
+              toolResult,
+            );
           } else {
-            return this.createErrorResult(
+            const displayText =
+              typeof toolResult.returnDisplay === 'string'
+                ? toolResult.returnDisplay
+                : undefined;
+            completedToolCall = this.createErrorResult(
               call,
               new Error(toolResult.error.message),
               toolResult.error.type,
+              displayText,
+              toolResult.tailToolCallRequest,
             );
           }
         } catch (executionError: unknown) {
           spanMetadata.error = executionError;
-          if (signal.aborted) {
-            return this.createCancelledResult(
+          const isAbortError =
+            executionError instanceof Error &&
+            (executionError.name === 'AbortError' ||
+              executionError.message.includes('Operation cancelled by user'));
+
+          if (signal.aborted || isAbortError) {
+            completedToolCall = await this.createCancelledResult(
               call,
               'User cancelled tool execution.',
             );
+          } else {
+            const error =
+              executionError instanceof Error
+                ? executionError
+                : new Error(String(executionError));
+            completedToolCall = this.createErrorResult(
+              call,
+              error,
+              ToolErrorType.UNHANDLED_EXCEPTION,
+            );
           }
-          const error =
-            executionError instanceof Error
-              ? executionError
-              : new Error(String(executionError));
-          return this.createErrorResult(
-            call,
-            error,
-            ToolErrorType.UNHANDLED_EXCEPTION,
-          );
         }
+
+        spanMetadata.output = completedToolCall;
+        return completedToolCall;
       },
     );
   }
 
-  private createCancelledResult(
+  private async truncateOutputIfNeeded(
+    call: ToolCall,
+    content: PartListUnion,
+  ): Promise<{ truncatedContent: PartListUnion; outputFile?: string }> {
+    const toolName = call.request.name;
+    const callId = call.request.callId;
+    let outputFile: string | undefined;
+
+    if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
+      const threshold = this.config.getTruncateToolOutputThreshold();
+
+      if (threshold > 0 && content.length > threshold) {
+        const originalContentLength = content.length;
+        const { outputFile: savedPath } = await saveTruncatedToolOutput(
+          content,
+          toolName,
+          callId,
+          this.config.storage.getProjectTempDir(),
+          this.config.getSessionId(),
+        );
+        outputFile = savedPath;
+        const truncatedContent = formatTruncatedToolOutput(
+          content,
+          outputFile,
+          threshold,
+        );
+
+        logToolOutputTruncated(
+          this.config,
+          new ToolOutputTruncatedEvent(call.request.prompt_id, {
+            toolName,
+            originalContentLength,
+            truncatedContentLength: truncatedContent.length,
+            threshold,
+          }),
+        );
+
+        return { truncatedContent, outputFile };
+      }
+    } else if (
+      Array.isArray(content) &&
+      content.length === 1 &&
+      'tool' in call &&
+      call.tool instanceof DiscoveredMCPTool
+    ) {
+      const firstPart = content[0];
+      if (typeof firstPart === 'object' && typeof firstPart.text === 'string') {
+        const textContent = firstPart.text;
+        const threshold = this.config.getTruncateToolOutputThreshold();
+
+        if (threshold > 0 && textContent.length > threshold) {
+          const originalContentLength = textContent.length;
+          const { outputFile: savedPath } = await saveTruncatedToolOutput(
+            textContent,
+            toolName,
+            callId,
+            this.config.storage.getProjectTempDir(),
+            this.config.getSessionId(),
+          );
+          outputFile = savedPath;
+          const truncatedText = formatTruncatedToolOutput(
+            textContent,
+            outputFile,
+            threshold,
+          );
+
+          // We need to return a NEW array to avoid mutating the original toolResult if it matters,
+          // though here we are creating the response so it's probably fine to mutate or return new.
+          const truncatedContent: Part[] = [
+            { ...firstPart, text: truncatedText },
+          ];
+
+          logToolOutputTruncated(
+            this.config,
+            new ToolOutputTruncatedEvent(call.request.prompt_id, {
+              toolName,
+              originalContentLength,
+              truncatedContentLength: truncatedText.length,
+              threshold,
+            }),
+          );
+
+          return { truncatedContent, outputFile };
+        }
+      }
+    }
+
+    return { truncatedContent: content, outputFile };
+  }
+
+  private async createCancelledResult(
     call: ToolCall,
     reason: string,
-  ): CancelledToolCall {
+    toolResult?: ToolResult,
+  ): Promise<CancelledToolCall> {
     const errorMessage = `[Operation Cancelled] ${reason}`;
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
@@ -170,28 +288,58 @@ export class ToolExecutor {
       throw new Error('Cancelled tool call missing tool/invocation references');
     }
 
+    let responseParts: Part[] = [];
+    let outputFile: string | undefined;
+
+    if (toolResult?.llmContent) {
+      // Attempt to truncate and save output if we have content, even in cancellation case
+      // This is to handle cases where the tool may have produced output before cancellation
+      const { truncatedContent: output, outputFile: truncatedOutputFile } =
+        await this.truncateOutputIfNeeded(call, toolResult?.llmContent);
+
+      outputFile = truncatedOutputFile;
+      responseParts = convertToFunctionResponse(
+        call.request.name,
+        call.request.callId,
+        output,
+        this.config.getActiveModel(),
+      );
+
+      // Inject the cancellation error into the response object
+      const mainPart = responseParts[0];
+      if (mainPart?.functionResponse?.response) {
+        const respObj = mainPart.functionResponse.response;
+        respObj['error'] = errorMessage;
+      }
+    } else {
+      responseParts = [
+        {
+          functionResponse: {
+            id: call.request.callId,
+            name: call.request.name,
+            response: { error: errorMessage },
+          },
+        },
+      ];
+    }
+
     return {
-      status: 'cancelled',
+      status: CoreToolCallStatus.Cancelled,
       request: call.request,
       response: {
         callId: call.request.callId,
-        responseParts: [
-          {
-            functionResponse: {
-              id: call.request.callId,
-              name: call.request.name,
-              response: { error: errorMessage },
-            },
-          },
-        ],
-        resultDisplay: undefined,
+        responseParts,
+        resultDisplay: toolResult?.returnDisplay,
         error: undefined,
         errorType: undefined,
-        contentLength: errorMessage.length,
+        outputFile,
+        contentLength: JSON.stringify(responseParts).length,
       },
       tool: call.tool,
       invocation: call.invocation,
       durationMs: startTime ? Date.now() - startTime : undefined,
+      startTime,
+      endTime: Date.now(),
       outcome: call.outcome,
     };
   }
@@ -200,44 +348,11 @@ export class ToolExecutor {
     call: ToolCall,
     toolResult: ToolResult,
   ): Promise<SuccessfulToolCall> {
-    let content = toolResult.llmContent;
-    let outputFile: string | undefined;
-    const toolName = call.request.name;
+    const { truncatedContent: content, outputFile } =
+      await this.truncateOutputIfNeeded(call, toolResult.llmContent);
+
+    const toolName = call.request.originalRequestName || call.request.name;
     const callId = call.request.callId;
-
-    if (
-      typeof content === 'string' &&
-      toolName === SHELL_TOOL_NAME &&
-      this.config.getEnableToolOutputTruncation() &&
-      this.config.getTruncateToolOutputThreshold() > 0 &&
-      this.config.getTruncateToolOutputLines() > 0
-    ) {
-      const originalContentLength = content.length;
-      const threshold = this.config.getTruncateToolOutputThreshold();
-      const lines = this.config.getTruncateToolOutputLines();
-
-      if (content.length > threshold) {
-        const { outputFile: savedPath } = await saveTruncatedToolOutput(
-          content,
-          toolName,
-          callId,
-          this.config.storage.getProjectTempDir(),
-        );
-        outputFile = savedPath;
-        content = formatTruncatedToolOutput(content, outputFile, lines);
-
-        logToolOutputTruncated(
-          this.config,
-          new ToolOutputTruncatedEvent(call.request.prompt_id, {
-            toolName,
-            originalContentLength,
-            truncatedContentLength: content.length,
-            threshold,
-            lines,
-          }),
-        );
-      }
-    }
 
     const response = convertToFunctionResponse(
       toolName,
@@ -254,6 +369,7 @@ export class ToolExecutor {
       errorType: undefined,
       outputFile,
       contentLength: typeof content === 'string' ? content.length : undefined,
+      data: toolResult.data,
     };
 
     const startTime = 'startTime' in call ? call.startTime : undefined;
@@ -263,13 +379,16 @@ export class ToolExecutor {
     }
 
     return {
-      status: 'success',
+      status: CoreToolCallStatus.Success,
       request: call.request,
       tool: call.tool,
       response: successResponse,
       invocation: call.invocation,
       durationMs: startTime ? Date.now() - startTime : undefined,
+      startTime,
+      endTime: Date.now(),
       outcome: call.outcome,
+      tailToolCallRequest: toolResult.tailToolCallRequest,
     };
   }
 
@@ -277,17 +396,27 @@ export class ToolExecutor {
     call: ToolCall,
     error: Error,
     errorType?: ToolErrorType,
+    returnDisplay?: string,
+    tailToolCallRequest?: { name: string; args: Record<string, unknown> },
   ): ErroredToolCall {
-    const response = this.createErrorResponse(call.request, error, errorType);
+    const response = this.createErrorResponse(
+      call.request,
+      error,
+      errorType,
+      returnDisplay,
+    );
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
     return {
-      status: 'error',
+      status: CoreToolCallStatus.Error,
       request: call.request,
       response,
-      tool: call.tool,
+      tool: 'tool' in call ? call.tool : undefined,
       durationMs: startTime ? Date.now() - startTime : undefined,
+      startTime,
+      endTime: Date.now(),
       outcome: call.outcome,
+      tailToolCallRequest,
     };
   }
 
@@ -295,7 +424,9 @@ export class ToolExecutor {
     request: ToolCallRequestInfo,
     error: Error,
     errorType: ToolErrorType | undefined,
+    returnDisplay?: string,
   ): ToolCallResponseInfo {
+    const displayText = returnDisplay ?? error.message;
     return {
       callId: request.callId,
       error,
@@ -303,14 +434,14 @@ export class ToolExecutor {
         {
           functionResponse: {
             id: request.callId,
-            name: request.name,
+            name: request.originalRequestName || request.name,
             response: { error: error.message },
           },
         },
       ],
-      resultDisplay: error.message,
+      resultDisplay: displayText,
       errorType,
-      contentLength: error.message.length,
+      contentLength: displayText.length,
     };
   }
 }

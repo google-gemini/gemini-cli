@@ -5,11 +5,15 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import * as themeModule from './theme.js';
+import {
+  createCustomTheme,
+  validateCustomTheme,
+  pickDefaultThemeName,
+  darkTheme,
+  type Theme,
+} from './theme.js';
 import { themeManager } from './theme-manager.js';
-
-const { validateCustomTheme, createCustomTheme } = themeModule;
-type CustomTheme = themeModule.CustomTheme;
+import type { CustomTheme } from '@google/gemini-cli-core';
 
 describe('createCustomTheme', () => {
   const baseTheme: CustomTheme = {
@@ -33,11 +37,11 @@ describe('createCustomTheme', () => {
 
   it('should interpolate DarkGray when not provided', () => {
     const theme = createCustomTheme(baseTheme);
-    // Interpolate between Gray (#cccccc) and Background (#000000) at 0.5
+    // Interpolate between Background (#000000) and Gray (#cccccc) at 0.4
     // #cccccc is RGB(204, 204, 204)
     // #000000 is RGB(0, 0, 0)
-    // Midpoint is RGB(102, 102, 102) which is #666666
-    expect(theme.colors.DarkGray).toBe('#666666');
+    // Result is RGB(82, 82, 82) which is #525252
+    expect(theme.colors.DarkGray).toBe('#525252');
   });
 
   it('should use provided DarkGray', () => {
@@ -60,8 +64,8 @@ describe('createCustomTheme', () => {
       },
     };
     const theme = createCustomTheme(customTheme);
-    // Should be interpolated between #cccccc and #000000 at 0.5 -> #666666
-    expect(theme.colors.DarkGray).toBe('#666666');
+    // Should be interpolated between #000000 and #cccccc at 0.4 -> #525252
+    expect(theme.colors.DarkGray).toBe('#525252');
   });
 
   it('should prefer text.secondary over Gray for interpolation', () => {
@@ -77,8 +81,8 @@ describe('createCustomTheme', () => {
       },
     };
     const theme = createCustomTheme(customTheme);
-    // Interpolate between #cccccc and #000000 -> #666666
-    expect(theme.colors.DarkGray).toBe('#666666');
+    // Interpolate between #000000 and #cccccc -> #525252
+    expect(theme.colors.DarkGray).toBe('#525252');
   });
 });
 
@@ -152,7 +156,6 @@ describe('themeManager.loadCustomThemes', () => {
   };
 
   it('should use values from DEFAULT_THEME when DiffAdded and DiffRemoved are not provided', () => {
-    const { darkTheme } = themeModule;
     const legacyTheme: Partial<CustomTheme> = { ...baseTheme };
     delete legacyTheme.DiffAdded;
     delete legacyTheme.DiffRemoved;
@@ -170,12 +173,11 @@ describe('themeManager.loadCustomThemes', () => {
 });
 
 describe('pickDefaultThemeName', () => {
-  const { pickDefaultThemeName } = themeModule;
   const mockThemes = [
     { name: 'Dark Theme', type: 'dark', colors: { Background: '#000000' } },
     { name: 'Light Theme', type: 'light', colors: { Background: '#ffffff' } },
     { name: 'Blue Theme', type: 'dark', colors: { Background: '#0000ff' } },
-  ] as unknown as themeModule.Theme[];
+  ] as unknown as Theme[];
 
   it('should return exact match if found', () => {
     expect(

@@ -78,13 +78,19 @@ description: project-desc
     };
 
     vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(userDir);
+    vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+      '/non-existent-user-agent',
+    );
     const storage = new Storage('/dummy');
     vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
+    vi.spyOn(storage, 'getProjectAgentSkillsDir').mockReturnValue(
+      '/non-existent-project-agent',
+    );
 
     const service = new SkillManager();
     // @ts-expect-error accessing private method for testing
     vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
-    await service.discoverSkills(storage, [mockExtension]);
+    await service.discoverSkills(storage, [mockExtension], true);
 
     const skills = service.getSkills();
     expect(skills).toHaveLength(3);
@@ -135,13 +141,19 @@ description: project-desc
     };
 
     vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(userDir);
+    vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+      '/non-existent-user-agent',
+    );
     const storage = new Storage('/dummy');
     vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
+    vi.spyOn(storage, 'getProjectAgentSkillsDir').mockReturnValue(
+      '/non-existent-project-agent',
+    );
 
     const service = new SkillManager();
     // @ts-expect-error accessing private method for testing
     vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
-    await service.discoverSkills(storage, [mockExtension]);
+    await service.discoverSkills(storage, [mockExtension], true);
 
     const skills = service.getSkills();
     expect(skills).toHaveLength(1);
@@ -149,7 +161,7 @@ description: project-desc
 
     // Test User > Extension
     vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue('/non-existent');
-    await service.discoverSkills(storage, [mockExtension]);
+    await service.discoverSkills(storage, [mockExtension], true);
     expect(service.getSkills()[0].description).toBe('user-desc');
   });
 
@@ -173,7 +185,7 @@ description: project-desc
     vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue('/non-existent');
     vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue('/non-existent');
 
-    await service.discoverSkills(storage);
+    await service.discoverSkills(storage, [], true);
 
     const skills = service.getSkills();
     expect(skills).toHaveLength(1);
@@ -196,17 +208,57 @@ body1`,
 
     const storage = new Storage('/dummy');
     vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(testRootDir);
+    vi.spyOn(storage, 'getProjectAgentSkillsDir').mockReturnValue(
+      '/non-existent-project-agent',
+    );
     vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue('/non-existent');
+    vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+      '/non-existent-user-agent',
+    );
 
     const service = new SkillManager();
     // @ts-expect-error accessing private method for testing
     vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
-    await service.discoverSkills(storage);
+    await service.discoverSkills(storage, [], true);
     service.setDisabledSkills(['skill1']);
 
     expect(service.getSkills()).toHaveLength(0);
     expect(service.getAllSkills()).toHaveLength(1);
     expect(service.getAllSkills()[0].disabled).toBe(true);
+  });
+
+  it('should skip workspace skills if folder is not trusted', async () => {
+    const projectDir = path.join(testRootDir, 'workspace');
+    await fs.mkdir(path.join(projectDir, 'skill-project'), { recursive: true });
+
+    await fs.writeFile(
+      path.join(projectDir, 'skill-project', 'SKILL.md'),
+      `---
+name: skill-project
+description: project-desc
+---
+`,
+    );
+
+    const storage = new Storage('/dummy');
+    vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
+    vi.spyOn(storage, 'getProjectAgentSkillsDir').mockReturnValue(
+      '/non-existent-project-agent',
+    );
+    vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue('/non-existent');
+    vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+      '/non-existent-user-agent',
+    );
+
+    const service = new SkillManager();
+    // @ts-expect-error accessing private method for testing
+    vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
+
+    // Call with isTrusted = false
+    await service.discoverSkills(storage, [], false);
+
+    const skills = service.getSkills();
+    expect(skills).toHaveLength(0);
   });
 
   it('should filter built-in skills in getDisplayableSkills', async () => {
@@ -303,14 +355,20 @@ body1`,
       });
 
       vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(userDir);
+      vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+        '/non-existent-user-agent',
+      );
       const storage = new Storage('/dummy');
       vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
+      vi.spyOn(storage, 'getProjectAgentSkillsDir').mockReturnValue(
+        '/non-existent-project-agent',
+      );
 
       const service = new SkillManager();
       // @ts-expect-error accessing private method for testing
       vi.spyOn(service, 'discoverBuiltinSkills').mockResolvedValue(undefined);
 
-      await service.discoverSkills(storage, []);
+      await service.discoverSkills(storage, [], true);
 
       expect(emitFeedbackSpy).toHaveBeenCalledWith(
         'warning',
@@ -356,12 +414,18 @@ body1`,
       });
 
       vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(userDir);
+      vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+        '/non-existent-user-agent',
+      );
       const storage = new Storage('/dummy');
       vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue('/non-existent');
+      vi.spyOn(storage, 'getProjectAgentSkillsDir').mockReturnValue(
+        '/non-existent-project-agent',
+      );
 
       const service = new SkillManager();
 
-      await service.discoverSkills(storage, []);
+      await service.discoverSkills(storage, [], true);
 
       // UI warning should not be called
       expect(emitFeedbackSpy).not.toHaveBeenCalled();

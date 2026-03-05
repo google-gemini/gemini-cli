@@ -4,25 +4,63 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { parseGoogleApiError, type ErrorInfo } from './googleErrors.js';
+
 interface GaxiosError {
   response?: {
     data?: unknown;
   };
 }
 
+function isGaxiosError(error: unknown): error is GaxiosError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as { response: unknown }).response === 'object' &&
+    (error as { response: unknown }).response !== null
+  );
+}
+
 export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error;
 }
 
+/**
+ * Checks if an error is an AbortError.
+ */
+export function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
 export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
+  const friendlyError = toFriendlyError(error);
+  if (friendlyError instanceof Error) {
+    return friendlyError.message;
+  }
+  if (
+    typeof friendlyError === 'object' &&
+    friendlyError !== null &&
+    'message' in friendlyError &&
+    typeof (friendlyError as { message: unknown }).message === 'string'
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return (friendlyError as { message: string }).message;
   }
   try {
-    return String(error);
+    return String(friendlyError);
   } catch {
     return 'Failed to get error details';
   }
+}
+
+export function getErrorType(error: unknown): string {
+  if (!(error instanceof Error)) return 'unknown';
+
+  // Return constructor name if the generic 'Error' name is used (for custom errors)
+  return error.name === 'Error'
+    ? (error.constructor?.name ?? 'Error')
+    : error.name;
 }
 
 export class FatalError extends Error {
@@ -78,8 +116,26 @@ export class CanceledError extends Error {
 }
 
 export class ForbiddenError extends Error {}
+export class AccountSuspendedError extends ForbiddenError {
+  readonly appealUrl?: string;
+  readonly appealLinkText?: string;
+
+  constructor(message: string, metadata?: Record<string, string>) {
+    super(message);
+    this.name = 'AccountSuspendedError';
+    this.appealUrl = metadata?.['appeal_url'];
+    this.appealLinkText = metadata?.['appeal_url_link_text'];
+  }
+}
 export class UnauthorizedError extends Error {}
 export class BadRequestError extends Error {}
+
+export class ChangeAuthRequestedError extends Error {
+  constructor() {
+    super('User requested to change authentication method');
+    this.name = 'ChangeAuthRequestedError';
+  }
+}
 
 interface ResponseData {
   error?: {
@@ -88,10 +144,59 @@ interface ResponseData {
   };
 }
 
+function isResponseData(data: unknown): data is ResponseData {
+  if (typeof data !== 'object' || data === null) {
+    return false;
+  }
+  const candidate = data as ResponseData;
+  if (!('error' in candidate)) {
+    return false;
+  }
+  const error = candidate.error;
+  if (typeof error !== 'object' || error === null) {
+    return false; // error property exists but is not an object (could be undefined, but we checked 'in')
+  }
+
+  // Optional properties check
+  if (
+    'code' in error &&
+    typeof error.code !== 'number' &&
+    error.code !== undefined
+  ) {
+    return false;
+  }
+  if (
+    'message' in error &&
+    typeof error.message !== 'string' &&
+    error.message !== undefined
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 export function toFriendlyError(error: unknown): unknown {
-  if (error && typeof error === 'object' && 'response' in error) {
-    const gaxiosError = error as GaxiosError;
-    const data = parseResponseData(gaxiosError);
+  // First, try structured parsing for TOS_VIOLATION detection.
+  const googleApiError = parseGoogleApiError(error);
+  if (googleApiError && googleApiError.code === 403) {
+    const tosDetail = googleApiError.details.find(
+      (d): d is ErrorInfo =>
+        d['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo' &&
+        'reason' in d &&
+        d.reason === 'TOS_VIOLATION',
+    );
+    if (tosDetail) {
+      return new AccountSuspendedError(
+        googleApiError.message,
+        tosDetail.metadata,
+      );
+    }
+  }
+
+  // Fall back to basic Gaxios error parsing for other HTTP errors.
+  if (isGaxiosError(error)) {
+    const data = parseResponseData(error);
     if (data && data.error && data.error.message && data.error.code) {
       switch (data.error.code) {
         case 400:
@@ -99,9 +204,6 @@ export function toFriendlyError(error: unknown): unknown {
         case 401:
           return new UnauthorizedError(data.error.message);
         case 403:
-          // It's import to pass the message here since it might
-          // explain the cause like "the cloud project you're
-          // using doesn't have code assist enabled".
           return new ForbiddenError(data.error.message);
         default:
       }
@@ -110,16 +212,28 @@ export function toFriendlyError(error: unknown): unknown {
   return error;
 }
 
+export function isAccountSuspendedError(
+  error: unknown,
+): AccountSuspendedError | null {
+  const friendly = toFriendlyError(error);
+  return friendly instanceof AccountSuspendedError ? friendly : null;
+}
+
 function parseResponseData(error: GaxiosError): ResponseData | undefined {
+  let data = error.response?.data;
   // Inexplicably, Gaxios sometimes doesn't JSONify the response data.
-  if (typeof error.response?.data === 'string') {
+  if (typeof data === 'string') {
     try {
-      return JSON.parse(error.response?.data) as ResponseData;
+      data = JSON.parse(data);
     } catch {
       return undefined;
     }
   }
-  return error.response?.data as ResponseData | undefined;
+
+  if (isResponseData(data)) {
+    return data;
+  }
+  return undefined;
 }
 
 /**
@@ -132,8 +246,15 @@ function parseResponseData(error: GaxiosError): ResponseData | undefined {
 export function isAuthenticationError(error: unknown): boolean {
   // Check for MCP SDK errors with code property
   // (SseError and StreamableHTTPError both have numeric 'code' property)
-  if (error && typeof error === 'object' && 'code' in error) {
-    const errorCode = (error as { code: unknown }).code;
+  if (
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    typeof (error as { code: unknown }).code === 'number'
+  ) {
+    // Safe access after check
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const errorCode = (error as { code: number }).code;
     if (errorCode === 401) {
       return true;
     }

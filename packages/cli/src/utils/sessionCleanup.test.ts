@@ -17,10 +17,23 @@ import { cleanupExpiredSessions } from './sessionCleanup.js';
 import { type SessionInfo, getAllSessionFiles } from './sessionUtils.js';
 
 // Mock the fs module
-vi.mock('fs/promises');
+vi.mock('node:fs/promises');
 vi.mock('./sessionUtils.js', () => ({
   getAllSessionFiles: vi.fn(),
 }));
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    Storage: class MockStorage {
+      getProjectTempDir() {
+        return '/tmp/test-project';
+      }
+    },
+  };
+});
 
 const mockFs = vi.mocked(fs);
 const mockGetAllSessionFiles = vi.mocked(getAllSessionFiles);
@@ -904,6 +917,32 @@ describe('Session Cleanup', () => {
           'chats',
           `${SESSION_FILE_PREFIX}3d.json`,
         ),
+      );
+    });
+
+    it('should delete the session-specific directory', async () => {
+      const config = createMockConfig();
+      const settings: Settings = {
+        general: {
+          sessionRetention: {
+            enabled: true,
+            maxAge: '1d', // Very short retention to trigger deletion of all but current
+          },
+        },
+      };
+
+      // Mock successful file operations
+      mockFs.access.mockResolvedValue(undefined);
+      mockFs.unlink.mockResolvedValue(undefined);
+      mockFs.rm.mockResolvedValue(undefined);
+
+      await cleanupExpiredSessions(config, settings);
+
+      // Verify that fs.rm was called with the session directory for the deleted session that has sessionInfo
+      // recent456 should be deleted and its directory removed
+      expect(mockFs.rm).toHaveBeenCalledWith(
+        path.join('/tmp/test-project', 'recent456'),
+        expect.objectContaining({ recursive: true, force: true }),
       );
     });
   });

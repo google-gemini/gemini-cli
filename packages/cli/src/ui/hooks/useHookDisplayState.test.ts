@@ -14,6 +14,7 @@ import {
   type HookEndPayload,
 } from '@google/gemini-cli-core';
 import { act } from 'react';
+import { WARNING_PROMPT_DURATION_MS } from '../constants.js';
 
 describe('useHookDisplayState', () => {
   beforeEach(() => {
@@ -53,7 +54,7 @@ describe('useHookDisplayState', () => {
     });
   });
 
-  it('should remove a hook immediately if duration > 1s', () => {
+  it('should remove a hook immediately if duration > minimum duration', () => {
     const { result } = renderHook(() => useHookDisplayState());
 
     const startPayload: HookStartPayload = {
@@ -65,9 +66,9 @@ describe('useHookDisplayState', () => {
       coreEvents.emitHookStart(startPayload);
     });
 
-    // Advance time by 1.1 seconds
+    // Advance time by slightly more than the minimum duration
     act(() => {
-      vi.advanceTimersByTime(1100);
+      vi.advanceTimersByTime(WARNING_PROMPT_DURATION_MS + 100);
     });
 
     const endPayload: HookEndPayload = {
@@ -83,7 +84,7 @@ describe('useHookDisplayState', () => {
     expect(result.current).toHaveLength(0);
   });
 
-  it('should delay removal if duration < 1s', () => {
+  it('should delay removal if duration < minimum duration', () => {
     const { result } = renderHook(() => useHookDisplayState());
 
     const startPayload: HookStartPayload = {
@@ -113,9 +114,9 @@ describe('useHookDisplayState', () => {
     // Should still be present
     expect(result.current).toHaveLength(1);
 
-    // Advance remaining time (900ms needed, let's go 950ms)
+    // Advance remaining time + buffer
     act(() => {
-      vi.advanceTimersByTime(950);
+      vi.advanceTimersByTime(WARNING_PROMPT_DURATION_MS - 100 + 50);
     });
 
     expect(result.current).toHaveLength(0);
@@ -138,7 +139,7 @@ describe('useHookDisplayState', () => {
 
     expect(result.current).toHaveLength(2);
 
-    // End h1 (total time 500ms -> needs 500ms delay)
+    // End h1 (total time 500ms -> needs remaining delay)
     act(() => {
       coreEvents.emitHookEnd({
         hookName: 'h1',
@@ -150,15 +151,24 @@ describe('useHookDisplayState', () => {
     // h1 still there
     expect(result.current).toHaveLength(2);
 
-    // Advance 600ms. h1 should disappear. h2 has been running for 600ms.
+    // Advance enough for h1 to expire.
+    // h1 ran for 500ms. Needs WARNING_PROMPT_DURATION_MS total.
+    // So advance WARNING_PROMPT_DURATION_MS - 500 + 100.
+    const advanceForH1 = WARNING_PROMPT_DURATION_MS - 500 + 100;
     act(() => {
-      vi.advanceTimersByTime(600);
+      vi.advanceTimersByTime(advanceForH1);
     });
 
+    // h1 should disappear. h2 has been running for 500 (initial) + advanceForH1.
     expect(result.current).toHaveLength(1);
     expect(result.current[0].name).toBe('h2');
 
-    // End h2 (total time 600ms -> needs 400ms delay)
+    // End h2.
+    // h2 duration so far: 0 (start) -> 500 (start h2) -> (end h1) -> advanceForH1.
+    // Actually h2 started at t=500. Current time is t=500 + advanceForH1.
+    // Duration = advanceForH1.
+    // advanceForH1 = 3000 - 500 + 100 = 2600.
+    // So h2 has run for 2600ms. Needs 400ms more.
     act(() => {
       coreEvents.emitHookEnd({
         hookName: 'h2',
@@ -169,6 +179,8 @@ describe('useHookDisplayState', () => {
 
     expect(result.current).toHaveLength(1);
 
+    // Advance remaining needed for h2 + buffer
+    // 3000 - 2600 = 400.
     act(() => {
       vi.advanceTimersByTime(500);
     });
@@ -199,34 +211,42 @@ describe('useHookDisplayState', () => {
     expect(result.current[0].name).toBe('same-hook');
     expect(result.current[1].name).toBe('same-hook');
 
-    // End Hook 1 at t=600 (Duration 600ms -> delay 400ms)
+    // End Hook 1 at t=600 (Duration 600ms -> delay needed)
     act(() => {
       vi.advanceTimersByTime(100);
       coreEvents.emitHookEnd({ ...hook, success: true });
     });
 
-    // Both still visible (Hook 1 pending removal in 400ms)
+    // Both still visible
     expect(result.current).toHaveLength(2);
 
-    // Advance 400ms (t=1000). Hook 1 should be removed.
+    // Advance to make Hook 1 expire.
+    // Hook 1 duration 600ms. Needs WARNING_PROMPT_DURATION_MS total.
+    // Needs WARNING_PROMPT_DURATION_MS - 600 more.
+    const advanceForHook1 = WARNING_PROMPT_DURATION_MS - 600;
     act(() => {
-      vi.advanceTimersByTime(400);
+      vi.advanceTimersByTime(advanceForHook1);
     });
 
     expect(result.current).toHaveLength(1);
 
-    // End Hook 2 at t=1100 (Duration: 1100 - 500 = 600ms -> delay 400ms)
+    // End Hook 2.
+    // Hook 2 started at t=500.
+    // Current time: t = 600 (hook 1 end) + advanceForHook1 = 600 + 3000 - 600 = 3000.
+    // Hook 2 duration = 3000 - 500 = 2500ms.
+    // Needs 3000 - 2500 = 500ms more.
     act(() => {
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(100); // just a small step before ending
       coreEvents.emitHookEnd({ ...hook, success: true });
     });
 
-    // Hook 2 still visible (pending removal in 400ms)
+    // Hook 2 still visible (pending removal)
+    // Total run time: 2500 + 100 = 2600ms. Needs 400ms.
     expect(result.current).toHaveLength(1);
 
-    // Advance 400ms (t=1500). Hook 2 should be removed.
+    // Advance remaining
     act(() => {
-      vi.advanceTimersByTime(400);
+      vi.advanceTimersByTime(500);
     });
 
     expect(result.current).toHaveLength(0);

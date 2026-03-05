@@ -10,12 +10,14 @@ import {
   Storage,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
+  ExitCodes,
 } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 
 const cleanupFunctions: Array<(() => void) | (() => Promise<void>)> = [];
 const syncCleanupFunctions: Array<() => void> = [];
 let configForTelemetry: Config | null = null;
+let isShuttingDown = false;
 
 export function registerCleanup(fn: (() => void) | (() => Promise<void>)) {
   cleanupFunctions.push(fn);
@@ -33,6 +35,7 @@ export function resetCleanupForTesting() {
   cleanupFunctions.length = 0;
   syncCleanupFunctions.length = 0;
   configForTelemetry = null;
+  isShuttingDown = false;
 }
 
 export function runSyncCleanup() {
@@ -55,6 +58,10 @@ export function registerTelemetryConfig(config: Config) {
 }
 
 export async function runExitCleanup() {
+  // drain stdin to prevent printing garbage on exit
+  // https://github.com/google-gemini/gemini-cli/issues/1680
+  await drainStdin();
+
   runSyncCleanup();
   for (const fn of cleanupFunctions) {
     try {
@@ -84,8 +91,80 @@ export async function runExitCleanup() {
   }
 }
 
+async function drainStdin() {
+  if (!process.stdin?.isTTY) return;
+  // Resume stdin and attach a no-op listener to drain the buffer.
+  // We use removeAllListeners to ensure we don't trigger other handlers.
+  process.stdin
+    .resume()
+    .removeAllListeners('data')
+    .on('data', () => {});
+  // Give it a moment to flush the OS buffer.
+  await new Promise((resolve) => setTimeout(resolve, 50));
+}
+
+/**
+ * Gracefully shuts down the process, ensuring cleanup runs exactly once.
+ * Guards against concurrent shutdown from signals (SIGHUP, SIGTERM, SIGINT)
+ * and TTY loss detection racing each other.
+ *
+ * @see https://github.com/google-gemini/gemini-cli/issues/15874
+ */
+async function gracefulShutdown(_reason: string) {
+  if (isShuttingDown) {
+    return;
+  }
+  isShuttingDown = true;
+
+  await runExitCleanup();
+  process.exit(ExitCodes.SUCCESS);
+}
+
+export function setupSignalHandlers() {
+  process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+}
+
+export function setupTtyCheck(): () => void {
+  let intervalId: ReturnType<typeof setInterval> | null = null;
+  let isCheckingTty = false;
+
+  intervalId = setInterval(async () => {
+    if (isCheckingTty || isShuttingDown) {
+      return;
+    }
+
+    if (process.env['SANDBOX']) {
+      return;
+    }
+
+    if (!process.stdin.isTTY && !process.stdout.isTTY) {
+      isCheckingTty = true;
+
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+
+      await gracefulShutdown('TTY loss');
+    }
+  }, 5000);
+
+  // Don't keep the process alive just for this interval
+  intervalId.unref();
+
+  return () => {
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+  };
+}
+
 export async function cleanupCheckpoints() {
   const storage = new Storage(process.cwd());
+  await storage.initialize();
   const tempDir = storage.getProjectTempDir();
   const checkpointsDir = join(tempDir, 'checkpoints');
   try {

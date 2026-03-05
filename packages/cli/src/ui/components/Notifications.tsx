@@ -5,18 +5,21 @@
  */
 
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useAppContext } from '../contexts/AppContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { theme } from '../semantic-colors.js';
 import { StreamingState } from '../types.js';
 import { UpdateNotification } from './UpdateNotification.js';
+import { persistentState } from '../../utils/persistentState.js';
+import { useKeypress } from '../hooks/useKeypress.js';
+import { KeypressPriority } from '../contexts/KeypressContext.js';
 
 import {
   GEMINI_DIR,
   Storage,
-  debugLogger,
   homedir,
+  WarningPriority,
 } from '@google/gemini-cli-core';
 
 import * as fs from 'node:fs/promises';
@@ -29,24 +32,81 @@ const screenReaderNudgeFilePath = path.join(
   'seen_screen_reader_nudge.json',
 );
 
+const MAX_STARTUP_WARNING_SHOW_COUNT = 3;
+
 export const Notifications = () => {
   const { startupWarnings } = useAppContext();
   const { initError, streamingState, updateInfo } = useUIState();
 
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
-  const showStartupWarnings = startupWarnings.length > 0;
   const showInitError =
     initError && streamingState !== StreamingState.Responding;
 
-  const [hasSeenScreenReaderNudge, setHasSeenScreenReaderNudge] = useState<
-    boolean | undefined
-  >(undefined);
+  const [hasSeenScreenReaderNudge, setHasSeenScreenReaderNudge] = useState(() =>
+    persistentState.get('hasSeenScreenReaderNudge'),
+  );
+
+  const [dismissed, setDismissed] = useState(false);
+
+  // Track if we have already incremented the show count in this session
+  const hasIncrementedRef = useRef(false);
+
+  // Filter warnings based on persistent state count if low priority
+  const visibleWarnings = useMemo(() => {
+    if (dismissed) return [];
+
+    const counts = persistentState.get('startupWarningCounts') || {};
+    return startupWarnings.filter((w) => {
+      if (w.priority === WarningPriority.Low) {
+        const count = counts[w.id] || 0;
+        return count < MAX_STARTUP_WARNING_SHOW_COUNT;
+      }
+      return true;
+    });
+  }, [startupWarnings, dismissed]);
+
+  const showStartupWarnings = visibleWarnings.length > 0;
+
+  // Increment counts for low priority warnings when shown
+  useEffect(() => {
+    if (visibleWarnings.length > 0 && !hasIncrementedRef.current) {
+      const counts = { ...(persistentState.get('startupWarningCounts') || {}) };
+      let changed = false;
+      visibleWarnings.forEach((w) => {
+        if (w.priority === WarningPriority.Low) {
+          counts[w.id] = (counts[w.id] || 0) + 1;
+          changed = true;
+        }
+      });
+      if (changed) {
+        persistentState.set('startupWarningCounts', counts);
+      }
+      hasIncrementedRef.current = true;
+    }
+  }, [visibleWarnings]);
+
+  const handleKeyPress = useCallback(() => {
+    if (showStartupWarnings) {
+      setDismissed(true);
+    }
+    return false;
+  }, [showStartupWarnings]);
+
+  useKeypress(handleKeyPress, {
+    isActive: showStartupWarnings,
+    priority: KeypressPriority.Critical,
+  });
 
   useEffect(() => {
-    const checkScreenReader = async () => {
+    const checkLegacyScreenReaderNudge = async () => {
+      if (hasSeenScreenReaderNudge !== undefined) return;
+
       try {
         await fs.access(screenReaderNudgeFilePath);
+        persistentState.set('hasSeenScreenReaderNudge', true);
         setHasSeenScreenReaderNudge(true);
+        // Best effort cleanup of legacy file
+        await fs.unlink(screenReaderNudgeFilePath).catch(() => {});
       } catch {
         setHasSeenScreenReaderNudge(false);
       }
@@ -54,28 +114,17 @@ export const Notifications = () => {
 
     if (isScreenReaderEnabled) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      checkScreenReader();
+      checkLegacyScreenReaderNudge();
     }
-  }, [isScreenReaderEnabled]);
+  }, [isScreenReaderEnabled, hasSeenScreenReaderNudge]);
 
   const showScreenReaderNudge =
     isScreenReaderEnabled && hasSeenScreenReaderNudge === false;
 
   useEffect(() => {
-    const writeScreenReaderNudgeFile = async () => {
-      if (showScreenReaderNudge) {
-        try {
-          await fs.mkdir(path.dirname(screenReaderNudgeFilePath), {
-            recursive: true,
-          });
-          await fs.writeFile(screenReaderNudgeFilePath, 'true');
-        } catch (error) {
-          debugLogger.error('Error storing screen reader nudge', error);
-        }
-      }
-    };
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    writeScreenReaderNudgeFile();
+    if (showScreenReaderNudge) {
+      persistentState.set('hasSeenScreenReaderNudge', true);
+    }
   }, [showScreenReaderNudge]);
 
   if (
@@ -98,17 +147,16 @@ export const Notifications = () => {
       )}
       {updateInfo && <UpdateNotification message={updateInfo.message} />}
       {showStartupWarnings && (
-        <Box
-          borderStyle="round"
-          borderColor={theme.status.warning}
-          paddingX={1}
-          marginY={1}
-          flexDirection="column"
-        >
-          {startupWarnings.map((warning, index) => (
-            <Text key={index} color={theme.status.warning}>
-              {warning}
-            </Text>
+        <Box marginY={1} flexDirection="column">
+          {visibleWarnings.map((warning, index) => (
+            <Box key={index} flexDirection="row">
+              <Box width={3}>
+                <Text color={theme.status.warning}>⚠ </Text>
+              </Box>
+              <Box flexGrow={1}>
+                <Text color={theme.status.warning}>{warning.message}</Text>
+              </Box>
+            </Box>
           ))}
         </Box>
       )}

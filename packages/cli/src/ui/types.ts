@@ -1,19 +1,22 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  CompressionStatus,
-  GeminiCLIExtension,
-  MCPServerConfig,
-  ThoughtSummary,
-  ToolCallConfirmationDetails,
-  ToolResultDisplay,
-  RetrieveUserQuotaResponse,
-  SkillDefinition,
-  AgentDefinition,
+import {
+  type CompressionStatus,
+  type GeminiCLIExtension,
+  type MCPServerConfig,
+  type ThoughtSummary,
+  type SerializableConfirmationDetails,
+  type ToolResultDisplay,
+  type RetrieveUserQuotaResponse,
+  type SkillDefinition,
+  type AgentDefinition,
+  type ApprovalMode,
+  CoreToolCallStatus,
+  checkExhaustive,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
@@ -56,26 +59,62 @@ export enum ToolCallStatus {
   Error = 'Error',
 }
 
+/**
+ * Maps core tool call status to a simplified UI status.
+ */
+export function mapCoreStatusToDisplayStatus(
+  coreStatus: CoreToolCallStatus,
+): ToolCallStatus {
+  switch (coreStatus) {
+    case CoreToolCallStatus.Validating:
+      return ToolCallStatus.Pending;
+    case CoreToolCallStatus.AwaitingApproval:
+      return ToolCallStatus.Confirming;
+    case CoreToolCallStatus.Executing:
+      return ToolCallStatus.Executing;
+    case CoreToolCallStatus.Success:
+      return ToolCallStatus.Success;
+    case CoreToolCallStatus.Cancelled:
+      return ToolCallStatus.Canceled;
+    case CoreToolCallStatus.Error:
+      return ToolCallStatus.Error;
+    case CoreToolCallStatus.Scheduled:
+      return ToolCallStatus.Pending;
+    default:
+      return checkExhaustive(coreStatus);
+  }
+}
+
 export interface ToolCallEvent {
   type: 'tool_call';
-  status: ToolCallStatus;
+  status: CoreToolCallStatus;
   callId: string;
   name: string;
   args: Record<string, never>;
   resultDisplay: ToolResultDisplay | undefined;
-  confirmationDetails: ToolCallConfirmationDetails | undefined;
+  confirmationDetails: SerializableConfirmationDetails | undefined;
+  correlationId?: string;
 }
 
 export interface IndividualToolCallDisplay {
   callId: string;
+  parentCallId?: string;
   name: string;
   description: string;
   resultDisplay: ToolResultDisplay | undefined;
-  status: ToolCallStatus;
-  confirmationDetails: ToolCallConfirmationDetails | undefined;
+  status: CoreToolCallStatus;
+  // True when the tool was initiated directly by the user (slash/@/shell flows).
+  isClientInitiated?: boolean;
+  confirmationDetails: SerializableConfirmationDetails | undefined;
   renderOutputAsMarkdown?: boolean;
   ptyId?: number;
   outputFile?: string;
+  correlationId?: string;
+  approvalMode?: ApprovalMode;
+  progressMessage?: string;
+  originalRequestName?: string;
+  progress?: number;
+  progressTotal?: number;
 }
 
 export interface CompressionProps {
@@ -112,8 +151,10 @@ export type HistoryItemGeminiContent = HistoryItemBase & {
 export type HistoryItemInfo = HistoryItemBase & {
   type: 'info';
   text: string;
+  secondaryText?: string;
   icon?: string;
   color?: string;
+  marginBottom?: number;
 };
 
 export type HistoryItemError = HistoryItemBase & {
@@ -136,6 +177,7 @@ export type HistoryItemAbout = HistoryItemBase & {
   gcpProject: string;
   ideClient: string;
   userEmail?: string;
+  tier?: string;
 };
 
 export type HistoryItemHelp = HistoryItemBase & {
@@ -143,13 +185,30 @@ export type HistoryItemHelp = HistoryItemBase & {
   timestamp: Date;
 };
 
-export type HistoryItemStats = HistoryItemBase & {
+export interface HistoryItemQuotaBase extends HistoryItemBase {
+  selectedAuthType?: string;
+  userEmail?: string;
+  tier?: string;
+  currentModel?: string;
+  pooledRemaining?: number;
+  pooledLimit?: number;
+  pooledResetTime?: string;
+}
+
+export interface QuotaStats {
+  remaining: number | undefined;
+  limit: number | undefined;
+  resetTime?: string;
+}
+
+export type HistoryItemStats = HistoryItemQuotaBase & {
   type: 'stats';
   duration: string;
   quotas?: RetrieveUserQuotaResponse;
+  creditBalance?: number;
 };
 
-export type HistoryItemModelStats = HistoryItemBase & {
+export type HistoryItemModelStats = HistoryItemQuotaBase & {
   type: 'model_stats';
 };
 
@@ -170,6 +229,10 @@ export type HistoryItemQuit = HistoryItemBase & {
 export type HistoryItemToolGroup = HistoryItemBase & {
   type: 'tool_group';
   tools: IndividualToolCallDisplay[];
+  borderTop?: boolean;
+  borderBottom?: boolean;
+  borderColor?: string;
+  borderDimColor?: boolean;
 };
 
 export type HistoryItemUserShell = HistoryItemBase & {
@@ -191,6 +254,16 @@ export interface ChatDetail {
   name: string;
   mtime: string;
 }
+
+export type HistoryItemThinking = HistoryItemBase & {
+  type: 'thinking';
+  thought: ThoughtSummary;
+};
+
+export type HistoryItemHint = HistoryItemBase & {
+  type: 'hint';
+  text: string;
+};
 
 export type HistoryItemChatList = HistoryItemBase & {
   type: 'chat_list';
@@ -261,23 +334,20 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
     string,
     'authenticated' | 'expired' | 'unauthenticated' | 'not-configured'
   >;
+  enablementState: Record<
+    string,
+    {
+      enabled: boolean;
+      isSessionDisabled: boolean;
+      isPersistentDisabled: boolean;
+    }
+  >;
+  errors: Record<string, string>;
   blockedServers: Array<{ name: string; extensionName: string }>;
   discoveryInProgress: boolean;
   connectingServers: string[];
   showDescriptions: boolean;
   showSchema: boolean;
-};
-
-export type HistoryItemHooksList = HistoryItemBase & {
-  type: 'hooks_list';
-  hooks: Array<{
-    config: { command?: string; type: string; timeout?: number };
-    source: string;
-    eventName: string;
-    matcher?: string;
-    sequential?: boolean;
-    enabled: boolean;
-  }>;
 };
 
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
@@ -307,7 +377,8 @@ export type HistoryItemWithoutId =
   | HistoryItemAgentsList
   | HistoryItemMcpStatus
   | HistoryItemChatList
-  | HistoryItemHooksList;
+  | HistoryItemThinking
+  | HistoryItemHint;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -331,7 +402,7 @@ export enum MessageType {
   AGENTS_LIST = 'agents_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
-  HOOKS_LIST = 'hooks_list',
+  HINT = 'hint',
 }
 
 // Simplified message structure for internal feedback
@@ -423,6 +494,11 @@ export interface ConfirmationRequest {
 
 export interface LoopDetectionConfirmationRequest {
   onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
+}
+
+export interface PermissionConfirmationRequest {
+  files: string[];
+  onComplete: (result: { allowed: boolean }) => void;
 }
 
 export interface ActiveHook {

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal();
@@ -24,7 +24,6 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
   };
 });
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getIdeInstaller } from './ide-installer.js';
 import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
@@ -200,6 +199,53 @@ describe('ide-installer', () => {
           expect(result.message).toContain(expectedErr);
         },
       );
+    });
+  });
+
+  describe('PositronInstaller', () => {
+    function setup({
+      execSync = () => '',
+      platform = 'linux' as NodeJS.Platform,
+      existsResult = false,
+    }: {
+      execSync?: () => string;
+      platform?: NodeJS.Platform;
+      existsResult?: boolean;
+    } = {}) {
+      vi.spyOn(child_process, 'execSync').mockImplementation(execSync);
+      vi.spyOn(fs, 'existsSync').mockReturnValue(existsResult);
+      const installer = getIdeInstaller(IDE_DEFINITIONS.positron, platform)!;
+
+      return { installer };
+    }
+
+    it('installs the extension', async () => {
+      vi.stubEnv('POSITRON', '1');
+      const { installer } = setup({});
+      const result = await installer.install();
+
+      expect(result.success).toBe(true);
+      expect(child_process.spawnSync).toHaveBeenCalledWith(
+        'positron',
+        [
+          '--install-extension',
+          'google.gemini-cli-vscode-ide-companion',
+          '--force',
+        ],
+        { stdio: 'pipe', shell: false },
+      );
+    });
+
+    it('returns a failure message if the cli is not found', async () => {
+      const { installer } = setup({
+        execSync: () => {
+          throw new Error('Command not found');
+        },
+      });
+      const result = await installer.install();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Positron CLI not found');
     });
   });
 });
