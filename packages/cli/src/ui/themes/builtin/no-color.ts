@@ -1,12 +1,12 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ColorsTheme } from './theme.js';
-import { Theme } from './theme.js';
-import type { SemanticColors } from './semantic-tokens.js';
+import type { ColorsTheme } from '../theme.js';
+import { Theme } from '../theme.js';
+import type { SemanticColors } from '../semantic-tokens.js';
 
 const noColorColorsTheme: ColorsTheme = {
   type: 'ansi',
@@ -26,6 +26,7 @@ const noColorColorsTheme: ColorsTheme = {
   DarkGray: '',
   InputBackground: '',
   MessageBackground: '',
+  FocusBackground: '',
 };
 
 const noColorSemanticColors: SemanticColors = {
@@ -40,6 +41,7 @@ const noColorSemanticColors: SemanticColors = {
     primary: '',
     message: '',
     input: '',
+    focus: '',
     diff: {
       added: '',
       removed: '',
@@ -47,12 +49,13 @@ const noColorSemanticColors: SemanticColors = {
   },
   border: {
     default: '',
-    focused: '',
   },
   ui: {
     comment: '',
     symbol: '',
+    active: '',
     dark: '',
+    focus: '',
     gradient: [],
   },
   status: {
