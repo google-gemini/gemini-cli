@@ -21,9 +21,9 @@ describe('useEditBuffer', () => {
     const { result } = renderHook(() =>
       useEditBuffer({ onCommit: mockOnCommit }),
     );
-    expect(result.current.state.editingKey).toBeNull();
-    expect(result.current.state.buffer).toBe('');
-    expect(result.current.state.cursorPos).toBe(0);
+    expect(result.current.editState.editingKey).toBeNull();
+    expect(result.current.editState.buffer).toBe('');
+    expect(result.current.editState.cursorPos).toBe(0);
   });
 
   it('should start editing correctly', () => {
@@ -32,9 +32,9 @@ describe('useEditBuffer', () => {
     );
     act(() => result.current.startEditing('my-key', 'initial'));
 
-    expect(result.current.state.editingKey).toBe('my-key');
-    expect(result.current.state.buffer).toBe('initial');
-    expect(result.current.state.cursorPos).toBe(7); // End of string
+    expect(result.current.editState.editingKey).toBe('my-key');
+    expect(result.current.editState.buffer).toBe('initial');
+    expect(result.current.editState.cursorPos).toBe(7); // End of string
   });
 
   it('should commit edit and reset state', () => {
@@ -46,8 +46,8 @@ describe('useEditBuffer', () => {
     act(() => result.current.commitEdit());
 
     expect(mockOnCommit).toHaveBeenCalledWith('my-key', 'text');
-    expect(result.current.state.editingKey).toBeNull();
-    expect(result.current.state.buffer).toBe('');
+    expect(result.current.editState.editingKey).toBeNull();
+    expect(result.current.editState.buffer).toBe('');
   });
 
   it('should move cursor left and right', () => {
@@ -56,18 +56,18 @@ describe('useEditBuffer', () => {
     );
     act(() => result.current.startEditing('key', 'ab')); // cursor at 2
 
-    act(() => result.current.dispatch({ type: 'MOVE_LEFT' }));
-    expect(result.current.state.cursorPos).toBe(1);
+    act(() => result.current.editDispatch({ type: 'MOVE_LEFT' }));
+    expect(result.current.editState.cursorPos).toBe(1);
 
-    act(() => result.current.dispatch({ type: 'MOVE_LEFT' }));
-    expect(result.current.state.cursorPos).toBe(0);
+    act(() => result.current.editDispatch({ type: 'MOVE_LEFT' }));
+    expect(result.current.editState.cursorPos).toBe(0);
 
     // Shouldn't go below 0
-    act(() => result.current.dispatch({ type: 'MOVE_LEFT' }));
-    expect(result.current.state.cursorPos).toBe(0);
+    act(() => result.current.editDispatch({ type: 'MOVE_LEFT' }));
+    expect(result.current.editState.cursorPos).toBe(0);
 
-    act(() => result.current.dispatch({ type: 'MOVE_RIGHT' }));
-    expect(result.current.state.cursorPos).toBe(1);
+    act(() => result.current.editDispatch({ type: 'MOVE_RIGHT' }));
+    expect(result.current.editState.cursorPos).toBe(1);
   });
 
   it('should handle home and end', () => {
@@ -76,11 +76,11 @@ describe('useEditBuffer', () => {
     );
     act(() => result.current.startEditing('key', 'testing')); // cursor at 7
 
-    act(() => result.current.dispatch({ type: 'HOME' }));
-    expect(result.current.state.cursorPos).toBe(0);
+    act(() => result.current.editDispatch({ type: 'HOME' }));
+    expect(result.current.editState.cursorPos).toBe(0);
 
-    act(() => result.current.dispatch({ type: 'END' }));
-    expect(result.current.state.cursorPos).toBe(7);
+    act(() => result.current.editDispatch({ type: 'END' }));
+    expect(result.current.editState.cursorPos).toBe(7);
   });
 
   it('should delete characters to the left (backspace)', () => {
@@ -89,14 +89,14 @@ describe('useEditBuffer', () => {
     );
     act(() => result.current.startEditing('key', 'abc')); // cursor at 3
 
-    act(() => result.current.dispatch({ type: 'DELETE_LEFT' }));
-    expect(result.current.state.buffer).toBe('ab');
-    expect(result.current.state.cursorPos).toBe(2);
+    act(() => result.current.editDispatch({ type: 'DELETE_LEFT' }));
+    expect(result.current.editState.buffer).toBe('ab');
+    expect(result.current.editState.cursorPos).toBe(2);
 
     // Move to start, shouldn't delete
-    act(() => result.current.dispatch({ type: 'HOME' }));
-    act(() => result.current.dispatch({ type: 'DELETE_LEFT' }));
-    expect(result.current.state.buffer).toBe('ab');
+    act(() => result.current.editDispatch({ type: 'HOME' }));
+    act(() => result.current.editDispatch({ type: 'DELETE_LEFT' }));
+    expect(result.current.editState.buffer).toBe('ab');
   });
 
   it('should delete characters to the right (delete tab)', () => {
@@ -104,11 +104,11 @@ describe('useEditBuffer', () => {
       useEditBuffer({ onCommit: mockOnCommit }),
     );
     act(() => result.current.startEditing('key', 'abc'));
-    act(() => result.current.dispatch({ type: 'HOME' })); // cursor at 0
+    act(() => result.current.editDispatch({ type: 'HOME' })); // cursor at 0
 
-    act(() => result.current.dispatch({ type: 'DELETE_RIGHT' }));
-    expect(result.current.state.buffer).toBe('bc');
-    expect(result.current.state.cursorPos).toBe(0);
+    act(() => result.current.editDispatch({ type: 'DELETE_RIGHT' }));
+    expect(result.current.editState.buffer).toBe('bc');
+    expect(result.current.editState.cursorPos).toBe(0);
   });
 
   it('should insert valid characters into string', () => {
@@ -116,17 +116,17 @@ describe('useEditBuffer', () => {
       useEditBuffer({ onCommit: mockOnCommit }),
     );
     act(() => result.current.startEditing('key', 'ab'));
-    act(() => result.current.dispatch({ type: 'MOVE_LEFT' })); // cursor at 1
+    act(() => result.current.editDispatch({ type: 'MOVE_LEFT' })); // cursor at 1
 
     act(() =>
-      result.current.dispatch({
+      result.current.editDispatch({
         type: 'INSERT_CHAR',
         char: 'x',
         isNumberType: false,
       }),
     );
-    expect(result.current.state.buffer).toBe('axb');
-    expect(result.current.state.cursorPos).toBe(2);
+    expect(result.current.editState.buffer).toBe('axb');
+    expect(result.current.editState.cursorPos).toBe(2);
   });
 
   it('should validate number character insertions', () => {
@@ -137,22 +137,22 @@ describe('useEditBuffer', () => {
 
     // Valid number char
     act(() =>
-      result.current.dispatch({
+      result.current.editDispatch({
         type: 'INSERT_CHAR',
         char: '.',
         isNumberType: true,
       }),
     );
-    expect(result.current.state.buffer).toBe('12.');
+    expect(result.current.editState.buffer).toBe('12.');
 
     // Invalid number char
     act(() =>
-      result.current.dispatch({
+      result.current.editDispatch({
         type: 'INSERT_CHAR',
         char: 'a',
         isNumberType: true,
       }),
     );
-    expect(result.current.state.buffer).toBe('12.'); // Unchanged
+    expect(result.current.editState.buffer).toBe('12.'); // Unchanged
   });
 });

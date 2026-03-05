@@ -184,8 +184,8 @@ export function BaseSettingsDialog({
   // Keyboard handling
   useKeypress(
     (key: Key) => {
-      // Let parent handle custom keys first
-      if (onKeyPress?.(key, currentItem)) {
+      // Let parent handle custom keys first (only if not editing)
+      if (!editingKey && onKeyPress?.(key, currentItem)) {
         return;
       }
 
@@ -315,7 +315,7 @@ export function BaseSettingsDialog({
     },
     {
       isActive: true,
-      priority: effectiveFocusSection === 'settings' && !editingKey,
+      priority: effectiveFocusSection === 'settings',
     },
   );
 
