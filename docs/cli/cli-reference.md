@@ -20,9 +20,9 @@ and parameters.
 
 ### Positional arguments
 
-| Argument | Type              | Description                                                                                                        |
-| -------- | ----------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `query`  | string (variadic) | Positional prompt. Defaults to one-shot mode. Use `-i/--prompt-interactive` to execute and continue interactively. |
+| Argument | Type              | Description                                                                                                                                                                     |
+| -------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `query`  | string (variadic) | Positional prompt argument. Supported for compatibility; prefer `-p/--prompt` for non-interactive prompts. Use `-i/--prompt-interactive` to execute and continue interactively. |
 
 ## CLI Options
 
@@ -32,7 +32,7 @@ and parameters.
 | `--version`                      | `-v`  | -       | -         | Show CLI version number and exit                                                                                                                                       |
 | `--help`                         | `-h`  | -       | -         | Show help information                                                                                                                                                  |
 | `--model`                        | `-m`  | string  | `auto`    | Model to use. See [Model Selection](#model-selection) for available values.                                                                                            |
-| `--prompt`                       | `-p`  | string  | -         | Prompt text. Appended to stdin input if provided. **Deprecated:** Use positional arguments instead.                                                                    |
+| `--prompt`                       | `-p`  | string  | -         | Prompt text for non-interactive mode. Appended to stdin input if provided.                                                                                             |
 | `--prompt-interactive`           | `-i`  | string  | -         | Execute prompt and continue in interactive mode                                                                                                                        |
 | `--sandbox`                      | `-s`  | boolean | `false`   | Run in a sandboxed environment for safer execution                                                                                                                     |
 | `--approval-mode`                | -     | string  | `default` | Approval mode for tool execution. Choices: `default`, `auto_edit`, `yolo`                                                                                              |
