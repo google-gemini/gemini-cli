@@ -453,9 +453,17 @@ export class BrowserManager {
       return;
     }
 
+    const existingHandler = this.rawMcpClient.fallbackNotificationHandler;
     this.rawMcpClient.fallbackNotificationHandler = async (notification: {
       method: string;
     }) => {
+      // Chain with any existing handler first.
+      if (existingHandler) {
+        await (
+          existingHandler as (n: { method: string }) => Promise<void> | void
+        )(notification);
+      }
+
       // Only re-inject on resource update notifications which indicate
       // page content has changed (navigation, new page, etc.)
       if (notification.method === 'notifications/resources/updated') {
