@@ -38,6 +38,7 @@ Tips for getting started:
 
 
 
+
 Notifications
 Composer
 "
@@ -68,6 +69,7 @@ exports[`App > Snapshots > renders with dialogs visible 1`] = `
     ▝▜▄
    ▗▟▀ 
   ▝▀    
+
 
 
 
@@ -131,8 +133,9 @@ HistoryItemDisplay
 │   2. Allow for this session                                                                      │
 │   3. No, suggest changes (esc)                                                                   │
 │                                                                                                  │
+│ Enter to select · ↑/↓ to navigate · Esc to cancel                                                │
+│                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
-
 
 
 

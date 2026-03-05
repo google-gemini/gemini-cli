@@ -4,13 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import {
   ApprovalMode,
   checkExhaustive,
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import { useState, useEffect, useMemo } from 'react';
+import { useConfig } from '../contexts/ConfigContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
+import { useUIState } from '../contexts/UIStateContext.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
+import { useVimMode } from '../contexts/VimModeContext.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { isNarrowWidth } from '../utils/isNarrowWidth.js';
+import { isContextUsageHigh } from '../utils/contextUsage.js';
+import { theme } from '../semantic-colors.js';
+import { GENERIC_WORKING_LABEL } from '../textConstants.js';
+import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
+import { StreamingState, type HistoryItemToolGroup } from '../types.js';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
 import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
@@ -24,38 +37,30 @@ import { InputPrompt } from './InputPrompt.js';
 import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
-import { ContextUsageDisplay } from './ContextUsageDisplay.js';
-import { HorizontalLine } from './shared/HorizontalLine.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
-import { isNarrowWidth } from '../utils/isNarrowWidth.js';
-import { useUIState } from '../contexts/UIStateContext.js';
-import { useUIActions } from '../contexts/UIActionsContext.js';
-import { useVimMode } from '../contexts/VimModeContext.js';
-import { useConfig } from '../contexts/ConfigContext.js';
-import { useSettings } from '../contexts/SettingsContext.js';
-import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { StreamingState, type HistoryItemToolGroup } from '../types.js';
-import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
+import { GeminiRespondingSpinner } from './GeminiRespondingSpinner.js';
+import { HookStatusDisplay } from './HookStatusDisplay.js';
+import { ConfigInitDisplay } from './ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
-import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
-import { isContextUsageHigh } from '../utils/contextUsage.js';
-import { theme } from '../semantic-colors.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
-  const config = useConfig();
-  const settings = useSettings();
-  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const uiState = useUIState();
   const uiActions = useUIActions();
+  const settings = useSettings();
+  const config = useConfig();
   const { vimEnabled, vimMode } = useVimMode();
-  const inlineThinkingMode = getInlineThinkingMode(settings);
-  const terminalWidth = uiState.terminalWidth;
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  const { columns: terminalWidth } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
 
   const isAlternateBuffer = useAlternateBuffer();
   const { showApprovalModeIndicator } = uiState;
+  const loadingPhrases = settings.merged.ui.loadingPhrases;
+  const showTips = loadingPhrases === 'tips' || loadingPhrases === 'all';
+  const showWit = loadingPhrases === 'witty' || loadingPhrases === 'all';
+
   const showUiDetails = uiState.cleanUiDetailsVisible;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
   const hideContextSummary =
@@ -84,6 +89,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     Boolean(uiState.quota.proQuotaRequest) ||
     Boolean(uiState.quota.validationRequest) ||
     Boolean(uiState.customDialog);
+
   const isPassiveShortcutsHelpState =
     uiState.isInputActive &&
     uiState.streamingState === StreamingState.Idle &&
@@ -105,16 +111,53 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     uiState.shortcutsHelpVisible &&
     uiState.streamingState === StreamingState.Idle &&
     !hasPendingActionRequired;
+
+  const [showShortcutsHintDebounced, setShowShortcutsHintDebounced] =
+    useState(false);
+  const canShowShortcutsHint =
+    uiState.isInputActive &&
+    uiState.streamingState === StreamingState.Idle &&
+    !hasPendingActionRequired &&
+    uiState.buffer.text.length === 0;
+
+  useEffect(() => {
+    if (!canShowShortcutsHint) {
+      setShowShortcutsHintDebounced(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setShowShortcutsHintDebounced(true);
+    }, 200);
+
+    return () => clearTimeout(timeout);
+  }, [canShowShortcutsHint]);
+
+  /**
+   * Use the setting if provided, otherwise default to true for the new UX.
+   * This allows tests to override the collapse behavior.
+   */
+  const shouldCollapseDuringApproval =
+    (settings.merged.ui as Record<string, unknown>)[
+      'collapseDrawerDuringApproval'
+    ] !== false;
+
+  if (hasPendingActionRequired && shouldCollapseDuringApproval) {
+    return null;
+  }
+
   const hasToast = shouldShowToast(uiState);
   const showLoadingIndicator =
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
     uiState.streamingState === StreamingState.Responding &&
     !hasPendingActionRequired;
+
   const hideUiDetailsForSuggestions =
     suggestionsVisible && suggestionsPosition === 'above';
   const showApprovalIndicator =
     !uiState.shellModeActive && !hideUiDetailsForSuggestions;
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
+
   let modeBleedThrough: { text: string; color: string } | null = null;
   switch (showApprovalModeIndicator) {
     case ApprovalMode.YOLO:
@@ -137,10 +180,22 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
   const hideMinimalModeHintWhileBusy =
     !showUiDetails && (showLoadingIndicator || hasPendingActionRequired);
-  const minimalModeBleedThrough = hideMinimalModeHintWhileBusy
-    ? null
-    : modeBleedThrough;
-  const hasMinimalStatusBleedThrough = shouldShowToast(uiState);
+
+  // Universal Content Objects
+  const modeContentObj = hideMinimalModeHintWhileBusy ? null : modeBleedThrough;
+
+  const USER_HOOK_SOURCES = ['user', 'project', 'runtime'];
+  const userHooks = uiState.activeHooks.filter(
+    (h) => !h.source || USER_HOOK_SOURCES.includes(h.source),
+  );
+  const hasUserHooks =
+    userHooks.length > 0 && settings.merged.hooksConfig.notifications;
+
+  const shouldReserveSpaceForShortcutsHint =
+    settings.merged.ui.showShortcutsHint && !hideUiDetailsForSuggestions;
+
+  const showShortcutsHint =
+    shouldReserveSpaceForShortcutsHint && showShortcutsHintDebounced;
 
   const showMinimalContextBleedThrough =
     !settings.merged.ui.footer.hideContextPercentage &&
@@ -150,44 +205,348 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         ? uiState.currentModel
         : undefined,
     );
-  const hideShortcutsHintForSuggestions = hideUiDetailsForSuggestions;
-  const isModelIdle = uiState.streamingState === StreamingState.Idle;
-  const isBufferEmpty = uiState.buffer.text.length === 0;
-  const canShowShortcutsHint =
-    isModelIdle && isBufferEmpty && !hasPendingActionRequired;
-  const [showShortcutsHintDebounced, setShowShortcutsHintDebounced] =
-    useState(canShowShortcutsHint);
 
-  useEffect(() => {
-    if (!canShowShortcutsHint) {
-      setShowShortcutsHintDebounced(false);
-      return;
+  /**
+   * Calculate the estimated length of the status message to avoid collisions
+   * with the tips area.
+   */
+  let estimatedStatusLength = 0;
+  if (hasUserHooks) {
+    const hookLabel =
+      userHooks.length > 1 ? 'Executing Hooks' : 'Executing Hook';
+    const hookNames = userHooks
+      .map(
+        (h) =>
+          h.name +
+          (h.index && h.total && h.total > 1 ? ` (${h.index}/${h.total})` : ''),
+      )
+      .join(', ');
+    estimatedStatusLength = hookLabel.length + hookNames.length + 10;
+  } else if (showLoadingIndicator) {
+    const thoughtText = uiState.thought?.subject || GENERIC_WORKING_LABEL;
+    const inlineWittyLength =
+      showWit && uiState.currentWittyPhrase
+        ? uiState.currentWittyPhrase.length + 1
+        : 0;
+    estimatedStatusLength = thoughtText.length + 25 + inlineWittyLength;
+  } else if (hasPendingActionRequired) {
+    estimatedStatusLength = 20;
+  } else if (hasToast) {
+    estimatedStatusLength = 40;
+  }
+
+  /**
+   * Determine the ambient text (tip) to display.
+   */
+  const ambientContentStr = (() => {
+    // Only show Tips on the right
+    if (showTips && uiState.currentTip) {
+      if (
+        estimatedStatusLength + uiState.currentTip.length + 10 <=
+        terminalWidth
+      ) {
+        return uiState.currentTip;
+      }
     }
 
-    const timeout = setTimeout(() => {
-      setShowShortcutsHintDebounced(true);
-    }, 200);
+    return undefined;
+  })();
 
-    return () => clearTimeout(timeout);
-  }, [canShowShortcutsHint]);
+  const estimatedAmbientLength = ambientContentStr?.length || 0;
+  const willCollideAmbient =
+    estimatedStatusLength + estimatedAmbientLength + 5 > terminalWidth;
 
-  const shouldReserveSpaceForShortcutsHint =
-    settings.merged.ui.showShortcutsHint && !hideShortcutsHintForSuggestions;
-  const showShortcutsHint =
-    shouldReserveSpaceForShortcutsHint && showShortcutsHintDebounced;
-  const showMinimalModeBleedThrough =
-    !hideUiDetailsForSuggestions && Boolean(minimalModeBleedThrough);
+  const showAmbientLine =
+    uiState.streamingState !== StreamingState.Idle &&
+    !hasPendingActionRequired &&
+    (showTips || showWit) &&
+    ambientContentStr &&
+    !willCollideAmbient &&
+    !isNarrow;
+
+  // Mini Mode VIP Flags (Pure Content Triggers)
+  const miniMode_ShowApprovalMode =
+    Boolean(modeContentObj) && !hideUiDetailsForSuggestions;
+  const miniMode_ShowToast = hasToast;
+  const miniMode_ShowContext = showMinimalContextBleedThrough;
+  const miniMode_ShowShortcuts = shouldReserveSpaceForShortcutsHint;
+  const miniMode_ShowStatus = showLoadingIndicator || hasUserHooks;
+  const miniMode_ShowAmbient = showAmbientLine;
+
+  // Composite Mini Mode Triggers
+  const showRow1_MiniMode =
+    miniMode_ShowToast ||
+    miniMode_ShowStatus ||
+    miniMode_ShowShortcuts ||
+    miniMode_ShowAmbient;
+
+  const showRow2_MiniMode = miniMode_ShowApprovalMode || miniMode_ShowContext;
+
+  // Final Display Rules (Stable Footer Architecture)
+  const showRow1 = showUiDetails || showRow1_MiniMode;
+  const showRow2 = showUiDetails || showRow2_MiniMode;
+
   const showMinimalInlineLoading = !showUiDetails && showLoadingIndicator;
-  const showMinimalBleedThroughRow =
-    !showUiDetails &&
-    (showMinimalModeBleedThrough ||
-      hasMinimalStatusBleedThrough ||
-      showMinimalContextBleedThrough);
-  const showMinimalMetaRow =
-    !showUiDetails &&
-    (showMinimalInlineLoading ||
-      showMinimalBleedThroughRow ||
-      shouldReserveSpaceForShortcutsHint);
+  const showMinimalBleedThroughRow = !showUiDetails && showRow2_MiniMode;
+
+  const isInteractiveShellWaiting = uiState.currentLoadingPhrase?.includes(
+    INTERACTIVE_SHELL_WAITING_PHRASE,
+  );
+
+  const renderAmbientNode = () => {
+    if (!ambientContentStr) return null;
+
+    return (
+      <Box
+        flexDirection="row"
+        justifyContent="flex-end"
+        marginLeft={1}
+        marginRight={1}
+      >
+        <Text
+          color={theme.text.secondary}
+          wrap="truncate-end"
+          italic={ambientContentStr === uiState.currentWittyPhrase}
+        >
+          {ambientContentStr === uiState.currentTip
+            ? `Tip: ${ambientContentStr}`
+            : ambientContentStr}
+        </Text>
+      </Box>
+    );
+  };
+
+  const renderStatusNode = () => {
+    if (hasUserHooks) {
+      const activeHook = userHooks[0];
+      const hookIcon = activeHook?.eventName?.startsWith('After') ? '↩' : '↪';
+
+      return (
+        <Box flexDirection="row" alignItems="center">
+          <Box marginRight={1}>
+            <GeminiRespondingSpinner
+              nonRespondingDisplay={hookIcon}
+              isHookActive={true}
+            />
+          </Box>
+          <Text color={theme.text.primary} italic wrap="truncate-end">
+            <HookStatusDisplay activeHooks={userHooks} />
+          </Text>
+          {showWit && uiState.currentWittyPhrase && (
+            <Box marginLeft={1}>
+              <Text color={theme.text.secondary} dimColor italic>
+                {uiState.currentWittyPhrase} :)
+              </Text>
+            </Box>
+          )}
+        </Box>
+      );
+    }
+
+    if (showLoadingIndicator) {
+      return (
+        <LoadingIndicator
+          inline
+          loadingPhrases={loadingPhrases}
+          errorVerbosity={settings.merged.ui.errorVerbosity}
+          thought={uiState.thought}
+          elapsedTime={uiState.elapsedTime}
+          forceRealStatusOnly={false}
+          showCancelAndTimer={false}
+          wittyPhrase={uiState.currentWittyPhrase}
+        />
+      );
+    }
+    return null;
+  };
+
+  const statusNode = renderStatusNode();
+
+  /**
+   * Renders the minimal metadata row content shown when UI details are hidden.
+   */
+  const renderMinimalMetaRowContent = () => (
+    <Box flexDirection="row">
+      {showMinimalInlineLoading && (
+        <LoadingIndicator
+          inline
+          loadingPhrases={loadingPhrases}
+          errorVerbosity={settings.merged.ui.errorVerbosity}
+          elapsedTime={uiState.elapsedTime}
+          forceRealStatusOnly={true}
+          showCancelAndTimer={false}
+        />
+      )}
+      {hasUserHooks && (
+        <Box marginLeft={showMinimalInlineLoading ? 1 : 0}>
+          <Box marginRight={1}>
+            <GeminiRespondingSpinner isHookActive={true} />
+          </Box>
+          <Text color={theme.text.primary} italic>
+            <HookStatusDisplay activeHooks={userHooks} />
+          </Text>
+        </Box>
+      )}
+      {showMinimalBleedThroughRow && (
+        <Box marginLeft={showMinimalInlineLoading || hasUserHooks ? 1 : 0}>
+          {miniMode_ShowApprovalMode && modeContentObj && (
+            <Text color={modeContentObj.color}>● {modeContentObj.text}</Text>
+          )}
+          {/* {zenMode_ShowToast && (
+            <Box
+              marginLeft={
+                showMinimalInlineLoading ||
+                zenMode_ShowApprovalMode ||
+                hasUserHooks
+                  ? 1
+                  : 0
+              }
+            >
+              <ToastDisplay />
+            </Box>
+          )} */}
+        </Box>
+      )}
+    </Box>
+  );
+
+  const renderStatusRow = () => {
+    // Mini Mode Height Reservation (The "Anti-Jitter" line)
+    if (!showUiDetails && !showRow1_MiniMode && !showRow2_MiniMode) {
+      return <Box height={1} />;
+    }
+
+    return (
+      <Box flexDirection="column" width="100%">
+        {/* Row 1: multipurpose status (thinking, hooks, wit, tips) */}
+        {showRow1 && (
+          <Box
+            width="100%"
+            flexDirection="row"
+            alignItems="center"
+            justifyContent="space-between"
+            minHeight={1}
+          >
+            <Box flexDirection="row" flexGrow={1} flexShrink={1}>
+              {!showUiDetails && miniMode_ShowStatus ? (
+                renderMinimalMetaRowContent()
+              ) : isInteractiveShellWaiting ? (
+                <Box width="100%" marginLeft={1}>
+                  <Text color={theme.status.warning}>
+                    ! Shell awaiting input (Tab to focus)
+                  </Text>
+                </Box>
+              ) : (
+                <Box
+                  flexDirection="row"
+                  alignItems={isNarrow ? 'flex-start' : 'center'}
+                  flexGrow={1}
+                  flexShrink={0}
+                  marginLeft={1}
+                >
+                  {statusNode}
+                </Box>
+              )}
+            </Box>
+
+            <Box flexShrink={0} marginLeft={2} marginRight={isNarrow ? 0 : 1}>
+              {!isNarrow && (
+                <>
+                  {showShortcutsHint && <ShortcutsHint />}
+                  {!showShortcutsHint && showAmbientLine && renderAmbientNode()}
+                </>
+              )}
+            </Box>
+          </Box>
+        )}
+
+        {/* Internal Separator Line */}
+        {showRow1 &&
+          showRow2 &&
+          (showUiDetails || (showRow1_MiniMode && showRow2_MiniMode)) && (
+            <Box width="100%" marginLeft={1} marginRight={1}>
+              <Box
+                borderStyle="single"
+                borderTop
+                borderBottom={false}
+                borderLeft={false}
+                borderRight={false}
+                borderColor={theme.border.default}
+                borderDimColor={true}
+                width="100%"
+                height={1}
+              />
+            </Box>
+          )}
+
+        {/* Row 2: Mode and Context Summary */}
+        {showRow2 && (
+          <Box
+            width="100%"
+            flexDirection={isNarrow ? 'column' : 'row'}
+            alignItems={isNarrow ? 'flex-start' : 'center'}
+            justifyContent="space-between"
+          >
+            <Box flexDirection="row" alignItems="center" marginLeft={1}>
+              {showUiDetails ? (
+                <>
+                  {showApprovalIndicator && (
+                    <ApprovalModeIndicator
+                      approvalMode={showApprovalModeIndicator}
+                      allowPlanMode={uiState.allowPlanMode}
+                    />
+                  )}
+                  {uiState.shellModeActive && (
+                    <Box
+                      marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
+                      marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
+                    >
+                      <ShellModeIndicator />
+                    </Box>
+                  )}
+                  {showRawMarkdownIndicator && (
+                    <Box
+                      marginLeft={
+                        (showApprovalIndicator || uiState.shellModeActive) &&
+                        !isNarrow
+                          ? 1
+                          : 0
+                      }
+                      marginTop={
+                        (showApprovalIndicator || uiState.shellModeActive) &&
+                        isNarrow
+                          ? 1
+                          : 0
+                      }
+                    >
+                      <RawMarkdownIndicator />
+                    </Box>
+                  )}
+                </>
+              ) : (
+                miniMode_ShowApprovalMode &&
+                modeContentObj && (
+                  <Text color={modeContentObj.color}>
+                    ● {modeContentObj.text}
+                  </Text>
+                )
+              )}
+            </Box>
+            <Box
+              marginTop={isNarrow ? 1 : 0}
+              flexDirection="row"
+              alignItems="center"
+              marginLeft={isNarrow ? 1 : 0}
+            >
+              {(showUiDetails || miniMode_ShowContext) && (
+                <StatusDisplay hideContextSummary={hideContextSummary} />
+              )}
+            </Box>
+          </Box>
+        )}
+      </Box>
+    );
+  };
 
   return (
     <Box
@@ -210,212 +569,16 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
       {showUiDetails && <TodoTray />}
 
-      <Box width="100%" flexDirection="column">
-        <Box
-          width="100%"
-          flexDirection={isNarrow ? 'column' : 'row'}
-          alignItems={isNarrow ? 'flex-start' : 'center'}
-          justifyContent={isNarrow ? 'flex-start' : 'space-between'}
-        >
-          <Box
-            marginLeft={1}
-            marginRight={isNarrow ? 0 : 1}
-            flexDirection="row"
-            alignItems={isNarrow ? 'flex-start' : 'center'}
-            flexGrow={1}
-          >
-            {showUiDetails && showLoadingIndicator && (
-              <LoadingIndicator
-                inline
-                thought={
-                  uiState.streamingState ===
-                  StreamingState.WaitingForConfirmation
-                    ? undefined
-                    : uiState.thought
-                }
-                currentLoadingPhrase={
-                  settings.merged.ui.loadingPhrases === 'off'
-                    ? undefined
-                    : uiState.currentLoadingPhrase
-                }
-                thoughtLabel={
-                  inlineThinkingMode === 'full' ? 'Thinking...' : undefined
-                }
-                elapsedTime={uiState.elapsedTime}
-              />
-            )}
-          </Box>
-          <Box
-            marginTop={isNarrow ? 1 : 0}
-            flexDirection="column"
-            alignItems={isNarrow ? 'flex-start' : 'flex-end'}
-            minHeight={
-              showUiDetails && shouldReserveSpaceForShortcutsHint ? 1 : 0
-            }
-          >
-            {showUiDetails && showShortcutsHint && <ShortcutsHint />}
-          </Box>
-        </Box>
-        {showMinimalMetaRow && (
-          <Box
-            justifyContent="space-between"
-            width="100%"
-            flexDirection={isNarrow ? 'column' : 'row'}
-            alignItems={isNarrow ? 'flex-start' : 'center'}
-          >
-            <Box
-              marginLeft={1}
-              marginRight={isNarrow ? 0 : 1}
-              flexDirection="row"
-              alignItems={isNarrow ? 'flex-start' : 'center'}
-              flexGrow={1}
-            >
-              {showMinimalInlineLoading && (
-                <LoadingIndicator
-                  inline
-                  thought={
-                    uiState.streamingState ===
-                    StreamingState.WaitingForConfirmation
-                      ? undefined
-                      : uiState.thought
-                  }
-                  currentLoadingPhrase={
-                    settings.merged.ui.loadingPhrases === 'off'
-                      ? undefined
-                      : uiState.currentLoadingPhrase
-                  }
-                  thoughtLabel={
-                    inlineThinkingMode === 'full' ? 'Thinking...' : undefined
-                  }
-                  elapsedTime={uiState.elapsedTime}
-                />
-              )}
-              {showMinimalModeBleedThrough && minimalModeBleedThrough && (
-                <Text color={minimalModeBleedThrough.color}>
-                  ● {minimalModeBleedThrough.text}
-                </Text>
-              )}
-              {hasMinimalStatusBleedThrough && (
-                <Box
-                  marginLeft={
-                    showMinimalInlineLoading || showMinimalModeBleedThrough
-                      ? 1
-                      : 0
-                  }
-                >
-                  <ToastDisplay />
-                </Box>
-              )}
-            </Box>
-            {(showMinimalContextBleedThrough ||
-              shouldReserveSpaceForShortcutsHint) && (
-              <Box
-                marginTop={isNarrow && showMinimalBleedThroughRow ? 1 : 0}
-                flexDirection={isNarrow ? 'column' : 'row'}
-                alignItems={isNarrow ? 'flex-start' : 'flex-end'}
-                minHeight={1}
-              >
-                {showMinimalContextBleedThrough && (
-                  <ContextUsageDisplay
-                    promptTokenCount={uiState.sessionStats.lastPromptTokenCount}
-                    model={uiState.currentModel}
-                    terminalWidth={uiState.terminalWidth}
-                  />
-                )}
-                <Box
-                  marginLeft={
-                    showMinimalContextBleedThrough && !isNarrow ? 1 : 0
-                  }
-                  marginTop={showMinimalContextBleedThrough && isNarrow ? 1 : 0}
-                >
-                  {showShortcutsHint && <ShortcutsHint />}
-                </Box>
-              </Box>
-            )}
-          </Box>
-        )}
-        {showShortcutsHelp && <ShortcutsHelp />}
-        {showUiDetails && <HorizontalLine />}
-        {showUiDetails && (
-          <Box
-            justifyContent={
-              settings.merged.ui.hideContextSummary
-                ? 'flex-start'
-                : 'space-between'
-            }
-            width="100%"
-            flexDirection={isNarrow ? 'column' : 'row'}
-            alignItems={isNarrow ? 'flex-start' : 'center'}
-          >
-            <Box
-              marginLeft={1}
-              marginRight={isNarrow ? 0 : 1}
-              flexDirection="row"
-              alignItems="center"
-              flexGrow={1}
-            >
-              {hasToast ? (
-                <ToastDisplay />
-              ) : (
-                <Box
-                  flexDirection={isNarrow ? 'column' : 'row'}
-                  alignItems={isNarrow ? 'flex-start' : 'center'}
-                >
-                  {showApprovalIndicator && (
-                    <ApprovalModeIndicator
-                      approvalMode={showApprovalModeIndicator}
-                      allowPlanMode={uiState.allowPlanMode}
-                    />
-                  )}
-                  {!showLoadingIndicator && (
-                    <>
-                      {uiState.shellModeActive && (
-                        <Box
-                          marginLeft={
-                            showApprovalIndicator && !isNarrow ? 1 : 0
-                          }
-                          marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
-                        >
-                          <ShellModeIndicator />
-                        </Box>
-                      )}
-                      {showRawMarkdownIndicator && (
-                        <Box
-                          marginLeft={
-                            (showApprovalIndicator ||
-                              uiState.shellModeActive) &&
-                            !isNarrow
-                              ? 1
-                              : 0
-                          }
-                          marginTop={
-                            (showApprovalIndicator ||
-                              uiState.shellModeActive) &&
-                            !isNarrow
-                              ? 1
-                              : 0
-                          }
-                        >
-                          <RawMarkdownIndicator />
-                        </Box>
-                      )}
-                    </>
-                  )}
-                </Box>
-              )}
-            </Box>
+      {showShortcutsHelp && <ShortcutsHelp />}
 
-            <Box
-              marginTop={isNarrow ? 1 : 0}
-              flexDirection="column"
-              alignItems={isNarrow ? 'flex-start' : 'flex-end'}
-            >
-              {!showLoadingIndicator && (
-                <StatusDisplay hideContextSummary={hideContextSummary} />
-              )}
-            </Box>
-          </Box>
-        )}
+      {(showUiDetails || miniMode_ShowToast) && (
+        <Box minHeight={1} marginLeft={isNarrow ? 0 : 1}>
+          <ToastDisplay />
+        </Box>
+      )}
+
+      <Box width="100%" flexDirection="column">
+        {renderStatusRow()}
       </Box>
 
       {showUiDetails && uiState.showErrorDetails && (
