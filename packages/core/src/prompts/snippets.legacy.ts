@@ -179,8 +179,6 @@ Sub-agents are specialized expert agents that you can use to assist you in the c
 
 Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
 
-**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
-
 The following tools can be used to start sub-agents:
 
 ${subAgentsList}
