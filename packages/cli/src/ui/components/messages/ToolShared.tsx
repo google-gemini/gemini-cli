@@ -193,6 +193,8 @@ type ToolInfoProps = {
   status: CoreToolCallStatus;
   emphasis: TextEmphasis;
   originalRequestName?: string;
+  /** Human-readable summary of what the command does (shown instead of raw description). */
+  commandSummary?: string;
 };
 
 export const ToolInfo: React.FC<ToolInfoProps> = ({
@@ -201,6 +203,7 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   status: coreStatus,
   emphasis,
   originalRequestName,
+  commandSummary,
 }) => {
   const status = mapCoreStatusToDisplayStatus(coreStatus);
   const nameColor = React.useMemo<string>(() => {
@@ -221,6 +224,8 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   // Hide description for completed Ask User tools (the result display speaks for itself)
   const isCompletedAskUser = isCompletedAskUserTool(name, status);
 
+  const displayDescription = commandSummary || description;
+
   return (
     <Box overflow="hidden" height={1} flexGrow={1} flexShrink={1}>
       <Text strikethrough={status === ToolCallStatus.Canceled} wrap="truncate">
@@ -236,7 +241,11 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
         {!isCompletedAskUser && (
           <>
             {' '}
-            <Text color={theme.text.secondary}>{description}</Text>
+            <Text
+              color={commandSummary ? theme.text.primary : theme.text.secondary}
+            >
+              {displayDescription}
+            </Text>
           </>
         )}
       </Text>

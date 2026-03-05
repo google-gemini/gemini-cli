@@ -10,11 +10,46 @@ import {
   type ToolResultDisplay,
   debugLogger,
   CoreToolCallStatus,
+  SHELL_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import {
   type HistoryItemToolGroup,
   type IndividualToolCallDisplay,
 } from '../types.js';
+import { SHELL_COMMAND_NAME, SHELL_NAME } from '../constants.js';
+
+function isShellToolName(name: string): boolean {
+  return (
+    name === SHELL_COMMAND_NAME ||
+    name === SHELL_NAME ||
+    name === SHELL_TOOL_NAME
+  );
+}
+
+/**
+ * Extracts the raw command and model-provided summary from shell tool args.
+ */
+function extractShellCommandInfo(args: Record<string, unknown>): {
+  rawCommand: string | undefined;
+  commandSummary: string | undefined;
+} {
+  const command =
+    typeof args['command'] === 'string' ? args['command'] : undefined;
+  const description =
+    typeof args['description'] === 'string' ? args['description'] : undefined;
+  const dirPath =
+    typeof args['dir_path'] === 'string' ? args['dir_path'] : undefined;
+
+  let rawCommand = command;
+  if (rawCommand && dirPath) {
+    rawCommand = `${rawCommand} [in ${dirPath}]`;
+  }
+
+  return {
+    rawCommand,
+    commandSummary: description || undefined,
+  };
+}
 
 /**
  * Transforms `ToolCall` objects into `HistoryItemToolGroup` objects for UI
@@ -46,12 +81,23 @@ export function mapToDisplay(
       renderOutputAsMarkdown = call.tool.isOutputMarkdown;
     }
 
+    let commandSummary: string | undefined = undefined;
+    let rawCommand: string | undefined = undefined;
+
+    if (isShellToolName(displayName) || isShellToolName(call.request.name)) {
+      const shellInfo = extractShellCommandInfo(call.request.args);
+      rawCommand = shellInfo.rawCommand;
+      commandSummary = shellInfo.commandSummary;
+    }
+
     const baseDisplayProperties = {
       callId: call.request.callId,
       parentCallId: call.request.parentCallId,
       name: displayName,
       description,
       renderOutputAsMarkdown,
+      commandSummary,
+      rawCommand,
     };
 
     let resultDisplay: ToolResultDisplay | undefined = undefined;

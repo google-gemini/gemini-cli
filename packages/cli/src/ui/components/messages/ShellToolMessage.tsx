@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Box, type DOMElement } from 'ink';
+import { Box, Text, type DOMElement } from 'ink';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { StickyHeader } from '../StickyHeader.js';
 import { useUIActions } from '../../contexts/UIActionsContext.js';
@@ -26,6 +26,8 @@ import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { type Config } from '@google/gemini-cli-core';
 import { calculateShellMaxLines } from '../../utils/toolLayoutUtils.js';
+import { useCommandSummary } from '../../hooks/useCommandSummary.js';
+import { theme } from '../../semantic-colors.js';
 
 export interface ShellToolMessageProps extends ToolMessageProps {
   config?: Config;
@@ -62,6 +64,9 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   isExpandable,
 
   originalRequestName,
+
+  commandSummary: modelSummary,
+  rawCommand,
 }) => {
   const {
     activePtyId: activeShellPtyId,
@@ -69,6 +74,8 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     constrainHeight,
   } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
+
+  const commandSummary = useCommandSummary(config, rawCommand, modelSummary);
 
   const isThisShellFocused = checkIsShellFocused(
     name,
@@ -96,8 +103,6 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
 
   const contentRef = React.useRef<DOMElement>(null);
 
-  // The shell is focusable if it's the shell command, it's executing, and the interactive shell is enabled.
-
   const isThisShellFocusable = checkIsShellFocusable(name, status, config);
 
   const handleFocus = () => {
@@ -115,6 +120,8 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     isThisShellFocused,
     resultDisplay,
   );
+
+  const showCollapsedCommand = !!commandSummary && !!rawCommand;
 
   return (
     <>
@@ -137,6 +144,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           description={description}
           emphasis={emphasis}
           originalRequestName={originalRequestName}
+          commandSummary={commandSummary}
         />
 
         <FocusHint
@@ -160,6 +168,14 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         paddingX={1}
         flexDirection="column"
       >
+        {showCollapsedCommand && (
+          <Box>
+            <Text dimColor color={theme.text.secondary} wrap="truncate">
+              {'$ '}
+              {rawCommand}
+            </Text>
+          </Box>
+        )}
         <ToolResultDisplay
           resultDisplay={resultDisplay}
           availableTerminalHeight={availableTerminalHeight}

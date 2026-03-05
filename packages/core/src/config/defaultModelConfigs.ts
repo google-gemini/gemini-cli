@@ -169,6 +169,18 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       },
     },
+    'command-summarizer': {
+      extends: 'base',
+      modelConfig: {
+        model: 'gemini-2.5-flash-lite',
+        generateContentConfig: {
+          maxOutputTokens: 100,
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
+        },
+      },
+    },
     'web-search': {
       extends: 'gemini-3-flash-base',
       modelConfig: {
