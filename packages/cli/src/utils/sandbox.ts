@@ -33,6 +33,7 @@ import {
   shouldUseCurrentUserInSandbox,
   parseImageName,
   ports,
+  sanitizeDebugPort,
   entrypoint,
   LOCAL_DEV_SANDBOX_IMAGE_NAME,
   SANDBOX_NETWORK_NAME,
@@ -416,7 +417,7 @@ export async function start_sandbox(
 
     // if DEBUG is set, expose debugging port
     if (process.env['DEBUG']) {
-      const debugPort = process.env['DEBUG_PORT'] || '9229';
+      const debugPort = sanitizeDebugPort(process.env['DEBUG_PORT']);
       args.push(`--publish`, `${debugPort}:${debugPort}`);
     }
 
@@ -695,7 +696,7 @@ export async function start_sandbox(
       let proxyContainerCommand = `${config.command} run --rm --init ${userFlag} --name ${SANDBOX_PROXY_NAME} --network ${SANDBOX_PROXY_NAME} -p 8877:8877 -v ${process.cwd()}:${workdir} --workdir ${workdir} ${image} ${proxyCommand}`;
       if (config.command === 'udocker') {
         // udocker doesn't support --init or --network
-        proxyContainerCommand = `${config.command} run --rm ${userFlag} -p 8877:8877 -v ${process.cwd()}:${workdir} --workdir ${workdir} ${image} ${proxyCommand}`;
+        proxyContainerCommand = `${config.command} run --rm ${userFlag} --publish=8877:8877 --volume=${process.cwd()}:${workdir} --workdir=${workdir} ${image} ${proxyCommand}`;
       }
       proxyProcess = spawn(proxyContainerCommand, {
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -744,7 +745,9 @@ export async function start_sandbox(
       const combinedArgs: string[] = [];
       for (let i = 0; i < args.length; i++) {
         if (
-          ['--workdir', '--volume', '--env', '--user'].includes(args[i]) &&
+          ['--workdir', '--volume', '--env', '--user', '--publish'].includes(
+            args[i],
+          ) &&
           i + 1 < args.length
         ) {
           combinedArgs.push(`${args[i]}=${args[i + 1]}`);
@@ -758,7 +761,6 @@ export async function start_sandbox(
 
     // spawn child and let it inherit stdio
     process.stdin.pause();
-    debugLogger.log(`Executing ${config.command} ` + args.join(' '));
     sandboxProcess = spawn(config.command, args, {
       stdio: 'inherit',
     });

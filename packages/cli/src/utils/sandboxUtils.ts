@@ -84,6 +84,20 @@ export function ports(): string[] {
     .map((p) => p.trim());
 }
 
+export function sanitizeDebugPort(value: string | undefined): string {
+  if (!value) {
+    return '9229';
+  }
+
+  const trimmedValue = value.trim();
+  if (!/^\d{1,5}$/.test(trimmedValue)) {
+    return '9229';
+  }
+
+  const port = Number(trimmedValue);
+  return port >= 1 && port <= 65535 ? trimmedValue : '9229';
+}
+
 export function entrypoint(
   workdir: string,
   cliArgs: string[],
@@ -149,7 +163,7 @@ export function entrypoint(
         ? 'npm run debug --'
         : 'npm rebuild && npm run start --'
       : isDebugMode
-        ? `node --inspect-brk=0.0.0.0:${process.env['DEBUG_PORT'] || '9229'} $(which gemini)`
+        ? `node --inspect-brk=0.0.0.0:${sanitizeDebugPort(process.env['DEBUG_PORT'])} $(which gemini)`
         : 'gemini';
 
   const args = [...shellCmds, cliCmd, ...quotedCliArgs].filter(Boolean);
