@@ -160,3 +160,20 @@ export {
 export { runInDevTraceSpan, type SpanMetadata } from './trace.js';
 export { startupProfiler, StartupProfiler } from './startupProfiler.js';
 export * from './constants.js';
+export { PerformanceCollector } from './performanceCollector.js';
+export type {
+  PerformanceSummary,
+  ModelLatency,
+  TokenEfficiency,
+  MemoryDataPoint,
+  StartupPhase,
+  OptimizationSuggestion,
+} from './performanceCollector.js';
+export { CostEstimator } from './costEstimator.js';
+export type {
+  ModelPricing,
+  ModelCostBreakdown,
+  CostSummary,
+} from './costEstimator.js';
+export { exportToJSON, exportToMarkdown } from './performanceExporter.js';
+export type { ExportOptions } from './performanceExporter.js';
