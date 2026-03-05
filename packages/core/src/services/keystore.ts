@@ -161,12 +161,18 @@ export class KeystoreService {
 
   /**
    * Removes a secret from the keystore.
+   * @throws Error if the keystore is unavailable.
    * @returns true if the secret was deleted, false otherwise.
    */
   async deletePassword(account: string): Promise<boolean> {
-    if (!(await this.isAvailable())) return false;
+    if (!(await this.isAvailable())) {
+      throw new Error('Keystore is not available');
+    }
     const keystore = await this.getKeystore();
-    return keystore?.deletePassword(this.serviceName, account) ?? false;
+    if (!keystore) {
+      throw new Error('Keystore module not found');
+    }
+    return keystore.deletePassword(this.serviceName, account);
   }
 
   /**

@@ -176,9 +176,10 @@ describe('KeystoreService', () => {
       );
     });
 
-    it('deletePassword should return false', async () => {
-      const result = await service.deletePassword('acc');
-      expect(result).toBe(false);
+    it('deletePassword should throw an error', async () => {
+      await expect(service.deletePassword('acc')).rejects.toThrow(
+        'Keystore is not available',
+      );
     });
 
     it('listCredentials should return empty array', async () => {

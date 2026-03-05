@@ -238,4 +238,59 @@ describe('KeychainTokenStorage', () => {
       });
     });
   });
+
+  describe('with keychain unavailable', () => {
+    beforeEach(() => {
+      isAvailableSpy.mockResolvedValue(false);
+      getPasswordSpy.mockResolvedValue(null);
+      setPasswordSpy.mockRejectedValue(new Error('Keystore is not available'));
+      deletePasswordSpy.mockRejectedValue(
+        new Error('Keystore is not available'),
+      );
+      listCredentialsSpy.mockResolvedValue([]);
+    });
+
+    it('getCredentials should return null', async () => {
+      const result = await storage.getCredentials('test-server');
+      expect(result).toBeNull();
+    });
+
+    it('setCredentials should throw', async () => {
+      await expect(storage.setCredentials(validCredentials)).rejects.toThrow(
+        'Keystore is not available',
+      );
+    });
+
+    it('deleteCredentials should throw', async () => {
+      await expect(storage.deleteCredentials('test-server')).rejects.toThrow(
+        'Keystore is not available',
+      );
+    });
+
+    it('listServers should return empty array', async () => {
+      const result = await storage.listServers();
+      expect(result).toEqual([]);
+    });
+
+    it('getAllCredentials should return empty map', async () => {
+      const result = await storage.getAllCredentials();
+      expect(result.size).toBe(0);
+    });
+
+    it('clearAll should not throw and do nothing', async () => {
+      await expect(storage.clearAll()).resolves.not.toThrow();
+      expect(deletePasswordSpy).not.toHaveBeenCalled();
+    });
+
+    it('secrets methods should handle unavailability', async () => {
+      expect(await storage.getSecret('key')).toBeNull();
+      await expect(storage.setSecret('key', 'val')).rejects.toThrow(
+        'Keystore is not available',
+      );
+      await expect(storage.deleteSecret('key')).rejects.toThrow(
+        'Keystore is not available',
+      );
+      expect(await storage.listSecrets()).toEqual([]);
+    });
+  });
 });
