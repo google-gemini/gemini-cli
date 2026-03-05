@@ -107,9 +107,8 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`general.preferredEditor`** (string):
   - **Description:** The preferred editor to open files in. Must be one of the
-    built-in supported identifiers — run /editor in the CLI for the full list.
-    Power users who need an editor not in this list can leave this unset and
-    configure $VISUAL or $EDITOR in their shell environment instead.
+    built-in supported identifiers. Use /editor in the CLI to pick
+    interactively, or leave unset to use $VISUAL/$EDITOR.
   - **Default:** `undefined`
 
 - **`general.vimMode`** (boolean):
