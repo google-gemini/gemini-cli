@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
@@ -136,80 +136,78 @@ export function BaseSettingsDialog({
 }: BaseSettingsDialogProps): React.JSX.Element {
   // Calculate effective max items and scope visibility based on terminal height
   const hasFooter = footerContent ? true : false;
-  const { effectiveMaxItemsToShow, finalShowScopeSelector } =
-    React.useMemo(() => {
-      const initialShowScope = showScopeSelector;
-      const initialMaxItems = maxItemsToShow;
+  const { effectiveMaxItemsToShow, finalShowScopeSelector } = useMemo(() => {
+    const initialShowScope = showScopeSelector;
+    const initialMaxItems = maxItemsToShow;
 
-      if (!availableHeight) {
-        return {
-          effectiveMaxItemsToShow: initialMaxItems,
-          finalShowScopeSelector: initialShowScope,
-        };
-      }
-
-      // Layout constants based on BaseSettingsDialog structure:
-      const DIALOG_PADDING = 4;
-      const SETTINGS_TITLE_HEIGHT = 1;
-      const SEARCH_SECTION_HEIGHT = searchEnabled ? 5 : 0;
-      const SCROLL_ARROWS_HEIGHT = 2;
-      const ITEMS_SPACING_AFTER = 1;
-      const SCOPE_SECTION_HEIGHT = 5;
-      const HELP_TEXT_HEIGHT = 1;
-      const FOOTER_CONTENT_HEIGHT = hasFooter ? 1 : 0;
-      const ITEM_HEIGHT = 3;
-
-      const currentAvailableHeight = availableHeight - DIALOG_PADDING;
-
-      const baseFixedHeight =
-        SETTINGS_TITLE_HEIGHT +
-        SEARCH_SECTION_HEIGHT +
-        SCROLL_ARROWS_HEIGHT +
-        ITEMS_SPACING_AFTER +
-        HELP_TEXT_HEIGHT +
-        FOOTER_CONTENT_HEIGHT;
-
-      // Calculate max items with scope selector
-      const heightWithScope = baseFixedHeight + SCOPE_SECTION_HEIGHT;
-      const availableForItemsWithScope =
-        currentAvailableHeight - heightWithScope;
-      const maxItemsWithScope = Math.max(
-        1,
-        Math.floor(availableForItemsWithScope / ITEM_HEIGHT),
-      );
-
-      // Calculate max items without scope selector
-      const availableForItemsWithoutScope =
-        currentAvailableHeight - baseFixedHeight;
-      const maxItemsWithoutScope = Math.max(
-        1,
-        Math.floor(availableForItemsWithoutScope / ITEM_HEIGHT),
-      );
-
-      // In small terminals, hide scope selector if it would allow more items to show
-      let shouldShowScope = initialShowScope;
-      let maxItems = maxItemsWithScope;
-
-      if (initialShowScope && availableHeight < 25) {
-        // Hide scope selector if it gains us more than 1 extra item
-        if (maxItemsWithoutScope > maxItemsWithScope + 1) {
-          shouldShowScope = false;
-          maxItems = maxItemsWithoutScope;
-        }
-      }
-
+    if (!availableHeight) {
       return {
-        effectiveMaxItemsToShow: Math.min(maxItems, items.length),
-        finalShowScopeSelector: shouldShowScope,
+        effectiveMaxItemsToShow: initialMaxItems,
+        finalShowScopeSelector: initialShowScope,
       };
-    }, [
-      availableHeight,
-      maxItemsToShow,
-      items.length,
-      searchEnabled,
-      showScopeSelector,
-      hasFooter,
-    ]);
+    }
+
+    // Layout constants based on BaseSettingsDialog structure:
+    const DIALOG_PADDING = 4;
+    const SETTINGS_TITLE_HEIGHT = 1;
+    const SEARCH_SECTION_HEIGHT = searchEnabled ? 5 : 0;
+    const SCROLL_ARROWS_HEIGHT = 2;
+    const ITEMS_SPACING_AFTER = 1;
+    const SCOPE_SECTION_HEIGHT = 5;
+    const HELP_TEXT_HEIGHT = 1;
+    const FOOTER_CONTENT_HEIGHT = hasFooter ? 1 : 0;
+    const ITEM_HEIGHT = 3;
+
+    const currentAvailableHeight = availableHeight - DIALOG_PADDING;
+
+    const baseFixedHeight =
+      SETTINGS_TITLE_HEIGHT +
+      SEARCH_SECTION_HEIGHT +
+      SCROLL_ARROWS_HEIGHT +
+      ITEMS_SPACING_AFTER +
+      HELP_TEXT_HEIGHT +
+      FOOTER_CONTENT_HEIGHT;
+
+    // Calculate max items with scope selector
+    const heightWithScope = baseFixedHeight + SCOPE_SECTION_HEIGHT;
+    const availableForItemsWithScope = currentAvailableHeight - heightWithScope;
+    const maxItemsWithScope = Math.max(
+      1,
+      Math.floor(availableForItemsWithScope / ITEM_HEIGHT),
+    );
+
+    // Calculate max items without scope selector
+    const availableForItemsWithoutScope =
+      currentAvailableHeight - baseFixedHeight;
+    const maxItemsWithoutScope = Math.max(
+      1,
+      Math.floor(availableForItemsWithoutScope / ITEM_HEIGHT),
+    );
+
+    // In small terminals, hide scope selector if it would allow more items to show
+    let shouldShowScope = initialShowScope;
+    let maxItems = maxItemsWithScope;
+
+    if (initialShowScope && availableHeight < 25) {
+      // Hide scope selector if it gains us more than 1 extra item
+      if (maxItemsWithoutScope > maxItemsWithScope + 1) {
+        shouldShowScope = false;
+        maxItems = maxItemsWithoutScope;
+      }
+    }
+
+    return {
+      effectiveMaxItemsToShow: Math.min(maxItems, items.length),
+      finalShowScopeSelector: shouldShowScope,
+    };
+  }, [
+    availableHeight,
+    maxItemsToShow,
+    items.length,
+    searchEnabled,
+    showScopeSelector,
+    hasFooter,
+  ]);
 
   // Internal state
   const { activeIndex, scrollOffset, moveUp, moveDown } = useSettingsNavigation(
