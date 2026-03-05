@@ -12,6 +12,7 @@ import {
   useEffect,
   useReducer,
   useContext,
+  useState,
 } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
@@ -782,28 +783,28 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     }
   }, [customOptionText, isCustomOptionSelected, question.multiSelect]);
 
+  const [actualQuestionHeight, setActualQuestionHeight] = useState(0);
+
   const HEADER_HEIGHT = progressHeader ? 2 : 0;
   const TITLE_MARGIN = 1;
   const FOOTER_HEIGHT = 2; // DialogFooter + margin
   const overhead = HEADER_HEIGHT + TITLE_MARGIN + FOOTER_HEIGHT;
+
   const listHeight = availableHeight
     ? Math.max(1, availableHeight - overhead)
     : undefined;
-  const maxQuestionHeight =
-    question.unconstrainedHeight && listHeight
-      ? // When unconstrained, give the question a majority of the vertical space (e.g., 70%).
-        // The options list will take the remaining space and scroll if necessary.
-        // This is more robust than calculating based on `selectionItems.length`,
-        // which can incorrectly shrink the question if there are many options.
-        Math.max(5, Math.floor(listHeight * 0.7))
-      : 15;
-  const questionHeight =
+
+  // Modulo the fixed overflow (overhead + 4 lines reserved for list), use all remaining height.
+  const maxQuestionHeight = listHeight ? Math.max(5, listHeight - 4) : 15;
+
+  const questionHeightLimit =
     listHeight && !isAlternateBuffer
-      ? Math.min(maxQuestionHeight, Math.max(1, listHeight - DIALOG_PADDING))
+      ? Math.min(maxQuestionHeight, listHeight)
       : undefined;
+
   const maxItemsToShow =
-    listHeight && questionHeight
-      ? Math.max(1, Math.floor((listHeight - questionHeight) / 2))
+    listHeight && actualQuestionHeight
+      ? Math.max(1, Math.floor((listHeight - actualQuestionHeight) / 2))
       : selectionItems.length;
 
   return (
@@ -811,9 +812,10 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       {progressHeader}
       <Box marginBottom={TITLE_MARGIN}>
         <MaxSizedBox
-          maxHeight={questionHeight}
+          maxHeight={questionHeightLimit}
           maxWidth={availableWidth}
           overflowDirection="bottom"
+          onHeightChange={setActualQuestionHeight}
         >
           <Box flexDirection="column">
             <MarkdownDisplay

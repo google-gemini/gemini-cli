@@ -36,6 +36,22 @@ Enter to select · ↑/↓ to navigate · Esc to cancel
 "
 `;
 
+exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: false) > shows scroll arrows correctly when useAlternateBuffer is false 2`] = `
+"Choose an option
+
+▲
+●  1.  Option 1
+       Description 1
+   2.  Option 2
+       Description 2
+   3.  Option 3
+       Description 3
+▼
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
+"
+`;
+
 exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: true) > shows scroll arrows correctly when useAlternateBuffer is true 1`] = `
 "Choose an option
 

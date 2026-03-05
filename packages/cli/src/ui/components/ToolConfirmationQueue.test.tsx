@@ -282,9 +282,10 @@ describe('ToolConfirmationQueue', () => {
     // hideToolIdentity is true for ask_user -> subtracts 4 instead of 6
     // availableContentHeight = 19 - 4 = 15
     // ToolConfirmationMessage handlesOwnUI=true -> returns full 15
-    // AskUserDialog allocates questionHeight = Math.min(maxQuestionHeight, Math.max(5, listHeight - DIALOG_PADDING)).
-    // maxQuestionHeight = floor(15 * 0.7) = 10.
-    // 10 lines is enough for the 6-line question + padding.
+    // AskUserDialog allocates questionHeight = availableHeight - overhead - minListHeight.
+    // listHeight = 15 - overhead (Header:0, Margin:1, Footer:2) = 12.
+    // maxQuestionHeight = listHeight - 4 = 8.
+    // 8 lines is enough for the 6-line question.
     await waitFor(() => {
       expect(lastFrame()).toContain('Line 6');
       expect(lastFrame()).not.toContain('lines hidden');
