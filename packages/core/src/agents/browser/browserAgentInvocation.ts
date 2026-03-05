@@ -94,15 +94,24 @@ function sanitizeToolArgs(args: unknown): unknown {
  */
 function sanitizeErrorMessage(message: string): string {
   return message
-    .replace(/api[_-]?key[s]?[:=]\s*['"]?[^\s'"]+['"]?/gi, 'api_key=[REDACTED]')
-    .replace(/token[:=]\s*['"]?[^\s'"]+['"]?/gi, 'token=[REDACTED]')
-    .replace(/password[:=]\s*['"]?[^\s'"]+['"]?/gi, 'password=[REDACTED]')
-    .replace(/secret[:=]\s*['"]?[^\s'"]+['"]?/gi, 'secret=[REDACTED]')
-    .replace(/credential[:=]\s*['"]?[^\s'"]+['"]?/gi, 'credential=[REDACTED]')
-    .replace(/auth[:=]\s*['"]?[^\s'"]+['"]?/gi, 'auth=[REDACTED]')
-    .replace(/passphrase[:=]\s*['"]?[^\s'"]+['"]?/gi, 'passphrase=[REDACTED]')
     .replace(
-      /private[_-]?key[:=]\s*['"]?[^\s'"]+['"]?/gi,
+      /api[_-]?key[s]?[:=]\s*['"]?[^\s,'"&;]+['"]?/gi,
+      'api_key=[REDACTED]',
+    )
+    .replace(/token[:=]\s*['"]?[^\s,'"&;]+['"]?/gi, 'token=[REDACTED]')
+    .replace(/password[:=]\s*['"]?[^\s,'"&;]+['"]?/gi, 'password=[REDACTED]')
+    .replace(/secret[:=]\s*['"]?[^\s,'"&;]+['"]?/gi, 'secret=[REDACTED]')
+    .replace(
+      /credential[:=]\s*['"]?[^\s,'"&;]+['"]?/gi,
+      'credential=[REDACTED]',
+    )
+    .replace(/auth[:=]\s*['"]?[^\s,'"&;]+['"]?/gi, 'auth=[REDACTED]')
+    .replace(
+      /passphrase[:=]\s*['"]?[^\s,'"&;]+['"]?/gi,
+      'passphrase=[REDACTED]',
+    )
+    .replace(
+      /private[_-]?key[:=]\s*['"]?[^\s,'"&;]+['"]?/gi,
       'private_key=[REDACTED]',
     )
     .replace(
