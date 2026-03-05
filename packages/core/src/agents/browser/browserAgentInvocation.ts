@@ -63,6 +63,9 @@ const SENSITIVE_KEY_PATTERNS = [
  * Supports nested objects and arrays.
  */
 function sanitizeToolArgs(args: unknown): unknown {
+  if (typeof args === 'string') {
+    return sanitizeErrorMessage(args);
+  }
   if (typeof args !== 'object' || args === null) {
     return args;
   }
@@ -87,8 +90,6 @@ function sanitizeToolArgs(args: unknown): unknown {
     );
     if (isSensitive) {
       sanitized[key] = '[REDACTED]';
-    } else if (typeof value === 'string') {
-      sanitized[key] = sanitizeErrorMessage(value);
     } else {
       sanitized[key] = sanitizeToolArgs(value);
     }
@@ -102,21 +103,34 @@ function sanitizeToolArgs(args: unknown): unknown {
  * Uses [^\s'"]+ to catch JWTs, tokens with dots/slashes, and other complex values.
  */
 function sanitizeErrorMessage(message: string): string {
+  const valuePattern = `(?:"[^"]*"|'[^']*'|[^&;]*)`;
   return message
     .replace(
-      /api[_-]?key[s]?[:=]\s*['"]?[^,'"&;]+['"]?/gi,
-      'api_key=[REDACTED]',
+      new RegExp(`(api[_-]?key[s]?[:=]\\s*)${valuePattern}`, 'gi'),
+      '$1[REDACTED]',
     )
-    .replace(/token[:=]\s*['"]?[^,'"&;]+['"]?/gi, 'token=[REDACTED]')
-    .replace(/password[:=]\s*['"]?[^,'"&;]+['"]?/gi, 'password=[REDACTED]')
-    .replace(/pwd[:=]\s*['"]?[^,'"&;]+['"]?/gi, 'pwd=[REDACTED]')
-    .replace(/secret[:=]\s*['"]?[^,'"&;]+['"]?/gi, 'secret=[REDACTED]')
-    .replace(/credential[:=]\s*['"]?[^,'"&;]+['"]?/gi, 'credential=[REDACTED]')
-    .replace(/auth[:=]\s*['"]?[^,'"&;]+['"]?/gi, 'auth=[REDACTED]')
-    .replace(/passphrase[:=]\s*['"]?[^,'"&;]+['"]?/gi, 'passphrase=[REDACTED]')
+    .replace(new RegExp(`(token[:=]\\s*)${valuePattern}`, 'gi'), '$1[REDACTED]')
     .replace(
-      /private[_-]?key[:=]\s*['"]?[^,'"&;]+['"]?/gi,
-      'private_key=[REDACTED]',
+      new RegExp(`(password[:=]\\s*)${valuePattern}`, 'gi'),
+      '$1[REDACTED]',
+    )
+    .replace(new RegExp(`(pwd[:=]\\s*)${valuePattern}`, 'gi'), '$1[REDACTED]')
+    .replace(
+      new RegExp(`(secret[:=]\\s*)${valuePattern}`, 'gi'),
+      '$1[REDACTED]',
+    )
+    .replace(
+      new RegExp(`(credential[:=]\\s*)${valuePattern}`, 'gi'),
+      '$1[REDACTED]',
+    )
+    .replace(new RegExp(`(auth[:=]\\s*)${valuePattern}`, 'gi'), '$1[REDACTED]')
+    .replace(
+      new RegExp(`(passphrase[:=]\\s*)${valuePattern}`, 'gi'),
+      '$1[REDACTED]',
+    )
+    .replace(
+      new RegExp(`(private[_-]?key[:=]\\s*)${valuePattern}`, 'gi'),
+      '$1[REDACTED]',
     )
     .replace(
       /\/[a-zA-Z0-9_\-/]*\/[a-zA-Z0-9_-]*\.(key|pem|p12|pfx)/gi,
