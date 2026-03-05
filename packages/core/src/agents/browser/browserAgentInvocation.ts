@@ -40,7 +40,27 @@ const DESCRIPTION_MAX_LENGTH = 200;
 const MAX_RECENT_ACTIVITY = 20;
 
 /**
- * Sanitizes tool arguments by redacting sensitive fields.
+ * Sensitive key patterns used for redaction.
+ */
+const SENSITIVE_KEY_PATTERNS = [
+  'password',
+  'pwd',
+  'apikey',
+  'api_key',
+  'api-key',
+  'token',
+  'secret',
+  'credential',
+  'auth',
+  'passphrase',
+  'privatekey',
+  'private_key',
+  'private-key',
+];
+
+/**
+ * Sanitizes tool arguments by recursively redacting sensitive fields.
+ * Supports nested objects and arrays.
  */
 function sanitizeToolArgs(args: unknown): unknown {
   if (typeof args !== 'object' || args === null) {
@@ -51,22 +71,12 @@ function sanitizeToolArgs(args: unknown): unknown {
     return args.map(sanitizeToolArgs);
   }
 
-  const sensitiveKeys = [
-    'password',
-    'apikey',
-    'token',
-    'secret',
-    'credential',
-    'auth',
-    'passphrase',
-    'privatekey',
-  ];
-
   const sanitized: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(args)) {
-    const isSensitive = sensitiveKeys.some((sensitiveKey) =>
-      key.toLowerCase().includes(sensitiveKey.toLowerCase()),
+    const keyNormalized = key.toLowerCase().replace(/[-_]/g, '');
+    const isSensitive = SENSITIVE_KEY_PATTERNS.some((pattern) =>
+      keyNormalized.includes(pattern.replace(/[-_]/g, '')),
     );
     if (isSensitive) {
       sanitized[key] = '[REDACTED]';
@@ -76,6 +86,24 @@ function sanitizeToolArgs(args: unknown): unknown {
   }
 
   return sanitized;
+}
+
+/**
+ * Sanitizes error messages by redacting potential sensitive data patterns.
+ */
+function sanitizeErrorMessage(message: string): string {
+  return message
+    .replace(
+      /api[_-]?key[s]?[:=]\s*['"]?[a-zA-Z0-9_-]+['"]?/gi,
+      'api_key=[REDACTED]',
+    )
+    .replace(/token[:=]\s*['"]?[a-zA-Z0-9_-]+['"]?/gi, 'token=[REDACTED]')
+    .replace(/password[:=]\s*['"]?[^\s'"]+['"]?/gi, 'password=[REDACTED]')
+    .replace(/secret[:=]\s*['"]?[a-zA-Z0-9_-]+['"]?/gi, 'secret=[REDACTED]')
+    .replace(
+      /\/[a-zA-Z0-9_\-/]*\/[a-zA-Z0-9_-]*\.(key|pem|p12|pfx)/gi,
+      '/path/to/[REDACTED].key',
+    );
 }
 
 /**
@@ -250,28 +278,40 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             const toolName = activity.data['name']
               ? String(activity.data['name'])
               : undefined;
+            const newStatus = isCancellation ? 'cancelled' : 'error';
 
             if (toolName) {
+              // Mark the specific tool as error/cancelled
               for (let i = recentActivity.length - 1; i >= 0; i--) {
                 if (
                   recentActivity[i].type === 'tool_call' &&
                   recentActivity[i].content === toolName &&
                   recentActivity[i].status === 'running'
                 ) {
-                  recentActivity[i].status = isCancellation
-                    ? 'cancelled'
-                    : 'error';
+                  recentActivity[i].status = newStatus;
                   updated = true;
                   break;
                 }
               }
+            } else {
+              // No specific tool — mark ALL running tool_call items
+              for (const item of recentActivity) {
+                if (item.type === 'tool_call' && item.status === 'running') {
+                  item.status = newStatus;
+                  updated = true;
+                }
+              }
             }
 
+            // Sanitize the error message before emitting
+            const sanitizedError = sanitizeErrorMessage(error);
             recentActivity.push({
               id: randomUUID(),
               type: 'thought',
-              content: isCancellation ? error : `Error: ${error}`,
-              status: isCancellation ? 'cancelled' : 'error',
+              content: isCancellation
+                ? sanitizedError
+                : `Error: ${sanitizedError}`,
+              status: newStatus,
             });
             updated = true;
             break;
