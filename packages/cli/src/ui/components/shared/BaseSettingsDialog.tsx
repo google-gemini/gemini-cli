@@ -134,7 +134,6 @@ export function BaseSettingsDialog({
   availableHeight,
 }: BaseSettingsDialogProps): React.JSX.Element {
   // Calculate effective max items and scope visibility based on terminal height
-  // (Ported 1:1 from SettingsDialog.tsx logic)
   const hasFooter = footerContent ? true : false;
   const { effectiveMaxItemsToShow, finalShowScopeSelector } =
     React.useMemo(() => {
