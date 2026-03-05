@@ -22,6 +22,7 @@ import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
 import { useSettingsNavigation } from '../../hooks/useSettingsNavigation.js';
 import { useInlineEditBuffer } from '../../hooks/useInlineEditBuffer.js';
+import { formatCommand } from '../../utils/keybindingUtils.js';
 
 /**
  * Represents a single item in the settings dialog.
@@ -600,7 +601,7 @@ export function BaseSettingsDialog({
         {/* Help text */}
         <Box marginX={1}>
           <Text color={theme.text.secondary}>
-            (Use Enter to select, Ctrl+L to reset
+            (Use Enter to select, {formatCommand(Command.CLEAR_SCREEN)}
             {finalShowScopeSelector ? ', Tab to change focus' : ''}, Esc to
             close)
           </Text>
