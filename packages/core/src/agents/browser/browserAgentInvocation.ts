@@ -415,7 +415,7 @@ ${output.result}
         : `Browser agent failed. Error: ${errorMessage}`;
 
       return {
-        llmContent,
+        llmContent: [{ text: llmContent }],
         returnDisplay: progress,
         error: {
           message: errorMessage,
