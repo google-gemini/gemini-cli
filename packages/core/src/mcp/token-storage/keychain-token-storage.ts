@@ -156,12 +156,6 @@ export class KeychainTokenStorage
     }
   }
 
-  // Checks whether or not a set-get-delete cycle with the keychain works.
-  // Returns false if any operation fails.
-  async checkKeychainAvailability(): Promise<boolean> {
-    return this.keystoreService.isAvailable();
-  }
-
   async isAvailable(): Promise<boolean> {
     return this.keystoreService.isAvailable();
   }

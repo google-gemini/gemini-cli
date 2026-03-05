@@ -90,8 +90,7 @@ export class KeystoreService {
   }
 
   /**
-   * Verifies if the OS-level keystore is accessible and functional by
-   * performing a set-get-delete test cycle.
+   * Verifies if the OS-level keystore is accessible and functional.
    */
   async isAvailable(): Promise<boolean> {
     if (this.availability !== null) {
@@ -101,8 +100,7 @@ export class KeystoreService {
     try {
       const keystore = await this.getKeystore();
       if (!keystore) {
-        this.availability = false;
-        return false;
+        return (this.availability = false);
       }
 
       const testAccount = `${KEYCHAIN_TEST_PREFIX}${crypto.randomBytes(8).toString('hex')}`;
@@ -118,21 +116,16 @@ export class KeystoreService {
         testAccount,
       );
 
-      const success = deleted && retrieved === testPassword;
-      this.availability = success;
-
-      coreEvents.emitTelemetryKeychainAvailability(
-        new KeychainAvailabilityEvent(success),
-      );
-
-      return success;
+      this.availability = deleted && retrieved === testPassword;
     } catch (_error) {
       this.availability = false;
-      coreEvents.emitTelemetryKeychainAvailability(
-        new KeychainAvailabilityEvent(false),
-      );
-      return false;
     }
+
+    coreEvents.emitTelemetryKeychainAvailability(
+      new KeychainAvailabilityEvent(this.availability),
+    );
+
+    return this.availability;
   }
 
   /**

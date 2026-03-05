@@ -55,18 +55,18 @@ describe('KeychainTokenStorage', () => {
     updatedAt: Date.now(),
   } as OAuthCredentials;
 
-  describe('checkKeychainAvailability', () => {
+  describe('isAvailable', () => {
     it('should return true if keystore is available', async () => {
       isAvailableSpy.mockResolvedValue(true);
 
-      const isAvailable = await storage.checkKeychainAvailability();
+      const isAvailable = await storage.isAvailable();
       expect(isAvailable).toBe(true);
       expect(isAvailableSpy).toHaveBeenCalled();
     });
 
     it('should return false if keystore is unavailable', async () => {
       isAvailableSpy.mockResolvedValue(false);
-      const isAvailable = await storage.checkKeychainAvailability();
+      const isAvailable = await storage.isAvailable();
       expect(isAvailable).toBe(false);
     });
   });
