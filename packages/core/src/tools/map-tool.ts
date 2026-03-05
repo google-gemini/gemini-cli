@@ -60,15 +60,18 @@ class MapToolInvocation extends BaseToolInvocation<MapToolParams, ToolResult> {
         const pkgContent = await fs.readFile(pkgPath, 'utf8');
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const pkgData = JSON.parse(pkgContent) as Record<string, unknown>;
-        dependencies = {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          ...((pkgData['dependencies'] as Record<string, string>) || {}),
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          ...((pkgData['devDependencies'] as Record<string, string>) || {}),
-        };
-        workspaces = Array.isArray(pkgData['workspaces'])
-          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (pkgData['workspaces'] as string[])
+        dependencies = {};
+        const deps = pkgData['dependencies'];
+        const devDeps = pkgData['devDependencies'];
+        if (deps && typeof deps === 'object' && !Array.isArray(deps)) {
+          Object.assign(dependencies, deps);
+        }
+        if (devDeps && typeof devDeps === 'object' && !Array.isArray(devDeps)) {
+          Object.assign(dependencies, devDeps);
+        }
+        const ws = pkgData['workspaces'];
+        workspaces = Array.isArray(ws)
+          ? ws.filter((item): item is string => typeof item === 'string')
           : [];
       } catch (_e) {
         // no package.json or invalid
