@@ -47,7 +47,7 @@ import type {
 } from '../services/modelConfigService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import * as policyCatalog from '../availability/policyCatalog.js';
-import { LlmRole } from '../telemetry/types.js';
+import { LlmRole, LoopType } from '../telemetry/types.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents } from '../utils/events.js';
 
@@ -2915,45 +2915,257 @@ ${JSON.stringify(
       expect(mockCheckNextSpeaker).not.toHaveBeenCalled();
     });
 
-    it('should abort linked signal when loop is detected', async () => {
-      // Arrange
-      vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue(false);
-      vi.spyOn(client['loopDetector'], 'addAndCheck')
-        .mockReturnValueOnce(false)
-        .mockReturnValueOnce(true);
-
-      let capturedSignal: AbortSignal;
-      mockTurnRunFn.mockImplementation((_modelConfigKey, _request, signal) => {
-        capturedSignal = signal;
-        return (async function* () {
-          yield { type: 'content', value: 'First event' };
-          yield { type: 'content', value: 'Second event' };
-        })();
+    describe('Loop Recovery (Two-Strike)', () => {
+      beforeEach(() => {
+        const mockChat: Partial<GeminiChat> = {
+          addHistory: vi.fn(),
+          setTools: vi.fn(),
+          getHistory: vi.fn().mockReturnValue([]),
+          getLastPromptTokenCount: vi.fn(),
+        };
+        client['chat'] = mockChat as GeminiChat;
+        vi.spyOn(client['loopDetector'], 'clearDetection');
+        vi.spyOn(client['loopDetector'], 'reset');
       });
 
-      const mockChat: Partial<GeminiChat> = {
-        addHistory: vi.fn(),
-        setTools: vi.fn(),
-        getHistory: vi.fn().mockReturnValue([]),
-        getLastPromptTokenCount: vi.fn(),
-      };
-      client['chat'] = mockChat as GeminiChat;
+      it('should trigger recovery (Strike 1) and continue', async () => {
+        // Arrange
+        vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+          count: 0,
+        });
+        vi.spyOn(client['loopDetector'], 'addAndCheck')
+          .mockReturnValueOnce({ count: 0 })
+          .mockReturnValueOnce({ count: 1, detail: 'Repetitive tool call' });
 
-      // Act
-      const stream = client.sendMessageStream(
-        [{ text: 'Hi' }],
-        new AbortController().signal,
-        'prompt-id-loop',
-      );
+        const sendMessageStreamSpy = vi.spyOn(client, 'sendMessageStream');
 
-      const events = [];
-      for await (const event of stream) {
-        events.push(event);
-      }
+        mockTurnRunFn.mockImplementation(() =>
+          (async function* () {
+            yield { type: GeminiEventType.Content, value: 'First event' };
+            yield { type: GeminiEventType.Content, value: 'Second event' };
+          })(),
+        );
 
-      // Assert
-      expect(events).toContainEqual({ type: GeminiEventType.LoopDetected });
-      expect(capturedSignal!.aborted).toBe(true);
+        // Act
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-loop-1',
+        );
+
+        const events = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+
+        // Assert
+        // sendMessageStream should be called twice (original + recovery)
+        expect(sendMessageStreamSpy).toHaveBeenCalledTimes(2);
+
+        // Verify recovery call parameters
+        const recoveryCall = sendMessageStreamSpy.mock.calls[1];
+        expect((recoveryCall[0] as Part[])[0].text).toContain(
+          'System: Potential loop detected',
+        );
+        expect((recoveryCall[0] as Part[])[0].text).toContain(
+          'Repetitive tool call',
+        );
+
+        // Verify loopDetector.clearDetection was called
+        expect(client['loopDetector'].clearDetection).toHaveBeenCalled();
+      });
+
+      it('should terminate (Strike 2) after recovery fails', async () => {
+        // Arrange
+        vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+          count: 0,
+        });
+
+        // First call triggers Strike 1, Second call triggers Strike 2
+        vi.spyOn(client['loopDetector'], 'addAndCheck')
+          .mockReturnValueOnce({ count: 0 })
+          .mockReturnValueOnce({ count: 1, detail: 'Strike 1' }) // Triggers recovery in turn 1
+          .mockReturnValueOnce({ count: 2, detail: 'Strike 2' }); // Triggers termination in turn 2 (recovery turn)
+
+        const sendMessageStreamSpy = vi.spyOn(client, 'sendMessageStream');
+
+        mockTurnRunFn.mockImplementation(() =>
+          (async function* () {
+            yield { type: GeminiEventType.Content, value: 'Event' };
+            yield { type: GeminiEventType.Content, value: 'Event' };
+          })(),
+        );
+
+        // Act
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-loop-2',
+        );
+
+        const events = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+
+        // Assert
+        expect(events).toContainEqual({ type: GeminiEventType.LoopDetected });
+        expect(sendMessageStreamSpy).toHaveBeenCalledTimes(2); // One original, one recovery
+      });
+
+      it('should respect boundedTurns during recovery', async () => {
+        // Arrange
+        vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+          count: 0,
+        });
+        vi.spyOn(client['loopDetector'], 'addAndCheck').mockReturnValue({
+          count: 1,
+          detail: 'Loop',
+        });
+
+        const sendMessageStreamSpy = vi.spyOn(client, 'sendMessageStream');
+
+        mockTurnRunFn.mockImplementation(() =>
+          (async function* () {
+            yield { type: GeminiEventType.Content, value: 'Event' };
+          })(),
+        );
+
+        // Act
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-loop-3',
+          1, // Only 1 turn allowed
+        );
+
+        const events = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+
+        // Assert
+        // Should NOT trigger recovery because boundedTurns would reach 0
+        expect(events).toContainEqual({
+          type: GeminiEventType.MaxSessionTurns,
+        });
+        expect(sendMessageStreamSpy).toHaveBeenCalledTimes(1);
+      });
+
+      it('should suppress LoopDetected event on Strike 1', async () => {
+        // Arrange
+        vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+          count: 0,
+        });
+        vi.spyOn(client['loopDetector'], 'addAndCheck')
+          .mockReturnValueOnce({ count: 0 })
+          .mockReturnValueOnce({ count: 1, detail: 'Strike 1' });
+
+        const sendMessageStreamSpy = vi.spyOn(client, 'sendMessageStream');
+
+        mockTurnRunFn.mockImplementation(() =>
+          (async function* () {
+            yield { type: GeminiEventType.Content, value: 'Event' };
+            yield { type: GeminiEventType.Content, value: 'Event 2' };
+          })(),
+        );
+
+        // Act
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-telemetry',
+        );
+
+        const events = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+
+        // Assert
+        // Strike 1 should trigger recovery call but NOT emit LoopDetected event
+        expect(events).not.toContainEqual({
+          type: GeminiEventType.LoopDetected,
+        });
+        expect(sendMessageStreamSpy).toHaveBeenCalledTimes(2);
+      });
+
+      it('should escalate Strike 2 even if loop type changes', async () => {
+        // Arrange
+        vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+          count: 0,
+        });
+
+        // Strike 1: Tool Call Loop, Strike 2: LLM Detected Loop
+        vi.spyOn(client['loopDetector'], 'addAndCheck')
+          .mockReturnValueOnce({ count: 0 })
+          .mockReturnValueOnce({
+            count: 1,
+            type: LoopType.TOOL_CALL_LOOP,
+            detail: 'Repetitive tool',
+          })
+          .mockReturnValueOnce({
+            count: 2,
+            type: LoopType.LLM_DETECTED_LOOP,
+            detail: 'LLM loop',
+          });
+
+        const sendMessageStreamSpy = vi.spyOn(client, 'sendMessageStream');
+
+        mockTurnRunFn.mockImplementation(() =>
+          (async function* () {
+            yield { type: GeminiEventType.Content, value: 'Event' };
+            yield { type: GeminiEventType.Content, value: 'Event 2' };
+          })(),
+        );
+
+        // Act
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-escalate',
+        );
+
+        const events = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+
+        // Assert
+        expect(events).toContainEqual({ type: GeminiEventType.LoopDetected });
+        expect(sendMessageStreamSpy).toHaveBeenCalledTimes(2);
+      });
+
+      it('should reset loop detector on new prompt', async () => {
+        // Arrange
+        vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue({
+          count: 0,
+        });
+        vi.spyOn(client['loopDetector'], 'addAndCheck').mockReturnValue({
+          count: 0,
+        });
+        mockTurnRunFn.mockImplementation(() =>
+          (async function* () {
+            yield { type: GeminiEventType.Content, value: 'Event' };
+          })(),
+        );
+
+        // Act
+        const stream = client.sendMessageStream(
+          [{ text: 'Hi' }],
+          new AbortController().signal,
+          'prompt-id-new',
+        );
+        for await (const _ of stream) {
+          // Consume stream
+        }
+
+        // Assert
+        expect(client['loopDetector'].reset).toHaveBeenCalledWith(
+          'prompt-id-new',
+          'Hi',
+        );
+      });
     });
   });
 

@@ -35,7 +35,6 @@ import {
   CoreEvent,
   CoreToolCallStatus,
   buildUserSteeringHintPrompt,
-  generateSteeringAckMessage,
   GeminiCliOperation,
   getPlanModeExitMessage,
 } from '@google/gemini-cli-core';
@@ -597,7 +596,10 @@ export const useGeminiStream = (
       if (!isLowErrorVerbosity || config.getDebugMode()) {
         return;
       }
-      if (lowVerbosityFailureNoteShownRef.current) {
+      if (
+        lowVerbosityFailureNoteShownRef.current ||
+        suppressedToolErrorNoteShownRef.current
+      ) {
         return;
       }
 
@@ -1065,16 +1067,27 @@ export const useGeminiStream = (
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
       }
-      return addItem({
-        type: 'info',
-        text:
-          `IMPORTANT: This conversation exceeded the compress threshold. ` +
-          `A compressed context will be sent for future messages (compressed from: ` +
-          `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
-          `${eventValue?.newTokenCount ?? 'unknown'} tokens).`,
-      });
+
+      const limit = tokenLimit(config.getModel());
+      const originalPercentage = Math.round(
+        ((eventValue?.originalTokenCount ?? 0) / limit) * 100,
+      );
+      const newPercentage = Math.round(
+        ((eventValue?.newTokenCount ?? 0) / limit) * 100,
+      );
+
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: `Context compressed from ${originalPercentage}% to ${newPercentage}%.`,
+          secondaryText: `Change threshold in /settings.`,
+          color: theme.status.warning,
+          marginBottom: 1,
+        } as HistoryItemInfo,
+        userMessageTimestamp,
+      );
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, config],
   );
 
   const handleMaxSessionTurnsEvent = useCallback(
@@ -1094,12 +1107,12 @@ export const useGeminiStream = (
 
       const limit = tokenLimit(config.getModel());
 
-      const isLessThan75Percent =
+      const isMoreThan25PercentUsed =
         limit > 0 && remainingTokenCount < limit * 0.75;
 
-      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the remaining context window limit (${remainingTokenCount} tokens).`;
+      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the context window limit (${remainingTokenCount.toLocaleString()} tokens left).`;
 
-      if (isLessThan75Percent) {
+      if (isMoreThan25PercentUsed) {
         text +=
           ' Please try reducing the size of your message or use the `/compress` command to compress the chat history.';
       }
@@ -1749,18 +1762,6 @@ export const useGeminiStream = (
           const hintText = userHint.trim();
           responsesToSend.unshift({
             text: buildUserSteeringHintPrompt(hintText),
-          });
-          void generateSteeringAckMessage(
-            config.getBaseLlmClient(),
-            hintText,
-          ).then((ackText) => {
-            addItem({
-              type: 'info',
-              icon: '· ',
-              color: theme.text.secondary,
-              marginBottom: 1,
-              text: ackText,
-            } as HistoryItemInfo);
           });
         }
       }
