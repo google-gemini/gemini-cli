@@ -115,7 +115,7 @@ export interface UseEditBufferProps {
   onCommit: (key: string, value: string) => void;
 }
 
-export function useEditBuffer({ onCommit }: UseEditBufferProps) {
+export function useInlineEditBuffer({ onCommit }: UseEditBufferProps) {
   const [state, dispatch] = useReducer(editBufferReducer, initialState);
   const [cursorVisible, setCursorVisible] = useState(true);
 

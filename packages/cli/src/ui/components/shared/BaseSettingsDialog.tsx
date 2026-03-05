@@ -21,7 +21,7 @@ import { cpSlice, cpLen, cpIndexToOffset } from '../../utils/textUtils.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
 import { useSettingsNavigation } from '../../hooks/useSettingsNavigation.js';
-import { useEditBuffer } from '../../hooks/useEditBuffer.js';
+import { useInlineEditBuffer } from '../../hooks/useInlineEditBuffer.js';
 
 /**
  * Represents a single item in the settings dialog.
@@ -217,7 +217,7 @@ export function BaseSettingsDialog({
   );
 
   const { editState, editDispatch, startEditing, commitEdit, cursorVisible } =
-    useEditBuffer({
+    useInlineEditBuffer({
       onCommit: (key, value) => {
         const itemToCommit = items.find((i) => i.key === key);
         if (itemToCommit) {
