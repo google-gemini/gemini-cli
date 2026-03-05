@@ -42,9 +42,6 @@ function hasCodeSnippet(
   if (details.type === 'ask_user') {
     return details.questions.some((q) => q.question.includes('```'));
   }
-  if (details.type === 'info') {
-    return details.prompt.includes('```');
-  }
 
   return false;
 }
