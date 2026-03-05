@@ -801,4 +801,57 @@ describe('BaseSettingsDialog', () => {
       unmount();
     });
   });
+
+  describe('responsiveness', () => {
+    it('should show the scope selector when availableHeight is sufficient (25)', async () => {
+      const { lastFrame, unmount } = await renderDialog({
+        availableHeight: 25,
+        showScopeSelector: true,
+      });
+
+      const frame = lastFrame();
+      expect(frame).toContain('Apply To');
+      unmount();
+    });
+
+    it('should hide the scope selector when availableHeight is small (24) to show more items', async () => {
+      const { lastFrame, unmount } = await renderDialog({
+        availableHeight: 24,
+        showScopeSelector: true,
+      });
+
+      const frame = lastFrame();
+      expect(frame).not.toContain('Apply To');
+      unmount();
+    });
+
+    it('should reduce the number of visible items based on height', async () => {
+      // At height 25, it should show 2 items (math: (25-4 - (10+5))/3 = 2)
+      const { lastFrame, unmount } = await renderDialog({
+        availableHeight: 25,
+        items: createMockItems(10),
+      });
+
+      const frame = lastFrame();
+      // Items 0 and 1 should be there
+      expect(frame).toContain('Boolean Setting');
+      expect(frame).toContain('String Setting');
+      // Item 2 should NOT be there
+      expect(frame).not.toContain('Number Setting');
+      unmount();
+    });
+
+    it('should show scroll indicators when list is truncated by height', async () => {
+      const { lastFrame, unmount } = await renderDialog({
+        availableHeight: 25,
+        items: createMockItems(10),
+      });
+
+      const frame = lastFrame();
+      // Shows both scroll indicators when the list is truncated by height
+      expect(frame).toContain('▼');
+      expect(frame).toContain('▲');
+      unmount();
+    });
+  });
 });
