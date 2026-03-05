@@ -1,14 +1,11 @@
 # Gemini CLI: Quotas and pricing
 
 Gemini CLI offers a generous free tier that covers many individual developers'
-use cases. For enterprise or professional usage, or if you need increased,
+use cases. For enterprise or professional usage, or if you need increased quota,
 several options are available depending on your authentication account type.
 
-For a high-level comparison of available subscriptions and to find the right
+For a high-level comparison of available subscriptions and to select the right
 quota for your needs, see the [Plans page](../../plans/).
-
-See [privacy and terms](./tos-privacy.md) for details on the Privacy Policy and
-Terms of Service.
 
 ## Overview
 
@@ -25,8 +22,8 @@ Generally, there are three categories to choose from:
 
 ## Free usage
 
-Your journey begins with a generous free tier, perfect for experimentation and
-light use.
+Access to Gemini CLI begins with a generous free tier, perfect for
+experimentation and light use.
 
 Your free usage is governed by the following limits, which depend on your
 authorization type.
@@ -107,18 +104,27 @@ recommended path for uninterrupted access.
 
 To do this, log in using a Gemini API key or Vertex AI.
 
-- Vertex AI (Regular Mode):
-  - Quota: Governed by a dynamic shared quota system or pre-purchased
-    provisioned throughput.
-  - Cost: Based on model and token usage.
+### Vertex AI (regular mode)
+
+An enterprise-grade platform for building, deploying, and managing AI models,
+including Gemini. It offers enhanced security, data governance, and integration
+with other Google Cloud services.
+
+- Quota: Governed by a dynamic shared quota system or pre-purchased provisioned
+  throughput.
+- Cost: Based on model and token usage.
 
 Learn more at
 [Vertex AI Dynamic Shared Quota](https://cloud.google.com/vertex-ai/generative-ai/docs/resources/dynamic-shared-quota)
 and [Vertex AI Pricing](https://cloud.google.com/vertex-ai/pricing).
 
-- Gemini API key:
-  - Quota: Varies by pricing tier.
-  - Cost: Varies by pricing tier and model/token usage.
+### Gemini API key
+
+Ideal for developers who want to quickly build applications with the Gemini
+models. This is the most direct way to use the models.
+
+- Quota: Varies by pricing tier.
+- Cost: Varies by pricing tier and model/token usage.
 
 Learn more at
 [Gemini API Rate Limits](https://ai.google.dev/gemini-api/docs/rate-limits),
@@ -164,11 +170,3 @@ costs.
 - **Monitor your usage**: Use the `/stats model` command to track your token
   usage during a session. This can help you stay aware of your spending in real
   time.
-
-## Gemini API vs. Vertex AI
-
-- **Gemini API**: Ideal for developers who want to quickly build applications
-  with the Gemini models. This is the most direct way to use the models.
-- **Vertex AI**: An enterprise-grade platform for building, deploying, and
-  managing AI models, including Gemini. It offers enhanced security, data
-  governance, and integration with other Google Cloud services.
