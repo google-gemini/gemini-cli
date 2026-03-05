@@ -43,6 +43,18 @@ import {
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
+function setupProcessExitHandlers(stopFn: () => void): () => void {
+  process.on('exit', stopFn);
+  process.on('SIGINT', stopFn);
+  process.on('SIGTERM', stopFn);
+
+  return () => {
+    process.off('exit', stopFn);
+    process.off('SIGINT', stopFn);
+    process.off('SIGTERM', stopFn);
+  };
+}
+
 export async function start_sandbox(
   config: SandboxConfig,
   nodeArgs: string[] = [],
@@ -173,15 +185,7 @@ export async function start_sandbox(
           }
         };
 
-        cleanupProxyHandlers = () => {
-          process.off('exit', stopProxy);
-          process.off('SIGINT', stopProxy);
-          process.off('SIGTERM', stopProxy);
-        };
-
-        process.on('exit', stopProxy);
-        process.on('SIGINT', stopProxy);
-        process.on('SIGTERM', stopProxy);
+        cleanupProxyHandlers = setupProcessExitHandlers(stopProxy);
 
         // commented out as it disrupts ink rendering
         // proxyProcess.stdout?.on('data', (data) => {
@@ -704,15 +708,7 @@ export async function start_sandbox(
         execSync(`${config.command} rm -f ${SANDBOX_PROXY_NAME}`);
       };
 
-      cleanupProxyHandlers = () => {
-        process.off('exit', stopProxy);
-        process.off('SIGINT', stopProxy);
-        process.off('SIGTERM', stopProxy);
-      };
-
-      process.on('exit', stopProxy);
-      process.on('SIGINT', stopProxy);
-      process.on('SIGTERM', stopProxy);
+      cleanupProxyHandlers = setupProcessExitHandlers(stopProxy);
 
       // commented out as it disrupts ink rendering
       // proxyProcess.stdout?.on('data', (data) => {
