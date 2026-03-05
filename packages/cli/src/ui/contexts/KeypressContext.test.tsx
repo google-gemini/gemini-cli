@@ -155,16 +155,17 @@ describe('KeypressContext', () => {
       },
     );
 
-    it('should recognize \n (LF) as ctrl+j', async () => {
+    it('should recognize \\n (LF) as Shift+Enter', async () => {
       const { keyHandler } = setupKeypressTest();
 
       act(() => stdin.write('\n'));
 
+      expect(keyHandler).toHaveBeenCalledTimes(1);
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: 'j',
-          shift: false,
-          ctrl: true,
+          name: 'return',
+          shift: true,
+          ctrl: false,
           cmd: false,
         }),
       );

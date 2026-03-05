@@ -211,7 +211,10 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.HISTORY_DOWN]: [{ key: 'n', shift: false, ctrl: true }],
   [Command.REVERSE_SEARCH]: [{ key: 'r', ctrl: true }],
   [Command.REWIND]: [{ key: 'double escape' }],
-  [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
+  [Command.SUBMIT_REVERSE_SEARCH]: [
+    { key: 'return', ctrl: false },
+    { key: 'return', shift: true },
+  ],
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab', shift: false }],
 
   // Navigation
@@ -234,6 +237,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.ACCEPT_SUGGESTION]: [
     { key: 'tab', shift: false },
     { key: 'return', ctrl: false },
+    { key: 'return', shift: true },
   ],
   [Command.COMPLETION_UP]: [
     { key: 'up', shift: false },
@@ -489,7 +493,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUBMIT]: 'Submit the current prompt.',
   [Command.NEWLINE]: 'Insert a newline without submitting.',
   [Command.OPEN_EXTERNAL_EDITOR]:
-    'Open the current prompt or the plan in an external editor.',
+    'Open the current prompt in an external editor.',
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
 
   // App Controls
