@@ -36,47 +36,45 @@ export class ContextManager {
   async refresh(): Promise<void> {
     this.loadedPaths.clear();
     this.loadedFileIdentities.clear();
-    const debugMode = this.config.getDebugMode();
 
-    const paths = await this.discoverMemoryPaths(debugMode);
-    const contentsMap = await this.loadMemoryContents(paths, debugMode);
+    const paths = await this.discoverMemoryPaths();
+    const contentsMap = await this.loadMemoryContents(paths);
 
     this.categorizeMemoryContents(paths, contentsMap);
     this.emitMemoryChanged();
   }
 
-  private async discoverMemoryPaths(debugMode: boolean) {
+  private async discoverMemoryPaths() {
     const [global, extension, project] = await Promise.all([
-      getGlobalMemoryPaths(debugMode),
+      getGlobalMemoryPaths(),
       Promise.resolve(
         getExtensionMemoryPaths(this.config.getExtensionLoader()),
       ),
       this.config.isTrustedFolder()
-        ? getEnvironmentMemoryPaths(
-            [...this.config.getWorkspaceContext().getDirectories()],
-            debugMode,
-          )
+        ? getEnvironmentMemoryPaths([
+            ...this.config.getWorkspaceContext().getDirectories(),
+          ])
         : Promise.resolve([]),
     ]);
 
     return { global, extension, project };
   }
 
-  private async loadMemoryContents(
-    paths: { global: string[]; extension: string[]; project: string[] },
-    debugMode: boolean,
-  ) {
+  private async loadMemoryContents(paths: {
+    global: string[];
+    extension: string[];
+    project: string[];
+  }) {
     const allPathsStringDeduped = Array.from(
       new Set([...paths.global, ...paths.extension, ...paths.project]),
     );
 
     // deduplicate by file identity to handle case-insensitive filesystems
     const { paths: allPaths, identityMap: pathIdentityMap } =
-      await deduplicatePathsByFileIdentity(allPathsStringDeduped, debugMode);
+      await deduplicatePathsByFileIdentity(allPathsStringDeduped);
 
     const allContents = await readGeminiMdFiles(
       allPaths,
-      debugMode,
       this.config.getImportFormat(),
     );
 
@@ -139,7 +137,6 @@ export class ContextManager {
       accessedPath,
       trustedRoots,
       this.loadedPaths,
-      this.config.getDebugMode(),
       this.loadedFileIdentities,
     );
 

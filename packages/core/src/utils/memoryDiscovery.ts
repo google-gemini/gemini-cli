@@ -48,12 +48,10 @@ export interface GeminiFileContent {
  * of the same filename resolve to the same physical file but have different path strings.
  *
  * @param filePaths Array of file paths to deduplicate
- * @param debugMode Whether to log debug information
  * @returns Object containing deduplicated file paths and a map of path to identity key
  */
 export async function deduplicatePathsByFileIdentity(
   filePaths: string[],
-  debugMode: boolean,
 ): Promise<{
   paths: string[];
   identityMap: Map<string, string>;
@@ -108,11 +106,10 @@ export async function deduplicatePathsByFileIdentity(
         results.push(result.value);
       } else {
         const message = getErrorMessage(result.reason);
-        if (debugMode) {
-          logger.debug(
-            `unexpected error during deduplication stat: ${message}`,
-          );
-        }
+        debugLogger.debug(
+          '[DEBUG] [MemoryDiscovery] unexpected error during deduplication stat:',
+          message,
+        );
       }
     }
   }
@@ -125,18 +122,18 @@ export async function deduplicatePathsByFileIdentity(
       if (!fileIdentityMap.has(identityKey)) {
         fileIdentityMap.set(identityKey, path);
         deduplicatedPaths.push(path);
-        if (debugMode) {
-          logger.debug(
-            `deduplication: keeping ${path} (dev: ${dev}, ino: ${ino})`,
-          );
-        }
+        debugLogger.debug(
+          '[DEBUG] [MemoryDiscovery] deduplication: keeping',
+          path,
+          `(dev: ${dev}, ino: ${ino})`,
+        );
       } else {
         const existingPath = fileIdentityMap.get(identityKey);
-        if (debugMode) {
-          logger.debug(
-            `deduplication: skipping ${path} (same file as ${existingPath})`,
-          );
-        }
+        debugLogger.debug(
+          '[DEBUG] [MemoryDiscovery] deduplication: skipping',
+          path,
+          `(same file as ${existingPath})`,
+        );
       }
     } else {
       deduplicatedPaths.push(path);
@@ -199,7 +196,6 @@ async function getGeminiMdFilePathsInternal(
   currentWorkingDirectory: string,
   includeDirectoriesToReadGemini: readonly string[],
   userHomePath: string,
-  debugMode: boolean,
   fileService: FileDiscoveryService,
   folderTrust: boolean,
   fileFilteringOptions: FileFilteringOptions,
@@ -222,7 +218,6 @@ async function getGeminiMdFilePathsInternal(
       getGeminiMdFilePathsInternalForEachDir(
         dir,
         userHomePath,
-        debugMode,
         fileService,
         folderTrust,
         fileFilteringOptions,
@@ -254,7 +249,6 @@ async function getGeminiMdFilePathsInternal(
 async function getGeminiMdFilePathsInternalForEachDir(
   dir: string,
   userHomePath: string,
-  debugMode: boolean,
   fileService: FileDiscoveryService,
   folderTrust: boolean,
   fileFilteringOptions: FileFilteringOptions,
@@ -275,10 +269,11 @@ async function getGeminiMdFilePathsInternalForEachDir(
     try {
       await fs.access(globalMemoryPath, fsSync.constants.R_OK);
       globalPaths.add(globalMemoryPath);
-      if (debugMode)
-        logger.debug(
-          `Found readable global ${geminiMdFilename}: ${globalMemoryPath}`,
-        );
+      debugLogger.debug(
+        '[DEBUG] [MemoryDiscovery] Found readable global',
+        geminiMdFilename + ':',
+        globalMemoryPath,
+      );
     } catch {
       // It's okay if it's not found.
     }
@@ -287,14 +282,18 @@ async function getGeminiMdFilePathsInternalForEachDir(
     // if a valid currentWorkingDirectory is provided.
     if (dir && folderTrust) {
       const resolvedCwd = normalizePath(dir);
-      if (debugMode)
-        logger.debug(
-          `Searching for ${geminiMdFilename} starting from CWD: ${resolvedCwd}`,
-        );
+      debugLogger.debug(
+        '[DEBUG] [MemoryDiscovery] Searching for',
+        geminiMdFilename,
+        'starting from CWD:',
+        resolvedCwd,
+      );
 
       const projectRoot = await findProjectRoot(resolvedCwd);
-      if (debugMode)
-        logger.debug(`Determined project root: ${projectRoot ?? 'None'}`);
+      debugLogger.debug(
+        '[DEBUG] [MemoryDiscovery] Determined project root:',
+        projectRoot ?? 'None',
+      );
 
       const upwardPaths: string[] = [];
       let currentDir = resolvedCwd;
@@ -338,7 +337,6 @@ async function getGeminiMdFilePathsInternalForEachDir(
       const downwardPaths = await bfsFileSearch(resolvedCwd, {
         fileName: geminiMdFilename,
         maxDirs,
-        debug: debugMode,
         fileService,
         fileFilteringOptions: mergedOptions,
       });
@@ -357,7 +355,6 @@ async function getGeminiMdFilePathsInternalForEachDir(
 
 export async function readGeminiMdFiles(
   filePaths: string[],
-  debugMode: boolean,
   importFormat: 'flat' | 'tree' = 'tree',
 ): Promise<GeminiFileContent[]> {
   // Process files in parallel with concurrency limit to prevent EMFILE errors
@@ -375,15 +372,16 @@ export async function readGeminiMdFiles(
           const processedResult = await processImports(
             content,
             path.dirname(filePath),
-            debugMode,
+            false,
             undefined,
             undefined,
             importFormat,
           );
-          if (debugMode)
-            logger.debug(
-              `Successfully read and processed imports: ${filePath} (Length: ${processedResult.content.length})`,
-            );
+          debugLogger.debug(
+            '[DEBUG] [MemoryDiscovery] Successfully read and processed imports:',
+            filePath,
+            `(Length: ${processedResult.content.length})`,
+          );
 
           return { filePath, content: processedResult.content };
         } catch (error: unknown) {
@@ -396,7 +394,10 @@ export async function readGeminiMdFiles(
               `Warning: Could not read ${getAllGeminiMdFilenames()} file at ${filePath}. Error: ${message}`,
             );
           }
-          if (debugMode) logger.debug(`Failed to read: ${filePath}`);
+          debugLogger.debug(
+            '[DEBUG] [MemoryDiscovery] Failed to read:',
+            filePath,
+          );
           return { filePath, content: null }; // Still include it with null content
         }
       },
@@ -448,9 +449,7 @@ export interface MemoryLoadResult {
   fileIdentities?: string[];
 }
 
-export async function getGlobalMemoryPaths(
-  debugMode: boolean = false,
-): Promise<string[]> {
+export async function getGlobalMemoryPaths(): Promise<string[]> {
   const userHome = homedir();
   const geminiMdFilenames = getAllGeminiMdFilenames();
 
@@ -458,9 +457,10 @@ export async function getGlobalMemoryPaths(
     const globalPath = normalizePath(path.join(userHome, GEMINI_DIR, filename));
     try {
       await fs.access(globalPath, fsSync.constants.R_OK);
-      if (debugMode) {
-        logger.debug(`Found global memory file: ${globalPath}`);
-      }
+      debugLogger.debug(
+        '[DEBUG] [MemoryDiscovery] Found global memory file:',
+        globalPath,
+      );
       return globalPath;
     } catch {
       return null;
@@ -486,19 +486,18 @@ export function getExtensionMemoryPaths(
 
 export async function getEnvironmentMemoryPaths(
   trustedRoots: string[],
-  debugMode: boolean = false,
 ): Promise<string[]> {
   const allPaths = new Set<string>();
 
   // Trusted Roots Upward Traversal (Parallelized)
   const traversalPromises = trustedRoots.map(async (root) => {
     const resolvedRoot = normalizePath(root);
-    if (debugMode) {
-      logger.debug(
-        `Loading environment memory for trusted root: ${resolvedRoot} (Stopping exactly here)`,
-      );
-    }
-    return findUpwardGeminiFiles(resolvedRoot, resolvedRoot, debugMode);
+    debugLogger.debug(
+      '[DEBUG] [MemoryDiscovery] Loading environment memory for trusted root:',
+      resolvedRoot,
+      '(Stopping exactly here)',
+    );
+    return findUpwardGeminiFiles(resolvedRoot, resolvedRoot);
   });
 
   const pathArrays = await Promise.all(traversalPromises);
@@ -536,7 +535,6 @@ export function categorizeAndConcatenate(
 async function findUpwardGeminiFiles(
   startDir: string,
   stopDir: string,
-  debugMode: boolean,
 ): Promise<string[]> {
   const upwardPaths: string[] = [];
   let currentDir = normalizePath(startDir);
@@ -544,11 +542,12 @@ async function findUpwardGeminiFiles(
   const geminiMdFilenames = getAllGeminiMdFilenames();
   const globalGeminiDir = normalizePath(path.join(homedir(), GEMINI_DIR));
 
-  if (debugMode) {
-    logger.debug(
-      `Starting upward search from ${currentDir} stopping at ${resolvedStopDir}`,
-    );
-  }
+  debugLogger.debug(
+    '[DEBUG] [MemoryDiscovery] Starting upward search from',
+    currentDir,
+    'stopping at',
+    resolvedStopDir,
+  );
 
   while (true) {
     if (currentDir === globalGeminiDir) {
@@ -594,7 +593,6 @@ export interface LoadServerHierarchicalMemoryResponse {
 export async function loadServerHierarchicalMemory(
   currentWorkingDirectory: string,
   includeDirectoriesToReadGemini: readonly string[],
-  debugMode: boolean,
   fileService: FileDiscoveryService,
   extensionLoader: ExtensionLoader,
   folderTrust: boolean,
@@ -613,10 +611,11 @@ export async function loadServerHierarchicalMemory(
   // function to signal that it should skip the workspace search.
   currentWorkingDirectory = isHomeDirectory ? '' : currentWorkingDirectory;
 
-  if (debugMode)
-    logger.debug(
-      `Loading server hierarchical memory for CWD: ${currentWorkingDirectory} (importFormat: ${importFormat})`,
-    );
+  debugLogger.debug(
+    '[DEBUG] [MemoryDiscovery] Loading server hierarchical memory for CWD:',
+    currentWorkingDirectory,
+    `(importFormat: ${importFormat})`,
+  );
 
   // For the server, homedir() refers to the server process's home.
   // This is consistent with how MemoryTool already finds the global path.
@@ -628,7 +627,6 @@ export async function loadServerHierarchicalMemory(
       currentWorkingDirectory,
       includeDirectoriesToReadGemini,
       userHomePath,
-      debugMode,
       fileService,
       folderTrust,
       fileFilteringOptions || DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
@@ -646,8 +644,9 @@ export async function loadServerHierarchicalMemory(
   );
 
   if (allFilePathsStringDeduped.length === 0) {
-    if (debugMode)
-      logger.debug('No GEMINI.md files found in hierarchy of the workspace.');
+    debugLogger.debug(
+      '[DEBUG] [MemoryDiscovery] No GEMINI.md files found in hierarchy of the workspace.',
+    );
     return {
       memoryContent: { global: '', extension: '', project: '' },
       fileCount: 0,
@@ -658,14 +657,12 @@ export async function loadServerHierarchicalMemory(
   // deduplicate by file identity to handle case-insensitive filesystems
   const { paths: allFilePaths } = await deduplicatePathsByFileIdentity(
     allFilePathsStringDeduped,
-    debugMode,
   );
 
   if (allFilePaths.length === 0) {
-    if (debugMode)
-      logger.debug(
-        'No unique GEMINI.md files found after deduplication by file identity.',
-      );
+    debugLogger.debug(
+      '[DEBUG] [MemoryDiscovery] No unique GEMINI.md files found after deduplication by file identity.',
+    );
     return {
       memoryContent: { global: '', extension: '', project: '' },
       fileCount: 0,
@@ -674,11 +671,7 @@ export async function loadServerHierarchicalMemory(
   }
 
   // 2. GATHER: Read all files in parallel
-  const allContents = await readGeminiMdFiles(
-    allFilePaths,
-    debugMode,
-    importFormat,
-  );
+  const allContents = await readGeminiMdFiles(allFilePaths, importFormat);
   const contentsMap = new Map(allContents.map((c) => [c.filePath, c]));
 
   // 3. CATEGORIZE: Back into Global, Project, Extension
@@ -711,7 +704,6 @@ export async function refreshServerHierarchicalMemory(config: Config) {
     config.shouldLoadMemoryFromIncludeDirectories()
       ? config.getWorkspaceContext().getDirectories()
       : [],
-    config.getDebugMode(),
     config.getFileService(),
     config.getExtensionLoader(),
     config.isTrustedFolder(),
@@ -738,7 +730,6 @@ export async function loadJitSubdirectoryMemory(
   targetPath: string,
   trustedRoots: string[],
   alreadyLoadedPaths: Set<string>,
-  debugMode: boolean = false,
   alreadyLoadedIdentities?: Set<string>,
 ): Promise<MemoryLoadResult> {
   const resolvedTarget = normalizePath(targetPath);
@@ -762,26 +753,22 @@ export async function loadJitSubdirectoryMemory(
   }
 
   if (!bestRoot) {
-    if (debugMode) {
-      logger.debug(
-        `JIT memory skipped: ${resolvedTarget} is not in any trusted root.`,
-      );
-    }
+    debugLogger.debug(
+      '[DEBUG] [MemoryDiscovery] JIT memory skipped:',
+      resolvedTarget,
+      'is not in any trusted root.',
+    );
     return { files: [], fileIdentities: [] };
   }
 
-  if (debugMode) {
-    logger.debug(
-      `Loading JIT memory for ${resolvedTarget} (Trusted root: ${bestRoot})`,
-    );
-  }
+  debugLogger.debug(
+    '[DEBUG] [MemoryDiscovery] Loading JIT memory for',
+    resolvedTarget,
+    `(Trusted root: ${bestRoot})`,
+  );
 
   // Traverse from target up to the trusted root
-  const potentialPaths = await findUpwardGeminiFiles(
-    resolvedTarget,
-    bestRoot,
-    debugMode,
-  );
+  const potentialPaths = await findUpwardGeminiFiles(resolvedTarget, bestRoot);
 
   if (potentialPaths.length === 0) {
     return { files: [], fileIdentities: [] };
@@ -790,7 +777,7 @@ export async function loadJitSubdirectoryMemory(
   // deduplicate by file identity to handle case-insensitive filesystems
   // this deduplicates within the current batch
   const { paths: deduplicatedNewPaths, identityMap: newPathsIdentityMap } =
-    await deduplicatePathsByFileIdentity(potentialPaths, debugMode);
+    await deduplicatePathsByFileIdentity(potentialPaths);
 
   // Use cached file identities if provided, otherwise build from paths
   // This avoids redundant fs.stat() calls on already loaded files
@@ -822,11 +809,11 @@ export async function loadJitSubdirectoryMemory(
   for (const filePath of deduplicatedNewPaths) {
     const identityKey = newPathsIdentityMap.get(filePath);
     if (identityKey && cachedIdentities.has(identityKey)) {
-      if (debugMode) {
-        logger.debug(
-          `jit memory: skipping ${filePath} (already loaded with different case)`,
-        );
-      }
+      debugLogger.debug(
+        '[DEBUG] [MemoryDiscovery] jit memory: skipping',
+        filePath,
+        '(already loaded with different case)',
+      );
       continue;
     }
     // if we don't have an identity (stat failed), include it to be safe
@@ -840,11 +827,12 @@ export async function loadJitSubdirectoryMemory(
     return { files: [], fileIdentities: [] };
   }
 
-  if (debugMode) {
-    logger.debug(`Found new JIT memory files: ${JSON.stringify(newPaths)}`);
-  }
+  debugLogger.debug(
+    '[DEBUG] [MemoryDiscovery] Found new JIT memory files:',
+    JSON.stringify(newPaths),
+  );
 
-  const contents = await readGeminiMdFiles(newPaths, debugMode, 'tree');
+  const contents = await readGeminiMdFiles(newPaths, 'tree');
 
   return {
     files: contents

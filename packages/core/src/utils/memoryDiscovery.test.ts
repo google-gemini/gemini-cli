@@ -39,7 +39,6 @@ import { Config, type GeminiCLIExtension } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { SimpleExtensionLoader } from './extensionLoader.js';
 import { CoreEvent, coreEvents } from './events.js';
-import { debugLogger } from './debugLogger.js';
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -129,7 +128,6 @@ describe('memoryDiscovery', () => {
         await loadServerHierarchicalMemory(
           cwd,
           [],
-          false,
           new FileDiscoveryService(projectRoot),
           new SimpleExtensionLoader([]),
           false, // untrusted
@@ -166,7 +164,6 @@ describe('memoryDiscovery', () => {
         await loadServerHierarchicalMemory(
           cwd,
           [],
-          false,
           new FileDiscoveryService(projectRoot),
           new SimpleExtensionLoader([]),
           false, // untrusted
@@ -184,7 +181,6 @@ describe('memoryDiscovery', () => {
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -208,7 +204,6 @@ describe('memoryDiscovery', () => {
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -241,7 +236,6 @@ default context content
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -275,7 +269,6 @@ custom context content
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -313,7 +306,6 @@ cwd context content
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -348,7 +340,6 @@ Subdir custom memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -383,7 +374,6 @@ Src directory memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -430,7 +420,6 @@ Subdir memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -487,7 +476,6 @@ Subdir memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -512,10 +500,6 @@ My code memory
   });
 
   it('should respect the maxDirs parameter during downward scan', async () => {
-    const consoleDebugSpy = vi
-      .spyOn(debugLogger, 'debug')
-      .mockImplementation(() => {});
-
     // Create directories in parallel for better performance
     const dirPromises = Array.from({ length: 2 }, (_, i) =>
       createEmptyDir(path.join(cwd, `deep_dir_${i}`)),
@@ -526,7 +510,6 @@ My code memory
     await loadServerHierarchicalMemory(
       cwd,
       [],
-      true,
       new FileDiscoveryService(projectRoot),
       new SimpleExtensionLoader([]),
       DEFAULT_FOLDER_TRUST,
@@ -539,18 +522,13 @@ My code memory
       1, // maxDirs
     );
 
-    expect(consoleDebugSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[DEBUG] [BfsFileSearch]'),
-      expect.stringContaining('Scanning [1/1]:'),
-    );
-
-    consoleDebugSpy.mockRestore();
+    // Note: bfsFileSearch debug logging is no longer controlled via debugMode parameter
+    // The test verifies maxDirs is respected by checking the result, not debug logs
 
     const result = flattenResult(
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -574,7 +552,6 @@ My code memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([
           {
@@ -609,7 +586,6 @@ Extension memory content
       await loadServerHierarchicalMemory(
         cwd,
         [includedDir],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -647,7 +623,6 @@ included directory memory
       await loadServerHierarchicalMemory(
         cwd,
         createdFiles.map((f) => path.dirname(f)),
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -685,7 +660,6 @@ included directory memory
       await loadServerHierarchicalMemory(
         parentDir,
         [childDir, parentDir], // Deliberately include duplicates
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -899,7 +873,6 @@ included directory memory
         await loadServerHierarchicalMemory(
           cwd,
           [],
-          false,
           new FileDiscoveryService(projectRoot),
           new SimpleExtensionLoader([]),
           DEFAULT_FOLDER_TRUST,
@@ -965,7 +938,6 @@ included directory memory
         await loadServerHierarchicalMemory(
           cwd,
           [],
-          false,
           new FileDiscoveryService(projectRoot),
           new SimpleExtensionLoader([]),
           DEFAULT_FOLDER_TRUST,
@@ -1013,7 +985,6 @@ included directory memory
         await loadServerHierarchicalMemory(
           cwd,
           [],
-          false,
           new FileDiscoveryService(projectRoot),
           new SimpleExtensionLoader([]),
           DEFAULT_FOLDER_TRUST,
@@ -1203,7 +1174,6 @@ included directory memory
         config.shouldLoadMemoryFromIncludeDirectories()
           ? config.getWorkspaceContext().getDirectories()
           : [],
-        config.getDebugMode(),
         config.getFileService(),
         config.getExtensionLoader(),
         config.isTrustedFolder(),
