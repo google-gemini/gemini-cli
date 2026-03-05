@@ -135,20 +135,15 @@ export function BaseSettingsDialog({
     { items, maxItemsToShow },
   );
 
-  const {
-    state: editState,
-    dispatch: editDispatch,
-    startEditing,
-    commitEdit,
-    cursorVisible,
-  } = useEditBuffer({
-    onCommit: (key, value) => {
-      const itemToCommit = items.find((i) => i.key === key);
-      if (itemToCommit) {
-        onEditCommit(key, value, itemToCommit);
-      }
-    },
-  });
+  const { editState, editDispatch, startEditing, commitEdit, cursorVisible } =
+    useEditBuffer({
+      onCommit: (key, value) => {
+        const itemToCommit = items.find((i) => i.key === key);
+        if (itemToCommit) {
+          onEditCommit(key, value, itemToCommit);
+        }
+      },
+    });
 
   const {
     editingKey,

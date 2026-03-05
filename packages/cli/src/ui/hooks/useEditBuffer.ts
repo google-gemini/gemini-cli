@@ -143,8 +143,8 @@ export function useEditBuffer({ onCommit }: UseEditBufferProps) {
   }, [state.editingKey, state.buffer, onCommit]);
 
   return {
-    state,
-    dispatch,
+    editState: state,
+    editDispatch: dispatch,
     startEditing,
     commitEdit,
     cursorVisible,
