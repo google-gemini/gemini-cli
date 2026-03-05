@@ -21,8 +21,7 @@ import { ProQuotaDialog } from './ProQuotaDialog.js';
 import { ValidationDialog } from './ValidationDialog.js';
 import { OverageMenuDialog } from './OverageMenuDialog.js';
 import { EmptyWalletDialog } from './EmptyWalletDialog.js';
-import { runExitCleanup } from '../../utils/cleanup.js';
-import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
+import { relaunchApp } from '../../utils/processUtils.js';
 import { SessionBrowser } from './SessionBrowser.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { ModelDialog } from './ModelDialog.js';
@@ -37,9 +36,6 @@ import { AdminSettingsChangedDialog } from './AdminSettingsChangedDialog.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 import { NewAgentsNotification } from './NewAgentsNotification.js';
 import { AgentConfigDialog } from './AgentConfigDialog.js';
-import { SessionRetentionWarningDialog } from './SessionRetentionWarningDialog.js';
-import { useCallback } from 'react';
-import { SettingScope } from '../../config/settings.js';
 import { PolicyUpdateDialog } from './PolicyUpdateDialog.js';
 
 interface DialogManagerProps {
@@ -62,55 +58,7 @@ export const DialogManager = ({
     terminalHeight,
     staticExtraHeight,
     terminalWidth: uiTerminalWidth,
-    shouldShowRetentionWarning,
-    sessionsToDeleteCount,
   } = uiState;
-
-  const handleKeep120Days = useCallback(() => {
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.warningAcknowledged',
-      true,
-    );
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.enabled',
-      true,
-    );
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.maxAge',
-      '120d',
-    );
-  }, [settings]);
-
-  const handleKeep30Days = useCallback(() => {
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.warningAcknowledged',
-      true,
-    );
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.enabled',
-      true,
-    );
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.maxAge',
-      '30d',
-    );
-  }, [settings]);
-
-  if (shouldShowRetentionWarning && sessionsToDeleteCount !== undefined) {
-    return (
-      <SessionRetentionWarningDialog
-        onKeep120Days={handleKeep120Days}
-        onKeep30Days={handleKeep30Days}
-        sessionsToDeleteCount={sessionsToDeleteCount ?? 0}
-      />
-    );
-  }
 
   if (uiState.adminSettingsChanged) {
     return <AdminSettingsChangedDialog />;
@@ -281,14 +229,9 @@ export const DialogManager = ({
     return (
       <Box flexDirection="column">
         <SettingsDialog
-          settings={settings}
           onSelect={() => uiActions.closeSettingsDialog()}
-          onRestartRequest={async () => {
-            await runExitCleanup();
-            process.exit(RELAUNCH_EXIT_CODE);
-          }}
+          onRestartRequest={relaunchApp}
           availableTerminalHeight={terminalHeight - staticExtraHeight}
-          config={config}
         />
       </Box>
     );

@@ -27,12 +27,14 @@ export class EnterPlanModeTool extends BaseDeclarativeTool<
   EnterPlanModeParams,
   ToolResult
 > {
+  static readonly Name = ENTER_PLAN_MODE_TOOL_NAME;
+
   constructor(
     private config: Config,
     messageBus: MessageBus,
   ) {
     super(
-      ENTER_PLAN_MODE_TOOL_NAME,
+      EnterPlanModeTool.Name,
       'Enter Plan Mode',
       ENTER_PLAN_MODE_DEFINITION.base.description!,
       Kind.Plan,

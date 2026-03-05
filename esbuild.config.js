@@ -88,6 +88,9 @@ const cliConfig = {
   outfile: 'bundle/gemini.js',
   define: {
     'process.env.CLI_VERSION': JSON.stringify(pkg.version),
+    'process.env.GEMINI_SANDBOX_IMAGE_DEFAULT': JSON.stringify(
+      pkg.config?.sandboxImageUri,
+    ),
   },
   plugins: createWasmPlugins(),
   alias: {
