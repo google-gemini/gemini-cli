@@ -34,6 +34,21 @@ function getConfirmationHeader(
   return headers[details.type] ?? 'Action Required';
 }
 
+function hasCodeSnippet(
+  details: SerializableConfirmationDetails | undefined,
+): boolean {
+  if (!details) return false;
+
+  if (details.type === 'ask_user') {
+    return details.questions.some((q) => q.question.includes('```'));
+  }
+  if (details.type === 'info') {
+    return details.prompt.includes('```');
+  }
+
+  return false;
+}
+
 interface ToolConfirmationQueueProps {
   confirmingTool: ConfirmingToolState;
 }
@@ -67,6 +82,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
     tool.confirmationDetails?.type === 'exit_plan_mode';
   const borderColor = isRoutine ? theme.status.success : theme.status.warning;
   const hideToolIdentity = isRoutine;
+  const hideSideBorders = hasCodeSnippet(tool.confirmationDetails);
 
   // ToolConfirmationMessage needs to know the height available for its OWN content.
   // We subtract the lines used by the Queue wrapper:
@@ -85,6 +101,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           isFirst={true}
           borderColor={borderColor}
           borderDimColor={false}
+          hideSideBorders={hideSideBorders}
         >
           <Box flexDirection="column" width={mainAreaWidth - 4}>
             {/* Header */}
@@ -122,9 +139,9 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           borderColor={borderColor}
           borderTop={false}
           borderBottom={false}
-          borderLeft={true}
-          borderRight={true}
-          paddingX={1}
+          borderLeft={!hideSideBorders}
+          borderRight={!hideSideBorders}
+          paddingX={hideSideBorders ? 2 : 1}
           flexDirection="column"
         >
           {/* Interactive Area */}
@@ -145,8 +162,8 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
         <Box
           height={1}
           width={mainAreaWidth}
-          borderLeft={true}
-          borderRight={true}
+          borderLeft={!hideSideBorders}
+          borderRight={!hideSideBorders}
           borderTop={false}
           borderBottom={true}
           borderColor={borderColor}
