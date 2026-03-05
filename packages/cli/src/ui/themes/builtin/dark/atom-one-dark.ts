@@ -1,11 +1,11 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type ColorsTheme, Theme } from './theme.js';
-import { interpolateColor } from './color-utils.js';
+import { type ColorsTheme, Theme } from '../../theme.js';
+import { interpolateColor } from '../../color-utils.js';
 
 const atomOneDarkColors: ColorsTheme = {
   type: 'dark',
