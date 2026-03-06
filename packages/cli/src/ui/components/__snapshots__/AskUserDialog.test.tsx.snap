@@ -115,6 +115,20 @@ Review your answers:
 Tests → (not answered)
 Docs → (not answered)
 
+Enter to submit · / to edit answers · Esc to cancel
+"
+`;
+
+exports[`AskUserDialog > allows navigating to Review tab and back 2`] = `
+"← □ Tests │ □ Docs │ ≡ Review →
+
+Review your answers:
+
+⚠ You have 2 unanswered questions
+
+Tests → (not answered)
+Docs → (not answered)
+
 Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel
 "
 `;
@@ -189,6 +203,20 @@ Enter to select · ←/→ to switch questions · Esc to cancel
 `;
 
 exports[`AskUserDialog > shows warning for unanswered questions on Review tab 1`] = `
+"← □ License │ □ README │ ≡ Review →
+
+Review your answers:
+
+⚠ You have 2 unanswered questions
+
+License → (not answered)
+README → (not answered)
+
+Enter to submit · / to edit answers · Esc to cancel
+"
+`;
+
+exports[`AskUserDialog > shows warning for unanswered questions on Review tab 2`] = `
 "← □ License │ □ README │ ≡ Review →
 
 Review your answers:

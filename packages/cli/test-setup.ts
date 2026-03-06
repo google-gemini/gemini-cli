@@ -27,6 +27,9 @@ if (process.env.NO_COLOR !== undefined) {
 // Force true color output for ink so that snapshots always include color information.
 process.env.FORCE_COLOR = '3';
 
+// Force generic keybinding hints to ensure stable snapshots across different operating systems.
+process.env.FORCE_GENERIC_KEYBINDING_HINTS = 'true';
+
 import './src/test-utils/customMatchers.js';
 
 let consoleErrorSpy: vi.SpyInstance;
