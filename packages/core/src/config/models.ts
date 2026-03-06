@@ -32,6 +32,15 @@ export const GEMINI_MODEL_ALIAS_PRO = 'pro';
 export const GEMINI_MODEL_ALIAS_FLASH = 'flash';
 export const GEMINI_MODEL_ALIAS_FLASH_LITE = 'flash-lite';
 
+export const VALID_ALIASES = new Set([
+  GEMINI_MODEL_ALIAS_AUTO,
+  GEMINI_MODEL_ALIAS_PRO,
+  GEMINI_MODEL_ALIAS_FLASH,
+  GEMINI_MODEL_ALIAS_FLASH_LITE,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_MODEL_AUTO,
+]);
+
 export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 
 // Cap the thinking at 8192 to prevent run-away thinking loops.
@@ -292,16 +301,7 @@ export function isActiveModel(
  */
 export function isValidModelOrAlias(model: string): boolean {
   // Check if it's a valid alias
-  const validAliases = new Set([
-    GEMINI_MODEL_ALIAS_AUTO,
-    GEMINI_MODEL_ALIAS_PRO,
-    GEMINI_MODEL_ALIAS_FLASH,
-    GEMINI_MODEL_ALIAS_FLASH_LITE,
-    PREVIEW_GEMINI_MODEL_AUTO,
-    DEFAULT_GEMINI_MODEL_AUTO,
-  ]);
-
-  if (validAliases.has(model)) {
+  if (VALID_ALIASES.has(model)) {
     return true;
   }
 
@@ -324,15 +324,5 @@ export function isValidModelOrAlias(model: string): boolean {
  * @returns Array of valid model names and aliases.
  */
 export function getValidModelsAndAliases(): string[] {
-  return [
-    // Aliases
-    GEMINI_MODEL_ALIAS_AUTO,
-    GEMINI_MODEL_ALIAS_PRO,
-    GEMINI_MODEL_ALIAS_FLASH,
-    GEMINI_MODEL_ALIAS_FLASH_LITE,
-    PREVIEW_GEMINI_MODEL_AUTO,
-    DEFAULT_GEMINI_MODEL_AUTO,
-    // Concrete models
-    ...Array.from(VALID_GEMINI_MODELS),
-  ].sort();
+  return [...VALID_ALIASES, ...VALID_GEMINI_MODELS].sort();
 }
