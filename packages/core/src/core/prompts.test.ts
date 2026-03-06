@@ -599,24 +599,24 @@ describe('Core System Prompt (prompts.ts)', () => {
       expect(prompt).not.toContain('via `&`');
     });
 
-    it("should include 'ctrl + f' instructions when interactive shell is enabled", () => {
+    it("should include 'tab' instructions when interactive shell is enabled", () => {
       vi.mocked(mockConfig.getActiveModel).mockReturnValue(
         PREVIEW_GEMINI_MODEL,
       );
       vi.mocked(mockConfig.isInteractive).mockReturnValue(true);
       vi.mocked(mockConfig.isInteractiveShellEnabled).mockReturnValue(true);
       const prompt = getCoreSystemPrompt(mockConfig);
-      expect(prompt).toContain('ctrl + f');
+      expect(prompt).toContain('tab');
     });
 
-    it("should NOT include 'ctrl + f' instructions when interactive shell is disabled", () => {
+    it("should NOT include 'tab' instructions when interactive shell is disabled", () => {
       vi.mocked(mockConfig.getActiveModel).mockReturnValue(
         PREVIEW_GEMINI_MODEL,
       );
       vi.mocked(mockConfig.isInteractive).mockReturnValue(true);
       vi.mocked(mockConfig.isInteractiveShellEnabled).mockReturnValue(false);
       const prompt = getCoreSystemPrompt(mockConfig);
-      expect(prompt).not.toContain('ctrl + f');
+      expect(prompt).not.toContain('`tab`');
     });
   });
 
