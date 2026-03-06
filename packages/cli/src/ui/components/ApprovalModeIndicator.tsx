@@ -8,21 +8,13 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
+import { formatCommand } from '../utils/keybindingUtils.js';
+import { Command } from '../../config/keyBindings.js';
 
 interface ApprovalModeIndicatorProps {
   approvalMode: ApprovalMode;
   allowPlanMode?: boolean;
 }
-
-export const APPROVAL_MODE_TEXT = {
-  AUTO_EDIT: 'auto-accept edits',
-  PLAN: 'plan',
-  YOLO: 'YOLO',
-  HINT_SWITCH_TO_PLAN_MODE: 'shift+tab to plan',
-  HINT_SWITCH_TO_MANUAL_MODE: 'shift+tab to manual',
-  HINT_SWITCH_TO_AUTO_EDIT_MODE: 'shift+tab to accept edits',
-  HINT_SWITCH_TO_YOLO_MODE: 'ctrl+y',
-};
 
 export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
   approvalMode,
@@ -32,29 +24,32 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
   let textContent = '';
   let subText = '';
 
+  const cycleHint = formatCommand(Command.CYCLE_APPROVAL_MODE);
+  const yoloHint = formatCommand(Command.TOGGLE_YOLO);
+
   switch (approvalMode) {
     case ApprovalMode.AUTO_EDIT:
       textColor = theme.status.warning;
-      textContent = APPROVAL_MODE_TEXT.AUTO_EDIT;
+      textContent = 'auto-accept edits';
       subText = allowPlanMode
-        ? APPROVAL_MODE_TEXT.HINT_SWITCH_TO_PLAN_MODE
-        : APPROVAL_MODE_TEXT.HINT_SWITCH_TO_MANUAL_MODE;
+        ? `${cycleHint} to plan`
+        : `${cycleHint} to manual`;
       break;
     case ApprovalMode.PLAN:
       textColor = theme.status.success;
-      textContent = APPROVAL_MODE_TEXT.PLAN;
-      subText = APPROVAL_MODE_TEXT.HINT_SWITCH_TO_MANUAL_MODE;
+      textContent = 'plan';
+      subText = `${cycleHint} to manual`;
       break;
     case ApprovalMode.YOLO:
       textColor = theme.status.error;
-      textContent = APPROVAL_MODE_TEXT.YOLO;
-      subText = APPROVAL_MODE_TEXT.HINT_SWITCH_TO_YOLO_MODE;
+      textContent = 'YOLO';
+      subText = yoloHint;
       break;
     case ApprovalMode.DEFAULT:
     default:
       textColor = theme.text.accent;
       textContent = '';
-      subText = APPROVAL_MODE_TEXT.HINT_SWITCH_TO_AUTO_EDIT_MODE;
+      subText = `${cycleHint} to accept edits`;
       break;
   }
 
