@@ -12,6 +12,7 @@ import {
   useEffect,
   useReducer,
   useContext,
+  useState,
 } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
@@ -104,6 +105,18 @@ const initialState: AskUserDialogState = {
   isEditingCustomOption: false,
   submitted: false,
 };
+
+/**
+ * Module-level draft store: survives React remounts (e.g. from CTRL-Z
+ * suspend/resume which bumps forceRerenderKey and remounts <App>).
+ * Keyed by the first question's text so we only restore for the same dialog.
+ */
+interface AskUserDraft {
+  questionsKey: string;
+  answers: { [key: string]: string };
+  currentIndex: number;
+}
+let askUserDraft: AskUserDraft | null = null;
 
 function askUserDialogReducerLogic(
   state: AskUserDialogState,
@@ -941,21 +954,66 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       ? uiState?.availableTerminalHeight
       : undefined);
 
-  const [state, dispatch] = useReducer(askUserDialogReducerLogic, initialState);
+  // Restore draft state from a previous mount if the same questions are shown
+  // (i.e. the component was remounted due to CTRL-Z suspend/resume).
+  const questionsKey = questions[0]?.question ?? '';
+  const restoredDraft =
+    askUserDraft?.questionsKey === questionsKey ? askUserDraft : null;
+
+  const [state, dispatch] = useReducer(
+    askUserDialogReducerLogic,
+    restoredDraft
+      ? { ...initialState, answers: restoredDraft.answers }
+      : initialState,
+  );
   const { answers, isEditingCustomOption, submitted } = state;
 
   const reviewTabIndex = questions.length;
   const tabCount =
     questions.length > 1 ? questions.length + 1 : questions.length;
 
+  const [restoredIndex] = useState(() => restoredDraft?.currentIndex ?? 0);
+
   const { currentIndex, goToNextTab, goToPrevTab } = useTabbedNavigation({
     tabCount,
     isActive: !submitted && questions.length > 1,
     enableArrowNavigation: false, // We'll handle arrows via textBuffer callbacks or manually
     enableTabKey: false, // We'll handle tab manually to match existing behavior
+    initialIndex: restoredIndex,
   });
 
   const currentQuestionIndex = currentIndex;
+
+  // Save draft state whenever answers or currentIndex change so we can
+  // restore them after a remount. Use refs so the cleanup closure always
+  // reads the latest values (avoids stale closure on unmount).
+  const answersRef = useRef(answers);
+  answersRef.current = answers;
+  const currentIndexRef = useRef(currentQuestionIndex);
+  currentIndexRef.current = currentQuestionIndex;
+  const submittedRef = useRef(submitted);
+  submittedRef.current = submitted;
+
+  useEffect(() => {
+    // Clear any stale draft for a different dialog on mount.
+    if (askUserDraft && askUserDraft.questionsKey !== questionsKey) {
+      askUserDraft = null;
+    }
+    return () => {
+      // On unmount, persist draft so the next mount can restore it.
+      // Use refs to read latest state, not the stale closure values.
+      if (!submittedRef.current) {
+        askUserDraft = {
+          questionsKey,
+          answers: answersRef.current,
+          currentIndex: currentIndexRef.current,
+        };
+      } else {
+        askUserDraft = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleEditingCustomOption = useCallback((isEditing: boolean) => {
     dispatch({ type: 'SET_EDITING_CUSTOM', payload: { isEditing } });
