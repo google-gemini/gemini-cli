@@ -7,12 +7,16 @@
 import { spawn, spawnSync } from 'node:child_process';
 import type { ReadStream } from 'node:tty';
 import {
-  coreEvents,
+  ALL_EDITORS,
   CoreEvent,
+  coreEvents,
   type EditorType,
   getEditorCommand,
+  getEditorExtraArgs,
+  getEditorWaitFlag,
   isGuiEditor,
   isTerminalEditor,
+  isValidEditorType,
 } from '@google/gemini-cli-core';
 
 /**
@@ -32,12 +36,22 @@ export async function openFileInEditor(
 ): Promise<void> {
   let command: string | undefined = undefined;
   const args = [filePath];
+  // Extra args that come before the file path (e.g. -nw for emacsclient)
+  const extraArgs: string[] = [];
 
   if (preferredEditorType) {
+    if (!isValidEditorType(preferredEditorType)) {
+      throw new Error(
+        `Editor '${preferredEditorType}' is not a recognized editor identifier. ` +
+          `Supported editors: ${ALL_EDITORS.join(', ')}. ` +
+          `Use /editor to select one, or set the $VISUAL or $EDITOR environment variable.`,
+      );
+    }
     command = getEditorCommand(preferredEditorType);
     if (isGuiEditor(preferredEditorType)) {
-      args.unshift('--wait');
+      args.unshift(getEditorWaitFlag(preferredEditorType));
     }
+    extraArgs.push(...getEditorExtraArgs(preferredEditorType));
   }
 
   if (!command) {
@@ -66,7 +80,16 @@ export async function openFileInEditor(
   // Determine if we should use sync or async based on the command/editor type.
   // If we have a preferredEditorType, we can check if it's a terminal editor.
   // Otherwise, we guess based on the command name.
-  const terminalEditors = ['vi', 'vim', 'nvim', 'emacs', 'hx', 'nano'];
+  const terminalEditors = [
+    'vi',
+    'vim',
+    'nvim',
+    'emacs',
+    'emacsclient',
+    'hx',
+    'nano',
+    'micro',
+  ];
   const isTerminal = preferredEditorType
     ? isTerminalEditor(preferredEditorType)
     : terminalEditors.some((te) => executable.toLowerCase().includes(te));
@@ -86,56 +109,50 @@ export async function openFileInEditor(
 
   try {
     if (isTerminal) {
-      const result = spawnSync(executable, [...initialArgs, ...args], {
-        stdio: 'inherit',
-        shell: process.platform === 'win32',
-      });
+      const result = spawnSync(
+        executable,
+        [...initialArgs, ...extraArgs, ...args],
+        {
+          stdio: 'inherit',
+          shell: process.platform === 'win32',
+        },
+      );
       if (result.error) {
-        coreEvents.emitFeedback(
-          'error',
-          '[editorUtils] external terminal editor error',
-          result.error,
-        );
-        throw result.error;
+        const spawnErr = result.error as NodeJS.ErrnoException;
+        throw spawnErr.code === 'ENOENT'
+          ? new Error(
+              `Editor command '${executable}' was not found in PATH. Install it or use /editor to choose another editor.`,
+            )
+          : result.error;
       }
       if (typeof result.status === 'number' && result.status !== 0) {
-        const err = new Error(
-          `External editor exited with status ${result.status}`,
-        );
-        coreEvents.emitFeedback(
-          'error',
-          '[editorUtils] external editor error',
-          err,
-        );
-        throw err;
+        throw new Error(`External editor exited with status ${result.status}`);
       }
     } else {
       await new Promise<void>((resolve, reject) => {
-        const child = spawn(executable, [...initialArgs, ...args], {
-          stdio: 'inherit',
-          shell: process.platform === 'win32',
-        });
+        const child = spawn(
+          executable,
+          [...initialArgs, ...extraArgs, ...args],
+          {
+            stdio: 'inherit',
+            shell: process.platform === 'win32',
+          },
+        );
 
         child.on('error', (err) => {
-          coreEvents.emitFeedback(
-            'error',
-            '[editorUtils] external editor spawn error',
-            err,
+          const spawnErr = err as NodeJS.ErrnoException;
+          reject(
+            spawnErr.code === 'ENOENT'
+              ? new Error(
+                  `Editor command '${executable}' was not found in PATH. Install it or use /editor to choose another editor.`,
+                )
+              : err,
           );
-          reject(err);
         });
 
         child.on('close', (status) => {
           if (typeof status === 'number' && status !== 0) {
-            const err = new Error(
-              `External editor exited with status ${status}`,
-            );
-            coreEvents.emitFeedback(
-              'error',
-              '[editorUtils] external editor error',
-              err,
-            );
-            reject(err);
+            reject(new Error(`External editor exited with status ${status}`));
           } else {
             resolve();
           }
