@@ -26,7 +26,7 @@ export const TOOL_RESULT_MIN_LINES_SHOWN = 2;
  * This accounts for:
  * 1. The static height of the tool message (name, status line).
  * 2. Reserved space for hints and padding (different in ASB vs Standard mode).
- * 3. Enforcing a physical minimum size based on terminal limits.
+ * 3. Enforcing a minimum number of lines shown.
  */
 export function calculateToolContentMaxLines(options: {
   availableTerminalHeight: number | undefined;
