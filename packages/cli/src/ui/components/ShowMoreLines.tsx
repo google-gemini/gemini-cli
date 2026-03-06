@@ -4,23 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type React from 'react';
 import { Box, Text } from 'ink';
+import { theme } from '../semantic-colors.js';
 import { useOverflowState } from '../contexts/OverflowContext.js';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
-import { theme } from '../semantic-colors.js';
-import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 
 interface ShowMoreLinesProps {
+  /** Explicitly set if height is constrained. */
   constrainHeight: boolean;
+  /** Optional: manually override the overflow detection. */
   isOverflowing?: boolean;
 }
 
-export const ShowMoreLines = ({
+export const ShowMoreLines: React.FC<ShowMoreLinesProps> = ({
   constrainHeight,
   isOverflowing: isOverflowingProp,
-}: ShowMoreLinesProps) => {
-  const isAlternateBuffer = useAlternateBuffer();
+}) => {
   const overflowState = useOverflowState();
   const streamingState = useStreamingContext();
 
@@ -29,7 +30,6 @@ export const ShowMoreLines = ({
     (overflowState !== undefined && overflowState.overflowingIds.size > 0);
 
   if (
-    !isAlternateBuffer ||
     !isOverflowing ||
     !constrainHeight ||
     !(
