@@ -149,12 +149,3 @@ export function createCache<K extends object | string | undefined, V>(
 ): CacheService<K, V> {
   return new CacheService<K, V>(options);
 }
-
-/**
- * A global singleton cache for general-purpose use.
- * Defaults to Map-based storage with a 5-minute TTL.
- */
-export const globalCache = createCache<string, unknown>({
-  storage: 'map',
-  defaultTtl: 300000, // 5 minutes
-});
