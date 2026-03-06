@@ -479,6 +479,13 @@ export interface LoadCliConfigOptions {
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
     disabled?: string[];
   };
+  /**
+   * When true, forces the config to treat this as an interactive session,
+   * which means MCP server initialization happens in the background rather
+   * than blocking startup. Used by daemon mode to avoid blocking on slow
+   * or unavailable MCP servers.
+   */
+  forceInteractive?: boolean;
 }
 
 export async function loadCliConfig(
@@ -487,7 +494,7 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks } = options;
+  const { cwd = process.cwd(), projectHooks, forceInteractive } = options;
   const debugMode = isDebugMode(argv);
 
   const loadedSettings = loadSettings(cwd);
@@ -667,6 +674,7 @@ export async function loadCliConfig(
   // -p/--prompt forces non-interactive (headless) mode
   // -i/--prompt-interactive forces interactive mode with an initial prompt
   const interactive =
+    !!forceInteractive ||
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
     (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&

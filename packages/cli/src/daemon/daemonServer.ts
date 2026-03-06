@@ -137,6 +137,12 @@ interface DaemonPayload {
   verbose?: boolean;
 }
 
+const SESSION_NAME_RE = /^[a-zA-Z0-9_-]{1,64}$/;
+
+function isValidSessionName(name: string): boolean {
+  return SESSION_NAME_RE.test(name);
+}
+
 async function handleClientRequest(
   payload: DaemonPayload,
   socket: net.Socket,
@@ -152,11 +158,12 @@ async function handleClientRequest(
 
   if (payload.action === 'close_session') {
     const sessionName = payload.session;
-    if (!sessionName) {
+    if (!sessionName || !isValidSessionName(sessionName)) {
       socket.write(
         JSON.stringify({
           type: 'error',
-          content: 'Missing session parameter for close_session.\n',
+          content:
+            'Missing or invalid session name. Use 1-64 alphanumeric, dash, or underscore characters.\n',
         }) + '\n',
       );
       socket.end();
@@ -190,7 +197,18 @@ async function handleClientRequest(
       socket.write(
         JSON.stringify({
           type: 'error',
-          content: 'Missing required prompt parameters',
+          content: 'Missing required prompt parameters.',
+        }) + '\n',
+      );
+      socket.write(JSON.stringify({ type: 'end' }) + '\n');
+      return;
+    }
+    if (!isValidSessionName(sessionName)) {
+      socket.write(
+        JSON.stringify({
+          type: 'error',
+          content:
+            'Invalid session name. Use 1-64 alphanumeric, dash, or underscore characters.',
         }) + '\n',
       );
       socket.write(JSON.stringify({ type: 'end' }) + '\n');
@@ -199,12 +217,26 @@ async function handleClientRequest(
 
     const resolvedCwd = path.resolve(cwd);
     const homeDir = os.homedir();
-    if (!resolvedCwd.startsWith(homeDir)) {
+    if (
+      resolvedCwd !== homeDir &&
+      !resolvedCwd.startsWith(homeDir + path.sep)
+    ) {
       socket.write(
         JSON.stringify({
           type: 'error',
           content:
             'Error: Security restriction - session cwd must be within the user home directory.',
+        }) + '\n',
+      );
+      socket.write(JSON.stringify({ type: 'end' }) + '\n');
+      return;
+    }
+
+    if (!fs.existsSync(resolvedCwd)) {
+      socket.write(
+        JSON.stringify({
+          type: 'error',
+          content: `Error: Working directory does not exist: ${resolvedCwd}`,
         }) + '\n',
       );
       socket.write(JSON.stringify({ type: 'end' }) + '\n');
@@ -233,7 +265,7 @@ async function handleClientRequest(
           settings.merged,
           sessionName,
           sessionArgv,
-          { cwd },
+          { cwd, forceInteractive: true },
         );
         await sessionConfig.initialize();
         if (settings.merged.security.auth.selectedType) {

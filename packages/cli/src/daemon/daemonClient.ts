@@ -106,10 +106,24 @@ export async function runDaemonClientCommands(
         let buffer = '';
         client.on('data', (d) => {
           buffer += d.toString();
-          if (buffer.includes('\n')) {
-            client.end();
-            resolve();
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (!line) continue;
+            try {
+              const raw: unknown = JSON.parse(line);
+              if (isDaemonMessage(raw) && raw.type === 'error') {
+                writeToStderr((raw.content ?? '') + '\n');
+                client.end();
+                process.exit(1);
+                return;
+              }
+            } catch {
+              // ignore unparseable lines
+            }
           }
+          client.end();
+          resolve();
         });
         client.on('end', resolve);
       }).then(() => {
@@ -142,43 +156,65 @@ export async function runDaemonClientCommands(
 
       client.write(JSON.stringify(payload) + '\n');
 
-      let buffer = '';
-      client.on('data', (data) => {
-        buffer += data.toString();
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line for next data event
-
-        for (const line of lines) {
-          if (!line) continue;
-          try {
-            const raw: unknown = JSON.parse(line);
-            if (!isDaemonMessage(raw)) continue;
-            const msg = raw;
-            if (msg.type === 'output') {
-              writeToStdout(msg.content ?? '');
-            } else if (msg.type === 'error') {
-              writeToStderr((msg.content ?? '') + '\n');
-              process.exit(1);
-            } else if (msg.type === 'verbose' && argv.verbose) {
-              writeToStderr((msg.content ?? '') + '\n');
-            } else if (msg.type === 'end') {
-              client.end();
-              process.exit(ExitCodes.SUCCESS);
-            }
-          } catch (_e) {
-            // Unparseable, just print generic
-            writeToStdout(line + '\n');
+      // Wait for the daemon response to complete before returning.
+      // Without this, main() returns immediately and the process may exit
+      // before the socket event listeners fire.
+      await new Promise<void>((resolve) => {
+        let resolved = false;
+        let hasOutput = false;
+        const exit = (code: number) => {
+          if (resolved) return;
+          resolved = true;
+          // Ensure output ends with a newline so the shell prompt
+          // doesn't overwrite the last line of output.
+          if (hasOutput) {
+            writeToStdout('\n');
           }
-        }
-      });
+          resolve();
+          // Flush stdout fully before exiting to avoid losing buffered output
+          // on TTY streams where process.exit() can discard pending writes.
+          process.stdout.write('', () => process.exit(code));
+        };
 
-      client.on('end', () => {
-        process.exit(ExitCodes.SUCCESS);
-      });
+        let buffer = '';
+        client.on('data', (data) => {
+          buffer += data.toString();
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line for next data event
 
-      client.on('error', (err) => {
-        writeToStderr(`Stream error: ${err.message}\n`);
-        process.exit(1);
+          for (const line of lines) {
+            if (!line) continue;
+            try {
+              const raw: unknown = JSON.parse(line);
+              if (!isDaemonMessage(raw)) continue;
+              const msg = raw;
+              if (msg.type === 'output') {
+                writeToStdout(msg.content ?? '');
+                hasOutput = true;
+              } else if (msg.type === 'error') {
+                writeToStderr((msg.content ?? '') + '\n');
+                exit(1);
+              } else if (msg.type === 'verbose' && argv.verbose) {
+                writeToStderr((msg.content ?? '') + '\n');
+              } else if (msg.type === 'end') {
+                client.end();
+                exit(ExitCodes.SUCCESS);
+              }
+            } catch (_e) {
+              // Unparseable, just print generic
+              writeToStdout(line + '\n');
+            }
+          }
+        });
+
+        client.on('end', () => {
+          exit(ExitCodes.SUCCESS);
+        });
+
+        client.on('error', (err) => {
+          writeToStderr(`Stream error: ${err.message}\n`);
+          exit(1);
+        });
       });
     } catch (_err) {
       writeToStderr(
