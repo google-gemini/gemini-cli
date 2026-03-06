@@ -109,7 +109,7 @@ const initialState: AskUserDialogState = {
 /**
  * Module-level draft store: survives React remounts (e.g. from CTRL-Z
  * suspend/resume which bumps forceRerenderKey and remounts <App>).
- * Keyed by the first question's text so we only restore for the same dialog.
+ * Keyed by the serialized questions so we only restore for the same dialog.
  */
 interface AskUserDraft {
   questionsKey: string;
@@ -977,8 +977,8 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   const { currentIndex, goToNextTab, goToPrevTab } = useTabbedNavigation({
     tabCount,
     isActive: !submitted && questions.length > 1,
-    enableArrowNavigation: false, // We'll handle arrows via textBuffer callbacks or manually
-    enableTabKey: false, // We'll handle tab manually to match existing behavior
+    enableArrowNavigation: false,
+    enableTabKey: false,
     initialIndex: restoredIndex,
   });
 

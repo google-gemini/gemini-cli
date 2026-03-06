@@ -1277,6 +1277,125 @@ describe('AskUserDialog', () => {
     expect(lastFrame()).toContain('This is a very long question');
   });
 
+  describe('Suspend/resume state preservation (CTRL-Z)', () => {
+    // Simulates forceRerenderKey bump on SIGCONT: unmount then remount
+    // with the same questions. The askUserDraft store should restore state.
+
+    const renderDialog = (questions: Question[]) =>
+      renderWithProviders(
+        <AskUserDialog
+          questions={questions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={120}
+        />,
+        { width: 120 },
+      );
+
+    it('restores in-progress text answer after suspend/resume', async () => {
+      const q: Question[] = [
+        { question: 'What to build?', header: 'Q', type: QuestionType.TEXT },
+      ];
+
+      const first = renderDialog(q);
+      for (const char of 'Test Test Test') writeKey(first.stdin, char);
+      await waitFor(async () => {
+        await first.waitUntilReady();
+        expect(first.lastFrame()).toContain('Test Test Test');
+      });
+
+      act(() => first.unmount());
+
+      const second = renderDialog(q);
+      await waitFor(async () => {
+        await second.waitUntilReady();
+        expect(second.lastFrame()).toContain('Test Test Test');
+      });
+    });
+
+    it('restores choice custom text after suspend/resume', async () => {
+      const q: Question[] = [
+        {
+          question: 'Which database?',
+          header: 'DB',
+          type: QuestionType.CHOICE,
+          options: [{ label: 'PostgreSQL', description: '' }],
+          multiSelect: false,
+        },
+      ];
+
+      const first = renderDialog(q);
+      writeKey(first.stdin, '\x1b[B'); // Down to Other
+      for (const char of 'Redis') writeKey(first.stdin, char);
+      await waitFor(async () => {
+        await first.waitUntilReady();
+        expect(first.lastFrame()).toContain('Redis');
+      });
+
+      act(() => first.unmount());
+
+      const second = renderDialog(q);
+      await waitFor(async () => {
+        await second.waitUntilReady();
+        expect(second.lastFrame()).toContain('Redis');
+      });
+    });
+
+    it('does NOT restore draft after successful submission', async () => {
+      const q: Question[] = [
+        { question: 'Your name?', header: 'N', type: QuestionType.TEXT },
+      ];
+      const onSubmit = vi.fn();
+      const first = renderWithProviders(
+        <AskUserDialog
+          questions={q}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+          width={120}
+        />,
+        { width: 120 },
+      );
+
+      for (const char of 'Alice') writeKey(first.stdin, char);
+      writeKey(first.stdin, '\r');
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith({ '0': 'Alice' }),
+      );
+
+      act(() => first.unmount());
+
+      const second = renderDialog(q);
+      await waitFor(async () => {
+        await second.waitUntilReady();
+        expect(second.lastFrame()).not.toContain('Alice');
+      });
+    });
+
+    it('does NOT restore draft for different questions', async () => {
+      const qA: Question[] = [
+        { question: 'Question A?', header: 'A', type: QuestionType.TEXT },
+      ];
+      const qB: Question[] = [
+        { question: 'Question B?', header: 'B', type: QuestionType.TEXT },
+      ];
+
+      const first = renderDialog(qA);
+      for (const char of 'answer for A') writeKey(first.stdin, char);
+      await waitFor(async () => {
+        await first.waitUntilReady();
+        expect(first.lastFrame()).toContain('answer for A');
+      });
+
+      act(() => first.unmount());
+
+      const second = renderDialog(qB);
+      await waitFor(async () => {
+        await second.waitUntilReady();
+        expect(second.lastFrame()).not.toContain('answer for A');
+      });
+    });
+  });
+
   describe('Choice question placeholder', () => {
     it('uses placeholder for "Other" option when provided', async () => {
       const questions: Question[] = [
