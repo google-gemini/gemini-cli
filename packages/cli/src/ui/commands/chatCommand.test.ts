@@ -9,7 +9,11 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { SlashCommand, CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { Content } from '@google/genai';
-import { AuthType, type GeminiClient } from '@google/gemini-cli-core';
+import {
+  AuthType,
+  decodeTagName,
+  type GeminiClient,
+} from '@google/gemini-cli-core';
 
 import * as fsPromises from 'node:fs/promises';
 import { chatCommand, debugCommand } from './chatCommand.js';
@@ -186,7 +190,7 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint saved with tag: ${tag}.`,
+        content: `Conversation checkpoint saved with tag: ${decodeTagName(tag)}.`,
       });
     });
 
@@ -218,7 +222,7 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint saved with tag: ${tag}.`,
+        content: `Conversation checkpoint saved with tag: ${decodeTagName(tag)}.`,
       });
       expect(mockSetActiveCheckpointTag).toHaveBeenCalledWith(tag);
     });
@@ -278,7 +282,7 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint saved with tag: ${tag}.`,
+        content: `Conversation checkpoint saved with tag: ${decodeTagName(tag)}.`,
       });
       expect(mockSetActiveCheckpointTag).toHaveBeenCalledWith(tag);
     });
@@ -311,7 +315,7 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: `No saved checkpoint found with tag: ${badTag}.`,
+        content: `No saved checkpoint found with tag: ${decodeTagName(badTag)}.`,
       });
       expect(mockSetActiveCheckpointTag).not.toHaveBeenCalled();
     });
@@ -447,7 +451,7 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: `Error: No checkpoint found with tag '${tag}'.`,
+        content: `Error: No checkpoint found with tag '${decodeTagName(tag)}'.`,
       });
       expect(mockSetActiveCheckpointTag).not.toHaveBeenCalled();
     });
@@ -459,7 +463,7 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint '${tag}' has been deleted.`,
+        content: `Conversation checkpoint '${decodeTagName(tag)}' has been deleted.`,
       });
       expect(mockSetActiveCheckpointTag).not.toHaveBeenCalled();
     });

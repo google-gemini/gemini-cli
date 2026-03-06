@@ -273,6 +273,7 @@ export const useSlashCommandProcessor = (
       setConfirmationRequest,
       toggleVimEnabled,
       activeCheckpointTag,
+      setActiveCheckpointTag,
       sessionShellAllowlist,
       reloadCommands,
       extensionsUpdateState,
