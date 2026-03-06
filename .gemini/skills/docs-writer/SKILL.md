@@ -65,12 +65,19 @@ accessible.
 - **UI and code:** Use **bold** for UI elements and `code font` for filenames,
   snippets, commands, and API elements. Focus on the task when discussing
   interaction.
-- **Links:** Use descriptive anchor text; avoid "click here." Ensure the link
-  makes sense out of context.
 - **Accessibility:** Use semantic HTML elements correctly (headings, lists, 
   tables).
 - **Media:** Use lowercase hyphenated filenames. Provide descriptive alt text
   for all images.
+
+### Links
+- **Accessibility:** Use descriptive anchor text; avoid "click here."Ensure the
+  link makes sense out of context, such as when being read by a screen reader.
+- **Use relative links in docs:** Use relative links in documentation to
+ensure portability; avoid absolute URLs for links within the same repository. Do not
+  include the /docs/ section of a link.
+- **When changing headings, check for deep links:** If a user is changing a heading,
+check for deep links to that heading in other pages, and update accordingly.
 
 ### Structure
 - **BLUF:** Start with an introduction explaining what to expect.
@@ -125,7 +132,6 @@ documentation.
   sentences to make them easier for users to understand.
 - **Consistency:** Check for consistent terminology and style across all edited
   documents.
-
 
 ## Phase 4: Verification and finalization
 Perform a final quality check to ensure that all changes are correctly formatted
