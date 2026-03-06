@@ -34,7 +34,7 @@ import {
   type RetryAvailabilityContext,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage, isAbortError } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
 import type {
   ChatRecordingService,
@@ -957,6 +957,12 @@ export class GeminiClient {
           );
         }
       }
+    } catch (error) {
+      if (signal?.aborted || isAbortError(error)) {
+        yield { type: GeminiEventType.UserCancelled };
+        return turn;
+      }
+      throw error;
     } finally {
       const hookState = this.hookStateMap.get(prompt_id);
       if (hookState) {

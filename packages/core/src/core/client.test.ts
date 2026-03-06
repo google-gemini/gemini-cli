@@ -728,6 +728,23 @@ describe('Gemini Client (client.ts)', () => {
       );
     });
 
+    it('yields UserCancelled when processTurn throws AbortError', async () => {
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+      vi.spyOn(client['loopDetector'], 'turnStarted').mockRejectedValueOnce(
+        abortError,
+      );
+
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-abort-error',
+      );
+      const events = await fromAsync(stream);
+
+      expect(events).toEqual([{ type: GeminiEventType.UserCancelled }]);
+    });
+
     it.each([
       {
         compressionStatus:
