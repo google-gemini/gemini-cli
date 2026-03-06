@@ -1799,7 +1799,6 @@ export const useGeminiStream = (
       addItem,
       registerBackgroundShell,
       consumeUserHint,
-      config,
       isLowErrorVerbosity,
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,
