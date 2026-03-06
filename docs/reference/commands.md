@@ -46,9 +46,11 @@ Slash commands provide meta-level control over the CLI itself.
     - **Note:** You can only resume chats that were saved within the current
       project. To resume a chat from a different project, you must run the
       Gemini CLI from that project's directory.
-  - **`save <tag>`**
-    - **Description:** Saves the current conversation history. You must add a
-      `<tag>` for identifying the conversation state.
+  - **`save [tag]`**
+    - **Description:** Saves the current conversation history. If you omit the
+      tag, Gemini CLI saves to the active checkpoint tag from the most recent
+      successful `/chat resume <tag>` or `/chat save <tag>` in the current
+      session.
     - **Details on checkpoint location:** The default locations for saved chat
       checkpoints are:
       - Linux/macOS: `~/.gemini/tmp/<project_hash>/`

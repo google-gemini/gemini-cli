@@ -41,6 +41,7 @@ describe('chatCommand', () => {
   const mockExport = vi.mocked(exportHistoryToFile);
 
   let mockContext: CommandContext;
+  let mockSetActiveCheckpointTag: ReturnType<typeof vi.fn>;
   let mockGetChat: ReturnType<typeof vi.fn>;
   let mockSaveCheckpoint: ReturnType<typeof vi.fn>;
   let mockLoadCheckpoint: ReturnType<typeof vi.fn>;
@@ -91,6 +92,8 @@ describe('chatCommand', () => {
         },
       },
     });
+    mockSetActiveCheckpointTag = mockContext.session
+      .setActiveCheckpointTag as ReturnType<typeof vi.fn>;
   });
 
   afterEach(() => {
@@ -158,7 +161,32 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat save <tag>',
+        content:
+          'No active checkpoint tag. Usage: /chat save <tag> or /chat resume <tag> first.',
+      });
+    });
+
+    it('should use the active checkpoint tag when no explicit tag is provided', async () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'context for our chat' }] },
+        { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] },
+        { role: 'user', parts: [{ text: 'Hello, how are you?' }] },
+      ];
+      mockGetHistory.mockReturnValue(history);
+      mockContext.session.activeCheckpointTag = tag;
+
+      const result = await saveCommand?.action?.(mockContext, '   ');
+
+      expect(mockCheckpointExists).toHaveBeenCalledWith(tag);
+      expect(mockSaveCheckpoint).toHaveBeenCalledWith(
+        { history, authType: AuthType.LOGIN_WITH_GOOGLE },
+        tag,
+      );
+      expect(mockSetActiveCheckpointTag).toHaveBeenCalledWith(tag);
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: `Conversation checkpoint saved with tag: ${tag}.`,
       });
     });
 
@@ -192,6 +220,7 @@ describe('chatCommand', () => {
         messageType: 'info',
         content: `Conversation checkpoint saved with tag: ${tag}.`,
       });
+      expect(mockSetActiveCheckpointTag).toHaveBeenCalledWith(tag);
     });
 
     it('should return confirm_action if checkpoint already exists', async () => {
@@ -214,6 +243,23 @@ describe('chatCommand', () => {
       expect(result).toHaveProperty('prompt');
     });
 
+    it('should use the resolved active tag in overwrite confirmation replay', async () => {
+      mockCheckpointExists.mockResolvedValue(true);
+      mockContext.session.activeCheckpointTag = tag;
+      mockContext.invocation = {
+        raw: '/chat save',
+        name: 'save',
+        args: '',
+      };
+
+      const result = await saveCommand?.action?.(mockContext, '   ');
+
+      expect(result).toMatchObject({
+        type: 'confirm_action',
+        originalInvocation: { raw: `/chat save ${tag}` },
+      });
+    });
+
     it('should save the conversation if overwrite is confirmed', async () => {
       const history: Content[] = [
         { role: 'user', parts: [{ text: 'context for our chat' }] },
@@ -234,6 +280,7 @@ describe('chatCommand', () => {
         messageType: 'info',
         content: `Conversation checkpoint saved with tag: ${tag}.`,
       });
+      expect(mockSetActiveCheckpointTag).toHaveBeenCalledWith(tag);
     });
   });
 
@@ -266,6 +313,7 @@ describe('chatCommand', () => {
         messageType: 'info',
         content: `No saved checkpoint found with tag: ${badTag}.`,
       });
+      expect(mockSetActiveCheckpointTag).not.toHaveBeenCalled();
     });
 
     it('should resume a conversation with matching authType', async () => {
@@ -289,6 +337,7 @@ describe('chatCommand', () => {
         ] as HistoryItemWithoutId[],
         clientHistory: conversation,
       });
+      expect(mockSetActiveCheckpointTag).toHaveBeenCalledWith(goodTag);
     });
 
     it('should block resuming a conversation with mismatched authType', async () => {
@@ -309,6 +358,7 @@ describe('chatCommand', () => {
         messageType: 'error',
         content: `Cannot resume chat. It was saved with a different authentication method (${AuthType.USE_GEMINI}) than the current one (${AuthType.LOGIN_WITH_GOOGLE}).`,
       });
+      expect(mockSetActiveCheckpointTag).not.toHaveBeenCalled();
     });
 
     it('should resume a legacy conversation without authType', async () => {
@@ -329,6 +379,7 @@ describe('chatCommand', () => {
         ] as HistoryItemWithoutId[],
         clientHistory: conversation,
       });
+      expect(mockSetActiveCheckpointTag).toHaveBeenCalledWith(goodTag);
     });
 
     describe('completion', () => {
@@ -398,6 +449,7 @@ describe('chatCommand', () => {
         messageType: 'error',
         content: `Error: No checkpoint found with tag '${tag}'.`,
       });
+      expect(mockSetActiveCheckpointTag).not.toHaveBeenCalled();
     });
 
     it('should delete the conversation', async () => {
@@ -409,6 +461,15 @@ describe('chatCommand', () => {
         messageType: 'info',
         content: `Conversation checkpoint '${tag}' has been deleted.`,
       });
+      expect(mockSetActiveCheckpointTag).not.toHaveBeenCalled();
+    });
+
+    it('should clear the active checkpoint tag when deleting the active checkpoint', async () => {
+      mockContext.session.activeCheckpointTag = tag;
+
+      await deleteCommand?.action?.(mockContext, tag);
+
+      expect(mockSetActiveCheckpointTag).toHaveBeenCalledWith(null);
     });
 
     describe('completion', () => {

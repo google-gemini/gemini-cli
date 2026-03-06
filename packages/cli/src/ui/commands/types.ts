@@ -98,6 +98,10 @@ export interface CommandContext {
     stats: SessionStatsState;
     /** A transient list of shell commands the user has approved for this session. */
     sessionShellAllowlist: Set<string>;
+    /** The active `/chat` checkpoint tag for the current interactive session, if any. */
+    activeCheckpointTag: string | null;
+    /** Updates the active `/chat` checkpoint tag for the current interactive session. */
+    setActiveCheckpointTag: (tag: string | null) => void;
   };
   // Flag to indicate if an overwrite has been confirmed
   overwriteConfirmed?: boolean;
