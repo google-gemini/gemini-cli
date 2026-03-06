@@ -13,7 +13,7 @@ import {
   type Mocked,
   type Mock,
 } from 'vitest';
-import { GeminiAgent } from './zedIntegration.js';
+import { GeminiAgent } from './acpClient.js';
 import * as acp from '@agentclientprotocol/sdk';
 import {
   ApprovalMode,
