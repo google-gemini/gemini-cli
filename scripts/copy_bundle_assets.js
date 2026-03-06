@@ -87,6 +87,7 @@ const devtoolsDest = join(
 const devtoolsDistSrc = join(devtoolsSrc, 'dist');
 const devtoolsDistDest = join(devtoolsDest, 'dist');
 if (existsSync(devtoolsDistSrc)) {
+  rmSync(devtoolsDest, { recursive: true, force: true });
   mkdirSync(devtoolsDest, { recursive: true });
   copyDirFresh(devtoolsDistSrc, devtoolsDistDest);
   copyFileSync(
