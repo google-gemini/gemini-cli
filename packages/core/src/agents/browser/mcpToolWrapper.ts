@@ -30,6 +30,7 @@ import {
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { BrowserManager, McpToolCallResult } from './browserManager.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import type { BrowserSessionLogger } from './browserSessionLogger.js';
 
 /**
  * Tool invocation that dispatches to BrowserManager's isolated MCP client.
@@ -384,6 +385,7 @@ class TypeTextDeclarativeTool extends DeclarativeTool<
 export async function createMcpDeclarativeTools(
   browserManager: BrowserManager,
   messageBus: MessageBus,
+  _sessionLogger?: BrowserSessionLogger,
 ): Promise<Array<McpDeclarativeTool | TypeTextDeclarativeTool>> {
   // Get dynamically discovered tools from the MCP server
   const mcpTools = await browserManager.getDiscoveredTools();

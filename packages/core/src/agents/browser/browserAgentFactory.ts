@@ -28,6 +28,7 @@ import {
 import { createMcpDeclarativeTools } from './mcpToolWrapper.js';
 import { createAnalyzeScreenshotTool } from './analyzeScreenshot.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import type { BrowserSessionLogger } from './browserSessionLogger.js';
 
 /**
  * Creates a browser agent definition with MCP tools configured.
@@ -45,6 +46,7 @@ export async function createBrowserAgentDefinition(
   config: Config,
   messageBus: MessageBus,
   printOutput?: (msg: string) => void,
+  sessionLogger?: BrowserSessionLogger,
 ): Promise<{
   definition: LocalAgentDefinition<typeof BrowserTaskResultSchema>;
   browserManager: BrowserManager;
@@ -53,9 +55,17 @@ export async function createBrowserAgentDefinition(
     'Creating browser agent definition with isolated MCP tools...',
   );
 
+  const browserConfig = config.getBrowserAgentConfig();
+  sessionLogger?.logEvent('connection_start', {
+    sessionMode: browserConfig.customConfig.sessionMode ?? 'persistent',
+    headless: browserConfig.customConfig.headless ?? false,
+  });
+
   // Create and initialize browser manager with isolated MCP client
-  const browserManager = new BrowserManager(config);
+  const browserManager = new BrowserManager(config, sessionLogger);
   await browserManager.ensureConnection();
+
+  sessionLogger?.logEvent('connection_established', {});
 
   if (printOutput) {
     printOutput('Browser connected with isolated MCP client.');
@@ -63,7 +73,11 @@ export async function createBrowserAgentDefinition(
 
   // Create declarative tools from dynamically discovered MCP tools
   // These tools dispatch to browserManager's isolated client
-  const mcpTools = await createMcpDeclarativeTools(browserManager, messageBus);
+  const mcpTools = await createMcpDeclarativeTools(
+    browserManager,
+    messageBus,
+    sessionLogger,
+  );
   const availableToolNames = mcpTools.map((t) => t.name);
 
   // Validate required semantic tools are available
@@ -118,16 +132,30 @@ export async function createBrowserAgentDefinition(
 
   if (visionDisabledReason) {
     debugLogger.log(`Vision disabled: ${visionDisabledReason}`);
+    sessionLogger?.logEvent('vision_disabled', {
+      reason: visionDisabledReason,
+    });
   } else {
     allTools.push(
-      createAnalyzeScreenshotTool(browserManager, config, messageBus),
+      createAnalyzeScreenshotTool(
+        browserManager,
+        config,
+        messageBus,
+        sessionLogger,
+      ),
     );
+    sessionLogger?.logEvent('vision_enabled', {});
   }
 
+  const toolNames = allTools.map((t) => t.name);
   debugLogger.log(
     `Created ${allTools.length} tools for browser agent: ` +
-      allTools.map((t) => t.name).join(', '),
+      toolNames.join(', '),
   );
+  sessionLogger?.logEvent('tools_configured', {
+    count: allTools.length,
+    tools: toolNames,
+  });
 
   // Create configured definition with tools
   // BrowserAgentDefinition is a factory function - call it with config
@@ -149,13 +177,15 @@ export async function createBrowserAgentDefinition(
  */
 export async function cleanupBrowserAgent(
   browserManager: BrowserManager,
+  sessionLogger?: BrowserSessionLogger,
 ): Promise<void> {
   try {
     await browserManager.close();
     debugLogger.log('Browser agent cleanup complete');
+    sessionLogger?.logEvent('cleanup', { success: true });
   } catch (error) {
-    debugLogger.error(
-      `Error during browser cleanup: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    const msg = error instanceof Error ? error.message : String(error);
+    debugLogger.error(`Error during browser cleanup: ${msg}`);
+    sessionLogger?.logEvent('cleanup', { success: false, error: msg });
   }
 }

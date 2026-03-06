@@ -30,6 +30,7 @@ import type { Config } from '../../config/config.js';
 import { getVisualAgentModel } from './modelAvailability.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { LlmRole } from '../../telemetry/llmRole.js';
+import type { BrowserSessionLogger } from './browserSessionLogger.js';
 
 /**
  * System prompt for the visual analysis model call.
@@ -67,6 +68,7 @@ class AnalyzeScreenshotInvocation extends BaseToolInvocation<
     private readonly config: Config,
     params: Record<string, unknown>,
     messageBus: MessageBus,
+    private readonly sessionLogger?: BrowserSessionLogger,
   ) {
     super(params, messageBus, 'analyze_screenshot', 'Analyze Screenshot');
   }
@@ -81,6 +83,7 @@ class AnalyzeScreenshotInvocation extends BaseToolInvocation<
       const instruction = String(this.params['instruction'] ?? '');
 
       debugLogger.log(`Visual analysis requested: ${instruction}`);
+      this.sessionLogger?.logEvent('visual_analysis_start', { instruction });
 
       // Capture screenshot via MCP tool
       const screenshotResult = await this.browserManager.callTool(
@@ -163,6 +166,9 @@ class AnalyzeScreenshotInvocation extends BaseToolInvocation<
       }
 
       debugLogger.log(`Visual analysis complete: ${responseText}`);
+      this.sessionLogger?.logEvent('visual_analysis_end', {
+        responseLength: responseText.length,
+      });
 
       return {
         llmContent: `Visual Analysis Result:\n${responseText}`,
@@ -171,6 +177,9 @@ class AnalyzeScreenshotInvocation extends BaseToolInvocation<
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       debugLogger.error(`Visual analysis failed: ${errorMsg}`);
+      this.sessionLogger?.logEvent('visual_analysis_error', {
+        error: errorMsg,
+      });
 
       // Provide a graceful fallback message for model unavailability
       const isModelError =
@@ -203,6 +212,7 @@ class AnalyzeScreenshotTool extends DeclarativeTool<
     private readonly browserManager: BrowserManager,
     private readonly config: Config,
     messageBus: MessageBus,
+    private readonly sessionLogger?: BrowserSessionLogger,
   ) {
     super(
       'analyze_screenshot',
@@ -234,6 +244,7 @@ class AnalyzeScreenshotTool extends DeclarativeTool<
       this.config,
       params,
       this.messageBus,
+      this.sessionLogger,
     );
   }
 }
@@ -245,6 +256,12 @@ export function createAnalyzeScreenshotTool(
   browserManager: BrowserManager,
   config: Config,
   messageBus: MessageBus,
+  sessionLogger?: BrowserSessionLogger,
 ): AnalyzeScreenshotTool {
-  return new AnalyzeScreenshotTool(browserManager, config, messageBus);
+  return new AnalyzeScreenshotTool(
+    browserManager,
+    config,
+    messageBus,
+    sessionLogger,
+  );
 }
