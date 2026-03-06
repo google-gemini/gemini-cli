@@ -296,6 +296,20 @@
           "default": true,
           "type": "boolean"
         },
+        "terminalTitleMaxLen": {
+          "title": "Terminal Title Max Length",
+          "description": "Maximum length of the terminal window title.",
+          "markdownDescription": "Maximum length of the terminal window title.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `80`",
+          "default": 80,
+          "type": "number"
+        },
+        "padWindowTitle": {
+          "title": "Pad Window Title",
+          "description": "Pad the terminal window title with spaces to a fixed length to prevent taskbar jitter.",
+          "markdownDescription": "Pad the terminal window title with spaces to a fixed length to prevent taskbar jitter.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "showHomeDirectoryWarning": {
           "title": "Show Home Directory Warning",
           "description": "Show a warning when running Gemini CLI in the home directory.",

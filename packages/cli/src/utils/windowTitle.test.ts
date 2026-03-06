@@ -237,4 +237,65 @@ describe('computeTerminalTitle', () => {
     expect(title).toContain('Gemini CLI (CCCCC');
     expect(title).toContain('…)');
   });
+
+  it('should respect custom maxLen', () => {
+    const customMaxLen = 40;
+    const title = computeTerminalTitle({
+      streamingState: StreamingState.Idle,
+      isConfirming: false,
+      isSilentWorking: false,
+      folderName: 'my-project',
+      showThoughts: false,
+      useDynamicTitle: true,
+      terminalTitleMaxLen: customMaxLen,
+    });
+
+    expect(title.length).toBe(customMaxLen);
+    expect(title).toContain('◇  Ready (my-project)');
+  });
+
+  it('should truncate and pad to custom maxLen when useDynamicTitle is false', () => {
+    const customMaxLen = 50;
+    const title = computeTerminalTitle({
+      streamingState: StreamingState.Responding,
+      isConfirming: false,
+      isSilentWorking: false,
+      folderName: 'a-very-long-folder-name-that-should-be-truncated',
+      showThoughts: true,
+      useDynamicTitle: false,
+      terminalTitleMaxLen: customMaxLen,
+    });
+
+    expect(title.length).toBe(customMaxLen);
+    expect(title).toContain('Gemini CLI (');
+  });
+
+  it('should not pad the title when padWindowTitle is false', () => {
+    const title = computeTerminalTitle({
+      streamingState: StreamingState.Idle,
+      isConfirming: false,
+      isSilentWorking: false,
+      folderName: 'my-project',
+      showThoughts: false,
+      useDynamicTitle: true,
+      padWindowTitle: false,
+    });
+
+    expect(title).toBe('◇  Ready (my-project)');
+    expect(title.length).toBeLessThan(80);
+  });
+
+  it('should still pad by default', () => {
+    const title = computeTerminalTitle({
+      streamingState: StreamingState.Idle,
+      isConfirming: false,
+      isSilentWorking: false,
+      folderName: 'my-project',
+      showThoughts: false,
+      useDynamicTitle: true,
+    });
+
+    expect(title.length).toBe(80);
+    expect(title.endsWith(' ')).toBe(true);
+  });
 });
