@@ -17,67 +17,78 @@ Do NOT automatically change strings without user approval. You must only suggest
 changes and do not attempt to rewrite them directly unless the user explicitly
 asks you to do so.
 
-### Determine if the text adheres to good UX writing principles
+## Core voice principles
 
-Use these basic principles of good UX writing as a guide for your suggestions. 
+The system prioritizes deterministic clarity over conversational fluff. We
+provide telemetry, not etiquette, ensuring the user retains absolute agency..
 
-- **Clarity:** Text is easy to understand. Text is easy to follow. No errors or
-  typos.
-- **Usefulness:** Users get the info they need, when they need it. Use plain,
-  familiar language. Concepts are explained; value props are user-focused.
-- **Brevity:** Language is precise. Short, simple sentences; active voice. Text
-  is broken up; scannable.
-- **Style:** Friendly, helpful, positive, and humble tone. Sentence-style
-  capitalization. Solitary sentences aren't punctuated. Speaks to the user
-  ("you").
+1. **Deterministic clarity:** Distinguish between certain system/service states
+   (Cloud Billing, IAM, the System) and probabilistic AI analysis (Gemini).
+2. **System transparency:** Replace "Loading..." with active technical telemetry
+   (e.g., Tracing stack traces...). Keep status updates under 5 words.
+3. **Front-loaded actionability:** Always use the [Goal] + [Action] pattern.
+   Lead with intent so users can scan left-to-right.
+4. **Agentic error recovery:** Every error must be a pivot point. Pair failures
+   with one-click recovery commands or suggested prompts.
+5. **Contextual humility:** Reserve disclaimers and "be careful" warnings for P0
+   (destructive/irreversible) tasks only. Stop warning-fatigue.
 
-### Enforce general style guidelines
+## The writing checklist
 
-1. Do not use a period for single sentences under 10 words. Use periods only for
-   multi-sentence blocks or exceptionally complex instructions.
-2. Use contractions. However, don't make a sentence harder to understand just to
-   follow this rule. For example, "do not" can give more emphasis than "don't"
-   when needed. 
-3. Use abbreviations with care. It’s okay to abbreviate commonly understood
-   terms, such as "VM", but be consistent. Try to avoid mixing and matching
-   abbreviations and non-abbreviations in the same flow.
-4. Use ampersands instead of “and” sparingly. Don't use "+" instead of "&".
-5. Only capitalize the first word in titles and headings.
-6. Use a serial/Oxford comma to separate items in a list.
-7. When reviewing strings with variables or placeholders, ensure the surrounding
-   text remains grammatically correct regardless of the variable's value.
+Use this checklist to audit UI strings and AI responses.
 
-### Ensure consistent style for settings
+### Identity and voice
+- **Eliminate the "I":** Remove all first-person pronouns (I, me, my, mine).
+- **Subject attribution:** Refer to the AI as Gemini and the infrastructure as
+  the - system or the CLI.
+- **Active voice:** Ensure the subject (Gemini or the system) is clearly
+  performing the action.
+- **Ownership rule:** Use the system for execution (doing) and Gemini for
+  analysis (thinking)
 
-If `packages/cli/src/config/settingsSchema.ts` is modified, confirm labels and 
-descriptions follow the [Settings guidelines](./references/settings.md).
+### Structural scannability
+- **The skip test:** Do the first 3 words describe the user’s intent? If not,
+  rewrite.
+- **Goal-first sequence:** Use the template: [To Accomplish X] + [Do Y].
+- **The 5-word rule:** Keep status updates and loading states under 5 words.
+- **Telemetry over etiquette:** Remove polite filler (Please wait, Thank you,
+  Certainly). Replace with raw data or progress indicators.
+- **Micro-state cycles:** For tasks $> 3$ seconds, cycle through specific
+  sub-states (e.g., Parsing logs... ➔ Identifying patterns...) to show momentum.
 
-### Ensure that error messages are actionable by the end user
 
-If a file contains an error message, ensure that it provides actionable
-information to the end user. Review the reference at [error message guidelines](./references/error-messages.md) 
-for more details.
+### Technical accuracy and humility
+- **Verb signal check:** Use deterministic verbs (is, will, must) for system
+  state/infrastructure.
+  - Use probabilistic verbs (suggests, appears, may, identifies) for AI output.
+- **No 100% certainty:** Never attribute absolute certainty to model-generated
+  content.
+- **Precision over fuzziness:** Use technical metrics (latency, tokens, compute) instead of "speed" or "cost."
+- **Instructional warnings:** Every warning must include a specific corrective action (e.g., "Perform a dry-run first" or "Review line 42").
 
-### Ensure consistent use of keyboard shortcuts
-
-Render shortcuts as `Modifier+Key` (for example, `Ctrl+S`). Modifiers and named keys
-(for example, `Enter`, `Tab`, and `Esc`) should be **Title case**; single character
-keys should be **uppercase**. No extra spaces.
-
-- Use `Esc` instead of "Escape".
-- Use `Enter` instead of "Return".
-- Use Unicode symbols (`⇧`, `⏎`) only if there are tight space constraints.
-- If there are space constraints, it is acceptable to use Unicode symbols for
-  modifiers, for example `⇧+K` for `Shift+K`, or `⏎` for `Enter`. 
+### Agentic error recovery
+- **The one-step rule:** Pair every error message with exactly one immediate
+  path to a fix (command, link, or prompt).
+- **Human-first:** Provide a human-readable explanation before machine error
+  codes (e.g., 404, 500).
+-  **Suggested prompts:** Offer specific text for the user to copy/click like
+   “Ask Gemini: 'Explain this port error.'”
 
 ### Use consistent terminology
 
-Ensure all terminology aligns with the project [word list](./references/word-list.md). 
+Ensure all terminology aligns with the project [word
+list](./references/word-list.md). 
 
 If a string uses a term marked "do not use" or "use with caution," provide a
 correction based on the preferred terms.
 
-### Output format
+## Ensure consistent style for settings
+
+If `packages/cli/src/config/settingsSchema.ts` is modified, confirm labels and
+descriptions specifically follow the unique [Settings
+guidelines](./references/settings.md).
+
+## Output format
 When suggesting changes, always present your review using the following list
 format. Do not provide suggestions outside of this list..
 
