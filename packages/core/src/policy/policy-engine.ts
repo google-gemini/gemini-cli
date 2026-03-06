@@ -647,174 +647,68 @@ export class PolicyEngine {
     allToolNames?: Set<string>,
   ): Set<string> {
     const excludedTools = new Set<string>();
-    const processedTools = new Set<string>();
-    let globalVerdict: PolicyDecision | undefined;
 
-    for (const rule of this.rules) {
-      if (rule.argsPattern) {
-        if (rule.toolName && rule.decision !== PolicyDecision.DENY) {
-          processedTools.add(rule.toolName);
-        }
-        continue;
-      }
-
-      // Check if rule applies to current approval mode
-      if (rule.modes && rule.modes.length > 0) {
-        if (!rule.modes.includes(this.approvalMode)) {
-          continue;
-        }
-      }
-
-      // Handle annotation-based rules
-      if (rule.toolAnnotations) {
-        if (!toolMetadata) {
-          // Without metadata, we can't evaluate annotation rules — skip (conservative fallback)
-          continue;
-        }
-        // Iterate over all known tools and check if their annotations match this rule
-        for (const [toolName, annotations] of toolMetadata) {
-          if (processedTools.has(toolName)) {
-            continue;
-          }
-          // Check if annotations match the rule's toolAnnotations (partial match)
-          let annotationsMatch = true;
-          for (const [key, value] of Object.entries(rule.toolAnnotations)) {
-            if (annotations[key] !== value) {
-              annotationsMatch = false;
-              break;
-            }
-          }
-          if (!annotationsMatch) {
-            continue;
-          }
-          // Check if the tool name matches the rule's toolName pattern (if any)
-          let matches = true;
-
-          const rawServerName = annotations['_serverName'];
-          let serverName =
-            typeof rawServerName === 'string' ? rawServerName : undefined;
-
-          if (!serverName && toolName.startsWith(MCP_TOOL_PREFIX)) {
-            const parts = toolName.split('_');
-            if (parts.length >= 3) serverName = parts[1];
-          }
-
-          if (rule.mcpName) {
-            if (rule.mcpName === '*' && serverName === undefined) {
-              matches = false;
-            } else if (rule.mcpName !== '*' && serverName !== rule.mcpName) {
-              matches = false;
-            }
-          }
-
-          if (matches && rule.toolName) {
-            if (isWildcardPattern(rule.toolName)) {
-              if (!matchesWildcard(rule.toolName, toolName, serverName)) {
-                matches = false;
-              }
-            } else if (toolName !== rule.toolName) {
-              matches = false;
-            }
-          }
-
-          if (!matches) {
-            continue;
-          }
-          // Determine decision considering global verdict
-          let decision: PolicyDecision;
-          if (globalVerdict !== undefined) {
-            decision = globalVerdict;
-          } else {
-            decision = rule.decision;
-          }
-          if (decision === PolicyDecision.DENY) {
-            excludedTools.add(toolName);
-          }
-          processedTools.add(toolName);
-        }
-        continue;
-      }
-
-      // Handle Global Rules
-      if (!rule.toolName) {
-        if (globalVerdict === undefined) {
-          globalVerdict = rule.decision;
-          if (globalVerdict !== PolicyDecision.DENY) {
-            // Global ALLOW/ASK found.
-            // Since rules are sorted by priority, this overrides any lower-priority rules.
-            // We can stop processing because nothing else will be excluded.
-            break;
-          }
-          // If Global DENY, we continue to find specific tools to add to excluded set
-        }
-        continue;
-      }
-
-      const toolName = rule.toolName;
-
-      // Check if already processed (exact match)
-      if (processedTools.has(toolName)) {
-        continue;
-      }
-
-      // Check if over-ruled by an mcpName mismatch prior
-      let serverName: string | undefined;
-      // Best-effort extraction since we lack runtime metadata for processed tools list
-      if (toolName.startsWith(MCP_TOOL_PREFIX)) {
-        const parts = toolName.split('_');
-        if (parts.length >= 3) serverName = parts[1];
-      }
-
-      if (rule.mcpName) {
-        if (rule.mcpName === '*' && serverName === undefined) {
-          continue;
-        } else if (rule.mcpName !== '*' && serverName !== rule.mcpName) {
-          continue;
-        }
-      }
-
-      // Check if covered by a processed wildcard
-      let coveredByWildcard = false;
-      for (const processed of processedTools) {
-        if (
-          isWildcardPattern(processed) &&
-          matchesWildcard(processed, toolName, serverName)
-        ) {
-          // It's covered by a higher-priority wildcard rule.
-          // If that wildcard rule resulted in exclusion, this tool should also be excluded.
-          if (excludedTools.has(processed)) {
-            excludedTools.add(toolName);
-          }
-          coveredByWildcard = true;
-          break;
-        }
-      }
-      if (coveredByWildcard) {
-        continue;
-      }
-
-      processedTools.add(toolName);
-
-      // Determine decision
-      let decision: PolicyDecision;
-      if (globalVerdict !== undefined) {
-        decision = globalVerdict;
-      } else {
-        decision = rule.decision;
-      }
-
-      if (decision === PolicyDecision.DENY) {
-        excludedTools.add(toolName);
-      }
+    if (!allToolNames) {
+      return excludedTools;
     }
 
-    // If there's a global DENY and we know all tool names, exclude any tool
-    // that wasn't explicitly allowed by a higher-priority rule.
-    if (globalVerdict === PolicyDecision.DENY && allToolNames) {
-      for (const name of allToolNames) {
-        if (!processedTools.has(name)) {
-          excludedTools.add(name);
+    for (const toolName of allToolNames) {
+      const annotations = toolMetadata?.get(toolName);
+      const rawServerName = annotations?.['_serverName'];
+      const serverName =
+        typeof rawServerName === 'string' ? rawServerName : undefined;
+
+      let staticallyExcluded = false;
+      let matchFound = false;
+
+      // Evaluate rules in priority order (they are already sorted in constructor)
+      for (const rule of this.rules) {
+        // Create a copy of the rule without argsPattern to see if it targets the tool
+        // regardless of the runtime arguments it might receive.
+        const ruleWithoutArgs: PolicyRule = { ...rule, argsPattern: undefined };
+        const toolCall: FunctionCall = { name: toolName, args: {} };
+
+        const appliesToTool = ruleMatches(
+          ruleWithoutArgs,
+          toolCall,
+          undefined, // stringifiedArgs
+          serverName,
+          this.approvalMode,
+          annotations,
+        );
+
+        if (appliesToTool) {
+          if (rule.argsPattern) {
+            // Exclusions only apply statically before arguments are known.
+            if (rule.decision !== PolicyDecision.DENY) {
+              // Conditionally allowed/asked based on args. Therefore NOT statically excluded.
+              staticallyExcluded = false;
+              matchFound = true;
+              break;
+            }
+            // If it's conditionally DENIED based on args, it means it's not unconditionally denied.
+            // We must keep evaluating lower priority rules to see the default/unconditional state.
+            continue;
+          } else {
+            // Unconditional rule for this tool
+            const decision = this.applyNonInteractiveMode(rule.decision);
+            staticallyExcluded = decision === PolicyDecision.DENY;
+            matchFound = true;
+            break;
+          }
         }
+      }
+
+      if (!matchFound) {
+        // Fallback to default decision if no rule matches
+        const defaultDec = this.applyNonInteractiveMode(this.defaultDecision);
+        if (defaultDec === PolicyDecision.DENY) {
+          staticallyExcluded = true;
+        }
+      }
+
+      if (staticallyExcluded) {
+        excludedTools.add(toolName);
       }
     }
 

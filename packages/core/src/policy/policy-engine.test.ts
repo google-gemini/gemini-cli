@@ -2122,6 +2122,8 @@ describe('PolicyEngine', () => {
       rules: PolicyRule[];
       approvalMode?: ApprovalMode;
       nonInteractive?: boolean;
+      allToolNames?: string[];
+      metadata?: Map<string, Record<string, unknown>>;
       expected: string[];
     }
 
@@ -2129,11 +2131,13 @@ describe('PolicyEngine', () => {
       {
         name: 'should return empty set when no rules provided',
         rules: [],
+        allToolNames: ['tool1'],
         expected: [],
       },
       {
         name: 'should apply rules without explicit modes to all modes',
         rules: [{ toolName: 'tool1', decision: PolicyDecision.DENY }],
+        allToolNames: ['tool1', 'tool2'],
         expected: ['tool1'],
       },
       {
@@ -2153,6 +2157,7 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.DEFAULT],
           },
         ],
+        allToolNames: ['tool1'],
         expected: [],
       },
       {
@@ -2169,6 +2174,7 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.DEFAULT],
           },
         ],
+        allToolNames: ['tool1', 'tool2', 'tool3'],
         expected: ['tool1'],
       },
       {
@@ -2187,6 +2193,7 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.DEFAULT],
           },
         ],
+        allToolNames: ['tool1'],
         expected: ['tool1'],
       },
       {
@@ -2205,6 +2212,7 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.DEFAULT],
           },
         ],
+        allToolNames: ['tool1'],
         expected: [],
       },
       {
@@ -2217,7 +2225,8 @@ describe('PolicyEngine', () => {
           },
         ],
         nonInteractive: true,
-        expected: [],
+        allToolNames: ['tool1'],
+        expected: ['tool1'],
       },
       {
         name: 'should ignore rules with argsPattern',
@@ -2229,6 +2238,7 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.DEFAULT],
           },
         ],
+        allToolNames: ['tool1'],
         expected: [],
       },
       {
@@ -2241,6 +2251,7 @@ describe('PolicyEngine', () => {
           },
         ],
         approvalMode: ApprovalMode.PLAN,
+        allToolNames: ['tool1'],
         expected: ['tool1'],
       },
       {
@@ -2253,6 +2264,7 @@ describe('PolicyEngine', () => {
           },
         ],
         approvalMode: ApprovalMode.DEFAULT,
+        allToolNames: ['tool1'],
         expected: [],
       },
       {
@@ -2271,6 +2283,7 @@ describe('PolicyEngine', () => {
           },
         ],
         approvalMode: ApprovalMode.YOLO,
+        allToolNames: ['dangerous-tool', 'safe-tool'],
         expected: [],
       },
       {
@@ -2283,7 +2296,17 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.DEFAULT],
           },
         ],
-        expected: ['mcp_server_*'],
+        allToolNames: [
+          'mcp_server_tool1',
+          'mcp_server_tool2',
+          'mcp_other_tool',
+        ],
+        metadata: new Map([
+          ['mcp_server_tool1', { _serverName: 'server' }],
+          ['mcp_server_tool2', { _serverName: 'server' }],
+          ['mcp_other_tool', { _serverName: 'other' }],
+        ]),
+        expected: ['mcp_server_tool1', 'mcp_server_tool2'],
       },
       {
         name: 'should expand server wildcard for specific tools if already processed',
@@ -2298,12 +2321,17 @@ describe('PolicyEngine', () => {
           {
             toolName: 'mcp_server_tool1',
             mcpName: 'server',
-            decision: PolicyDecision.DENY,
+            decision: PolicyDecision.DENY, // redundant but tests ordering
             priority: 10,
             modes: [ApprovalMode.DEFAULT],
           },
         ],
-        expected: ['mcp_server_*', 'mcp_server_tool1'],
+        allToolNames: ['mcp_server_tool1', 'mcp_server_tool2'],
+        metadata: new Map([
+          ['mcp_server_tool1', { _serverName: 'server' }],
+          ['mcp_server_tool2', { _serverName: 'server' }],
+        ]),
+        expected: ['mcp_server_tool1', 'mcp_server_tool2'],
       },
       {
         name: 'should exclude run_shell_command but NOT write_file in simulated Plan Mode',
@@ -2330,7 +2358,8 @@ describe('PolicyEngine', () => {
             priority: 10,
           },
         ],
-        expected: ['run_shell_command'],
+        allToolNames: ['write_file', 'run_shell_command', 'read_file'],
+        expected: ['run_shell_command', 'read_file'],
       },
       {
         name: 'should NOT exclude tool if covered by a higher priority wildcard ALLOW',
@@ -2350,6 +2379,8 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.DEFAULT],
           },
         ],
+        allToolNames: ['mcp_server_tool1'],
+        metadata: new Map([['mcp_server_tool1', { _serverName: 'server' }]]),
         expected: [],
       },
       {
@@ -2361,41 +2392,63 @@ describe('PolicyEngine', () => {
             priority: 10,
           },
         ],
-        expected: ['*'],
+        allToolNames: ['toolA', 'toolB', 'mcp_server_toolC'],
+        expected: ['toolA', 'toolB', 'mcp_server_toolC'], // all tools denied by *
       },
       {
         name: 'should handle MCP category wildcard *__* in getExcludedTools',
         rules: [
           {
-            toolName: '*__*',
+            toolName: 'mcp_*',
             decision: PolicyDecision.DENY,
             priority: 10,
           },
         ],
-        expected: ['*__*'],
+        allToolNames: ['localTool', 'mcp_myserver_mytool'],
+        metadata: new Map([
+          ['mcp_myserver_mytool', { _serverName: 'myserver' }],
+        ]),
+        expected: ['mcp_myserver_mytool'],
       },
       {
-        name: 'should handle tool wildcard *__search in getExcludedTools',
+        name: 'should handle tool wildcard mcp_server_* in getExcludedTools',
         rules: [
           {
-            toolName: '*__search',
+            toolName: 'mcp_server_*',
             decision: PolicyDecision.DENY,
             priority: 10,
           },
         ],
-        expected: ['*__search'],
+        allToolNames: [
+          'localTool',
+          'mcp_server_search',
+          'mcp_otherserver_read',
+        ],
+        metadata: new Map([
+          ['mcp_server_search', { _serverName: 'server' }],
+          ['mcp_otherserver_read', { _serverName: 'otherserver' }],
+        ]),
+        expected: ['mcp_server_search'],
       },
     ];
 
     it.each(testCases)(
       '$name',
-      ({ rules, approvalMode, nonInteractive, expected }) => {
+      ({
+        rules,
+        approvalMode,
+        nonInteractive,
+        allToolNames,
+        metadata,
+        expected,
+      }) => {
         engine = new PolicyEngine({
           rules,
           approvalMode: approvalMode ?? ApprovalMode.DEFAULT,
           nonInteractive: nonInteractive ?? false,
         });
-        const excluded = engine.getExcludedTools();
+        const toolsSet = allToolNames ? new Set(allToolNames) : undefined;
+        const excluded = engine.getExcludedTools(metadata, toolsSet);
         expect(Array.from(excluded).sort()).toEqual(expected.sort());
       },
     );
@@ -2410,7 +2463,10 @@ describe('PolicyEngine', () => {
           },
         ],
       });
-      const excluded = engine.getExcludedTools();
+      const excluded = engine.getExcludedTools(
+        undefined,
+        new Set(['dangerous_tool']),
+      );
       expect(Array.from(excluded)).toEqual([]);
     });
 
@@ -2428,7 +2484,10 @@ describe('PolicyEngine', () => {
         ['dangerous_tool', { destructiveHint: true }],
         ['safe_tool', { readOnlyHint: true }],
       ]);
-      const excluded = engine.getExcludedTools(metadata);
+      const excluded = engine.getExcludedTools(
+        metadata,
+        new Set(['dangerous_tool', 'safe_tool']),
+      );
       expect(Array.from(excluded)).toEqual(['dangerous_tool']);
     });
 
@@ -2445,7 +2504,10 @@ describe('PolicyEngine', () => {
       const metadata = new Map<string, Record<string, unknown>>([
         ['safe_tool', { readOnlyHint: true }],
       ]);
-      const excluded = engine.getExcludedTools(metadata);
+      const excluded = engine.getExcludedTools(
+        metadata,
+        new Set(['safe_tool']),
+      );
       expect(Array.from(excluded)).toEqual([]);
     });
 
@@ -2462,11 +2524,24 @@ describe('PolicyEngine', () => {
         ],
       });
       const metadata = new Map<string, Record<string, unknown>>([
-        ['mcp_server_dangerous_tool', { destructiveHint: true }],
-        ['mcp_other_dangerous_tool', { destructiveHint: true }],
-        ['mcp_server_safe_tool', { readOnlyHint: true }],
+        [
+          'mcp_server_dangerous_tool',
+          { destructiveHint: true, _serverName: 'server' },
+        ],
+        [
+          'mcp_other_dangerous_tool',
+          { destructiveHint: true, _serverName: 'other' },
+        ],
+        ['mcp_server_safe_tool', { readOnlyHint: true, _serverName: 'server' }],
       ]);
-      const excluded = engine.getExcludedTools(metadata);
+      const excluded = engine.getExcludedTools(
+        metadata,
+        new Set([
+          'mcp_server_dangerous_tool',
+          'mcp_other_dangerous_tool',
+          'mcp_server_safe_tool',
+        ]),
+      );
       expect(Array.from(excluded)).toEqual(['mcp_server_dangerous_tool']);
     });
 
@@ -2527,7 +2602,7 @@ describe('PolicyEngine', () => {
       expect(excluded.has('mcp_my-server_read_mcp_tool')).toBe(false);
     });
 
-    it('should match already-qualified MCP tool names without _serverName', () => {
+    it('should match MCP wildcard rules when explicitly mapped with _serverName', () => {
       engine = new PolicyEngine({
         rules: [
           {
@@ -2548,11 +2623,17 @@ describe('PolicyEngine', () => {
         'mcp_myserver_write_tool',
       ]);
       const toolMetadata = new Map<string, Record<string, unknown>>([
-        ['mcp_myserver_read_tool', { readOnlyHint: true }],
-        ['mcp_myserver_write_tool', { readOnlyHint: false }],
+        [
+          'mcp_myserver_read_tool',
+          { readOnlyHint: true, _serverName: 'myserver' },
+        ],
+        [
+          'mcp_myserver_write_tool',
+          { readOnlyHint: false, _serverName: 'myserver' },
+        ],
       ]);
       const excluded = engine.getExcludedTools(toolMetadata, allToolNames);
-      // Qualified name already contains __, matched directly without _serverName
+      // Qualified name matched using explicit _serverName
       expect(excluded.has('mcp_myserver_read_tool')).toBe(false);
       expect(excluded.has('mcp_myserver_write_tool')).toBe(true);
     });
