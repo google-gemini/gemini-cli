@@ -47,7 +47,10 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
     }
     // Invoke taskkill to ensure the entire tree is terminated and any orphaned descendant processes are reaped.
     try {
-      cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
+      const child = cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
+      child.on('error', () => {
+        // Ignore errors if taskkill fails or is missing on the system to prevent zombie crash
+      });
     } catch {
       // Ignore errors if the process tree is already dead
     }
