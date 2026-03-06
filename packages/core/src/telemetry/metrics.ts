@@ -1396,6 +1396,7 @@ export function recordTokenStorageInitialization(
   if (!tokenStorageTypeCounter || !isMetricsInitialized) return;
   tokenStorageTypeCounter.add(1, {
     ...baseMetricDefinition.getCommonAttributes(config),
+    type: event.type,
     forced: event.forced,
   });
 }
