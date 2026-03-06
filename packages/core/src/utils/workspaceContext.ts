@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { isNodeError } from '../utils/errors.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { debugLogger } from './debugLogger.js';
+import { resolveToRealPath } from './paths.js';
 
 export type Unsubscribe = () => void;
 
@@ -227,22 +227,7 @@ export class WorkspaceContext {
    * if it did exist.
    */
   private fullyResolvedPath(pathToCheck: string): string {
-    try {
-      return fs.realpathSync(path.resolve(this.targetDir, pathToCheck));
-    } catch (e: unknown) {
-      if (
-        isNodeError(e) &&
-        e.code === 'ENOENT' &&
-        e.path &&
-        // realpathSync does not set e.path correctly for symlinks to
-        // non-existent files.
-        !this.isFileSymlink(e.path)
-      ) {
-        // If it doesn't exist, e.path contains the fully resolved path.
-        return e.path;
-      }
-      throw e;
-    }
+    return resolveToRealPath(path.resolve(this.targetDir, pathToCheck));
   }
 
   /**
