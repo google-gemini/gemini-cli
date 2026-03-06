@@ -234,7 +234,7 @@ export class PromptProvider {
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
-    return activeSnippets.getCompressionPrompt();
+    return activeSnippets.getCompressionPrompt(config.getApprovedPlanPath());
   }
 
   private withSection<T>(

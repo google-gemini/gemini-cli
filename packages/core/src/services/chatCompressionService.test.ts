@@ -10,7 +10,7 @@ import {
   findCompressSplitPoint,
   modelStringToModelConfigAlias,
 } from './chatCompressionService.js';
-import type { Content, GenerateContentResponse } from '@google/genai';
+import type { Content, GenerateContentResponse, Part } from '@google/genai';
 import { CompressionStatus } from '../core/turn.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { GeminiChat } from '../core/geminiChat.js';
@@ -189,6 +189,7 @@ describe('ChatCompressionService', () => {
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue(testTempDir),
       },
+      getApprovedPlanPath: vi.fn().mockReturnValue('/path/to/plan.md'),
     } as unknown as Config;
 
     vi.mocked(getInitialChatHistory).mockImplementation(
@@ -353,6 +354,63 @@ describe('ChatCompressionService', () => {
     expect(lastContent?.parts?.[0].text).toContain(
       'A previous <state_snapshot> exists',
     );
+  });
+
+  it('should include the approved plan path in the system instruction', async () => {
+    const planPath = '/custom/plan/path.md';
+    vi.mocked(mockConfig.getApprovedPlanPath).mockReturnValue(planPath);
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+      'gemini-3.1-pro-preview',
+    );
+
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'msg1' }] },
+      { role: 'model', parts: [{ text: 'msg2' }] },
+    ];
+    vi.mocked(mockChat.getHistory).mockReturnValue(history);
+    vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
+
+    await service.compress(
+      mockChat,
+      mockPromptId,
+      false,
+      mockModel,
+      mockConfig,
+      false,
+    );
+
+    const firstCallText = (
+      vi.mocked(mockConfig.getBaseLlmClient().generateContent).mock.calls[0][0]
+        .systemInstruction as Part
+    ).text;
+    expect(firstCallText).toContain('### APPROVED PLAN PRESERVATION');
+    expect(firstCallText).toContain(planPath);
+  });
+
+  it('should not include the approved plan section if no approved plan path exists', async () => {
+    vi.mocked(mockConfig.getApprovedPlanPath).mockReturnValue(undefined);
+
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'msg1' }] },
+      { role: 'model', parts: [{ text: 'msg2' }] },
+    ];
+    vi.mocked(mockChat.getHistory).mockReturnValue(history);
+    vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
+
+    await service.compress(
+      mockChat,
+      mockPromptId,
+      false,
+      mockModel,
+      mockConfig,
+      false,
+    );
+
+    const firstCallText = (
+      vi.mocked(mockConfig.getBaseLlmClient().generateContent).mock.calls[0][0]
+        .systemInstruction as Part
+    ).text;
+    expect(firstCallText).not.toContain('### APPROVED PLAN PRESERVATION');
   });
 
   it('should force compress even if under threshold', async () => {
