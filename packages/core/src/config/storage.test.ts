@@ -13,6 +13,7 @@ vi.unmock('./storageMigration.js');
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import { sessionId as defaultSessionId } from '../utils/session.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -161,10 +162,10 @@ describe('Storage – additional helpers', () => {
     expect(Storage.getGlobalBinDir()).toBe(expected);
   });
 
-  it('getProjectTempPlansDir returns ~/.gemini/tmp/<identifier>/plans when no sessionId is provided', async () => {
+  it('getProjectTempPlansDir returns ~/.gemini/tmp/<identifier>/<defaultSessionId>/plans when no sessionId is provided', async () => {
     await storage.initialize();
     const tempDir = storage.getProjectTempDir();
-    const expected = path.join(tempDir, 'plans');
+    const expected = path.join(tempDir, defaultSessionId, 'plans');
     expect(storage.getProjectTempPlansDir()).toBe(expected);
   });
 

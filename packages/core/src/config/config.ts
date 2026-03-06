@@ -1349,6 +1349,7 @@ export class Config implements McpContext {
 
   setSessionId(sessionId: string): void {
     this.sessionId = sessionId;
+    this.storage.setSessionId(sessionId);
   }
 
   setTerminalBackground(terminalBackground: string | undefined): void {

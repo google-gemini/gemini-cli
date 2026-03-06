@@ -16,6 +16,7 @@ import {
   resolveToRealPath,
   normalizePath,
 } from '../utils/paths.js';
+import { sessionId as defaultSessionId } from '../utils/session.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
 
@@ -28,13 +29,17 @@ export const AUTO_SAVED_POLICY_FILENAME = 'auto-saved.toml';
 
 export class Storage {
   private readonly targetDir: string;
-  private readonly sessionId: string | undefined;
+  private sessionId: string;
   private projectIdentifier: string | undefined;
   private initPromise: Promise<void> | undefined;
   private customPlansDir: string | undefined;
 
-  constructor(targetDir: string, sessionId?: string) {
+  constructor(targetDir: string, sessionId: string = defaultSessionId) {
     this.targetDir = targetDir;
+    this.sessionId = sessionId;
+  }
+
+  setSessionId(sessionId: string): void {
     this.sessionId = sessionId;
   }
 
@@ -280,10 +285,7 @@ export class Storage {
   }
 
   getProjectTempPlansDir(): string {
-    if (this.sessionId) {
-      return path.join(this.getProjectTempDir(), this.sessionId, 'plans');
-    }
-    return path.join(this.getProjectTempDir(), 'plans');
+    return path.join(this.getProjectTempDir(), this.sessionId, 'plans');
   }
 
   getProjectTempTrackerDir(): string {
@@ -311,10 +313,7 @@ export class Storage {
   }
 
   getProjectTempTasksDir(): string {
-    if (this.sessionId) {
-      return path.join(this.getProjectTempDir(), this.sessionId, 'tasks');
-    }
-    return path.join(this.getProjectTempDir(), 'tasks');
+    return path.join(this.getProjectTempDir(), this.sessionId, 'tasks');
   }
 
   async listProjectChatFiles(): Promise<
