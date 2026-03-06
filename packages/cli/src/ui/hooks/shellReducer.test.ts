@@ -11,6 +11,7 @@ import {
   type ShellState,
   type ShellAction,
 } from './shellReducer.js';
+import { MAX_SHELL_OUTPUT_SIZE } from '../constants.js';
 
 describe('shellReducer', () => {
   it('should return the initial state', () => {
@@ -189,5 +190,42 @@ describe('shellReducer', () => {
     const state = shellReducer(registeredState, action);
     expect(state.backgroundShells.has(1001)).toBe(false);
     expect(state.isBackgroundShellVisible).toBe(false); // Auto-hide if last shell
+  });
+
+  it('should truncate shell output when it exceeds MAX_SHELL_OUTPUT_SIZE', () => {
+    // Build an initial output that is already at the limit
+    const initialOutput = 'a'.repeat(MAX_SHELL_OUTPUT_SIZE);
+    const stateWithLargeOutput: ShellState = {
+      ...initialState,
+      isBackgroundShellVisible: false,
+      backgroundShells: new Map([
+        [
+          1001,
+          {
+            pid: 1001,
+            command: 'long-running-cmd',
+            output: initialOutput,
+            isBinary: false,
+            binaryBytesReceived: 0,
+            status: 'running',
+          },
+        ],
+      ]),
+    };
+
+    const newChunk = 'b'.repeat(100);
+    const action: ShellAction = {
+      type: 'APPEND_SHELL_OUTPUT',
+      pid: 1001,
+      chunk: newChunk,
+    };
+
+    const state = shellReducer(stateWithLargeOutput, action);
+    const output = state.backgroundShells.get(1001)?.output as string;
+
+    // Output must not exceed the cap
+    expect(output.length).toBe(MAX_SHELL_OUTPUT_SIZE);
+    // The most recent data (the new chunk) should be at the end
+    expect(output.endsWith(newChunk)).toBe(true);
   });
 });
