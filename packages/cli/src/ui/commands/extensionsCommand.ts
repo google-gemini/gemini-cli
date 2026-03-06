@@ -594,33 +594,53 @@ async function uninstallAction(context: CommandContext, args: string) {
     return;
   }
 
-  const name = args.trim();
-  if (!name) {
+  const uninstallArgs = args.split(' ').filter((value) => value.length > 0);
+  const all = uninstallArgs.includes('--all');
+  const names = uninstallArgs.filter((a) => !a.startsWith('--'));
+
+  if (!all && names.length === 0) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Usage: /extensions uninstall <extension-name>`,
+      text: `Usage: /extensions uninstall <extension-names...>|--all`,
     });
     return;
   }
 
-  context.ui.addItem({
-    type: MessageType.INFO,
-    text: `Uninstalling extension "${name}"...`,
-  });
+  let namesToUninstall: string[] = [];
+  if (all) {
+    namesToUninstall = extensionLoader.getExtensions().map((ext) => ext.name);
+  } else {
+    namesToUninstall = names;
+  }
 
-  try {
-    await extensionLoader.uninstallExtension(name, false);
+  if (namesToUninstall.length === 0) {
     context.ui.addItem({
       type: MessageType.INFO,
-      text: `Extension "${name}" uninstalled successfully.`,
+      text: all ? 'No extensions installed.' : 'No extension name provided.',
     });
-  } catch (error) {
+    return;
+  }
+
+  for (const extensionName of namesToUninstall) {
     context.ui.addItem({
-      type: MessageType.ERROR,
-      text: `Failed to uninstall extension "${name}": ${getErrorMessage(
-        error,
-      )}`,
+      type: MessageType.INFO,
+      text: `Uninstalling extension "${extensionName}"...`,
     });
+
+    try {
+      await extensionLoader.uninstallExtension(extensionName, false);
+      context.ui.addItem({
+        type: MessageType.INFO,
+        text: `Extension "${extensionName}" uninstalled successfully.`,
+      });
+    } catch (error) {
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: `Failed to uninstall extension "${extensionName}": ${getErrorMessage(
+          error,
+        )}`,
+      });
+    }
   }
 }
 

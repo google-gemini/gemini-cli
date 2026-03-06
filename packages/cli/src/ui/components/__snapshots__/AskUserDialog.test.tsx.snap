@@ -11,17 +11,6 @@ Enter to submit · Esc to cancel
 "
 `;
 
-exports[`AskUserDialog > Choice question placeholder > uses default placeholder when not provided 2`] = `
-"Select your preferred language:
-
-  1.  TypeScript
-  2.  JavaScript
-● 3.  Enter a custom value
-
-Enter to submit · Esc to cancel
-"
-`;
-
 exports[`AskUserDialog > Choice question placeholder > uses placeholder for "Other" option when provided 1`] = `
 "Select your preferred language:
 
@@ -33,37 +22,12 @@ Enter to submit · Esc to cancel
 "
 `;
 
-exports[`AskUserDialog > Choice question placeholder > uses placeholder for "Other" option when provided 2`] = `
-"Select your preferred language:
-
-  1.  TypeScript
-  2.  JavaScript
-● 3.  Type another language...
-
-Enter to submit · Esc to cancel
-"
-`;
-
 exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: false) > shows scroll arrows correctly when useAlternateBuffer is false 1`] = `
 "Choose an option
 
 ▲
 ●  1.  Option 1                                                                 
        Description 1                                                            
-   2.  Option 2
-       Description 2
-▼
-
-Enter to select · ↑/↓ to navigate · Esc to cancel
-"
-`;
-
-exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: false) > shows scroll arrows correctly when useAlternateBuffer is false 2`] = `
-"Choose an option
-
-▲
-●  1.  Option 1
-       Description 1
    2.  Option 2
        Description 2
 ▼
@@ -108,82 +72,6 @@ exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: true) > shows scroll
   16.  Enter a custom value
 
 Enter to select · ↑/↓ to navigate · Esc to cancel
-"
-`;
-
-exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: true) > shows scroll arrows correctly when useAlternateBuffer is true 2`] = `
-"Choose an option
-
-●  1.  Option 1
-       Description 1
-   2.  Option 2
-       Description 2
-   3.  Option 3
-       Description 3
-   4.  Option 4
-       Description 4
-   5.  Option 5
-       Description 5
-   6.  Option 6
-       Description 6
-   7.  Option 7
-       Description 7
-   8.  Option 8
-       Description 8
-   9.  Option 9
-       Description 9
-  10.  Option 10
-       Description 10
-  11.  Option 11
-       Description 11
-  12.  Option 12
-       Description 12
-  13.  Option 13
-       Description 13
-  14.  Option 14
-       Description 14
-  15.  Option 15
-       Description 15
-  16.  Enter a custom value
-
-Enter to select · ↑/↓ to navigate · Esc to cancel
-"
-`;
-
-exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: true) > shows scroll arrows correctly when useAlternateBuffer is true 2`] = `
-"
-  ERROR  Text string "                " must be rendered inside <Text> component
-
- file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10
-
- - createTextInstance (file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10)
- -completeWor
-             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
-             ent.js:9082:42)
- -runWithFiberIn
-  EV            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
-                opment.js:1738:13)
- -completeUnitOfW
-  rk             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                 lopment.js:12962:19)
- -performUnitOfW
-  rk            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
-                opment.js:12843:11)
- -workLoopSyn
-             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
-             ent.js:12644:41)
- -renderRootSy
-  c           (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develop
-              ment.js:12624:11)
- -performWorkOnR
-  ot            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
-                opment.js:12135:44)
- -performSyncWorkOn
-  oot              (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.de
-                   velopment.js:2446:7)
- -flushSyncWorkAcrossRoo
-  s_impl                (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconcil
-                        er.development.js:2294:21)
 "
 `;
 
@@ -311,42 +199,5 @@ License → (not answered)
 README → (not answered)
 
 Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel
-"
-`;
-
-exports[`AskUserDialog > shows warning for unanswered questions on Review tab 2`] = `
-"
-  ERROR  Text string "                " must be rendered inside <Text> component
-
- file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10
-
- - createTextInstance (file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10)
- -completeWor
-             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
-             ent.js:9082:42)
- -runWithFiberIn
-  EV            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
-                opment.js:1738:13)
- -completeUnitOfW
-  rk             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
-                 lopment.js:12962:19)
- -performUnitOfW
-  rk            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
-                opment.js:12843:11)
- -workLoopSyn
-             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
-             ent.js:12644:41)
- -renderRootSy
-  c           (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develop
-              ment.js:12624:11)
- -performWorkOnR
-  ot            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
-                opment.js:12135:44)
- -performSyncWorkOn
-  oot              (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.de
-                   velopment.js:2446:7)
- -flushSyncWorkAcrossRoo
-  s_impl                (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconcil
-                        er.development.js:2294:21)
 "
 `;
