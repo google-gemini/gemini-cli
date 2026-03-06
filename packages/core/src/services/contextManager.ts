@@ -13,12 +13,14 @@ import {
   readGeminiMdFiles,
   categorizeAndConcatenate,
   type GeminiFileContent,
+  deduplicatePathsByFileIdentity,
 } from '../utils/memoryDiscovery.js';
 import type { Config } from '../config/config.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 
 export class ContextManager {
   private readonly loadedPaths: Set<string> = new Set();
+  private readonly loadedFileIdentities: Set<string> = new Set();
   private readonly config: Config;
   private globalMemory: string = '';
   private extensionMemory: string = '';
@@ -33,49 +35,61 @@ export class ContextManager {
    */
   async refresh(): Promise<void> {
     this.loadedPaths.clear();
-    const debugMode = this.config.getDebugMode();
+    this.loadedFileIdentities.clear();
 
-    const paths = await this.discoverMemoryPaths(debugMode);
-    const contentsMap = await this.loadMemoryContents(paths, debugMode);
+    const paths = await this.discoverMemoryPaths();
+    const contentsMap = await this.loadMemoryContents(paths);
 
     this.categorizeMemoryContents(paths, contentsMap);
     this.emitMemoryChanged();
   }
 
-  private async discoverMemoryPaths(debugMode: boolean) {
+  private async discoverMemoryPaths() {
     const [global, extension, project] = await Promise.all([
-      getGlobalMemoryPaths(debugMode),
+      getGlobalMemoryPaths(),
       Promise.resolve(
         getExtensionMemoryPaths(this.config.getExtensionLoader()),
       ),
       this.config.isTrustedFolder()
-        ? getEnvironmentMemoryPaths(
-            [...this.config.getWorkspaceContext().getDirectories()],
-            debugMode,
-          )
+        ? getEnvironmentMemoryPaths([
+            ...this.config.getWorkspaceContext().getDirectories(),
+          ])
         : Promise.resolve([]),
     ]);
 
     return { global, extension, project };
   }
 
-  private async loadMemoryContents(
-    paths: { global: string[]; extension: string[]; project: string[] },
-    debugMode: boolean,
-  ) {
-    const allPaths = Array.from(
+  private async loadMemoryContents(paths: {
+    global: string[];
+    extension: string[];
+    project: string[];
+  }) {
+    const allPathsStringDeduped = Array.from(
       new Set([...paths.global, ...paths.extension, ...paths.project]),
     );
 
+    // deduplicate by file identity to handle case-insensitive filesystems
+    const { paths: allPaths, identityMap: pathIdentityMap } =
+      await deduplicatePathsByFileIdentity(allPathsStringDeduped);
+
     const allContents = await readGeminiMdFiles(
       allPaths,
-      debugMode,
       this.config.getImportFormat(),
     );
 
-    this.markAsLoaded(
-      allContents.filter((c) => c.content !== null).map((c) => c.filePath),
-    );
+    const loadedFilePaths = allContents
+      .filter((c) => c.content !== null)
+      .map((c) => c.filePath);
+    this.markAsLoaded(loadedFilePaths);
+
+    // Cache file identities for performance optimization
+    for (const filePath of loadedFilePaths) {
+      const identity = pathIdentityMap.get(filePath);
+      if (identity) {
+        this.loadedFileIdentities.add(identity);
+      }
+    }
 
     return new Map(allContents.map((c) => [c.filePath, c]));
   }
@@ -123,14 +137,22 @@ export class ContextManager {
       accessedPath,
       trustedRoots,
       this.loadedPaths,
-      this.config.getDebugMode(),
+      this.loadedFileIdentities,
     );
 
     if (result.files.length === 0) {
       return '';
     }
 
-    this.markAsLoaded(result.files.map((f) => f.path));
+    const newFilePaths = result.files.map((f) => f.path);
+    this.markAsLoaded(newFilePaths);
+
+    // Cache identities for newly loaded files
+    if (result.fileIdentities) {
+      for (const identity of result.fileIdentities) {
+        this.loadedFileIdentities.add(identity);
+      }
+    }
     return concatenateInstructions(
       result.files.map((f) => ({ filePath: f.path, content: f.content })),
       this.config.getWorkingDir(),

@@ -39,7 +39,6 @@ import { Config, type GeminiCLIExtension } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { SimpleExtensionLoader } from './extensionLoader.js';
 import { CoreEvent, coreEvents } from './events.js';
-import { debugLogger } from './debugLogger.js';
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -129,7 +128,6 @@ describe('memoryDiscovery', () => {
         await loadServerHierarchicalMemory(
           cwd,
           [],
-          false,
           new FileDiscoveryService(projectRoot),
           new SimpleExtensionLoader([]),
           false, // untrusted
@@ -166,7 +164,6 @@ describe('memoryDiscovery', () => {
         await loadServerHierarchicalMemory(
           cwd,
           [],
-          false,
           new FileDiscoveryService(projectRoot),
           new SimpleExtensionLoader([]),
           false, // untrusted
@@ -184,7 +181,6 @@ describe('memoryDiscovery', () => {
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -208,7 +204,6 @@ describe('memoryDiscovery', () => {
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -241,7 +236,6 @@ default context content
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -275,7 +269,6 @@ custom context content
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -313,7 +306,6 @@ cwd context content
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -348,7 +340,6 @@ Subdir custom memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -383,7 +374,6 @@ Src directory memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -430,7 +420,6 @@ Subdir memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -487,7 +476,6 @@ Subdir memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -512,10 +500,6 @@ My code memory
   });
 
   it('should respect the maxDirs parameter during downward scan', async () => {
-    const consoleDebugSpy = vi
-      .spyOn(debugLogger, 'debug')
-      .mockImplementation(() => {});
-
     // Create directories in parallel for better performance
     const dirPromises = Array.from({ length: 2 }, (_, i) =>
       createEmptyDir(path.join(cwd, `deep_dir_${i}`)),
@@ -526,7 +510,6 @@ My code memory
     await loadServerHierarchicalMemory(
       cwd,
       [],
-      true,
       new FileDiscoveryService(projectRoot),
       new SimpleExtensionLoader([]),
       DEFAULT_FOLDER_TRUST,
@@ -539,18 +522,13 @@ My code memory
       1, // maxDirs
     );
 
-    expect(consoleDebugSpy).toHaveBeenCalledWith(
-      expect.stringContaining('[DEBUG] [BfsFileSearch]'),
-      expect.stringContaining('Scanning [1/1]:'),
-    );
-
-    consoleDebugSpy.mockRestore();
+    // Note: bfsFileSearch debug logging is no longer controlled via debugMode parameter
+    // The test verifies maxDirs is respected by checking the result, not debug logs
 
     const result = flattenResult(
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -574,7 +552,6 @@ My code memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([
           {
@@ -609,7 +586,6 @@ Extension memory content
       await loadServerHierarchicalMemory(
         cwd,
         [includedDir],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -647,7 +623,6 @@ included directory memory
       await loadServerHierarchicalMemory(
         cwd,
         createdFiles.map((f) => path.dirname(f)),
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -685,7 +660,6 @@ included directory memory
       await loadServerHierarchicalMemory(
         parentDir,
         [childDir, parentDir], // Deliberately include duplicates
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -864,6 +838,173 @@ included directory memory
     });
   });
 
+  describe('case-insensitive filesystem deduplication', () => {
+    it('should deduplicate files that point to the same inode (same physical file)', async () => {
+      const geminiFile = await createTestFile(
+        path.join(projectRoot, 'gemini.md'),
+        'Project root memory',
+      );
+
+      // create hard link to simulate case-insensitive filesystem behavior
+      const geminiFileLink = path.join(projectRoot, 'GEMINI.md');
+      try {
+        await fsPromises.link(geminiFile, geminiFileLink);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        if (
+          errorMessage.includes('cross-device') ||
+          errorMessage.includes('EXDEV') ||
+          errorMessage.includes('EEXIST')
+        ) {
+          return;
+        }
+        throw error;
+      }
+
+      const stats1 = await fsPromises.lstat(geminiFile);
+      const stats2 = await fsPromises.lstat(geminiFileLink);
+      expect(stats1.ino).toBe(stats2.ino);
+      expect(stats1.dev).toBe(stats2.dev);
+
+      setGeminiMdFilename(['GEMINI.md', 'gemini.md']);
+
+      const result = flattenResult(
+        await loadServerHierarchicalMemory(
+          cwd,
+          [],
+          new FileDiscoveryService(projectRoot),
+          new SimpleExtensionLoader([]),
+          DEFAULT_FOLDER_TRUST,
+        ),
+      );
+
+      expect(result.fileCount).toBe(1);
+      expect(result.filePaths).toHaveLength(1);
+      expect(result.memoryContent).toContain('Project root memory');
+      const contentMatches = result.memoryContent.match(/Project root memory/g);
+      expect(contentMatches).toHaveLength(1);
+
+      try {
+        await fsPromises.unlink(geminiFileLink);
+      } catch {
+        // ignore cleanup errors
+      }
+    });
+
+    it('should handle case where files have different inodes (different files)', async () => {
+      const geminiFileLower = await createTestFile(
+        path.join(projectRoot, 'gemini.md'),
+        'Lowercase file content',
+      );
+      const geminiFileUpper = await createTestFile(
+        path.join(projectRoot, 'GEMINI.md'),
+        'Uppercase file content',
+      );
+
+      const stats1 = await fsPromises.lstat(geminiFileLower);
+      const stats2 = await fsPromises.lstat(geminiFileUpper);
+
+      if (stats1.ino !== stats2.ino || stats1.dev !== stats2.dev) {
+        setGeminiMdFilename(['GEMINI.md', 'gemini.md']);
+
+        const result = flattenResult(
+          await loadServerHierarchicalMemory(
+            cwd,
+            [],
+            new FileDiscoveryService(projectRoot),
+            new SimpleExtensionLoader([]),
+            DEFAULT_FOLDER_TRUST,
+          ),
+        );
+
+        expect(result.fileCount).toBe(2);
+        expect(result.filePaths).toHaveLength(2);
+        expect(result.memoryContent).toContain('Lowercase file content');
+        expect(result.memoryContent).toContain('Uppercase file content');
+      }
+    });
+
+    it("should handle files that cannot be stat'd (missing files)", async () => {
+      await createTestFile(
+        path.join(projectRoot, 'gemini.md'),
+        'Valid file content',
+      );
+
+      setGeminiMdFilename(['gemini.md', 'missing.md']);
+
+      const result = flattenResult(
+        await loadServerHierarchicalMemory(
+          cwd,
+          [],
+          new FileDiscoveryService(projectRoot),
+          new SimpleExtensionLoader([]),
+          DEFAULT_FOLDER_TRUST,
+        ),
+      );
+
+      expect(result.fileCount).toBe(1);
+      expect(result.memoryContent).toContain('Valid file content');
+    });
+
+    it('should deduplicate multiple paths pointing to same file (3+ duplicates)', async () => {
+      const geminiFile = await createTestFile(
+        path.join(projectRoot, 'gemini.md'),
+        'Project root memory',
+      );
+
+      const link1 = path.join(projectRoot, 'GEMINI.md');
+      const link2 = path.join(projectRoot, 'Gemini.md');
+
+      try {
+        await fsPromises.link(geminiFile, link1);
+        await fsPromises.link(geminiFile, link2);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        if (
+          errorMessage.includes('cross-device') ||
+          errorMessage.includes('EXDEV') ||
+          errorMessage.includes('EEXIST')
+        ) {
+          return;
+        }
+        throw error;
+      }
+
+      const stats1 = await fsPromises.lstat(geminiFile);
+      const stats2 = await fsPromises.lstat(link1);
+      const stats3 = await fsPromises.lstat(link2);
+      expect(stats1.ino).toBe(stats2.ino);
+      expect(stats1.ino).toBe(stats3.ino);
+
+      setGeminiMdFilename(['gemini.md', 'GEMINI.md', 'Gemini.md']);
+
+      const result = flattenResult(
+        await loadServerHierarchicalMemory(
+          cwd,
+          [],
+          new FileDiscoveryService(projectRoot),
+          new SimpleExtensionLoader([]),
+          DEFAULT_FOLDER_TRUST,
+        ),
+      );
+
+      expect(result.fileCount).toBe(1);
+      expect(result.filePaths).toHaveLength(1);
+      expect(result.memoryContent).toContain('Project root memory');
+      const contentMatches = result.memoryContent.match(/Project root memory/g);
+      expect(contentMatches).toHaveLength(1);
+
+      try {
+        await fsPromises.unlink(link1);
+        await fsPromises.unlink(link2);
+      } catch {
+        // ignore cleanup errors
+      }
+    });
+  });
+
   describe('loadJitSubdirectoryMemory', () => {
     it('should load JIT memory when target is inside a trusted root', async () => {
       const rootDir = await createEmptyDir(path.join(testRootDir, 'jit_root'));
@@ -937,6 +1078,57 @@ included directory memory
       expect(result.files[0].content).toBe('Subdir content');
     });
 
+    it('should deduplicate files in JIT memory loading (same inode)', async () => {
+      const rootDir = await createEmptyDir(path.join(testRootDir, 'jit_root'));
+      const subDir = await createEmptyDir(path.join(rootDir, 'subdir'));
+      const targetFile = path.join(subDir, 'target.txt');
+
+      const geminiFile = await createTestFile(
+        path.join(subDir, 'gemini.md'),
+        'JIT memory content',
+      );
+
+      const geminiFileLink = path.join(subDir, 'GEMINI.md');
+      try {
+        await fsPromises.link(geminiFile, geminiFileLink);
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        if (
+          errorMessage.includes('cross-device') ||
+          errorMessage.includes('EXDEV') ||
+          errorMessage.includes('EEXIST')
+        ) {
+          return;
+        }
+        throw error;
+      }
+
+      const stats1 = await fsPromises.lstat(geminiFile);
+      const stats2 = await fsPromises.lstat(geminiFileLink);
+      expect(stats1.ino).toBe(stats2.ino);
+
+      setGeminiMdFilename(['gemini.md', 'GEMINI.md']);
+
+      const result = await loadJitSubdirectoryMemory(
+        targetFile,
+        [rootDir],
+        new Set(),
+      );
+
+      expect(result.files).toHaveLength(1);
+      expect(result.files[0].content).toBe('JIT memory content');
+      const contentMatches =
+        result.files[0].content.match(/JIT memory content/g);
+      expect(contentMatches).toHaveLength(1);
+
+      try {
+        await fsPromises.unlink(geminiFileLink);
+      } catch {
+        // ignore cleanup errors
+      }
+    });
+
     it('should use the deepest trusted root when multiple nested roots exist', async () => {
       const outerRoot = await createEmptyDir(path.join(testRootDir, 'outer'));
       const innerRoot = await createEmptyDir(path.join(outerRoot, 'inner'));
@@ -981,7 +1173,6 @@ included directory memory
         config.shouldLoadMemoryFromIncludeDirectories()
           ? config.getWorkspaceContext().getDirectories()
           : [],
-        config.getDebugMode(),
         config.getFileService(),
         config.getExtensionLoader(),
         config.isTrustedFolder(),
@@ -1026,7 +1217,6 @@ included directory memory
     const mockConfig = {
       getWorkingDir: vi.fn().mockReturnValue(cwd),
       shouldLoadMemoryFromIncludeDirectories: vi.fn().mockReturnValue(false),
-      getDebugMode: vi.fn().mockReturnValue(false),
       getFileService: vi
         .fn()
         .mockReturnValue(new FileDiscoveryService(projectRoot)),

@@ -116,14 +116,16 @@ vi.mock('@google/gemini-cli-core', async () => {
       (
         cwd,
         dirs,
-        debug,
         fileService,
         extensionLoader: ExtensionLoader,
+        _folderTrust,
+        _importFormat,
+        _fileFilteringOptions,
         _maxDirs,
       ) => {
-        const extensionPaths = extensionLoader
-          .getExtensions()
-          .flatMap((e) => e.contextFiles);
+        const extensionPaths =
+          extensionLoader?.getExtensions?.()?.flatMap((e) => e.contextFiles) ||
+          [];
         return Promise.resolve({
           memoryContent: extensionPaths.join(',') || '',
           fileCount: extensionPaths?.length || 0,
@@ -847,7 +849,6 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       [],
-      false,
       expect.any(Object),
       expect.any(ExtensionManager),
       true,
@@ -876,7 +877,6 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       [includeDir],
-      false,
       expect.any(Object),
       expect.any(ExtensionManager),
       true,
@@ -904,7 +904,6 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       [],
-      false,
       expect.any(Object),
       expect.any(ExtensionManager),
       true,
