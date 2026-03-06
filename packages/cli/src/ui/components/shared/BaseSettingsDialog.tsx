@@ -210,9 +210,10 @@ export function BaseSettingsDialog({
   ]);
 
   // Internal state
-  const { activeIndex, scrollOffset, moveUp, moveDown } = useSettingsNavigation(
-    { items, maxItemsToShow: effectiveMaxItemsToShow },
-  );
+  const { activeIndex, windowStart, moveUp, moveDown } = useSettingsNavigation({
+    items,
+    maxItemsToShow: effectiveMaxItemsToShow,
+  });
 
   const { editState, editDispatch, startEditing, commitEdit, cursorVisible } =
     useInlineEditBuffer({
@@ -246,8 +247,8 @@ export function BaseSettingsDialog({
 
   // Calculate visible items based on scroll offset
   const visibleItems = items.slice(
-    scrollOffset,
-    scrollOffset + effectiveMaxItemsToShow,
+    windowStart,
+    windowStart + effectiveMaxItemsToShow,
   );
 
   // Show scroll indicators if there are more items than can be displayed
@@ -462,7 +463,7 @@ export function BaseSettingsDialog({
               </Box>
             )}
             {visibleItems.map((item, idx) => {
-              const globalIndex = idx + scrollOffset;
+              const globalIndex = idx + windowStart;
               const isActive =
                 effectiveFocusSection === 'settings' &&
                 activeIndex === globalIndex;

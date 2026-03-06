@@ -13,26 +13,28 @@ export interface UseSettingsNavigationProps {
 
 type NavState = {
   activeItemKey: string | null;
-  scrollOffset: number;
+  windowStart: number;
 };
 
-type NavAction =
-  | { type: 'MOVE_UP' }
-  | { type: 'MOVE_DOWN' }
-  | { type: 'JUMP_TO'; index: number };
+type NavAction = { type: 'MOVE_UP' } | { type: 'MOVE_DOWN' };
 
-function clampScroll(
-  offset: number,
+function calculateSlidingWindow(
+  start: number,
   activeIndex: number,
   itemCount: number,
-  maxItemsToShow: number,
+  windowSize: number,
 ): number {
-  if (activeIndex < offset) {
-    offset = activeIndex;
-  } else if (activeIndex >= offset + maxItemsToShow) {
-    offset = activeIndex - maxItemsToShow + 1;
+  // User moves up above the window start
+  if (activeIndex < start) {
+    start = activeIndex;
+    // User moves down below the window end
+  } else if (activeIndex >= start + windowSize) {
+    start = activeIndex - windowSize + 1;
   }
-  return Math.max(0, Math.min(offset, Math.max(0, itemCount - maxItemsToShow)));
+  // User is inside the window but performed search or terminal resized
+  const maxScroll = Math.max(0, itemCount - windowSize);
+  const bounded = Math.min(start, maxScroll);
+  return Math.max(0, bounded);
 }
 
 function createNavReducer(
@@ -50,8 +52,8 @@ function createNavReducer(
         const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
         return {
           activeItemKey: items[newIndex].key,
-          scrollOffset: clampScroll(
-            state.scrollOffset,
+          windowStart: calculateSlidingWindow(
+            state.windowStart,
             newIndex,
             items.length,
             maxItemsToShow,
@@ -62,20 +64,8 @@ function createNavReducer(
         const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
         return {
           activeItemKey: items[newIndex].key,
-          scrollOffset: clampScroll(
-            state.scrollOffset,
-            newIndex,
-            items.length,
-            maxItemsToShow,
-          ),
-        };
-      }
-      case 'JUMP_TO': {
-        const newIndex = Math.max(0, Math.min(action.index, items.length - 1));
-        return {
-          activeItemKey: items[newIndex].key,
-          scrollOffset: clampScroll(
-            state.scrollOffset,
+          windowStart: calculateSlidingWindow(
+            state.windowStart,
             newIndex,
             items.length,
             maxItemsToShow,
@@ -100,39 +90,35 @@ export function useSettingsNavigation({
 
   const [state, dispatch] = useReducer(reducer, {
     activeItemKey: items[0]?.key ?? null,
-    scrollOffset: 0,
+    windowStart: 0,
   });
 
+  // Retain the proper highlighting when items change (e.g. search)
   const activeIndex = useMemo(() => {
     if (items.length === 0) return 0;
     const idx = items.findIndex((i) => i.key === state.activeItemKey);
     return idx !== -1 ? idx : 0;
   }, [items, state.activeItemKey]);
 
-  const scrollOffset = useMemo(
+  const windowStart = useMemo(
     () =>
-      clampScroll(
-        state.scrollOffset,
+      calculateSlidingWindow(
+        state.windowStart,
         activeIndex,
         items.length,
         maxItemsToShow,
       ),
-    [state.scrollOffset, activeIndex, items.length, maxItemsToShow],
+    [state.windowStart, activeIndex, items.length, maxItemsToShow],
   );
 
   const moveUp = useCallback(() => dispatch({ type: 'MOVE_UP' }), []);
   const moveDown = useCallback(() => dispatch({ type: 'MOVE_DOWN' }), []);
-  const jumpTo = useCallback(
-    (index: number) => dispatch({ type: 'JUMP_TO', index }),
-    [],
-  );
 
   return {
     activeItemKey: state.activeItemKey,
     activeIndex,
-    scrollOffset,
+    windowStart,
     moveUp,
     moveDown,
-    jumpTo,
   };
 }

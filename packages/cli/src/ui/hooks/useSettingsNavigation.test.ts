@@ -24,7 +24,7 @@ describe('useSettingsNavigation', () => {
     );
     expect(result.current.activeIndex).toBe(0);
     expect(result.current.activeItemKey).toBe('a');
-    expect(result.current.scrollOffset).toBe(0);
+    expect(result.current.windowStart).toBe(0);
   });
 
   it('should move down correctly', () => {
@@ -59,7 +59,11 @@ describe('useSettingsNavigation', () => {
       useSettingsNavigation({ items: mockItems, maxItemsToShow: 3 }),
     );
     // Move to last item
-    act(() => result.current.jumpTo(4));
+    // Move to last item (index 4)
+    act(() => result.current.moveDown()); // 1
+    act(() => result.current.moveDown()); // 2
+    act(() => result.current.moveDown()); // 3
+    act(() => result.current.moveDown()); // 4
     expect(result.current.activeIndex).toBe(4);
 
     // Move down once more
@@ -74,10 +78,10 @@ describe('useSettingsNavigation', () => {
 
     act(() => result.current.moveDown()); // index 1
     act(() => result.current.moveDown()); // index 2, still offset 0
-    expect(result.current.scrollOffset).toBe(0);
+    expect(result.current.windowStart).toBe(0);
 
     act(() => result.current.moveDown()); // index 3, offset should be 1
-    expect(result.current.scrollOffset).toBe(1);
+    expect(result.current.windowStart).toBe(1);
   });
 
   it('should adjust scrollOffset when moving up past visible area', () => {
@@ -85,13 +89,15 @@ describe('useSettingsNavigation', () => {
       useSettingsNavigation({ items: mockItems, maxItemsToShow: 3 }),
     );
 
-    act(() => result.current.jumpTo(3)); // offset 1
-    expect(result.current.scrollOffset).toBe(1);
+    act(() => result.current.moveDown()); // 1
+    act(() => result.current.moveDown()); // 2
+    act(() => result.current.moveDown()); // 3
+    expect(result.current.windowStart).toBe(1);
 
     act(() => result.current.moveUp()); // index 2
     act(() => result.current.moveUp()); // index 1, offset should become 1
     act(() => result.current.moveUp()); // index 0, offset should become 0
-    expect(result.current.scrollOffset).toBe(0);
+    expect(result.current.windowStart).toBe(0);
   });
 
   it('should handle item preservation when list filters (Part 1 logic)', () => {
@@ -101,7 +107,8 @@ describe('useSettingsNavigation', () => {
       { initialProps: { list: items } },
     );
 
-    act(() => result.current.jumpTo(2)); // Item 'c'
+    act(() => result.current.moveDown());
+    act(() => result.current.moveDown()); // Item 'c'
     expect(result.current.activeItemKey).toBe('c');
 
     // Filter items but keep 'c'
