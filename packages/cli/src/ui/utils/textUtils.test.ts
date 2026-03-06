@@ -521,6 +521,28 @@ describe('textUtils', () => {
         expect(sanitized.g).toBe(null);
         expect(sanitized.h()).toBe('\u001b[35mpurple\u001b[0m');
       });
+
+      it('should not recurse into large Uint8Array payloads', () => {
+        const bytes = new Uint8Array(2_000_000);
+        bytes.fill(65);
+        const details = {
+          payload: bytes,
+          title: '\u001b[31mimage\u001b[0m',
+        };
+
+        const sanitized = escapeAnsiCtrlCodes(details);
+
+        expect(sanitized).not.toBe(details);
+        expect(sanitized.payload).toBe(bytes);
+        expect(sanitized.title).toBe('\\u001b[31mimage\\u001b[0m');
+      });
+
+      it('should preserve Buffer payload references', () => {
+        const binary = Buffer.from([0x1b, 0x5b, 0x33, 0x31, 0x6d]);
+        const sanitized = escapeAnsiCtrlCodes({ payload: binary });
+
+        expect(sanitized.payload).toBe(binary);
+      });
     });
   });
 });

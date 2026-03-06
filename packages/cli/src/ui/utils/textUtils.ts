@@ -229,6 +229,12 @@ export function escapeAnsiCtrlCodes<T>(obj: T): T {
     return obj;
   }
 
+  // Avoid iterating over every byte index for binary payloads (Buffer/Uint8Array),
+  // which can block the event loop for large inlineData blobs.
+  if (obj instanceof Uint8Array) {
+    return obj;
+  }
+
   if (Array.isArray(obj)) {
     let newArr: unknown[] | null = null;
 
