@@ -795,7 +795,10 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     : undefined;
 
   // Modulo the fixed overflow (overhead + 4 lines reserved for list), use all remaining height.
-  const maxQuestionHeight = listHeight ? Math.max(5, listHeight - 4) : 15;
+  const maxQuestionHeight =
+    question.unconstrainedHeight && listHeight
+      ? Math.max(5, listHeight - 4)
+      : 15;
 
   const questionHeightLimit =
     listHeight && !isAlternateBuffer
