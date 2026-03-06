@@ -11,7 +11,7 @@ import {
   modelStringToModelConfigAlias,
 } from './chatCompressionService.js';
 import type { Content, GenerateContentResponse } from '@google/genai';
-import { CompressionStatus } from '../core/turn.js';
+import { CompressionStatus } from '../core/compression-status.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import type { Config } from '../config/config.js';

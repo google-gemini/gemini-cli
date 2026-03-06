@@ -370,6 +370,8 @@ export class ToolExecutor {
       outputFile,
       contentLength: typeof content === 'string' ? content.length : undefined,
       data: toolResult.data,
+      newHistory: toolResult.newHistory,
+      compressionInfo: toolResult.compressionInfo,
     };
 
     const startTime = 'startTime' in call ? call.startTime : undefined;

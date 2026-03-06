@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Part } from '@google/genai';
+import type { Part, Content } from '@google/genai';
+import { type ChatCompressionInfo } from '../core/compression-status.js';
 import type {
   AnyDeclarativeTool,
   AnyToolInvocation,
@@ -61,6 +62,17 @@ export interface ToolCallResponseInfo {
    * Optional data payload for passing structured information back to the caller.
    */
   data?: Record<string, unknown>;
+
+  /**
+   * Optional new conversation history to replace the current one.
+   * Used for context compression and history restoration.
+   */
+  newHistory?: Content[];
+
+  /**
+   * Optional compression metrics if the tool performed context compression.
+   */
+  compressionInfo?: ChatCompressionInfo;
 }
 
 /** Request to execute another tool immediately after a completed one. */

@@ -91,6 +91,10 @@ export {
   PLAN_MODE_PARAM_REASON,
   EXIT_PLAN_PARAM_PLAN_PATH,
   SKILL_PARAM_NAME,
+  CHECKPOINT_STATE_TOOL_NAME,
+  CHECKPOINT_STATE_PARAM_SUMMARY,
+  COMPRESS_TOOL_NAME,
+  COMPRESS_PARAM_FORCE,
 } from './base-declarations.js';
 
 // Re-export sets for compatibility
@@ -219,6 +223,20 @@ export const ENTER_PLAN_MODE_DEFINITION: ToolDefinition = {
     return DEFAULT_LEGACY_SET.enter_plan_mode;
   },
   overrides: (modelId) => getToolSet(modelId).enter_plan_mode,
+};
+
+export const CHECKPOINT_STATE_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.checkpoint_state;
+  },
+  overrides: (modelId) => getToolSet(modelId).checkpoint_state,
+};
+
+export const COMPRESS_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.compress;
+  },
+  overrides: (modelId) => getToolSet(modelId).compress,
 };
 
 // ============================================================================

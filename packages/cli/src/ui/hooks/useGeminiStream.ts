@@ -1278,10 +1278,22 @@ export const useGeminiStream = (
           case ServerGeminiEventType.ChatCompressed:
             handleChatCompressionEvent(event.value, userMessageTimestamp);
             break;
-          case ServerGeminiEventType.ToolCallConfirmation:
-          case ServerGeminiEventType.ToolCallResponse:
-            // do nothing
+          case ServerGeminiEventType.ToolCallResponse: {
+            const response = event.value;
+            if (response.resultDisplay) {
+              addItem(
+                {
+                  type: MessageType.INFO,
+                  text: typeof response.resultDisplay === 'string' 
+                    ? response.resultDisplay 
+                    : 'Tool execution completed.',
+                },
+                userMessageTimestamp,
+              );
+            }
             break;
+          }
+          case ServerGeminiEventType.ToolCallConfirmation:
           case ServerGeminiEventType.MaxSessionTurns:
             handleMaxSessionTurnsEvent();
             break;

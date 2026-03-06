@@ -33,6 +33,8 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
+import { CheckpointStateTool } from '../tools/checkpoint-state.js';
+import { CompressTool } from '../tools/compress.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
@@ -104,6 +106,8 @@ import {
 } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
+import { ChatCompressionService } from '../services/chatCompressionService.js';
+
 import { TrackerService } from '../services/trackerService.js';
 import type { GenerateContentParameters } from '@google/genai';
 
@@ -155,6 +159,7 @@ import { CheckerRunner } from '../safety/checker-runner.js';
 import { ContextBuilder } from '../safety/context-builder.js';
 import { CheckerRegistry } from '../safety/registry.js';
 import { ConsecaSafetyChecker } from '../safety/conseca/conseca.js';
+import { ContinuityCompressionService } from '../services/continuityCompressionService.js'
 
 export interface AccessibilitySettings {
   /** @deprecated Use ui.loadingPhrases instead. */
@@ -507,6 +512,7 @@ export interface ConfigParameters {
     customIgnoreFilePaths?: string[];
   };
   checkpointing?: boolean;
+  continuousSession?: boolean;
   proxy?: string;
   cwd: string;
   fileDiscoveryService?: FileDiscoveryService;
@@ -663,6 +669,7 @@ export class Config implements McpContext {
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
   private readonly checkpointing: boolean;
+  private readonly continuousSession: boolean;
   private readonly proxy: string | undefined;
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
@@ -798,6 +805,8 @@ export class Config implements McpContext {
   private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
+  private chatCompressionService?: ChatCompressionService;
+  private continuityCompressionService?: ContinuityCompressionService;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
@@ -874,6 +883,7 @@ export class Config implements McpContext {
       customIgnoreFilePaths: params.fileFiltering?.customIgnoreFilePaths ?? [],
     };
     this.checkpointing = params.checkpointing ?? false;
+    this.continuousSession = params.continuousSession ?? false;
     this.proxy = params.proxy;
     this.cwd = params.cwd ?? process.cwd();
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
@@ -1197,6 +1207,8 @@ export class Config implements McpContext {
       this.contextManager = new ContextManager(this);
       await this.contextManager.refresh();
     }
+
+    this.chatCompressionService = new ChatCompressionService();
 
     await this.geminiClient.initialize();
     this.initialized = true;
@@ -1897,6 +1909,22 @@ export class Config implements McpContext {
     return this.contextManager;
   }
 
+  getChatCompressionService(): ChatCompressionService {
+    if (!this.chatCompressionService) {
+      this.chatCompressionService = new ChatCompressionService();
+    }
+    return this.chatCompressionService;
+  }
+
+  getContinuityCompressionService(): ContinuityCompressionService {
+    if (!this.continuityCompressionService) {
+      this.continuityCompressionService = new ContinuityCompressionService(
+        this.getBaseLlmClient(),
+      );
+    }
+    return this.continuityCompressionService;
+  }
+
   isJitContextEnabled(): boolean {
     return this.experimentalJitContext;
   }
@@ -2194,6 +2222,10 @@ export class Config implements McpContext {
     // - Environment variables
     // - CLI arguments
     return [];
+  }
+
+  getContinuousSessionEnabled(): boolean {
+    return this.continuousSession;
   }
 
   getCheckpointingEnabled(): boolean {
@@ -2842,6 +2874,12 @@ export class Config implements McpContext {
     );
     maybeRegister(AskUserTool, () =>
       registry.registerTool(new AskUserTool(this.messageBus)),
+    );
+    maybeRegister(CheckpointStateTool, () =>
+      registry.registerTool(new CheckpointStateTool(this, this.messageBus)),
+    );
+    maybeRegister(CompressTool, () =>
+      registry.registerTool(new CompressTool(this, this.messageBus)),
     );
     if (this.getUseWriteTodos()) {
       maybeRegister(WriteTodosTool, () =>

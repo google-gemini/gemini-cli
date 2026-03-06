@@ -24,12 +24,14 @@ import {
 import { GeminiChat } from './geminiChat.js';
 import type { Config } from '../config/config.js';
 import {
-  CompressionStatus,
   GeminiEventType,
   Turn,
-  type ChatCompressionInfo,
   type ServerGeminiStreamEvent,
 } from './turn.js';
+import {
+  CompressionStatus,
+  type ChatCompressionInfo,
+} from './compression-status.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { DEFAULT_GEMINI_MODEL_AUTO } from '../config/models.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
@@ -51,6 +53,7 @@ import * as policyCatalog from '../availability/policyCatalog.js';
 import { LlmRole, LoopType } from '../telemetry/types.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents } from '../utils/events.js';
+import { COMPRESS_TOOL_NAME } from '../tools/tool-names.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -244,6 +247,13 @@ describe('Gemini Client (client.ts)', () => {
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
       getShowModelInfoInChat: vi.fn().mockReturnValue(false),
       getContinueOnFailedApiCall: vi.fn(),
+      getChatCompressionService: vi
+        .fn()
+        .mockReturnValue(new ChatCompressionService()),
+      getContinuityCompressionService: vi.fn().mockResolvedValue({
+        generateSnapshot: vi.fn().mockResolvedValue('Mock Snapshot'),
+      }),
+      getContinuousSessionEnabled: vi.fn().mockReturnValue(false),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       getIncludeDirectoryTree: vi.fn().mockReturnValue(true),
       storage: {
@@ -251,6 +261,9 @@ describe('Gemini Client (client.ts)', () => {
       },
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getBaseLlmClient: vi.fn().mockReturnValue({
+        generateContent: vi.fn().mockResolvedValue({
+          candidates: [{ content: { parts: [{ text: '{"key": "value"}' }] } }],
+        }),
         generateJson: vi.fn().mockResolvedValue({
           next_speaker: 'user',
           reasoning: 'test',
@@ -390,11 +403,15 @@ describe('Gemini Client (client.ts)', () => {
       }));
 
       client['chat'] = {
-        getHistory: mockGetHistory,
+        getHistory: mockGetHistory.mockReturnValue([]),
         addHistory: vi.fn(),
         setHistory: vi.fn(),
         setTools: vi.fn(),
         getLastPromptTokenCount: vi.fn(),
+        getChatRecordingService: vi.fn().mockReturnValue({
+          getConversation: vi.fn().mockReturnValue(null),
+          getConversationFilePath: vi.fn().mockReturnValue(null),
+        }),
       } as unknown as GeminiChat;
     });
 
@@ -3215,6 +3232,54 @@ ${JSON.stringify(
           'Hi',
         );
       });
+    });
+
+    it('detects a manual compression request from the agent', async () => {
+      // Arrange
+      mockTurnRunFn.mockReturnValue(
+        (async function* () {
+          yield { type: 'content', value: 'Hello' };
+        })(),
+      );
+
+      vi.spyOn(ChatCompressionService.prototype, 'compress').mockResolvedValue({
+        newHistory: [{ role: 'user', parts: [{ text: 'Summary' }] }],
+        info: {
+          originalTokenCount: 1000,
+          newTokenCount: 500,
+          compressionStatus: CompressionStatus.COMPRESSED,
+        },
+      });
+
+      const compressResponse = [
+        {
+          functionResponse: {
+            name: COMPRESS_TOOL_NAME,
+            response: { output: 'Compression requested.' },
+          },
+        },
+      ];
+
+      // Act
+      const stream = client.sendMessageStream(
+        compressResponse,
+        new AbortController().signal,
+        'prompt-id-1',
+      );
+
+      await fromAsync(stream);
+
+      // Assert
+      // Verify that ChatCompressionService.compress was called with force=true
+      expect(ChatCompressionService.prototype.compress).toHaveBeenCalledWith(
+        expect.anything(),
+        'prompt-id-1',
+        false, // force
+        'test-model',
+        expect.anything(),
+        false, // hasFailedCompressionAttempt
+      );
+
     });
   });
 

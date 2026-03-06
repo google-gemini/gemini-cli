@@ -122,3 +122,11 @@ export const EXIT_PLAN_PARAM_PLAN_PATH = 'plan_path';
 // -- enter_plan_mode --
 export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
 export const PLAN_MODE_PARAM_REASON = 'reason';
+
+// -- checkpoint_state --
+export const CHECKPOINT_STATE_TOOL_NAME = 'checkpoint_state';
+export const CHECKPOINT_STATE_PARAM_SUMMARY = 'summary';
+
+// -- compress --
+export const COMPRESS_TOOL_NAME = 'compress';
+export const COMPRESS_PARAM_FORCE = 'force';

@@ -39,6 +39,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
+
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
@@ -206,6 +211,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Large files:** utilize search tools like grep_search and/or read_file called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
+
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -494,6 +504,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
+
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
@@ -661,6 +676,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Large files:** utilize search tools like grep_search and/or read_file called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
+
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -830,6 +850,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
+
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
@@ -951,6 +976,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Large files:** utilize search tools like grep_search and/or read_file called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
+
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -1547,6 +1577,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
+
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
@@ -1711,6 +1746,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
+
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
@@ -1865,6 +1905,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Large files:** utilize search tools like grep_search and/or read_file called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
+
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -2021,6 +2066,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
+
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
@@ -2171,6 +2221,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Large files:** utilize search tools like grep_search and/or read_file called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
+
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -2323,6 +2378,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
+
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
@@ -2465,6 +2525,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Large files:** utilize search tools like grep_search and/or read_file called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
+
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -2615,6 +2680,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Large files:** utilize search tools like grep_search and/or read_file called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
+
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -3008,6 +3078,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
+
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
@@ -3158,6 +3233,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Large files:** utilize search tools like grep_search and/or read_file called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
+
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -3422,6 +3502,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
+
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
@@ -3572,6 +3657,11 @@ Use the following guidelines to optimize your search and read patterns.
 - **Large files:** utilize search tools like grep_search and/or read_file called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
+
+## Intentional Continuity & Context Management
+- **Semantic Checkpointing:** Periodically use the \`checkpoint_state\` tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the \`compress\` tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.
+- **Context Awareness:** You are responsible for maintaining your context health. As history grows, technical noise (like long file reads or repetitive searches) creates **entropy** that degrades your reasoning precision and self-awareness. Signs of degradation include repeating redundant steps, circular reasoning, or experiencing subtle tool parameter errors. You MUST proactively use the "Save-Point" strategy: \`checkpoint_state\` to lock in critical progress and \`compress\` to restore clarity. It is always better to compress "too soon" than to struggle through a foggy context. Do not wait for an overflow; clear the deck as soon as a major sub-task is finished or noise begins to accumulate.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.

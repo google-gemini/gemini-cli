@@ -17,7 +17,7 @@ import {
 } from '@google/genai';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import { CompressionStatus } from '../core/turn.js';
+import { CompressionStatus } from '../core/compression-status.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';

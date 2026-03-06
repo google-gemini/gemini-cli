@@ -18,12 +18,14 @@ import {
   getInitialChatHistory,
 } from '../utils/environmentContext.js';
 import {
-  CompressionStatus,
   Turn,
   GeminiEventType,
   type ServerGeminiStreamEvent,
-  type ChatCompressionInfo,
 } from './turn.js';
+import {
+  CompressionStatus,
+  type ChatCompressionInfo,
+} from './compression-status.js';
 import type { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
@@ -42,7 +44,8 @@ import type {
 } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
-import { ChatCompressionService } from '../services/chatCompressionService.js';
+import type { ChatCompressionService } from '../services/chatCompressionService.js';
+import type { ContinuityCompressionService } from '../services/continuityCompressionService.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logContentRetryFailure,
@@ -92,7 +95,6 @@ export class GeminiClient {
   private sessionTurnCount = 0;
 
   private readonly loopDetector: LoopDetectionService;
-  private readonly compressionService: ChatCompressionService;
   private readonly toolOutputMaskingService: ToolOutputMaskingService;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
@@ -107,11 +109,18 @@ export class GeminiClient {
 
   constructor(private readonly config: Config) {
     this.loopDetector = new LoopDetectionService(config);
-    this.compressionService = new ChatCompressionService();
     this.toolOutputMaskingService = new ToolOutputMaskingService();
     this.lastPromptId = this.config.getSessionId();
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
+  }
+
+  get compressionService(): ChatCompressionService {
+    return this.config.getChatCompressionService();
+  }
+
+  get continuityCompressionService(): ContinuityCompressionService {
+    return this.config.getContinuityCompressionService();
   }
 
   private handleModelChanged = () => {
@@ -735,6 +744,22 @@ export class GeminiClient {
       if (event.type === GeminiEventType.Error) {
         isError = true;
       }
+
+      if (event.type === GeminiEventType.ToolCallResponse) {
+        const toolResponse = event.value;
+        if (toolResponse.newHistory) {
+          this.getChat().replaceHistory(toolResponse.newHistory);
+          // Yield the event so UI knows compression happened
+          yield {
+            type: GeminiEventType.ChatCompressed,
+            value: toolResponse.compressionInfo ?? {
+              originalTokenCount: 0,
+              newTokenCount: 0,
+              compressionStatus: CompressionStatus.COMPRESSED,
+            },
+          };
+        }
+      }
     }
 
     if (loopDetectedAbort) {
@@ -835,7 +860,8 @@ export class GeminiClient {
         }
       }
     }
-    return turn;
+    const turnResult = turn;
+    return turnResult;
   }
 
   async *sendMessageStream(
@@ -1115,6 +1141,7 @@ export class GeminiClient {
       this.config,
       this.hasFailedCompressionAttempt,
     );
+
 
     if (
       info.compressionStatus ===

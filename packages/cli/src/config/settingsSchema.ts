@@ -1846,6 +1846,15 @@ const SETTINGS_SCHEMA = {
           'Enable model steering (user hints) to guide the model during tool execution.',
         showInDialog: true,
       },
+      continuousSession: {
+        type: 'boolean',
+        label: 'Continuous Session',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description: 'Enables tool and prompts for a continuous session effect.',
+        showInDialog: true,
+      },
       directWebFetch: {
         type: 'boolean',
         label: 'Direct Web Fetch',

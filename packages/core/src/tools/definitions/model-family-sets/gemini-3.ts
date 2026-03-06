@@ -73,6 +73,10 @@ import {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
+  CHECKPOINT_STATE_TOOL_NAME,
+  CHECKPOINT_STATE_PARAM_SUMMARY,
+  COMPRESS_TOOL_NAME,
+  COMPRESS_PARAM_FORCE,
 } from '../base-declarations.js';
 import {
   getShellDeclaration,
@@ -709,4 +713,35 @@ The agent did not use the todo list because this task could be completed by a ti
 
   exit_plan_mode: (plansDir) => getExitPlanModeDeclaration(plansDir),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
+
+  checkpoint_state: {
+    name: CHECKPOINT_STATE_TOOL_NAME,
+    description: `Parks the current state of the conversation with a high-fidelity summary provided by you. This summary will be preserved through future compression events, ensuring that critical intent, progress, and technical details are not lost. Use this tool when you have completed a significant sub-task or want to "save" the current context before it gets potentially compressed. Returns the previous summary (if any) to allow for reconciliation.`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [CHECKPOINT_STATE_PARAM_SUMMARY]: {
+          type: 'string',
+          description:
+            'A detailed, structured summary of the current session state, including goals, progress, constraints, and key discoveries.',
+        },
+      },
+      required: [CHECKPOINT_STATE_PARAM_SUMMARY],
+    },
+  },
+
+  compress: {
+    name: COMPRESS_TOOL_NAME,
+    description: `Manually triggers a context compression event. Use this after calling '${CHECKPOINT_STATE_TOOL_NAME}' to ensure your summary is persisted and the context window is cleared of unnecessary details.`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [COMPRESS_PARAM_FORCE]: {
+          type: 'boolean',
+          description: 'Whether to force compression even if under the threshold.',
+          default: true,
+        },
+      },
+    },
+  },
 };

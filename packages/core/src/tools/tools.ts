@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { FunctionDeclaration, PartListUnion } from '@google/genai';
+import type { Content, FunctionDeclaration, PartListUnion } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
 import type { DiffUpdateResult } from '../ide/ide-client.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
@@ -595,6 +595,17 @@ export interface ToolResult {
     name: string;
     args: Record<string, unknown>;
   };
+
+  /**
+   * Optional new conversation history to replace the current one.
+   * Used for context compression and history restoration.
+   */
+  newHistory?: Content[];
+
+  /**
+   * Optional compression metrics if the tool performed context compression.
+   */
+  compressionInfo?: import('../core/compression-status.js').ChatCompressionInfo;
 }
 
 /**

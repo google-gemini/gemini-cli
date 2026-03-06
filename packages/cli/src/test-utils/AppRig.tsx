@@ -680,9 +680,10 @@ export class AppRig {
     await this.waitUntil(
       () => {
         const frame = this.lastFrame;
-        return typeof pattern === 'string'
+        const matched = typeof pattern === 'string'
           ? frame.includes(pattern)
           : pattern.test(frame);
+        return matched;
       },
       {
         timeout,

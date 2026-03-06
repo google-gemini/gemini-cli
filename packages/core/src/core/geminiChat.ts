@@ -261,6 +261,16 @@ export class GeminiChat {
     );
   }
 
+  private continuityAnchor?: string;
+
+  setContinuityAnchor(anchor: string) {
+    this.continuityAnchor = anchor;
+  }
+
+  getContinuityAnchor(): string | undefined {
+    return this.continuityAnchor;
+  }
+
   setSystemInstruction(sysInstr: string) {
     this.systemInstruction = sysInstr;
   }
@@ -687,17 +697,48 @@ export class GeminiChat {
    * @return History contents alternating between user and model for the entire
    * chat session.
    */
+  /**
+   * Replaces the entire conversation history. Use with caution.
+   * This is primarily used for context compression and history restoration.
+   */
+  replaceHistory(newHistory: Content[]): void {
+    validateHistory(newHistory);
+    this.history = [...newHistory];
+    this.lastPromptTokenCount = estimateTokenCountSync(
+      this.history.flatMap((c) => c.parts || []),
+    );
+  }
+
   getHistory(curated: boolean = false): Content[] {
     const history = curated
       ? extractCuratedHistory(this.history)
       : this.history;
-    // Return a shallow copy of the array to prevent callers from mutating
-    // the internal history array (push/pop/splice). Content objects are
-    // shared references — callers MUST NOT mutate them in place.
-    // This replaces a prior structuredClone() which deep-copied the entire
-    // conversation on every call, causing O(n) memory pressure per turn
-    // that compounded into OOM crashes in long-running sessions.
-    return [...history];
+
+    if (!this.continuityAnchor) {
+      return [...history];
+    }
+
+    const anchorText = `<state_checkpoint>\n${this.continuityAnchor}\n</state_checkpoint>`;
+    const baseHistory = [...history];
+
+    if (baseHistory.length > 0 && baseHistory[0].role === 'user') {
+      // Merge into the first user message to preserve role alternation
+      const firstMessage = { ...baseHistory[0] };
+      // Ensure we don't accidentally mutate the original parts array
+      firstMessage.parts = [
+        { text: anchorText },
+        ...(firstMessage.parts || []),
+      ];
+      baseHistory[0] = firstMessage;
+    } else {
+      // Prepend as a new user message
+      baseHistory.unshift({
+        role: 'user',
+        parts: [{ text: anchorText }],
+      });
+    }
+
+    return baseHistory;
   }
 
   /**

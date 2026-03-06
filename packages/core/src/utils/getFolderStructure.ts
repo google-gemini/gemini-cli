@@ -292,6 +292,10 @@ function formatStructure(
 
 // --- Main Exported Function ---
 
+// --- Caching ---
+const structureCache = new Map<string, { result: string; timestamp: number }>();
+const CACHE_TTL_MS = 10000; // 10 seconds
+
 /**
  * Generates a string representation of a directory's structure,
  * limiting the number of items displayed. Ignored folders are shown
@@ -306,6 +310,14 @@ export async function getFolderStructure(
   options?: FolderStructureOptions,
 ): Promise<string> {
   const resolvedPath = path.resolve(directory);
+  const cacheKey = `${resolvedPath}:${JSON.stringify(options || {})}`;
+  const now = Date.now();
+
+  const cached = structureCache.get(cacheKey);
+  if (cached && now - cached.timestamp < CACHE_TTL_MS) {
+    return cached.result;
+  }
+
   const mergedOptions: MergedFolderStructureOptions = {
     maxItems: options?.maxItems ?? MAX_ITEMS,
     ignoredFolders: options?.ignoredFolders ?? DEFAULT_IGNORED_FOLDERS,
@@ -347,7 +359,9 @@ export async function getFolderStructure(
       summary += ` Folders or files indicated with ${TRUNCATION_INDICATOR} contain more items not shown, were ignored, or the display limit (${mergedOptions.maxItems} items) was reached.`;
     }
 
-    return `${summary}\n\n${resolvedPath}${path.sep}\n${structureLines.join('\n')}`;
+    const finalResult = `${summary}\n\n${resolvedPath}${path.sep}\n${structureLines.join('\n')}`;
+    structureCache.set(cacheKey, { result: finalResult, timestamp: now });
+    return finalResult;
   } catch (error: unknown) {
     debugLogger.warn(
       `Error getting folder structure for ${resolvedPath}:`,

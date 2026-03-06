@@ -63,7 +63,7 @@ import {
 } from './types.js';
 import type { AnyDeclarativeTool, AnyToolInvocation } from '../tools/tools.js';
 import type { ToolCallRequestInfo } from '../scheduler/types.js';
-import { CompressionStatus } from '../core/turn.js';
+import { CompressionStatus } from '../core/compression-status.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import type {
   ModelConfigKey,
