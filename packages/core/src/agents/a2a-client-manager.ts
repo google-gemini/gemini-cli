@@ -43,6 +43,15 @@ export type SendMessageResult =
   | TaskStatusUpdateEvent
   | TaskArtifactUpdateEvent;
 
+export interface LoadAgentOptions {
+  /**
+   * Whether the agent card endpoint itself requires authentication.
+   * When false (default), the card is fetched without auth headers to avoid
+   * servers that reject unexpected credentials on the card endpoint.
+   */
+  agentCardRequiresAuth?: boolean;
+}
+
 /**
  * Manages A2A clients and caches loaded agent information.
  * Follows a singleton pattern to ensure a single client instance.
@@ -80,30 +89,38 @@ export class A2AClientManager {
    * @param name The name to assign to the agent.
    * @param agentCardUrl The full URL to the agent's card.
    * @param authHandler Optional authentication handler to use for this agent.
+   * @param loadOptions Optional settings controlling agent loading behavior.
    * @returns The loaded AgentCard.
    */
   async loadAgent(
     name: string,
     agentCardUrl: string,
     authHandler?: AuthenticationHandler,
+    loadOptions?: LoadAgentOptions,
   ): Promise<AgentCard> {
     if (this.clients.has(name) && this.agentCards.has(name)) {
       throw new Error(`Agent with name '${name}' is already loaded.`);
     }
 
-    let fetchImpl: typeof fetch = a2aFetch;
+    // Authenticated fetch for API calls (transports).
+    let authFetch: typeof fetch = a2aFetch;
     if (authHandler) {
-      fetchImpl = createAuthenticatingFetchWithRetry(a2aFetch, authHandler);
+      authFetch = createAuthenticatingFetchWithRetry(a2aFetch, authHandler);
     }
 
-    const resolver = new DefaultAgentCardResolver({ fetchImpl });
+    // Use unauthenticated fetch for the agent card unless explicitly required.
+    // Some servers reject unexpected auth headers on the card endpoint (e.g. 400).
+    const cardFetch =
+      loadOptions?.agentCardRequiresAuth && authHandler ? authFetch : a2aFetch;
+
+    const resolver = new DefaultAgentCardResolver({ fetchImpl: cardFetch });
 
     const options = ClientFactoryOptions.createFrom(
       ClientFactoryOptions.default,
       {
         transports: [
-          new RestTransportFactory({ fetchImpl }),
-          new JsonRpcTransportFactory({ fetchImpl }),
+          new RestTransportFactory({ fetchImpl: authFetch }),
+          new JsonRpcTransportFactory({ fetchImpl: authFetch }),
         ],
         cardResolver: resolver,
       },

@@ -140,7 +140,7 @@ describe('A2AClientManager', () => {
       expect(createAuthenticatingFetchWithRetry).not.toHaveBeenCalled();
     });
 
-    it('should use provided custom authentication handler', async () => {
+    it('should use provided custom authentication handler for transports only', async () => {
       const customAuthHandler = {
         headers: vi.fn(),
         shouldRetryWithHeaders: vi.fn(),
@@ -155,6 +155,37 @@ describe('A2AClientManager', () => {
         expect.anything(),
         customAuthHandler,
       );
+
+      // Card resolver should NOT use the authenticated fetch by default.
+      const resolverInstance = vi.mocked(DefaultAgentCardResolver).mock
+        .instances[0];
+      expect(resolverInstance).toBeDefined();
+      const resolverOptions = vi.mocked(DefaultAgentCardResolver).mock
+        .calls[0][0];
+      expect(resolverOptions?.fetchImpl).not.toBe(authFetchMock);
+    });
+
+    it('should use authenticated fetch for card resolver when agentCardRequiresAuth is true', async () => {
+      const customAuthHandler = {
+        headers: vi.fn(),
+        shouldRetryWithHeaders: vi.fn(),
+      };
+      await manager.loadAgent(
+        'AuthCardAgent',
+        'http://authcard.agent/card',
+        customAuthHandler as unknown as AuthenticationHandler,
+        { agentCardRequiresAuth: true },
+      );
+
+      expect(createAuthenticatingFetchWithRetry).toHaveBeenCalledWith(
+        expect.anything(),
+        customAuthHandler,
+      );
+
+      // Card resolver SHOULD use the authenticated fetch.
+      const resolverOptions = vi.mocked(DefaultAgentCardResolver).mock
+        .calls[0][0];
+      expect(resolverOptions?.fetchImpl).toBe(authFetchMock);
     });
 
     it('should log a debug message upon loading an agent', async () => {

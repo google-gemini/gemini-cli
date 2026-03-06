@@ -430,6 +430,10 @@ export class AgentRegistry {
         remoteDef.name,
         remoteDef.agentCardUrl,
         authHandler,
+        {
+          agentCardRequiresAuth:
+            definition.auth?.agent_card_requires_auth ?? false,
+        },
       );
 
       const userDescription = remoteDef.originalDescription;
