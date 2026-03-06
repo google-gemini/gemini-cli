@@ -62,12 +62,7 @@ async function handleEnable(args: Args): Promise<void> {
 
   if (!result.allowed) {
     if (result.blockType === 'admin') {
-      debugLogger.log(
-        `${RED}Error:${RESET} MCP servers are disabled by administrator.`,
-      );
-    } else {
-      debugLogger.log(`${RED}Error:${RESET} ${result.reason}`);
-    }
+    debugLogger.log(`${RED}Error:${RESET} ${result.reason}`);
     return;
   }
 
