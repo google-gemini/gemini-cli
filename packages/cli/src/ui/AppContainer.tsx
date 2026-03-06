@@ -40,6 +40,7 @@ import {
 import { checkPermissions } from './hooks/atCommandProcessor.js';
 import { MessageType, StreamingState } from './types.js';
 import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
+import { AskUserActionsProvider } from './contexts/AskUserActionsContext.js';
 import {
   type StartupWarning,
   type EditorType,
@@ -2600,11 +2601,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
               startupWarnings: props.startupWarnings || [],
             }}
           >
-            <ToolActionsProvider config={config} toolCalls={allToolCalls}>
-              <ShellFocusContext.Provider value={isFocused}>
-                <App key={`app-${forceRerenderKey}`} />
-              </ShellFocusContext.Provider>
-            </ToolActionsProvider>
+            <AskUserActionsProvider
+              request={null}
+              onSubmit={async () => {}}
+              onCancel={() => {}}
+            >
+              <ToolActionsProvider config={config} toolCalls={allToolCalls}>
+                <ShellFocusContext.Provider value={isFocused}>
+                  <App key={`app-${forceRerenderKey}`} />
+                </ShellFocusContext.Provider>
+              </ToolActionsProvider>
+            </AskUserActionsProvider>
           </AppContext.Provider>
         </ConfigContext.Provider>
       </UIActionsContext.Provider>

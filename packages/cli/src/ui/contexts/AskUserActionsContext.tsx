@@ -5,7 +5,13 @@
  */
 
 import type React from 'react';
-import { createContext, useContext, useMemo } from 'react';
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  useCallback,
+} from 'react';
 import type { Question } from '@google/gemini-cli-core';
 
 export interface AskUserState {
@@ -14,14 +20,12 @@ export interface AskUserState {
 }
 
 interface AskUserActionsContextValue {
-  /** Current ask_user request, or null if no dialog should be shown */
   request: AskUserState | null;
-
-  /** Submit answers - publishes ASK_USER_RESPONSE to message bus */
   submit: (answers: { [questionIndex: string]: string }) => Promise<void>;
-
-  /** Cancel the dialog - clears request state */
   cancel: () => void;
+  inProgressAnswers: Record<string, string>;
+  setInProgressAnswer: (key: string, value: string) => void;
+  clearInProgressAnswers: () => void;
 }
 
 export const AskUserActionsContext =
@@ -39,33 +43,46 @@ export const useAskUserActions = () => {
 
 interface AskUserActionsProviderProps {
   children: React.ReactNode;
-  /** Current ask_user request state (managed by AppContainer) */
   request: AskUserState | null;
-  /** Handler to submit answers */
   onSubmit: (answers: { [questionIndex: string]: string }) => Promise<void>;
-  /** Handler to cancel the dialog */
   onCancel: () => void;
 }
 
-/**
- * Provides ask_user dialog state and actions to child components.
- *
- * State is managed by AppContainer (which subscribes to the message bus)
- * and passed here as props. This follows the same pattern as ToolActionsProvider.
- */
 export const AskUserActionsProvider: React.FC<AskUserActionsProviderProps> = ({
   children,
   request,
   onSubmit,
   onCancel,
 }) => {
+  const [inProgressAnswers, setInProgressAnswersState] = useState<
+    Record<string, string>
+  >({});
+
+  const setInProgressAnswer = useCallback((key: string, value: string) => {
+    setInProgressAnswersState((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
+  const clearInProgressAnswers = useCallback(() => {
+    setInProgressAnswersState({});
+  }, []);
+
   const value = useMemo(
     () => ({
       request,
       submit: onSubmit,
       cancel: onCancel,
+      inProgressAnswers,
+      setInProgressAnswer,
+      clearInProgressAnswers,
     }),
-    [request, onSubmit, onCancel],
+    [
+      request,
+      onSubmit,
+      onCancel,
+      inProgressAnswers,
+      setInProgressAnswer,
+      clearInProgressAnswers,
+    ],
   );
 
   return (

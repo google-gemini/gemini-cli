@@ -31,6 +31,7 @@ import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
 import { RenderInline } from '../utils/InlineMarkdownRenderer.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { UIStateContext } from '../contexts/UIStateContext.js';
+import { useAskUserActions } from '../contexts/AskUserActionsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 
 /** Padding for dialog content to prevent text from touching edges. */
@@ -941,8 +942,28 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       ? uiState?.availableTerminalHeight
       : undefined);
 
-  const [state, dispatch] = useReducer(askUserDialogReducerLogic, initialState);
+  const { inProgressAnswers, setInProgressAnswer, clearInProgressAnswers } =
+    useAskUserActions();
+
+  const [state, dispatch] = useReducer(
+    askUserDialogReducerLogic,
+    undefined,
+    (): AskUserDialogState => ({
+      ...initialState,
+      answers:
+        Object.keys(inProgressAnswers).length > 0
+          ? { ...inProgressAnswers }
+          : {},
+    }),
+  );
   const { answers, isEditingCustomOption, submitted } = state;
+
+  useEffect(() => {
+    if (submitted) return;
+    for (const [key, value] of Object.entries(answers)) {
+      setInProgressAnswer(key, value);
+    }
+  }, [answers, submitted, setInProgressAnswer]);
 
   const reviewTabIndex = questions.length;
   const tabCount =
@@ -972,10 +993,12 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     (key: Key) => {
       if (submitted) return false;
       if (keyMatchers[Command.ESCAPE](key)) {
+        clearInProgressAnswers();
         onCancel();
         return true;
       } else if (keyMatchers[Command.QUIT](key)) {
         if (!isEditingCustomOption) {
+          clearInProgressAnswers();
           onCancel();
         }
         // Return false to let ctrl-C bubble up to AppContainer for exit flow
@@ -983,7 +1006,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       }
       return false;
     },
-    [onCancel, submitted, isEditingCustomOption],
+    [onCancel, submitted, isEditingCustomOption, clearInProgressAnswers],
   );
 
   useKeypress(handleCancel, {
@@ -1025,9 +1048,10 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
 
   useEffect(() => {
     if (submitted) {
+      clearInProgressAnswers();
       onSubmit(answers);
     }
-  }, [submitted, answers, onSubmit]);
+  }, [submitted, answers, onSubmit, clearInProgressAnswers]);
 
   const handleAnswer = useCallback(
     (answer: string) => {

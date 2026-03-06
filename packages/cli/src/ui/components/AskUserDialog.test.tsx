@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { act } from 'react';
+import { act , useState } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { AskUserDialog } from './AskUserDialog.js';
@@ -656,6 +656,63 @@ describe('AskUserDialog', () => {
 
     await waitFor(async () => {
       expect(onSubmit).toHaveBeenCalledWith({ '0': 'Node 20' });
+    });
+  });
+
+  it('restores in-progress text answer after forceRerenderKey remount', async () => {
+    const textQuestion: Question[] = [
+      {
+        question: 'What is your name?',
+        header: 'Name',
+        type: QuestionType.TEXT,
+        placeholder: 'Enter name',
+      },
+    ];
+
+    const onSubmit = vi.fn();
+
+    // Use a wrapper that holds AskUserActionsProvider stable while
+    // allowing the dialog key (simulating forceRerenderKey) to be bumped.
+    let bumpKey: () => void = () => {};
+
+    const Wrapper = () => {
+      const [remountKey, setRemountKey] = useState(0);
+      bumpKey = () => setRemountKey((k) => k + 1);
+      return (
+        <AskUserDialog
+          key={remountKey}
+          questions={textQuestion}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+          width={80}
+        />
+      );
+    };
+
+    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      <Wrapper />,
+      { width: 80 },
+    );
+
+    // Type a partial answer
+    for (const char of 'hello') {
+      writeKey(stdin, char);
+    }
+
+    await waitFor(async () => {
+      await waitUntilReady();
+      expect(lastFrame()).toContain('hello');
+    });
+
+    // Simulate forceRerenderKey bump — remounts dialog, provider stays alive
+    act(() => {
+      bumpKey();
+    });
+
+    // Answer should be restored from context
+    await waitFor(async () => {
+      await waitUntilReady();
+      expect(lastFrame()).toContain('hello');
     });
   });
 
