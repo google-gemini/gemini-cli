@@ -13,18 +13,12 @@ import { ApprovalMode } from '../policy/types.js';
 
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
-<<<<<<< HEAD
-import { DiscoveredMCPTool, MCP_QUALIFIED_NAME_SEPARATOR } from './mcp-tool.js';
-import type { FunctionDeclaration, CallableTool } from '@google/genai';
-import { mcpToTool } from '@google/genai';
-=======
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import {
   mcpToTool,
   type FunctionDeclaration,
   type CallableTool,
 } from '@google/genai';
->>>>>>> 931e668b4 (refactor(core): standardize MCP tool naming to mcp_ FQN format (#21425))
 import { spawn } from 'node:child_process';
 
 import fs from 'node:fs';

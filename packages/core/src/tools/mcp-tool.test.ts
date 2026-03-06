@@ -8,18 +8,12 @@
 import type { Mocked } from 'vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-<<<<<<< HEAD
-import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
-import type { ToolResult } from './tools.js';
-import { ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
-=======
 import {
   DiscoveredMCPTool,
   generateValidName,
   formatMcpToolName,
 } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
 import { ToolConfirmationOutcome, type ToolResult } from './tools.js';
->>>>>>> 931e668b4 (refactor(core): standardize MCP tool naming to mcp_ FQN format (#21425))
 import type { CallableTool, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
 import {

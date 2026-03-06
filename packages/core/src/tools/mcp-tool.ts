@@ -5,7 +5,7 @@
  */
 
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-<<<<<<< HEAD
+import { debugLogger } from '../utils/debugLogger.js';
 import type {
   ToolCallConfirmationDetails,
   ToolInvocation,
@@ -13,9 +13,6 @@ import type {
   ToolResult,
   PolicyUpdateOptions,
 } from './tools.js';
-=======
-import { debugLogger } from '../utils/debugLogger.js';
->>>>>>> 931e668b4 (refactor(core): standardize MCP tool naming to mcp_ FQN format (#21425))
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
