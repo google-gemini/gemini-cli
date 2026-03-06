@@ -121,9 +121,106 @@ describe('partUtils', () => {
       );
     });
 
-    it('should return descriptive string for inlineData part', () => {
+    it('should return descriptive string for inlineData image part without data', () => {
       const part = { inlineData: { mimeType: 'image/png', data: '' } } as Part;
-      expect(partToString(part, verboseOptions)).toBe('<image/png>');
+      expect(partToString(part, verboseOptions)).toBe('[Image: image/png]');
+    });
+
+    it('should show size for inlineData image part with data', () => {
+      // 4 base64 chars = 3 bytes = 3/1024 KB
+      const part = {
+        inlineData: { mimeType: 'image/jpeg', data: 'AAAA' },
+      } as Part;
+      expect(partToString(part, verboseOptions)).toBe(
+        '[Image: image/jpeg, 0.0 KB]',
+      );
+    });
+
+    it('should show size and duration for audio inlineData', () => {
+      // 128 kbps audio: 1280 bytes = 1.25 KB -> duration = 1.25*8/128 = 0.078125s
+      // base64 of 1280 bytes = ceil(1280/3)*4 = 1708 chars (no padding)
+      // Using a simple known value: 'AAAA' = 3 bytes, audio/mp3 @128kbps -> ~0.0s
+      const data = 'A'.repeat(512); // 512 chars -> ~384 bytes -> ~0.375 KB -> ~0.0s audio
+      const part = { inlineData: { mimeType: 'audio/mp3', data } } as Part;
+      const result = partToString(part, verboseOptions);
+      expect(result).toMatch(/^\[Audio: audio\/mp3, \d+\.\d KB, ~\d+\.\ds]$/);
+    });
+
+    it('should show size and duration for video inlineData', () => {
+      const data = 'A'.repeat(1024);
+      const part = { inlineData: { mimeType: 'video/mp4', data } } as Part;
+      const result = partToString(part, verboseOptions);
+      expect(result).toMatch(/^\[Video: video\/mp4, \d+\.\d KB, ~\d+\.\ds]$/);
+    });
+
+    it('should show Document category for application/pdf', () => {
+      const data = 'A'.repeat(256);
+      const part = {
+        inlineData: { mimeType: 'application/pdf', data },
+      } as Part;
+      const result = partToString(part, verboseOptions);
+      expect(result).toMatch(/^\[Document: application\/pdf, \d+\.\d KB]$/);
+    });
+
+    it('should show Text category for text/plain', () => {
+      const data = 'A'.repeat(64);
+      const part = { inlineData: { mimeType: 'text/plain', data } } as Part;
+      const result = partToString(part, verboseOptions);
+      expect(result).toMatch(/^\[Text: text\/plain, \d+\.\d KB]$/);
+    });
+
+    it('should show Binary category for application/octet-stream', () => {
+      const data = 'A'.repeat(128);
+      const part = {
+        inlineData: { mimeType: 'application/octet-stream', data },
+      } as Part;
+      const result = partToString(part, verboseOptions);
+      expect(result).toMatch(
+        /^\[Binary: application\/octet-stream, \d+\.\d KB]$/,
+      );
+    });
+
+    it('should show WAV audio with uncompressed bitrate estimation', () => {
+      const data = 'A'.repeat(1024);
+      const part = { inlineData: { mimeType: 'audio/wav', data } } as Part;
+      const result = partToString(part, verboseOptions);
+      expect(result).toMatch(/^\[Audio: audio\/wav, \d+\.\d KB, ~\d+\.\ds]$/);
+    });
+
+    it('should return descriptive string for fileData with URI and MIME', () => {
+      const part = {
+        fileData: { fileUri: 'gs://my-bucket/clip.mp4', mimeType: 'video/mp4' },
+      } as Part;
+      expect(partToString(part, verboseOptions)).toBe(
+        '[File: gs://my-bucket/clip.mp4, video/mp4]',
+      );
+    });
+
+    it('should return fallback for fileData with only URI', () => {
+      const part = { fileData: { fileUri: 'gs://bucket/file' } } as Part;
+      expect(partToString(part, verboseOptions)).toBe(
+        '[File: gs://bucket/file]',
+      );
+    });
+
+    it('should return [File Data] for empty fileData', () => {
+      const part = { fileData: {} } as Part;
+      expect(partToString(part, verboseOptions)).toBe('[File Data]');
+    });
+
+    it('should show time range for videoMetadata with numeric offsets', () => {
+      // The runtime format can be numeric; we cast through unknown to satisfy TS.
+      const part = {
+        videoMetadata: { startOffset: 10, endOffset: 83 },
+      } as unknown as Part;
+      expect(partToString(part, verboseOptions)).toBe(
+        '[Video Metadata: 0:10–1:23]',
+      );
+    });
+
+    it('should fallback to [Video Metadata] when no offsets', () => {
+      const part = { videoMetadata: {} } as Part;
+      expect(partToString(part, verboseOptions)).toBe('[Video Metadata]');
     });
 
     it('should return an empty string for an unknown part type', () => {
@@ -142,7 +239,7 @@ describe('partUtils', () => {
         ],
       ];
       expect(partToString(parts as Part, verboseOptions)).toBe(
-        'start middle[Function Call: func1] end<audio/mp3>',
+        'start middle[Function Call: func1] end[Audio: audio/mp3]',
       );
     });
   });
