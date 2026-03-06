@@ -956,7 +956,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
 
   // Restore draft state from a previous mount if the same questions are shown
   // (i.e. the component was remounted due to CTRL-Z suspend/resume).
-  const questionsKey = questions[0]?.question ?? '';
+  const questionsKey = JSON.stringify(questions);
   const restoredDraft =
     askUserDraft?.questionsKey === questionsKey ? askUserDraft : null;
 
@@ -1012,8 +1012,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         askUserDraft = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [questionsKey]);
 
   const handleEditingCustomOption = useCallback((isEditing: boolean) => {
     dispatch({ type: 'SET_EDITING_CUSTOM', payload: { isEditing } });
