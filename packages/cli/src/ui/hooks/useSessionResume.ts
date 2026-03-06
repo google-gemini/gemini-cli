@@ -109,12 +109,18 @@ export function useSessionResume({
       !hasLoadedResumedSession.current
     ) {
       hasLoadedResumedSession.current = true;
+      const compressionIndex =
+        resumedSessionData.conversation.lastCompressionIndex;
       const historyData = convertSessionToHistoryFormats(
         resumedSessionData.conversation.messages,
+        compressionIndex,
       );
       void loadHistoryForResume(
         historyData.uiHistory,
-        convertSessionToClientHistory(resumedSessionData.conversation.messages),
+        convertSessionToClientHistory(
+          resumedSessionData.conversation.messages,
+          compressionIndex,
+        ),
         resumedSessionData,
       );
     }

@@ -526,15 +526,31 @@ export class SessionSelector {
 
 /**
  * Converts session/conversation data into UI history format.
+ *
+ * @param messages - The full array of recorded messages.
+ * @param startIndex - If provided, only messages from this index onward are
+ *   converted.  A leading info item is added to indicate earlier history was
+ *   compressed away.
  */
 export function convertSessionToHistoryFormats(
   messages: ConversationRecord['messages'],
+  startIndex?: number,
 ): {
   uiHistory: HistoryItemWithoutId[];
 } {
   const uiHistory: HistoryItemWithoutId[] = [];
+  const hasCompressedHistory =
+    startIndex != null && startIndex > 0 && startIndex < messages.length;
+  const slice = hasCompressedHistory ? messages.slice(startIndex) : messages;
 
-  for (const msg of messages) {
+  if (hasCompressedHistory) {
+    uiHistory.push({
+      type: MessageType.INFO,
+      text: `ℹ️  Earlier history (${startIndex} messages) was compressed. Showing conversation from last compression point.`,
+    });
+  }
+
+  for (const msg of slice) {
     // Add thoughts if present
     if (msg.type === 'gemini' && msg.thoughts && msg.thoughts.length > 0) {
       for (const thought of msg.thoughts) {

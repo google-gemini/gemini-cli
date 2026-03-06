@@ -222,6 +222,7 @@ export async function runNonInteractive({
         await geminiClient.resumeChat(
           convertSessionToClientHistory(
             resumedSessionData.conversation.messages,
+            resumedSessionData.conversation.lastCompressionIndex,
           ),
           resumedSessionData,
         );

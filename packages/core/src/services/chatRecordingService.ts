@@ -104,6 +104,13 @@ export interface ConversationRecord {
   directories?: string[];
   /** The kind of conversation (main agent or subagent) */
   kind?: 'main' | 'subagent';
+  /**
+   * The index into `messages` at which the last compression occurred.
+   * On resume, only messages from this index onward need to be loaded
+   * into the client history / UI — earlier messages were already
+   * summarised and folded into the compressed context.
+   */
+  lastCompressionIndex?: number;
 }
 
 /**
@@ -530,6 +537,25 @@ export class ChatRecordingService {
     const conversation = this.readConversation();
     updateFn(conversation);
     this.writeConversation(conversation);
+  }
+
+  /**
+   * Marks the current end of the messages array as the compression point.
+   * On resume, only messages from this index onward will be loaded.
+   */
+  recordCompressionPoint(): void {
+    if (!this.conversationFile) return;
+
+    try {
+      this.updateConversation((conversation) => {
+        conversation.lastCompressionIndex = conversation.messages.length;
+      });
+    } catch (error) {
+      debugLogger.error(
+        'Error recording compression point in chat history.',
+        error,
+      );
+    }
   }
 
   /**

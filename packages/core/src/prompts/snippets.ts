@@ -138,6 +138,7 @@ export function getCoreSystemPrompt(options: SystemPromptOptions): string {
     options.planningWorkflow
       ? renderPlanningWorkflow(options.planningWorkflow)
       : renderPrimaryWorkflows(options.primaryWorkflows),
+    options.taskTracker ? renderTaskTracker() : '',
     renderOperationalGuidelines(options.operationalGuidelines),
     renderInteractiveYoloMode(options.interactiveYoloMode),
     renderSandbox(options.sandbox),
@@ -149,18 +150,6 @@ export function getCoreSystemPrompt(options: SystemPromptOptions): string {
     .filter((part) => part && part.trim() !== '')
     .join('\n\n')
     .trim();
-}
-
-${options.taskTracker ? renderTaskTracker() : ''}
-
-${renderOperationalGuidelines(options.operationalGuidelines)}
-
-${renderInteractiveYoloMode(options.interactiveYoloMode)}
-
-${renderSandbox(options.sandbox)}
-
-${renderGitRepo(options.gitRepo)}
-`.trim();
 }
 
 /**

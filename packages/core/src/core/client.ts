@@ -1222,6 +1222,11 @@ Do not wait for a reflection cycle if the information is critical for future tur
         // capture current session data before resetting
         const currentRecordingService =
           this.getChat().getChatRecordingService();
+
+        // Mark this point in the recording so resume only loads
+        // messages from here onward (everything before was compressed).
+        currentRecordingService.recordCompressionPoint();
+
         const conversation = currentRecordingService.getConversation();
         const filePath = currentRecordingService.getConversationFilePath();
 

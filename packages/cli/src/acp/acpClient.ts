@@ -358,7 +358,10 @@ export class GeminiAgent {
       config.setFileSystemService(acpFileSystemService);
     }
 
-    const clientHistory = convertSessionToClientHistory(sessionData.messages);
+    const clientHistory = convertSessionToClientHistory(
+      sessionData.messages,
+      sessionData.lastCompressionIndex,
+    );
 
     const geminiClient = config.getGeminiClient();
     await geminiClient.initialize();

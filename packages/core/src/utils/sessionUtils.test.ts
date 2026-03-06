@@ -182,4 +182,70 @@ describe('convertSessionToClientHistory', () => {
       },
     ]);
   });
+
+  describe('startIndex parameter', () => {
+    const messages: ConversationRecord['messages'] = [
+      {
+        id: '1',
+        type: 'user',
+        timestamp: '2024-01-01T10:00:00Z',
+        content: 'First message',
+      },
+      {
+        id: '2',
+        type: 'gemini',
+        timestamp: '2024-01-01T10:01:00Z',
+        content: 'First response',
+      },
+      {
+        id: '3',
+        type: 'user',
+        timestamp: '2024-01-01T10:02:00Z',
+        content: 'Second message',
+      },
+      {
+        id: '4',
+        type: 'gemini',
+        timestamp: '2024-01-01T10:03:00Z',
+        content: 'Second response',
+      },
+    ];
+
+    it('should only convert messages from startIndex onward', () => {
+      const history = convertSessionToClientHistory(messages, 2);
+
+      expect(history).toEqual([
+        { role: 'user', parts: [{ text: 'Second message' }] },
+        { role: 'model', parts: [{ text: 'Second response' }] },
+      ]);
+    });
+
+    it('should convert all messages when startIndex is 0', () => {
+      const history = convertSessionToClientHistory(messages, 0);
+
+      expect(history).toEqual([
+        { role: 'user', parts: [{ text: 'First message' }] },
+        { role: 'model', parts: [{ text: 'First response' }] },
+        { role: 'user', parts: [{ text: 'Second message' }] },
+        { role: 'model', parts: [{ text: 'Second response' }] },
+      ]);
+    });
+
+    it('should convert all messages when startIndex is undefined', () => {
+      const history = convertSessionToClientHistory(messages, undefined);
+
+      expect(history).toEqual([
+        { role: 'user', parts: [{ text: 'First message' }] },
+        { role: 'model', parts: [{ text: 'First response' }] },
+        { role: 'user', parts: [{ text: 'Second message' }] },
+        { role: 'model', parts: [{ text: 'Second response' }] },
+      ]);
+    });
+
+    it('should return empty array when startIndex exceeds messages length', () => {
+      const history = convertSessionToClientHistory(messages, 100);
+
+      expect(history).toEqual([]);
+    });
+  });
 });

@@ -532,6 +532,60 @@ describe('ChatRecordingService', () => {
     });
   });
 
+  describe('recordCompressionPoint', () => {
+    it('should set lastCompressionIndex to the current message count and update on subsequent calls', () => {
+      chatRecordingService.initialize();
+
+      // Record a few messages
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'msg1',
+        model: 'm',
+      });
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'response1',
+        model: 'm',
+      });
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'msg2',
+        model: 'm',
+      });
+
+      // Record compression point
+      chatRecordingService.recordCompressionPoint();
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      let conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+
+      expect(conversation.lastCompressionIndex).toBe(3);
+
+      // Record more messages
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'response2',
+        model: 'm',
+      });
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'msg3',
+        model: 'm',
+      });
+
+      // Record compression point again
+      chatRecordingService.recordCompressionPoint();
+
+      conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+
+      expect(conversation.lastCompressionIndex).toBe(5);
+    });
+  });
+
   describe('ENOSPC (disk full) graceful degradation - issue #16266', () => {
     it('should disable recording and not throw when ENOSPC occurs during initialize', () => {
       const enospcError = new Error('ENOSPC: no space left on device');

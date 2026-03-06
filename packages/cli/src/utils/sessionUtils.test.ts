@@ -10,10 +10,16 @@ import {
   extractFirstUserMessage,
   formatRelativeTime,
   hasUserOrAssistantMessage,
+  convertSessionToHistoryFormats,
   SessionError,
 } from './sessionUtils.js';
-import type { Config, MessageRecord } from '@google/gemini-cli-core';
+import type {
+  Config,
+  MessageRecord,
+  ConversationRecord,
+} from '@google/gemini-cli-core';
 import { SESSION_FILE_PREFIX } from '@google/gemini-cli-core';
+import { MessageType } from '../ui/types.js';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -763,5 +769,82 @@ describe('formatRelativeTime', () => {
     // Just now (within 60 seconds)
     const thirtySecondsAgo = new Date(now.getTime() - 30 * 1000);
     expect(formatRelativeTime(thirtySecondsAgo.toISOString())).toBe('Just now');
+  });
+});
+
+describe('convertSessionToHistoryFormats', () => {
+  const messages: ConversationRecord['messages'] = [
+    {
+      id: '1',
+      type: 'user',
+      timestamp: '2024-01-01T10:00:00Z',
+      content: 'First question',
+    },
+    {
+      id: '2',
+      type: 'gemini',
+      timestamp: '2024-01-01T10:01:00Z',
+      content: 'First answer',
+    },
+    {
+      id: '3',
+      type: 'user',
+      timestamp: '2024-01-01T10:02:00Z',
+      content: 'Second question',
+    },
+    {
+      id: '4',
+      type: 'gemini',
+      timestamp: '2024-01-01T10:03:00Z',
+      content: 'Second answer',
+    },
+  ];
+
+  it('should convert all messages when startIndex is undefined', () => {
+    const { uiHistory } = convertSessionToHistoryFormats(messages);
+
+    expect(uiHistory).toHaveLength(4);
+    expect(uiHistory[0]).toEqual({
+      type: MessageType.USER,
+      text: 'First question',
+    });
+    expect(uiHistory[1]).toEqual({
+      type: MessageType.GEMINI,
+      text: 'First answer',
+    });
+    expect(uiHistory[2]).toEqual({
+      type: MessageType.USER,
+      text: 'Second question',
+    });
+    expect(uiHistory[3]).toEqual({
+      type: MessageType.GEMINI,
+      text: 'Second answer',
+    });
+  });
+
+  it('should show only post-compression messages with a leading info message when startIndex is provided', () => {
+    const { uiHistory } = convertSessionToHistoryFormats(messages, 2);
+
+    // Should have: 1 info message + 2 remaining messages
+    expect(uiHistory).toHaveLength(3);
+
+    // First item is the compression info message
+    expect(uiHistory[0].type).toBe(MessageType.INFO);
+    expect((uiHistory[0] as { type: string; text: string }).text).toContain(
+      '2 messages',
+    );
+    expect((uiHistory[0] as { type: string; text: string }).text).toContain(
+      'compressed',
+    );
+
+    // Remaining items are the post-compression messages
+    expect(uiHistory[1]).toEqual({
+      type: MessageType.USER,
+      text: 'Second question',
+    });
+    expect(uiHistory[2]).toEqual({
+      type: MessageType.GEMINI,
+      text: 'Second answer',
+    });
   });
 });

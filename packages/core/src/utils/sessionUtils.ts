@@ -26,13 +26,22 @@ function ensurePartArray(content: PartListUnion): Part[] {
 
 /**
  * Converts session/conversation data into Gemini client history formats.
+ *
+ * @param messages - The full array of recorded messages.
+ * @param startIndex - If provided, only messages from this index onward are
+ *   converted.  Used on resume to skip pre-compression history.
  */
 export function convertSessionToClientHistory(
   messages: ConversationRecord['messages'],
+  startIndex?: number,
 ): Array<{ role: 'user' | 'model'; parts: Part[] }> {
   const clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }> = [];
+  const slice =
+    startIndex != null && startIndex > 0
+      ? messages.slice(startIndex)
+      : messages;
 
-  for (const msg of messages) {
+  for (const msg of slice) {
     if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
       continue;
     }

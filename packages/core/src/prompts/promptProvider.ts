@@ -178,6 +178,7 @@ export class PromptProvider {
                 approvedPlan: approvedPlanPath
                   ? { path: approvedPlanPath }
                   : undefined,
+                taskTracker: config.isTrackerEnabled(),
               }),
               !isPlanMode,
             ),
@@ -189,6 +190,7 @@ export class PromptProvider {
                   planModeToolsList,
                   plansDir: config.storage.getPlansDir(),
                   approvedPlanPath: config.getApprovedPlanPath(),
+                  taskTracker: config.isTrackerEnabled(),
                 }),
                 isPlanMode,
               )
@@ -200,48 +202,7 @@ export class PromptProvider {
               enableShellEfficiency: config.getEnableShellOutputEfficiency(),
               interactiveShellEnabled: config.isInteractiveShellEnabled(),
             })),
-          skills.length > 0,
-        ),
-        hookContext: isSectionEnabled('hookContext') || undefined,
-        primaryWorkflows: this.withSection(
-          'primaryWorkflows',
-          () => ({
-            interactive: interactiveMode,
-            enableCodebaseInvestigator: enabledToolNames.has(
-              CodebaseInvestigatorAgent.name,
-            ),
-            enableWriteTodosTool: enabledToolNames.has(WRITE_TODOS_TOOL_NAME),
-            enableEnterPlanModeTool: enabledToolNames.has(
-              ENTER_PLAN_MODE_TOOL_NAME,
-            ),
-            enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
-            enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
-            approvedPlan: approvedPlanPath
-              ? { path: approvedPlanPath }
-              : undefined,
-            taskTracker: config.isTrackerEnabled(),
-          }),
-          !isPlanMode,
-        ),
-        planningWorkflow: this.withSection(
-          'planningWorkflow',
-          () => ({
-            planModeToolsList,
-            plansDir: config.storage.getPlansDir(),
-            approvedPlanPath: config.getApprovedPlanPath(),
-            taskTracker: config.isTrackerEnabled(),
-          }),
-          isPlanMode,
-        ),
         taskTracker: config.isTrackerEnabled(),
-        operationalGuidelines: this.withSection(
-          'operationalGuidelines',
-          () => ({
-            interactive: interactiveMode,
-            enableShellEfficiency: config.getEnableShellOutputEfficiency(),
-            interactiveShellEnabled: config.isInteractiveShellEnabled(),
-          }),
-        ),
         sandbox: this.withSection('sandbox', () => getSandboxMode()),
         interactiveYoloMode: this.withSection(
           'interactiveYoloMode',
