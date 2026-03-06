@@ -1041,8 +1041,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.gemmaModelRouter.enabled`** (boolean):
-  - **Description:** Enable the Gemma Model Router. Requires a local endpoint
-    serving Gemma via the Gemini API using LiteRT-LM shim.
+  - **Description:** Enable the Gemma Model Router (experimental). Requires a
+    local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.
   - **Default:** `false`
   - **Requires restart:** Yes
 
