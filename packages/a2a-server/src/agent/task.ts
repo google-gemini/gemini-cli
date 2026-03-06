@@ -37,7 +37,6 @@ import {
   processRestorableToolCalls,
   MessageBusType,
   type ToolCallsUpdateMessage,
-  type SerializableConfirmationDetails,
 } from '@google/gemini-cli-core';
 import {
   type ExecutionEventBus,
@@ -134,7 +133,7 @@ export class Task {
     this.config = config;
 
     if (this.config.isEventDrivenSchedulerEnabled()) {
-      this.scheduler = this._setupEventDrivenScheduler();
+      this.scheduler = this.setupEventDrivenScheduler();
     } else {
       this.scheduler = this.createLegacyScheduler();
     }
@@ -521,132 +520,139 @@ export class Task {
     return scheduler;
   }
 
-  private _setupEventDrivenScheduler(): Scheduler {
+  private setupEventDrivenScheduler(): Scheduler {
     const messageBus = this.config.getMessageBus();
     const scheduler = new Scheduler({
+      schedulerId: this.id,
       config: this.config,
       messageBus,
       getPreferredEditor: () => DEFAULT_GUI_EDITOR,
     });
 
-    messageBus.subscribe(
+    messageBus.subscribe<ToolCallsUpdateMessage>(
       MessageBusType.TOOL_CALLS_UPDATE,
-      (message: unknown) => {
-        const event = message as ToolCallsUpdateMessage;
-        if (event.type !== MessageBusType.TOOL_CALLS_UPDATE) {
-          return;
-        }
-
-        const toolCalls = event.toolCalls;
-
-        toolCalls.forEach((tc) => {
-          const callId = tc.request.callId;
-          const previousStatus = this.pendingToolCalls.get(callId);
-          const hasChanged = previousStatus !== tc.status;
-
-          // 1. Handle Output
-          if (tc.status === 'executing' && tc.liveOutput) {
-            this._schedulerOutputUpdate(callId, tc.liveOutput);
-          }
-
-          // 2. Handle terminal states
-          if (['success', 'error', 'cancelled'].includes(tc.status)) {
-            if (hasChanged) {
-              const completedCall = tc as CompletedToolCall;
-              logger.info(
-                `[Task] Tool call ${callId} completed with status: ${tc.status}`,
-              );
-              this.completedToolCalls.push(completedCall);
-              this._resolveToolCall(callId);
-            }
-          } else {
-            // Keep track of pending tools
-            this._registerToolCall(callId, tc.status);
-          }
-
-          // 3. Handle Confirmation Stash
-          if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
-            // Bridge the new serializable details back to the legacy shape for A2A UI
-            const details =
-              tc.confirmationDetails as SerializableConfirmationDetails;
-
-            if (tc.correlationId) {
-              this.pendingCorrelationIds.set(callId, tc.correlationId);
-            }
-
-            // In A2A, we just need to store the details so the client can fetch them.
-            // The actual confirmation will be handled by _handleToolConfirmationPart
-            // publishing back to the bus using the correlationId.
-            this.pendingToolConfirmationDetails.set(callId, {
-              ...details,
-              // Inject a dummy onConfirm for legacy UI compatibility if needed,
-              // though A2A should use the correlationId-based path now.
-              onConfirm: async () => {},
-            } as ToolCallConfirmationDetails);
-          }
-
-          // 4. Publish Status Updates to A2A event bus
-          if (hasChanged) {
-            const coderAgentMessage: CoderAgentMessage =
-              tc.status === 'awaiting_approval'
-                ? { kind: CoderAgentEvent.ToolCallConfirmationEvent }
-                : { kind: CoderAgentEvent.ToolCallUpdateEvent };
-
-            const message = this.toolStatusMessage(tc, this.id, this.contextId);
-            const statusUpdate = this._createStatusUpdateEvent(
-              this.taskState,
-              coderAgentMessage,
-              message,
-              false,
-            );
-            this.eventBus?.publish(statusUpdate);
-          }
-
-          // 5. Handle Auto-Execution (YOLO)
-          if (
-            tc.status === 'awaiting_approval' &&
-            tc.correlationId &&
-            (this.autoExecute ||
-              this.config.getApprovalMode() === ApprovalMode.YOLO)
-          ) {
-            logger.info(`[Task] Auto-approving tool call ${callId}`);
-            void messageBus.publish({
-              type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-              correlationId: tc.correlationId,
-              confirmed: true,
-              outcome: ToolConfirmationOutcome.ProceedOnce,
-            });
-            this.pendingToolConfirmationDetails.delete(callId);
-          }
-        });
-
-        // 6. Handle Input Required State
-        const allPendingStatuses = Array.from(this.pendingToolCalls.values());
-        const isAwaitingApproval = allPendingStatuses.some(
-          (status) => status === 'awaiting_approval',
-        );
-        const isExecuting = allPendingStatuses.some(
-          (status) => status === 'executing',
-        );
-
-        if (
-          isAwaitingApproval &&
-          !isExecuting &&
-          !this.skipFinalTrueAfterInlineEdit
-        ) {
-          this.skipFinalTrueAfterInlineEdit = false;
-          this.setTaskStateAndPublishUpdate(
-            'input-required',
-            { kind: CoderAgentEvent.StateChangeEvent },
-            undefined,
-            undefined,
-            /*final*/ true,
-          );
-        }
-      },
+      this.handleEventDrivenToolCallsUpdate.bind(this),
     );
 
     return scheduler;
+  }
+
+  private handleEventDrivenToolCallsUpdate(
+    event: ToolCallsUpdateMessage,
+  ): void {
+    if (event.type !== MessageBusType.TOOL_CALLS_UPDATE) {
+      return;
+    }
+
+    const toolCalls = event.toolCalls;
+
+    toolCalls.forEach((tc) => {
+      this.handleEventDrivenToolCall(tc);
+    });
+
+    this.checkInputRequiredState();
+  }
+
+  private handleEventDrivenToolCall(tc: ToolCall): void {
+    const callId = tc.request.callId;
+    const previousStatus = this.pendingToolCalls.get(callId);
+    const hasChanged = previousStatus !== tc.status;
+
+    // 1. Handle Output
+    if (tc.status === 'executing' && tc.liveOutput) {
+      this._schedulerOutputUpdate(callId, tc.liveOutput);
+    }
+
+    // 2. Handle terminal states
+    if (
+      tc.status === 'success' ||
+      tc.status === 'error' ||
+      tc.status === 'cancelled'
+    ) {
+      if (hasChanged) {
+        logger.info(
+          `[Task] Tool call ${callId} completed with status: ${tc.status}`,
+        );
+        this.completedToolCalls.push(tc);
+        this._resolveToolCall(callId);
+      }
+    } else {
+      // Keep track of pending tools
+      this._registerToolCall(callId, tc.status);
+    }
+
+    // 3. Handle Confirmation Stash
+    if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
+      const details = tc.confirmationDetails;
+
+      if (tc.correlationId) {
+        this.pendingCorrelationIds.set(callId, tc.correlationId);
+      }
+
+      this.pendingToolConfirmationDetails.set(callId, {
+        ...details,
+        onConfirm: async () => {},
+      } as ToolCallConfirmationDetails);
+    }
+
+    // 4. Publish Status Updates to A2A event bus
+    if (hasChanged) {
+      const coderAgentMessage: CoderAgentMessage =
+        tc.status === 'awaiting_approval'
+          ? { kind: CoderAgentEvent.ToolCallConfirmationEvent }
+          : { kind: CoderAgentEvent.ToolCallUpdateEvent };
+
+      const message = this.toolStatusMessage(tc, this.id, this.contextId);
+      const statusUpdate = this._createStatusUpdateEvent(
+        this.taskState,
+        coderAgentMessage,
+        message,
+        false,
+      );
+      this.eventBus?.publish(statusUpdate);
+    }
+
+    // 5. Handle Auto-Execution (YOLO)
+    if (
+      tc.status === 'awaiting_approval' &&
+      tc.correlationId &&
+      (this.autoExecute || this.config.getApprovalMode() === ApprovalMode.YOLO)
+    ) {
+      logger.info(`[Task] Auto-approving tool call ${callId}`);
+      void this.config.getMessageBus().publish({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: tc.correlationId,
+        confirmed: true,
+        outcome: ToolConfirmationOutcome.ProceedOnce,
+      });
+      this.pendingToolConfirmationDetails.delete(callId);
+    }
+  }
+
+  private checkInputRequiredState(): void {
+    // 6. Handle Input Required State
+    const allPendingStatuses = Array.from(this.pendingToolCalls.values());
+    const isAwaitingApproval = allPendingStatuses.some(
+      (status) => status === 'awaiting_approval',
+    );
+    const isExecuting = allPendingStatuses.some(
+      (status) => status === 'executing',
+    );
+
+    if (
+      isAwaitingApproval &&
+      !isExecuting &&
+      !this.skipFinalTrueAfterInlineEdit
+    ) {
+      this.skipFinalTrueAfterInlineEdit = false;
+      this.setTaskStateAndPublishUpdate(
+        'input-required',
+        { kind: CoderAgentEvent.StateChangeEvent },
+        undefined,
+        undefined,
+        /*final*/ true,
+      );
+    }
   }
 
   private _pickFields<
@@ -859,11 +865,7 @@ export class Task {
     };
     this.setTaskStateAndPublishUpdate('working', stateChange);
 
-    if (this.scheduler instanceof Scheduler) {
-      await this.scheduler.schedule(updatedRequests, abortSignal);
-    } else {
-      await this.scheduler.schedule(updatedRequests, abortSignal);
-    }
+    await this.scheduler.schedule(updatedRequests, abortSignal);
   }
 
   async acceptAgentMessage(event: ServerGeminiStreamEvent): Promise<void> {
@@ -1051,26 +1053,20 @@ export class Task {
             void this.config.getMessageBus().publish({
               type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
               correlationId,
-              confirmed: confirmationOutcome === ToolConfirmationOutcome.ProceedOnce,
+              confirmed:
+                confirmationOutcome === ToolConfirmationOutcome.ProceedOnce,
               outcome: confirmationOutcome,
               payload,
             });
           } else if (confirmationDetails?.onConfirm) {
             // Fallback for legacy callback-based confirmation
             await confirmationDetails.onConfirm(confirmationOutcome, payload);
-            this.skipFinalTrueAfterInlineEdit = !!payload;
-            try {
-              await confirmationDetails.onConfirm(confirmationOutcome, payload);
-            } finally {
-              // Once confirmationDetails.onConfirm finishes (or fails) with a payload,
-              // reset skipFinalTrueAfterInlineEdit so that external callers receive
-              // their call has been completed.
-              this.skipFinalTrueAfterInlineEdit = false;
-            }
-          } else {
-            await confirmationDetails.onConfirm(confirmationOutcome);
->>>>>>> 1c4335686 (feat(a2a): switch from callback-based to event-driven tool scheduler)
           }
+        } finally {
+          // Once confirmation payload is sent or callback finishes,
+          // reset skipFinalTrueAfterInlineEdit so that external callers receive
+          // their call has been completed.
+          this.skipFinalTrueAfterInlineEdit = false;
         }
       } finally {
         if (gcpProject) {
