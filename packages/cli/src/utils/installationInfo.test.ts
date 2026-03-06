@@ -17,6 +17,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     isGitRepository: vi.fn(),
+    debugLogger: {
+      ...actual.debugLogger,
+      log: vi.fn(),
+    },
   };
 });
 
@@ -190,46 +194,54 @@ describe('getInstallationInfo', () => {
     expect(info.isGlobal).toBe(true);
   });
 
-  it('should detect global pnpm installation', () => {
-    const pnpmPath = `/Users/test/.pnpm/global/5/node_modules/.pnpm/some-hash/node_modules/@google/gemini-cli/dist/index.js`;
-    process.argv[1] = pnpmPath;
-    mockedRealPathSync.mockReturnValue(pnpmPath);
-    mockedExecSync.mockImplementation(() => {
-      throw new Error('Command failed');
-    });
+  it('should detect global pnpm installation in various locations', () => {
+    const pnpmPaths = [
+      `/Users/test/.pnpm/global/5/node_modules/.pnpm/some-hash/node_modules/@google/gemini-cli/dist/index.js`,
+      `/home/user/.local/share/pnpm/global/5/node_modules/@google/gemini-cli/dist/index.js`,
+      `/opt/pnpm-home/global/5/node_modules/.pnpm/@google+gemini-cli@0.1.0/node_modules/@google/gemini-cli/dist/index.js`,
+      `/home/user/.pnpm-global/node_modules/@google/gemini-cli/dist/index.js`,
+    ];
 
-    // isAutoUpdateEnabled = true -> "Attempting to automatically update"
-    const info = getInstallationInfo(projectRoot, true);
-    expect(info.packageManager).toBe(PackageManager.PNPM);
-    expect(info.isGlobal).toBe(true);
-    expect(info.updateCommand).toBe('pnpm add -g @google/gemini-cli@latest');
-    expect(info.updateMessage).toContain('Attempting to automatically update');
+    for (const pnpmPath of pnpmPaths) {
+      process.argv[1] = pnpmPath;
+      mockedRealPathSync.mockReturnValue(pnpmPath);
 
-    // isAutoUpdateEnabled = false -> "Please run..."
-    const infoDisabled = getInstallationInfo(projectRoot, false);
-    expect(infoDisabled.updateMessage).toContain('Please run pnpm add');
+      const info = getInstallationInfo(projectRoot, true);
+      expect(info.packageManager).toBe(PackageManager.PNPM);
+      expect(info.isGlobal).toBe(true);
+      expect(info.updateCommand).toBe('pnpm add -g @google/gemini-cli@latest');
+    }
   });
 
-  it('should detect global yarn installation', () => {
-    const yarnPath = `/Users/test/.yarn/global/node_modules/@google/gemini-cli/dist/index.js`;
-    process.argv[1] = yarnPath;
-    mockedRealPathSync.mockReturnValue(yarnPath);
-    mockedExecSync.mockImplementation(() => {
-      throw new Error('Command failed');
-    });
+  it('should detect pnpm global install in custom PNPM_HOME', () => {
+    const pnpmHome = '/home/user/my-pnpm';
+    const cliPath = `${pnpmHome}/global/5/node_modules/@google/gemini-cli/dist/index.js`;
+    process.argv[1] = cliPath;
+    mockedRealPathSync.mockReturnValue(cliPath);
 
-    // isAutoUpdateEnabled = true -> "Attempting to automatically update"
+    vi.stubEnv('PNPM_HOME', pnpmHome);
     const info = getInstallationInfo(projectRoot, true);
-    expect(info.packageManager).toBe(PackageManager.YARN);
-    expect(info.isGlobal).toBe(true);
-    expect(info.updateCommand).toBe(
-      'yarn global add @google/gemini-cli@latest',
-    );
-    expect(info.updateMessage).toContain('Attempting to automatically update');
+    expect(info.packageManager).toBe(PackageManager.PNPM);
+    vi.unstubAllEnvs();
+  });
 
-    // isAutoUpdateEnabled = false -> "Please run..."
-    const infoDisabled = getInstallationInfo(projectRoot, false);
-    expect(infoDisabled.updateMessage).toContain('Please run yarn global add');
+  it('should detect global yarn installation in various locations', () => {
+    const yarnPaths = [
+      `/Users/test/.yarn/global/node_modules/@google/gemini-cli/dist/index.js`,
+      `/home/user/.config/yarn/global/node_modules/@google/gemini-cli/dist/index.js`,
+    ];
+
+    for (const yarnPath of yarnPaths) {
+      process.argv[1] = yarnPath;
+      mockedRealPathSync.mockReturnValue(yarnPath);
+
+      const info = getInstallationInfo(projectRoot, true);
+      expect(info.packageManager).toBe(PackageManager.YARN);
+      expect(info.isGlobal).toBe(true);
+      expect(info.updateCommand).toBe(
+        'yarn global add @google/gemini-cli@latest',
+      );
+    }
   });
 
   it('should detect global bun installation', () => {

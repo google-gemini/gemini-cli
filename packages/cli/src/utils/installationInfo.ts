@@ -106,9 +106,15 @@ export function getInstallationInfo(
     }
 
     // Check for pnpm
+    const pnpmHome = process.env['PNPM_HOME']?.replace(/\\/g, '/');
     if (
+      (pnpmHome && realPath.includes(pnpmHome)) ||
+
       realPath.includes('/.pnpm/global') ||
-      realPath.includes('/.local/share/pnpm')
+      realPath.includes('/.local/share/pnpm') ||
+      realPath.includes('/pnpm/') ||
+      realPath.includes('/.pnpm/') ||
+      realPath.includes('pnpm-global')
     ) {
       const updateCommand = 'pnpm add -g @google/gemini-cli@latest';
       return {
@@ -122,7 +128,11 @@ export function getInstallationInfo(
     }
 
     // Check for yarn
-    if (realPath.includes('/.yarn/global')) {
+    if (
+      realPath.includes('/.yarn/global') ||
+      realPath.includes('/.config/yarn/global') ||
+      realPath.includes('/yarn/')
+    ) {
       const updateCommand = 'yarn global add @google/gemini-cli@latest';
       return {
         packageManager: PackageManager.YARN,
