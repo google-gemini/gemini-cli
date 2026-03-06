@@ -919,6 +919,32 @@ describe('Session Cleanup', () => {
         ),
       );
     });
+
+    it('should delete the session-specific directory', async () => {
+      const config = createMockConfig();
+      const settings: Settings = {
+        general: {
+          sessionRetention: {
+            enabled: true,
+            maxAge: '1d', // Very short retention to trigger deletion of all but current
+          },
+        },
+      };
+
+      // Mock successful file operations
+      mockFs.access.mockResolvedValue(undefined);
+      mockFs.unlink.mockResolvedValue(undefined);
+      mockFs.rm.mockResolvedValue(undefined);
+
+      await cleanupExpiredSessions(config, settings);
+
+      // Verify that fs.rm was called with the session directory for the deleted session that has sessionInfo
+      // recent456 should be deleted and its directory removed
+      expect(mockFs.rm).toHaveBeenCalledWith(
+        path.join('/tmp/test-project', 'recent456'),
+        expect.objectContaining({ recursive: true, force: true }),
+      );
+    });
   });
 
   describe('parseRetentionPeriod format validation', () => {
