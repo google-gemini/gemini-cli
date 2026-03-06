@@ -23,7 +23,6 @@ and parameters.
 
 | Argument | Type              | Description                                                                                                        |
 | -------- | ----------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `query`  | string (variadic) | Positional prompt. Defaults to one-shot mode. Use `-i/--prompt-interactive` to execute and continue interactively. |
 | `query`  | string (variadic) | Positional prompt. Defaults to interactive mode in a TTY. Use `-p/--prompt` for non-interactive execution.         |
 
 ## CLI Options
