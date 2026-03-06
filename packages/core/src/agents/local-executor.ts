@@ -19,6 +19,7 @@ import { ToolRegistry } from '../tools/tool-registry.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
+import { type Message } from '../confirmation-bus/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
@@ -113,10 +114,37 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     runtimeContext: Config,
     onActivity?: ActivityCallback,
   ): Promise<LocalAgentExecutor<TOutput>> {
+    const parentMessageBus = runtimeContext.getMessageBus();
+
+    // Create a proxy to inject the subagent name into tool confirmation requests
+    const subagentMessageBus = new Proxy(parentMessageBus, {
+      get(
+        target: typeof parentMessageBus,
+        prop: string | symbol,
+        receiver: unknown,
+      ) {
+        if (prop === 'publish') {
+          return async (message: Message) => {
+            if (message.type === 'tool-confirmation-request') {
+              return target.publish({
+                ...message,
+                subagent: definition.name,
+              });
+            }
+            return target.publish(message);
+          };
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const value = Reflect.get(target, prop, receiver);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+
     // Create an isolated tool registry for this agent instance.
     const agentToolRegistry = new ToolRegistry(
       runtimeContext,
-      runtimeContext.getMessageBus(),
+      subagentMessageBus,
     );
     const parentToolRegistry = runtimeContext.getToolRegistry();
     const allAgentNames = new Set(

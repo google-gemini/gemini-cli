@@ -27,6 +27,7 @@ describe('agent-scheduler', () => {
     mockMessageBus = {} as Mocked<MessageBus>;
     mockToolRegistry = {
       getTool: vi.fn(),
+      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
     } as unknown as Mocked<ToolRegistry>;
     mockConfig = {
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),

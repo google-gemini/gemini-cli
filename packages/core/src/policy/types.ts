@@ -111,6 +111,12 @@ export interface PolicyRule {
   toolName?: string;
 
   /**
+   * The name of the subagent this rule applies to.
+   * If undefined, the rule applies regardless of whether it's the main agent or a subagent.
+   */
+  subagent?: string;
+
+  /**
    * Pattern to match against tool arguments.
    * Can be used for more fine-grained control.
    */

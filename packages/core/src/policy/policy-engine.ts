@@ -103,10 +103,18 @@ function ruleMatches(
   serverName: string | undefined,
   currentApprovalMode: ApprovalMode,
   toolAnnotations?: Record<string, unknown>,
+  subagent?: string,
 ): boolean {
   // Check if rule applies to current approval mode
   if (rule.modes && rule.modes.length > 0) {
     if (!rule.modes.includes(currentApprovalMode)) {
+      return false;
+    }
+  }
+
+  // Check subagent if specified (only for PolicyRule, SafetyCheckerRule doesn't have it)
+  if ('subagent' in rule && rule.subagent) {
+    if (rule.subagent !== subagent) {
       return false;
     }
   }
@@ -370,6 +378,7 @@ export class PolicyEngine {
     toolCall: FunctionCall,
     serverName: string | undefined,
     toolAnnotations?: Record<string, unknown>,
+    subagent?: string,
   ): Promise<CheckResult> {
     let stringifiedArgs: string | undefined;
     // Compute stringified args once before the loop
@@ -429,6 +438,7 @@ export class PolicyEngine {
           serverName,
           this.approvalMode,
           toolAnnotations,
+          subagent,
         ),
       );
 
@@ -495,6 +505,7 @@ export class PolicyEngine {
             serverName,
             this.approvalMode,
             toolAnnotations,
+            subagent,
           )
         ) {
           debugLogger.debug(
