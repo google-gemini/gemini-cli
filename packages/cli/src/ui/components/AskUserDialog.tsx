@@ -12,7 +12,6 @@ import {
   useEffect,
   useReducer,
   useContext,
-  useState,
 } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
@@ -783,8 +782,6 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     }
   }, [customOptionText, isCustomOptionSelected, question.multiSelect]);
 
-  const [actualQuestionHeight, setActualQuestionHeight] = useState(0);
-
   const HEADER_HEIGHT = progressHeader ? 2 : 0;
   const TITLE_MARGIN = 1;
   const FOOTER_HEIGHT = 2; // DialogFooter + margin
@@ -794,38 +791,19 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     ? Math.max(1, availableHeight - overhead)
     : undefined;
 
-  const idealOptionsHeight = selectionItems.reduce(
-    (acc, item) => acc + (item.value.description ? 2 : 1),
-    0,
-  );
-
-  // Use remaining height for the question, reserving space for the options list
-  const maxQuestionHeight =
-    question.unconstrainedHeight && listHeight
-      ? Math.max(5, listHeight - Math.min(idealOptionsHeight, 10))
-      : 15;
+  const minListHeight = 6; // Reserve ~6 lines for options list to avoid squishing
 
   const questionHeightLimit =
     listHeight && !isAlternateBuffer
-      ? Math.min(maxQuestionHeight, listHeight)
+      ? question.unconstrainedHeight
+        ? Math.max(1, listHeight - minListHeight)
+        : Math.min(15, Math.max(1, listHeight - DIALOG_PADDING))
       : undefined;
 
-  let maxItemsToShow = selectionItems.length;
-  if (listHeight && actualQuestionHeight) {
-    const remainingHeight = Math.max(0, listHeight - actualQuestionHeight);
-    let linesUsed = 0;
-    let itemsThatFit = 0;
-    for (const item of selectionItems) {
-      const itemLines = item.value.description ? 2 : 1;
-      if (linesUsed + itemLines <= remainingHeight) {
-        linesUsed += itemLines;
-        itemsThatFit++;
-      } else {
-        break;
-      }
-    }
-    maxItemsToShow = Math.max(1, itemsThatFit);
-  }
+  const maxItemsToShow =
+    listHeight && questionHeightLimit
+      ? Math.max(1, Math.floor((listHeight - questionHeightLimit) / 2))
+      : selectionItems.length;
 
   return (
     <Box flexDirection="column">
@@ -835,7 +813,6 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
           maxHeight={questionHeightLimit}
           maxWidth={availableWidth}
           overflowDirection="bottom"
-          onHeightChange={setActualQuestionHeight}
         >
           <Box flexDirection="column">
             <MarkdownDisplay
