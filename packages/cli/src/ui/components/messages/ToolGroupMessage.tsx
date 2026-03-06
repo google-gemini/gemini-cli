@@ -84,12 +84,14 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const config = useConfig();
   const {
     constrainHeight,
+    copyModeEnabled,
     activePtyId,
     embeddedShellFocused,
     backgroundShells,
     pendingHistoryItems,
   } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
+  const hideFrames = isAlternateBuffer && copyModeEnabled;
 
   const { borderColor, borderDimColor } = useMemo(
     () =>
@@ -251,6 +253,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           borderColor,
           borderDimColor,
           isExpandable,
+          hideFrame: hideFrames,
         };
 
         return (
@@ -267,14 +270,14 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             )}
             {tool.outputFile && (
               <Box
-                borderLeft={true}
-                borderRight={true}
+                borderLeft={!hideFrames}
+                borderRight={!hideFrames}
                 borderTop={false}
                 borderBottom={false}
                 borderColor={borderColor}
                 borderDimColor={borderDimColor}
                 flexDirection="column"
-                borderStyle="round"
+                borderStyle={hideFrames ? undefined : 'round'}
                 paddingLeft={1}
                 paddingRight={1}
               >
@@ -297,13 +300,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           <Box
             height={0}
             width={contentWidth}
-            borderLeft={true}
-            borderRight={true}
+            borderLeft={!hideFrames}
+            borderRight={!hideFrames}
             borderTop={false}
             borderBottom={borderBottomOverride ?? true}
             borderColor={borderColor}
             borderDimColor={borderDimColor}
-            borderStyle="round"
+            borderStyle={hideFrames ? undefined : 'round'}
           />
         )
       }

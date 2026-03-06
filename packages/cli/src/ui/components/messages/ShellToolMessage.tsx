@@ -62,6 +62,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   isExpandable,
 
   originalRequestName,
+  hideFrame = false,
 }) => {
   const {
     activePtyId: activeShellPtyId,
@@ -123,6 +124,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         isFirst={isFirst}
         borderColor={borderColor}
         borderDimColor={borderDimColor}
+        hideFrame={hideFrame}
         containerRef={headerRef}
       >
         <ToolStatusIndicator
@@ -150,13 +152,13 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
       <Box
         ref={contentRef}
         width={terminalWidth}
-        borderStyle="round"
+        borderStyle={hideFrame ? undefined : 'round'}
         borderColor={borderColor}
         borderDimColor={borderDimColor}
         borderTop={false}
         borderBottom={false}
-        borderLeft={true}
-        borderRight={true}
+        borderLeft={!hideFrame}
+        borderRight={!hideFrame}
         paddingX={1}
         flexDirection="column"
       >
