@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { ToolEditConfirmationDetails, ToolResult } from './tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
   ToolConfirmationOutcome,
+  type ToolEditConfirmationDetails,
+  type ToolResult,
 } from './tools.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';

@@ -34,6 +34,7 @@ export const MainContent = () => {
 
   const confirmingTool = useConfirmingTool();
   const showConfirmationQueue = confirmingTool !== null;
+  const confirmingToolCallId = confirmingTool?.tool.callId;
 
   const scrollableListRef = useRef<VirtualizedListRef<unknown>>(null);
 
@@ -41,7 +42,7 @@ export const MainContent = () => {
     if (showConfirmationQueue) {
       scrollableListRef.current?.scrollToEnd();
     }
-  }, [showConfirmationQueue, confirmingTool]);
+  }, [showConfirmationQueue, confirmingToolCallId]);
 
   const {
     pendingHistoryItems,

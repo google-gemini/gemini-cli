@@ -22,8 +22,13 @@ vi.mock('../semantic-colors.js', async (importOriginal) => {
     ...original,
     theme: {
       ...original.theme,
+      background: {
+        ...original.theme.background,
+        focus: '#004000',
+      },
       ui: {
         ...original.theme.ui,
+        focus: '#00ff00',
         gradient: [], // Empty array to potentially trigger the crash
       },
     },
