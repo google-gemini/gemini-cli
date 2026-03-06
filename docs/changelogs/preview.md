@@ -33,17 +33,21 @@ npm install -g @google/gemini-cli@preview
   version v0.33.0-preview.3 and create version 0.33.0-preview.4 by
   @gemini-cli-robot in
   [#21349](https://github.com/google-gemini/gemini-cli/pull/21349)
-
-* fix(patch): cherry-pick 173376b to release/v0.33.0-preview.1-pr-21157 to patch
+- fix(patch): cherry-pick 0135b03 to release/v0.33.0-preview.2-pr-21171
+  [CONFLICTS] by @gemini-cli-robot in
+  [#21336](https://github.com/google-gemini/gemini-cli/pull/21336)
+- fix(patch): cherry-pick 173376b to release/v0.33.0-preview.1-pr-21157 to patch
   version v0.33.0-preview.1 and create version 0.33.0-preview.2 by
   @gemini-cli-robot in
   [#21300](https://github.com/google-gemini/gemini-cli/pull/21300)
-
+- fix(patch): cherry-pick 173376b to release/v0.33.0-preview.1-pr-21157 to patch
+  version v0.33.0-preview.1 and create version 0.33.0-preview.2 by
+  @gemini-cli-robot in
+  [#21300](https://github.com/google-gemini/gemini-cli/pull/21300)
 - fix(patch): cherry-pick 0659ad1 to release/v0.33.0-preview.0-pr-21042 to patch
   version v0.33.0-preview.0 and create version 0.33.0-preview.1 by
   @gemini-cli-robot in
   [#21047](https://github.com/google-gemini/gemini-cli/pull/21047)
-
 - Docs: Update model docs to remove Preview Features. by @jkcinouye in
   [#20084](https://github.com/google-gemini/gemini-cli/pull/20084)
 - docs: fix typo in installation documentation by @AdityaSharma-Git3207 in
