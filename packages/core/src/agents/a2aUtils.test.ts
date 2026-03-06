@@ -14,6 +14,7 @@ import {
   normalizeAgentCard,
   getGrpcCredentials,
   pinUrlToIp,
+  splitAgentCardUrl,
 } from './a2aUtils.js';
 import type { SendMessageResult } from './a2a-client-manager.js';
 import type {
@@ -422,6 +423,60 @@ describe('a2aUtils', () => {
       expect(normalized.additionalInterfaces?.[0].url).toBe(
         'http://127.0.0.1:8080',
       );
+    });
+
+    it('should NOT override existing transport if protocolBinding is also present', () => {
+      const raw = {
+        name: 'priority-test',
+        supportedInterfaces: [
+          { url: 'foo', transport: 'GRPC', protocolBinding: 'REST' },
+        ],
+      };
+      const normalized = normalizeAgentCard(raw);
+      expect(normalized.additionalInterfaces?.[0].transport).toBe('GRPC');
+    });
+  });
+
+  describe('splitAgentCardUrl', () => {
+    const standard = '.well-known/agent-card.json';
+
+    it('should return baseUrl as-is if it does not end with standard path', () => {
+      const url = 'http://localhost:9001/custom/path';
+      expect(splitAgentCardUrl(url)).toEqual({ baseUrl: url });
+    });
+
+    it('should split correctly if URL ends with standard path', () => {
+      const url = `http://localhost:9001/${standard}`;
+      expect(splitAgentCardUrl(url)).toEqual({
+        baseUrl: 'http://localhost:9001/',
+        path: undefined,
+      });
+    });
+
+    it('should handle trailing slash in baseUrl when splitting', () => {
+      const url = `http://example.com/api/${standard}`;
+      expect(splitAgentCardUrl(url)).toEqual({
+        baseUrl: 'http://example.com/api/',
+        path: undefined,
+      });
+    });
+
+    it('should ignore hashes and query params when splitting', () => {
+      const url = `http://localhost:9001/${standard}?foo=bar#baz`;
+      expect(splitAgentCardUrl(url)).toEqual({
+        baseUrl: 'http://localhost:9001/',
+        path: undefined,
+      });
+    });
+
+    it('should return original URL if parsing fails', () => {
+      const url = 'not-a-url';
+      expect(splitAgentCardUrl(url)).toEqual({ baseUrl: url });
+    });
+
+    it('should handle standard path appearing earlier in the path', () => {
+      const url = `http://localhost:9001/${standard}/something-else`;
+      expect(splitAgentCardUrl(url)).toEqual({ baseUrl: url });
     });
   });
 

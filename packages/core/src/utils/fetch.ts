@@ -9,6 +9,7 @@ import { URL } from 'node:url';
 import * as dns from 'node:dns';
 import { lookup } from 'node:dns/promises';
 import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
+import ipaddr from 'ipaddr.js';
 
 const DEFAULT_HEADERS_TIMEOUT = 300000; // 5 minutes
 const DEFAULT_BODY_TIMEOUT = 300000; // 5 minutes
@@ -20,26 +21,6 @@ setGlobalDispatcher(
     bodyTimeout: DEFAULT_BODY_TIMEOUT,
   }),
 );
-
-const PRIVATE_IP_RANGES = [
-  /^10\./,
-  /^127\./,
-  /^0\./,
-  /^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./,
-  /^169\.254\./,
-  /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
-  /^192\.0\.(0|2)\./,
-  /^192\.88\.99\./,
-  /^192\.168\./,
-  /^198\.(1[8-9]|51\.100)\./,
-  /^203\.0\.113\./,
-  /^2(2[4-9]|3[0-9]|[4-5][0-9])\./,
-  /^::1$/,
-  /^::$/,
-  /^f[cd]00:/i, // fc00::/7 (ULA)
-  /^fe[89ab][0-9a-f]:/i, // fe80::/10 (Link-local)
-  /^::ffff:(10\.|127\.|0\.|100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.0\.(0|2)\.|192\.88\.99\.|192\.168\.|198\.(1[8-9]|51\.100)\.|203\.0\.113\.|2(2[4-9]|3[0-9]|[4-5][0-9])\.|a9fe:|ac1[0-9a-f]:|c0a8:|0+:)/i, // IPv4-mapped IPv6
-];
 
 // Local extension of RequestInit to support Node.js/undici dispatcher
 interface NodeFetchInit extends RequestInit {
@@ -166,15 +147,43 @@ export async function isPrivateIpAsync(url: string): Promise<boolean> {
 }
 
 /**
- * Internal helper to check if an IP address string is in a private range.
+ * Internal helper to check if an IP address string is in a private or reserved range.
  */
 export function isAddressPrivate(address: string): boolean {
   const sanitized = sanitizeHostname(address);
 
-  return (
-    sanitized === 'localhost' ||
-    PRIVATE_IP_RANGES.some((range) => range.test(sanitized))
-  );
+  if (sanitized === 'localhost') {
+    return true;
+  }
+
+  try {
+    if (!ipaddr.isValid(sanitized)) {
+      return false;
+    }
+
+    const addr = ipaddr.parse(sanitized);
+    const range = addr.range();
+
+    // Special handling for IPv4-mapped IPv6 (::ffff:x.x.x.x)
+    // We unmap it and check the underlying IPv4 address.
+    if (addr instanceof ipaddr.IPv6 && addr.isIPv4MappedAddress()) {
+      return isAddressPrivate(addr.toIPv4Address().toString());
+    }
+
+    // Explicitly block 198.18.0.0/15 (Benchmark testing) which ipaddr.js
+    // classifies as unicast, but is not public internet.
+    if (addr instanceof ipaddr.IPv4) {
+      const [r, bits] = ipaddr.parseCIDR('198.18.0.0/15');
+      if (r instanceof ipaddr.IPv4 && addr.match(r, bits)) {
+        return true;
+      }
+    }
+
+    return range !== 'unicast';
+  } catch (_e) {
+    // If parsing fails despite isValid(), we treat it as potentially unsafe.
+    return true;
+  }
 }
 
 /**

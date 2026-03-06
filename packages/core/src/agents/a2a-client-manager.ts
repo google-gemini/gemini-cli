@@ -29,6 +29,7 @@ import {
   getGrpcCredentials,
   normalizeAgentCard,
   pinUrlToIp,
+  splitAgentCardUrl,
 } from './a2aUtils.js';
 import {
   isPrivateIpAsync,
@@ -291,10 +292,6 @@ export class A2AClientManager {
     url: string,
     resolver: DefaultAgentCardResolver,
   ): Promise<AgentCard> {
-    const standardPath = '.well-known/agent-card.json';
-    let baseUrl = url;
-    let path: string | undefined;
-
     // Validate URL to prevent SSRF (with DNS resolution)
     if (await isPrivateIpAsync(url)) {
       // Local/private IPs are allowed ONLY for localhost for testing.
@@ -306,24 +303,7 @@ export class A2AClientManager {
       }
     }
 
-    try {
-      const parsedUrl = new URL(url);
-      if (parsedUrl.pathname.endsWith(standardPath)) {
-        // Correctly split the URL into baseUrl and standard path
-        path = standardPath;
-        // Reconstruct baseUrl from parsed components to avoid issues with hashes or query params.
-        parsedUrl.pathname = parsedUrl.pathname.substring(
-          0,
-          parsedUrl.pathname.lastIndexOf(standardPath),
-        );
-        parsedUrl.search = '';
-        parsedUrl.hash = '';
-        baseUrl = parsedUrl.toString();
-      }
-    } catch (e) {
-      throw new Error(`Invalid agent card URL: ${url}`, { cause: e });
-    }
-
+    const { baseUrl, path } = splitAgentCardUrl(url);
     const rawCard = await resolver.resolve(baseUrl, path);
     const agentCard = normalizeAgentCard(rawCard);
 

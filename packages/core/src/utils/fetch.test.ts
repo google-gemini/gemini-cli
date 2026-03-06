@@ -51,7 +51,10 @@ describe('fetch utils', () => {
       expect(isAddressPrivate('192.0.0.1')).toBe(true);
       expect(isAddressPrivate('192.0.2.1')).toBe(true);
       expect(isAddressPrivate('192.88.99.1')).toBe(true);
+      // Benchmark range (198.18.0.0/15)
+      expect(isAddressPrivate('198.18.0.0')).toBe(true);
       expect(isAddressPrivate('198.18.0.1')).toBe(true);
+      expect(isAddressPrivate('198.19.255.255')).toBe(true);
       expect(isAddressPrivate('198.51.100.1')).toBe(true);
       expect(isAddressPrivate('203.0.113.1')).toBe(true);
       expect(isAddressPrivate('224.0.0.1')).toBe(true);

@@ -341,6 +341,35 @@ export async function pinUrlToIp(
 }
 
 /**
+ * Splts an agent card URL into a baseUrl and a standard path if it already
+ * contains '.well-known/agent-card.json'.
+ */
+export function splitAgentCardUrl(url: string): {
+  baseUrl: string;
+  path?: string;
+} {
+  const standardPath = '.well-known/agent-card.json';
+  try {
+    const parsedUrl = new URL(url);
+    if (parsedUrl.pathname.endsWith(standardPath)) {
+      // Reconstruct baseUrl from parsed components to avoid issues with hashes or query params.
+      parsedUrl.pathname = parsedUrl.pathname.substring(
+        0,
+        parsedUrl.pathname.lastIndexOf(standardPath),
+      );
+      parsedUrl.search = '';
+      parsedUrl.hash = '';
+      // We return undefined for path if it's the standard one,
+      // because the SDK's DefaultAgentCardResolver appends it automatically.
+      return { baseUrl: parsedUrl.toString(), path: undefined };
+    }
+  } catch (_e) {
+    // Ignore URL parsing errors here, let the resolver handle them.
+  }
+  return { baseUrl: url };
+}
+
+/**
  * Extracts contextId and taskId from a Message, Task, or Update response.
  * Follows the pattern from the A2A CLI sample to maintain conversational continuity.
  */

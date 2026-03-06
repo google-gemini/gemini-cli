@@ -419,7 +419,7 @@ describe('A2AClientManager', () => {
 
       expect(resolverInstance.resolve).toHaveBeenCalledWith(
         'http://localhost:9001/',
-        '.well-known/agent-card.json',
+        undefined,
       );
     });
 
@@ -479,44 +479,6 @@ describe('A2AClientManager', () => {
         manager.loadAgent('malicious-agent', publicUrl),
       ).rejects.toThrow(
         /contains transport URL pointing to private IP range: http:\/\/192.168.1.1\/api/,
-      );
-    });
-
-    it('should handle URLs where .well-known appears in the domain/subdomain', async () => {
-      const trickyUrl =
-        'http://.well-known/agent-card.json.attacker.com/my-agent';
-      const resolverInstance = {
-        resolve: vi.fn().mockResolvedValue({ name: 'test' } as AgentCard),
-      };
-      vi.mocked(sdkClient.DefaultAgentCardResolver).mockReturnValue(
-        resolverInstance as unknown as sdkClient.DefaultAgentCardResolver,
-      );
-
-      await manager.loadAgent('tricky-agent', trickyUrl);
-
-      // Should treat the whole thing as baseUrl since it doesn't end with standardPath
-      expect(resolverInstance.resolve).toHaveBeenCalledWith(
-        trickyUrl,
-        undefined,
-      );
-    });
-
-    it('should correctly handle URLs with standardPath in the hash fragment', async () => {
-      const fragmentUrl =
-        'http://localhost:9001/.well-known/agent-card.json#.well-known/agent-card.json';
-      const resolverInstance = {
-        resolve: vi.fn().mockResolvedValue({ name: 'test' } as AgentCard),
-      };
-      vi.mocked(sdkClient.DefaultAgentCardResolver).mockReturnValue(
-        resolverInstance as unknown as sdkClient.DefaultAgentCardResolver,
-      );
-
-      await manager.loadAgent('fragment-agent', fragmentUrl);
-
-      // Should correctly ignore the hash fragment and use the path from the URL object
-      expect(resolverInstance.resolve).toHaveBeenCalledWith(
-        'http://localhost:9001/',
-        '.well-known/agent-card.json',
       );
     });
   });
