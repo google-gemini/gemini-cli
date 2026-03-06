@@ -6,6 +6,7 @@
 
 import { getErrorMessage, isNodeError } from './errors.js';
 import { URL } from 'node:url';
+import { lookup } from 'node:dns/promises';
 import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
 
 const DEFAULT_HEADERS_TIMEOUT = 300000; // 5 minutes
@@ -44,10 +45,42 @@ export class FetchError extends Error {
 export function isPrivateIp(url: string): boolean {
   try {
     const hostname = new URL(url).hostname;
-    return PRIVATE_IP_RANGES.some((range) => range.test(hostname));
+    return isAddressPrivate(hostname);
   } catch (_e) {
     return false;
   }
+}
+
+/**
+ * Checks if a URL resolves to a private IP address.
+ * Performs DNS resolution to prevent DNS rebinding/SSRF bypasses.
+ */
+export async function isPrivateIpAsync(url: string): Promise<boolean> {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname;
+
+    // Fast check for literal IPs or localhost
+    if (isAddressPrivate(hostname)) {
+      return true;
+    }
+
+    // Resolve DNS to check the actual target IP
+    const addresses = await lookup(hostname, { all: true });
+    return addresses.some((addr) => isAddressPrivate(addr.address));
+  } catch (_e) {
+    return false;
+  }
+}
+
+/**
+ * Internal helper to check if an IP address string is in a private range.
+ */
+function isAddressPrivate(address: string): boolean {
+  return (
+    address === 'localhost' ||
+    PRIVATE_IP_RANGES.some((range) => range.test(address))
+  );
 }
 
 export async function fetchWithTimeout(

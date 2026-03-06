@@ -8,6 +8,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { A2AClientManager } from './a2a-client-manager.js';
 import type { AgentCard } from '@a2a-js/sdk';
 import * as sdkClient from '@a2a-js/sdk/client';
+import { lookup } from 'node:dns/promises';
 import { debugLogger } from '../utils/debugLogger.js';
 
 interface MockClient {
@@ -34,6 +35,10 @@ vi.mock('../utils/debugLogger.js', () => ({
   debugLogger: {
     debug: vi.fn(),
   },
+}));
+
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn().mockResolvedValue([{ address: '93.184.216.34' }]),
 }));
 
 describe('A2AClientManager', () => {
@@ -404,6 +409,20 @@ describe('A2AClientManager', () => {
       const privateUrl = 'http://169.254.169.254/.well-known/agent-card.json';
       await expect(manager.loadAgent('ssrf-agent', privateUrl)).rejects.toThrow(
         /Refusing to load agent 'ssrf-agent' from private IP range/,
+      );
+    });
+
+    it('should throw if a domain resolves to a private IP (DNS SSRF protection)', async () => {
+      const maliciousDomainUrl =
+        'http://malicious.com/.well-known/agent-card.json';
+      vi.mocked(lookup).mockResolvedValueOnce([
+        { address: '10.0.0.1', family: 4 },
+      ]);
+
+      await expect(
+        manager.loadAgent('dns-ssrf-agent', maliciousDomainUrl),
+      ).rejects.toThrow(
+        /Refusing to load agent 'dns-ssrf-agent' from private IP range/,
       );
     });
 

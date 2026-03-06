@@ -26,7 +26,7 @@ import { GrpcTransportFactory } from '@a2a-js/sdk/client/grpc';
 import { v4 as uuidv4 } from 'uuid';
 import { Agent as UndiciAgent } from 'undici';
 import { getGrpcCredentials, normalizeAgentCard } from './a2aUtils.js';
-import { isPrivateIp } from '../utils/fetch.js';
+import { isPrivateIpAsync } from '../utils/fetch.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 // Remote agents can take 10+ minutes (e.g. Deep Research).
@@ -259,8 +259,8 @@ export class A2AClientManager {
     let baseUrl = url;
     let path: string | undefined;
 
-    // Validate URL to prevent SSRF
-    if (isPrivateIp(url)) {
+    // Validate URL to prevent SSRF (with DNS resolution)
+    if (await isPrivateIpAsync(url)) {
       // Local/private IPs are allowed ONLY for localhost for testing.
       const parsed = new URL(url);
       if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
@@ -285,7 +285,7 @@ export class A2AClientManager {
     const agentCard = normalizeAgentCard(rawCard);
 
     // Deep validation of all transport URLs within the card to prevent SSRF
-    this.validateAgentCardUrls(agentName, agentCard);
+    await this.validateAgentCardUrls(agentName, agentCard);
 
     return agentCard;
   }
@@ -293,7 +293,10 @@ export class A2AClientManager {
   /**
    * Validates all URLs (top-level and interfaces) within an AgentCard for SSRF.
    */
-  private validateAgentCardUrls(agentName: string, card: AgentCard): void {
+  private async validateAgentCardUrls(
+    agentName: string,
+    card: AgentCard,
+  ): Promise<void> {
     const urlsToValidate = [card.url];
     if (card.additionalInterfaces) {
       for (const intf of card.additionalInterfaces) {
@@ -307,7 +310,7 @@ export class A2AClientManager {
       // Ensure URL has a scheme for the parser (gRPC often provides raw IP:port)
       const validationUrl = url.includes('://') ? url : `http://${url}`;
 
-      if (isPrivateIp(validationUrl)) {
+      if (await isPrivateIpAsync(validationUrl)) {
         const parsed = new URL(validationUrl);
         if (
           parsed.hostname !== 'localhost' &&
