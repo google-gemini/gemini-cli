@@ -5,17 +5,27 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Mocked, MockInstance } from 'vitest';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { ConfigParameters } from '../config/config.js';
-import { Config } from '../config/config.js';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mocked,
+  type MockInstance,
+} from 'vitest';
+import { Config, type ConfigParameters } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
 import { DiscoveredMCPTool, MCP_QUALIFIED_NAME_SEPARATOR } from './mcp-tool.js';
-import type { FunctionDeclaration, CallableTool } from '@google/genai';
-import { mcpToTool } from '@google/genai';
+import {
+  mcpToTool,
+  type FunctionDeclaration,
+  type CallableTool,
+} from '@google/genai';
 import { spawn } from 'node:child_process';
 
 import fs from 'node:fs';
@@ -380,20 +390,36 @@ describe('ToolRegistry', () => {
   });
 
   describe('getAllToolNames', () => {
-    it('should return all registered tool names', () => {
+    it('should return all registered tool names with qualified names for MCP tools', () => {
       // Register tools with displayNames in non-alphabetical order
       const toolC = new MockTool({ name: 'c-tool', displayName: 'Tool C' });
       const toolA = new MockTool({ name: 'a-tool', displayName: 'Tool A' });
-      const toolB = new MockTool({ name: 'b-tool', displayName: 'Tool B' });
+      const mcpTool = createMCPTool('my-server', 'my-tool', 'desc');
 
       toolRegistry.registerTool(toolC);
       toolRegistry.registerTool(toolA);
-      toolRegistry.registerTool(toolB);
+      toolRegistry.registerTool(mcpTool);
 
       const toolNames = toolRegistry.getAllToolNames();
 
-      // Assert that the returned array contains all tool names
-      expect(toolNames).toEqual(['c-tool', 'a-tool', 'b-tool']);
+      // Assert that the returned array contains all tool names, with MCP qualified
+      expect(toolNames).toContain('c-tool');
+      expect(toolNames).toContain('a-tool');
+      expect(toolNames).toContain('my-server__my-tool');
+      expect(toolNames).toHaveLength(3);
+    });
+
+    it('should deduplicate tool names', () => {
+      const serverName = 'my-server';
+      const toolName = 'my-tool';
+      const mcpTool = createMCPTool(serverName, toolName, 'desc');
+
+      // Register same MCP tool twice (one as alias, one as qualified)
+      toolRegistry.registerTool(mcpTool);
+      toolRegistry.registerTool(mcpTool.asFullyQualifiedTool());
+
+      const toolNames = toolRegistry.getAllToolNames();
+      expect(toolNames).toEqual([`${serverName}__${toolName}`]);
     });
   });
 
@@ -465,8 +491,8 @@ describe('ToolRegistry', () => {
         'builtin-1',
         'builtin-2',
         DISCOVERED_TOOL_PREFIX + 'discovered-1',
-        'mcp-apple',
-        'mcp-zebra',
+        'apple-server__mcp-apple',
+        'zebra-server__mcp-zebra',
       ]);
     });
   });
@@ -656,6 +682,34 @@ describe('ToolRegistry', () => {
       const retrievedTool = toolRegistry.getTool(legacyName);
       expect(retrievedTool).toBeDefined();
       expect(retrievedTool?.name).toBe(currentName);
+    });
+  });
+
+  describe('getFunctionDeclarations', () => {
+    it('should use fully qualified names for MCP tools in declarations', () => {
+      const serverName = 'my-server';
+      const toolName = 'my-tool';
+      const mcpTool = createMCPTool(serverName, toolName, 'description');
+
+      toolRegistry.registerTool(mcpTool);
+
+      const declarations = toolRegistry.getFunctionDeclarations();
+      expect(declarations).toHaveLength(1);
+      expect(declarations[0].name).toBe(`${serverName}__${toolName}`);
+    });
+
+    it('should deduplicate MCP tools in declarations', () => {
+      const serverName = 'my-server';
+      const toolName = 'my-tool';
+      const mcpTool = createMCPTool(serverName, toolName, 'description');
+
+      // Register both alias and qualified
+      toolRegistry.registerTool(mcpTool);
+      toolRegistry.registerTool(mcpTool.asFullyQualifiedTool());
+
+      const declarations = toolRegistry.getFunctionDeclarations();
+      expect(declarations).toHaveLength(1);
+      expect(declarations[0].name).toBe(`${serverName}__${toolName}`);
     });
   });
 
