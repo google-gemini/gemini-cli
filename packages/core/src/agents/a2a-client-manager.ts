@@ -282,6 +282,42 @@ export class A2AClientManager {
     }
 
     const rawCard = await resolver.resolve(baseUrl, path);
-    return normalizeAgentCard(rawCard);
+    const agentCard = normalizeAgentCard(rawCard);
+
+    // Deep validation of all transport URLs within the card to prevent SSRF
+    this.validateAgentCardUrls(agentName, agentCard);
+
+    return agentCard;
+  }
+
+  /**
+   * Validates all URLs (top-level and interfaces) within an AgentCard for SSRF.
+   */
+  private validateAgentCardUrls(agentName: string, card: AgentCard): void {
+    const urlsToValidate = [card.url];
+    if (card.additionalInterfaces) {
+      for (const intf of card.additionalInterfaces) {
+        if (intf.url) urlsToValidate.push(intf.url);
+      }
+    }
+
+    for (const url of urlsToValidate) {
+      if (!url) continue;
+
+      // Ensure URL has a scheme for the parser (gRPC often provides raw IP:port)
+      const validationUrl = url.includes('://') ? url : `http://${url}`;
+
+      if (isPrivateIp(validationUrl)) {
+        const parsed = new URL(validationUrl);
+        if (
+          parsed.hostname !== 'localhost' &&
+          parsed.hostname !== '127.0.0.1'
+        ) {
+          throw new Error(
+            `Refusing to load agent '${agentName}': contains transport URL pointing to private IP range: ${url}.`,
+          );
+        }
+      }
+    }
   }
 }

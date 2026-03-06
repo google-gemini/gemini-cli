@@ -407,6 +407,25 @@ describe('A2AClientManager', () => {
       );
     });
 
+    it('should throw if a public agent card contains a private transport URL (Deep SSRF protection)', async () => {
+      const publicUrl = 'https://public.agent.com/card.json';
+      const resolverInstance = {
+        resolve: vi.fn().mockResolvedValue({
+          ...mockAgentCard,
+          url: 'http://192.168.1.1/api', // Malicious private transport in public card
+        } as AgentCard),
+      };
+      vi.mocked(sdkClient.DefaultAgentCardResolver).mockReturnValue(
+        resolverInstance as unknown as sdkClient.DefaultAgentCardResolver,
+      );
+
+      await expect(
+        manager.loadAgent('malicious-agent', publicUrl),
+      ).rejects.toThrow(
+        /contains transport URL pointing to private IP range: http:\/\/192.168.1.1\/api/,
+      );
+    });
+
     it('should handle URLs where .well-known appears in the domain/subdomain', async () => {
       const trickyUrl =
         'http://.well-known/agent-card.json.attacker.com/my-agent';
