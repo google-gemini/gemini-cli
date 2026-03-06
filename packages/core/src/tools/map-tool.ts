@@ -143,7 +143,7 @@ class MapToolInvocation extends BaseToolInvocation<MapToolParams, ToolResult> {
       return {
         llmContent: errorMsg,
         returnDisplay: 'Failed to map project.',
-        error: { message: errorMsg, type: ToolErrorType.LS_EXECUTION_ERROR },
+        error: { message: errorMsg, type: ToolErrorType.MAP_EXECUTION_ERROR },
       };
     }
   }
