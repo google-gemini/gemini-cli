@@ -50,6 +50,15 @@ export class TrackerService {
       id,
     };
 
+    if (task.parentId) {
+      const parentList = await this.listTasks();
+      if (!parentList.find((t) => t.id === task.parentId)) {
+        throw new Error(`Parent task with ID ${task.parentId} not found.`);
+      }
+    }
+
+    TrackerTaskSchema.parse(task);
+
     await this.saveTask(task);
     return task;
   }
@@ -70,7 +79,8 @@ export class TrackerService {
         error &&
         typeof error === 'object' &&
         'code' in error &&
-        error.code === 'ENOENT'
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (error as NodeJS.ErrnoException).code === 'ENOENT'
       ) {
         return null;
       }
@@ -130,25 +140,47 @@ export class TrackerService {
     id: string,
     updates: Partial<TrackerTask>,
   ): Promise<TrackerTask> {
-    const task = await this.getTask(id);
+    const isClosing = updates.status === TaskStatus.CLOSED;
+    const changingDependencies = updates.dependencies !== undefined;
+
+    let taskMap: Map<string, TrackerTask> | undefined;
+
+    if (isClosing || changingDependencies) {
+      const allTasks = await this.listTasks();
+      taskMap = new Map<string, TrackerTask>(allTasks.map((t) => [t.id, t]));
+    }
+
+    const task = taskMap ? taskMap.get(id) : await this.getTask(id);
+
     if (!task) {
       throw new Error(`Task with ID ${id} not found.`);
     }
 
-    const updatedTask = { ...task, ...updates };
+    const updatedTask = { ...task, ...updates, id: task.id };
 
-    // Validate status transition if closing
-    if (
-      updatedTask.status === TaskStatus.CLOSED &&
-      task.status !== TaskStatus.CLOSED
-    ) {
-      await this.validateCanClose(updatedTask);
+    if (updatedTask.parentId) {
+      const parentExists = taskMap
+        ? taskMap.has(updatedTask.parentId)
+        : !!(await this.getTask(updatedTask.parentId));
+      if (!parentExists) {
+        throw new Error(
+          `Parent task with ID ${updatedTask.parentId} not found.`,
+        );
+      }
     }
 
-    // Validate circular dependencies if dependencies changed
-    if (updates.dependencies) {
-      await this.validateNoCircularDependencies(updatedTask);
+    if (taskMap) {
+      if (isClosing && task.status !== TaskStatus.CLOSED) {
+        this.validateCanClose(updatedTask, taskMap);
+      }
+
+      if (changingDependencies) {
+        taskMap.set(updatedTask.id, updatedTask);
+        this.validateNoCircularDependencies(updatedTask, taskMap);
+      }
     }
+
+    TrackerTaskSchema.parse(updatedTask);
 
     await this.saveTask(updatedTask);
     return updatedTask;
@@ -165,9 +197,12 @@ export class TrackerService {
   /**
    * Validates that a task can be closed (all dependencies must be closed).
    */
-  private async validateCanClose(task: TrackerTask): Promise<void> {
+  private validateCanClose(
+    task: TrackerTask,
+    taskMap: Map<string, TrackerTask>,
+  ): void {
     for (const depId of task.dependencies) {
-      const dep = await this.getTask(depId);
+      const dep = taskMap.get(depId);
       if (!dep) {
         throw new Error(`Dependency ${depId} not found for task ${task.id}.`);
       }
@@ -182,16 +217,10 @@ export class TrackerService {
   /**
    * Validates that there are no circular dependencies.
    */
-  private async validateNoCircularDependencies(
+  private validateNoCircularDependencies(
     task: TrackerTask,
-  ): Promise<void> {
-    const allTasks = await this.listTasks();
-    const taskMap = new Map<string, TrackerTask>(
-      allTasks.map((t) => [t.id, t]),
-    );
-    // Ensure the current (possibly unsaved) task state is used
-    taskMap.set(task.id, task);
-
+    taskMap: Map<string, TrackerTask>,
+  ): void {
     const visited = new Set<string>();
     const stack = new Set<string>();
 
@@ -209,10 +238,11 @@ export class TrackerService {
       stack.add(currentId);
 
       const currentTask = taskMap.get(currentId);
-      if (currentTask) {
-        for (const depId of currentTask.dependencies) {
-          check(depId);
-        }
+      if (!currentTask) {
+        throw new Error(`Dependency ${currentId} not found.`);
+      }
+      for (const depId of currentTask.dependencies) {
+        check(depId);
       }
 
       stack.delete(currentId);

@@ -17,6 +17,19 @@ import {
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
+  GREP_PARAM_TOTAL_MAX_MATCHES,
+  GREP_PARAM_INCLUDE_PATTERN,
+  GREP_PARAM_EXCLUDE_PATTERN,
+  GREP_PARAM_CONTEXT,
+  GREP_PARAM_BEFORE,
+  GREP_PARAM_AFTER,
+  READ_FILE_PARAM_START_LINE,
+  READ_FILE_PARAM_END_LINE,
+  SHELL_PARAM_IS_BACKGROUND,
+  EDIT_PARAM_OLD_STRING,
+  TRACKER_CREATE_TASK_TOOL_NAME,
+  TRACKER_LIST_TASKS_TOOL_NAME,
+  TRACKER_UPDATE_TASK_TOOL_NAME,
 } from '../tools/tool-names.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
@@ -31,6 +44,7 @@ export interface SystemPromptOptions {
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
   planningWorkflow?: PlanningWorkflowOptions;
+  taskTracker?: boolean;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
@@ -56,6 +70,7 @@ export interface PrimaryWorkflowsOptions {
   enableGrep: boolean;
   enableGlob: boolean;
   approvedPlan?: { path: string };
+  taskTracker?: boolean;
 }
 
 export interface OperationalGuidelinesOptions {
@@ -73,6 +88,7 @@ export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
   approvedPlanPath?: string;
+  taskTracker?: boolean;
 }
 
 export interface AgentSkillOptions {
@@ -109,6 +125,8 @@ ${
     ? renderPlanningWorkflow(options.planningWorkflow)
     : renderPrimaryWorkflows(options.primaryWorkflows)
 }
+
+${options.taskTracker ? renderTaskTracker() : ''}
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
@@ -183,16 +201,16 @@ Use the following guidelines to optimize your search and read patterns.
 - Prefer using tools like ${GREP_TOOL_NAME} to identify points of interest instead of reading lots of files individually.
 - If you need to read multiple ranges in a file, do so parallel, in as few turns as possible.
 - It is more important to reduce extra turns, but please also try to minimize unnecessarily large file reads and search results, when doing so doesn't result in extra turns. Do this by always providing conservative limits and scopes to tools like ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME}.
-- ${READ_FILE_TOOL_NAME} fails if old_string is ambiguous, causing extra turns. Take care to read enough with ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME} to make the edit unambiguous.
+- ${READ_FILE_TOOL_NAME} fails if ${EDIT_PARAM_OLD_STRING} is ambiguous, causing extra turns. Take care to read enough with ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME} to make the edit unambiguous.
 - You can compensate for the risk of missing results with scoped or limited searches by doing multiple searches in parallel.
 - Your primary goal is still to do your best quality work. Efficiency is an important, but secondary concern.
 </guidelines>
 
 <examples>
-- **Searching:** utilize search tools like ${GREP_TOOL_NAME} and ${GLOB_TOOL_NAME} with a conservative result count (\`total_max_matches\`) and a narrow scope (\`include_pattern\` and \`exclude_pattern\` parameters).
-- **Searching and editing:** utilize search tools like ${GREP_TOOL_NAME} with a conservative result count and a narrow scope. Use \`context\`, \`before\`, and/or \`after\` to request enough context to avoid the need to read the file before editing matches.
+- **Searching:** utilize search tools like ${GREP_TOOL_NAME} and ${GLOB_TOOL_NAME} with a conservative result count (\`${GREP_PARAM_TOTAL_MAX_MATCHES}\`) and a narrow scope (\`${GREP_PARAM_INCLUDE_PATTERN}\` and \`${GREP_PARAM_EXCLUDE_PATTERN}\` parameters).
+- **Searching and editing:** utilize search tools like ${GREP_TOOL_NAME} with a conservative result count and a narrow scope. Use \`${GREP_PARAM_CONTEXT}\`, \`${GREP_PARAM_BEFORE}\`, and/or \`${GREP_PARAM_AFTER}\` to request enough context to avoid the need to read the file before editing matches.
 - **Understanding:** minimize turns needed to understand a file. It's most efficient to read small files in their entirety.
-- **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
+- **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with '${READ_FILE_PARAM_START_LINE}' and '${READ_FILE_PARAM_END_LINE}' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
@@ -331,7 +349,7 @@ export function renderOperationalGuidelines(
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
 
 ## Security and Safety Rules
-- **Explain Critical Commands:** Before executing commands with ${formatToolName(SHELL_TOOL_NAME)} that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
+- **Explain Critical Commands:** Before executing commands with ${formatToolName(SHELL_TOOL_NAME)} that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this). You MUST NOT use ${formatToolName(ASK_USER_TOOL_NAME)} to ask for permission to run a command.
 - **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
 
 ## Tool Usage
@@ -454,6 +472,24 @@ ${trimmed}
   return `\n---\n\n<loaded_context>\n${sections.join('\n')}\n</loaded_context>`;
 }
 
+export function renderTaskTracker(): string {
+  const trackerCreate = formatToolName(TRACKER_CREATE_TASK_TOOL_NAME);
+  const trackerList = formatToolName(TRACKER_LIST_TASKS_TOOL_NAME);
+  const trackerUpdate = formatToolName(TRACKER_UPDATE_TASK_TOOL_NAME);
+
+  return `
+# TASK MANAGEMENT PROTOCOL
+You are operating with a persistent file-based task tracking system located at \`.tracker/tasks/\`. You must adhere to the following rules:
+
+1.  **NO IN-MEMORY LISTS**: Do not maintain a mental list of tasks or write markdown checkboxes in the chat. Use the provided tools (${trackerCreate}, ${trackerList}, ${trackerUpdate}) for all state management.
+2.  **IMMEDIATE DECOMPOSITION**: Upon receiving a task, evaluate its functional complexity and scope. If the request involves more than a single atomic modification, or necessitates research before execution, you MUST immediately decompose it into discrete entries using ${trackerCreate}.
+3.  **IGNORE FORMATTING BIAS**: Trigger the protocol based on the **objective complexity** of the goal, regardless of whether the user provided a structured list or a single block of text/paragraph. "Paragraph-style" goals that imply multiple actions are multi-step projects and MUST be tracked.
+4.  **PLAN MODE INTEGRATION**: If an approved plan exists, you MUST use the ${trackerCreate} tool to decompose it into discrete tasks before writing any code. Maintain a bidirectional understanding between the plan document and the task graph.
+5.  **VERIFICATION**: Before marking a task as complete, verify the work is actually done (e.g., run the test, check the file existence).
+6.  **STATE OVER CHAT**: If the user says "I think we finished that," but the tool says it is 'pending', trust the tool--or verify explicitly before updating.
+7.  **DEPENDENCY MANAGEMENT**: Respect task topology. Never attempt to execute a task if its dependencies are not marked as 'closed'. If you are blocked, focus only on the leaf nodes of the task graph.`.trim();
+}
+
 export function renderPlanningWorkflow(
   options?: PlanningWorkflowOptions,
 ): string {
@@ -472,7 +508,7 @@ ${options.planModeToolsList}
 ## Rules
 1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`${options.plansDir}/\`. If the user asks you to modify source code directly, you MUST explain that you are in Plan Mode and must first create a plan and get approval.
 2. **Write Constraint:** ${formatToolName(WRITE_FILE_TOOL_NAME)} and ${formatToolName(EDIT_TOOL_NAME)} may ONLY be used to write .md plan files to \`${options.plansDir}/\`. They cannot modify source code.
-3. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use ${formatToolName(ASK_USER_TOOL_NAME)} to clarify.
+3. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use ${formatToolName(ASK_USER_TOOL_NAME)} to clarify. Use multi-select to offer flexibility and include detailed descriptions for each option to help the user understand the implications of their choice.
 4. **Inquiries and Directives:** Distinguish between Inquiries and Directives to minimize unnecessary planning.
    - **Inquiries:** If the request is an **Inquiry** (e.g., "How does X work?"), answer directly. DO NOT create a plan.
    - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below.
@@ -573,6 +609,9 @@ function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
   if (options.approvedPlan) {
     return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Once all implementation and verification steps are finished, provide a **final summary** of the work completed against the plan and offer clear **next steps** to the user (e.g., 'Open a pull request').`;
   }
+  if (options.approvedPlan && options.taskTracker) {
+    return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth and invoke the task tracker tool to create tasks for this plan. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Make sure to update the tracker task list based on this updated plan. Once all implementation and verification steps are finished, provide a **final summary** of the work completed against the plan and offer clear **next steps** to the user (e.g., 'Open a pull request').`;
+  }
 
   if (options.enableWriteTodosTool) {
     return `2. **Strategy:** Formulate a grounded plan based on your research.${
@@ -655,15 +694,15 @@ function toolUsageInteractive(
   interactiveShellEnabled: boolean,
 ): string {
   if (interactive) {
-    const ctrlF = interactiveShellEnabled
-      ? ' If you choose to execute an interactive command consider letting the user know they can press `ctrl + f` to focus into the shell to provide input.'
+    const focusHint = interactiveShellEnabled
+      ? ' If you choose to execute an interactive command consider letting the user know they can press `tab` to focus into the shell to provide input.'
       : '';
     return `
-- **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
-- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).${ctrlF}`;
+- **Background Processes:** To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true. If unsure, ask the user.
+- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).${focusHint}`;
   }
   return `
-- **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true.
+- **Background Processes:** To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).`;
 }
 

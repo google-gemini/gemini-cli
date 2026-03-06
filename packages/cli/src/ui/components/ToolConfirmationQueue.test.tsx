@@ -51,6 +51,7 @@ describe('ToolConfirmationQueue', () => {
     storage: {
       getPlansDir: () => '/mock/temp/plans',
     },
+    getUseAlternateBuffer: () => false,
   } as unknown as Config;
 
   beforeEach(() => {
