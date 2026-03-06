@@ -17,7 +17,8 @@ vi.mock('../../hooks/useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
 
-vi.mock('./text-buffer.js', () => {
+vi.mock(import('./text-buffer.js'), async (importOriginal) => {
+  const actual = await importOriginal();
   const mockTextBuffer = {
     text: '',
     lines: [''],
@@ -60,6 +61,7 @@ vi.mock('./text-buffer.js', () => {
   };
 
   return {
+    ...actual,
     useTextBuffer: vi.fn(() => mockTextBuffer as unknown as TextBuffer),
     TextBuffer: vi.fn(() => mockTextBuffer as unknown as TextBuffer),
   };
@@ -364,6 +366,67 @@ describe('TextInput', () => {
 
     expect(lastFrame()).toContain('line1');
     expect(lastFrame()).toContain('line2');
+    unmount();
+  });
+
+  it('expands paste placeholders on submit', async () => {
+    const placeholder = '[Pasted Text: 6 lines]';
+    const actualContent = 'line1\nline2\nline3\nline4\nline5\nline6';
+    mockBuffer.text = placeholder;
+    mockBuffer.viewportVisualLines = [placeholder];
+    (
+      mockBuffer as unknown as { pastedContent: Record<string, string> }
+    ).pastedContent = {
+      [placeholder]: actualContent,
+    };
+
+    const { waitUntilReady, unmount } = render(
+      <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
+    );
+    await waitUntilReady();
+    const keypressHandler = mockedUseKeypress.mock.calls[0][0];
+
+    await act(async () => {
+      keypressHandler({
+        name: 'return',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: '',
+      });
+    });
+    await waitUntilReady();
+
+    expect(onSubmit).toHaveBeenCalledWith(actualContent);
+    unmount();
+  });
+
+  it('passes text through unchanged on submit when no paste placeholders exist', async () => {
+    mockBuffer.setText('regular text');
+    (
+      mockBuffer as unknown as { pastedContent: Record<string, string> }
+    ).pastedContent = {};
+
+    const { waitUntilReady, unmount } = render(
+      <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
+    );
+    await waitUntilReady();
+    const keypressHandler = mockedUseKeypress.mock.calls[0][0];
+
+    await act(async () => {
+      keypressHandler({
+        name: 'return',
+        shift: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: '',
+      });
+    });
+    await waitUntilReady();
+
+    expect(onSubmit).toHaveBeenCalledWith('regular text');
     unmount();
   });
 });

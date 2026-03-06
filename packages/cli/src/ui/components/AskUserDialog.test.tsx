@@ -1347,4 +1347,79 @@ describe('AskUserDialog', () => {
       });
     });
   });
+
+  describe('Paste placeholder expansion', () => {
+    const largePasteText = 'line1\nline2\nline3\nline4\nline5\nline6';
+
+    it('expands paste placeholders in text question submission', async () => {
+      const textQuestion: Question[] = [
+        {
+          question: 'Describe the issue',
+          header: 'Description',
+          type: QuestionType.TEXT,
+        },
+      ];
+
+      const onSubmit = vi.fn();
+      const { stdin } = renderWithProviders(
+        <AskUserDialog
+          questions={textQuestion}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+          width={120}
+        />,
+        { width: 120 },
+      );
+
+      // Simulate a bracketed paste of large text (>5 lines triggers placeholder)
+      writeKey(stdin, `\x1B[200~${largePasteText}\x1B[201~`);
+
+      // Submit with Enter
+      writeKey(stdin, '\r');
+
+      await waitFor(async () => {
+        expect(onSubmit).toHaveBeenCalledWith({ '0': largePasteText });
+      });
+    });
+
+    it('expands paste placeholders in choice question custom "Other" input', async () => {
+      const choiceQuestion: Question[] = [
+        {
+          question: 'Which option?',
+          header: 'Option',
+          type: QuestionType.CHOICE,
+          options: [
+            { label: 'Option A', description: 'First option' },
+            { label: 'Option B', description: 'Second option' },
+          ],
+          multiSelect: false,
+        },
+      ];
+
+      const onSubmit = vi.fn();
+      const { stdin } = renderWithProviders(
+        <AskUserDialog
+          questions={choiceQuestion}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+          width={120}
+        />,
+        { width: 120 },
+      );
+
+      // Navigate down past options to the "Other" custom option
+      writeKey(stdin, '\x1b[B'); // Down past Option A
+      writeKey(stdin, '\x1b[B'); // Down past Option B to "Other"
+
+      // Simulate a bracketed paste of large text
+      writeKey(stdin, `\x1B[200~${largePasteText}\x1B[201~`);
+
+      // Submit with Enter
+      writeKey(stdin, '\r');
+
+      await waitFor(async () => {
+        expect(onSubmit).toHaveBeenCalledWith({ '0': largePasteText });
+      });
+    });
+  });
 });

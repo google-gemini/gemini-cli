@@ -23,7 +23,10 @@ import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import { checkExhaustive } from '@google/gemini-cli-core';
 import { TextInput } from './shared/TextInput.js';
-import { useTextBuffer } from './shared/text-buffer.js';
+import {
+  useTextBuffer,
+  PASTED_TEXT_PLACEHOLDER_REGEX,
+} from './shared/text-buffer.js';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
 import { DialogFooter } from './shared/DialogFooter.js';
@@ -79,6 +82,21 @@ function autoBoldIfPlain(text: string): string {
     return `**${text}**`;
   }
   return text;
+}
+
+/**
+ * Expands paste placeholders like [Pasted Text: 6 lines] with the actual
+ * pasted content stored in the buffer's pastedContent map.
+ */
+function expandPastePlaceholders(
+  text: string,
+  pastedContent: Record<string, string>,
+): string {
+  if (!pastedContent || Object.keys(pastedContent).length === 0) return text;
+  return text.replace(
+    PASTED_TEXT_PLACEHOLDER_REGEX,
+    (match) => pastedContent[match] || match,
+  );
 }
 
 interface AskUserDialogState {
@@ -302,10 +320,11 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   const lastTextValueRef = useRef(textValue);
   useEffect(() => {
     if (textValue !== lastTextValueRef.current) {
-      onSelectionChange?.(textValue);
+      const expanded = expandPastePlaceholders(textValue, buffer.pastedContent);
+      onSelectionChange?.(expanded);
       lastTextValueRef.current = textValue;
     }
-  }, [textValue, onSelectionChange]);
+  }, [textValue, onSelectionChange, buffer.pastedContent]);
 
   // Handle Ctrl+C to clear all text
   const handleExtraKeys = useCallback(
@@ -588,11 +607,15 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         }
       });
       if (includeCustomOption && customOption.trim()) {
-        answers.push(customOption.trim());
+        const expanded = expandPastePlaceholders(
+          customOption.trim(),
+          customBuffer.pastedContent,
+        );
+        answers.push(expanded);
       }
       return answers.join(', ');
     },
-    [questionOptions],
+    [questionOptions, customBuffer.pastedContent],
   );
 
   // Synchronize selection changes with parent - only when it actually changes
@@ -757,7 +780,11 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         } else if (itemValue.type === 'other') {
           // In single select, selecting other submits it if it has text
           if (customOptionText.trim()) {
-            onAnswer(customOptionText.trim());
+            const expanded = expandPastePlaceholders(
+              customOptionText.trim(),
+              customBuffer.pastedContent,
+            );
+            onAnswer(expanded);
           }
         }
       }
@@ -767,6 +794,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       selectedIndices,
       isCustomOptionSelected,
       customOptionText,
+      customBuffer.pastedContent,
       onAnswer,
       buildAnswerString,
     ],
