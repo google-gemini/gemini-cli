@@ -4,70 +4,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as crypto from 'node:crypto';
 import { BaseTokenStorage } from './base-token-storage.js';
 import type { OAuthCredentials, SecretStorage } from './types.js';
 import { coreEvents } from '../../utils/events.js';
-import { KeychainAvailabilityEvent } from '../../telemetry/types.js';
-
-interface Keytar {
-  getPassword(service: string, account: string): Promise<string | null>;
-  setPassword(
-    service: string,
-    account: string,
-    password: string,
-  ): Promise<void>;
-  deletePassword(service: string, account: string): Promise<boolean>;
-  findCredentials(
-    service: string,
-  ): Promise<Array<{ account: string; password: string }>>;
-}
-
-const KEYCHAIN_TEST_PREFIX = '__keychain_test__';
-const SECRET_PREFIX = '__secret__';
+import { KeychainService } from '../../services/keychainService.js';
+import {
+  KEYCHAIN_TEST_PREFIX,
+  SECRET_PREFIX,
+} from '../../services/keychainTypes.js';
 
 export class KeychainTokenStorage
   extends BaseTokenStorage
   implements SecretStorage
 {
-  private keychainAvailable: boolean | null = null;
-  private keytarModule: Keytar | null = null;
-  private keytarLoadAttempted = false;
+  private readonly keychainService: KeychainService;
 
-  async getKeytar(): Promise<Keytar | null> {
-    // If we've already tried loading (successfully or not), return the result
-    if (this.keytarLoadAttempted) {
-      return this.keytarModule;
-    }
-
-    this.keytarLoadAttempted = true;
-
-    try {
-      // Try to import keytar without any timeout - let the OS handle it
-      const moduleName = 'keytar';
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const module = await import(moduleName);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      this.keytarModule = module.default || module;
-    } catch (_) {
-      //Keytar is optional so we shouldn't raise an error of log anything.
-    }
-    return this.keytarModule;
+  constructor(serviceName: string) {
+    super(serviceName);
+    this.keychainService = new KeychainService(serviceName);
   }
 
   async getCredentials(serverName: string): Promise<OAuthCredentials | null> {
-    if (!(await this.checkKeychainAvailability())) {
-      throw new Error('Keychain is not available');
-    }
-
-    const keytar = await this.getKeytar();
-    if (!keytar) {
-      throw new Error('Keytar module not available');
-    }
-
     try {
       const sanitizedName = this.sanitizeServerName(serverName);
-      const data = await keytar.getPassword(this.serviceName, sanitizedName);
+      const data = await this.keychainService.getPassword(sanitizedName);
 
       if (!data) {
         return null;
@@ -90,15 +50,6 @@ export class KeychainTokenStorage
   }
 
   async setCredentials(credentials: OAuthCredentials): Promise<void> {
-    if (!(await this.checkKeychainAvailability())) {
-      throw new Error('Keychain is not available');
-    }
-
-    const keytar = await this.getKeytar();
-    if (!keytar) {
-      throw new Error('Keytar module not available');
-    }
-
     this.validateCredentials(credentials);
 
     const sanitizedName = this.sanitizeServerName(credentials.serverName);
@@ -108,24 +59,12 @@ export class KeychainTokenStorage
     };
 
     const data = JSON.stringify(updatedCredentials);
-    await keytar.setPassword(this.serviceName, sanitizedName, data);
+    await this.keychainService.setPassword(sanitizedName, data);
   }
 
   async deleteCredentials(serverName: string): Promise<void> {
-    if (!(await this.checkKeychainAvailability())) {
-      throw new Error('Keychain is not available');
-    }
-
-    const keytar = await this.getKeytar();
-    if (!keytar) {
-      throw new Error('Keytar module not available');
-    }
-
     const sanitizedName = this.sanitizeServerName(serverName);
-    const deleted = await keytar.deletePassword(
-      this.serviceName,
-      sanitizedName,
-    );
+    const deleted = await this.keychainService.deletePassword(sanitizedName);
 
     if (!deleted) {
       throw new Error(`No credentials found for ${serverName}`);
@@ -133,17 +72,8 @@ export class KeychainTokenStorage
   }
 
   async listServers(): Promise<string[]> {
-    if (!(await this.checkKeychainAvailability())) {
-      throw new Error('Keychain is not available');
-    }
-
-    const keytar = await this.getKeytar();
-    if (!keytar) {
-      throw new Error('Keytar module not available');
-    }
-
     try {
-      const credentials = await keytar.findCredentials(this.serviceName);
+      const credentials = await this.keychainService.findCredentials();
       return credentials
         .filter(
           (cred) =>
@@ -162,20 +92,9 @@ export class KeychainTokenStorage
   }
 
   async getAllCredentials(): Promise<Map<string, OAuthCredentials>> {
-    if (!(await this.checkKeychainAvailability())) {
-      throw new Error('Keychain is not available');
-    }
-
-    const keytar = await this.getKeytar();
-    if (!keytar) {
-      throw new Error('Keytar module not available');
-    }
-
     const result = new Map<string, OAuthCredentials>();
     try {
-      const credentials = (
-        await keytar.findCredentials(this.serviceName)
-      ).filter(
+      const credentials = (await this.keychainService.findCredentials()).filter(
         (c) =>
           !c.account.startsWith(KEYCHAIN_TEST_PREFIX) &&
           !c.account.startsWith(SECRET_PREFIX),
@@ -208,119 +127,48 @@ export class KeychainTokenStorage
   }
 
   async clearAll(): Promise<void> {
-    if (!(await this.checkKeychainAvailability())) {
-      throw new Error('Keychain is not available');
-    }
-
-    const servers = this.keytarModule
-      ? await this.keytarModule
-          .findCredentials(this.serviceName)
-          .then((creds) => creds.map((c) => c.account))
-          .catch((error: Error) => {
-            throw new Error(
-              `Failed to list servers for clearing: ${error.message}`,
-            );
-          })
-      : [];
-    const errors: Error[] = [];
-
-    for (const server of servers) {
-      try {
-        await this.deleteCredentials(server);
-      } catch (error) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        errors.push(error as Error);
-      }
-    }
-
-    if (errors.length > 0) {
-      throw new Error(
-        `Failed to clear some credentials: ${errors.map((e) => e.message).join(', ')}`,
-      );
-    }
-  }
-
-  // Checks whether or not a set-get-delete cycle with the keychain works.
-  // Returns false if any operation fails.
-  async checkKeychainAvailability(): Promise<boolean> {
-    if (this.keychainAvailable !== null) {
-      return this.keychainAvailable;
-    }
-
     try {
-      const keytar = await this.getKeytar();
-      if (!keytar) {
-        this.keychainAvailable = false;
-        return false;
+      const credentials = await this.keychainService.findCredentials();
+      const errors: Error[] = [];
+
+      for (const cred of credentials) {
+        try {
+          await this.deleteCredentials(cred.account);
+        } catch (error) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          errors.push(error as Error);
+        }
       }
 
-      const testAccount = `${KEYCHAIN_TEST_PREFIX}${crypto.randomBytes(8).toString('hex')}`;
-      const testPassword = 'test';
-
-      await keytar.setPassword(this.serviceName, testAccount, testPassword);
-      const retrieved = await keytar.getPassword(this.serviceName, testAccount);
-      const deleted = await keytar.deletePassword(
-        this.serviceName,
-        testAccount,
+      if (errors.length > 0) {
+        throw new Error(
+          `Failed to clear some credentials: ${errors.map((e) => e.message).join(', ')}`,
+        );
+      }
+    } catch (error) {
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to clear credentials from keychain',
+        error,
       );
-
-      const success = deleted && retrieved === testPassword;
-      this.keychainAvailable = success;
-
-      coreEvents.emitTelemetryKeychainAvailability(
-        new KeychainAvailabilityEvent(success),
-      );
-
-      return success;
-    } catch (_error) {
-      this.keychainAvailable = false;
-
-      // Do not log the raw error message to avoid potential PII leaks
-      // (e.g. from OS-level error messages containing file paths)
-      coreEvents.emitTelemetryKeychainAvailability(
-        new KeychainAvailabilityEvent(false),
-      );
-
-      return false;
+      throw error;
     }
   }
 
   async isAvailable(): Promise<boolean> {
-    return this.checkKeychainAvailability();
+    return this.keychainService.isAvailable();
   }
 
   async setSecret(key: string, value: string): Promise<void> {
-    if (!(await this.checkKeychainAvailability())) {
-      throw new Error('Keychain is not available');
-    }
-    const keytar = await this.getKeytar();
-    if (!keytar) {
-      throw new Error('Keytar module not available');
-    }
-    await keytar.setPassword(this.serviceName, `${SECRET_PREFIX}${key}`, value);
+    await this.keychainService.setPassword(`${SECRET_PREFIX}${key}`, value);
   }
 
   async getSecret(key: string): Promise<string | null> {
-    if (!(await this.checkKeychainAvailability())) {
-      throw new Error('Keychain is not available');
-    }
-    const keytar = await this.getKeytar();
-    if (!keytar) {
-      throw new Error('Keytar module not available');
-    }
-    return keytar.getPassword(this.serviceName, `${SECRET_PREFIX}${key}`);
+    return this.keychainService.getPassword(`${SECRET_PREFIX}${key}`);
   }
 
   async deleteSecret(key: string): Promise<void> {
-    if (!(await this.checkKeychainAvailability())) {
-      throw new Error('Keychain is not available');
-    }
-    const keytar = await this.getKeytar();
-    if (!keytar) {
-      throw new Error('Keytar module not available');
-    }
-    const deleted = await keytar.deletePassword(
-      this.serviceName,
+    const deleted = await this.keychainService.deletePassword(
       `${SECRET_PREFIX}${key}`,
     );
     if (!deleted) {
@@ -329,15 +177,8 @@ export class KeychainTokenStorage
   }
 
   async listSecrets(): Promise<string[]> {
-    if (!(await this.checkKeychainAvailability())) {
-      throw new Error('Keychain is not available');
-    }
-    const keytar = await this.getKeytar();
-    if (!keytar) {
-      throw new Error('Keytar module not available');
-    }
     try {
-      const credentials = await keytar.findCredentials(this.serviceName);
+      const credentials = await this.keychainService.findCredentials();
       return credentials
         .filter((cred) => cred.account.startsWith(SECRET_PREFIX))
         .map((cred) => cred.account.substring(SECRET_PREFIX.length));

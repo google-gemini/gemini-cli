@@ -173,7 +173,7 @@ export class McpClientManager {
         return Promise.resolve();
       }),
     );
-    await this.cliConfig.refreshMcpContext();
+    await this.scheduleMcpContextRefresh();
   }
 
   /**
@@ -193,7 +193,7 @@ export class McpClientManager {
         }),
       ),
     );
-    await this.cliConfig.refreshMcpContext();
+    await this.scheduleMcpContextRefresh();
   }
 
   /**
@@ -251,7 +251,7 @@ export class McpClientManager {
         if (!skipRefresh) {
           // This is required to update the content generator configuration with the
           // new tool configuration and system instructions.
-          await this.cliConfig.refreshMcpContext();
+          await this.scheduleMcpContextRefresh();
         }
       }
     }
@@ -321,7 +321,7 @@ export class McpClientManager {
             this.cliConfig.getDebugMode(),
             this.clientVersion,
             async () => {
-              debugLogger.log('Tools changed, updating Gemini context...');
+              debugLogger.log(`🔔 Refreshing context for server '${name}'...`);
               await this.scheduleMcpContextRefresh();
             },
           );
@@ -431,7 +431,7 @@ export class McpClientManager {
       this.eventEmitter?.emit('mcp-client-update', this.clients);
     }
 
-    await this.cliConfig.refreshMcpContext();
+    await this.scheduleMcpContextRefresh();
   }
 
   /**
@@ -451,7 +451,7 @@ export class McpClientManager {
         },
       ),
     );
-    await this.cliConfig.refreshMcpContext();
+    await this.scheduleMcpContextRefresh();
   }
 
   /**
@@ -463,7 +463,7 @@ export class McpClientManager {
       throw new Error(`No MCP server registered with the name "${name}"`);
     }
     await this.maybeDiscoverMcpServer(name, config);
-    await this.cliConfig.refreshMcpContext();
+    await this.scheduleMcpContextRefresh();
   }
 
   /**
@@ -517,21 +517,51 @@ export class McpClientManager {
     return instructions.join('\n\n');
   }
 
+  private isRefreshingMcpContext: boolean = false;
+  private pendingMcpContextRefresh: boolean = false;
+
   private async scheduleMcpContextRefresh(): Promise<void> {
+    this.pendingMcpContextRefresh = true;
+
+    if (this.isRefreshingMcpContext) {
+      debugLogger.log(
+        'MCP context refresh already in progress, queuing trailing execution.',
+      );
+      return this.pendingRefreshPromise ?? Promise.resolve();
+    }
+
     if (this.pendingRefreshPromise) {
+      debugLogger.log(
+        'MCP context refresh already scheduled, coalescing with existing request.',
+      );
       return this.pendingRefreshPromise;
     }
 
+    debugLogger.log('Scheduling MCP context refresh...');
     this.pendingRefreshPromise = (async () => {
-      // Debounce to coalesce multiple rapid updates
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      this.isRefreshingMcpContext = true;
       try {
-        await this.cliConfig.refreshMcpContext();
+        do {
+          this.pendingMcpContextRefresh = false;
+          debugLogger.log('Executing MCP context refresh...');
+          await this.cliConfig.refreshMcpContext();
+          debugLogger.log('MCP context refresh complete.');
+
+          // If more refresh requests came in during the execution, wait a bit
+          // to coalesce them before the next iteration.
+          if (this.pendingMcpContextRefresh) {
+            debugLogger.log(
+              'Coalescing burst refresh requests (300ms delay)...',
+            );
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          }
+        } while (this.pendingMcpContextRefresh);
       } catch (error) {
         debugLogger.error(
           `Error refreshing MCP context: ${getErrorMessage(error)}`,
         );
       } finally {
+        this.isRefreshingMcpContext = false;
         this.pendingRefreshPromise = null;
       }
     })();
