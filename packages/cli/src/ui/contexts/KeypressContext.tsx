@@ -178,8 +178,7 @@ function nonKeyboardEventFilter(
 }
 
 /**
- * Converts return keys pressed quickly after other keys into plain
- * insertable return characters.
+ * Converts return keys pressed quickly after insertable keys into a shift+return
  *
  * This is to accommodate older terminals that paste text without bracketing.
  */
@@ -201,7 +200,7 @@ function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
     } else {
       keypressHandler(key);
     }
-    lastKeyTime = now;
+    lastKeyTime = key.insertable ? now : 0;
   };
 }
 
@@ -630,7 +629,7 @@ function* emitKeys(
     } else if (sequence === `${ESC}${ESC}`) {
       // Double escape
       name = 'escape';
-      alt = true;
+      alt = false;
 
       // Emit first escape key here, then continue processing
       keypressHandler({
@@ -645,7 +644,7 @@ function* emitKeys(
     } else if (escaped) {
       // Escape sequence timeout
       name = ch.length ? undefined : 'escape';
-      alt = true;
+      alt = ch.length > 0;
     } else {
       // Any other character is considered printable.
       insertable = true;
