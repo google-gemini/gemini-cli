@@ -13,7 +13,6 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
-  type ForcedToolDecision,
   type ToolCallConfirmationDetails,
   type ToolConfirmationOutcome,
   type ToolEditConfirmationDetails,
@@ -27,7 +26,7 @@ import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../policy/types.js';
+import { type ApprovalMode } from '../policy/types.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
@@ -700,26 +699,26 @@ class EditToolInvocation
     );
   }
 
+  protected override get respectsAutoEdit(): boolean {
+    return true;
+  }
+
+  protected override getApprovalMode(): ApprovalMode {
+    return this.config.getApprovalMode();
+  }
+
   /**
    * Handles the confirmation prompt for the Edit tool in the CLI.
    * It needs to calculate the diff to show the user.
    */
   protected override async getConfirmationDetails(
-    abortSignal: AbortSignal,
-    forcedDecision?: ForcedToolDecision,
+    _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (
-      this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT &&
-      forcedDecision !== 'ask_user'
-    ) {
-      return false;
-    }
-
     let editData: CalculatedEdit;
     try {
-      editData = await this.calculateEdit(this.params, abortSignal);
+      editData = await this.calculateEdit(this.params, _abortSignal);
     } catch (error) {
-      if (abortSignal.aborted) {
+      if (_abortSignal.aborted) {
         throw error;
       }
       const errorMsg = error instanceof Error ? error.message : String(error);

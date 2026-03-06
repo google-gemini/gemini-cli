@@ -11,13 +11,12 @@ import os from 'node:os';
 import * as Diff from 'diff';
 import { WRITE_FILE_TOOL_NAME, WRITE_FILE_DISPLAY_NAME } from './tool-names.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../policy/types.js';
+import { type ApprovalMode } from '../policy/types.js';
 
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
-  type ForcedToolDecision,
   type FileDiff,
   type ToolCallConfirmationDetails,
   type ToolEditConfirmationDetails,
@@ -173,22 +172,22 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     return `Writing to ${shortenPath(relativePath)}`;
   }
 
-  protected override async getConfirmationDetails(
-    abortSignal: AbortSignal,
-    forcedDecision?: ForcedToolDecision,
-  ): Promise<ToolCallConfirmationDetails | false> {
-    if (
-      this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT &&
-      forcedDecision !== 'ask_user'
-    ) {
-      return false;
-    }
+  protected override get respectsAutoEdit(): boolean {
+    return true;
+  }
 
+  protected override getApprovalMode(): ApprovalMode {
+    return this.config.getApprovalMode();
+  }
+
+  protected override async getConfirmationDetails(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
     const correctedContentResult = await getCorrectedFileContent(
       this.config,
       this.resolvedPath,
       this.params.content,
-      abortSignal,
+      _abortSignal,
     );
 
     if (correctedContentResult.error) {

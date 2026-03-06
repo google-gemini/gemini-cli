@@ -8,7 +8,6 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
-  type ForcedToolDecision,
   type ToolCallConfirmationDetails,
   type ToolInvocation,
   type ToolResult,
@@ -18,7 +17,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../policy/types.js';
+import { type ApprovalMode } from '../policy/types.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { truncateString } from '../utils/textUtils.js';
@@ -292,16 +291,17 @@ ${textContent}
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
   }
 
+  protected override get respectsAutoEdit(): boolean {
+    return true;
+  }
+
+  protected override getApprovalMode(): ApprovalMode {
+    return this.config.getApprovalMode();
+  }
+
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
-    _forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
-    // Check for AUTO_EDIT approval mode. This tool has a specific behavior
-    // where ProceedAlways switches the entire session to AUTO_EDIT.
-    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
-      return false;
-    }
-
     let urls: string[] = [];
     let prompt = this.params.prompt || '';
 

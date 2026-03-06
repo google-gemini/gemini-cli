@@ -9,7 +9,6 @@ import {
   BaseToolInvocation,
   Kind,
   ToolConfirmationOutcome,
-  type ForcedToolDecision,
   type ToolEditConfirmationDetails,
   type ToolResult,
 } from './tools.js';
@@ -164,7 +163,6 @@ class MemoryToolInvocation extends BaseToolInvocation<
 
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
-    _forcedDecision?: ForcedToolDecision,
   ): Promise<ToolEditConfirmationDetails | false> {
     const memoryFilePath = getGlobalMemoryFilePath();
     const allowlistKey = memoryFilePath;

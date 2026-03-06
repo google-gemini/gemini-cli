@@ -16,7 +16,6 @@ import {
 import type {
   ToolCallConfirmationDetails,
   ToolResult,
-  ForcedToolDecision,
 } from '../tools/tools.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
@@ -47,7 +46,6 @@ export interface ServerTool {
   shouldConfirmExecute(
     params: Record<string, unknown>,
     abortSignal: AbortSignal,
-    forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false>;
 }
 

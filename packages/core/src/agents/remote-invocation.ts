@@ -6,7 +6,6 @@
 
 import {
   BaseToolInvocation,
-  type ForcedToolDecision,
   type ToolConfirmationOutcome,
   type ToolResult,
   type ToolCallConfirmationDetails,
@@ -135,7 +134,6 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
-    _forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
     // For now, always require confirmation for remote agents until we have a policy system for them.
     return {

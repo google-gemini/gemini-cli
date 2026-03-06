@@ -10,7 +10,6 @@ import {
   Kind,
   type ToolInvocation,
   type ToolResult,
-  type ForcedToolDecision,
   type ToolCallConfirmationDetails,
 } from './tools.js';
 import { GET_INTERNAL_DOCS_TOOL_NAME } from './tool-names.js';
@@ -86,7 +85,6 @@ class GetInternalDocsInvocation extends BaseToolInvocation<
 
   override async shouldConfirmExecute(
     _abortSignal: AbortSignal,
-    _forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
     return false;
   }

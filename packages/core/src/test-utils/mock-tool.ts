@@ -12,7 +12,6 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
-  type ForcedToolDecision,
   type ToolCallConfirmationDetails,
   type ToolInvocation,
   type ToolLiveOutput,
@@ -31,7 +30,6 @@ interface MockToolOptions {
   shouldConfirmExecute?: (
     params: { [key: string]: unknown },
     signal: AbortSignal,
-    forcedDecision?: ForcedToolDecision,
   ) => Promise<ToolCallConfirmationDetails | false>;
   execute?: (
     params: { [key: string]: unknown },
@@ -70,13 +68,8 @@ class MockToolInvocation extends BaseToolInvocation<
 
   override shouldConfirmExecute(
     abortSignal: AbortSignal,
-    forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
-    return this.tool.shouldConfirmExecute(
-      this.params,
-      abortSignal,
-      forcedDecision,
-    );
+    return this.tool.shouldConfirmExecute(this.params, abortSignal);
   }
 
   getDescription(): string {
@@ -94,7 +87,6 @@ export class MockTool extends BaseDeclarativeTool<
   readonly shouldConfirmExecute: (
     params: { [key: string]: unknown },
     signal: AbortSignal,
-    forcedDecision?: ForcedToolDecision,
   ) => Promise<ToolCallConfirmationDetails | false>;
 
   readonly execute: (
@@ -177,7 +169,6 @@ export class MockModifiableToolInvocation extends BaseToolInvocation<
 
   override async shouldConfirmExecute(
     _abortSignal: AbortSignal,
-    _forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (this.tool.shouldConfirm) {
       return {

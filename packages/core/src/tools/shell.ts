@@ -16,7 +16,6 @@ import {
   BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
-  type ForcedToolDecision,
   type ToolInvocation,
   type ToolResult,
   type ToolCallConfirmationDetails,
@@ -110,7 +109,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
-    _forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
 

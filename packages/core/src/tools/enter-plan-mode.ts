@@ -7,7 +7,6 @@
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
-  type ForcedToolDecision,
   type ToolResult,
   Kind,
   type ToolInfoConfirmationDetails,
@@ -86,10 +85,8 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
 
   override async shouldConfirmExecute(
     abortSignal: AbortSignal,
-    forcedDecision?: ForcedToolDecision,
   ): Promise<ToolInfoConfirmationDetails | false> {
-    const decision =
-      forcedDecision ?? (await this.getMessageBusDecision(abortSignal));
+    const decision = await this.getMessageBusDecision(abortSignal);
     if (decision === 'allow') {
       return false;
     }

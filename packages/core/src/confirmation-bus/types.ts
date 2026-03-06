@@ -46,6 +46,10 @@ export interface ToolConfirmationRequest {
    * Optional rich details for the confirmation UI (diffs, counts, etc.)
    */
   details?: SerializableConfirmationDetails;
+  /**
+   * Optional decision to force for this tool call, bypassing the policy engine.
+   */
+  forcedDecision?: 'allow' | 'deny' | 'ask_user';
 }
 
 export interface ToolConfirmationResponse {

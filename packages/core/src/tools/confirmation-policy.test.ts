@@ -191,5 +191,39 @@ describe('Tool Confirmation Policy Updates', () => {
         }
       },
     );
+
+    it('should skip confirmation in AUTO_EDIT mode', async () => {
+      vi.spyOn(mockConfig, 'getApprovalMode').mockReturnValue(
+        ApprovalMode.AUTO_EDIT,
+      );
+      const tool = create(mockConfig, mockMessageBus);
+      const invocation = tool.build(params as any);
+
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      expect(confirmation).toBe(false);
+    });
+
+    it('should NOT skip confirmation in AUTO_EDIT mode if forcedDecision is ask_user', async () => {
+      vi.spyOn(mockConfig, 'getApprovalMode').mockReturnValue(
+        ApprovalMode.AUTO_EDIT,
+      );
+      const tool = create(mockConfig, mockMessageBus);
+      const invocation = tool.build(params as any);
+
+      // Mock getMessageBusDecision to return ask_user
+      vi.spyOn(invocation as any, 'getMessageBusDecision').mockResolvedValue(
+        'ask_user',
+      );
+
+      const confirmation = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+        'ask_user',
+      );
+
+      expect(confirmation).not.toBe(false);
+    });
   });
 });

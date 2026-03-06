@@ -18,7 +18,7 @@ import {
   type ToolConfirmationResponse,
   type Question,
 } from '../confirmation-bus/types.js';
-import { type ApprovalMode } from '../policy/types.js';
+import { ApprovalMode } from '../policy/types.js';
 import type { SubagentProgress } from '../agents/types.js';
 
 /**
@@ -58,10 +58,10 @@ export interface ToolInvocation<
    * @param abortSignal An AbortSignal that can be used to cancel the confirmation request.
    * @returns A ToolCallConfirmationDetails object if confirmation is required, or false if not.
    */
-  shouldConfirmExecute: (
+  shouldConfirmExecute(
     abortSignal: AbortSignal,
     forcedDecision?: ForcedToolDecision,
-  ) => Promise<ToolCallConfirmationDetails | false>;
+  ): Promise<ToolCallConfirmationDetails | false>;
 
   /**
    * Executes the tool with the validated parameters.
@@ -111,6 +111,14 @@ export abstract class BaseToolInvocation<
     abortSignal: AbortSignal,
     forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
+    if (
+      this.respectsAutoEdit &&
+      this.getApprovalMode() === ApprovalMode.AUTO_EDIT &&
+      forcedDecision !== 'ask_user'
+    ) {
+      return false;
+    }
+
     const decision =
       forcedDecision ?? (await this.getMessageBusDecision(abortSignal));
     if (decision === 'allow') {
@@ -126,11 +134,28 @@ export abstract class BaseToolInvocation<
     }
 
     if (decision === 'ask_user') {
-      return this.getConfirmationDetails(abortSignal, forcedDecision);
+      return this.getConfirmationDetails(abortSignal);
     }
 
     // Default to confirmation details if decision is unknown (should not happen with exhaustive policy)
-    return this.getConfirmationDetails(abortSignal, forcedDecision);
+    return this.getConfirmationDetails(abortSignal);
+  }
+
+  /**
+   * Whether this tool respects the AUTO_EDIT approval mode.
+   * Subclasses should override this and return true if they want to skip
+   * confirmation when the session is in AUTO_EDIT mode.
+   */
+  protected get respectsAutoEdit(): boolean {
+    return false;
+  }
+
+  /**
+   * Returns the current approval mode from the tool configuration.
+   * Subclasses should override this and return the actual approval mode.
+   */
+  protected getApprovalMode(): ApprovalMode {
+    return ApprovalMode.DEFAULT;
   }
 
   /**
@@ -174,7 +199,6 @@ export abstract class BaseToolInvocation<
    */
   protected async getConfirmationDetails(
     _abortSignal: AbortSignal,
-    _forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (!this.messageBus) {
       return false;
@@ -193,6 +217,7 @@ export abstract class BaseToolInvocation<
 
   protected getMessageBusDecision(
     abortSignal: AbortSignal,
+    forcedDecision?: ForcedToolDecision,
   ): Promise<ForcedToolDecision> {
     if (!this.messageBus || !this._toolName) {
       // If there's no message bus, we can't make a decision, so we allow.
@@ -211,6 +236,7 @@ export abstract class BaseToolInvocation<
       },
       serverName: this._serverName,
       toolAnnotations: this._toolAnnotations,
+      forcedDecision,
     };
 
     return new Promise<ForcedToolDecision>((resolve) => {

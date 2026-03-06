@@ -7,7 +7,6 @@
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
-  type ForcedToolDecision,
   type ToolResult,
   Kind,
   type ToolExitPlanModeConfirmationDetails,
@@ -119,7 +118,6 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
 
   override async shouldConfirmExecute(
     abortSignal: AbortSignal,
-    forcedDecision?: ForcedToolDecision,
   ): Promise<ToolExitPlanModeConfirmationDetails | false> {
     const resolvedPlanPath = this.getResolvedPlanPath();
 
@@ -139,8 +137,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       return false;
     }
 
-    const decision =
-      forcedDecision ?? (await this.getMessageBusDecision(abortSignal));
+    const decision = await this.getMessageBusDecision(abortSignal);
     if (decision === 'deny') {
       throw new Error(
         `Tool execution for "${
