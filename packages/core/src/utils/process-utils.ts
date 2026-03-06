@@ -49,11 +49,11 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
     try {
       const child = cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
       child.on('error', () => {
-        // Ignore errors if taskkill fails or is missing on the system to prevent zombie crash
+      const child = cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
+      // Handle errors if taskkill fails to spawn, but don't crash.
+      child.on('error', (err) => {
+        // It's good practice to log this error, for example using the project's debugLogger.
       });
-    } catch {
-      // Ignore errors if the process tree is already dead
-    }
     return;
   }
 
