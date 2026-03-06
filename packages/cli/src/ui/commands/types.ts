@@ -82,7 +82,7 @@ export interface CommandContext {
     ) => void;
     extensionsUpdateState: Map<string, ExtensionUpdateStatus>;
     dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
-    addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
+    addInteractiveConsentRequest: (value: ConfirmationRequest) => void;
     /**
      * Sets a confirmation request to be displayed to the user.
      *

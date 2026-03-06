@@ -29,7 +29,7 @@ interface RunEventNotificationParams {
   commandConfirmationRequest: ConfirmationRequest | null;
   authConsentRequest: ConfirmationRequest | null;
   permissionConfirmationRequest: PermissionConfirmationRequest | null;
-  hasConfirmUpdateExtensionRequests: boolean;
+  hasInteractiveConsentRequests: boolean;
   hasLoopDetectionConfirmationRequest: boolean;
   terminalName?: string;
 }
@@ -44,7 +44,7 @@ export function useRunEventNotifications({
   commandConfirmationRequest,
   authConsentRequest,
   permissionConfirmationRequest,
-  hasConfirmUpdateExtensionRequests,
+  hasInteractiveConsentRequests,
   hasLoopDetectionConfirmationRequest,
 }: RunEventNotificationParams): void {
   const pendingAttentionNotification = useMemo(
@@ -54,7 +54,7 @@ export function useRunEventNotifications({
         commandConfirmationRequest,
         authConsentRequest,
         permissionConfirmationRequest,
-        hasConfirmUpdateExtensionRequests,
+        hasInteractiveConsentRequests,
         hasLoopDetectionConfirmationRequest,
       ),
     [
@@ -62,7 +62,7 @@ export function useRunEventNotifications({
       commandConfirmationRequest,
       authConsentRequest,
       permissionConfirmationRequest,
-      hasConfirmUpdateExtensionRequests,
+      hasInteractiveConsentRequests,
       hasLoopDetectionConfirmationRequest,
     ],
   );

@@ -38,7 +38,7 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     openAgentConfigDialog: () => {},
     extensionsUpdateState: new Map(),
     dispatchExtensionStateUpdate: (_action: ExtensionUpdateAction) => {},
-    addConfirmUpdateExtensionRequest: (_request) => {},
+    addInteractiveConsentRequest: (_request) => {},
     setConfirmationRequest: (_request) => {},
     removeComponent: () => {},
     toggleBackgroundShell: () => {},

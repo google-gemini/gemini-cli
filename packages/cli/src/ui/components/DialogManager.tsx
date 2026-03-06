@@ -194,8 +194,8 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.confirmUpdateExtensionRequests.length > 0) {
-    const request = uiState.confirmUpdateExtensionRequests[0];
+  if (uiState.interactiveConsentRequests.length > 0) {
+    const request = uiState.interactiveConsentRequests[0];
     return (
       <ConsentPrompt
         prompt={request.prompt}

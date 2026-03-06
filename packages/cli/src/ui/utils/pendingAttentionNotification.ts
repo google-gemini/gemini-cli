@@ -33,7 +33,7 @@ export function getPendingAttentionNotification(
   commandConfirmationRequest: ConfirmationRequest | null,
   authConsentRequest: ConfirmationRequest | null,
   permissionConfirmationRequest: PermissionConfirmationRequest | null,
-  hasConfirmUpdateExtensionRequests: boolean,
+  hasInteractiveConsentRequests: boolean,
   hasLoopDetectionConfirmationRequest: boolean,
 ): PendingAttentionNotification | null {
   const confirmingToolState = getConfirmingToolState(pendingHistoryItems);
@@ -100,13 +100,13 @@ export function getPendingAttentionNotification(
     };
   }
 
-  if (hasConfirmUpdateExtensionRequests) {
+  if (hasInteractiveConsentRequests) {
     return {
-      key: 'extension_update_confirmation',
+      key: 'interactive_consent_confirmation',
       event: {
         type: 'attention',
-        heading: 'Extension update confirmation required',
-        detail: 'An extension update is waiting for your confirmation.',
+        heading: 'Action required',
+        detail: 'Gemini CLI is waiting for your response.',
       },
     };
   }

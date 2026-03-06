@@ -82,7 +82,7 @@ interface SlashCommandProcessorActions {
   toggleCorgiMode: () => void;
   toggleDebugProfiler: () => void;
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
-  addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
+  addInteractiveConsentRequest: (request: ConfirmationRequest) => void;
   toggleBackgroundShell: () => void;
   toggleShortcutsHelp: () => void;
   setText: (text: string) => void;
@@ -237,8 +237,7 @@ export const useSlashCommandProcessor = (
         openAgentConfigDialog: actions.openAgentConfigDialog,
         extensionsUpdateState,
         dispatchExtensionStateUpdate: actions.dispatchExtensionStateUpdate,
-        addConfirmUpdateExtensionRequest:
-          actions.addConfirmUpdateExtensionRequest,
+        addInteractiveConsentRequest: actions.addInteractiveConsentRequest,
         setConfirmationRequest,
         removeComponent: () => setCustomDialog(null),
         toggleBackgroundShell: actions.toggleBackgroundShell,
