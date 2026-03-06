@@ -33,7 +33,7 @@ export interface CacheOptions {
 /**
  * A generic caching service with TTL support.
  */
-export class CacheService<K extends object | string, V> {
+export class CacheService<K extends object | string | undefined, V> {
   private readonly storage:
     | Map<K, CacheEntry<V>>
     | WeakMap<WeakKey, CacheEntry<V>>;
@@ -138,13 +138,13 @@ export class CacheService<K extends object | string, V> {
 /**
  * Factory function to create a new cache.
  */
-export function createCache<K extends string, V>(
+export function createCache<K extends string | undefined, V>(
   options: CacheOptions & { storage: 'map' },
 ): CacheService<K, V>;
 export function createCache<K extends object, V>(
   options?: CacheOptions,
 ): CacheService<K, V>;
-export function createCache<K extends object | string, V>(
+export function createCache<K extends object | string | undefined, V>(
   options: CacheOptions = {},
 ): CacheService<K, V> {
   return new CacheService<K, V>(options);
