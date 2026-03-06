@@ -399,9 +399,9 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
   const [planModeUIHistoryStartIndex, setPlanModeUIHistoryStartIndex] =
-    useState<number | null>(() => 
+    useState<number | null>(() =>
       // Initialize if starting in PLAN mode (e.g. session resume)
-       config.getApprovalMode() === ApprovalMode.PLAN ? 0 : null
+      config.getApprovalMode() === ApprovalMode.PLAN ? 0 : null,
     );
 
   useEffect(() => {
