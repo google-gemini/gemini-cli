@@ -17,6 +17,7 @@ import {
   isGuiEditor,
   isTerminalEditor,
   isValidEditorType,
+  resolveEditorTypeFromCommand,
 } from '@google/gemini-cli-core';
 
 /**
@@ -55,18 +56,29 @@ export async function openFileInEditor(
   }
 
   if (!command) {
-    command = process.env['VISUAL'] ?? process.env['EDITOR'];
-    if (command) {
-      const lowerCommand = command.toLowerCase();
-      const isGui = ['code', 'cursor', 'subl', 'zed', 'atom'].some((gui) =>
-        lowerCommand.includes(gui),
-      );
-      if (
-        isGui &&
-        !lowerCommand.includes('--wait') &&
-        !lowerCommand.includes('-w')
-      ) {
-        args.unshift(lowerCommand.includes('subl') ? '-w' : '--wait');
+    const envCommand = process.env['VISUAL'] ?? process.env['EDITOR'];
+    if (envCommand) {
+      command = envCommand;
+      const [envExecutable = ''] = envCommand.split(' ');
+      const resolvedType = resolveEditorTypeFromCommand(envExecutable);
+      if (resolvedType) {
+        if (
+          isGuiEditor(resolvedType) &&
+          !envCommand.includes('--wait') &&
+          !envCommand.includes('-w')
+        ) {
+          args.unshift(getEditorWaitFlag(resolvedType));
+        }
+        extraArgs.push(...getEditorExtraArgs(resolvedType));
+      } else {
+        // Heuristic fallback for commands not in the registry
+        const lower = envCommand.toLowerCase();
+        const isGui = ['code', 'cursor', 'subl', 'zed', 'atom'].some((g) =>
+          lower.includes(g),
+        );
+        if (isGui && !lower.includes('--wait') && !lower.includes('-w')) {
+          args.unshift(lower.includes('subl') ? '-w' : '--wait');
+        }
       }
     }
   }
