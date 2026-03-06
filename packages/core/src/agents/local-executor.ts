@@ -137,7 +137,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const value = Reflect.get(target, prop, receiver);
         // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        return typeof value === 'function' ? value.bind(target) : value;
+        return typeof value === 'function' ? value.bind(receiver) : value;
       },
     });
 

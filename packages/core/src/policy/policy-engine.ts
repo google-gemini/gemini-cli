@@ -229,6 +229,7 @@ export class PolicyEngine {
     allowRedirection?: boolean,
     rule?: PolicyRule,
     toolAnnotations?: Record<string, unknown>,
+    subagent?: string,
   ): Promise<CheckResult> {
     if (!command) {
       return {
@@ -320,6 +321,7 @@ export class PolicyEngine {
           { name: toolName, args: { command: subCmd, dir_path } },
           serverName,
           toolAnnotations,
+          subagent,
         );
 
         // subResult.decision is already filtered through applyNonInteractiveMode by this.check()
@@ -457,6 +459,7 @@ export class PolicyEngine {
             rule.allowRedirection,
             rule,
             toolAnnotations,
+            subagent,
           );
           decision = shellResult.decision;
           if (shellResult.rule) {
@@ -483,9 +486,10 @@ export class PolicyEngine {
           this.defaultDecision,
           serverName,
           shellDirPath,
-          undefined,
+          false,
           undefined,
           toolAnnotations,
+          subagent,
         );
         decision = shellResult.decision;
         matchedRule = shellResult.rule;
