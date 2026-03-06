@@ -268,8 +268,8 @@ describe('AskUserDialog', () => {
             expect(lastFrame()).not.toContain('▼');
           }
           await waitUntilReady();
+          expect(lastFrame()).toMatchSnapshot();
         });
-        expect(lastFrame()).toMatchSnapshot();
       });
     },
   );
@@ -569,9 +569,8 @@ describe('AskUserDialog', () => {
 
     await waitFor(async () => {
       await waitUntilReady();
-      expect(lastFrame()).toContain('Review your answers:');
+      expect(lastFrame()).toMatchSnapshot();
     });
-    expect(lastFrame()).toMatchSnapshot();
 
     writeKey(stdin, '\x1b[D'); // Left arrow back
 
@@ -615,9 +614,8 @@ describe('AskUserDialog', () => {
 
     await waitFor(async () => {
       await waitUntilReady();
-      expect(lastFrame()).toContain('Review your answers:');
+      expect(lastFrame()).toMatchSnapshot();
     });
-    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('submits with unanswered questions when user confirms on Review', async () => {
@@ -1311,9 +1309,8 @@ describe('AskUserDialog', () => {
 
       await waitFor(async () => {
         await waitUntilReady();
-        expect(lastFrame()).toContain('Type another language...');
+        expect(lastFrame()).toMatchSnapshot();
       });
-      expect(lastFrame()).toMatchSnapshot();
     });
 
     it('uses default placeholder when not provided', async () => {
@@ -1346,9 +1343,8 @@ describe('AskUserDialog', () => {
 
       await waitFor(async () => {
         await waitUntilReady();
-        expect(lastFrame()).toContain('Enter a custom value');
+        expect(lastFrame()).toMatchSnapshot();
       });
-      expect(lastFrame()).toMatchSnapshot();
     });
   });
 });
