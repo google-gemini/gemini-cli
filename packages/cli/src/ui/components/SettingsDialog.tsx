@@ -33,7 +33,7 @@ import {
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, FeatureDefinitions } from '@google/gemini-cli-core';
 
 import { useSearchBuffer } from '../hooks/useSearchBuffer.js';
 import {
@@ -244,6 +244,14 @@ export function SettingsDialog({
       // The inline editor needs a string but non primitive settings like Arrays and Objects exist
       const editValue = getEditValue(type, rawValue);
 
+      let stage: string | undefined;
+      const definitionKey = key.replace(/^features\./, '');
+      if (key.startsWith('features.') && FeatureDefinitions[definitionKey]) {
+        const specs = FeatureDefinitions[definitionKey];
+        const latest = specs[specs.length - 1];
+        stage = latest.preRelease;
+      }
+
       return {
         key,
         label: definition?.label || key,
@@ -254,6 +262,7 @@ export function SettingsDialog({
         scopeMessage,
         rawValue,
         editValue,
+        stage,
       };
     });
   }, [settingKeys, selectedScope, settings]);

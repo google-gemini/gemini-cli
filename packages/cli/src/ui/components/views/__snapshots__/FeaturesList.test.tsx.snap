@@ -1,0 +1,43 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<FeaturesList /> > renders correctly with features 1`] = `
+"┃ Alpha Features (1)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ FEATURE                                ENABLED             SINCE              UNTIL
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ alphaFeat                              🔴 false            0.30.0             —
+   An alpha feature.
+
+
+┃ Beta Features (1)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ FEATURE                                ENABLED             SINCE              UNTIL
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ betaFeat                               🟢 true             0.29.0             —
+   A beta feature.
+
+
+┃ Deprecated Features (1)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ FEATURE                                ENABLED             SINCE              UNTIL
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ deprecatedFeat                         🔴 false            0.28.0             0.31.0
+   A deprecated feature.
+
+
+
+ 💡 Use /settings to enable or disable features. You can also use stage toggles like allAlpha=true
+ or allBeta=false to toggle entire stages.
+"
+`;
+
+exports[`<FeaturesList /> > renders correctly with no features 1`] = `
+" No features found
+"
+`;
