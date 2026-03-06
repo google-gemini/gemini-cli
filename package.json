@@ -164,7 +164,7 @@
     ],
     "packages/cli/src/config/settingsSchema.ts": [
       "npm run docs:settings",
-      "git add schemas/settings.schema.json docs/get-started/configuration.md docs/cli/settings.md docs/cli/feature-lifecycle.md"
+      "git add schemas/settings.schema.json docs/reference/configuration.md docs/cli/settings.md docs/cli/feature-lifecycle.md"
     ],
     "packages/cli/src/config/keyBindings.ts": [
       "npm run docs:keybindings",

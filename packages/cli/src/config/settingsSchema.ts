@@ -2389,15 +2389,6 @@ const SETTINGS_SCHEMA = {
         description: 'Enable planning features (Plan Mode and tools).',
         showInDialog: true,
       },
-      zedIntegration: {
-        type: 'boolean',
-        label: 'Zed Integration',
-        category: 'Features',
-        requiresRestart: true,
-        default: false,
-        description: 'Enable Zed integration.',
-        showInDialog: true,
-      },
     },
   },
 } as const satisfies SettingsSchema;

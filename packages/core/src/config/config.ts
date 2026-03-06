@@ -733,8 +733,6 @@ export class Config implements McpContext {
   private readonly useBackgroundColor: boolean;
   private readonly useAlternateBuffer: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
-  private readonly extensionManagement: boolean = true;
-  private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
   private compressionTruncationCounter = 0;
   private initialized = false;
@@ -788,7 +786,6 @@ export class Config implements McpContext {
     overageStrategy: OverageStrategy;
   };
 
-  private readonly enableAgents: boolean;
   private agents: AgentSettings;
   private readonly enableEventDrivenScheduler: boolean;
   private readonly skillsSupport: boolean;
@@ -913,7 +910,6 @@ export class Config implements McpContext {
       extensionManagement: params.extensionManagement,
       plan: params.plan,
       jitContext: params.experimentalJitContext,
-      zedIntegration: params.experimentalZedIntegration,
     };
     for (const [key, value] of Object.entries(legacyMap)) {
       if (value !== undefined && params.features?.[key] === undefined) {
@@ -931,7 +927,6 @@ export class Config implements McpContext {
     this.featureGate = gate;
 
     this.modelAvailabilityService = new ModelAvailabilityService();
-    this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.userHintService = new UserHintService(() =>
       this.isModelSteeringEnabled(),
@@ -1215,7 +1210,7 @@ export class Config implements McpContext {
       }
     });
 
-    if (!this.interactive || this.acpMode || this.getExperimentalZedIntegration()) {
+    if (!this.interactive || this.acpMode) {
       await this.mcpInitializationPromise;
     }
 
@@ -2093,42 +2088,6 @@ export class Config implements McpContext {
   }
 
   /**
-   * Synchronizes enter/exit plan mode tools based on current mode.
-   */
-  syncPlanModeTools(): void {
-    const isPlanMode = this.getApprovalMode() === ApprovalMode.PLAN;
-    const registry = this.getToolRegistry();
-
-    if (isPlanMode) {
-      if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-        registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
-      }
-      if (!registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
-        registry.registerTool(new ExitPlanModeTool(this, this.messageBus));
-      }
-    } else {
-      if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
-        registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
-      }
-      if (this.isPlanEnabled()) {
-        if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-          registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
-        }
-      } else {
-        if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-          registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
-        }
-      }
-    }
-
-    if (this.geminiClient?.isInitialized()) {
-      this.geminiClient.setTools().catch((err) => {
-        debugLogger.error('Failed to update tools', err);
-      });
-    }
-  }
-
-  /**
    * Logs the duration of the current approval mode.
    */
   logCurrentModeDuration(mode: ApprovalMode): void {
@@ -2332,10 +2291,6 @@ export class Config implements McpContext {
     if (this.mcpInitializationPromise) {
       await this.mcpInitializationPromise;
     }
-  }
-
-  getExperimentalZedIntegration(): boolean {
-    return this.isFeatureEnabled('zedIntegration');
   }
 
   getListExtensions(): boolean {

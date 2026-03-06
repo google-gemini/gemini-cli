@@ -2124,13 +2124,6 @@
           "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Features`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
-        },
-        "zedIntegration": {
-          "title": "Zed Integration",
-          "description": "Enable Zed integration.",
-          "markdownDescription": "Enable Zed integration.\n\n- Category: `Features`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
         }
       },
       "additionalProperties": false

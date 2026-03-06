@@ -137,18 +137,6 @@ they appear in the UI.
 | --------------------------------- | ------------------------------ | --------------------------------------------- | ------- |
 | Auto Configure Max Old Space Size | `advanced.autoConfigureMemory` | Automatically configure Node.js memory limits | `false` |
 
-### Experimental
-
-| UI Label                   | Setting                                  | Description                                                                                                                                               | Default |
-| -------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| Enable Tool Output Masking | `experimental.toolOutputMasking.enabled` | Enables tool output masking to save tokens.                                                                                                               | `true`  |
-| Use OSC 52 Paste           | `experimental.useOSC52Paste`             | Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
-| Use OSC 52 Copy            | `experimental.useOSC52Copy`              | Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
-| Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                                                                                           | `false` |
-| Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
-| Direct Web Fetch           | `experimental.directWebFetch`            | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
-| Enable Gemma Model Router  | `experimental.gemmaModelRouter.enabled`  | Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.                                           | `false` |
-
 ### Skills
 
 | UI Label            | Setting          | Description          | Default |
@@ -177,6 +165,5 @@ they appear in the UI.
 | JIT Context Loading           | `features.jitContext`          | Enable Just-In-Time (JIT) context loading.                  | `false` | `ALPHA` |
 | Use OSC 52 Paste              | `features.useOSC52Paste`       | Use OSC 52 sequence for pasting.                            | `false` | `ALPHA` |
 | Plan Mode                     | `features.plan`                | Enable planning features (Plan Mode and tools).             | `false` | `ALPHA` |
-| Zed Integration               | `features.zedIntegration`      | Enable Zed integration.                                     | `false` | `ALPHA` |
 
 <!-- SETTINGS-AUTOGEN:END -->

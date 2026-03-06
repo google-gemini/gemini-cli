@@ -767,7 +767,6 @@ export async function loadCliConfig(
     bugCommand: settings.advanced?.bugCommand,
     model: resolvedModel,
     maxSessionTurns: settings.model?.maxSessionTurns,
-    experimentalZedIntegration: argv.experimentalAcp || false,
     features: settings.features,
     featureGates: argv.featureGates,
     listExtensions: argv.listExtensions || false,

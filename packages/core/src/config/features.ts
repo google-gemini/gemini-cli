@@ -311,13 +311,6 @@ export const FeatureDefinitions: Record<string, FeatureSpec[]> = {
       description: 'Enable planning features (Plan Mode and tools).',
     },
   ],
-  zedIntegration: [
-    {
-      preRelease: FeatureStage.Alpha,
-      since: '0.30.0',
-      description: 'Enable Zed integration.',
-    },
-  ],
 };
 
 // Register core features

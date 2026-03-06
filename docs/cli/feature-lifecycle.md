@@ -99,7 +99,6 @@ For more details on persistent configuration, see the [Configuration guide].
 | `plan`                | ALPHA | Disabled | 0.30.0 | Enable planning features (Plan Mode and tools).             |
 | `toolOutputMasking`   | BETA  | Enabled  | 0.30.0 | Enables tool output masking to save tokens.                 |
 | `useOSC52Paste`       | ALPHA | Disabled | 0.30.0 | Use OSC 52 sequence for pasting.                            |
-| `zedIntegration`      | ALPHA | Disabled | 0.30.0 | Enable Zed integration.                                     |
 
 <!-- FEATURES-AUTOGEN:END -->
 

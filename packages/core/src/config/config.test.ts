@@ -2473,7 +2473,6 @@ describe('FeatureGate Integration', () => {
         extensionManagement: true,
         plan: true,
         enableAgents: true,
-        zedIntegration: true,
       },
     });
 
@@ -2482,7 +2481,6 @@ describe('FeatureGate Integration', () => {
     expect(config.getExtensionManagement()).toBe(true);
     expect(config.isPlanEnabled()).toBe(true);
     expect(config.isAgentsEnabled()).toBe(true);
-    expect(config.getExperimentalZedIntegration()).toBe(true);
   });
 });
 
