@@ -51,7 +51,6 @@ import {
 } from '../services/shellExecutionService.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { EOL } from 'node:os';
 import * as path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import * as crypto from 'node:crypto';
@@ -264,7 +263,7 @@ describe('ShellTool', () => {
 
       // Simulate pgrep output file creation by the shell command
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      fs.writeFileSync(tmpFile, `54321${EOL}54322${EOL}`);
+      fs.writeFileSync(tmpFile, `54321${os.EOL}54322${os.EOL}`);
 
       const result = await promise;
 

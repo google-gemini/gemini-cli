@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isAuthenticationError,
+  isAbortError,
   UnauthorizedError,
   toFriendlyError,
   BadRequestError,
@@ -45,6 +46,29 @@ describe('getErrorMessage', () => {
       },
     };
     expect(getErrorMessage(error)).toBe('Bad Request Message');
+  });
+});
+
+describe('isAbortError', () => {
+  it('should return true for AbortError', () => {
+    const error = new Error('Aborted');
+    error.name = 'AbortError';
+    expect(isAbortError(error)).toBe(true);
+  });
+
+  it('should return true for DOMException AbortError', () => {
+    const error = new DOMException('Aborted', 'AbortError');
+    expect(isAbortError(error)).toBe(true);
+  });
+
+  it('should return false for other errors', () => {
+    expect(isAbortError(new Error('Other error'))).toBe(false);
+  });
+
+  it('should return false for non-error objects', () => {
+    expect(isAbortError({ name: 'AbortError' })).toBe(false);
+    expect(isAbortError(null)).toBe(false);
+    expect(isAbortError('AbortError')).toBe(false);
   });
 });
 

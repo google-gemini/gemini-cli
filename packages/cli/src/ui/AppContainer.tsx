@@ -80,8 +80,8 @@ import {
   type ConsentRequestPayload,
   type AgentsDiscoveredPayload,
   ChangeAuthRequestedError,
+  ProjectIdRequiredError,
   CoreToolCallStatus,
-  generateSteeringAckMessage,
   buildUserSteeringHintPrompt,
   logBillingEvent,
   ApiKeyUpdatedEvent,
@@ -129,7 +129,7 @@ import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
-import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
+import { relaunchApp } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useMcpStatus } from './hooks/useMcpStatus.js';
@@ -146,7 +146,6 @@ import { requestConsentInteractive } from '../config/extensions/consent.js';
 import { useSessionBrowser } from './hooks/useSessionBrowser.js';
 import { useSessionResume } from './hooks/useSessionResume.js';
 import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
-import { useSessionRetentionCheck } from './hooks/useSessionRetentionCheck.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
@@ -772,6 +771,12 @@ export const AppContainer = (props: AppContainerProps) => {
           if (e instanceof ChangeAuthRequestedError) {
             return;
           }
+          if (e instanceof ProjectIdRequiredError) {
+            // OAuth succeeded but account setup requires project ID
+            // Show the error message directly without "Failed to authenticate" prefix
+            onAuthError(getErrorMessage(e));
+            return;
+          }
           onAuthError(
             `Failed to authenticate: ${e instanceof Error ? e.message : String(e)}`,
           );
@@ -782,13 +787,12 @@ export const AppContainer = (props: AppContainerProps) => {
           authType === AuthType.LOGIN_WITH_GOOGLE &&
           config.isBrowserLaunchSuppressed()
         ) {
-          await runExitCleanup();
           writeToStdout(`
 ----------------------------------------------------------------
 Logging in with Google... Restarting Gemini CLI to continue.
 ----------------------------------------------------------------
           `);
-          process.exit(RELAUNCH_EXIT_CODE);
+          await relaunchApp();
         }
       }
       setAuthState(AuthState.Authenticated);
@@ -1548,28 +1552,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
-  const handleAutoEnableRetention = useCallback(() => {
-    const userSettings = settings.forScope(SettingScope.User).settings;
-    const currentRetention = userSettings.general?.sessionRetention ?? {};
-
-    settings.setValue(SettingScope.User, 'general.sessionRetention', {
-      ...currentRetention,
-      enabled: true,
-      maxAge: '30d',
-      warningAcknowledged: true,
-    });
-  }, [settings]);
-
-  const {
-    shouldShowWarning: shouldShowRetentionWarning,
-    checkComplete: retentionCheckComplete,
-    sessionsToDeleteCount,
-  } = useSessionRetentionCheck(
-    config,
-    settings.merged,
-    handleAutoEnableRetention,
-  );
-
   const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -1896,10 +1878,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
-  useKeypress(handleGlobalKeypress, {
-    isActive: true,
-    priority: KeypressPriority.Low,
-  });
+  useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
 
   useKeypress(
     () => {
@@ -2015,7 +1994,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const nightly = props.version.includes('nightly');
 
   const dialogsVisible =
-    (shouldShowRetentionWarning && retentionCheckComplete) ||
+    shouldShowIdePrompt ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     isPolicyUpdateDialogOpen ||
@@ -2129,15 +2108,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       return;
     }
 
-    void generateSteeringAckMessage(
-      config.getBaseLlmClient(),
-      pendingHint,
-    ).then((ackText) => {
-      historyManager.addItem({
-        type: 'info',
-        text: ackText,
-      });
-    });
     void submitQuery([{ text: buildUserSteeringHintPrompt(pendingHint) }]);
   }, [
     config,
@@ -2202,9 +2172,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       history: historyManager.history,
       historyManager,
       isThemeDialogOpen,
-      shouldShowRetentionWarning:
-        shouldShowRetentionWarning && retentionCheckComplete,
-      sessionsToDeleteCount: sessionsToDeleteCount ?? 0,
+
       themeError,
       isAuthenticating,
       isConfigInitialized,
@@ -2334,9 +2302,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }),
     [
       isThemeDialogOpen,
-      shouldShowRetentionWarning,
-      retentionCheckComplete,
-      sessionsToDeleteCount,
+
       themeError,
       isAuthenticating,
       isConfigInitialized,
@@ -2527,8 +2493,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
             });
           }
         }
-        await runExitCleanup();
-        process.exit(RELAUNCH_EXIT_CODE);
+        await relaunchApp();
       },
       handleNewAgentsSelect: async (choice: NewAgentsChoice) => {
         if (newAgents && choice === NewAgentsChoice.ACKNOWLEDGE) {
