@@ -40,12 +40,7 @@ describe('deprecated-spew', () => {
   it('should not contain any deprecated package spew in stderr when running a prompt', async () => {
     rig.setup('deprecated-spew-prompt-test');
 
-    // Use a command that doesn't require API key if possible, or just ignore exit code
-    const output = await rig
-      .run({
-        args: ['-p', '/about'],
-      })
-      .catch((err) => err.message);
+    const { stderr: output } = await rig.runWithStreams(['-p', '/about']);
 
     for (const pattern of forbiddenPatterns) {
       expect(output).not.toContain(pattern);
