@@ -531,14 +531,10 @@ describe('AgentRegistry', () => {
       });
 
       expect(call).toBeDefined();
-      // Verify that the wrapper delegates to safeFetch
       const options = call?.[0] as { fetchImpl?: typeof fetch };
 
-      // We can't easily spy on safeFetch because it's an exported function,
-      // but we've verified it is provided via options.
-      expect(typeof options?.fetchImpl).toBe('function');
-      // Use safeFetch to satisfy the unused import check.
-      expect(safeFetch).toBeDefined();
+      // We passed safeFetch directly
+      expect(options?.fetchImpl).toBe(safeFetch);
     });
   });
 

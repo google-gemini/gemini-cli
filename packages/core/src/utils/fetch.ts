@@ -191,7 +191,7 @@ export function isAddressPrivate(address: string): boolean {
  * Prevents access to private/internal networks at the connection level.
  */
 export async function safeFetch(
-  url: string | URL,
+  input: RequestInfo | URL,
   init?: RequestInit,
 ): Promise<Response> {
   const nodeInit: NodeFetchInit = {
@@ -200,13 +200,19 @@ export async function safeFetch(
   };
 
   try {
-    return await fetch(url, nodeInit);
+    return await fetch(input, nodeInit);
   } catch (error) {
     if (error instanceof Error) {
       // Re-map refusing to connect errors to standard FetchError
       if (error.message.includes('Refusing to connect to private IP address')) {
+        const urlString =
+          input instanceof Request
+            ? input.url
+            : typeof input === 'string'
+              ? input
+              : input.toString();
         throw new FetchError(
-          `Access to private network is blocked: ${url.toString()}`,
+          `Access to private network is blocked: ${urlString}`,
           'ERR_PRIVATE_NETWORK',
           { cause: error },
         );

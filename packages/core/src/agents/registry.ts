@@ -166,15 +166,8 @@ export class AgentRegistry {
             // We use a dedicated resolver here to fetch the card for hashing.
             // This is separate from loadAgent to keep hashing logic isolated.
             // We provide safeFetch to ensure SSRF and DNS rebinding protection.
-            // We wrap it to match the signature expected by the SDK.
-            const fetchImpl: typeof fetch = (input, init) => {
-              if (input instanceof Request) {
-                return safeFetch(input.url, init);
-              }
-              return safeFetch(input, init);
-            };
             const resolver = new DefaultAgentCardResolver({
-              fetchImpl,
+              fetchImpl: safeFetch,
             });
             const { baseUrl, path } = splitAgentCardUrl(agent.agentCardUrl);
             const rawCard = await resolver.resolve(baseUrl, path);

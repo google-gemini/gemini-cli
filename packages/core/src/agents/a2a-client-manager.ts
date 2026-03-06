@@ -66,7 +66,7 @@ const a2aDispatcher = new UndiciAgent({
 });
 const a2aFetch: typeof fetch = (input, init) => {
   const nodeInit: NodeFetchInit = { ...init, dispatcher: a2aDispatcher };
-  return fetch(input, nodeInit);
+  return fetch(input, nodeInit as RequestInit);
 };
 
 /**
