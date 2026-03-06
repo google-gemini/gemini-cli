@@ -355,16 +355,13 @@ describe('SessionSelector', () => {
 
     const sessionSelector = new SessionSelector(emptyConfig);
 
-    await expect(sessionSelector.resolveSession('latest')).rejects.toThrow(
-      SessionError,
+    await expect(sessionSelector.resolveSession('latest')).rejects.toSatisfy(
+      (error) => {
+        expect(error).toBeInstanceOf(SessionError);
+        expect((error as SessionError).code).toBe('NO_SESSIONS_FOUND');
+        return true;
+      },
     );
-
-    try {
-      await sessionSelector.resolveSession('latest');
-    } catch (error) {
-      expect(error).toBeInstanceOf(SessionError);
-      expect((error as SessionError).code).toBe('NO_SESSIONS_FOUND');
-    }
   });
 
   it('should not list sessions with only system messages', async () => {
