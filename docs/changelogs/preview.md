@@ -1,6 +1,6 @@
-# Preview release: v0.33.0-preview.2
+# Preview release: v0.33.0-preview.4
 
-Released: March 05, 2026
+Released: March 06, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -28,6 +28,8 @@ npm install -g @google/gemini-cli@preview
   MCP tool output.
 
 ## What's Changed
+
+* fix(patch): cherry-pick 7ec477d to release/v0.33.0-preview.3-pr-21305 to patch version v0.33.0-preview.3 and create version 0.33.0-preview.4 by @gemini-cli-robot in [#21349](https://github.com/google-gemini/gemini-cli/pull/21349)
 
 - fix(patch): cherry-pick 173376b to release/v0.33.0-preview.1-pr-21157 to patch
   version v0.33.0-preview.1 and create version 0.33.0-preview.2 by
@@ -188,5 +190,4 @@ npm install -g @google/gemini-cli@preview
 - feat(acp): add set models interface by @skeshive in
   [#20991](https://github.com/google-gemini/gemini-cli/pull/20991)
 
-**Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.32.0-preview.0...v0.33.0-preview.2
+**Full Changelog**: https://github.com/google-gemini/gemini-cli/compare/v0.32.0-preview.0...v0.33.0-preview.4
