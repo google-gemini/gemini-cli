@@ -17,16 +17,22 @@ const GUI_EDITORS = [
   'cursor',
   'zed',
   'antigravity',
-  'sublime',
+  'sublimetext',
+  'lapce',
+  'nova',
+  'bbedit',
 ] as const;
 const TERMINAL_EDITORS = [
   'vim',
   'neovim',
   'emacs',
-  'emacsclient',
   'hx',
+  'emacsclient',
+  'micro',
 ] as const;
 const EDITORS = [...GUI_EDITORS, ...TERMINAL_EDITORS] as const;
+
+export const ALL_EDITORS: readonly string[] = EDITORS;
 
 const GUI_EDITORS_SET = new Set<string>(GUI_EDITORS);
 const TERMINAL_EDITORS_SET = new Set<string>(TERMINAL_EDITORS);
@@ -63,14 +69,18 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   emacsclient: 'Emacs Client',
   antigravity: 'Antigravity',
   hx: 'Helix',
-  sublime: 'Sublime Text',
+  sublimetext: 'Sublime Text',
+  lapce: 'Lapce',
+  nova: 'Nova',
+  bbedit: 'BBEdit',
+  micro: 'Micro',
 };
 
 export function getEditorDisplayName(editor: EditorType): string {
   return EDITOR_DISPLAY_NAMES[editor] || editor;
 }
 
-function isValidEditorType(editor: string): editor is EditorType {
+export function isValidEditorType(editor: string): editor is EditorType {
   return EDITORS_SET.has(editor);
 }
 
@@ -135,7 +145,12 @@ const editorCommands: Record<
     default: ['agy', 'antigravity'],
   },
   hx: { win32: ['hx'], default: ['hx'] },
-  sublime: { win32: ['subl'], default: ['subl'] },
+  sublimetext: { win32: ['subl'], default: ['subl'] },
+  lapce: { win32: ['lapce'], default: ['lapce'] },
+  // nova and bbedit are macOS-only; commandExists will return false on other platforms
+  nova: { win32: ['nova'], default: ['nova'] },
+  bbedit: { win32: ['bbedit'], default: ['bbedit'] },
+  micro: { win32: ['micro'], default: ['micro'] },
 };
 
 function getEditorCommands(editor: EditorType): string[] {
@@ -165,6 +180,39 @@ export function getEditorCommand(editor: EditorType): string {
     commands.slice(0, -1).find((cmd) => commandExists(cmd)) ||
     commands[commands.length - 1]
   );
+}
+
+/**
+ * Per-editor wait flags for GUI editors. Most use '--wait'; exceptions are listed here.
+ */
+const editorWaitFlags: Partial<Record<EditorType, string>> = {
+  sublimetext: '-w', // subl uses -w instead of --wait
+};
+
+/**
+ * Returns the flag used to make a GUI editor block until the file is closed.
+ */
+export function getEditorWaitFlag(editor: EditorType): string {
+  return editorWaitFlags[editor] ?? '--wait';
+}
+
+/**
+ * Per-editor extra arguments prepended to the command invocation.
+ */
+const editorExtraArgs: Partial<Record<EditorType, string[]>> = {
+  emacsclient: ['-nw'], // Force terminal (no-window) mode
+  vscode: ['--new-window'], // Force a new window to open the file directly
+  vscodium: ['--new-window'],
+  cursor: ['--new-window'],
+  windsurf: ['--new-window'],
+};
+
+/**
+ * Returns any extra arguments that must be passed to the editor executable
+ * (in addition to the file path and any wait flag).
+ */
+export function getEditorExtraArgs(editor: EditorType): string[] {
+  return editorExtraArgs[editor] ?? [];
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
@@ -248,8 +296,6 @@ export function getDiffCommand(
     case 'zed':
     case 'antigravity':
       return { command, args: ['--wait', '--diff', oldPath, newPath] };
-    case 'sublime':
-      return { command, args: ['--wait', newPath] };
     case 'vim':
     case 'neovim':
       return {
@@ -296,6 +342,9 @@ export function getDiffCommand(
         command: 'hx',
         args: ['--vsplit', '--', oldPath, newPath],
       };
+    case 'bbedit':
+      return { command, args: ['--wait', '--diff', oldPath, newPath] };
+    // sublimetext, lapce, nova, micro do not support CLI-driven diff views
     default:
       return null;
   }
