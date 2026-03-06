@@ -1,25 +1,52 @@
 # Agent Skills
 
-Agent Skills allow you to extend Gemini CLI with specialized expertise,
-procedural workflows, and task-specific resources. Based on the
+Agent Skills let you extend Gemini CLI with specialized expertise, procedural
+workflows, and task-specific resources. Based on the
 [Agent Skills](https://agentskills.io) open standard, a "skill" is a
 self-contained directory that packages instructions and assets into a
 discoverable capability.
 
 ## Overview
 
-Unlike general context files ([`GEMINI.md`](./gemini-md.md)), which provide
+Unlike general context files ([`GEMINI.md`](../gemini-md.md)), which provide
 persistent workspace-wide background, Skills represent **on-demand expertise**.
-This allows Gemini to maintain a vast library of specialized capabilities—such
-as security auditing, cloud deployments, or codebase migrations—without
-cluttering the model's immediate context window.
+This lets Gemini maintain a vast library of specialized capabilities—such as
+security auditing, cloud deployments, or codebase migrations—without cluttering
+the model's immediate context window.
 
 Gemini autonomously decides when to employ a skill based on your request and the
 skill's description. When a relevant skill is identified, the model "pulls in"
 the full instructions and resources required to complete the task using the
 `activate_skill` tool.
 
+## Choose your path
+
+Choose the guide that best fits your needs.
+
+### I want to use skills
+
+Learn how to discover, install, and manage skills to enhance your Gemini CLI
+experience.
+
+- **[Manage skills](#managing-skills):** List and verify your installed skills.
+- **[Install skills](#from-the-terminal):** Add new capabilities from GitHub or
+  local paths.
+
+### I want to build skills
+
+Learn how to create, test, and share your own skills with the community.
+
+- **[Build agent skills](./creating-skills.md):** Create your first skill from a
+  template.
+- **[Best practices](./skills-best-practices.md):** Learn how to build secure
+  and reliable skills.
+- **[Technical specifications](../reference/skills.md):** Deeply understand the
+  skill format and discovery tiers.
+
 ## Key Benefits
+
+Agent Skills provide several advantages for managing specialized knowledge and
+complex workflows.
 
 - **Shared Expertise:** Package complex workflows (like a specific team's PR
   review process) into a folder that anyone can use.
@@ -31,104 +58,76 @@ the full instructions and resources required to complete the task using the
   loaded initially. Detailed instructions and resources are only disclosed when
   the model explicitly activates the skill, saving context tokens.
 
-## Skill Discovery Tiers
+## Standard Agent Skills
 
-Gemini CLI discovers skills from three primary locations:
+Gemini CLI includes several high-value standard skills that showcase the power
+of the framework. These skills are often used for:
 
-1.  **Workspace Skills**: Located in `.gemini/skills/` or the `.agents/skills/`
-    alias. Workspace skills are typically committed to version control and
-    shared with the team.
-2.  **User Skills**: Located in `~/.gemini/skills/` or the `~/.agents/skills/`
-    alias. These are personal skills available across all your workspaces.
-3.  **Extension Skills**: Skills bundled within installed
-    [extensions](../extensions/index.md).
+- **`pr-creator`**: Automates the creation of pull requests following repo
+  templates.
+- **`code-reviewer`**: Provides systematic reviews of code changes against
+  security and style guidelines.
+- **`docs-writer`**: Expert assistance for technical writing and documentation
+  management.
+- **`skill-creator`**: A specialized meta-skill that helps you build, validate,
+  and package new skills.
 
-**Precedence:** If multiple skills share the same name, higher-precedence
-locations override lower ones: **Workspace > User > Extension**.
-
-Within the same tier (user or workspace), the `.agents/skills/` alias takes
-precedence over the `.gemini/skills/` directory. This generic alias provides an
-intuitive path for managing agent-specific expertise that remains compatible
-across different AI agent tools.
+To see all available skills in your current session, use the `/skills list`
+command.
 
 ## Managing Skills
+
+You can manage Agent Skills through interactive session commands or directly
+from your terminal.
 
 ### In an Interactive Session
 
 Use the `/skills` slash command to view and manage available expertise:
 
-- `/skills list` (default): Shows all discovered skills and their status.
+- `/skills list [--all]`: Shows discovered skills. Use `--all` to include
+  built-in skills.
 - `/skills link <path>`: Links agent skills from a local directory via symlink.
-- `/skills disable <name>`: Prevents a specific skill from being used.
-- `/skills enable <name>`: Re-enables a disabled skill.
+- `/skills disable <name> [--scope]`: Prevents a specific skill from being used.
+- `/skills enable <name> [--scope]`: Re-enables a disabled skill.
 - `/skills reload`: Refreshes the list of discovered skills from all tiers.
-
-_Note: `/skills disable` and `/skills enable` default to the `user` scope. Use
-`--scope workspace` to manage workspace-specific settings._
 
 ### From the Terminal
 
 The `gemini skills` command provides management utilities:
 
 ```bash
-# List all discovered skills
-gemini skills list
+# List all discovered skills. Use --all to include built-in skills.
+gemini skills list --all
 
-# Link agent skills from a local directory via symlink
-# Discovers skills (SKILL.md or */SKILL.md) and creates symlinks in ~/.gemini/skills
-# (or ~/.agents/skills)
-gemini skills link /path/to/my-skills-repo
+# Install a skill from a Git repository or local directory.
+# Use --consent to skip the security confirmation prompt.
+gemini skills install https://github.com/user/repo.git --consent
 
-# Link to the workspace scope (.gemini/skills or .agents/skills)
-gemini skills link /path/to/my-skills-repo --scope workspace
-
-# Install a skill from a Git repository, local directory, or zipped skill file (.skill)
-# Uses the user scope by default (~/.gemini/skills or ~/.agents/skills)
-gemini skills install https://github.com/user/repo.git
-gemini skills install /path/to/local/skill
-gemini skills install /path/to/local/my-expertise.skill
-
-# Install a specific skill from a monorepo or subdirectory using --path
-gemini skills install https://github.com/my-org/my-skills.git --path skills/frontend-design
-
-# Install to the workspace scope (.gemini/skills or .agents/skills)
-gemini skills install /path/to/skill --scope workspace
-
-# Uninstall a skill by name
-gemini skills uninstall my-expertise --scope workspace
-
-# Enable a skill (globally)
-gemini skills enable my-expertise
-
-# Disable a skill. Can use --scope to specify workspace or user (defaults to workspace)
-gemini skills disable my-expertise --scope workspace
+# Uninstall a skill.
+gemini skills uninstall my-skill --scope workspace
 ```
 
-## How it Works
+#### Command options
 
-1.  **Discovery**: At the start of a session, Gemini CLI scans the discovery
-    tiers and injects the name and description of all enabled skills into the
-    system prompt.
-2.  **Activation**: When Gemini identifies a task matching a skill's
-    description, it calls the `activate_skill` tool.
-3.  **Consent**: You will see a confirmation prompt in the UI detailing the
-    skill's name, purpose, and the directory path it will gain access to.
-4.  **Injection**: Upon your approval:
-    - The `SKILL.md` body and folder structure is added to the conversation
-      history.
-    - The skill's directory is added to the agent's allowed file paths, granting
-      it permission to read any bundled assets.
-5.  **Execution**: The model proceeds with the specialized expertise active. It
-    is instructed to prioritize the skill's procedural guidance within reason.
+The skill management commands support several global and command-specific
+options.
 
-### Skill activation
+- `--scope`: Either `user` (global, default) or `workspace` (local to the
+  project).
+- `--path`: The sub-directory within a Git repository containing the skill.
+- `--consent`: Acknowledge security risks and skip the interactive confirmation
+  during installation.
 
-Once a skill is activated (typically by Gemini identifying a task that matches
-the skill's description and your approval), its specialized instructions and
-resources are loaded into the agent's context. A skill remains active and its
-guidance is prioritized for the duration of the session.
+For more details on CLI commands, see the
+[CLI reference](./cli-reference.md#skills-management).
 
-## Creating your own skills
+## Next steps
 
-To create your own skills, see the [Create Agent Skills](./creating-skills.md)
-guide.
+Explore these resources to refine your skills and understand the framework
+better.
+
+- [Build agent skills](./creating-skills.md): Start developing your own skills.
+- [Skill reference](../reference/skills.md): Deeply understand the skill format
+  and discovery tiers.
+- [Best practices](./skills-best-practices.md): Learn strategies for building
+  effective skills.

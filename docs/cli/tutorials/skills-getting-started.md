@@ -12,6 +12,9 @@ responding correctly.
 
 ### Create the directory structure
 
+The first step is to create the necessary folders for your skill and its
+scripts.
+
 1.  Run the following command to create the folders:
 
     **macOS/Linux**
@@ -27,6 +30,8 @@ responding correctly.
     ```
 
 ### Create the definition
+
+The `SKILL.md` file defines the skill's purpose and instructions for the agent.
 
 1.  Create a file at `.gemini/skills/api-auditor/SKILL.md`. This tells the agent
     _when_ to use the skill and _how_ to behave.
@@ -54,7 +59,7 @@ responding correctly.
 
 ### Add the tool logic
 
-Skills can bundle resources like scripts.
+Skills can bundle resources like scripts to perform deterministic tasks.
 
 1.  Create a file at `.gemini/skills/api-auditor/scripts/audit.js`. This is the
     code the agent will run.
@@ -77,34 +82,39 @@ Skills can bundle resources like scripts.
 ## How to verify discovery
 
 Gemini CLI automatically discovers skills in the `.gemini/skills` directory. You
-can also use `.agents/skills` as a more generic alternative. Check that it found
-your new skill.
+can also use `.agents/skills` as a more generic alternative.
 
-**Command:** `/skills list`
+1.  Check that Gemini CLI found your new skill by running the following command:
 
-You should see `api-auditor` in the list of available skills.
+    **Command:** `/skills list`
+
+    You should see `api-auditor` in the list of available skills.
 
 ## How to use the skill
 
-Now, try it out. Start a new session and ask a question that triggers the
-skill's description.
+Now that the skill is discovered, you can trigger its activation by asking a
+relevant question.
 
-**User:** "Can you audit http://geminicli.com"
+1. Start a new session and ask a question that triggers the skill's description.
 
-Gemini recognizes the request matches the `api-auditor` description and asks for
-permission to activate it.
+   **User:** "Can you audit http://geminicli.com"
 
-**Model:** (After calling `activate_skill`) "I've activated the **api-auditor**
-skill. I'll run the audit script now..."
+   Gemini recognizes the request matches the `api-auditor` description and asks
+   for permission to activate it.
 
-Gemini then uses the `run_shell_command` tool to execute your bundled Node
-script:
+   **Model:** (After calling `activate_skill`) "I've activated the
+   **api-auditor** skill. I'll run the audit script now..."
 
-`node .gemini/skills/api-auditor/scripts/audit.js http://geminili.com`
+   Gemini then uses the `run_shell_command` tool to execute your bundled Node
+   script:
+
+   `node .gemini/skills/api-auditor/scripts/audit.js http://geminicli.com`
 
 ## Next steps
 
-- Explore the
-  [Agent Skills Authoring Guide](../../cli/skills.md#creating-a-skill) to learn
+Continue exploring the Agent Skills framework to build even more powerful
+extensions.
+
+- Explore the [Build agent skills](../../cli/creating-skills.md) guide to learn
   about more advanced features.
 - Learn how to share skills via [Extensions](../../extensions/index.md).
