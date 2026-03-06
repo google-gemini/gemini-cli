@@ -227,17 +227,22 @@ export class ChatRecordingService {
    * Converts API Content array to storage-compatible MessageRecord array.
    */
   private apiContentToMessageRecords(history: Content[]): MessageRecord[] {
-    return history.map((content) => {
-      const type = content.role === 'model' ? 'gemini' : 'user';
-      const record = {
-        id: randomUUID(),
-        timestamp: new Date().toISOString(),
-        type,
-        content: content.parts,
-      };
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return record as MessageRecord;
+    return history.map((content): MessageRecord => {
+      if (content.role === 'model') {
+        return {
+          id: randomUUID(),
+          timestamp: new Date().toISOString(),
+          type: 'gemini',
+          content: content.parts || [],
+        };
+      } else {
+        return {
+          id: randomUUID(),
+          timestamp: new Date().toISOString(),
+          type: 'user',
+          content: content.parts || [],
+        };
+      }
     });
   }
 
