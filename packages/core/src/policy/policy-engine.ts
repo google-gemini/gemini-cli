@@ -25,7 +25,11 @@ import {
   hasRedirection,
 } from '../utils/shell-utils.js';
 import { getToolAliases } from '../tools/tool-names.js';
-import { MCP_TOOL_PREFIX } from '../tools/mcp-tool.js';
+import {
+  MCP_TOOL_PREFIX,
+  isMcpToolAnnotation,
+  parseMcpToolName,
+} from '../tools/mcp-tool.js';
 
 function isWildcardPattern(name: string): boolean {
   return name === '*' || name.includes('*');
@@ -33,7 +37,7 @@ function isWildcardPattern(name: string): boolean {
 
 /**
  * Checks if a tool call matches a wildcard pattern.
- * Supports global (*) and the new explicit MCP (*mcp_serverName_**) format.
+ * Supports global (*) and the explicit MCP (*mcp_serverName_**) format.
  */
 function matchesWildcard(
   pattern: string,
@@ -91,7 +95,7 @@ function ruleMatches(
 
   // Check tool name if specified
   if (rule.toolName) {
-    // Support wildcard patterns: "serverName__*" matches "serverName__anyTool"
+    // Support wildcard patterns: "mcp_serverName_*" matches "mcp_serverName_anyTool"
     if (rule.toolName === '*') {
       // Match all tools
     } else if (isWildcardPattern(rule.toolName)) {
@@ -349,18 +353,19 @@ export class PolicyEngine {
     serverName: string | undefined,
     toolAnnotations?: Record<string, unknown>,
   ): Promise<CheckResult> {
-    if (
-      !serverName &&
-      toolAnnotations &&
-      typeof toolAnnotations['_serverName'] === 'string'
-    ) {
-      serverName = toolAnnotations['_serverName'];
+    // Case 1: Metadata injection is the primary and safest way to identify an MCP server.
+    // If we have explicit `_serverName` metadata (usually injected by tool-registry for active tools), use it.
+    if (!serverName && isMcpToolAnnotation(toolAnnotations)) {
+      serverName = toolAnnotations._serverName;
     }
 
-    if (!serverName && toolCall.name?.startsWith(MCP_TOOL_PREFIX)) {
-      const parts = toolCall.name.split('_');
-      if (parts.length >= 3) {
-        serverName = parts[1];
+    // Case 2: Fallback for static FQN strings (e.g. from TOML policies or allowed/excluded settings strings).
+    // These strings don't have active metadata objects associated with them during policy generation,
+    // so we must extract the server name from the qualified `mcp_{server}_{tool}` format.
+    if (!serverName && toolCall.name) {
+      const parsed = parseMcpToolName(toolCall.name);
+      if (parsed.serverName) {
+        serverName = parsed.serverName;
       }
     }
 
@@ -397,20 +402,12 @@ export class PolicyEngine {
     let matchedRule: PolicyRule | undefined;
     let decision: PolicyDecision | undefined;
 
-    // For tools with a server name, we want to try matching both the
-    // original name and the fully qualified name (server__tool).
     // We also want to check legacy aliases for the tool name.
     const toolNamesToTry = toolCall.name ? getToolAliases(toolCall.name) : [];
 
     const toolCallsToTry: FunctionCall[] = [];
     for (const name of toolNamesToTry) {
       toolCallsToTry.push({ ...toolCall, name });
-      if (serverName && !name.includes('__')) {
-        toolCallsToTry.push({
-          ...toolCall,
-          name: `${serverName}__${name}`,
-        });
-      }
     }
 
     for (const rule of this.rules) {
@@ -654,9 +651,9 @@ export class PolicyEngine {
 
     for (const toolName of allToolNames) {
       const annotations = toolMetadata?.get(toolName);
-      const rawServerName = annotations?.['_serverName'];
-      const serverName =
-        typeof rawServerName === 'string' ? rawServerName : undefined;
+      const serverName = isMcpToolAnnotation(annotations)
+        ? annotations._serverName
+        : undefined;
 
       let staticallyExcluded = false;
       let matchFound = false;

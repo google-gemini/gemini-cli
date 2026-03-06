@@ -41,6 +41,77 @@ export function isMcpToolName(name: string): boolean {
   return name.startsWith(MCP_TOOL_PREFIX);
 }
 
+/**
+ * Extracts the server name and tool name from a fully qualified MCP tool name.
+ * Expected format: `mcp_{server_name}_{tool_name}`
+ * @param name The fully qualified tool name.
+ * @returns An object containing the extracted `serverName` and `toolName`, or
+ *          `undefined` properties if the name doesn't match the expected format.
+ */
+export function parseMcpToolName(name: string): {
+  serverName?: string;
+  toolName?: string;
+} {
+  if (!isMcpToolName(name)) {
+    return {};
+  }
+  // Remove the prefix
+  const withoutPrefix = name.slice(MCP_TOOL_PREFIX.length);
+  // The first segment is the server name, the rest is the tool name
+  const match = withoutPrefix.match(/^([^_]+)_(.+)$/);
+  if (match) {
+    return {
+      serverName: match[1],
+      toolName: match[2],
+    };
+  }
+  return {};
+}
+
+/**
+ * Assembles a fully qualified MCP tool name (or wildcard pattern) from its server and tool components.
+ *
+ * @param serverName The backend MCP server name (can be '*' for global wildcards).
+ * @param toolName The name of the tool (can be undefined or '*' for tool-level wildcards).
+ * @returns The fully qualified name (e.g., `mcp_server_tool`, `mcp_*`, `mcp_server_*`).
+ */
+export function formatMcpToolName(
+  serverName: string,
+  toolName?: string,
+): string {
+  if (serverName === '*' && !toolName) {
+    return `${MCP_TOOL_PREFIX}*`;
+  } else if (serverName === '*') {
+    return `${MCP_TOOL_PREFIX}*_${toolName}`;
+  } else if (!toolName) {
+    return `${MCP_TOOL_PREFIX}${serverName}_*`;
+  } else {
+    return `${MCP_TOOL_PREFIX}${serverName}_${toolName}`;
+  }
+}
+
+/**
+ * Interface representing metadata annotations specific to an MCP tool.
+ * Ensures strongly-typed access to server-level properties.
+ */
+export interface McpToolAnnotation extends Record<string, unknown> {
+  _serverName: string;
+}
+
+/**
+ * Type guard to check if tool annotations implement McpToolAnnotation.
+ */
+export function isMcpToolAnnotation(
+  annotation: unknown,
+): annotation is McpToolAnnotation {
+  return (
+    typeof annotation === 'object' &&
+    annotation !== null &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    typeof (annotation as Record<string, unknown>)['_serverName'] === 'string'
+  );
+}
+
 type ToolParams = Record<string, unknown>;
 
 // Discriminated union for MCP Content Blocks to ensure type safety.

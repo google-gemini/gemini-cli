@@ -24,7 +24,7 @@ import path from 'node:path';
 import toml from '@iarna/toml';
 import { z, type ZodError } from 'zod';
 import { isNodeError } from '../utils/errors.js';
-import { MCP_TOOL_PREFIX } from '../tools/mcp-tool.js';
+import { MCP_TOOL_PREFIX, formatMcpToolName } from '../tools/mcp-tool.js';
 
 /**
  * Maximum Levenshtein distance to consider a name a likely typo of a built-in tool.
@@ -455,14 +455,11 @@ export async function loadPoliciesFromToml(
                 let effectiveToolName: string | undefined = toolName;
                 const mcpName = rule.mcpName;
 
-                if (mcpName === '*' && !effectiveToolName) {
-                  effectiveToolName = `${MCP_TOOL_PREFIX}*`;
-                } else if (mcpName === '*') {
-                  effectiveToolName = `${MCP_TOOL_PREFIX}*_${effectiveToolName}`;
-                } else if (mcpName && !effectiveToolName) {
-                  effectiveToolName = `${MCP_TOOL_PREFIX}${mcpName}_*`;
-                } else if (mcpName) {
-                  effectiveToolName = `${MCP_TOOL_PREFIX}${mcpName}_${effectiveToolName}`;
+                if (mcpName) {
+                  effectiveToolName = formatMcpToolName(
+                    mcpName,
+                    effectiveToolName,
+                  );
                 }
 
                 const policyRule: PolicyRule = {

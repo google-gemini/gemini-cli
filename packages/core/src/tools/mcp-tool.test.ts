@@ -15,7 +15,11 @@ import {
   type Mocked,
 } from 'vitest';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
+import {
+  DiscoveredMCPTool,
+  generateValidName,
+  formatMcpToolName,
+} from './mcp-tool.js'; // Added getStringifiedResultForDisplay
 import { ToolConfirmationOutcome, type ToolResult } from './tools.js';
 import type { CallableTool, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
@@ -78,6 +82,30 @@ describe('generateValidName', () => {
       expect(generateValidName('a'.repeat(length)).length).toBe(expected);
     },
   );
+});
+
+describe('formatMcpToolName', () => {
+  it('should format a fully qualified name', () => {
+    expect(formatMcpToolName('github', 'list_repos')).toBe(
+      'mcp_github_list_repos',
+    );
+  });
+
+  it('should handle global wildcards', () => {
+    expect(formatMcpToolName('*')).toBe('mcp_*');
+  });
+
+  it('should handle tool-level wildcards', () => {
+    expect(formatMcpToolName('github', '*')).toBe('mcp_github_*');
+  });
+
+  it('should handle undefined toolName as a tool-level wildcard', () => {
+    expect(formatMcpToolName('github')).toBe('mcp_github_*');
+  });
+
+  it('should format explicitly global wildcard with specific tool', () => {
+    expect(formatMcpToolName('*', 'list_repos')).toBe('mcp_*_list_repos');
+  });
 });
 
 describe('DiscoveredMCPTool', () => {
