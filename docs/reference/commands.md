@@ -8,6 +8,8 @@ with a forward slash (`/`), an at symbol (`@`), or an exclamation mark (`!`).
 
 Slash commands provide meta-level control over the CLI itself.
 
+### Built-in Commands
+
 ### `/about`
 
 - **Description:** Show version info. Share this information when filing issues.
