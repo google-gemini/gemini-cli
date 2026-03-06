@@ -5,10 +5,12 @@
  */
 
 import type React from 'react';
-import { useEffect, useState } from 'react';
-import { Text, Box } from 'ink';
+import { useEffect, useState, useLayoutEffect, useRef } from 'react';
+import { Text, Box, getBoundingBox, type DOMElement } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { useSelectionList } from '../../hooks/useSelectionList.js';
+import { useTerminalSize } from '../../hooks/useTerminalSize.js';
+import { useUIState } from '../../contexts/UIStateContext.js';
 
 import type { SelectionListItem } from '../../hooks/useSelectionList.js';
 
@@ -80,6 +82,25 @@ export function BaseSelectionList<
   });
 
   const [scrollOffset, setScrollOffset] = useState(0);
+  const containerRef = useRef<DOMElement>(null);
+  const [horizontalOffset, setHorizontalOffset] = useState(0);
+  const { columns: terminalWidth } = useTerminalSize();
+  const uiState = useUIState();
+  const mainAreaWidth = uiState?.mainAreaWidth;
+  const effectiveTerminalWidth = mainAreaWidth ?? terminalWidth;
+
+  // Measure horizontal offset to allow full-width highlight
+  useLayoutEffect(() => {
+    if (containerRef.current) {
+      const { x } = getBoundingBox(containerRef.current);
+      // We want to track the "true" offset relative to the viewport.
+      // Since we apply -breakoutAmount as a margin to the SELECTED item,
+      // it should not affect the parent container's x coordinate in a standard layout.
+      if (x !== horizontalOffset) {
+        setHorizontalOffset(x);
+      }
+    }
+  }, [terminalWidth, mainAreaWidth, horizontalOffset]);
 
   // Handle scrolling for long lists
   useEffect(() => {
@@ -98,7 +119,7 @@ export function BaseSelectionList<
   const numberColumnWidth = String(items.length).length;
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" ref={containerRef}>
       {/* Use conditional coloring instead of conditional rendering */}
       {showScrollArrows && items.length > maxItemsToShow && (
         <Text
@@ -136,11 +157,20 @@ export function BaseSelectionList<
           numberColumnWidth,
         )}.`;
 
+        const breakoutAmount = isSelected
+          ? Math.max(0, horizontalOffset - 2)
+          : 0;
+
         return (
           <Box
             key={item.key}
             alignItems="flex-start"
             backgroundColor={isSelected ? theme.background.focus : undefined}
+            marginLeft={-breakoutAmount}
+            paddingLeft={breakoutAmount}
+            width={
+              isSelected ? Math.max(1, effectiveTerminalWidth - 4) : '100%'
+            }
           >
             {/* Radio button indicator */}
             <Box minWidth={2} flexShrink={0}>
