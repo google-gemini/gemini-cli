@@ -445,13 +445,15 @@ export class ToolRegistry {
   private buildToolMetadata(): Map<string, Record<string, unknown>> {
     const toolMetadata = new Map<string, Record<string, unknown>>();
     for (const [name, tool] of this.allKnownTools) {
-      if (tool.toolAnnotations) {
-        const metadata: Record<string, unknown> = { ...tool.toolAnnotations };
-        // Include server name so the policy engine can resolve composite
-        // wildcard patterns (e.g. "*__*") against unqualified tool names.
-        if (tool instanceof DiscoveredMCPTool) {
-          metadata['_serverName'] = tool.serverName;
-        }
+      const metadata: Record<string, unknown> = tool.toolAnnotations
+        ? { ...tool.toolAnnotations }
+        : {};
+      // Include server name so the policy engine can resolve composite
+      // wildcard patterns (e.g. "*__*") against unqualified tool names.
+      if (tool instanceof DiscoveredMCPTool) {
+        metadata['_serverName'] = tool.serverName;
+      }
+      if (Object.keys(metadata).length > 0) {
         toolMetadata.set(name, metadata);
       }
     }

@@ -709,7 +709,7 @@ describe('estimateContextBreakdown', () => {
         {
           functionDeclarations: [
             {
-              name: 'myserver__search',
+              name: 'mcp_myserver_search',
               description: 'Search via MCP',
               parameters: {},
             },
@@ -747,8 +747,7 @@ describe('estimateContextBreakdown', () => {
     expect(builtinOnly.mcp_servers).toBe(0);
   });
 
-  it('should not classify tools with __ in the middle of a segment as MCP', () => {
-    // "__" at start or end (not a valid server__tool pattern) should not be MCP
+  it('should not classify tools without mcp_ prefix as MCP', () => {
     const config = {
       tools: [
         {
@@ -842,7 +841,7 @@ describe('estimateContextBreakdown', () => {
           functionDeclarations: [
             { name: 'read_file', description: 'Read', parameters: {} },
             {
-              name: 'myserver__search',
+              name: 'mcp_myserver_search',
               description: 'MCP search',
               parameters: {},
             },
@@ -858,7 +857,7 @@ describe('estimateContextBreakdown', () => {
     expect(result.history).toBeGreaterThan(0);
     // tool_calls should only contain non-MCP tools
     expect(result.tool_calls['read_file']).toBeGreaterThan(0);
-    expect(result.tool_calls['myserver__search']).toBeUndefined();
+    expect(result.tool_calls['mcp_myserver_search']).toBeUndefined();
     // MCP tokens are only in mcp_servers
     expect(result.mcp_servers).toBeGreaterThan(0);
   });
@@ -870,7 +869,7 @@ describe('estimateContextBreakdown', () => {
         parts: [
           {
             functionCall: {
-              name: 'myserver__search',
+              name: 'mcp_myserver_search',
               args: { query: 'test' },
             },
           },
@@ -881,7 +880,7 @@ describe('estimateContextBreakdown', () => {
         parts: [
           {
             functionResponse: {
-              name: 'myserver__search',
+              name: 'mcp_myserver_search',
               response: { results: [] },
             },
           },
@@ -890,7 +889,7 @@ describe('estimateContextBreakdown', () => {
     ];
     const result = estimateContextBreakdown(contents);
     // MCP tool calls should NOT appear in tool_calls
-    expect(result.tool_calls['myserver__search']).toBeUndefined();
+    expect(result.tool_calls['mcp_myserver_search']).toBeUndefined();
     // MCP call tokens should only be counted in mcp_servers
     expect(result.mcp_servers).toBeGreaterThan(0);
   });
@@ -908,7 +907,7 @@ describe('estimateContextBreakdown', () => {
           },
           {
             functionCall: {
-              name: 'myserver__search',
+              name: 'mcp_myserver_search',
               args: { q: 'hello' },
             },
           },
@@ -919,7 +918,7 @@ describe('estimateContextBreakdown', () => {
     // Non-MCP tools should be in tool_calls
     expect(result.tool_calls['read_file']).toBeGreaterThan(0);
     // MCP tools should NOT be in tool_calls
-    expect(result.tool_calls['myserver__search']).toBeUndefined();
+    expect(result.tool_calls['mcp_myserver_search']).toBeUndefined();
     // MCP tool calls should only be in mcp_servers
     expect(result.mcp_servers).toBeGreaterThan(0);
   });

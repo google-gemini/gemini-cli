@@ -20,7 +20,7 @@ import { ApprovalMode } from '../policy/types.js';
 
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
-import { DiscoveredMCPTool, MCP_QUALIFIED_NAME_SEPARATOR } from './mcp-tool.js';
+import { DiscoveredMCPTool } from './mcp-tool.js';
 import {
   mcpToTool,
   type FunctionDeclaration,
@@ -317,7 +317,7 @@ describe('ToolRegistry', () => {
       {
         name: 'should match qualified MCP tool names when qualified or unqualified',
         tools: [mcpTool, mcpTool.asFullyQualifiedTool()],
-        excludedTools: [`${mcpTool.getFullyQualifiedPrefix()}${mcpTool.name}`],
+        excludedTools: [mcpTool.name],
       },
       {
         name: 'should match class names',
@@ -405,7 +405,7 @@ describe('ToolRegistry', () => {
       // Assert that the returned array contains all tool names, with MCP qualified
       expect(toolNames).toContain('c-tool');
       expect(toolNames).toContain('a-tool');
-      expect(toolNames).toContain('my-server__my-tool');
+      expect(toolNames).toContain('mcp_my-server_my-tool');
       expect(toolNames).toHaveLength(3);
     });
 
@@ -419,7 +419,7 @@ describe('ToolRegistry', () => {
       toolRegistry.registerTool(mcpTool.asFullyQualifiedTool());
 
       const toolNames = toolRegistry.getAllToolNames();
-      expect(toolNames).toEqual([`${serverName}__${toolName}`]);
+      expect(toolNames).toEqual([`mcp_${serverName}_${toolName}`]);
     });
   });
 
@@ -449,7 +449,11 @@ describe('ToolRegistry', () => {
 
       // Assert that the array has the correct tools and is sorted by name
       expect(toolsFromServer1).toHaveLength(3);
-      expect(toolNames).toEqual(['apple-tool', 'banana-tool', 'zebra-tool']);
+      expect(toolNames).toEqual([
+        'mcp_mcp-server-uno_apple-tool',
+        'mcp_mcp-server-uno_banana-tool',
+        'mcp_mcp-server-uno_zebra-tool',
+      ]);
 
       // Assert that all returned tools are indeed from the correct server
       for (const tool of toolsFromServer1) {
@@ -491,8 +495,8 @@ describe('ToolRegistry', () => {
         'builtin-1',
         'builtin-2',
         DISCOVERED_TOOL_PREFIX + 'discovered-1',
-        'apple-server__mcp-apple',
-        'zebra-server__mcp-zebra',
+        'mcp_apple-server_mcp-apple',
+        'mcp_zebra-server_mcp-zebra',
       ]);
     });
   });
@@ -608,25 +612,20 @@ describe('ToolRegistry', () => {
   });
 
   describe('getTool', () => {
-    it('should retrieve an MCP tool by its fully qualified name even if registered with simple name', () => {
+    it('should retrieve an MCP tool by its fully qualified name', () => {
       const serverName = 'my-server';
       const toolName = 'my-tool';
       const mcpTool = createMCPTool(serverName, toolName, 'description');
 
-      // Register tool (will be registered as 'my-tool' since no conflict)
+      // Register tool
       toolRegistry.registerTool(mcpTool);
 
-      // Verify it is available as 'my-tool'
-      expect(toolRegistry.getTool('my-tool')).toBeDefined();
-      expect(toolRegistry.getTool('my-tool')?.name).toBe('my-tool');
-
-      // Verify it is available as 'my-server__my-tool'
-      const fullyQualifiedName = `${serverName}__${toolName}`;
+      // Verify it is available as 'mcp_my-server_my-tool'
+      const fullyQualifiedName = `mcp_${serverName}_${toolName}`;
       const retrievedTool = toolRegistry.getTool(fullyQualifiedName);
 
       expect(retrievedTool).toBeDefined();
-      // The returned tool object is the same, so its name property is still 'my-tool'
-      expect(retrievedTool?.name).toBe('my-tool');
+      expect(retrievedTool?.name).toBe(fullyQualifiedName);
     });
 
     it('should retrieve an MCP tool by its fully qualified name when tool name has special characters', () => {
@@ -636,19 +635,15 @@ describe('ToolRegistry', () => {
       const validToolName = 'my_tool';
       const mcpTool = createMCPTool(serverName, toolName, 'description');
 
-      // Register tool (will be registered as sanitized name)
+      // Register tool
       toolRegistry.registerTool(mcpTool);
 
-      // Verify it is available as sanitized name
-      expect(toolRegistry.getTool(validToolName)).toBeDefined();
-      expect(toolRegistry.getTool(validToolName)?.name).toBe(validToolName);
-
-      // Verify it is available as 'my-server__my_tool'
-      const fullyQualifiedName = `${serverName}__${validToolName}`;
+      // Verify it is available as 'mcp_my-server_my_tool'
+      const fullyQualifiedName = `mcp_${serverName}_${validToolName}`;
       const retrievedTool = toolRegistry.getTool(fullyQualifiedName);
 
       expect(retrievedTool).toBeDefined();
-      expect(retrievedTool?.name).toBe(validToolName);
+      expect(retrievedTool?.name).toBe(fullyQualifiedName);
     });
 
     it('should resolve qualified names in getFunctionDeclarationsFiltered', () => {
@@ -658,13 +653,13 @@ describe('ToolRegistry', () => {
 
       toolRegistry.registerTool(mcpTool);
 
-      const fullyQualifiedName = `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${toolName}`;
+      const fullyQualifiedName = `mcp_${serverName}_${toolName}`;
       const declarations = toolRegistry.getFunctionDeclarationsFiltered([
         fullyQualifiedName,
       ]);
 
       expect(declarations).toHaveLength(1);
-      expect(declarations[0].name).toBe(toolName);
+      expect(declarations[0].name).toBe(fullyQualifiedName);
     });
 
     it('should retrieve a tool using its legacy alias', async () => {
@@ -695,7 +690,7 @@ describe('ToolRegistry', () => {
 
       const declarations = toolRegistry.getFunctionDeclarations();
       expect(declarations).toHaveLength(1);
-      expect(declarations[0].name).toBe(`${serverName}__${toolName}`);
+      expect(declarations[0].name).toBe(`mcp_${serverName}_${toolName}`);
     });
 
     it('should deduplicate MCP tools in declarations', () => {
@@ -709,7 +704,7 @@ describe('ToolRegistry', () => {
 
       const declarations = toolRegistry.getFunctionDeclarations();
       expect(declarations).toHaveLength(1);
-      expect(declarations[0].name).toBe(`${serverName}__${toolName}`);
+      expect(declarations[0].name).toBe(`mcp_${serverName}_${toolName}`);
     });
   });
 
@@ -762,7 +757,7 @@ describe('ToolRegistry', () => {
 
       const allTools = toolRegistry.getAllTools();
       const toolNames = allTools.map((t) => t.name);
-      expect(toolNames).toContain('read-only-tool');
+      expect(toolNames).toContain('mcp_test-server_read-only-tool');
     });
 
     it('should exclude non-read-only MCP tools when denied by policy in plan mode', () => {
@@ -779,7 +774,7 @@ describe('ToolRegistry', () => {
 
       const allTools = toolRegistry.getAllTools();
       const toolNames = allTools.map((t) => t.name);
-      expect(toolNames).not.toContain('write-mcp-tool');
+      expect(toolNames).not.toContain('mcp_test-server_write-mcp-tool');
     });
   });
 

@@ -104,7 +104,7 @@ describe('extension reloading', () => {
           return (
             output.includes(
               'test-server (from test-extension) - Ready (1 tool)',
-            ) && output.includes('- hello')
+            ) && output.includes('- mcp_test-server_hello')
           );
         },
         30000, // 30s timeout
@@ -148,7 +148,7 @@ describe('extension reloading', () => {
           return (
             output.includes(
               'test-server (from test-extension) - Ready (1 tool)',
-            ) && output.includes('- goodbye')
+            ) && output.includes('- mcp_test-server_goodbye')
           );
         },
         30000,

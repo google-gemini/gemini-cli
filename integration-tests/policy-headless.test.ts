@@ -68,6 +68,7 @@ async function verifyToolExecution(
   promptCommand: PromptCommand,
   result: string,
   expectAllowed: boolean,
+  expectedDenialString?: string,
 ) {
   const log = await waitForToolCallLog(
     rig,
@@ -78,10 +79,13 @@ async function verifyToolExecution(
   if (expectAllowed) {
     expect(log!.toolRequest.success).toBe(true);
     expect(result).not.toContain('Tool execution denied by policy');
+    expect(result).not.toContain(`Tool "${promptCommand.tool}" not found`);
     expect(result).toContain(promptCommand.expectedSuccessResult);
   } else {
     expect(log!.toolRequest.success).toBe(false);
-    expect(result).toContain('Tool execution denied by policy');
+    expect(result).toContain(
+      expectedDenialString || 'Tool execution denied by policy',
+    );
     expect(result).toContain(promptCommand.expectedFailureResult);
   }
 }
@@ -92,6 +96,7 @@ interface TestCase {
   promptCommand: PromptCommand;
   policyContent?: string;
   expectAllowed: boolean;
+  expectedDenialString?: string;
 }
 
 describe('Policy Engine Headless Mode', () => {
@@ -125,7 +130,13 @@ describe('Policy Engine Headless Mode', () => {
       approvalMode: 'default',
     });
 
-    await verifyToolExecution(rig, tc.promptCommand, result, tc.expectAllowed);
+    await verifyToolExecution(
+      rig,
+      tc.promptCommand,
+      result,
+      tc.expectAllowed,
+      tc.expectedDenialString,
+    );
   };
 
   const testCases = [
@@ -134,6 +145,7 @@ describe('Policy Engine Headless Mode', () => {
       responsesFile: 'policy-headless-shell-denied.responses',
       promptCommand: ECHO_PROMPT,
       expectAllowed: false,
+      expectedDenialString: 'Tool "run_shell_command" not found',
     },
     {
       name: 'should allow ASK_USER tools in headless mode if explicitly allowed via policy file',
@@ -178,6 +190,7 @@ describe('Policy Engine Headless Mode', () => {
         priority = 100
       `,
       expectAllowed: false,
+      expectedDenialString: 'Tool execution denied by policy',
     },
   ];
 
