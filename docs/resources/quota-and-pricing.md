@@ -72,7 +72,7 @@ Gemini CLI by upgrading to one of the following subscriptions:
 ### Individuals
 
 These tiers apply when you sign in with a personal account. 
-- To verify if you are on a personal account you can visit [the Google One page](https://one.google.com/about/plans?hl=en-US&g1_landing_page=0)
+To verify whether you're on a personal account, visit [Google One](https://one.google.com/about/plans?hl=en-US&g1_landing_page=0):
 - If you are not on a personal account you will see the following message "You're currently signed in to your Google Workspace Account"
 
 **Supported Tiers:** 
