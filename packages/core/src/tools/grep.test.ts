@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { GrepToolParams } from './grep.js';
-import { GrepTool } from './grep.js';
+import { GrepTool, type GrepToolParams } from './grep.js';
 import type { ToolResult } from './tools.js';
 import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
@@ -562,6 +561,22 @@ describe('GrepTool', () => {
       expect(result.llmContent).toContain('L51: Target match');
       // Verify context after
       expect(result.llmContent).toContain('L60- Line 60');
+    });
+
+    it('should truncate excessively long lines', async () => {
+      const longString = 'a'.repeat(3000);
+      await fs.writeFile(
+        path.join(tempRootDir, 'longline.txt'),
+        `Target match ${longString}`,
+      );
+
+      const params: GrepToolParams = { pattern: 'Target match' };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      // MAX_LINE_LENGTH_TEXT_FILE is 2000. It should be truncated.
+      expect(result.llmContent).toContain('... [truncated]');
+      expect(result.llmContent).not.toContain(longString);
     });
   });
 

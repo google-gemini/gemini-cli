@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -47,10 +47,11 @@ describe('<UserIdentity />', () => {
     const output = lastFrame();
     expect(output).toContain('Signed in with Google: test@example.com');
     expect(output).toContain('/auth');
+    expect(output).not.toContain('/upgrade');
     unmount();
   });
 
-  it('should render login message without colon if email is missing', async () => {
+  it('should render login message if email is missing', async () => {
     // Modify the mock for this specific test
     vi.mocked(UserAccountManager).mockImplementationOnce(
       () =>
@@ -75,10 +76,11 @@ describe('<UserIdentity />', () => {
     expect(output).toContain('Signed in with Google');
     expect(output).not.toContain('Signed in with Google:');
     expect(output).toContain('/auth');
+    expect(output).not.toContain('/upgrade');
     unmount();
   });
 
-  it('should render plan name on a separate line if provided', async () => {
+  it('should render plan name and upgrade indicator', async () => {
     const mockConfig = makeFakeConfig();
     vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
       authType: AuthType.LOGIN_WITH_GOOGLE,
@@ -95,6 +97,7 @@ describe('<UserIdentity />', () => {
     expect(output).toContain('Signed in with Google: test@example.com');
     expect(output).toContain('/auth');
     expect(output).toContain('Plan: Premium Plan');
+    expect(output).toContain('/upgrade');
 
     // Check for two lines (or more if wrapped, but here it should be separate)
     const lines = output?.split('\n').filter((line) => line.trim().length > 0);
@@ -139,6 +142,26 @@ describe('<UserIdentity />', () => {
     const output = lastFrame();
     expect(output).toContain(`Authenticated with ${AuthType.USE_GEMINI}`);
     expect(output).toContain('/auth');
+    expect(output).not.toContain('/upgrade');
+    unmount();
+  });
+
+  it('should render specific tier name when provided', async () => {
+    const mockConfig = makeFakeConfig();
+    vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+      model: 'gemini-pro',
+    } as unknown as ContentGeneratorConfig);
+    vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue('Enterprise Tier');
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <UserIdentity config={mockConfig} />,
+    );
+    await waitUntilReady();
+
+    const output = lastFrame();
+    expect(output).toContain('Plan: Enterprise Tier');
+    expect(output).toContain('/upgrade');
     unmount();
   });
 });

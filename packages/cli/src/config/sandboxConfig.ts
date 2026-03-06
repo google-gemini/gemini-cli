@@ -27,6 +27,8 @@ const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
   'docker',
   'podman',
   'sandbox-exec',
+  'runsc',
+  'lxc',
 ];
 
 function isSandboxCommand(value: string): value is SandboxConfig['command'] {
@@ -63,17 +65,30 @@ function getSandboxCommand(
         )}`,
       );
     }
-    // confirm that specified command exists
-    if (commandExists.sync(sandbox)) {
-      return sandbox;
+    // runsc (gVisor) is only supported on Linux
+    if (sandbox === 'runsc' && os.platform() !== 'linux') {
+      throw new FatalSandboxError(
+        'gVisor (runsc) sandboxing is only supported on Linux',
+      );
     }
-    throw new FatalSandboxError(
-      `Missing sandbox command '${sandbox}' (from GEMINI_SANDBOX)`,
-    );
+    // confirm that specified command exists
+    if (!commandExists.sync(sandbox)) {
+      throw new FatalSandboxError(
+        `Missing sandbox command '${sandbox}' (from GEMINI_SANDBOX)`,
+      );
+    }
+    // runsc uses Docker with --runtime=runsc; both must be available (prioritize runsc when explicitly chosen)
+    if (sandbox === 'runsc' && !commandExists.sync('docker')) {
+      throw new FatalSandboxError(
+        "runsc (gVisor) requires Docker. Install Docker, or use sandbox: 'docker'.",
+      );
+    }
+    return sandbox;
   }
 
   // look for seatbelt, docker, or podman, in that order
   // for container-based sandboxing, require sandbox to be enabled explicitly
+  // note: runsc is NOT auto-detected, it must be explicitly specified
   if (os.platform() === 'darwin' && commandExists.sync('sandbox-exec')) {
     return 'sandbox-exec';
   } else if (commandExists.sync('docker') && sandbox === true) {
@@ -91,6 +106,9 @@ function getSandboxCommand(
   }
 
   return '';
+  // Note: 'lxc' is intentionally not auto-detected because it requires a
+  // pre-existing, running container managed by the user. Use
+  // GEMINI_SANDBOX=lxc or sandbox: "lxc" in settings to enable it.
 }
 
 export async function loadSandboxConfig(
@@ -102,7 +120,9 @@ export async function loadSandboxConfig(
 
   const packageJson = await getPackageJson(__dirname);
   const image =
-    process.env['GEMINI_SANDBOX_IMAGE'] ?? packageJson?.config?.sandboxImageUri;
+    process.env['GEMINI_SANDBOX_IMAGE'] ??
+    process.env['GEMINI_SANDBOX_IMAGE_DEFAULT'] ??
+    packageJson?.config?.sandboxImageUri;
 
   return command && image ? { command, image } : undefined;
 }
