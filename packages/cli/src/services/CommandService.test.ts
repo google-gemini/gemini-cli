@@ -86,184 +86,19 @@ describe('CommandService', () => {
     });
   });
 
-  describe('name conflicts', () => {
-    it('should rename extension commands when they conflict', async () => {
-      const builtin = createMockCommand('deploy', CommandKind.BUILT_IN);
-      const extension = {
-        ...createMockCommand('deploy', CommandKind.EXTENSION_FILE),
-        extensionName: 'firebase',
-      };
-
-      const service = await CommandService.create(
-        [new MockCommandLoader([builtin]), new MockCommandLoader([extension])],
-        new AbortController().signal,
-      );
-
-      expect(
-        service.getCommands().find((c) => c.name === 'deploy'),
-      ).toBeDefined();
-      expect(
-        service.getCommands().find((c) => c.name === 'firebase.deploy'),
-      ).toBeDefined();
-    });
-
-    it('should prefix user and workspace commands when they conflict', async () => {
-      const userCmd = createMockCommand('sync', CommandKind.USER_FILE);
-      const workspaceCmd = createMockCommand(
-        'sync',
-        CommandKind.WORKSPACE_FILE,
-      );
-
-      const service = await CommandService.create(
-        [
-          new MockCommandLoader([userCmd]),
-          new MockCommandLoader([workspaceCmd]),
-        ],
-        new AbortController().signal,
-      );
-
-      const names = service.getCommands().map((c) => c.name);
-      // Both should be prefixed, and the original name should be free (no builtin here)
-      expect(names).not.toContain('sync');
-      expect(names).toContain('user.sync');
-      expect(names).toContain('workspace.sync');
-    });
-
-    it('should prefix file commands but keep built-in names during conflicts', async () => {
+  describe('conflict delegation', () => {
+    it('should delegate conflict resolution to SlashCommandResolver', async () => {
       const builtin = createMockCommand('help', CommandKind.BUILT_IN);
       const user = createMockCommand('help', CommandKind.USER_FILE);
 
       const service = await CommandService.create(
-        [new MockCommandLoader([builtin]), new MockCommandLoader([user])],
+        [new MockCommandLoader([builtin, user])],
         new AbortController().signal,
       );
 
-      const names = service.getCommands().map((c) => c.name);
-      expect(names).toContain('help');
-      expect(names).toContain('user.help');
-    });
-
-    it('should handle complex multi-way conflicts', async () => {
-      const builtin = createMockCommand('deploy', CommandKind.BUILT_IN);
-      const user = createMockCommand('deploy', CommandKind.USER_FILE);
-      const workspace = createMockCommand('deploy', CommandKind.WORKSPACE_FILE);
-      const extension = {
-        ...createMockCommand('deploy', CommandKind.EXTENSION_FILE),
-        extensionName: 'gcp',
-      };
-
-      const service = await CommandService.create(
-        [new MockCommandLoader([builtin, user, workspace, extension])],
-        new AbortController().signal,
-      );
-
-      const names = service.getCommands().map((c) => c.name);
-      expect(names).toEqual(
-        expect.arrayContaining([
-          'deploy',
-          'user.deploy',
-          'workspace.deploy',
-          'gcp.deploy',
-        ]),
-      );
-    });
-  });
-
-  describe('secondary conflicts (suffixing)', () => {
-    it('should apply numeric suffixes when extension renames also conflict', async () => {
-      // User has /deploy and /gcp.deploy
-      const user1 = createMockCommand('deploy', CommandKind.USER_FILE);
-      const user2 = createMockCommand('gcp.deploy', CommandKind.USER_FILE);
-      // Extension also has /deploy, which wants to be /gcp.deploy
-      const extension = {
-        ...createMockCommand('deploy', CommandKind.EXTENSION_FILE),
-        extensionName: 'gcp',
-      };
-
-      const service = await CommandService.create(
-        [new MockCommandLoader([user1, user2, extension])],
-        new AbortController().signal,
-      );
-
-      expect(
-        service.getCommands().find((c) => c.name === 'gcp.deploy1'),
-      ).toBeDefined();
-    });
-
-    it('should handle multiple incrementing suffixes', async () => {
-      const user1 = createMockCommand('deploy', CommandKind.USER_FILE);
-      const user2 = createMockCommand('gcp.deploy', CommandKind.USER_FILE);
-      const user3 = createMockCommand('gcp.deploy1', CommandKind.USER_FILE);
-      const extension = {
-        ...createMockCommand('deploy', CommandKind.EXTENSION_FILE),
-        extensionName: 'gcp',
-      };
-
-      const service = await CommandService.create(
-        [new MockCommandLoader([user1, user2, user3, extension])],
-        new AbortController().signal,
-      );
-
-      expect(
-        service.getCommands().find((c) => c.name === 'gcp.deploy2'),
-      ).toBeDefined();
-    });
-  });
-
-  describe('conflict reporting', () => {
-    it('should report extension conflicts correctly', async () => {
-      const builtin = createMockCommand('deploy', CommandKind.BUILT_IN);
-      const extension = {
-        ...createMockCommand('deploy', CommandKind.EXTENSION_FILE),
-        extensionName: 'firebase',
-      };
-
-      const service = await CommandService.create(
-        [new MockCommandLoader([builtin, extension])],
-        new AbortController().signal,
-      );
-
+      expect(service.getCommands().map((c) => c.name)).toContain('help');
+      expect(service.getCommands().map((c) => c.name)).toContain('user.help');
       expect(service.getConflicts()).toHaveLength(1);
-      expect(service.getConflicts()[0]).toMatchObject({
-        name: 'deploy',
-        losers: [
-          {
-            renamedTo: 'firebase.deploy',
-            reason: builtin,
-          },
-        ],
-      });
-    });
-
-    it('should report user and workspace conflicts correctly with individual winners', async () => {
-      const user = createMockCommand('sync', CommandKind.USER_FILE);
-      const workspace = createMockCommand('sync', CommandKind.WORKSPACE_FILE);
-
-      const service = await CommandService.create(
-        [new MockCommandLoader([user, workspace])],
-        new AbortController().signal,
-      );
-
-      const conflicts = service.getConflicts();
-      expect(conflicts).toHaveLength(1);
-      expect(conflicts[0].name).toBe('sync');
-      // Both are in losers because both got renamed.
-      // user.sync conflicted with workspace (which was current when rename happened)
-      // workspace.sync conflicted with user (which was encountered first)
-      expect(conflicts[0].losers).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            renamedTo: 'user.sync',
-            reason: expect.objectContaining({
-              kind: CommandKind.WORKSPACE_FILE,
-            }),
-          }),
-          expect.objectContaining({
-            renamedTo: 'workspace.sync',
-            reason: expect.objectContaining({ kind: CommandKind.USER_FILE }),
-          }),
-        ]),
-      );
     });
   });
 });

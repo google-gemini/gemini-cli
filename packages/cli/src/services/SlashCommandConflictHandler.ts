@@ -42,9 +42,9 @@ export class SlashCommandConflictHandler {
   private handleConflicts(payload: SlashCommandConflictsPayload) {
     const newConflicts = payload.conflicts.filter((c) => {
       // Use a unique key to prevent duplicate notifications for the same conflict
-      const key = `${c.name}:${c.loserExtensionName || c.loserKind}:${
-        c.renamedTo
-      }`;
+      const sourceId =
+        c.loserExtensionName || c.loserMcpServerName || c.loserKind;
+      const key = `${c.name}:${sourceId}:${c.renamedTo}`;
       if (this.notifiedConflicts.has(key)) {
         return false;
       }
@@ -85,39 +85,56 @@ export class SlashCommandConflictHandler {
 
     for (const [name, commandConflicts] of grouped) {
       if (commandConflicts.length > 1) {
-        // Multi-conflict style: grouped under a header
-        const conflictMessages = commandConflicts
-          .map((c) => {
-            const source = this.getSourceDescription(
-              c.loserExtensionName,
-              c.loserKind,
-            );
-            return `- ${this.capitalize(source)} was renamed to '/${c.renamedTo}'`;
-          })
-          .join('\n');
-
-        coreEvents.emitFeedback(
-          'info',
-          `Conflicts detected for command '/${name}':\n${conflictMessages}`,
-        );
+        this.emitGroupedFeedback(name, commandConflicts);
       } else {
-        // Single-conflict style: descriptive message
-        const c = commandConflicts[0];
-        const loserSource = this.getSourceDescription(
-          c.loserExtensionName,
-          c.loserKind,
-        );
-        const winnerSource = this.getSourceDescription(
-          c.winnerExtensionName,
-          c.winnerKind,
-        );
-
-        coreEvents.emitFeedback(
-          'info',
-          `Command '/${c.name}' from ${loserSource} was renamed to '/${c.renamedTo}' because it conflicts with ${winnerSource}.`,
-        );
+        this.emitSingleFeedback(commandConflicts[0]);
       }
     }
+  }
+
+  /**
+   * Emits a grouped notification for multiple conflicts sharing the same name.
+   */
+  private emitGroupedFeedback(
+    name: string,
+    conflicts: SlashCommandConflict[],
+  ): void {
+    const messages = conflicts
+      .map((c) => {
+        const source = this.getSourceDescription(
+          c.loserExtensionName,
+          c.loserKind,
+          c.loserMcpServerName,
+        );
+        return `- ${this.capitalize(source)} '/${c.name}' was renamed to '/${c.renamedTo}'`;
+      })
+      .join('\n');
+
+    coreEvents.emitFeedback(
+      'info',
+      `Conflicts detected for command '/${name}':\n${messages}`,
+    );
+  }
+
+  /**
+   * Emits a descriptive notification for a single command conflict.
+   */
+  private emitSingleFeedback(c: SlashCommandConflict): void {
+    const loserSource = this.getSourceDescription(
+      c.loserExtensionName,
+      c.loserKind,
+      c.loserMcpServerName,
+    );
+    const winnerSource = this.getSourceDescription(
+      c.winnerExtensionName,
+      c.winnerKind,
+      c.winnerMcpServerName,
+    );
+
+    coreEvents.emitFeedback(
+      'info',
+      `${this.capitalize(loserSource)} '/${c.name}' was renamed to '/${c.renamedTo}' because it conflicts with ${winnerSource}.`,
+    );
   }
 
   private capitalize(s: string): string {
@@ -127,22 +144,28 @@ export class SlashCommandConflictHandler {
   /**
    * Returns a human-readable description of a command's source.
    */
-  private getSourceDescription(extensionName?: string, kind?: string): string {
-    if (extensionName) {
-      return `extension '${extensionName}' command`;
+  private getSourceDescription(
+    extensionName?: string,
+    kind?: string,
+    mcpServerName?: string,
+  ): string {
+    switch (kind) {
+      case CommandKind.EXTENSION_FILE:
+        return extensionName
+          ? `extension '${extensionName}' command`
+          : 'extension command';
+      case CommandKind.MCP_PROMPT:
+        return mcpServerName
+          ? `MCP server '${mcpServerName}' command`
+          : 'MCP server command';
+      case CommandKind.USER_FILE:
+        return 'user command';
+      case CommandKind.WORKSPACE_FILE:
+        return 'workspace command';
+      case CommandKind.BUILT_IN:
+        return 'built-in command';
+      default:
+        return 'existing command';
     }
-    if (kind === CommandKind.USER_FILE || kind === 'user-file') {
-      return 'user command';
-    }
-    if (kind === CommandKind.WORKSPACE_FILE || kind === 'workspace-file') {
-      return 'workspace command';
-    }
-    if (kind === CommandKind.BUILT_IN || kind === 'built-in') {
-      return 'built-in command';
-    }
-    if (kind) {
-      return `${kind.replace('-file', '')} command`;
-    }
-    return 'an existing command';
   }
 }

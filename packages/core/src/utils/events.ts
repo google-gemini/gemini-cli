@@ -149,6 +149,8 @@ export interface SlashCommandConflict {
   renamedTo: string;
   loserExtensionName?: string;
   winnerExtensionName?: string;
+  loserMcpServerName?: string;
+  winnerMcpServerName?: string;
   loserKind?: string;
   winnerKind?: string;
 }

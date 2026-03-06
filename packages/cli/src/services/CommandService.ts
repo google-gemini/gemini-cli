@@ -6,17 +6,8 @@
 
 import { debugLogger, coreEvents } from '@google/gemini-cli-core';
 import type { SlashCommand } from '../ui/commands/types.js';
-import { CommandKind } from '../ui/commands/types.js';
-import type { ICommandLoader } from './types.js';
-
-export interface CommandConflict {
-  name: string;
-  losers: Array<{
-    command: SlashCommand;
-    renamedTo: string;
-    reason: SlashCommand;
-  }>;
-}
+import type { ICommandLoader, CommandConflict } from './types.js';
+import { SlashCommandResolver } from './SlashCommandResolver.js';
 
 /**
  * Orchestrates the discovery and loading of all slash commands for the CLI.
@@ -25,9 +16,9 @@ export interface CommandConflict {
  * with an array of `ICommandLoader` instances, each responsible for fetching
  * commands from a specific source (e.g., built-in code, local files).
  *
- * The CommandService is responsible for invoking these loaders, aggregating their
- * results, and resolving any name conflicts. This architecture allows the command
- * system to be extended with new sources without modifying the service itself.
+ * It uses a delegating resolver to reconcile name conflicts, ensuring that
+ * all commands are uniquely addressable via source-specific prefixes while
+ * allowing built-in commands to retain their primary names.
  */
 export class CommandService {
   /**
@@ -43,181 +34,71 @@ export class CommandService {
   /**
    * Asynchronously creates and initializes a new CommandService instance.
    *
-   * This factory method orchestrates the entire command loading process. It
-   * runs all provided loaders in parallel, aggregates their results, and
-   * resolves name conflicts.
+   * This factory method orchestrates the loading process and delegates
+   * conflict resolution to the SlashCommandResolver.
    *
-   * Conflict resolution:
-   * - Built-in and MCP commands always take precedence and are never renamed.
-   * - Extension, user, and workspace commands that conflict with existing
-   * commands are renamed to `extensionName.commandName`, `user.commandName` or
-   * `workspace.commandName`.
-   * - If multiple file-based commands conflict, all are prefixed and the
-   * original non-prefixed mapping is removed.
+   * @param loaders An array of loaders to fetch commands from.
+   * @param signal An AbortSignal to allow cancellation.
+   * @returns A promise that resolves to a fully initialized CommandService.
    */
   static async create(
     loaders: ICommandLoader[],
     signal: AbortSignal,
   ): Promise<CommandService> {
+    const allCommands = await this.loadAllCommands(loaders, signal);
+    const { finalCommands, conflicts } =
+      SlashCommandResolver.resolve(allCommands);
+
+    if (conflicts.length > 0) {
+      this.emitConflictEvents(conflicts);
+    }
+
+    return new CommandService(
+      Object.freeze(finalCommands),
+      Object.freeze(conflicts),
+    );
+  }
+
+  /**
+   * Invokes all loaders in parallel and flattens the results.
+   */
+  private static async loadAllCommands(
+    loaders: ICommandLoader[],
+    signal: AbortSignal,
+  ): Promise<SlashCommand[]> {
     const results = await Promise.allSettled(
       loaders.map((loader) => loader.loadCommands(signal)),
     );
 
-    const allCommands: SlashCommand[] = [];
+    const commands: SlashCommand[] = [];
     for (const result of results) {
       if (result.status === 'fulfilled') {
-        allCommands.push(...result.value);
+        commands.push(...result.value);
       } else {
         debugLogger.debug('A command loader failed:', result.reason);
       }
     }
-
-    const commandMap = new Map<string, SlashCommand>();
-    const conflictsMap = new Map<string, CommandConflict>();
-    const firstEncounters = new Map<string, SlashCommand>();
-
-    for (const cmd of allCommands) {
-      const originalName = cmd.name;
-      let finalName = originalName;
-
-      // Handle name conflicts
-      if (firstEncounters.has(originalName)) {
-        const first = firstEncounters.get(originalName)!;
-
-        // 1. Extension commands get renamed to extension.name if the name was ever claimed
-        if (cmd.extensionName) {
-          finalName = this.getRenamedExtensionName(cmd, commandMap);
-          // In this conflict, the original claimant (first) is the reason the extension command (cmd) is renamed.
-          this.trackConflict(conflictsMap, originalName, first, cmd, finalName);
-        }
-        // 2. User/Workspace commands get prefixed if they conflict
-        else if (
-          cmd.kind === CommandKind.USER_FILE ||
-          cmd.kind === CommandKind.WORKSPACE_FILE
-        ) {
-          const prefix = this.getKindPrefix(cmd.kind);
-          finalName = prefix ? `${prefix}.${cmd.name}` : cmd.name;
-
-          const existing = commandMap.get(originalName);
-          // If the existing command is still in the map under the original name,
-          // and it's a file-based command, rename it too.
-          if (
-            existing &&
-            (existing.kind === CommandKind.USER_FILE ||
-              existing.kind === CommandKind.WORKSPACE_FILE)
-          ) {
-            const existingPrefix = this.getKindPrefix(existing.kind);
-            const renamedExistingName = `${existingPrefix}.${existing.name}`;
-
-            commandMap.delete(originalName);
-            const renamedExisting = { ...existing, name: renamedExistingName };
-            commandMap.set(renamedExistingName, renamedExisting);
-
-            // Report the existing one being renamed because of the current one.
-            // This ensures the UI correctly identifies the newcomer as the reason for displacement.
-            this.trackConflict(
-              conflictsMap,
-              originalName,
-              cmd, // current is reason
-              existing, // existing is renamed
-              renamedExistingName,
-            );
-          }
-
-          // Report the current one being renamed because of the original claimant.
-          this.trackConflict(conflictsMap, originalName, first, cmd, finalName);
-        }
-      } else {
-        // First time we've seen this command name
-        firstEncounters.set(originalName, cmd);
-      }
-
-      commandMap.set(finalName, {
-        ...cmd,
-        name: finalName,
-      });
-    }
-
-    const conflicts = Array.from(conflictsMap.values());
-    if (conflicts.length > 0) {
-      coreEvents.emitSlashCommandConflicts(
-        conflicts.flatMap((c) =>
-          c.losers.map((l) => ({
-            name: c.name,
-            renamedTo: l.renamedTo,
-            loserExtensionName: l.command.extensionName,
-            winnerExtensionName: l.reason.extensionName,
-            loserKind: l.command.kind,
-            winnerKind: l.reason.kind,
-          })),
-        ),
-      );
-    }
-
-    const finalCommands = Object.freeze(Array.from(commandMap.values()));
-    const finalConflicts = Object.freeze(conflicts);
-    return new CommandService(finalCommands, finalConflicts);
+    return commands;
   }
 
   /**
-   * Generates a unique name for an extension command to avoid conflicts.
+   * Formats and emits telemetry for command conflicts.
    */
-  private static getRenamedExtensionName(
-    cmd: SlashCommand,
-    commandMap: Map<string, SlashCommand>,
-  ): string {
-    let renamedName = `${cmd.extensionName}.${cmd.name}`;
-    let suffix = 1;
-
-    // Keep trying until we find a name that doesn't conflict
-    while (commandMap.has(renamedName)) {
-      renamedName = `${cmd.extensionName}.${cmd.name}${suffix}`;
-      suffix++;
-    }
-    return renamedName;
-  }
-
-  /**
-   * Returns the short prefix string for user or workspace commands.
-   */
-  private static getKindPrefix(kind: CommandKind): string | null {
-    if (kind === CommandKind.USER_FILE) {
-      return 'user';
-    }
-    if (kind === CommandKind.WORKSPACE_FILE) {
-      return 'workspace';
-    }
-    return null;
-  }
-
-  /**
-   * Records a command conflict in the provided conflicts map.
-   *
-   * @param conflictsMap Map to store conflict data.
-   * @param originalName The base name that had a conflict.
-   * @param reason The command that caused the rename.
-   * @param renamedCommand The command that was renamed.
-   * @param renamedTo The new name assigned to the command.
-   */
-  private static trackConflict(
-    conflictsMap: Map<string, CommandConflict>,
-    originalName: string,
-    reason: SlashCommand,
-    renamedCommand: SlashCommand,
-    renamedTo: string,
-  ) {
-    if (!conflictsMap.has(originalName)) {
-      conflictsMap.set(originalName, {
-        name: originalName,
-        losers: [],
-      });
-    }
-
-    conflictsMap.get(originalName)!.losers.push({
-      command: renamedCommand,
-      renamedTo,
-      reason,
-    });
+  private static emitConflictEvents(conflicts: CommandConflict[]): void {
+    coreEvents.emitSlashCommandConflicts(
+      conflicts.flatMap((c) =>
+        c.losers.map((l) => ({
+          name: c.name,
+          renamedTo: l.renamedTo,
+          loserExtensionName: l.command.extensionName,
+          winnerExtensionName: l.reason.extensionName,
+          loserMcpServerName: l.command.mcpServerName,
+          winnerMcpServerName: l.reason.mcpServerName,
+          loserKind: l.command.kind,
+          winnerKind: l.reason.kind,
+        })),
+      ),
+    );
   }
 
   /**

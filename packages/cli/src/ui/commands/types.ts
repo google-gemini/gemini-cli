@@ -205,6 +205,9 @@ export interface SlashCommand {
   extensionName?: string;
   extensionId?: string;
 
+  // Optional metadata for MCP commands
+  mcpServerName?: string;
+
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (
     context: CommandContext,
