@@ -105,39 +105,14 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `general`
 
-- **`general.preferredEditor`** (string):
+- **`general.preferredEditor`** (enum):
   - **Description:** The preferred editor to open files in. Must be one of the
     built-in supported identifiers. Use /editor in the CLI to pick
     interactively, or leave unset to use $VISUAL/$EDITOR.
   - **Default:** `undefined`
-  - **Accepted values:**
-
-    | Identifier    | Editor                                         | Platform |
-    | ------------- | ---------------------------------------------- | -------- |
-    | `vscode`      | Visual Studio Code                             | All      |
-    | `vscodium`    | VSCodium                                       | All      |
-    | `cursor`      | Cursor                                         | All      |
-    | `windsurf`    | Windsurf                                       | All      |
-    | `zed`         | Zed                                            | All      |
-    | `antigravity` | Antigravity                                    | All      |
-    | `sublimetext` | Sublime Text                                   | All      |
-    | `lapce`       | Lapce                                          | All      |
-    | `nova`        | Nova                                           | macOS    |
-    | `bbedit`      | BBEdit                                         | macOS    |
-    | `vim`         | Vim                                            | All      |
-    | `neovim`      | Neovim                                         | All      |
-    | `emacs`       | Emacs                                          | All      |
-    | `emacsclient` | Emacs Client (requires a running Emacs daemon) | All      |
-    | `hx`          | Helix                                          | All      |
-    | `micro`       | Micro                                          | All      |
-
-  - **`$VISUAL` / `$EDITOR` fallback:** If `preferredEditor` is not set, the CLI
-    falls back to the `$VISUAL` environment variable, then `$EDITOR`, and
-    finally `vi` (Unix) or `notepad` (Windows). This lets you use any editor not
-    in the list above — including editors with custom arguments like
-    `emacsclient -nw` — by setting the environment variable directly.
-  - **Note:** Setting an unrecognized identifier produces a clear error at
-    runtime. To configure your editor interactively, use the `/editor` command.
+  - **Values:** `"vscode"`, `"vscodium"`, `"cursor"`, `"windsurf"`, `"zed"`,
+    `"antigravity"`, `"sublimetext"`, `"lapce"`, `"nova"`, `"bbedit"`, `"vim"`,
+    `"neovim"`, `"emacs"`, `"emacsclient"`, `"hx"`, `"micro"`
 
 - **`general.vimMode`** (boolean):
   - **Description:** Enable Vim keybindings
