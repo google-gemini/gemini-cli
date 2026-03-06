@@ -5,6 +5,7 @@
  */
 
 import * as grpc from '@grpc/grpc-js';
+import { lookup } from 'node:dns/promises';
 import type {
   Message,
   Part,
@@ -14,9 +15,12 @@ import type {
   Artifact,
   TaskState,
   TaskStatusUpdateEvent,
+  TaskArtifactUpdateEvent,
   AgentCard,
   AgentInterface,
+  Task,
 } from '@a2a-js/sdk';
+import { isAddressPrivate } from '../utils/fetch.js';
 import type { SendMessageResult } from './a2a-client-manager.js';
 
 export const AUTH_REQUIRED_MSG = `[Authorization Required] The agent has indicated it requires authorization to proceed. Please follow the agent's instructions.`;
@@ -36,80 +40,68 @@ export class A2AResultReassembler {
   update(chunk: SendMessageResult) {
     if (!('kind' in chunk)) return;
 
-    switch (chunk.kind) {
-      case 'status-update':
-        this.appendStateInstructions(chunk.status?.state);
-        this.pushMessage(chunk.status?.message);
-        break;
+    if (isStatusUpdateEvent(chunk)) {
+      this.appendStateInstructions(chunk.status?.state);
+      this.pushMessage(chunk.status?.message);
+    } else if (isArtifactUpdateEvent(chunk)) {
+      if (chunk.artifact) {
+        const id = chunk.artifact.artifactId;
+        const existing = this.artifacts.get(id);
 
-      case 'artifact-update':
-        if (chunk.artifact) {
-          const id = chunk.artifact.artifactId;
-          const existing = this.artifacts.get(id);
-
-          if (chunk.append && existing) {
-            for (const part of chunk.artifact.parts) {
-              existing.parts.push(structuredClone(part));
-            }
-          } else {
-            this.artifacts.set(id, structuredClone(chunk.artifact));
+        if (chunk.append && existing) {
+          for (const part of chunk.artifact.parts) {
+            existing.parts.push(structuredClone(part));
           }
-
-          const newText = extractPartsText(chunk.artifact.parts, '');
-          let chunks = this.artifactChunks.get(id);
-          if (!chunks) {
-            chunks = [];
-            this.artifactChunks.set(id, chunks);
-          }
-          if (chunk.append) {
-            chunks.push(newText);
-          } else {
-            chunks.length = 0;
-            chunks.push(newText);
-          }
+        } else {
+          this.artifacts.set(id, structuredClone(chunk.artifact));
         }
-        break;
 
-      case 'task':
-        this.appendStateInstructions(chunk.status?.state);
-        this.pushMessage(chunk.status?.message);
-        if (chunk.artifacts) {
-          for (const art of chunk.artifacts) {
-            this.artifacts.set(art.artifactId, structuredClone(art));
-            this.artifactChunks.set(art.artifactId, [
-              extractPartsText(art.parts, ''),
-            ]);
-          }
+        const newText = extractPartsText(chunk.artifact.parts, '');
+        let chunks = this.artifactChunks.get(id);
+        if (!chunks) {
+          chunks = [];
+          this.artifactChunks.set(id, chunks);
         }
-        // History Fallback: Some agent implementations do not populate the
-        // status.message in their final terminal response, instead archiving
-        // the final answer in the task's history array. To ensure we don't
-        // present an empty result, we fallback to the most recent agent message
-        // in the history only when the task is terminal and no other content
-        // (message log or artifacts) has been reassembled.
-        if (
-          isTerminalState(chunk.status?.state) &&
-          this.messageLog.length === 0 &&
-          this.artifacts.size === 0 &&
-          chunk.history &&
-          chunk.history.length > 0
-        ) {
-          const lastAgentMsg = [...chunk.history]
-            .reverse()
-            .find((m) => m.role?.toLowerCase().includes('agent'));
-          if (lastAgentMsg) {
-            this.pushMessage(lastAgentMsg);
-          }
+        if (chunk.append) {
+          chunks.push(newText);
+        } else {
+          chunks.length = 0;
+          chunks.push(newText);
         }
-        break;
-
-      case 'message': {
-        this.pushMessage(chunk);
-        break;
       }
-
-      default:
-        break;
+    } else if (isTask(chunk)) {
+      this.appendStateInstructions(chunk.status?.state);
+      this.pushMessage(chunk.status?.message);
+      if (chunk.artifacts) {
+        for (const art of chunk.artifacts) {
+          this.artifacts.set(art.artifactId, structuredClone(art));
+          this.artifactChunks.set(art.artifactId, [
+            extractPartsText(art.parts, ''),
+          ]);
+        }
+      }
+      // History Fallback: Some agent implementations do not populate the
+      // status.message in their final terminal response, instead archiving
+      // the final answer in the task's history array. To ensure we don't
+      // present an empty result, we fallback to the most recent agent message
+      // in the history only when the task is terminal and no other content
+      // (message log or artifacts) has been reassembled.
+      if (
+        isTerminalState(chunk.status?.state) &&
+        this.messageLog.length === 0 &&
+        this.artifacts.size === 0 &&
+        chunk.history &&
+        chunk.history.length > 0
+      ) {
+        const lastAgentMsg = [...chunk.history]
+          .reverse()
+          .find((m) => m.role?.toLowerCase().includes('agent'));
+        if (lastAgentMsg) {
+          this.pushMessage(lastAgentMsg);
+        }
+      }
+    } else if (isMessage(chunk)) {
+      this.pushMessage(chunk);
     }
   }
 
@@ -271,6 +263,84 @@ export function getGrpcCredentials(url: string): grpc.ChannelCredentials {
 }
 
 /**
+ * Returns gRPC channel options to ensure SSL/authority matches the original hostname
+ * when connecting via a pinned IP address.
+ */
+export function getGrpcChannelOptions(
+  hostname: string,
+): Record<string, unknown> {
+  return {
+    'grpc.default_authority': hostname,
+    'grpc.ssl_target_name_override': hostname,
+  };
+}
+
+/**
+ * Resolves a hostname to its IP address and validates it against SSRF.
+ * Returns the pinned IP-based URL and the original hostname.
+ */
+export async function pinUrlToIp(
+  url: string,
+  agentName: string,
+): Promise<{ pinnedUrl: string; hostname: string }> {
+  if (!url) return { pinnedUrl: url, hostname: '' };
+
+  // gRPC URLs in A2A can be 'host:port' or 'dns:///host:port' or have schemes.
+  // We normalize to host:port for resolution.
+  const hasScheme = url.includes('://');
+  const normalizedUrl = hasScheme ? url : `http://${url}`;
+
+  try {
+    const parsed = new URL(normalizedUrl);
+    const hostname = parsed.hostname;
+
+    const sanitizedHost =
+      hostname.startsWith('[') && hostname.endsWith(']')
+        ? hostname.slice(1, -1)
+        : hostname;
+
+    // Resolve DNS to check the actual target IP and pin it
+    const addresses = await lookup(hostname, { all: true });
+    const publicAddresses = addresses.filter(
+      (addr) =>
+        !isAddressPrivate(addr.address) ||
+        sanitizedHost === 'localhost' ||
+        sanitizedHost === '127.0.0.1' ||
+        sanitizedHost === '::1',
+    );
+
+    if (publicAddresses.length === 0 && addresses.length > 0) {
+      throw new Error(
+        `Refusing to load agent '${agentName}': transport URL '${url}' resolves to private IP range.`,
+      );
+    }
+
+    const pinnedIp = publicAddresses[0].address;
+    const pinnedHostname = pinnedIp.includes(':') ? `[${pinnedIp}]` : pinnedIp;
+
+    // Reconstruct URL with IP
+    parsed.hostname = pinnedHostname;
+    let pinnedUrl = parsed.toString();
+
+    // If original didn't have scheme, remove it (standard for gRPC targets)
+    if (!hasScheme) {
+      pinnedUrl = pinnedUrl.replace(/^http:\/\//, '');
+      // URL.toString() might append a trailing slash
+      if (pinnedUrl.endsWith('/') && !url.endsWith('/')) {
+        pinnedUrl = pinnedUrl.slice(0, -1);
+      }
+    }
+
+    return { pinnedUrl, hostname };
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('Refusing')) throw e;
+    throw new Error(`Failed to resolve host for agent '${agentName}': ${url}`, {
+      cause: e,
+    });
+  }
+}
+
+/**
  * Extracts contextId and taskId from a Message, Task, or Update response.
  * Follows the pattern from the A2A CLI sample to maintain conversational continuity.
  */
@@ -285,7 +355,7 @@ export function extractIdsFromResponse(result: SendMessageResult): {
 
   if ('kind' in result) {
     const kind = result.kind;
-    if (kind === 'message' || kind === 'artifact-update') {
+    if (kind === 'message' || isArtifactUpdateEvent(result)) {
       taskId = result.taskId;
       contextId = result.contextId;
     } else if (kind === 'task') {
@@ -391,6 +461,20 @@ function isStatusUpdateEvent(
   result: SendMessageResult,
 ): result is TaskStatusUpdateEvent {
   return result.kind === 'status-update';
+}
+
+function isArtifactUpdateEvent(
+  result: SendMessageResult,
+): result is TaskArtifactUpdateEvent {
+  return result.kind === 'artifact-update';
+}
+
+function isMessage(result: SendMessageResult): result is Message {
+  return result.kind === 'message';
+}
+
+function isTask(result: SendMessageResult): result is Task {
+  return result.kind === 'task';
 }
 
 /**

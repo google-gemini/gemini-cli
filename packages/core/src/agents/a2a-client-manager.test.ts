@@ -8,7 +8,8 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { A2AClientManager } from './a2a-client-manager.js';
 import type { AgentCard } from '@a2a-js/sdk';
 import * as sdkClient from '@a2a-js/sdk/client';
-import { lookup } from 'node:dns/promises';
+import * as dnsPromises from 'node:dns/promises';
+import type { LookupOptions } from 'node:dns';
 import { debugLogger } from '../utils/debugLogger.js';
 
 interface MockClient {
@@ -38,7 +39,7 @@ vi.mock('../utils/debugLogger.js', () => ({
 }));
 
 vi.mock('node:dns/promises', () => ({
-  lookup: vi.fn().mockResolvedValue([{ address: '93.184.216.34' }]),
+  lookup: vi.fn(),
 }));
 
 describe('A2AClientManager', () => {
@@ -65,8 +66,19 @@ describe('A2AClientManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    A2AClientManager.resetInstanceForTesting();
     manager = A2AClientManager.getInstance();
+    manager.clearCache();
+
+    // Default DNS mock: resolve to public IP.
+    // Use any cast only for return value due to complex multi-signature overloads.
+    vi.mocked(dnsPromises.lookup).mockImplementation(
+      async (_h: string, options?: LookupOptions | number) => {
+        const addr = { address: '93.184.216.34', family: 4 };
+        const isAll = typeof options === 'object' && options?.all;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (isAll ? [addr] : addr) as any;
+      },
+    );
 
     // Re-create the instances as plain objects that can be spied on
     const factoryInstance = {
@@ -253,7 +265,10 @@ describe('A2AClientManager', () => {
         contextId: 'ctx123',
         taskId: 'task456',
       });
-      await stream[Symbol.asyncIterator]().next();
+      // trigger execution
+      for await (const _ of stream) {
+        break;
+      }
 
       expect(mockClient.sendMessageStream).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -277,7 +292,10 @@ describe('A2AClientManager', () => {
       const stream = manager.sendMessageStream('TestAgent', 'Hello', {
         signal: controller.signal,
       });
-      await stream[Symbol.asyncIterator]().next();
+      // trigger execution
+      for await (const _ of stream) {
+        break;
+      }
 
       expect(mockClient.sendMessageStream).toHaveBeenCalledWith(
         expect.any(Object),
@@ -415,15 +433,19 @@ describe('A2AClientManager', () => {
     it('should throw if a domain resolves to a private IP (DNS SSRF protection)', async () => {
       const maliciousDomainUrl =
         'http://malicious.com/.well-known/agent-card.json';
-      vi.mocked(lookup).mockResolvedValueOnce([
-        { address: '10.0.0.1', family: 4 },
-      ]);
+
+      vi.mocked(dnsPromises.lookup).mockImplementationOnce(
+        async (_h: string, options?: LookupOptions | number) => {
+          const addr = { address: '10.0.0.1', family: 4 };
+          const isAll = typeof options === 'object' && options?.all;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return (isAll ? [addr] : addr) as any;
+        },
+      );
 
       await expect(
         manager.loadAgent('dns-ssrf-agent', maliciousDomainUrl),
-      ).rejects.toThrow(
-        /Refusing to load agent 'dns-ssrf-agent' from private IP range/,
-      );
+      ).rejects.toThrow(/private IP range/);
     });
 
     it('should throw if a public agent card contains a private transport URL (Deep SSRF protection)', async () => {
@@ -436,6 +458,21 @@ describe('A2AClientManager', () => {
       };
       vi.mocked(sdkClient.DefaultAgentCardResolver).mockReturnValue(
         resolverInstance as unknown as sdkClient.DefaultAgentCardResolver,
+      );
+
+      // DNS for public.agent.com is public
+      vi.mocked(dnsPromises.lookup).mockImplementation(
+        async (hostname: string, options?: LookupOptions | number) => {
+          const isAll = typeof options === 'object' && options?.all;
+          if (hostname === 'public.agent.com') {
+            const addr = { address: '1.1.1.1', family: 4 };
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return (isAll ? [addr] : addr) as any;
+          }
+          const addr = { address: '192.168.1.1', family: 4 };
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return (isAll ? [addr] : addr) as any;
+        },
       );
 
       await expect(
@@ -461,6 +498,25 @@ describe('A2AClientManager', () => {
       expect(resolverInstance.resolve).toHaveBeenCalledWith(
         trickyUrl,
         undefined,
+      );
+    });
+
+    it('should correctly handle URLs with standardPath in the hash fragment', async () => {
+      const fragmentUrl =
+        'http://localhost:9001/.well-known/agent-card.json#.well-known/agent-card.json';
+      const resolverInstance = {
+        resolve: vi.fn().mockResolvedValue({ name: 'test' } as AgentCard),
+      };
+      vi.mocked(sdkClient.DefaultAgentCardResolver).mockReturnValue(
+        resolverInstance as unknown as sdkClient.DefaultAgentCardResolver,
+      );
+
+      await manager.loadAgent('fragment-agent', fragmentUrl);
+
+      // Should correctly ignore the hash fragment and use the path from the URL object
+      expect(resolverInstance.resolve).toHaveBeenCalledWith(
+        'http://localhost:9001/',
+        '.well-known/agent-card.json',
       );
     });
   });

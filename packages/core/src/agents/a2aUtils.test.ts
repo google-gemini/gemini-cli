@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   extractMessageText,
   extractIdsFromResponse,
@@ -13,6 +13,7 @@ import {
   AUTH_REQUIRED_MSG,
   normalizeAgentCard,
   getGrpcCredentials,
+  pinUrlToIp,
 } from './a2aUtils.js';
 import type { SendMessageResult } from './a2a-client-manager.js';
 import type {
@@ -24,8 +25,17 @@ import type {
   TaskStatusUpdateEvent,
   TaskArtifactUpdateEvent,
 } from '@a2a-js/sdk';
+import * as dnsPromises from 'node:dns/promises';
+
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn(),
+}));
 
 describe('a2aUtils', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe('getGrpcCredentials', () => {
     it('should return secure credentials for https', () => {
       const credentials = getGrpcCredentials('https://test.agent');
@@ -35,6 +45,69 @@ describe('a2aUtils', () => {
     it('should return insecure credentials for http', () => {
       const credentials = getGrpcCredentials('http://test.agent');
       expect(credentials).toBeDefined();
+    });
+  });
+
+  describe('pinUrlToIp', () => {
+    it('should resolve and pin hostname to IP', async () => {
+      vi.mocked(dnsPromises.lookup).mockResolvedValue([
+        { address: '93.184.216.34', family: 4 },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ] as any);
+
+      const { pinnedUrl, hostname } = await pinUrlToIp(
+        'http://example.com:9000',
+        'test-agent',
+      );
+      expect(hostname).toBe('example.com');
+      expect(pinnedUrl).toBe('http://93.184.216.34:9000/');
+    });
+
+    it('should handle raw host:port strings (standard for gRPC)', async () => {
+      vi.mocked(dnsPromises.lookup).mockResolvedValue([
+        { address: '93.184.216.34', family: 4 },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ] as any);
+
+      const { pinnedUrl, hostname } = await pinUrlToIp(
+        'example.com:9000',
+        'test-agent',
+      );
+      expect(hostname).toBe('example.com');
+      expect(pinnedUrl).toBe('93.184.216.34:9000');
+    });
+
+    it('should throw error if resolution fails (fail closed)', async () => {
+      vi.mocked(dnsPromises.lookup).mockRejectedValue(new Error('DNS Error'));
+
+      await expect(
+        pinUrlToIp('http://unreachable.com', 'test-agent'),
+      ).rejects.toThrow("Failed to resolve host for agent 'test-agent'");
+    });
+
+    it('should throw error if resolved to private IP', async () => {
+      vi.mocked(dnsPromises.lookup).mockResolvedValue([
+        { address: '10.0.0.1', family: 4 },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ] as any);
+
+      await expect(
+        pinUrlToIp('http://malicious.com', 'test-agent'),
+      ).rejects.toThrow('resolves to private IP range');
+    });
+
+    it('should allow localhost/127.0.0.1/::1 exceptions', async () => {
+      vi.mocked(dnsPromises.lookup).mockResolvedValue([
+        { address: '127.0.0.1', family: 4 },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ] as any);
+
+      const { pinnedUrl, hostname } = await pinUrlToIp(
+        'http://localhost:9000',
+        'test-agent',
+      );
+      expect(hostname).toBe('localhost');
+      expect(pinnedUrl).toBe('http://127.0.0.1:9000/');
     });
   });
 
