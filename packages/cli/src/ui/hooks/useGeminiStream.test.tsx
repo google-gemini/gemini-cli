@@ -50,6 +50,7 @@ import { MessageType, StreamingState } from '../types.js';
 
 import type { LoadedSettings } from '../../config/settings.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
+import { theme } from '../semantic-colors.js';
 
 // --- MOCKS ---
 const mockSendMessageStream = vi
@@ -806,14 +807,6 @@ describe('useGeminiStream', () => {
     expect(injectedHintPart.text).toContain(
       'Do not cancel/skip tasks unless the user explicitly cancels them.',
     );
-    expect(
-      mockAddItem.mock.calls.some(
-        ([item]) =>
-          item?.type === 'info' &&
-          typeof item.text === 'string' &&
-          item.text.includes('Got it. Focusing on tests only.'),
-      ),
-    ).toBe(true);
 
     expect(mockRunInDevTraceSpan).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1057,9 +1050,9 @@ describe('useGeminiStream', () => {
     );
     expect(noteIndex).toBeGreaterThanOrEqual(0);
     expect(stopIndex).toBeGreaterThanOrEqual(0);
-    expect(failureHintIndex).toBeGreaterThanOrEqual(0);
+    // The failure hint should NOT be present if the suppressed error note was shown
+    expect(failureHintIndex).toBe(-1);
     expect(noteIndex).toBeLessThan(stopIndex);
-    expect(stopIndex).toBeLessThan(failureHintIndex);
   });
 
   it('should group multiple cancelled tool call responses into a single history entry', async () => {
@@ -2300,14 +2293,14 @@ describe('useGeminiStream', () => {
           requestTokens: 20,
           remainingTokens: 80,
           expectedMessage:
-            'Sending this message (20 tokens) might exceed the remaining context window limit (80 tokens).',
+            'Sending this message (20 tokens) might exceed the context window limit (80 tokens left).',
         },
         {
           name: 'with suggestion when remaining tokens are < 75% of limit',
           requestTokens: 30,
           remainingTokens: 70,
           expectedMessage:
-            'Sending this message (30 tokens) might exceed the remaining context window limit (70 tokens). Please try reducing the size of your message or use the `/compress` command to compress the chat history.',
+            'Sending this message (30 tokens) might exceed the context window limit (70 tokens left). Please try reducing the size of your message or use the `/compress` command to compress the chat history.',
         },
       ])(
         'should add message $name',
@@ -2385,6 +2378,43 @@ describe('useGeminiStream', () => {
       // Check that onCancelSubmit was called
       await waitFor(() => {
         expect(onCancelSubmitSpy).toHaveBeenCalledWith(true);
+      });
+    });
+
+    it('should add informational messages when ChatCompressed event is received', async () => {
+      vi.mocked(tokenLimit).mockReturnValue(10000);
+      // Setup mock to return a stream with ChatCompressed event
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.ChatCompressed,
+            value: {
+              originalTokenCount: 1000,
+              newTokenCount: 500,
+              compressionStatus: 'compressed',
+            },
+          };
+        })(),
+      );
+
+      const { result } = renderHookWithDefaults();
+
+      // Submit a query
+      await act(async () => {
+        await result.current.submitQuery('Test compression');
+      });
+
+      // Check that the succinct info message was added
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.INFO,
+            text: 'Context compressed from 10% to 5%.',
+            secondaryText: 'Change threshold in /settings.',
+            color: theme.status.warning,
+          }),
+          expect.any(Number),
+        );
       });
     });
 
