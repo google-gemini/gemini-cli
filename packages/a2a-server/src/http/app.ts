@@ -22,7 +22,11 @@ import type { AgentSettings } from '../types.js';
 import { GCSTaskStore, NoOpTaskStore } from '../persistence/gcs.js';
 import { CoderAgentExecutor } from '../agent/executor.js';
 import { requestStorage } from './requestStorage.js';
-import { loadConfig, loadEnvironment, setTargetDir } from '../config/config.js';
+import {
+  loadConfig,
+  loadEnvironment,
+  getWorkspaceDirs,
+} from '../config/config.js';
 import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { commandRegistry } from '../commands/command-registry.js';
@@ -195,14 +199,15 @@ async function handleExecuteCommand(
 export async function createApp() {
   try {
     // Load the server configuration once on startup.
-    const workspaceRoot = setTargetDir(undefined);
+    const workspaceRoots = getWorkspaceDirs(undefined);
     loadEnvironment();
-    const settings = loadSettings(workspaceRoot);
-    const extensions = loadExtensions(workspaceRoot);
+    const settings = loadSettings(workspaceRoots[0]);
+    const extensions = loadExtensions(workspaceRoots[0]);
     const config = await loadConfig(
       settings,
       new SimpleExtensionLoader(extensions),
       'a2a-server',
+      workspaceRoots,
     );
 
     let git: GitService | undefined;

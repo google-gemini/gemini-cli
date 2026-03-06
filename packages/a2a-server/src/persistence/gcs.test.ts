@@ -89,7 +89,7 @@ vi.mock('../utils/logger.js', () => ({
   },
 }));
 vi.mock('../config/config.js', () => ({
-  setTargetDir: vi.fn(),
+  getWorkspaceDirs: vi.fn(),
 }));
 vi.mock('node:stream/promises', () => ({
   pipeline: vi.fn(),
@@ -109,7 +109,7 @@ const mockTar = tar as Mocked<typeof tar>;
 const mockGzipSync = gzipSync as Mock;
 const mockGunzipSync = gunzipSync as Mock;
 const mockUuidv4 = uuidv4 as Mock;
-const mockSetTargetDir = configModule.setTargetDir as Mock;
+const mockGetWorkspaceDirs = configModule.getWorkspaceDirs as Mock;
 const mockGetPersistedState = getPersistedState as Mock;
 const TEST_METADATA_KEY = METADATA_KEY || '__persistedState';
 
@@ -197,7 +197,7 @@ describe('GCSTaskStore', () => {
     mockStorage.mockReturnValue(mockStorageInstance as unknown as Storage);
 
     mockUuidv4.mockReturnValue('test-uuid');
-    mockSetTargetDir.mockReturnValue('/tmp/workdir');
+    mockGetWorkspaceDirs.mockReturnValue(['/tmp/workdir']);
     mockGetPersistedState.mockReturnValue({
       _agentSettings: {},
       _taskState: 'submitted',

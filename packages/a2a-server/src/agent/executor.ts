@@ -31,7 +31,11 @@ import {
   getContextIdFromMetadata,
   getAgentSettingsFromMetadata,
 } from '../types.js';
-import { loadConfig, loadEnvironment, setTargetDir } from '../config/config.js';
+import {
+  loadConfig,
+  loadEnvironment,
+  getWorkspaceDirs,
+} from '../config/config.js';
 import { loadSettings } from '../config/settings.js';
 import { loadExtensions } from '../config/extension.js';
 import { Task } from './task.js';
@@ -92,11 +96,16 @@ export class CoderAgentExecutor implements AgentExecutor {
     agentSettings: AgentSettings,
     taskId: string,
   ): Promise<Config> {
-    const workspaceRoot = setTargetDir(agentSettings);
+    const workspaceRoots = getWorkspaceDirs(agentSettings);
     loadEnvironment(); // Will override any global env with workspace envs
-    const settings = loadSettings(workspaceRoot);
-    const extensions = loadExtensions(workspaceRoot);
-    return loadConfig(settings, new SimpleExtensionLoader(extensions), taskId);
+    const settings = loadSettings(workspaceRoots[0]);
+    const extensions = loadExtensions(workspaceRoots[0]);
+    return loadConfig(
+      settings,
+      new SimpleExtensionLoader(extensions),
+      taskId,
+      workspaceRoots,
+    );
   }
 
   /**
