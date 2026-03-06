@@ -13,6 +13,7 @@ import { LRUCache } from 'mnemonist';
 import {
   coreEvents,
   debugLogger,
+  getErrorMessage,
   unescapePath,
   type EditorType,
 } from '@google/gemini-cli-core';
@@ -3340,11 +3341,7 @@ export function useTextBuffer({
 
       dispatch({ type: 'set_text', payload: newText, pushToUndo: false });
     } catch (err) {
-      coreEvents.emitFeedback(
-        'error',
-        '[useTextBuffer] external editor error',
-        err,
-      );
+      coreEvents.emitFeedback('error', getErrorMessage(err), err);
     } finally {
       try {
         fs.unlinkSync(filePath);
