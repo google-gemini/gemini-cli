@@ -73,10 +73,11 @@ Gemini CLI by upgrading to one of the following subscriptions:
 
 These tiers apply when you sign in with a personal account. 
 To verify whether you're on a personal account, visit [Google One](https://one.google.com/about/plans?hl=en-US&g1_landing_page=0):
-- If you are not on a personal account you will see the following message "You're currently signed in to your Google Workspace Account"
+- If you are on a personal account, you will see your personal dashboard.
+- If you are not on a personal account, you will see: "You're currently signed in to your Google Workspace Account."
 
-**Supported Tiers:** 
-_- Tiers not listed above including Google AI Plus are not supported_
+**Supported tiers:** 
+_- Tiers not listed above, including Google AI Plus, are not supported._
 - [Google AI Pro and AI Ultra](https://gemini.google/subscriptions/). This is
   recommended for individual developers. Quotas and pricing are based on a fixed
   price subscription.
@@ -89,12 +90,12 @@ _- Tiers not listed above including Google AI Plus are not supported_
 
 
 ### Through your organization
-These tiers are applicable when you are signing in with a workspace account. 
+These tiers are applicable when you are signing in with a Google Workspace account. 
 - To verify your account type, visit [the Google One page](https://one.google.com/about/plans?hl=en-US&g1_landing_page=0).
 - You are on a workspace account if you see the message "You're currently signed in to your Google Workspace Account".
 
-**Supported Tiers:**
-_- Tiers not listed above including Workspace AI Standard/Plus and AI Expanded are not supported_
+**Supported tiers:**
+_- Tiers not listed above, including Workspace AI Standard/Plus and AI Expanded, are not supported._
 - [Workspace AI Ultra Access](https://workspace.google.com/products/ai-ultra/).
 - [Purchase a Gemini Code Assist Subscription through Google Cloud](https://cloud.google.com/gemini/docs/codeassist/overview).
 
