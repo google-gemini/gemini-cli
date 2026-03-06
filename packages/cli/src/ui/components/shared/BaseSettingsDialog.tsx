@@ -600,7 +600,7 @@ export function BaseSettingsDialog({
         {/* Help text */}
         <Box marginX={1}>
           <Text color={theme.text.secondary}>
-            (Use Enter to select, {formatCommand(Command.CLEAR_SCREEN)}
+            (Use Enter to select, {formatCommand(Command.CLEAR_SCREEN)} to reset
             {finalShowScopeSelector ? ', Tab to change focus' : ''}, Esc to
             close)
           </Text>
