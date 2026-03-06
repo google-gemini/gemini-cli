@@ -29,7 +29,7 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
   const config = useConfig();
   const useBackgroundColor = config.getUseBackgroundColor();
 
-  const textColor = isSlashCommand ? theme.text.accent : theme.text.secondary;
+  const textColor = isSlashCommand ? theme.text.accent : theme.text.primary;
 
   const displayText = useMemo(() => {
     if (!text) return text;
