@@ -25,6 +25,7 @@ import {
   getEditorWaitFlag,
   getEditorExtraArgs,
   resolveEditorAsync,
+  resolveEditorTypeFromCommand,
   type EditorType,
 } from './editor.js';
 import { coreEvents, CoreEvent } from './events.js';
@@ -898,6 +899,25 @@ describe('editor utils', () => {
       for (const editor of standardGuiEditors) {
         expect(getEditorWaitFlag(editor)).toBe('--wait');
       }
+    });
+  });
+
+  describe('resolveEditorTypeFromCommand', () => {
+    it('should resolve known command names to their editor type', () => {
+      expect(resolveEditorTypeFromCommand('cursor')).toBe('cursor');
+      expect(resolveEditorTypeFromCommand('code')).toBe('vscode');
+      expect(resolveEditorTypeFromCommand('codium')).toBe('vscodium');
+      expect(resolveEditorTypeFromCommand('vim')).toBe('vim');
+    });
+
+    it('should be case-insensitive', () => {
+      expect(resolveEditorTypeFromCommand('Cursor')).toBe('cursor');
+      expect(resolveEditorTypeFromCommand('CODE')).toBe('vscode');
+    });
+
+    it('should return undefined for unknown commands', () => {
+      expect(resolveEditorTypeFromCommand('unknowntool')).toBeUndefined();
+      expect(resolveEditorTypeFromCommand('')).toBeUndefined();
     });
   });
 
