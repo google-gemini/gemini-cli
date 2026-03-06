@@ -785,6 +785,31 @@ export async function loadCliConfig(
 
   const ptyInfo = await getPty();
 
+  // Validate PTY backend configuration
+  let validatedPtyBackend: 'native' | 'script' | 'proxy' | 'none' = 'native';
+  const rawPtyBackend = settings.tools?.shell?.ptyBackend as string | undefined;
+
+  if (rawPtyBackend) {
+    switch (rawPtyBackend) {
+      case 'native':
+        validatedPtyBackend = 'native';
+        break;
+      case 'script':
+        validatedPtyBackend = 'script';
+        break;
+      case 'proxy':
+        validatedPtyBackend = 'proxy';
+        break;
+      case 'none':
+        validatedPtyBackend = 'none';
+        break;
+      default:
+        throw new Error(
+          `Invalid PTY backend: ${rawPtyBackend}. Valid values are: native, script, proxy, none`,
+        );
+    }
+  }
+
   const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
   const extensionsEnabled = settings.admin?.extensions?.enabled ?? true;
   const adminSkillsEnabled = settings.admin?.skills?.enabled ?? true;
@@ -954,6 +979,7 @@ export async function loadCliConfig(
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
     enableShellOutputEfficiency:
       settings.tools?.shell?.enableShellOutputEfficiency ?? true,
+    ptyBackend: validatedPtyBackend,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     eventEmitter: coreEvents,

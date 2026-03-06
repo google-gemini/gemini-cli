@@ -1425,6 +1425,27 @@ const SETTINGS_SCHEMA = {
             `,
             showInDialog: true,
           },
+          ptyBackend: {
+            type: 'enum',
+            label: 'PTY Backend',
+            category: 'Tools',
+            requiresRestart: true,
+            default: 'native',
+            description: oneLine`
+              Select the PTY backend for shell execution.
+              "native" (default) uses @lydell/node-pty (requires N-API).
+              "script" uses the POSIX script(1) utility (no N-API required –
+              works on statically-linked or musl Node builds).
+              "none" disables the PTY entirely and uses piped child_process I/O.
+              Can also be set via the GEMINI_PTY_BACKEND environment variable.
+            `,
+            showInDialog: true,
+            options: [
+              { value: 'native', label: 'Native' },
+              { value: 'script', label: 'Script' },
+              { value: 'none', label: 'None' },
+            ],
+          },
           pager: {
             type: 'string',
             label: 'Pager',
