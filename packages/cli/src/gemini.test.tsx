@@ -747,6 +747,60 @@ describe('gemini.tsx main function kitty protocol', () => {
     emitFeedbackSpy.mockRestore();
   });
 
+  it('should start normally with a warning when no sessions found for resume', async () => {
+    const { SessionSelector, SessionError } = await import(
+      './utils/sessionUtils.js'
+    );
+    vi.mocked(SessionSelector).mockImplementation(
+      () =>
+        ({
+          resolveSession: vi
+            .fn()
+            .mockRejectedValue(SessionError.noSessionsFound()),
+        }) as unknown as InstanceType<typeof SessionSelector>,
+    );
+
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: { advanced: {}, security: { auth: {} }, ui: { theme: 'test' } },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
+    );
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      promptInteractive: false,
+      resume: 'latest',
+    } as unknown as CliArgs);
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => true,
+        getQuestion: () => '',
+        getSandbox: () => undefined,
+      }),
+    );
+
+    await main();
+
+    // Should NOT have crashed
+    expect(processExitSpy).not.toHaveBeenCalled();
+    // Should NOT have emitted a feedback error
+    expect(emitFeedbackSpy).not.toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Error resuming session'),
+    );
+    processExitSpy.mockRestore();
+    emitFeedbackSpy.mockRestore();
+  });
+
   it.skip('should log error when cleanupExpiredSessions fails', async () => {
     const { cleanupExpiredSessions } = await import(
       './utils/sessionCleanup.js'
@@ -959,13 +1013,18 @@ describe('gemini.tsx main function exit codes', () => {
       resume: 'invalid-session',
     } as unknown as CliArgs);
 
-    vi.mock('./utils/sessionUtils.js', () => ({
-      SessionSelector: vi.fn().mockImplementation(() => ({
-        resolveSession: vi
-          .fn()
-          .mockRejectedValue(new Error('Session not found')),
-      })),
-    }));
+    vi.mock('./utils/sessionUtils.js', async (importOriginal) => {
+      const original =
+        await importOriginal<typeof import('./utils/sessionUtils.js')>();
+      return {
+        ...original,
+        SessionSelector: vi.fn().mockImplementation(() => ({
+          resolveSession: vi
+            .fn()
+            .mockRejectedValue(new Error('Session not found')),
+        })),
+      };
+    });
 
     process.env['GEMINI_API_KEY'] = 'test-key';
     try {
