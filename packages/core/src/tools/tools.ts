@@ -132,7 +132,10 @@ export abstract class BaseToolInvocation<
    */
   protected getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
-  ): PolicyUpdateOptions | undefined {
+  ):
+    | PolicyUpdateOptions
+    | undefined
+    | Promise<PolicyUpdateOptions | undefined> {
     return undefined;
   }
 
@@ -148,7 +151,7 @@ export abstract class BaseToolInvocation<
       outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
     ) {
       if (this._toolName) {
-        const options = this.getPolicyUpdateOptions(outcome);
+        const options = await this.getPolicyUpdateOptions(outcome);
         void this.messageBus.publish({
           type: MessageBusType.UPDATE_POLICY,
           toolName: this._toolName,
@@ -772,6 +775,7 @@ export interface ToolExecuteConfirmationDetails {
   rootCommand: string;
   rootCommands: string[];
   commands?: string[];
+  hasRedirection?: boolean;
 }
 
 export interface ToolMcpConfirmationDetails {

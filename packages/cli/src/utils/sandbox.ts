@@ -268,6 +268,13 @@ export async function start_sandbox(
       }
     }
 
+    // stop if command or image is missing
+    if (!command || !image) {
+      throw new FatalSandboxError(
+        'Sandbox configuration is missing required "command" or "image" field.',
+      );
+    }
+
     // stop if image is missing
     if (!(await ensureSandboxImageIsPresent(command, image, cliConfig))) {
       const remedy =
@@ -714,10 +721,10 @@ export async function start_sandbox(
       // proxyProcess.stdout?.on('data', (data) => {
       //   console.info(data.toString());
       // });
-      proxyProcess.stderr?.on('data', (data) => {
+      proxyProcess?.stderr?.on('data', (data) => {
         debugLogger.debug(`[PROXY STDERR]: ${data.toString().trim()}`);
       });
-      proxyProcess.on('close', (code, signal) => {
+      proxyProcess?.on('close', (code, signal) => {
         if (sandboxProcess?.pid) {
           process.kill(-sandboxProcess.pid, 'SIGTERM');
         }
@@ -743,6 +750,10 @@ export async function start_sandbox(
     });
 
     return await new Promise<number>((resolve, reject) => {
+      if (!sandboxProcess) {
+        reject(new Error('Failed to spawn sandbox process.'));
+        return;
+      }
       sandboxProcess.on('error', (err) => {
         coreEvents.emitFeedback('error', 'Sandbox process error', err);
         reject(err);

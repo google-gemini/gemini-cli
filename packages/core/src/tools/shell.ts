@@ -31,6 +31,7 @@ import {
   type ShellExecutionConfig,
   type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
+import { SandboxProfile } from '../services/sandboxManager.js';
 import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
@@ -98,9 +99,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
       outcome === ToolConfirmationOutcome.ProceedAlways
     ) {
       const command = stripShellWrapper(this.params.command);
-      const rootCommands = [...new Set(getCommandRoots(command))];
-      if (rootCommands.length > 0) {
-        return { commandPrefix: rootCommands };
+      const rootCommands = getCommandRoots(command);
+      const uniqueRootCommands = [...new Set(rootCommands)];
+      if (uniqueRootCommands.length > 0) {
+        return { commandPrefix: uniqueRootCommands };
       }
       return { commandPrefix: this.params.command };
     }
@@ -112,14 +114,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
 
-    const parsed = parseCommandDetails(command);
+    const parsed = await parseCommandDetails(command);
     let rootCommandDisplay = '';
 
     if (!parsed || parsed.hasError || parsed.details.length === 0) {
       // Fallback if parser fails
       const fallback = command.trim().split(/\s+/)[0];
       rootCommandDisplay = fallback || 'shell command';
-      if (hasRedirection(command)) {
+      if (await hasRedirection(command)) {
         rootCommandDisplay += ', redirection';
       }
     } else {
@@ -128,7 +130,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
         .join(', ');
     }
 
-    const rootCommands = [...new Set(getCommandRoots(command))];
+    const rootCommands = await getCommandRoots(command);
+    const uniqueRootCommands = [...new Set(rootCommands)];
+    const redirection = await hasRedirection(command);
 
     // Rely entirely on PolicyEngine for interactive confirmation.
     // If we are here, it means PolicyEngine returned ASK_USER (or no message bus),
@@ -138,7 +142,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
       title: 'Confirm Shell Command',
       command: this.params.command,
       rootCommand: rootCommandDisplay,
-      rootCommands,
+      rootCommands: uniqueRootCommands,
+      hasRedirection: redirection,
       onConfirm: async (_outcome: ToolConfirmationOutcome) => {
         // Policy updates are now handled centrally by the scheduler
       },
@@ -278,6 +283,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
               shellExecutionConfig?.sanitizationConfig ??
               this.config.sanitizationConfig,
           },
+          SandboxProfile.WORKSPACE_WRITE,
         );
 
       if (pid) {

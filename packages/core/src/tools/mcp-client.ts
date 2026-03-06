@@ -46,6 +46,7 @@ import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
 import { XcodeMcpBridgeFixTransport } from './xcode-mcp-fix-transport.js';
+import { SandboxedTransport } from './sandboxed-transport.js';
 
 import type { CallableTool, FunctionCall, Part, Tool } from '@google/genai';
 import { basename } from 'node:path';
@@ -84,6 +85,7 @@ import {
   GEMINI_CLI_IDENTIFICATION_ENV_VAR,
   GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
 } from '../services/shellExecutionService.js';
+import { prepareSandboxedCommand } from '../utils/shell-utils.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -2218,13 +2220,30 @@ export async function createTransport(
       }
     }
 
+    const {
+      program: sandboxedCommand,
+      args: sandboxedArgs,
+      cleanup,
+    } = await prepareSandboxedCommand(
+      mcpServerConfig.command,
+      mcpServerConfig.args || [],
+      {
+        cwd: mcpServerConfig.cwd,
+        env: finalEnv,
+      },
+    );
+
     let transport: Transport = new StdioClientTransport({
-      command: mcpServerConfig.command,
-      args: mcpServerConfig.args || [],
+      command: sandboxedCommand,
+      args: sandboxedArgs,
       env: finalEnv,
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
     });
+
+    if (cleanup) {
+      transport = new SandboxedTransport(transport, cleanup);
+    }
 
     // Fix for Xcode 26.3 mcpbridge non-compliant responses
     // It returns JSON in `content` instead of `structuredContent`
@@ -2236,15 +2255,17 @@ export async function createTransport(
     }
 
     if (debugMode) {
-      // The `XcodeMcpBridgeFixTransport` wrapper hides the underlying `StdioClientTransport`,
+      // Wrapper transports hide the underlying `StdioClientTransport`,
       // which exposes `stderr` for debug logging. We need to unwrap it to attach the listener.
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const underlyingTransport =
-        transport instanceof XcodeMcpBridgeFixTransport
-          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-            (transport as any).transport
-          : transport;
+      let underlyingTransport: Transport = transport;
+      while (
+        underlyingTransport instanceof XcodeMcpBridgeFixTransport ||
+        underlyingTransport instanceof SandboxedTransport
+      ) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-type-assertion
+        underlyingTransport = (underlyingTransport as any).transport;
+      }
 
       if (
         underlyingTransport instanceof StdioClientTransport &&

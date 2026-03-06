@@ -137,7 +137,7 @@ describe('sandbox', () => {
   describe('start_sandbox', () => {
     it('should handle macOS seatbelt (sandbox-exec)', async () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
-      const config: SandboxConfig = {
+      const config: SandboxConfig = { enabled: true,
         command: 'sandbox-exec',
         image: 'some-image',
       };
@@ -173,7 +173,7 @@ describe('sandbox', () => {
     it('should throw FatalSandboxError if seatbelt profile is missing', async () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
       vi.mocked(fs.existsSync).mockReturnValue(false);
-      const config: SandboxConfig = {
+      const config: SandboxConfig = { enabled: true,
         command: 'sandbox-exec',
         image: 'some-image',
       };
@@ -182,7 +182,7 @@ describe('sandbox', () => {
     });
 
     it('should handle Docker execution', async () => {
-      const config: SandboxConfig = {
+      const config: SandboxConfig = { enabled: true,
         command: 'docker',
         image: 'gemini-cli-sandbox',
       };
@@ -231,7 +231,7 @@ describe('sandbox', () => {
     });
 
     it('should pull image if missing', async () => {
-      const config: SandboxConfig = {
+      const config: SandboxConfig = { enabled: true,
         command: 'docker',
         image: 'missing-image',
       };
@@ -300,7 +300,7 @@ describe('sandbox', () => {
     });
 
     it('should throw if image pull fails', async () => {
-      const config: SandboxConfig = {
+      const config: SandboxConfig = { enabled: true,
         command: 'docker',
         image: 'missing-image',
       };
@@ -338,7 +338,7 @@ describe('sandbox', () => {
     });
 
     it('should mount volumes correctly', async () => {
-      const config: SandboxConfig = {
+      const config: SandboxConfig = { enabled: true,
         command: 'docker',
         image: 'gemini-cli-sandbox',
       };
@@ -395,7 +395,7 @@ describe('sandbox', () => {
     });
 
     it('should pass through GOOGLE_GEMINI_BASE_URL and GOOGLE_VERTEX_BASE_URL', async () => {
-      const config: SandboxConfig = {
+      const config: SandboxConfig = { enabled: true,
         command: 'docker',
         image: 'gemini-cli-sandbox',
       };
@@ -442,7 +442,7 @@ describe('sandbox', () => {
     });
 
     it('should handle user creation on Linux if needed', async () => {
-      const config: SandboxConfig = {
+      const config: SandboxConfig = { enabled: true,
         command: 'docker',
         image: 'gemini-cli-sandbox',
       };
@@ -508,7 +508,7 @@ describe('sandbox', () => {
 
       it('should run lxc exec with correct args for a running container', async () => {
         process.env['TEST_LXC_LIST_OUTPUT'] = LXC_RUNNING;
-        const config: SandboxConfig = {
+        const config: SandboxConfig = { enabled: true,
           command: 'lxc',
           image: 'gemini-sandbox',
         };
@@ -542,7 +542,7 @@ describe('sandbox', () => {
 
       it('should throw FatalSandboxError if lxc list fails', async () => {
         process.env['TEST_LXC_LIST_OUTPUT'] = 'throw';
-        const config: SandboxConfig = {
+        const config: SandboxConfig = { enabled: true,
           command: 'lxc',
           image: 'gemini-sandbox',
         };
@@ -554,7 +554,7 @@ describe('sandbox', () => {
 
       it('should throw FatalSandboxError if container is not running', async () => {
         process.env['TEST_LXC_LIST_OUTPUT'] = LXC_STOPPED;
-        const config: SandboxConfig = {
+        const config: SandboxConfig = { enabled: true,
           command: 'lxc',
           image: 'gemini-sandbox',
         };
@@ -564,7 +564,7 @@ describe('sandbox', () => {
 
       it('should throw FatalSandboxError if container is not found in list', async () => {
         process.env['TEST_LXC_LIST_OUTPUT'] = '[]';
-        const config: SandboxConfig = {
+        const config: SandboxConfig = { enabled: true,
           command: 'lxc',
           image: 'gemini-sandbox',
         };
@@ -577,7 +577,7 @@ describe('sandbox', () => {
   describe('gVisor (runsc)', () => {
     it('should use docker with --runtime=runsc on Linux', async () => {
       vi.mocked(os.platform).mockReturnValue('linux');
-      const config: SandboxConfig = {
+      const config: SandboxConfig = { enabled: true,
         command: 'runsc',
         image: 'gemini-cli-sandbox',
       };

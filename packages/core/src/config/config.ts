@@ -105,14 +105,22 @@ import {
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
 import { TrackerService } from '../services/trackerService.js';
+import {
+  type SandboxManager,
+  StandardSandboxManager,
+} from '../services/sandboxManager.js';
 import type { GenerateContentParameters } from '@google/genai';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation, AnyDeclarativeTool };
 import type { AnyToolInvocation, AnyDeclarativeTool } from '../tools/tools.js';
+import { setSandboxManager as setCentralSandboxManager } from '../utils/shell-utils.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
-import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
+import {
+  ShellExecutionService,
+  type ShellExecutionConfig,
+} from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { EventEmitter } from 'node:events';
@@ -446,8 +454,10 @@ export enum AuthProviderType {
 }
 
 export interface SandboxConfig {
-  command: 'docker' | 'podman' | 'sandbox-exec' | 'runsc' | 'lxc';
-  image: string;
+  enabled: boolean;
+  command?: 'docker' | 'podman' | 'sandbox-exec' | 'runsc' | 'lxc';
+  image?: string;
+  allowedPaths?: string[];
 }
 
 /**
@@ -798,6 +808,7 @@ export class Config implements McpContext {
   private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
+  private sandboxManager!: SandboxManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
@@ -813,6 +824,9 @@ export class Config implements McpContext {
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
     this.sandbox = params.sandbox;
+    this.sandboxManager = new StandardSandboxManager(this);
+    ShellExecutionService.setSandboxManager(this.sandboxManager);
+    setCentralSandboxManager(this.sandboxManager);
     this.targetDir = path.resolve(params.targetDir);
     this.folderTrust = params.folderTrust ?? false;
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
@@ -1559,6 +1573,10 @@ export class Config implements McpContext {
 
   getSandbox(): SandboxConfig | undefined {
     return this.sandbox;
+  }
+
+  getSandboxManager(): SandboxManager {
+    return this.sandboxManager;
   }
 
   isRestrictiveSandbox(): boolean {

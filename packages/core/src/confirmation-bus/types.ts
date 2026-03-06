@@ -92,6 +92,7 @@ export type SerializableConfirmationDetails =
       rootCommand: string;
       rootCommands: string[];
       commands?: string[];
+      hasRedirection?: boolean;
     }
   | {
       type: 'mcp';

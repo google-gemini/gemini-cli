@@ -76,6 +76,7 @@ import {
   type ShellExecutionResult,
   type ShellOutputEvent,
   CoreToolCallStatus,
+  SandboxProfile,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -214,6 +215,7 @@ describe('useShellCommandProcessor', () => {
       expect.any(Object),
       false,
       expect.any(Object),
+      SandboxProfile.WORKSPACE_WRITE,
     );
     expect(onExecMock).toHaveBeenCalledWith(expect.any(Promise));
   });
@@ -306,6 +308,7 @@ describe('useShellCommandProcessor', () => {
         expect.any(Object),
         false, // enableInteractiveShell
         expect.any(Object),
+        SandboxProfile.WORKSPACE_WRITE,
       );
 
       // Wait for the async PID update to happen.
@@ -430,6 +433,7 @@ describe('useShellCommandProcessor', () => {
       expect.any(Object),
       false,
       expect.any(Object),
+      SandboxProfile.WORKSPACE_WRITE,
     );
 
     await act(async () => {

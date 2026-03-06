@@ -14,6 +14,7 @@ import {
   type Mocked,
 } from 'vitest';
 import { IdeClient, IDEConnectionStatus } from './ide-client.js';
+import { SandboxedTransport } from '../tools/sandboxed-transport.js';
 import type * as fs from 'node:fs';
 import { getIdeProcessInfo } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -50,6 +51,20 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('./detect-ide.js');
 vi.mock('node:os');
 vi.mock('./ide-connection-utils.js');
+vi.mock('../utils/shell-utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/shell-utils.js')>();
+  return {
+    ...actual,
+    prepareSandboxedCommand: vi.fn().mockImplementation((cmd: string, args: string[]) =>
+      Promise.resolve({
+        program: cmd,
+        args,
+        cleanup: vi.fn(),
+      }),
+    ),
+  };
+});
+import { prepareSandboxedCommand } from '../utils/shell-utils.js';
 
 describe('IdeClient', () => {
   let mockClient: Mocked<Client>;
@@ -97,6 +112,14 @@ describe('IdeClient', () => {
     vi.mocked(StreamableHTTPClientTransport).mockReturnValue(mockHttpTransport);
     vi.mocked(StdioClientTransport).mockReturnValue(mockStdioTransport);
 
+    vi.mocked(prepareSandboxedCommand).mockImplementation((cmd: string, args: string[]) =>
+      Promise.resolve({
+        program: cmd,
+        args,
+        cleanup: vi.fn(),
+      }),
+    );
+
     await IdeClient.getInstance();
   });
 
@@ -137,7 +160,9 @@ describe('IdeClient', () => {
         command: 'test-cmd',
         args: ['--foo'],
       });
-      expect(mockClient.connect).toHaveBeenCalledWith(mockStdioTransport);
+      expect(mockClient.connect).toHaveBeenCalledWith(
+        expect.any(SandboxedTransport),
+      );
       expect(ideClient.getConnectionStatus().status).toBe(
         IDEConnectionStatus.Connected,
       );
@@ -194,9 +219,42 @@ describe('IdeClient', () => {
         command: 'env-cmd',
         args: ['--bar'],
       });
-      expect(mockClient.connect).toHaveBeenCalledWith(mockStdioTransport);
+      expect(mockClient.connect).toHaveBeenCalledWith(
+        expect.any(SandboxedTransport),
+      );
       expect(ideClient.getConnectionStatus().status).toBe(
         IDEConnectionStatus.Connected,
+      );
+    });
+
+    it('should apply sandboxing to stdio transport', async () => {
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(undefined);
+      vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
+      vi.mocked(getStdioConfigFromEnv).mockReturnValue({
+        command: 'original-command',
+        args: ['--original-arg'],
+      });
+
+      const mockCleanup = vi.fn();
+      vi.mocked(prepareSandboxedCommand).mockResolvedValue({
+        program: 'sandboxed-command',
+        args: ['--sandboxed-arg'],
+        cleanup: mockCleanup,
+      });
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      expect(prepareSandboxedCommand).toHaveBeenCalledWith(
+        'original-command',
+        ['--original-arg'],
+      );
+
+      expect(StdioClientTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'sandboxed-command',
+          args: ['--sandboxed-arg'],
+        }),
       );
     });
 

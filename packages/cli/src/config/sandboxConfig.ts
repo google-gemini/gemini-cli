@@ -31,18 +31,13 @@ const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
   'lxc',
 ];
 
-function isSandboxCommand(value: string): value is SandboxConfig['command'] {
-  return (VALID_SANDBOX_COMMANDS as readonly string[]).includes(value);
+function isSandboxCommand(value: string | undefined): value is SandboxConfig['command'] {
+  return (VALID_SANDBOX_COMMANDS as readonly (string | undefined)[]).includes(value);
 }
 
 function getSandboxCommand(
   sandbox?: boolean | string | null,
 ): SandboxConfig['command'] | '' {
-  // If the SANDBOX env var is set, we're already inside the sandbox.
-  if (process.env['SANDBOX']) {
-    return '';
-  }
-
   // note environment variable takes precedence over argument (from command line or settings)
   const environmentConfiguredSandbox =
     process.env['GEMINI_SANDBOX']?.toLowerCase().trim() ?? '';
@@ -124,5 +119,10 @@ export async function loadSandboxConfig(
     process.env['GEMINI_SANDBOX_IMAGE_DEFAULT'] ??
     packageJson?.config?.sandboxImageUri;
 
-  return command && image ? { command, image } : undefined;
+  const enabled = !!(command === 'sandbox-exec' || (command && image));
+  if (enabled) {
+    console.error(`[DEBUG] Sandbox Enabled: ${command}${image ? ` (image: ${image})` : ''}`);
+  }
+
+  return enabled ? { command: command as SandboxConfig['command'], image, enabled: true } : undefined;
 }

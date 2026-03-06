@@ -12,8 +12,10 @@ import os from 'node:os';
 import type { IPty } from '@lydell/node-pty';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import {
+  getSandboxManager,
   getShellConfiguration,
   resolveExecutable,
+  setSandboxManager as setCentralSandboxManager,
   type ShellType,
 } from '../utils/shell-utils.js';
 import { isBinary } from '../utils/textUtils.js';
@@ -22,10 +24,8 @@ import {
   serializeTerminalToObject,
   type AnsiOutput,
 } from '../utils/terminalSerializer.js';
-import {
-  sanitizeEnvironment,
-  type EnvironmentSanitizationConfig,
-} from './environmentSanitization.js';
+import { sanitizeEnvironment, type EnvironmentSanitizationConfig } from './environmentSanitization.js';
+import { type SandboxManager, SandboxProfile } from './sandboxManager.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 const { Terminal } = pkg;
 
@@ -196,6 +196,10 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
  */
 
 export class ShellExecutionService {
+  static setSandboxManager(manager: SandboxManager): void {
+    setCentralSandboxManager(manager);
+  }
+
   private static activePtys = new Map<number, ActivePty>();
   private static activeChildProcesses = new Map<number, ActiveChildProcess>();
   private static exitedPtyInfo = new Map<
@@ -227,18 +231,48 @@ export class ShellExecutionService {
     abortSignal: AbortSignal,
     shouldUseNodePty: boolean,
     shellExecutionConfig: ShellExecutionConfig,
+    profile?: SandboxProfile,
   ): Promise<ShellExecutionHandle> {
+    const { executable, argsPrefix, shell } = getShellConfiguration();
+    const resolvedExecutable = (await resolveExecutable(executable)) ?? executable;
+    const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
+    const originalArgs = [...argsPrefix, guardedCommand];
+
+    let finalExecutable = resolvedExecutable;
+    let finalArgs = originalArgs;
+    let cleanup: (() => void) | undefined;
+
+    const manager = getSandboxManager();
+    if (manager) {
+      const sandboxed = await manager.prepareCommand({
+        command: resolvedExecutable,
+        args: originalArgs,
+        cwd,
+        env: sanitizeEnvironment(
+          process.env,
+          shellExecutionConfig.sanitizationConfig,
+        ),
+        profile,
+      });
+      finalExecutable = sandboxed.program;
+      finalArgs = sandboxed.args;
+      cleanup = sandboxed.cleanup;
+      console.error(`[DEBUG] Executing: ${finalExecutable} ${finalArgs.join(' ')}`);
+    }
+
     if (shouldUseNodePty) {
       const ptyInfo = await getPty();
       if (ptyInfo) {
         try {
           return await this.executeWithPty(
-            commandToExecute,
+            finalExecutable,
+            finalArgs,
             cwd,
             onOutputEvent,
             abortSignal,
             shellExecutionConfig,
             ptyInfo,
+            cleanup,
           );
         } catch (_e) {
           // Fallback to child_process
@@ -247,11 +281,13 @@ export class ShellExecutionService {
     }
 
     return this.childProcessFallback(
-      commandToExecute,
+      finalExecutable,
+      finalArgs,
       cwd,
       onOutputEvent,
       abortSignal,
       shellExecutionConfig.sanitizationConfig,
+      cleanup,
     );
   }
 
@@ -293,17 +329,16 @@ export class ShellExecutionService {
   }
 
   private static childProcessFallback(
-    commandToExecute: string,
+    executable: string,
+    spawnArgs: string[],
     cwd: string,
     onOutputEvent: (event: ShellOutputEvent) => void,
     abortSignal: AbortSignal,
     sanitizationConfig: EnvironmentSanitizationConfig,
+    cleanup?: () => void,
   ): ShellExecutionHandle {
     try {
       const isWindows = os.platform() === 'win32';
-      const { executable, argsPrefix, shell } = getShellConfiguration();
-      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const spawnArgs = [...argsPrefix, guardedCommand];
 
       const child = cpSpawn(executable, spawnArgs, {
         cwd,
@@ -414,7 +449,7 @@ export class ShellExecutionService {
           code: number | null,
           signal: NodeJS.Signals | null,
         ) => {
-          const { finalBuffer } = cleanup();
+          const { finalBuffer } = cleanupProcess();
 
           let combinedOutput = state.output;
 
@@ -441,6 +476,10 @@ export class ShellExecutionService {
             this.activeChildProcesses.delete(child.pid);
             this.activeResolvers.delete(child.pid);
             this.activeListeners.delete(child.pid);
+          }
+
+          if (cleanup) {
+            cleanup();
           }
 
           resolve({
@@ -478,7 +517,7 @@ export class ShellExecutionService {
           handleExit(code, signal);
         });
 
-        function cleanup() {
+        function cleanupProcess() {
           exited = true;
           abortSignal.removeEventListener('abort', abortHandler);
           if (stdoutDecoder) {
@@ -541,12 +580,14 @@ export class ShellExecutionService {
   }
 
   private static async executeWithPty(
-    commandToExecute: string,
+    executable: string,
+    args: string[],
     cwd: string,
     onOutputEvent: (event: ShellOutputEvent) => void,
     abortSignal: AbortSignal,
     shellExecutionConfig: ShellExecutionConfig,
     ptyInfo: PtyImplementation,
+    cleanup?: () => void,
   ): Promise<ShellExecutionHandle> {
     if (!ptyInfo) {
       // This should not happen, but as a safeguard...
@@ -555,17 +596,6 @@ export class ShellExecutionService {
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
-      const { executable, argsPrefix, shell } = getShellConfiguration();
-
-      const resolvedExecutable = await resolveExecutable(executable);
-      if (!resolvedExecutable) {
-        throw new Error(
-          `Shell executable "${executable}" not found in PATH or at absolute location. Please ensure the shell is installed and available in your environment.`,
-        );
-      }
-
-      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const args = [...argsPrefix, guardedCommand];
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(executable, args, {
@@ -824,6 +854,10 @@ export class ShellExecutionService {
               this.activeListeners.delete(ptyProcess.pid);
 
               const finalBuffer = Buffer.concat(outputChunks);
+
+              if (cleanup) {
+                cleanup();
+              }
 
               resolve({
                 rawOutput: finalBuffer,

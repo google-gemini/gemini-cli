@@ -48,19 +48,14 @@ export const useTurnActivityMonitor = (
   }, [streamingState, activePtyId]);
 
   // Detect redirection in the current query or tool calls.
-  // We derive this directly during render to ensure it's accurate from the first frame.
-  const isRedirectionActive = useMemo(
-    () =>
-      // Check active tool calls for run_shell_command
-      pendingToolCalls.some((tc) => {
-        if (tc.request.name !== 'run_shell_command') return false;
+  const isRedirectionActive = useMemo(() => {
+    return pendingToolCalls.some((tc) => {
+      if (tc.request.name !== 'run_shell_command') return false;
 
-        const command =
-          (tc.request.args as { command?: string })?.command || '';
-        return hasRedirection(command);
-      }),
-    [pendingToolCalls],
-  );
+      const command = (tc.request.args as { command?: string })?.command || '';
+      return hasRedirection(command);
+    });
+  }, [pendingToolCalls]);
 
   return {
     operationStartTime,

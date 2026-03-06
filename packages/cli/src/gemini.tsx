@@ -15,7 +15,6 @@ import { createHash } from 'node:crypto';
 import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
-import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
 import {
   loadTrustedFolders,
@@ -94,11 +93,6 @@ import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
 import { KeypressProvider } from './ui/contexts/KeypressContext.js';
 import { useKittyKeyboardProtocol } from './ui/hooks/useKittyKeyboardProtocol.js';
-import {
-  relaunchAppInChildProcess,
-  relaunchOnExitCode,
-} from './utils/relaunch.js';
-import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
@@ -503,63 +497,9 @@ export async function main() {
   // Run deferred command now that we have admin settings.
   await runDeferredCommand(settings.merged);
 
-  // hop into sandbox if we are outside and sandboxing is enabled
-  if (!process.env['SANDBOX']) {
-    const memoryArgs = settings.merged.advanced.autoConfigureMemory
-      ? getNodeMemoryArgs(isDebugMode)
-      : [];
-    const sandboxConfig = await loadSandboxConfig(settings.merged, argv);
-    // We intentionally omit the list of extensions here because extensions
-    // should not impact auth or setting up the sandbox.
-    // TODO(jacobr): refactor loadCliConfig so there is a minimal version
-    // that only initializes enough config to enable refreshAuth or find
-    // another way to decouple refreshAuth from requiring a config.
-
-    if (sandboxConfig) {
-      if (initialAuthFailed) {
-        await runExitCleanup();
-        process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
-      }
-      let stdinData = '';
-      if (!process.stdin.isTTY) {
-        stdinData = await readStdin();
-      }
-
-      // This function is a copy of the one from sandbox.ts
-      // It is moved here to decouple sandbox.ts from the CLI's argument structure.
-      const injectStdinIntoArgs = (
-        args: string[],
-        stdinData?: string,
-      ): string[] => {
-        const finalArgs = [...args];
-        if (stdinData) {
-          const promptIndex = finalArgs.findIndex(
-            (arg) => arg === '--prompt' || arg === '-p',
-          );
-          if (promptIndex > -1 && finalArgs.length > promptIndex + 1) {
-            // If there's a prompt argument, prepend stdin to it
-            finalArgs[promptIndex + 1] =
-              `${stdinData}\n\n${finalArgs[promptIndex + 1]}`;
-          } else {
-            // If there's no prompt argument, add stdin as the prompt
-            finalArgs.push('--prompt', stdinData);
-          }
-        }
-        return finalArgs;
-      };
-
-      const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
-
-      await relaunchOnExitCode(() =>
-        start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),
-      );
-      await runExitCleanup();
-      process.exit(ExitCodes.SUCCESS);
-    } else {
-      // Relaunch app so we always have a child process that can be internally
-      // restarted if needed.
-      await relaunchAppInChildProcess(memoryArgs, [], remoteAdminSettings);
-    }
+  if (initialAuthFailed) {
+    await runExitCleanup();
+    process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
   }
 
   // We are now past the logic handling potentially launching a child process

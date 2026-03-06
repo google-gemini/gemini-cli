@@ -234,6 +234,7 @@ vi.mock('./config/sandboxConfig.js', () => ({
   loadSandboxConfig: vi.fn().mockResolvedValue({
     command: 'docker',
     image: 'test-image',
+    enabled: true,
   }),
 }));
 
@@ -618,13 +619,18 @@ describe('gemini.tsx main function kitty protocol', () => {
     const mockConfig = createMockConfig({
       isInteractive: () => false,
       getQuestion: () => '',
-      getSandbox: () => ({ command: 'docker', image: 'test-image' }),
+      getSandbox: () => ({
+        command: 'docker',
+        image: 'test-image',
+        enabled: true,
+      }),
     });
 
     vi.mocked(loadCliConfig).mockResolvedValue(mockConfig);
     vi.mocked(loadSandboxConfig).mockResolvedValue({
       command: 'docker',
       image: 'test-image',
+      enabled: true,
     });
 
     process.env['GEMINI_API_KEY'] = 'test-key';
@@ -914,6 +920,7 @@ describe('gemini.tsx main function exit codes', () => {
   it('should exit with 41 for auth failure during sandbox setup', async () => {
     vi.stubEnv('SANDBOX', '');
     vi.mocked(loadSandboxConfig).mockResolvedValue({
+      enabled: true,
       command: 'docker',
       image: 'test-image',
     });

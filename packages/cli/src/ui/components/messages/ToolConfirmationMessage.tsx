@@ -90,6 +90,21 @@ export const ToolConfirmationMessage: React.FC<
     confirmationDetails.type === 'exit_plan_mode';
   const isTrustedFolder = config.isTrustedFolder();
 
+  const commandsToDisplay =
+    confirmationDetails.type === 'exec' &&
+    confirmationDetails.commands &&
+    confirmationDetails.commands.length > 1
+      ? confirmationDetails.commands
+      : confirmationDetails.type === 'exec'
+        ? [confirmationDetails.command]
+        : [];
+
+  const hasRedirectionCheck =
+    confirmationDetails.type === 'exec'
+      ? confirmationDetails.hasRedirection ??
+        commandsToDisplay.some((cmd) => hasRedirection(cmd))
+      : false;
+
   const handleConfirm = useCallback(
     (outcome: ToolConfirmationOutcome, payload?: ToolConfirmationPayload) => {
       void confirm(callId, outcome, payload).catch((error: unknown) => {
@@ -484,17 +499,14 @@ export const ToolConfirmationMessage: React.FC<
       }
     } else if (confirmationDetails.type === 'exec') {
       const executionProps = confirmationDetails;
+      const containsRedirection = hasRedirectionCheck;
+      let bodyContentHeight = availableBodyContentHeight();
+      let warnings: React.ReactNode | null = null;
 
       const commandsToDisplay =
         executionProps.commands && executionProps.commands.length > 1
           ? executionProps.commands
           : [executionProps.command];
-      const containsRedirection = commandsToDisplay.some((cmd) =>
-        hasRedirection(cmd),
-      );
-
-      let bodyContentHeight = availableBodyContentHeight();
-      let warnings: React.ReactNode = null;
 
       if (bodyContentHeight !== undefined) {
         bodyContentHeight -= 2; // Account for padding;

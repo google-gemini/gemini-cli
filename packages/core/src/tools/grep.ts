@@ -11,6 +11,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { globStream } from 'glob';
 import { execStreaming } from '../utils/shell-utils.js';
+import { SandboxProfile } from '../services/sandboxManager.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
@@ -370,6 +371,7 @@ class GrepToolInvocation extends BaseToolInvocation<
             cwd: absolutePath,
             signal: options.signal,
             allowedExitCodes: [0, 1],
+            profile: SandboxProfile.READ_ONLY,
           });
 
           const results: GrepMatch[] = [];
@@ -441,6 +443,7 @@ class GrepToolInvocation extends BaseToolInvocation<
             cwd: absolutePath,
             signal: options.signal,
             allowedExitCodes: [0, 1],
+            profile: SandboxProfile.READ_ONLY,
           });
 
           for await (const line of generator) {

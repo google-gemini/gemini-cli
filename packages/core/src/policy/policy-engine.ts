@@ -197,10 +197,10 @@ export class PolicyEngine {
     return this.approvalMode;
   }
 
-  private shouldDowngradeForRedirection(
+  private async shouldDowngradeForRedirection(
     command: string,
     allowRedirection?: boolean,
-  ): boolean {
+  ): Promise<boolean> {
     return (
       !allowRedirection &&
       hasRedirection(command) &&
@@ -274,7 +274,7 @@ export class PolicyEngine {
       let responsibleRule: PolicyRule | undefined;
 
       // Check for redirection on the full command string
-      if (this.shouldDowngradeForRedirection(command, allowRedirection)) {
+      if (await this.shouldDowngradeForRedirection(command, allowRedirection)) {
         debugLogger.debug(
           `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${command}`,
         );
@@ -286,7 +286,7 @@ export class PolicyEngine {
         const subCmd = rawSubCmd.trim();
         // Prevent infinite recursion for the root command
         if (subCmd === command) {
-          if (this.shouldDowngradeForRedirection(subCmd, allowRedirection)) {
+          if (await this.shouldDowngradeForRedirection(subCmd, allowRedirection)) {
             debugLogger.debug(
               `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${subCmd}`,
             );
@@ -336,7 +336,7 @@ export class PolicyEngine {
         // Check for redirection in allowed sub-commands
         if (
           subDecision === PolicyDecision.ALLOW &&
-          this.shouldDowngradeForRedirection(subCmd, allowRedirection)
+          (await this.shouldDowngradeForRedirection(subCmd, allowRedirection))
         ) {
           debugLogger.debug(
             `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${subCmd}`,

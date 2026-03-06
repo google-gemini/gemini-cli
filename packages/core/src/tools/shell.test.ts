@@ -43,6 +43,7 @@ vi.mock('../utils/summarizer.js');
 
 import { initializeShellParsers } from '../utils/shell-utils.js';
 import { ShellTool, OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
+import { SandboxProfile } from '../services/sandboxManager.js';
 import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
 import {
@@ -275,6 +276,7 @@ describe('ShellTool', () => {
         expect.any(AbortSignal),
         false,
         { pager: 'cat', sanitizationConfig: {} },
+        SandboxProfile.WORKSPACE_WRITE,
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
@@ -300,6 +302,7 @@ describe('ShellTool', () => {
         expect.any(AbortSignal),
         false,
         { pager: 'cat', sanitizationConfig: {} },
+        SandboxProfile.WORKSPACE_WRITE,
       );
     });
 
@@ -321,6 +324,7 @@ describe('ShellTool', () => {
         expect.any(AbortSignal),
         false,
         { pager: 'cat', sanitizationConfig: {} },
+        SandboxProfile.WORKSPACE_WRITE,
       );
     });
 
@@ -367,6 +371,7 @@ describe('ShellTool', () => {
           expect.any(AbortSignal),
           false,
           { pager: 'cat', sanitizationConfig: {} },
+          SandboxProfile.WORKSPACE_WRITE,
         );
       },
       20000,

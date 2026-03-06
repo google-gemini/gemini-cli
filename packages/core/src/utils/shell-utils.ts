@@ -11,14 +11,87 @@ import { quote } from 'shell-quote';
 import {
   spawn,
   spawnSync,
+  type SpawnOptions,
   type SpawnOptionsWithoutStdio,
+  type SpawnSyncOptions,
 } from 'node:child_process';
 import * as readline from 'node:readline';
 import { Language, Parser, Query, type Node, type Tree } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
 import { debugLogger } from './debugLogger.js';
+import {
+  type SandboxManager,
+  type SandboxedCommand,
+  SandboxProfile,
+} from '../services/sandboxManager.js';
 
 export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
+
+let sandboxManager: SandboxManager | undefined;
+
+/**
+ * Sets the global SandboxManager to be used for all shell spawning operations.
+ */
+export function setSandboxManager(manager: SandboxManager): void {
+  sandboxManager = manager;
+}
+
+/**
+ * Gets the global SandboxManager.
+ */
+export function getSandboxManager(): SandboxManager | undefined {
+  return sandboxManager;
+}
+
+function prepareSandboxedCommandSync(
+  command: string,
+  args: string[],
+  options?: {
+    cwd?: string | URL;
+    env?: NodeJS.ProcessEnv;
+    profile?: SandboxProfile;
+  },
+): SandboxedCommand {
+  if (!sandboxManager) return { program: command, args };
+
+  const cwd =
+    options?.cwd instanceof URL
+      ? options.cwd.pathname
+      : options?.cwd ?? process.cwd();
+
+  return sandboxManager.prepareCommandSync({
+    command,
+    args,
+    cwd,
+    env: options?.env ?? process.env,
+    profile: options?.profile,
+  });
+}
+
+export async function prepareSandboxedCommand(
+  command: string,
+  args: string[],
+  options?: {
+    cwd?: string | URL;
+    env?: NodeJS.ProcessEnv;
+    profile?: SandboxProfile;
+  },
+): Promise<SandboxedCommand> {
+  if (!sandboxManager) return { program: command, args };
+
+  const cwd =
+    options?.cwd instanceof URL
+      ? options.cwd.pathname
+      : options?.cwd ?? process.cwd();
+
+  return sandboxManager.prepareCommand({
+    command,
+    args,
+    cwd,
+    env: options?.env ?? process.env,
+    profile: options?.profile,
+  });
+}
 
 /**
  * An identifier for the shell type.
@@ -445,7 +518,11 @@ function parsePowerShellCommandDetails(
   }
 
   try {
-    const result = spawnSync(
+    const {
+      program: finalCommand,
+      args: finalArgs,
+      cleanup,
+    } = prepareSandboxedCommandSync(
       executable,
       [
         '-NoLogo',
@@ -459,9 +536,18 @@ function parsePowerShellCommandDetails(
           ...process.env,
           [POWERSHELL_COMMAND_ENV]: command,
         },
-        encoding: 'utf-8',
       },
     );
+
+    const result = spawnSync(finalCommand, finalArgs, {
+      env: {
+        ...process.env,
+        [POWERSHELL_COMMAND_ENV]: command,
+      },
+      encoding: 'utf-8',
+    });
+
+    if (cleanup) cleanup();
 
     if (result.error || result.status !== 0) {
       return null;
@@ -737,25 +823,39 @@ export function stripShellWrapper(command: string): string {
  * @param config The application configuration.
  * @returns An object with 'allowed' boolean and optional 'reason' string if not allowed.
  */
-export const spawnAsync = (
+export const spawnAsync = async (
   command: string,
   args: string[],
-  options?: SpawnOptionsWithoutStdio,
-): Promise<{ stdout: string; stderr: string }> =>
-  new Promise((resolve, reject) => {
-    const child = spawn(command, args, options);
+  options?: SpawnOptions & { profile?: SandboxProfile },
+): Promise<{ stdout: string; stderr: string }> => {
+  const {
+    program: finalCommand,
+    args: finalArgs,
+    cleanup,
+  } = await prepareSandboxedCommand(command, args, options);
+
+  return new Promise((resolve, reject) => {
+    const child = options
+      ? spawn(finalCommand, finalArgs, options)
+      : spawn(finalCommand, finalArgs);
+
     let stdout = '';
     let stderr = '';
 
-    child.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
+    if (child.stdout) {
+      child.stdout.on('data', (data: Buffer | string) => {
+        stdout += data.toString();
+      });
+    }
 
-    child.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
+    if (child.stderr) {
+      child.stderr.on('data', (data: Buffer | string) => {
+        stderr += data.toString();
+      });
+    }
 
-    child.on('close', (code) => {
+    child.on('close', (code: number | null) => {
+      if (cleanup) cleanup();
       if (code === 0) {
         resolve({ stdout, stderr });
       } else {
@@ -763,10 +863,38 @@ export const spawnAsync = (
       }
     });
 
-    child.on('error', (err) => {
+    child.on('error', (err: Error) => {
+      if (cleanup) cleanup();
       reject(err);
     });
   });
+};
+
+/**
+ * Executes a command synchronously but prepares the sandbox asynchronously.
+ * This is useful for terminal-based tools that need to inherit stdio.
+ */
+export const spawnSyncAsync = async (
+  command: string,
+  args: string[],
+  options?: SpawnSyncOptions & { profile?: SandboxProfile },
+): Promise<{ status: number | null; error?: Error }> => {
+  const {
+    program: finalCommand,
+    args: finalArgs,
+    cleanup,
+  } = await prepareSandboxedCommand(command, args, options);
+
+  try {
+    const result = spawnSync(finalCommand, finalArgs, options);
+    return {
+      status: result.status,
+      error: result.error,
+    };
+  } finally {
+    if (cleanup) cleanup();
+  }
+};
 
 /**
  * Executes a command and yields lines of output as they appear.
@@ -782,9 +910,16 @@ export async function* execStreaming(
   options?: SpawnOptionsWithoutStdio & {
     signal?: AbortSignal;
     allowedExitCodes?: number[];
+    profile?: SandboxProfile;
   },
 ): AsyncGenerator<string, void, void> {
-  const child = spawn(command, args, {
+  const {
+    program: finalCommand,
+    args: finalArgs,
+    cleanup,
+  } = await prepareSandboxedCommand(command, args, options);
+
+  const child = spawn(finalCommand, finalArgs, {
     ...options,
     // ensure we don't open a window on windows if possible/relevant
     windowsHide: true,
@@ -845,45 +980,49 @@ export async function* execStreaming(
     }
 
     // Ensure we wait for the process to exit to check codes
-    await new Promise<void>((resolve, reject) => {
-      // If an error occurred before we got here (e.g. spawn failure), reject immediately.
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      function checkExit(code: number | null) {
-        // If we aborted or killed it manually, we treat it as success (stop waiting)
-        if (options?.signal?.aborted || killedByGenerator) {
-          resolve();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        // If an error occurred before we got here (e.g. spawn failure), reject immediately.
+        if (error) {
+          reject(error);
           return;
         }
 
-        const allowed = options?.allowedExitCodes ?? [0];
-        if (code !== null && allowed.includes(code)) {
-          resolve();
-        } else {
-          // If we have an accumulated error or explicit error event
-          if (error) reject(error);
-          else {
-            const stderr = Buffer.concat(errorChunks).toString('utf8');
-            const truncatedMsg =
-              stderrTotalBytes >= MAX_STDERR_BYTES ? '...[truncated]' : '';
-            reject(
-              new Error(
-                `Process exited with code ${code}: ${stderr}${truncatedMsg}`,
-              ),
-            );
+        function checkExit(code: number | null) {
+          // If we aborted or killed it manually, we treat it as success (stop waiting)
+          if (options?.signal?.aborted || killedByGenerator) {
+            resolve();
+            return;
+          }
+
+          const allowed = options?.allowedExitCodes ?? [0];
+          if (code !== null && allowed.includes(code)) {
+            resolve();
+          } else {
+            // If we have an accumulated error or explicit error event
+            if (error) reject(error);
+            else {
+              const stderr = Buffer.concat(errorChunks).toString('utf8');
+              const truncatedMsg =
+                stderrTotalBytes >= MAX_STDERR_BYTES ? '...[truncated]' : '';
+              reject(
+                new Error(
+                  `Process exited with code ${code}: ${stderr}${truncatedMsg}`,
+                ),
+              );
+            }
           }
         }
-      }
 
-      if (child.exitCode !== null) {
-        checkExit(child.exitCode);
-      } else {
-        child.on('close', (code) => checkExit(code));
-        child.on('error', (err) => reject(err));
-      }
-    });
+        if (child.exitCode !== null) {
+          checkExit(child.exitCode);
+        } else {
+          child.on('close', (code) => checkExit(code));
+          child.on('error', (err) => reject(err));
+        }
+      });
+    } finally {
+      if (cleanup) cleanup();
+    }
   }
 }

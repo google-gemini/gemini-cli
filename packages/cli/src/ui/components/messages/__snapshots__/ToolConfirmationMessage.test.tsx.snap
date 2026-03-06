@@ -42,6 +42,9 @@ exports[`ToolConfirmationMessage > should render multiline shell scripts with co
 for i in 1 2 3; do
   echo $i
 done
+
+Note: Command contains redirection which can be undesirable.
+Tip:  Toggle auto-edit (Shift+Tab) to allow redirection in the future.
 Allow execution of: 'echo'?
 
 ● 1. Allow once               
@@ -93,6 +96,9 @@ Apply this change?
 
 exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' > should NOT show "allow always" when folder is untrusted 1`] = `
 "echo "hello"
+
+Note: Command contains redirection which can be undesirable.
+Tip:  Toggle auto-edit (Shift+Tab) to allow redirection in the future.
 Allow execution of: 'echo'?
 
 ● 1. Allow once               
@@ -102,6 +108,9 @@ Allow execution of: 'echo'?
 
 exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' > should show "allow always" when folder is trusted 1`] = `
 "echo "hello"
+
+Note: Command contains redirection which can be undesirable.
+Tip:  Toggle auto-edit (Shift+Tab) to allow redirection in the future.
 Allow execution of: 'echo'?
 
 ● 1. Allow once               

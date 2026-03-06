@@ -42,6 +42,21 @@ vi.mock('../../utils/debugLogger.js', () => ({
   },
 }));
 
+vi.mock('../../utils/shell-utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../utils/shell-utils.js')>();
+  return {
+    ...actual,
+    prepareSandboxedCommand: vi.fn().mockImplementation((cmd: string, args: string[]) =>
+      Promise.resolve({
+        program: cmd,
+        args,
+        cleanup: vi.fn(),
+      }),
+    ),
+  };
+});
+import { prepareSandboxedCommand } from '../../utils/shell-utils.js';
+
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -64,6 +79,14 @@ describe('BrowserManager', () => {
         },
       },
     });
+
+    vi.mocked(prepareSandboxedCommand).mockImplementation((cmd: string, args: string[]) =>
+      Promise.resolve({
+        program: cmd,
+        args,
+        cleanup: vi.fn(),
+      }),
+    );
 
     // Re-setup Client mock after reset
     vi.mocked(Client).mockImplementation(
@@ -260,6 +283,30 @@ describe('BrowserManager', () => {
         ?.args as string[];
       expect(args).toContain('--autoConnect');
       expect(args).not.toContain('--isolated');
+    });
+
+    it('should apply sandboxing to stdio transport', async () => {
+      const mockCleanup = vi.fn();
+      vi.mocked(prepareSandboxedCommand).mockResolvedValue({
+        program: 'sandboxed-npx',
+        args: ['sandboxed-arg'],
+        cleanup: mockCleanup,
+      });
+
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      expect(prepareSandboxedCommand).toHaveBeenCalledWith(
+        process.platform === 'win32' ? 'npx.cmd' : 'npx',
+        expect.anything(),
+      );
+
+      expect(StdioClientTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'sandboxed-npx',
+          args: ['sandboxed-arg'],
+        }),
+      );
     });
 
     it('should throw actionable error when existing mode connection fails', async () => {

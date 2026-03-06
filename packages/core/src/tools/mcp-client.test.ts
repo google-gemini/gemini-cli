@@ -36,6 +36,7 @@ import {
   populateMcpServerCommand,
   type McpContext,
 } from './mcp-client.js';
+import { SandboxedTransport } from './sandboxed-transport.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { ResourceRegistry } from '../resources/resource-registry.js';
 import * as fs from 'node:fs';
@@ -74,6 +75,20 @@ vi.mock('../mcp/oauth-token-storage.js');
 vi.mock('../mcp/oauth-utils.js');
 vi.mock('google-auth-library');
 import { GoogleAuth } from 'google-auth-library';
+vi.mock('../utils/shell-utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/shell-utils.js')>();
+  return {
+    ...actual,
+    prepareSandboxedCommand: vi.fn().mockImplementation((cmd: string, args: string[]) =>
+      Promise.resolve({
+        program: cmd,
+        args,
+        cleanup: vi.fn(),
+      }),
+    ),
+  };
+});
+import { prepareSandboxedCommand } from '../utils/shell-utils.js';
 
 vi.mock('../utils/events.js', () => ({
   coreEvents: {
@@ -99,6 +114,13 @@ describe('mcp-client', () => {
       path.join(os.tmpdir(), 'gemini-agent-test-'),
     );
     workspaceContext = new WorkspaceContext(testWorkspace);
+    vi.mocked(prepareSandboxedCommand).mockImplementation((cmd: string, args: string[]) =>
+      Promise.resolve({
+        program: cmd,
+        args,
+        cleanup: vi.fn(),
+      }),
+    );
   });
 
   afterEach(() => {
@@ -1943,6 +1965,50 @@ describe('mcp-client', () => {
       const callArgs = mockedTransport.mock.calls[0][0];
       expect(callArgs.env).toBeDefined();
       expect(callArgs.env!['GEMINI_CLI']).toBe('1');
+    });
+
+    it('should apply sandboxing to stdio transport', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      const mockCleanup = vi.fn();
+      vi.mocked(prepareSandboxedCommand).mockResolvedValue({
+        program: 'sandboxed-command',
+        args: ['--sandboxed-arg'],
+        cleanup: mockCleanup,
+      });
+
+      const transport = await createTransport(
+        'test-server',
+        {
+          command: 'original-command',
+          args: ['--original-arg'],
+          cwd: 'test/cwd',
+        },
+        false,
+        MOCK_CONTEXT,
+      );
+
+      expect(prepareSandboxedCommand).toHaveBeenCalledWith(
+        'original-command',
+        ['--original-arg'],
+        expect.objectContaining({
+          cwd: 'test/cwd',
+          env: expect.anything(),
+        }),
+      );
+
+      expect(mockedTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'sandboxed-command',
+          args: ['--sandboxed-arg'],
+          cwd: 'test/cwd',
+          stderr: 'pipe',
+        }),
+      );
+
+      expect(transport).toBeInstanceOf(SandboxedTransport);
     });
 
     it('should exclude extension settings with undefined values from environment', async () => {

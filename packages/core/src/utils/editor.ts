@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec, execSync, spawn, spawnSync } from 'node:child_process';
+import { exec, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
 import { debugLogger } from './debugLogger.js';
 import { coreEvents, CoreEvent, type EditorSelectedPayload } from './events.js';
+import { spawnAsync, spawnSyncAsync } from './shell-utils.js';
 
 const GUI_EDITORS = [
   'vscode',
@@ -302,7 +303,7 @@ export async function openDiff(
 
   if (isTerminalEditor(editor)) {
     try {
-      const result = spawnSync(diffCommand.command, diffCommand.args, {
+      const result = await spawnSyncAsync(diffCommand.command, diffCommand.args, {
         stdio: 'inherit',
       });
       if (result.error) {
@@ -317,22 +318,17 @@ export async function openDiff(
     return;
   }
 
-  return new Promise<void>((resolve, reject) => {
-    const childProcess = spawn(diffCommand.command, diffCommand.args, {
+  try {
+    await spawnAsync(diffCommand.command, diffCommand.args, {
       stdio: 'inherit',
       shell: process.platform === 'win32',
     });
-
-    childProcess.on('close', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`${editor} exited with code ${code}`));
-      }
-    });
-
-    childProcess.on('error', (error) => {
-      reject(error);
-    });
-  });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('Command failed with exit code')) {
+      const match = error.message.match(/exit code (\d+)/);
+      const code = match ? match[1] : 'unknown';
+      throw new Error(`${editor} exited with code ${code}`);
+    }
+    throw error;
+  }
 }

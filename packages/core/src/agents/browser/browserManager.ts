@@ -19,6 +19,9 @@
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { SandboxedTransport } from '../../tools/sandboxed-transport.js';
+import { prepareSandboxedCommand } from '../../utils/shell-utils.js';
 import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
@@ -67,7 +70,7 @@ export interface McpToolCallResult {
 export class BrowserManager {
   // Raw MCP SDK Client - NOT the wrapper McpClient
   private rawMcpClient: Client | undefined;
-  private mcpTransport: StdioClientTransport | undefined;
+  private mcpTransport: Transport | undefined;
   private discoveredTools: McpTool[] = [];
 
   constructor(private config: Config) {}
@@ -282,20 +285,33 @@ export class BrowserManager {
     // Create stdio transport to npx chrome-devtools-mcp.
     // stderr is piped (not inherited) to prevent MCP server banners and
     // warnings from corrupting the UI in alternate buffer mode.
-    this.mcpTransport = new StdioClientTransport({
-      command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
-      args: mcpArgs,
+    const command = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+    const {
+      program: sandboxedCommand,
+      args: sandboxedArgs,
+      cleanup,
+    } = await prepareSandboxedCommand(command, mcpArgs);
+
+    const stdioTransport = new StdioClientTransport({
+      command: sandboxedCommand,
+      args: sandboxedArgs,
       stderr: 'pipe',
     });
 
     // Forward piped stderr to debugLogger so it's visible with --debug.
-    const stderrStream = this.mcpTransport.stderr;
+    const stderrStream = stdioTransport.stderr;
     if (stderrStream) {
       stderrStream.on('data', (chunk: Buffer) => {
         debugLogger.log(
           `[chrome-devtools-mcp stderr] ${chunk.toString().trimEnd()}`,
         );
       });
+    }
+
+    if (cleanup) {
+      this.mcpTransport = new SandboxedTransport(stdioTransport, cleanup);
+    } else {
+      this.mcpTransport = stdioTransport;
     }
 
     this.mcpTransport.onclose = () => {

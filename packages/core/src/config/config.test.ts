@@ -248,6 +248,7 @@ vi.mock('../code_assist/experiments/experiments.js');
 describe('Server Config (config.ts)', () => {
   const MODEL = DEFAULT_GEMINI_MODEL;
   const SANDBOX: SandboxConfig = {
+    enabled: true,
     command: 'docker',
     image: 'gemini-cli-sandbox',
   };
@@ -1480,6 +1481,7 @@ describe('Server Config (config.ts)', () => {
 describe('GemmaModelRouterSettings', () => {
   const MODEL = DEFAULT_GEMINI_MODEL;
   const SANDBOX: SandboxConfig = {
+    enabled: true,
     command: 'docker',
     image: 'gemini-cli-sandbox',
   };
@@ -1860,6 +1862,7 @@ describe('isYoloModeDisabled', () => {
 describe('BaseLlmClient Lifecycle', () => {
   const MODEL = 'gemini-pro';
   const SANDBOX: SandboxConfig = {
+    enabled: true,
     command: 'docker',
     image: 'gemini-cli-sandbox',
   };
@@ -1915,6 +1918,7 @@ describe('BaseLlmClient Lifecycle', () => {
 describe('Generation Config Merging (HACK)', () => {
   const MODEL = 'gemini-pro';
   const SANDBOX: SandboxConfig = {
+    enabled: true,
     command: 'docker',
     image: 'gemini-cli-sandbox',
   };
@@ -2221,6 +2225,7 @@ describe('Config getHooks', () => {
 describe('LocalLiteRtLmClient Lifecycle', () => {
   const MODEL = 'gemini-pro';
   const SANDBOX: SandboxConfig = {
+    enabled: true,
     command: 'docker',
     image: 'gemini-cli-sandbox',
   };
@@ -2479,6 +2484,7 @@ describe('Config Quota & Preview Model Access', () => {
     usageStatisticsEnabled: false,
     embeddingModel: 'gemini-embedding',
     sandbox: {
+      enabled: true,
       command: 'docker',
       image: 'gemini-cli-sandbox',
     },

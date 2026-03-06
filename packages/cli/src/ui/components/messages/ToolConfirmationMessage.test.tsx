@@ -6,14 +6,23 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
-import type {
-  SerializableConfirmationDetails,
-  ToolCallConfirmationDetails,
-  Config,
+import {
+  type SerializableConfirmationDetails,
+  type ToolCallConfirmationDetails,
+  type Config,
+  hasRedirection,
 } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { createMockSettings } from '../../../test-utils/settings.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    hasRedirection: vi.fn(),
+  };
+});
 
 vi.mock('../../contexts/ToolActionsContext.js', async (importOriginal) => {
   const actual =
@@ -237,6 +246,90 @@ describe('ToolConfirmationMessage', () => {
     expect(output).toContain('ls -la');
     expect(output).toContain('whoami');
     expect(output).toMatchSnapshot();
+    unmount();
+  });
+
+  it('should display redirection warning when hasRedirection is true in confirmationDetails', async () => {
+    const confirmationDetails: SerializableConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Redirection',
+      command: 'ls > out.txt',
+      rootCommand: 'ls',
+      rootCommands: ['ls'],
+      hasRedirection: true,
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        getPreferredEditor={vi.fn()}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+    await waitUntilReady();
+
+    const output = lastFrame();
+    expect(output).toContain('Note: Command contains redirection which can be undesirable.');
+    unmount();
+  });
+
+  it('should display redirection warning via async fallback when hasRedirection is missing', async () => {
+    vi.mocked(hasRedirection).mockReturnValue(true);
+
+    const confirmationDetails: SerializableConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Redirection Fallback',
+      command: 'ls > out.txt',
+      rootCommand: 'ls',
+      rootCommands: ['ls'],
+      // hasRedirection is missing
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        getPreferredEditor={vi.fn()}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+    await waitUntilReady();
+
+    // The warning should be present as it is now calculated synchronously
+    const output = lastFrame();
+    expect(output).toContain('Note: Command contains redirection which can be undesirable.');
+    unmount();
+  });
+
+  it('should NOT display redirection warning when hasRedirection is false', async () => {
+    const confirmationDetails: SerializableConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm No Redirection',
+      command: 'ls -la',
+      rootCommand: 'ls',
+      rootCommands: ['ls'],
+      hasRedirection: false,
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        getPreferredEditor={vi.fn()}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+    await waitUntilReady();
+
+    const output = lastFrame();
+    expect(output).not.toContain('Note: This command uses shell redirection');
     unmount();
   });
 

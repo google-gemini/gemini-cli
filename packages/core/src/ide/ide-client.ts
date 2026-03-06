@@ -16,6 +16,9 @@ import { getIdeProcessInfo } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { SandboxedTransport } from '../tools/sandboxed-transport.js';
+import { prepareSandboxedCommand } from '../utils/shell-utils.js';
 import {
   CallToolResultSchema,
   ListToolsResultSchema,
@@ -618,7 +621,7 @@ export class IdeClient {
     command,
     args,
   }: StdioConfig): Promise<boolean> {
-    let transport: StdioClientTransport | undefined;
+    let transport: Transport | undefined;
     try {
       logger.debug('Attempting to connect to IDE via stdio');
       this.client = new Client({
@@ -627,10 +630,20 @@ export class IdeClient {
         version: '1.0.0',
       });
 
+      const {
+        program: sandboxedCommand,
+        args: sandboxedArgs,
+        cleanup,
+      } = await prepareSandboxedCommand(command, args);
+
       transport = new StdioClientTransport({
-        command,
-        args,
+        command: sandboxedCommand,
+        args: sandboxedArgs,
       });
+
+      if (cleanup) {
+        transport = new SandboxedTransport(transport, cleanup);
+      }
       await this.client.connect(transport);
       this.registerClientHandlers();
       await this.discoverTools();

@@ -65,7 +65,7 @@ describe('useTurnActivityMonitor', () => {
     expect(result.current.operationStartTime).toBe(2000);
   });
 
-  it('should detect redirection from tool calls', () => {
+  it('should detect redirection from tool calls', async () => {
     // Force mock implementation to ensure it's active
     vi.mocked(hasRedirection).mockImplementation((q: string) =>
       q.includes('>'),

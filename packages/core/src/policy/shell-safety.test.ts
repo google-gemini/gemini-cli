@@ -71,6 +71,7 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
     hasRedirection: (command: string) =>
       // Simple regex check sufficient for testing the policy engine's handling of the *result* of hasRedirection
       /[><]/.test(command),
+
   };
 });
 

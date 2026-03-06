@@ -30,6 +30,7 @@ import {
 } from '../utils/ignorePatterns.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { execStreaming } from '../utils/shell-utils.js';
+import { SandboxProfile } from '../services/sandboxManager.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
@@ -460,6 +461,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const generator = execStreaming(rgPath, rgArgs, {
         signal: options.signal,
         allowedExitCodes: [0, 1],
+        profile: SandboxProfile.READ_ONLY,
       });
 
       let matchesFound = 0;
