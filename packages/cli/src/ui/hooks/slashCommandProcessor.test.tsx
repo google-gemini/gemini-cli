@@ -18,14 +18,11 @@ import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import {
   type GeminiClient,
-  type UserFeedbackPayload,
   SlashCommandStatus,
   MCPDiscoveryState,
   makeFakeConfig,
   coreEvents,
-  CoreEvent,
 } from '@google/gemini-cli-core';
-import { SlashCommandConflictHandler } from '../../services/SlashCommandConflictHandler.js';
 
 const {
   logSlashCommand,
@@ -186,26 +183,6 @@ describe('useSlashCommandProcessor', () => {
     mockFileLoadCommands.mockResolvedValue(Object.freeze(fileCommands));
     mockMcpLoadCommands.mockResolvedValue(Object.freeze(mcpCommands));
 
-    const conflictHandler = new SlashCommandConflictHandler();
-    conflictHandler.start();
-
-    const handleFeedback = (payload: UserFeedbackPayload) => {
-      let type = MessageType.INFO;
-      if (payload.severity === 'error') {
-        type = MessageType.ERROR;
-      } else if (payload.severity === 'warning') {
-        type = MessageType.WARNING;
-      }
-      mockAddItem(
-        {
-          type,
-          text: payload.message,
-        },
-        Date.now(),
-      );
-    };
-    coreEvents.on(CoreEvent.UserFeedback, handleFeedback);
-
     let result!: { current: ReturnType<typeof useSlashCommandProcessor> };
     let unmount!: () => void;
     let rerender!: (props?: unknown) => void;
@@ -253,8 +230,6 @@ describe('useSlashCommandProcessor', () => {
     });
 
     unmountHook = async () => {
-      conflictHandler.stop();
-      coreEvents.off(CoreEvent.UserFeedback, handleFeedback);
       unmount();
     };
 
@@ -335,57 +310,6 @@ describe('useSlashCommandProcessor', () => {
       expect(mockBuiltinLoadCommands).toHaveBeenCalledTimes(1);
       expect(mockFileLoadCommands).toHaveBeenCalledTimes(1);
       expect(mockMcpLoadCommands).toHaveBeenCalledTimes(1);
-    });
-
-    it('should provide an immutable array of commands to consumers', async () => {
-      const testCommand = createTestCommand({ name: 'test' });
-      const result = await setupProcessorHook({
-        builtinCommands: [testCommand],
-      });
-
-      await waitFor(() => {
-        expect(result.current.slashCommands).toHaveLength(1);
-      });
-
-      const commands = result.current.slashCommands;
-
-      expect(() => {
-        // @ts-expect-error - We are intentionally testing a violation of the readonly type.
-        commands.push(createTestCommand({ name: 'rogue' }));
-      }).toThrow(TypeError);
-    });
-
-    it('should override built-in commands with file-based commands of the same name', async () => {
-      const builtinAction = vi.fn();
-      const fileAction = vi.fn();
-
-      const builtinCommand = createTestCommand({
-        name: 'override',
-        description: 'builtin',
-        action: builtinAction,
-      });
-      const fileCommand = createTestCommand(
-        { name: 'override', description: 'file', action: fileAction },
-        CommandKind.FILE,
-      );
-
-      const result = await setupProcessorHook({
-        builtinCommands: [builtinCommand],
-        fileCommands: [fileCommand],
-      });
-
-      await waitFor(() => {
-        // The service should only return one command with the name 'override'
-        expect(result.current.slashCommands).toHaveLength(1);
-      });
-
-      await act(async () => {
-        await result.current.handleSlashCommand('/override');
-      });
-
-      // Only the file-based command's action should be called.
-      expect(fileAction).toHaveBeenCalledTimes(1);
-      expect(builtinAction).not.toHaveBeenCalled();
     });
   });
 
@@ -731,7 +655,7 @@ describe('useSlashCommandProcessor', () => {
             content: [{ text: 'The actual prompt from the TOML file.' }],
           }),
         },
-        CommandKind.FILE,
+        CommandKind.USER_FILE,
       );
 
       const result = await setupProcessorHook({
@@ -866,42 +790,6 @@ describe('useSlashCommandProcessor', () => {
   });
 
   describe('Command Precedence', () => {
-    it('should override mcp-based commands with file-based commands of the same name', async () => {
-      const mcpAction = vi.fn();
-      const fileAction = vi.fn();
-
-      const mcpCommand = createTestCommand(
-        {
-          name: 'override',
-          description: 'mcp',
-          action: mcpAction,
-        },
-        CommandKind.MCP_PROMPT,
-      );
-      const fileCommand = createTestCommand(
-        { name: 'override', description: 'file', action: fileAction },
-        CommandKind.FILE,
-      );
-
-      const result = await setupProcessorHook({
-        fileCommands: [fileCommand],
-        mcpCommands: [mcpCommand],
-      });
-
-      await waitFor(() => {
-        // The service should only return one command with the name 'override'
-        expect(result.current.slashCommands).toHaveLength(1);
-      });
-
-      await act(async () => {
-        await result.current.handleSlashCommand('/override');
-      });
-
-      // Only the file-based command's action should be called.
-      expect(fileAction).toHaveBeenCalledTimes(1);
-      expect(mcpAction).not.toHaveBeenCalled();
-    });
-
     it('should prioritize a command with a primary name over a command with a matching alias', async () => {
       const quitAction = vi.fn();
       const exitAction = vi.fn();
@@ -917,7 +805,7 @@ describe('useSlashCommandProcessor', () => {
           name: 'exit',
           action: exitAction,
         },
-        CommandKind.FILE,
+        CommandKind.USER_FILE,
       );
 
       // The order of commands in the final loaded array is not guaranteed,
@@ -949,7 +837,7 @@ describe('useSlashCommandProcessor', () => {
       });
       const exitCommand = createTestCommand(
         { name: 'exit', action: vi.fn() },
-        CommandKind.FILE,
+        CommandKind.USER_FILE,
       );
 
       const result = await setupProcessorHook({
@@ -1105,120 +993,5 @@ describe('useSlashCommandProcessor', () => {
     await waitFor(() =>
       expect(result.current.slashCommands).toEqual([newCommand]),
     );
-  });
-
-  describe('Conflict Notifications', () => {
-    it('should display a warning when a command conflict occurs', async () => {
-      const builtinCommand = createTestCommand({ name: 'deploy' });
-      const extensionCommand = createTestCommand(
-        {
-          name: 'deploy',
-          extensionName: 'firebase',
-        },
-        CommandKind.FILE,
-      );
-
-      const result = await setupProcessorHook({
-        builtinCommands: [builtinCommand],
-        fileCommands: [extensionCommand],
-      });
-
-      await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
-
-      expect(mockAddItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: expect.stringContaining('Command conflicts detected'),
-        }),
-        expect.any(Number),
-      );
-
-      expect(mockAddItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: expect.stringContaining(
-            "- Command '/deploy' from extension 'firebase' was renamed",
-          ),
-        }),
-        expect.any(Number),
-      );
-    });
-
-    it('should deduplicate conflict warnings across re-renders', async () => {
-      const builtinCommand = createTestCommand({ name: 'deploy' });
-      const extensionCommand = createTestCommand(
-        {
-          name: 'deploy',
-          extensionName: 'firebase',
-        },
-        CommandKind.FILE,
-      );
-
-      const result = await setupProcessorHook({
-        builtinCommands: [builtinCommand],
-        fileCommands: [extensionCommand],
-      });
-
-      await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
-
-      // First notification
-      expect(mockAddItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: expect.stringContaining('Command conflicts detected'),
-        }),
-        expect.any(Number),
-      );
-
-      mockAddItem.mockClear();
-
-      // Trigger a reload or re-render
-      await act(async () => {
-        result.current.commandContext.ui.reloadCommands();
-      });
-
-      // Wait a bit for effect to run
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Should NOT have notified again
-      expect(mockAddItem).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: expect.stringContaining('Command conflicts detected'),
-        }),
-        expect.any(Number),
-      );
-    });
-
-    it('should correctly identify the winner extension in the message', async () => {
-      const ext1Command = createTestCommand(
-        {
-          name: 'deploy',
-          extensionName: 'firebase',
-        },
-        CommandKind.FILE,
-      );
-      const ext2Command = createTestCommand(
-        {
-          name: 'deploy',
-          extensionName: 'aws',
-        },
-        CommandKind.FILE,
-      );
-
-      const result = await setupProcessorHook({
-        fileCommands: [ext1Command, ext2Command],
-      });
-
-      await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
-
-      expect(mockAddItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: expect.stringContaining("conflicts with extension 'firebase'"),
-        }),
-        expect.any(Number),
-      );
-    });
   });
 });

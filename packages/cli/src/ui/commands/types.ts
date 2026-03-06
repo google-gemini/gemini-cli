@@ -177,7 +177,9 @@ export type SlashCommandActionReturn =
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
-  FILE = 'file',
+  USER_FILE = 'user-file',
+  WORKSPACE_FILE = 'workspace-file',
+  EXTENSION_FILE = 'extension-file',
   MCP_PROMPT = 'mcp-prompt',
   AGENT = 'agent',
 }
@@ -202,6 +204,9 @@ export interface SlashCommand {
   // Optional metadata for extension commands
   extensionName?: string;
   extensionId?: string;
+
+  // Optional metadata for MCP commands
+  mcpServerName?: string;
 
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (
