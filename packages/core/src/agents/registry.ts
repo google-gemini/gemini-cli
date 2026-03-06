@@ -345,7 +345,18 @@ export class AgentRegistry {
     }
 
     const mergedDefinition = this.applyOverrides(definition, settingsOverrides);
-    this.agents.set(definition.name, mergedDefinition);
+
+    // Ensure we don't accidentally overwrite an existing agent with a different canonical name
+    if (
+      mergedDefinition.name !== definition.name &&
+      this.agents.has(mergedDefinition.name)
+    ) {
+      throw new Error(
+        `Cannot register agent '${definition.name}' as '${mergedDefinition.name}': Name collision with an already registered agent.`,
+      );
+    }
+
+    this.agents.set(mergedDefinition.name, mergedDefinition);
 
     this.registerModelConfigs(mergedDefinition);
     this.addAgentPolicy(mergedDefinition);
