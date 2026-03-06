@@ -521,6 +521,25 @@ describe('resolveToRealPath', () => {
 
     expect(resolveToRealPath(input)).toBe(expected);
   });
+
+  it('should recursively resolve symlinks for non-existent child paths', () => {
+    const parentPath = path.resolve('/some/parent/path');
+    const resolvedParentPath = path.resolve('/resolved/parent/path');
+    const childPath = path.resolve(parentPath, 'child', 'file.txt');
+    const expectedPath = path.resolve(resolvedParentPath, 'child', 'file.txt');
+
+    vi.spyOn(fs, 'realpathSync').mockImplementation((p) => {
+      const pStr = p.toString();
+      if (pStr === parentPath) {
+        return resolvedParentPath;
+      }
+      const err = new Error('ENOENT') as NodeJS.ErrnoException;
+      err.code = 'ENOENT';
+      throw err;
+    });
+
+    expect(resolveToRealPath(childPath)).toBe(expectedPath);
+  });
 });
 
 describe('normalizePath', () => {
