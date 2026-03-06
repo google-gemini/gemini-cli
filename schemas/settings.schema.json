@@ -41,9 +41,27 @@
       "properties": {
         "preferredEditor": {
           "title": "Preferred Editor",
-          "description": "The preferred editor to open files in.",
-          "markdownDescription": "The preferred editor to open files in.\n\n- Category: `General`\n- Requires restart: `no`",
-          "type": "string"
+          "description": "The preferred editor to open files in when using the external editor feature (Ctrl-X). Accepted values: vscode, vscodium, cursor, windsurf, zed, antigravity, sublimetext, lapce, nova, bbedit, vim, neovim, emacs, emacsclient, hx, micro. If not set, falls back to $VISUAL, then $EDITOR, then vi/notepad.",
+          "markdownDescription": "The preferred editor to open files in when using the external editor feature (Ctrl-X).\n\nAccepted identifiers: `vscode`, `vscodium`, `cursor`, `windsurf`, `zed`, `antigravity`, `sublimetext`, `lapce`, `nova` (macOS), `bbedit` (macOS), `vim`, `neovim`, `emacs`, `emacsclient`, `hx`, `micro`.\n\nIf not set, falls back to `$VISUAL`, then `$EDITOR`, then `vi` (Unix) / `notepad` (Windows). Use `/editor` to configure interactively.\n\n- Category: `General`\n- Requires restart: `no`",
+          "type": "string",
+          "enum": [
+            "vscode",
+            "vscodium",
+            "cursor",
+            "windsurf",
+            "zed",
+            "antigravity",
+            "sublimetext",
+            "lapce",
+            "nova",
+            "bbedit",
+            "vim",
+            "neovim",
+            "emacs",
+            "emacsclient",
+            "hx",
+            "micro"
+          ]
         },
         "vimMode": {
           "title": "Vim Mode",
