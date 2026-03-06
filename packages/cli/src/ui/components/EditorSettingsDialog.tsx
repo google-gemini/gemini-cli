@@ -24,7 +24,6 @@ import {
   EDITOR_DISPLAY_NAMES,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { coreEvents } from '@google/gemini-cli-core';
 
 interface EditorDialogProps {
   onSelect: (
@@ -72,10 +71,6 @@ export function EditorSettingsDialog({
       )
     : 0;
   if (editorIndex === -1) {
-    coreEvents.emitFeedback(
-      'error',
-      `Editor is not supported: ${currentPreference}`,
-    );
     editorIndex = 0;
   }
 
@@ -161,6 +156,7 @@ export function EditorSettingsDialog({
           onSelect={handleEditorSelect}
           isFocused={focusedSection === 'editor'}
           key={selectedScope}
+          maxItemsToShow={editorItems.length}
         />
 
         <Box marginTop={1} flexDirection="column">
