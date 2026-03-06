@@ -195,6 +195,9 @@ describe('ClearcutLogger', () => {
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('REPLIT_USER', '');
     vi.stubEnv('__COG_BASHRC_SOURCED', '');
+    vi.stubEnv('GH_PR_NUMBER', '');
+    vi.stubEnv('GH_ISSUE_NUMBER', '');
+    vi.stubEnv('GH_CUSTOM_TRACKING_ID', '');
   });
 
   function setup({
@@ -621,29 +624,82 @@ describe('ClearcutLogger', () => {
     });
   });
 
-  describe('GH_EVENT_NUMBER metadata', () => {
-    it('includes event number when GH_EVENT_NUMBER is set', () => {
-      vi.stubEnv('GH_EVENT_NUMBER', '123');
+  describe('GH_PR_NUMBER metadata', () => {
+    it('includes PR number when GH_PR_NUMBER is set', () => {
+      vi.stubEnv('GH_PR_NUMBER', '123');
       const { logger } = setup({});
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
 
       expect(event?.event_metadata[0]).toContainEqual({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_EVENT_NUMBER,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_PR_NUMBER,
         value: '123',
       });
     });
 
-    it('does not include event number when GH_EVENT_NUMBER is not set', () => {
-      vi.stubEnv('GH_EVENT_NUMBER', undefined);
+    it('does not include PR number when GH_PR_NUMBER is not set', () => {
+      vi.stubEnv('GH_PR_NUMBER', undefined);
       const { logger } = setup({});
 
       const event = logger?.createLogEvent(EventNames.API_ERROR, []);
-      const hasEventNumber = event?.event_metadata[0].some(
+      const hasPRNumber = event?.event_metadata[0].some(
         (item) =>
-          item.gemini_cli_key === EventMetadataKey.GEMINI_CLI_GH_EVENT_NUMBER,
+          item.gemini_cli_key === EventMetadataKey.GEMINI_CLI_GH_PR_NUMBER,
       );
-      expect(hasEventNumber).toBe(false);
+      expect(hasPRNumber).toBe(false);
+    });
+  });
+
+  describe('GH_ISSUE_NUMBER metadata', () => {
+    it('includes issue number when GH_ISSUE_NUMBER is set', () => {
+      vi.stubEnv('GH_ISSUE_NUMBER', '456');
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_ISSUE_NUMBER,
+        value: '456',
+      });
+    });
+
+    it('does not include issue number when GH_ISSUE_NUMBER is not set', () => {
+      vi.stubEnv('GH_ISSUE_NUMBER', undefined);
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const hasIssueNumber = event?.event_metadata[0].some(
+        (item) =>
+          item.gemini_cli_key === EventMetadataKey.GEMINI_CLI_GH_ISSUE_NUMBER,
+      );
+      expect(hasIssueNumber).toBe(false);
+    });
+  });
+
+  describe('GH_CUSTOM_TRACKING_ID metadata', () => {
+    it('includes custom tracking ID when GH_CUSTOM_TRACKING_ID is set', () => {
+      vi.stubEnv('GH_CUSTOM_TRACKING_ID', 'abc-789');
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_CUSTOM_TRACKING_ID,
+        value: 'abc-789',
+      });
+    });
+
+    it('does not include custom tracking ID when GH_CUSTOM_TRACKING_ID is not set', () => {
+      vi.stubEnv('GH_CUSTOM_TRACKING_ID', undefined);
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const hasTrackingId = event?.event_metadata[0].some(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_CUSTOM_TRACKING_ID,
+      );
+      expect(hasTrackingId).toBe(false);
     });
   });
 
