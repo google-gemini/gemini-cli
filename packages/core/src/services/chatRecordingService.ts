@@ -147,14 +147,16 @@ export class ChatRecordingService {
    *
    * @param resumedSessionData Data from a previous session to resume from.
    * @param kind The kind of conversation (main or subagent).
-   * @param initialHistory The starting history for this session. If provided when resuming an
-   * existing session (e.g., after chat compression), this will overwrite the messages currently
-   * stored on disk to ensure the file reflects the new session state.
+   * @param initialHistory The starting history for this session.
+   * @param overwriteHistory If true and resuming an existing session, the messages on disk will
+   * be overwritten with initialHistory. Use with caution as this destroys original message
+   * IDs and timestamps.
    */
   initialize(
     resumedSessionData?: ResumedSessionData,
     kind?: 'main' | 'subagent',
     initialHistory?: Content[],
+    overwriteHistory: boolean = false,
   ): void {
     try {
       this.kind = kind;
@@ -167,7 +169,7 @@ export class ChatRecordingService {
         // Update the session ID in the existing file
         this.updateConversation((conversation) => {
           conversation.sessionId = this.sessionId;
-          if (initialHistory) {
+          if (overwriteHistory && initialHistory) {
             conversation.messages =
               this.apiContentToMessageRecords(initialHistory);
           }
@@ -225,6 +227,8 @@ export class ChatRecordingService {
 
   /**
    * Converts API Content array to storage-compatible MessageRecord array.
+   * WARNING: Generates new IDs and timestamps. Use only for brand new content
+   * or when explicitly overwriting history (e.g. after compression).
    */
   private apiContentToMessageRecords(history: Content[]): MessageRecord[] {
     return history.map((content): MessageRecord => {

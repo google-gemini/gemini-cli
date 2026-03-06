@@ -335,6 +335,7 @@ export class GeminiClient {
   async startChat(
     extraHistory?: Content[],
     resumedSessionData?: ResumedSessionData,
+    overwriteHistory: boolean = false,
   ): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
     this.hasFailedCompressionAttempt = false;
@@ -362,6 +363,8 @@ export class GeminiClient {
             toolRegistry.getFunctionDeclarations(modelId);
           return [{ functionDeclarations: toolDeclarations }];
         },
+        'main',
+        overwriteHistory,
       );
     } catch (error) {
       await reportError(
@@ -1136,7 +1139,7 @@ export class GeminiClient {
           resumedData = { conversation, filePath };
         }
 
-        this.chat = await this.startChat(newHistory, resumedData);
+        this.chat = await this.startChat(newHistory, resumedData, true);
         this.updateTelemetryTokenCount();
         this.forceFullIdeContext = true;
       }

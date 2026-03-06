@@ -661,6 +661,7 @@ describe('Gemini Client (client.ts)', () => {
           conversation: mockConversation,
           filePath: mockFilePath,
         },
+        true, // overwriteHistory
       );
     });
   });

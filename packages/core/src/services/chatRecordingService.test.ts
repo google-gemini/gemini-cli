@@ -123,7 +123,7 @@ describe('ChatRecordingService', () => {
       expect(conversation.sessionId).toBe('old-session-id');
     });
 
-    it('should overwrite existing messages if initialHistory is provided', () => {
+    it('should overwrite existing messages if overwriteHistory is true', () => {
       const chatsDir = path.join(testTempDir, 'chats');
       fs.mkdirSync(chatsDir, { recursive: true });
       const sessionFile = path.join(chatsDir, 'session-overwrite.json');
@@ -155,6 +155,7 @@ describe('ChatRecordingService', () => {
         },
         'main',
         newHistory,
+        true, // overwriteHistory = true
       );
 
       const conversation = JSON.parse(
@@ -165,6 +166,49 @@ describe('ChatRecordingService', () => {
         { text: 'Compressed Summary' },
       ]);
       expect(conversation.messages[0].type).toBe('user');
+    });
+
+    it('should NOT overwrite existing messages if overwriteHistory is false', () => {
+      const chatsDir = path.join(testTempDir, 'chats');
+      fs.mkdirSync(chatsDir, { recursive: true });
+      const sessionFile = path.join(chatsDir, 'session-no-overwrite.json');
+      const initialData = {
+        sessionId: 'test-session-id',
+        projectHash: 'test-project-hash',
+        messages: [
+          {
+            id: 'msg-1',
+            type: 'user',
+            content: 'Old Message',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      };
+      fs.writeFileSync(sessionFile, JSON.stringify(initialData));
+
+      const newHistory: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'Some New Context' }],
+        },
+      ];
+
+      chatRecordingService.initialize(
+        {
+          filePath: sessionFile,
+          conversation: initialData as ConversationRecord,
+        },
+        'main',
+        newHistory,
+        false, // overwriteHistory = false
+      );
+
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+      expect(conversation.messages).toHaveLength(1);
+      expect(conversation.messages[0].content).toBe('Old Message');
+      expect(conversation.messages[0].id).toBe('msg-1');
     });
   });
 
