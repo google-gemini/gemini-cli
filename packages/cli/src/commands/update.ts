@@ -23,20 +23,20 @@ export const updateCommand: CommandModule = {
   handler: async () => {
     coreEvents.emitFeedback('info', 'Checking installation method...');
 
+    const installInfo = getInstallationInfo(process.cwd(), true);
+
+    if (!installInfo.isGlobal || !installInfo.updateCommand) {
+      coreEvents.emitFeedback(
+        'error',
+        installInfo.updateMessage ||
+          'Could not determine a global installation method. Please update manually.',
+      );
+      await runExitCleanup();
+      process.exit(1);
+      return; // For tests
+    }
+
     try {
-      const installInfo = getInstallationInfo(process.cwd(), true);
-
-      if (!installInfo.isGlobal || !installInfo.updateCommand) {
-        coreEvents.emitFeedback(
-          'error',
-          installInfo.updateMessage ||
-            'Could not determine a global installation method. Please update manually.',
-        );
-        await runExitCleanup();
-        process.exit(1);
-        return; // For tests
-      }
-
       coreEvents.emitFeedback(
         'info',
         `Detected global installation via: ${installInfo.packageManager}. Upgrading...`,
@@ -54,7 +54,7 @@ export const updateCommand: CommandModule = {
       if (error instanceof Error && error.message.includes('EACCES')) {
         coreEvents.emitFeedback(
           'error',
-          'Permission denied. Try running the command with sudo: sudo gemini update',
+          `Permission denied. Try running the command with sudo: sudo ${installInfo.updateCommand}`,
         );
       } else {
         coreEvents.emitFeedback(
