@@ -1873,7 +1873,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: {},
         description: 'Enable Gemma model router (experimental).',
-        showInDialog: true,
+        showInDialog: false,
         properties: {
           enabled: {
             type: 'boolean',
@@ -1882,8 +1882,8 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: false,
             description:
-              'Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
-            showInDialog: true,
+              'Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+            showInDialog: false,
           },
           classifier: {
             type: 'object',
