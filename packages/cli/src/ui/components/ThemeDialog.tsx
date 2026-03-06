@@ -281,10 +281,6 @@ export function ThemeDialog({
   const codeBlockHeight = Math.ceil(availableHeightForPanes * 0.6);
   const diffHeight = Math.floor(availableHeightForPanes * 0.4);
 
-  const previewTheme =
-    themeManager.getTheme(highlightedThemeName || DEFAULT_THEME.name) ||
-    DEFAULT_THEME;
-
   return (
     <Box
       borderStyle="round"
@@ -425,7 +421,9 @@ def fibonacci(n):
     return a`,
                       language: 'python',
                       availableHeight:
-                        isAlternateBuffer === false ? codeBlockHeight : undefined,
+                        isAlternateBuffer === false
+                          ? codeBlockHeight
+                          : undefined,
                       maxWidth: colorizeCodeWidth,
                       settings,
                       theme: previewTheme,

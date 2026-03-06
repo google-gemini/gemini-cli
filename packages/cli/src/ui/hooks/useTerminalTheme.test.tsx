@@ -199,7 +199,7 @@ describe('useTerminalTheme', () => {
     config.setTerminalBackground('#000000');
     vi.mocked(config.setTerminalBackground).mockClear();
     // But theme is light
-    mockSettings.merged.ui.theme = 'default-light';
+    mockSettings.merged.ui.themeLight = 'default-light';
 
     const refreshStatic = vi.fn();
     const { unmount } = renderHook(() =>
@@ -220,7 +220,7 @@ describe('useTerminalTheme', () => {
       expect.anything(),
     );
 
-    mockSettings.merged.ui.theme = 'default';
+    mockSettings.merged.ui.themeDark = 'default';
     unmount();
   });
 
