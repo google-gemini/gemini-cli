@@ -460,7 +460,7 @@ export const useShellCommandProcessor = (
             finalOutput = `Command was cancelled.\n${finalOutput}`;
           } else if (result.backgrounded) {
             finalStatus = CoreToolCallStatus.Success;
-            finalOutput = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+            finalOutput = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+Q or /shells to view.`;
           } else if (result.signal) {
             finalStatus = CoreToolCallStatus.Error;
             finalOutput = `Command terminated by signal: ${result.signal}.\n${finalOutput}`;

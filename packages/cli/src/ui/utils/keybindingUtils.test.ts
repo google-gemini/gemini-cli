@@ -43,7 +43,7 @@ describe('keybindingUtils', () => {
     it('formats default commands', () => {
       expect(formatCommand(Command.QUIT)).toBe('Ctrl+C');
       expect(formatCommand(Command.SUBMIT)).toBe('Enter');
-      expect(formatCommand(Command.TOGGLE_BACKGROUND_SHELL)).toBe('Ctrl+B');
+      expect(formatCommand(Command.TOGGLE_BACKGROUND_SHELL)).toBe('Ctrl+Q');
     });
 
     it('returns empty string for unknown commands', () => {

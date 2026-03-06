@@ -59,11 +59,11 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.MOVE_LEFT,
-      positive: [createKey('left')],
+      positive: [createKey('left'), createKey('b', { ctrl: true })],
       negative: [
         createKey('left', { ctrl: true }),
         createKey('b'),
-        createKey('b', { ctrl: true }),
+        createKey('f', { ctrl: true }),
       ],
     },
     {
@@ -385,8 +385,12 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.TOGGLE_BACKGROUND_SHELL,
-      positive: [createKey('b', { ctrl: true })],
-      negative: [createKey('f10'), createKey('b')],
+      positive: [createKey('q', { ctrl: true })],
+      negative: [
+        createKey('f10'),
+        createKey('b'),
+        createKey('b', { ctrl: true }),
+      ],
     },
     {
       command: Command.TOGGLE_BACKGROUND_SHELL_LIST,

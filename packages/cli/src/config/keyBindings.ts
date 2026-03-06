@@ -150,6 +150,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   ],
   [Command.MOVE_LEFT]: [
     { key: 'left', shift: false, alt: false, ctrl: false, cmd: false },
+    { key: 'b', ctrl: true },
   ],
   [Command.MOVE_RIGHT]: [
     { key: 'right', shift: false, alt: false, ctrl: false, cmd: false },
@@ -279,7 +280,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
   [Command.TOGGLE_YOLO]: [{ key: 'y', ctrl: true }],
   [Command.CYCLE_APPROVAL_MODE]: [{ key: 'tab', shift: true }],
-  [Command.TOGGLE_BACKGROUND_SHELL]: [{ key: 'b', ctrl: true }],
+  [Command.TOGGLE_BACKGROUND_SHELL]: [{ key: 'q', ctrl: true }],
   [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [{ key: 'l', ctrl: true }],
   [Command.KILL_BACKGROUND_SHELL]: [{ key: 'k', ctrl: true }],
   [Command.UNFOCUS_BACKGROUND_SHELL]: [{ key: 'tab', shift: true }],

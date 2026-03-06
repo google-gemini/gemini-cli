@@ -2486,8 +2486,8 @@ describe('AppContainer State Management', () => {
       });
     });
 
-    describe('Background Shell Toggling (CTRL+B)', () => {
-      it('should toggle background shell on Ctrl+B even if visible but not focused', async () => {
+    describe('Background Shell Toggling (CTRL+Q)', () => {
+      it('should toggle background shell on Ctrl+Q even if visible but not focused', async () => {
         const mockToggleBackgroundShell = vi.fn();
         mockedUseGeminiStream.mockReturnValue({
           ...DEFAULT_GEMINI_STREAM_MOCK,
@@ -2502,8 +2502,8 @@ describe('AppContainer State Management', () => {
         // Initially not focused, but visible
         expect(capturedUIState.embeddedShellFocused).toBe(false);
 
-        // Press Ctrl+B
-        pressKey('\x02');
+        // Press Ctrl+Q
+        pressKey('\x11');
 
         // Should have toggled (closed) the shell
         expect(mockToggleBackgroundShell).toHaveBeenCalled();
@@ -2513,7 +2513,7 @@ describe('AppContainer State Management', () => {
         unmount();
       });
 
-      it('should show and focus background shell on Ctrl+B if hidden', async () => {
+      it('should show and focus background shell on Ctrl+Q if hidden', async () => {
         const mockToggleBackgroundShell = vi.fn();
         const geminiStreamMock = {
           ...DEFAULT_GEMINI_STREAM_MOCK,
@@ -2531,8 +2531,8 @@ describe('AppContainer State Management', () => {
           geminiStreamMock.isBackgroundShellVisible = true;
         });
 
-        // Press Ctrl+B
-        pressKey('\x02');
+        // Press Ctrl+Q
+        pressKey('\x11');
 
         // Should have toggled (shown) the shell
         expect(mockToggleBackgroundShell).toHaveBeenCalled();

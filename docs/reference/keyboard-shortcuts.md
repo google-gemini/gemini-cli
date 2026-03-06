@@ -23,7 +23,7 @@ available combinations.
 | Move the cursor to the end of the line.     | `Ctrl + E`<br />`End (no Shift, Ctrl)`                       |
 | Move the cursor up one line.                | `Up Arrow (no Shift, Alt, Ctrl, Cmd)`                        |
 | Move the cursor down one line.              | `Down Arrow (no Shift, Alt, Ctrl, Cmd)`                      |
-| Move the cursor one character to the left.  | `Left Arrow (no Shift, Alt, Ctrl, Cmd)`                      |
+| Move the cursor one character to the left.  | `Left Arrow (no Shift, Alt, Ctrl, Cmd)`<br />`Ctrl + B`      |
 | Move the cursor one character to the right. | `Right Arrow (no Shift, Alt, Ctrl, Cmd)`<br />`Ctrl + F`     |
 | Move the cursor one word to the left.       | `Ctrl + Left Arrow`<br />`Alt + Left Arrow`<br />`Alt + B`   |
 | Move the cursor one word to the right.      | `Ctrl + Right Arrow`<br />`Alt + Right Arrow`<br />`Alt + F` |
@@ -107,7 +107,7 @@ available combinations.
 | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy. | `Shift + Tab`    |
 | Expand and collapse blocks of content when not in alternate buffer mode.                                                                           | `Ctrl + O`       |
 | Expand or collapse a paste placeholder when cursor is over placeholder.                                                                            | `Ctrl + O`       |
-| Toggle current background shell visibility.                                                                                                        | `Ctrl + B`       |
+| Toggle current background shell visibility.                                                                                                        | `Ctrl + Q`       |
 | Toggle background shell list.                                                                                                                      | `Ctrl + L`       |
 | Kill the active background shell.                                                                                                                  | `Ctrl + K`       |
 | Confirm selection in background shell list.                                                                                                        | `Enter`          |
