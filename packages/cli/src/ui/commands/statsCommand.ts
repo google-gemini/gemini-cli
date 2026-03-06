@@ -20,6 +20,7 @@ import {
   type SlashCommand,
   CommandKind,
 } from './types.js';
+import { handlePerfCommand } from './perfCommand.js';
 
 function getUserIdentity(context: CommandContext) {
   const selectedAuthType =
@@ -129,6 +130,16 @@ export const statsCommand: SlashCommand = {
         context.ui.addItem({
           type: MessageType.TOOL_STATS,
         } as HistoryItemToolStats);
+      },
+    },
+    {
+      name: 'perf',
+      description: 'Show advanced performance metrics and telemetry',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      action: async (context: CommandContext) => {
+        // Routes to your decoupled OTel backend, safely bypassing the standard stats UI loop
+        await handlePerfCommand(context);
       },
     },
   ],
