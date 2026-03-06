@@ -160,7 +160,6 @@ export class ToolExecutor {
           }
         } catch (executionError: unknown) {
           spanMetadata.error = executionError;
-<<<<<<< HEAD
           const abortedByError =
             isAbortError(executionError) ||
             (executionError instanceof Error &&
@@ -170,14 +169,6 @@ export class ToolExecutor {
             completedToolCall = await this.createCancelledResult(
               call,
               isAbortError(executionError)
-=======
-          const abortError = isAbortError(executionError);
-          const aborted = signal.aborted || abortError;
-          if (aborted) {
-            completedToolCall = this.createCancelledResult(
-              call,
-              abortError
->>>>>>> 17d0adb97 (refactor(core): centralize AbortError detection)
                 ? 'Operation cancelled.'
                 : 'User cancelled tool execution.',
             );
