@@ -69,6 +69,14 @@ Learn more at
 If you use up your initial number of requests, you can continue to benefit from
 Gemini CLI by upgrading to one of the following subscriptions:
 
+### Individuals
+
+These tiers are applicable when you are signing in with a personal account. 
+- To verify if you are on a personal account you can visit [the Google One page](https://one.google.com/about/plans?hl=en-US&g1_landing_page=0)
+- If you are not on a personal account you will see the following message "You're currently signed in to your Google Workspace Account"
+
+**Supported Tiers:** 
+_- Tiers not listed above including Google AI Plus are not supported_
 - [Google AI Pro and AI Ultra](https://gemini.google/subscriptions/). This is
   recommended for individual developers. Quotas and pricing are based on a fixed
   price subscription.
@@ -78,6 +86,16 @@ Gemini CLI by upgrading to one of the following subscriptions:
   Learn more at
   [Gemini Code Assist Quotas and Limits](https://developers.google.com/gemini-code-assist/resources/quotas)
 
+
+
+### Through your organization
+These tiers are applicable when you are signing in with a workspace account. 
+- To verify if you are on a personal account you can visit [the Google One page](https://one.google.com/about/plans?hl=en-US&g1_landing_page=0)
+- If you are not on a personal account you will see the following message "You're currently signed in to your Google Workspace Account"
+
+**Supported Tiers:**
+_- Tiers not listed above including Workspace AI Standard/Plus and AI Expanded are not supported_
+- [Workspace AI Ultra Access] https://workspace.google.com/products/ai-ultra/
 - [Purchase a Gemini Code Assist Subscription through Google Cloud](https://cloud.google.com/gemini/docs/codeassist/overview).
 
   Quotas and pricing are based on a fixed price subscription with assigned
@@ -93,7 +111,7 @@ Gemini CLI by upgrading to one of the following subscriptions:
   - Model requests will be made across the Gemini model family as determined by
     Gemini CLI.
 
-  [Learn more about Gemini Code Assist Standard and Enterprise license limits](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli).
+  [Learn more about Gemini Code Assist license limits](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli).
 
 ## Pay as you go
 
