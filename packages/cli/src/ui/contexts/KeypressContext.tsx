@@ -593,9 +593,13 @@ function* emitKeys(
       name = 'tab';
       alt = escaped;
     } else if (ch === '\b') {
-      // ctrl+h or ctrl+backspace (windows terminals send \x08 for ctrl+backspace)
+      // ctrl+h / ctrl+backspace (windows terminals send \x08 for ctrl+backspace)
       name = 'backspace';
-      ctrl = true;
+      // In Windows Terminal, \b can be sent for Ctrl+Backspace.
+      // We scope this behavior to avoid breaking other terminals where \b is a plain backspace.
+      if (typeof process !== 'undefined' && !!process.env?.['WT_SESSION']) {
+        ctrl = true;
+      }
       alt = escaped;
     } else if (ch === '\x7f') {
       // backspace
