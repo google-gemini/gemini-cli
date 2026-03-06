@@ -177,4 +177,41 @@ describe('PromptProvider', () => {
       expect(prompt).toContain('/tmp/project-temp/plans/');
     });
   });
+
+  describe('getCompressionPrompt', () => {
+    it('should include plan preservation instructions when an approved plan path is provided', () => {
+      const planPath = '/path/to/plan.md';
+      (
+        mockConfig.getApprovedPlanPath as ReturnType<typeof vi.fn>
+      ).mockReturnValue(planPath);
+
+      const provider = new PromptProvider();
+      const prompt = provider.getCompressionPrompt(mockConfig);
+
+      expect(prompt).toContain('### APPROVED PLAN PRESERVATION');
+      expect(prompt).toContain(planPath);
+
+      // Verify it's BEFORE the structure example
+      const structureMarker = 'The structure MUST be as follows:';
+      const planPreservationMarker = '### APPROVED PLAN PRESERVATION';
+
+      const structureIndex = prompt.indexOf(structureMarker);
+      const planPreservationIndex = prompt.indexOf(planPreservationMarker);
+
+      expect(planPreservationIndex).toBeGreaterThan(-1);
+      expect(structureIndex).toBeGreaterThan(-1);
+      expect(planPreservationIndex).toBeLessThan(structureIndex);
+    });
+
+    it('should NOT include plan preservation instructions when no approved plan path is provided', () => {
+      (
+        mockConfig.getApprovedPlanPath as ReturnType<typeof vi.fn>
+      ).mockReturnValue(undefined);
+
+      const provider = new PromptProvider();
+      const prompt = provider.getCompressionPrompt(mockConfig);
+
+      expect(prompt).not.toContain('### APPROVED PLAN PRESERVATION');
+    });
+  });
 });
