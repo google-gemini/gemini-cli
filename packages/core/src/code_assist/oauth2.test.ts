@@ -15,8 +15,8 @@ import {
   authEvents,
 } from './oauth2.js';
 import {
-  recordOnboardingStart,
-  recordOnboardingEnd,
+  recordGoogleAuthStart,
+  recordGoogleAuthEnd,
 } from '../telemetry/metrics.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import { OAuth2Client, Compute, GoogleAuth } from 'google-auth-library';
@@ -96,8 +96,8 @@ vi.mock('../mcp/token-storage/hybrid-token-storage.js', () => ({
 }));
 
 vi.mock('../telemetry/metrics.js', () => ({
-  recordOnboardingStart: vi.fn(),
-  recordOnboardingEnd: vi.fn(),
+  recordGoogleAuthStart: vi.fn(),
+  recordGoogleAuthEnd: vi.fn(),
 }));
 
 const mockConfig = {
@@ -1378,8 +1378,8 @@ describe('oauth2', () => {
 
         await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
 
-        expect(recordOnboardingStart).toHaveBeenCalledWith(mockConfig);
-        expect(recordOnboardingEnd).toHaveBeenCalledWith(mockConfig);
+        expect(recordGoogleAuthStart).toHaveBeenCalledWith(mockConfig);
+        expect(recordGoogleAuthEnd).toHaveBeenCalledWith(mockConfig);
       });
 
       it('should NOT record onboarding events for other auth types', async () => {
