@@ -114,6 +114,7 @@ import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
+import { DefaultFeatureGate, type FeatureGate } from './features.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
@@ -584,6 +585,8 @@ export interface ConfigParameters {
   tracker?: boolean;
   planSettings?: PlanSettings;
   modelSteering?: boolean;
+  features?: Record<string, boolean>;
+  featureGates?: string;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -723,14 +726,12 @@ export class Config implements McpContext {
   readonly interactive: boolean;
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
-  private readonly directWebFetch: boolean;
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private readonly useBackgroundColor: boolean;
   private readonly useAlternateBuffer: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
-  private readonly extensionManagement: boolean = true;
   private readonly truncateToolOutputThreshold: number;
   private compressionTruncationCounter = 0;
   private initialized = false;
@@ -784,19 +785,16 @@ export class Config implements McpContext {
     overageStrategy: OverageStrategy;
   };
 
-  private readonly enableAgents: boolean;
   private agents: AgentSettings;
   private readonly enableEventDrivenScheduler: boolean;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
   private readonly adminSkillsEnabled: boolean;
 
-  private readonly experimentalJitContext: boolean;
+  private readonly featureGate: FeatureGate;
+
   private readonly disableLLMCorrection: boolean;
-  private readonly planEnabled: boolean;
-  private readonly trackerEnabled: boolean;
   private readonly planModeRoutingEnabled: boolean;
-  private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
@@ -881,19 +879,17 @@ export class Config implements McpContext {
     this.model = params.model;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
-    this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
-    this.planEnabled = params.plan ?? false;
-    this.trackerEnabled = params.tracker ?? false;
     this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
+
+    this.featureGate = Config.initializeFeatureGate(params);
+
     this.modelAvailabilityService = new ModelAvailabilityService();
-    this.experimentalJitContext = params.experimentalJitContext ?? false;
-    this.modelSteering = params.modelSteering ?? false;
     this.userHintService = new UserHintService(() =>
       this.isModelSteeringEnabled(),
     );
@@ -930,7 +926,6 @@ export class Config implements McpContext {
     this.interactive = params.interactive ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
-    this.directWebFetch = params.directWebFetch ?? false;
     this.useRipgrep = params.useRipgrep ?? true;
     this.useBackgroundColor = params.useBackgroundColor ?? true;
     this.useAlternateBuffer = params.useAlternateBuffer ?? false;
@@ -959,7 +954,6 @@ export class Config implements McpContext {
       params.enableShellOutputEfficiency ?? true;
     this.shellToolInactivityTimeout =
       (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
-    this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir, this.sessionId);
     this.storage.setCustomPlansDir(params.planSettings?.directory);
@@ -1088,8 +1082,63 @@ export class Config implements McpContext {
     );
   }
 
+  /**
+   * Initializes a FeatureGate with the following precedence (highest to lowest):
+   * 1. CLI flags (params.featureGates)
+   * 2. Environment variable (GEMINI_FEATURE_GATES)
+   * 3. User settings (params.features)
+   * 4. Legacy experimental settings
+   */
+  private static initializeFeatureGate(params: ConfigParameters): FeatureGate {
+    const gate = DefaultFeatureGate.deepCopy();
+    if (params.features) {
+      gate.setFromMap(params.features);
+    }
+
+    // Map legacy experimental flags to features if not already set
+    const legacyMap: Record<string, boolean | undefined> = {
+      toolOutputMasking: params.toolOutputMasking?.enabled,
+      enableAgents: params.enableAgents,
+      extensionManagement: params.extensionManagement,
+      plan: params.plan,
+      jitContext: params.experimentalJitContext,
+      modelSteering: params.modelSteering,
+      taskTracker: params.tracker,
+      directWebFetch: params.directWebFetch,
+      gemmaModelRouter: params.gemmaModelRouter?.enabled,
+    };
+    for (const [key, value] of Object.entries(legacyMap)) {
+      if (value !== undefined && params.features?.[key] === undefined) {
+        gate.setFromMap({ [key]: value });
+      }
+    }
+
+    const envGates = process.env['GEMINI_FEATURE_GATES'];
+    if (envGates) {
+      gate.set(envGates);
+    }
+    if (params.featureGates) {
+      gate.set(params.featureGates);
+    }
+    return gate;
+  }
+
+  /**
+   * Returns the feature gate for querying feature status.
+   */
+  getFeatureGate(): FeatureGate {
+    return this.featureGate;
+  }
+
   isInitialized(): boolean {
     return this.initialized;
+  }
+
+  /**
+   * Returns true if the feature is enabled.
+   */
+  isFeatureEnabled(key: string): boolean {
+    return this.featureGate.enabled(key);
   }
 
   /**
@@ -1115,7 +1164,7 @@ export class Config implements McpContext {
     }
 
     // Add plans directory to workspace context for plan file storage
-    if (this.planEnabled) {
+    if (this.isPlanEnabled()) {
       const plansDir = this.storage.getPlansDir();
       try {
         await fs.promises.access(plansDir);
@@ -1193,7 +1242,7 @@ export class Config implements McpContext {
       await this.hookSystem.initialize();
     }
 
-    if (this.experimentalJitContext) {
+    if (this.isJitContextEnabled()) {
       this.contextManager = new ContextManager(this);
       await this.contextManager.refresh();
     }
@@ -1853,7 +1902,7 @@ export class Config implements McpContext {
   }
 
   getUserMemory(): string | HierarchicalMemory {
-    if (this.experimentalJitContext && this.contextManager) {
+    if (this.isJitContextEnabled() && this.contextManager) {
       return {
         global: this.contextManager.getGlobalMemory(),
         extension: this.contextManager.getExtensionMemory(),
@@ -1867,7 +1916,7 @@ export class Config implements McpContext {
    * Refreshes the MCP context, including memory, tools, and system instructions.
    */
   async refreshMcpContext(): Promise<void> {
-    if (this.experimentalJitContext && this.contextManager) {
+    if (this.isJitContextEnabled() && this.contextManager) {
       await this.contextManager.refresh();
     } else {
       const { refreshServerHierarchicalMemory } = await import(
@@ -1898,15 +1947,15 @@ export class Config implements McpContext {
   }
 
   isJitContextEnabled(): boolean {
-    return this.experimentalJitContext;
+    return this.isFeatureEnabled('jitContext');
   }
 
   isModelSteeringEnabled(): boolean {
-    return this.modelSteering;
+    return this.isFeatureEnabled('modelSteering');
   }
 
   getToolOutputMaskingEnabled(): boolean {
-    return this.toolOutputMasking.enabled;
+    return this.isFeatureEnabled('toolOutputMasking');
   }
 
   async getToolOutputMaskingConfig(): Promise<ToolOutputMaskingConfig> {
@@ -1930,7 +1979,7 @@ export class Config implements McpContext {
       : undefined;
 
     return {
-      enabled: this.toolOutputMasking.enabled,
+      enabled: this.getToolOutputMaskingEnabled(),
       toolProtectionThreshold:
         parsedProtection !== undefined && !isNaN(parsedProtection)
           ? parsedProtection
@@ -1945,7 +1994,7 @@ export class Config implements McpContext {
   }
 
   getGeminiMdFileCount(): number {
-    if (this.experimentalJitContext && this.contextManager) {
+    if (this.isJitContextEnabled() && this.contextManager) {
       return this.contextManager.getLoadedPaths().size;
     }
     return this.geminiMdFileCount;
@@ -1956,7 +2005,7 @@ export class Config implements McpContext {
   }
 
   getGeminiMdFilePaths(): string[] {
-    if (this.experimentalJitContext && this.contextManager) {
+    if (this.isJitContextEnabled() && this.contextManager) {
       return Array.from(this.contextManager.getLoadedPaths());
     }
     return this.geminiMdFilePaths;
@@ -2259,7 +2308,7 @@ export class Config implements McpContext {
   }
 
   getExtensionManagement(): boolean {
-    return this.extensionManagement;
+    return this.isFeatureEnabled('extensionManagement');
   }
 
   getExtensions(): GeminiCLIExtension[] {
@@ -2285,11 +2334,11 @@ export class Config implements McpContext {
   }
 
   isPlanEnabled(): boolean {
-    return this.planEnabled;
+    return this.isFeatureEnabled('plan');
   }
 
   isTrackerEnabled(): boolean {
-    return this.trackerEnabled;
+    return this.isFeatureEnabled('taskTracker');
   }
 
   getApprovedPlanPath(): string | undefined {
@@ -2297,7 +2346,7 @@ export class Config implements McpContext {
   }
 
   getDirectWebFetch(): boolean {
-    return this.directWebFetch;
+    return this.isFeatureEnabled('directWebFetch');
   }
 
   setApprovedPlanPath(path: string | undefined): void {
@@ -2305,7 +2354,7 @@ export class Config implements McpContext {
   }
 
   isAgentsEnabled(): boolean {
-    return this.enableAgents;
+    return this.isFeatureEnabled('enableAgents');
   }
 
   isEventDrivenSchedulerEnabled(): boolean {
@@ -2716,7 +2765,7 @@ export class Config implements McpContext {
   }
 
   getGemmaModelRouterEnabled(): boolean {
-    return this.gemmaModelRouter.enabled ?? false;
+    return this.isFeatureEnabled('gemmaModelRouter');
   }
 
   getGemmaModelRouterSettings(): GemmaModelRouterSettings {
