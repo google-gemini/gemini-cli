@@ -13,7 +13,6 @@ import type {
   TaskArtifactUpdateEvent,
 } from '@a2a-js/sdk';
 import {
-  type Client,
   ClientFactory,
   ClientFactoryOptions,
   DefaultAgentCardResolver,
@@ -21,9 +20,12 @@ import {
   JsonRpcTransportFactory,
   type AuthenticationHandler,
   createAuthenticatingFetchWithRetry,
+  type Client,
 } from '@a2a-js/sdk/client';
+import { GrpcTransportFactory } from '@a2a-js/sdk/client/grpc';
 import { v4 as uuidv4 } from 'uuid';
 import { Agent as UndiciAgent } from 'undici';
+import { getGrpcCredentials, normalizeAgentCard } from './a2aUtils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 // Remote agents can take 10+ minutes (e.g. Deep Research).
@@ -44,8 +46,10 @@ export type SendMessageResult =
   | TaskArtifactUpdateEvent;
 
 /**
- * Manages A2A clients and caches loaded agent information.
- * Follows a singleton pattern to ensure a single client instance.
+ * Orchestrates communication with A2A agents.
+ *
+ * This manager handles agent discovery, card caching, and client lifecycle.
+ * It provides a unified messaging interface using the standard A2A SDK.
  */
 export class A2AClientManager {
   private static instance: A2AClientManager;
@@ -91,27 +95,26 @@ export class A2AClientManager {
       throw new Error(`Agent with name '${name}' is already loaded.`);
     }
 
-    let fetchImpl: typeof fetch = a2aFetch;
-    if (authHandler) {
-      fetchImpl = createAuthenticatingFetchWithRetry(a2aFetch, authHandler);
-    }
-
+    const fetchImpl = this.getFetchImpl(authHandler);
     const resolver = new DefaultAgentCardResolver({ fetchImpl });
+    const agentCard = await this.resolveAgentCard(agentCardUrl, resolver);
 
-    const options = ClientFactoryOptions.createFrom(
+    // Configure standard SDK client for tool registration and discovery
+    const clientOptions = ClientFactoryOptions.createFrom(
       ClientFactoryOptions.default,
       {
         transports: [
           new RestTransportFactory({ fetchImpl }),
           new JsonRpcTransportFactory({ fetchImpl }),
+          new GrpcTransportFactory({
+            grpcChannelCredentials: getGrpcCredentials(agentCard.url),
+          }),
         ],
         cardResolver: resolver,
       },
     );
-
-    const factory = new ClientFactory(options);
-    const client = await factory.createFromUrl(agentCardUrl, '');
-    const agentCard = await client.getAgentCard();
+    const factory = new ClientFactory(clientOptions);
+    const client = await factory.createFromAgentCard(agentCard);
 
     this.clients.set(name, client);
     this.agentCards.set(name, agentCard);
@@ -146,9 +149,7 @@ export class A2AClientManager {
     options?: { contextId?: string; taskId?: string; signal?: AbortSignal },
   ): AsyncIterable<SendMessageResult> {
     const client = this.clients.get(agentName);
-    if (!client) {
-      throw new Error(`Agent '${agentName}' not found.`);
-    }
+    if (!client) throw new Error(`Agent '${agentName}' not found.`);
 
     const messageParams: MessageSendParams = {
       message: {
@@ -202,9 +203,7 @@ export class A2AClientManager {
    */
   async getTask(agentName: string, taskId: string): Promise<Task> {
     const client = this.clients.get(agentName);
-    if (!client) {
-      throw new Error(`Agent '${agentName}' not found.`);
-    }
+    if (!client) throw new Error(`Agent '${agentName}' not found.`);
     try {
       return await client.getTask({ id: taskId });
     } catch (error: unknown) {
@@ -224,9 +223,7 @@ export class A2AClientManager {
    */
   async cancelTask(agentName: string, taskId: string): Promise<Task> {
     const client = this.clients.get(agentName);
-    if (!client) {
-      throw new Error(`Agent '${agentName}' not found.`);
-    }
+    if (!client) throw new Error(`Agent '${agentName}' not found.`);
     try {
       return await client.cancelTask({ id: taskId });
     } catch (error: unknown) {
@@ -236,5 +233,36 @@ export class A2AClientManager {
       }
       throw new Error(`${prefix}: Unexpected error: ${String(error)}`);
     }
+  }
+
+  /**
+   * Resolves the appropriate fetch implementation for an agent.
+   */
+  private getFetchImpl(authHandler?: AuthenticationHandler): typeof fetch {
+    return authHandler
+      ? createAuthenticatingFetchWithRetry(a2aFetch, authHandler)
+      : a2aFetch;
+  }
+
+  /**
+   * Resolves and normalizes an agent card from a given URL.
+   * Handles splitting the URL if it already contains the standard .well-known path.
+   */
+  private async resolveAgentCard(
+    url: string,
+    resolver: DefaultAgentCardResolver,
+  ): Promise<AgentCard> {
+    const standardPath = '.well-known/agent-card.json';
+    let baseUrl = url;
+    let path: string | undefined;
+
+    if (baseUrl.includes(standardPath)) {
+      const parts = baseUrl.split(standardPath);
+      baseUrl = parts[0] || '';
+      path = standardPath;
+    }
+
+    const rawCard = await resolver.resolve(baseUrl, path);
+    return normalizeAgentCard(rawCard);
   }
 }
