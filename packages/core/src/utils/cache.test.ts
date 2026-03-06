@@ -17,7 +17,7 @@ describe('CacheService', () => {
   });
 
   describe('Basic operations', () => {
-    it('should store and retrieve values', () => {
+    it('should store and retrieve values by default (Map)', () => {
       const cache = createCache<string, string>({ storage: 'map' });
       cache.set('key', 'value');
       expect(cache.get('key')).toBe('value');
@@ -45,7 +45,7 @@ describe('CacheService', () => {
     });
 
     it('should throw on clear() for WeakMap', () => {
-      const cache = createCache<object, string>(); // default is weakmap
+      const cache = createCache<object, string>({ storage: 'weakmap' });
       expect(() => cache.clear()).toThrow(
         'clear() is not supported on WeakMap storage',
       );
@@ -179,11 +179,20 @@ describe('CacheService', () => {
   });
 
   describe('WeakMap Storage', () => {
-    it('should work with object keys by default', () => {
+    it('should work with object keys explicitly', () => {
+      const cache = createCache<object, string>({ storage: 'weakmap' });
+      const key = { id: 1 };
+      cache.set(key, 'value');
+      expect(cache.get(key)).toBe('value');
+    });
+
+    it('should default to Map for objects', () => {
       const cache = createCache<object, string>();
       const key = { id: 1 };
       cache.set(key, 'value');
       expect(cache.get(key)).toBe('value');
+      // clear() should NOT throw because default is Map
+      expect(() => cache.clear()).not.toThrow();
     });
   });
 });

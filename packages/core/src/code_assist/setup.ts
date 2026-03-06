@@ -19,7 +19,7 @@ import type { ValidationHandler } from '../fallback/types.js';
 import { ChangeAuthRequestedError } from '../utils/errors.js';
 import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { createCache } from '../utils/cache.js';
+import { createCache, type CacheService } from '../utils/cache.js';
 
 export class ProjectIdRequiredError extends Error {
   constructor() {
@@ -58,13 +58,12 @@ export interface UserData {
 
 // Cache to store the results of setupUser to avoid redundant network calls.
 // The cache is keyed by the AuthClient instance. Inside each entry, we use
-// a Map keyed by project ID to ensure correctness if environment changes.
+// another cache keyed by project ID to ensure correctness if environment changes.
 let userDataCache = createCache<
   AuthClient,
-  Map<string | undefined, Promise<UserData>>
+  CacheService<string | undefined, Promise<UserData>>
 >({
   storage: 'weakmap',
-  defaultTtl: 30000, // 30 seconds
 });
 
 /**
@@ -74,10 +73,9 @@ let userDataCache = createCache<
 export function resetUserDataCacheForTesting() {
   userDataCache = createCache<
     AuthClient,
-    Map<string | undefined, Promise<UserData>>
+    CacheService<string | undefined, Promise<UserData>>
   >({
     storage: 'weakmap',
-    defaultTtl: 30000,
   });
 }
 
@@ -113,26 +111,16 @@ export async function setupUser(
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
 
-  const projectMap = userDataCache.getOrCreate(
-    client,
-    () => new Map<string | undefined, Promise<UserData>>(),
+  const projectCache = userDataCache.getOrCreate(client, () =>
+    createCache<string | undefined, Promise<UserData>>({
+      storage: 'map',
+      defaultTtl: 30000, // 30 seconds
+    }),
   );
 
-  let promise = projectMap.get(projectId);
-
-  if (!promise) {
-    promise = _doSetupUser(client, projectId, validationHandler, httpOptions);
-    projectMap.set(projectId, promise);
-
-    // Remove the promise from the map on failure so it can be retried immediately.
-    promise.catch(() => {
-      if (projectMap.get(projectId) === promise) {
-        projectMap.delete(projectId);
-      }
-    });
-  }
-
-  return promise;
+  return projectCache.getOrCreate(projectId, () =>
+    _doSetupUser(client, projectId, validationHandler, httpOptions),
+  );
 }
 
 /**

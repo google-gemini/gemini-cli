@@ -41,11 +41,11 @@ export class CacheService<K extends object | string, V> {
   private readonly deleteOnPromiseFailure: boolean;
 
   constructor(options: CacheOptions = {}) {
-    // Default to weakmap unless map is explicitly requested.
+    // Default to map for safety unless weakmap is explicitly requested.
     this.storage =
-      options.storage === 'map'
-        ? new Map<K, CacheEntry<V>>()
-        : new WeakMap<WeakKey, CacheEntry<V>>();
+      options.storage === 'weakmap'
+        ? new WeakMap<WeakKey, CacheEntry<V>>()
+        : new Map<K, CacheEntry<V>>();
     this.defaultTtl = options.defaultTtl;
     this.deleteOnPromiseFailure = options.deleteOnPromiseFailure ?? true;
   }
@@ -138,8 +138,14 @@ export class CacheService<K extends object | string, V> {
 /**
  * Factory function to create a new cache.
  */
-export function createCache<K extends object | string, V>(
+export function createCache<K extends string, V>(
+  options: CacheOptions & { storage: 'map' },
+): CacheService<K, V>;
+export function createCache<K extends object, V>(
   options?: CacheOptions,
+): CacheService<K, V>;
+export function createCache<K extends object | string, V>(
+  options: CacheOptions = {},
 ): CacheService<K, V> {
   return new CacheService<K, V>(options);
 }
