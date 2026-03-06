@@ -426,8 +426,7 @@ interface CalculatedEdit {
 
 class EditToolInvocation
   extends BaseToolInvocation<EditToolParams, ToolResult>
-  implements ToolInvocation<EditToolParams, ToolResult>
-{
+  implements ToolInvocation<EditToolParams, ToolResult> {
   constructor(
     private readonly config: Config,
     params: EditToolParams,
@@ -719,7 +718,7 @@ class EditToolInvocation
       editData.currentContent ?? '',
       editData.newContent,
       'Current',
-      'Proposed',
+      'Ghost Preview',
       DEFAULT_DIFF_OPTIONS,
     );
     const ideClient = await IdeClient.getInstance();
@@ -856,7 +855,7 @@ class EditToolInvocation
           editData.currentContent ?? '', // Should not be null here if not isNewFile
           editData.newContent,
           'Current',
-          'Proposed',
+          'Ghost Preview',
           DEFAULT_DIFF_OPTIONS,
         );
 
@@ -939,8 +938,7 @@ ${snippet}`);
  */
 export class EditTool
   extends BaseDeclarativeTool<EditToolParams, ToolResult>
-  implements ModifiableDeclarativeTool<EditToolParams>
-{
+  implements ModifiableDeclarativeTool<EditToolParams> {
   static readonly Name = EDIT_TOOL_NAME;
 
   constructor(

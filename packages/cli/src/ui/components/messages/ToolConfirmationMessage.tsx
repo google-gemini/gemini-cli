@@ -9,6 +9,8 @@ import { useMemo, useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
+import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
+import { useUIState } from '../../contexts/UIStateContext.js';
 import {
   type SerializableConfirmationDetails,
   type Config,
@@ -68,6 +70,7 @@ export const ToolConfirmationMessage: React.FC<
   terminalWidth,
 }) => {
   const { confirm, isDiffingEnabled } = useToolActions();
+  const { renderMarkdown } = useUIState();
   const [mcpDetailsExpansionState, setMcpDetailsExpansionState] = useState<{
     callId: string;
     expanded: boolean;
@@ -547,11 +550,14 @@ export const ToolConfirmationMessage: React.FC<
             maxWidth={Math.max(terminalWidth, 1)}
           >
             <Box flexDirection="column">
-              {commandsToDisplay.map((cmd, idx) => (
-                <Text key={idx} color={theme.text.link}>
-                  {sanitizeForDisplay(cmd)}
-                </Text>
-              ))}
+              <Box paddingBottom={1}>
+                <Text color={theme.status.warning} bold>Pending execution:</Text>
+              </Box>
+              <MarkdownDisplay
+                text={commandsToDisplay.map((cmd) => `\`\`\`bash\n${cmd}\n\`\`\``).join('\n')}
+                renderMarkdown={renderMarkdown}
+                terminalWidth={Math.max(terminalWidth, 1)}
+              />
             </Box>
           </MaxSizedBox>
           {warnings}

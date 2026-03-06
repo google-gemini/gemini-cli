@@ -189,7 +189,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       originalContent, // Original content (empty if new file or unreadable)
       correctedContent, // Content after potential correction
       'Current',
-      'Proposed',
+      'Ghost Preview',
       DEFAULT_DIFF_OPTIONS,
     );
 
