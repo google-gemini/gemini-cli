@@ -143,22 +143,6 @@ export async function createBrowserAgentDefinition(
 }
 
 /**
- * No-op cleanup for individual invocations.
- *
- * With persistent sessions the browser stays open across subagent invocations.
- * Actual cleanup happens via {@link resetBrowserSession} on /clear or CLI exit.
- *
- * @param _browserManager The browser manager (unused — kept for API compat)
- */
-export async function cleanupBrowserAgent(
-  _browserManager: BrowserManager,
-): Promise<void> {
-  debugLogger.log(
-    'Browser session persisted (skipping per-invocation cleanup)',
-  );
-}
-
-/**
  * Closes all persistent browser sessions and cleans up resources.
  *
  * Call this on /clear commands and CLI exit to reset browser state.

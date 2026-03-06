@@ -531,4 +531,18 @@ describe('BrowserManager', () => {
       expect(manager.isConnected()).toBe(true);
     });
   });
+
+  describe('concurrency', () => {
+    it('should not call connectMcp twice when ensureConnection is called concurrently', async () => {
+      const manager = new BrowserManager(mockConfig);
+
+      // Call ensureConnection twice simultaneously without awaiting the first
+      const [p1, p2] = [manager.ensureConnection(), manager.ensureConnection()];
+      await Promise.all([p1, p2]);
+
+      // connectMcp (via StdioClientTransport constructor) should only have been called once
+      // Each connection attempt creates a new StdioClientTransport
+      expect(vi.mocked(StdioClientTransport)).toHaveBeenCalledTimes(1);
+    });
+  });
 });

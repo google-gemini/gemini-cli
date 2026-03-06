@@ -7,13 +7,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createBrowserAgentDefinition,
-  cleanupBrowserAgent,
   resetBrowserSession,
 } from './browserAgentFactory.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
-import type { BrowserManager } from './browserManager.js';
 
 // Create mock browser manager
 const mockBrowserManager = {
@@ -224,17 +222,6 @@ describe('browserAgentFactory', () => {
           )
           .map((t) => t.name) ?? [];
       expect(toolNames).toContain('analyze_screenshot');
-    });
-  });
-
-  describe('cleanupBrowserAgent', () => {
-    it('should be a no-op for session persistence', async () => {
-      await cleanupBrowserAgent(
-        mockBrowserManager as unknown as BrowserManager,
-      );
-
-      // close should NOT be called — sessions persist across invocations
-      expect(mockBrowserManager.close).not.toHaveBeenCalled();
     });
   });
 

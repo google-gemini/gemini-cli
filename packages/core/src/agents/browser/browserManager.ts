@@ -138,6 +138,7 @@ export class BrowserManager {
   private mcpTransport: StdioClientTransport | undefined;
   private discoveredTools: McpTool[] = [];
   private disconnected = false;
+  private connectionPromise: Promise<void> | undefined;
 
   constructor(private config: Config) {}
 
@@ -251,11 +252,19 @@ export class BrowserManager {
    * Ensures browser and MCP client are connected.
    * If a previous connection was lost (e.g., user closed the browser),
    * this will reconnect with exponential backoff (up to MAX_RECONNECT_RETRIES).
+   *
+   * Concurrent callers share a single in-flight connection promise so that
+   * two subagents racing at startup do not trigger duplicate connectMcp() calls.
    */
   async ensureConnection(): Promise<void> {
     // Already connected and healthy — nothing to do
     if (this.rawMcpClient && !this.disconnected) {
       return;
+    }
+
+    // A connection is already being established — wait for it instead of racing
+    if (this.connectionPromise) {
+      return this.connectionPromise;
     }
 
     // If previously connected but transport died, clean up before reconnecting
@@ -267,7 +276,18 @@ export class BrowserManager {
       this.disconnected = false;
     }
 
-    // Connect with retry + exponential backoff
+    // Start connecting; store the promise so concurrent callers can join it
+    this.connectionPromise = this.connectWithRetry().finally(() => {
+      this.connectionPromise = undefined;
+    });
+
+    return this.connectionPromise;
+  }
+
+  /**
+   * Connects to chrome-devtools-mcp with exponential backoff retry.
+   */
+  private async connectWithRetry(): Promise<void> {
     let lastError: Error | undefined;
     for (let attempt = 0; attempt < MAX_RECONNECT_RETRIES; attempt++) {
       try {
@@ -284,7 +304,6 @@ export class BrowserManager {
         }
       }
     }
-
     throw lastError!;
   }
 
@@ -319,6 +338,7 @@ export class BrowserManager {
     }
 
     this.discoveredTools = [];
+    this.connectionPromise = undefined;
   }
 
   /**
@@ -410,8 +430,6 @@ export class BrowserManager {
         'chrome-devtools-mcp transport closed unexpectedly. ' +
           'The MCP server process may have crashed.',
       );
-      // Mark as disconnected instead of nulling the client so
-      // ensureConnection() knows to reconnect next time.
       this.disconnected = true;
     };
     this.mcpTransport.onerror = (error: Error) => {
