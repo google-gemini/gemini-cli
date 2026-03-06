@@ -251,6 +251,8 @@ Operate as a **strategic orchestrator**. Your own context window is your most pr
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
 
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
+
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
 - **High-Volume Output:** Commands or tools expected to return large amounts of data (e.g., verbose builds, exhaustive file searches).
@@ -606,11 +608,12 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
 }
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
-  if (options.approvedPlan) {
-    return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Once all implementation and verification steps are finished, provide a **final summary** of the work completed against the plan and offer clear **next steps** to the user (e.g., 'Open a pull request').`;
-  }
   if (options.approvedPlan && options.taskTracker) {
     return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth and invoke the task tracker tool to create tasks for this plan. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Make sure to update the tracker task list based on this updated plan. Once all implementation and verification steps are finished, provide a **final summary** of the work completed against the plan and offer clear **next steps** to the user (e.g., 'Open a pull request').`;
+  }
+
+  if (options.approvedPlan) {
+    return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Once all implementation and verification steps are finished, provide a **final summary** of the work completed against the plan and offer clear **next steps** to the user (e.g., 'Open a pull request').`;
   }
 
   if (options.enableWriteTodosTool) {

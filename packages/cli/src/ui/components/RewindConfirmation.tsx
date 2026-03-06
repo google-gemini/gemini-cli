@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import type React from 'react';
 import { useMemo } from 'react';
 import { theme } from '../semantic-colors.js';
@@ -58,6 +58,7 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
   terminalWidth,
   timestamp,
 }) => {
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   useKeypress(
     (key) => {
       if (keyMatchers[Command.ESCAPE](key)) {
@@ -83,6 +84,53 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
         option.value !== RewindOutcome.RevertOnly,
     );
   }, [stats]);
+  if (isScreenReaderEnabled) {
+    return (
+      <Box flexDirection="column" width={terminalWidth}>
+        <Text bold>Confirm Rewind</Text>
+
+        {stats && (
+          <Box flexDirection="column">
+            <Text>
+              {stats.fileCount === 1
+                ? `File: ${stats.details?.at(0)?.fileName}`
+                : `${stats.fileCount} files affected`}
+            </Text>
+            <Text>Lines added: {stats.addedLines}</Text>
+            <Text>Lines removed: {stats.removedLines}</Text>
+            {timestamp && <Text>({formatTimeAgo(timestamp)})</Text>}
+            <Text>
+              Note: Rewinding does not affect files edited manually or by the
+              shell tool.
+            </Text>
+          </Box>
+        )}
+
+        {!stats && (
+          <Box>
+            <Text color={theme.text.secondary}>No code changes to revert.</Text>
+            {timestamp && (
+              <Text color={theme.text.secondary}>
+                {' '}
+                ({formatTimeAgo(timestamp)})
+              </Text>
+            )}
+          </Box>
+        )}
+
+        <Text>Select an action:</Text>
+        <Text color={theme.text.secondary}>
+          Use arrow keys to navigate, Enter to confirm, Esc to cancel.
+        </Text>
+
+        <RadioButtonSelect
+          items={options}
+          onSelect={handleSelect}
+          isFocused={true}
+        />
+      </Box>
+    );
+  }
 
   return (
     <Box
