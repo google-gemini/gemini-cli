@@ -478,9 +478,13 @@ describe('Core System Prompt (prompts.ts)', () => {
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain('# Active Approval Mode: Plan');
       // Read-only MCP tool should appear with server name
-      expect(prompt).toContain('`read_data` (readonly-server)');
+      expect(prompt).toContain(
+        '`mcp_readonly-server_read_data` (readonly-server)',
+      );
       // Non-read-only MCP tool should not appear (excluded by policy)
-      expect(prompt).not.toContain('`write_data` (nonreadonly-server)');
+      expect(prompt).not.toContain(
+        '`mcp_nonreadonly-server_write_data` (nonreadonly-server)',
+      );
       expect(prompt).toMatchSnapshot();
     });
 
@@ -498,8 +502,12 @@ describe('Core System Prompt (prompts.ts)', () => {
 
       const prompt = getCoreSystemPrompt(mockConfig);
 
-      expect(prompt).toContain('`read_data` (readonly-server)');
-      expect(prompt).not.toContain('`write_data` (nonreadonly-server)');
+      expect(prompt).toContain(
+        '`mcp_readonly-server_read_data` (readonly-server)',
+      );
+      expect(prompt).not.toContain(
+        '`mcp_nonreadonly-server_write_data` (nonreadonly-server)',
+      );
     });
 
     it('should only list available tools in PLAN mode', () => {
