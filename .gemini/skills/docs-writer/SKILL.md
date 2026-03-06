@@ -71,13 +71,15 @@ accessible.
   for all images.
 
 ### Links
-- **Accessibility:** Use descriptive anchor text; avoid "click here."Ensure the
+- **Accessibility:** Use descriptive anchor text; avoid "click here." Ensure the
   link makes sense out of context, such as when being read by a screen reader.
-- **Use relative links in docs:** Use relative links in documentation to
-ensure portability; avoid absolute URLs for links within the same repository. Do not
-  include the /docs/ section of a link.
-- **When changing headings, check for deep links:** If a user is changing a heading,
-check for deep links to that heading in other pages, and update accordingly.
+- **Use relative links in docs:** Use relative links in documentation to ensure
+  portability. Use paths relative to the current file's directory (for example,
+  `../tools/` from `docs/cli/`). Do not include the `/docs/` section of a path,
+  but do verify that the resulting relative link exists.
+- **When changing headings, check for deep links:** If a user is changing a
+  heading, check for deep links to that heading in other pages and update
+  accordingly.
 
 ### Structure
 - **BLUF:** Start with an introduction explaining what to expect.
