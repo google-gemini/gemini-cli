@@ -9,9 +9,11 @@ import { CommandKind } from './types.js';
 import process from 'node:process';
 import { MessageType, type HistoryItemAbout } from '../types.js';
 import {
+  AuthType,
   IdeClient,
   UserAccountManager,
   debugLogger,
+  getCodeAssistServer,
   getVersion,
 } from '@google/gemini-cli-core';
 
@@ -34,7 +36,14 @@ export const aboutCommand: SlashCommand = {
     const cliVersion = await getVersion();
     const selectedAuthType =
       context.services.settings.merged.security.auth.selectedType || '';
-    const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'] || '';
+    const gcpProject =
+      selectedAuthType === AuthType.USE_VERTEX_AI
+        ? process.env['GOOGLE_CLOUD_PROJECT'] ||
+          process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
+          ''
+        : context.services.config
+          ? (getCodeAssistServer(context.services.config)?.projectId ?? '')
+          : '';
     const ideClient = await getIdeClientName(context);
 
     const userAccountManager = new UserAccountManager();
