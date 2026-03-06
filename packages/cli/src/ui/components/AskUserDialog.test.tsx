@@ -10,7 +10,7 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { makeFakeConfig } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
-import { AskUserDialog } from './AskUserDialog.js';
+import { AskUserDialog, resetAskUserDraft } from './AskUserDialog.js';
 import { QuestionType, type Question } from '@google/gemini-cli-core';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 
@@ -1451,6 +1451,125 @@ describe('AskUserDialog', () => {
       expect(onSubmit).toHaveBeenCalledWith({
         '0': `TypeScript, ${pastedText}`,
       });
+    });
+  });
+  describe('Suspend/resume state preservation (CTRL-Z)', () => {
+    // Simulates forceRerenderKey bump on SIGCONT: unmount then remount
+    // with the same questions. The askUserDraft store should restore state.
+
+    afterEach(() => {
+      resetAskUserDraft();
+    });
+
+    const renderDialog = (questions: Question[]) =>
+      renderWithProviders(
+        <AskUserDialog
+          questions={questions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={120}
+        />,
+        { width: 120 },
+      );
+
+    it('restores in-progress text answer after suspend/resume', async () => {
+      const q: Question[] = [
+        { question: 'What to build?', header: 'Q', type: QuestionType.TEXT },
+      ];
+
+      const first = await renderDialog(q);
+      for (const char of 'my cool app') writeKey(first.stdin, char);
+      await waitFor(async () => {
+        expect(first.lastFrame()).toContain('my cool app');
+      });
+
+      act(() => first.unmount());
+
+      const second = await renderDialog(q);
+      await waitFor(async () => {
+        expect(second.lastFrame()).toContain('my cool app');
+      });
+      act(() => second.unmount());
+    });
+
+    it('restores choice custom text after suspend/resume', async () => {
+      const q: Question[] = [
+        {
+          question: 'Which database?',
+          header: 'DB',
+          type: QuestionType.CHOICE,
+          options: [{ label: 'PostgreSQL', description: '' }],
+          multiSelect: false,
+        },
+      ];
+
+      const first = await renderDialog(q);
+      writeKey(first.stdin, '\x1b[B'); // Down to Other
+      for (const char of 'Redis') writeKey(first.stdin, char);
+      await waitFor(async () => {
+        expect(first.lastFrame()).toContain('Redis');
+      });
+
+      act(() => first.unmount());
+
+      const second = await renderDialog(q);
+      await waitFor(async () => {
+        expect(second.lastFrame()).toContain('Redis');
+      });
+      act(() => second.unmount());
+    });
+
+    it('does NOT restore draft after successful submission', async () => {
+      const q: Question[] = [
+        { question: 'Your name?', header: 'N', type: QuestionType.TEXT },
+      ];
+      const onSubmit = vi.fn();
+      const first = await renderWithProviders(
+        <AskUserDialog
+          questions={q}
+          onSubmit={onSubmit}
+          onCancel={vi.fn()}
+          width={120}
+        />,
+        { width: 120 },
+      );
+
+      for (const char of 'Alice') writeKey(first.stdin, char);
+      writeKey(first.stdin, '\r');
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith({ '0': 'Alice' }),
+      );
+
+      act(() => first.unmount());
+
+      const second = await renderDialog(q);
+      await waitFor(async () => {
+        expect(second.lastFrame()).not.toContain('Alice');
+      });
+      act(() => second.unmount());
+    });
+
+    it('does NOT restore draft for different questions', async () => {
+      const qA: Question[] = [
+        { question: 'Question A?', header: 'A', type: QuestionType.TEXT },
+      ];
+      const qB: Question[] = [
+        { question: 'Question B?', header: 'B', type: QuestionType.TEXT },
+      ];
+
+      const first = await renderDialog(qA);
+      for (const char of 'answer for A') writeKey(first.stdin, char);
+      await waitFor(async () => {
+        expect(first.lastFrame()).toContain('answer for A');
+      });
+
+      act(() => first.unmount());
+
+      const second = await renderDialog(qB);
+      await waitFor(async () => {
+        expect(second.lastFrame()).not.toContain('answer for A');
+      });
+      act(() => second.unmount());
     });
   });
 });
