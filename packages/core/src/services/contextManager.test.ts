@@ -21,6 +21,7 @@ vi.mock('../utils/memoryDiscovery.js', async (importOriginal) => {
     getEnvironmentMemoryPaths: vi.fn(),
     readGeminiMdFiles: vi.fn(),
     loadJitSubdirectoryMemory: vi.fn(),
+    deduplicatePathsByFileIdentity: vi.fn(),
     concatenateInstructions: vi
       .fn()
       .mockImplementation(actual.concatenateInstructions),
@@ -33,7 +34,6 @@ describe('ContextManager', () => {
 
   beforeEach(() => {
     mockConfig = {
-      getDebugMode: vi.fn().mockReturnValue(false),
       getWorkingDir: vi.fn().mockReturnValue('/app'),
       getImportFormat: vi.fn().mockReturnValue('tree'),
       getWorkspaceContext: vi.fn().mockReturnValue({
@@ -52,6 +52,13 @@ describe('ContextManager', () => {
     vi.clearAllMocks();
     vi.spyOn(coreEvents, 'emit');
     vi.mocked(memoryDiscovery.getExtensionMemoryPaths).mockReturnValue([]);
+    // default mock: deduplication returns paths as-is (no deduplication)
+    vi.mocked(
+      memoryDiscovery.deduplicatePathsByFileIdentity,
+    ).mockImplementation(async (paths: string[]) => ({
+      paths,
+      identityMap: new Map<string, string>(),
+    }));
   });
 
   describe('refresh', () => {
@@ -74,13 +81,11 @@ describe('ContextManager', () => {
       await contextManager.refresh();
 
       expect(memoryDiscovery.getGlobalMemoryPaths).toHaveBeenCalled();
-      expect(memoryDiscovery.getEnvironmentMemoryPaths).toHaveBeenCalledWith(
-        ['/app'],
-        false,
-      );
+      expect(memoryDiscovery.getEnvironmentMemoryPaths).toHaveBeenCalledWith([
+        '/app',
+      ]);
       expect(memoryDiscovery.readGeminiMdFiles).toHaveBeenCalledWith(
         expect.arrayContaining([...globalPaths, ...envPaths]),
-        false,
         'tree',
       );
 
@@ -128,6 +133,50 @@ describe('ContextManager', () => {
       expect(contextManager.getEnvironmentMemory()).toBe('');
       expect(contextManager.getGlobalMemory()).toContain('Global Content');
     });
+
+    it('should deduplicate files by file identity in case-insensitive filesystems', async () => {
+      const globalPaths = ['/home/user/.gemini/GEMINI.md'];
+      const envPaths = ['/app/gemini.md', '/app/GEMINI.md'];
+
+      vi.mocked(memoryDiscovery.getGlobalMemoryPaths).mockResolvedValue(
+        globalPaths,
+      );
+      vi.mocked(memoryDiscovery.getEnvironmentMemoryPaths).mockResolvedValue(
+        envPaths,
+      );
+
+      // mock deduplication to return deduplicated paths (simulating same file)
+      vi.mocked(
+        memoryDiscovery.deduplicatePathsByFileIdentity,
+      ).mockResolvedValue({
+        paths: ['/home/user/.gemini/GEMINI.md', '/app/gemini.md'],
+        identityMap: new Map<string, string>(),
+      });
+
+      vi.mocked(memoryDiscovery.readGeminiMdFiles).mockResolvedValue([
+        { filePath: '/home/user/.gemini/GEMINI.md', content: 'Global Content' },
+        { filePath: '/app/gemini.md', content: 'Project Content' },
+      ]);
+
+      await contextManager.refresh();
+
+      expect(
+        memoryDiscovery.deduplicatePathsByFileIdentity,
+      ).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          '/home/user/.gemini/GEMINI.md',
+          '/app/gemini.md',
+          '/app/GEMINI.md',
+        ]),
+      );
+      expect(memoryDiscovery.readGeminiMdFiles).toHaveBeenCalledWith(
+        ['/home/user/.gemini/GEMINI.md', '/app/gemini.md'],
+        'tree',
+      );
+      expect(contextManager.getEnvironmentMemory()).toContain(
+        'Project Content',
+      );
+    });
   });
 
   describe('discoverContext', () => {
@@ -147,7 +196,7 @@ describe('ContextManager', () => {
         '/app/src/file.ts',
         ['/app'],
         expect.any(Set),
-        false,
+        expect.any(Set),
       );
       expect(result).toMatch(/--- Context from: src[\\/]GEMINI\.md ---/);
       expect(result).toContain('Src Content');
