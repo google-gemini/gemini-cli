@@ -105,6 +105,10 @@ export const handleSlashCommand = async (
               'Exiting due to command result that is not supported in non-interactive mode.',
             );
         }
+      } else {
+        // Command executed successfully but returned void (e.g., /about, /help).
+        // Return empty array to indicate command was handled and we should exit early.
+        return [];
       }
     }
   }

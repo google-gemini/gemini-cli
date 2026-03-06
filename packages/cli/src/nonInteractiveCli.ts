@@ -247,9 +247,18 @@ export async function runNonInteractive({
           settings,
         );
         // If a slash command is found and returns a prompt, use it.
-        // Otherwise, slashCommandResult falls through to the default prompt
-        // handling.
+        // If it returns an empty array, the command was handled (e.g., /about, /help)
+        // and we should exit early without sending to the model.
+        // Otherwise, slashCommandResult falls through to the default prompt handling.
         if (slashCommandResult) {
+          // Check if command was handled (empty array means command executed but returned void)
+          if (
+            Array.isArray(slashCommandResult) &&
+            slashCommandResult.length === 0
+          ) {
+            // Command was handled (e.g., /about, /help), exit early
+            return;
+          }
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           query = slashCommandResult as Part[];
         }
