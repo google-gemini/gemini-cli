@@ -6,11 +6,15 @@ AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
-│ Line 10                                                                                      │
-│ Line 11                                                                                      │
-│ Line 12                                                                                      │
-│ Line 13                                                                                      │
-│ Line 14                                                                                      │
+│ Line 6                                                                                       │
+│ Line 7                                                                                       │
+│ Line 8                                                                                       │
+│ Line 9                                                                                     ▄ │
+│ Line 10                                                                                    █ │
+│ Line 11                                                                                    █ │
+│ Line 12                                                                                    █ │
+│ Line 13                                                                                    █ │
+│ Line 14                                                                                    █ │
 │ Line 15                                                                                    █ │
 │ Line 16                                                                                    █ │
 │ Line 17                                                                                    █ │
@@ -28,11 +32,15 @@ AppHeader(full)
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
-│ Line 10                                                                                      │
-│ Line 11                                                                                      │
-│ Line 12                                                                                      │
-│ Line 13                                                                                      │
-│ Line 14                                                                                      │
+│ Line 6                                                                                       │
+│ Line 7                                                                                       │
+│ Line 8                                                                                       │
+│ Line 9                                                                                     ▄ │
+│ Line 10                                                                                    █ │
+│ Line 11                                                                                    █ │
+│ Line 12                                                                                    █ │
+│ Line 13                                                                                    █ │
+│ Line 14                                                                                    █ │
 │ Line 15                                                                                    █ │
 │ Line 16                                                                                    █ │
 │ Line 17                                                                                    █ │
@@ -49,7 +57,12 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Con
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command Running a long command...                                                   │
 │                                                                                              │
-│ ... first 11 lines hidden (Ctrl+O to show) ...                                               │
+│ ... first 6 lines hidden (Ctrl+O to show) ...                                                │
+│ Line 7                                                                                       │
+│ Line 8                                                                                       │
+│ Line 9                                                                                       │
+│ Line 10                                                                                      │
+│ Line 11                                                                                      │
 │ Line 12                                                                                      │
 │ Line 13                                                                                      │
 │ Line 14                                                                                      │

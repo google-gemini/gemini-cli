@@ -48,6 +48,7 @@ export const MainContent = () => {
     pendingHistoryItems,
     mainAreaWidth,
     staticAreaMaxItemHeight,
+    availableTerminalHeight,
     cleanUiDetailsVisible,
   } = uiState;
   const showHeaderDetails = cleanUiDetailsVisible;
@@ -70,9 +71,11 @@ export const MainContent = () => {
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
             availableTerminalHeight={
-              uiState.constrainHeight || !isExpandable
+              !isExpandable
                 ? staticAreaMaxItemHeight
-                : undefined
+                : uiState.constrainHeight
+                  ? availableTerminalHeight
+                  : undefined
             }
             availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
             key={h.id}
@@ -87,6 +90,7 @@ export const MainContent = () => {
       uiState.history,
       mainAreaWidth,
       staticAreaMaxItemHeight,
+      availableTerminalHeight,
       uiState.slashCommands,
       uiState.constrainHeight,
       lastUserPromptIndex,
@@ -110,7 +114,7 @@ export const MainContent = () => {
           <HistoryItemDisplay
             key={i}
             availableTerminalHeight={
-              uiState.constrainHeight ? staticAreaMaxItemHeight : undefined
+              uiState.constrainHeight ? availableTerminalHeight : undefined
             }
             terminalWidth={mainAreaWidth}
             item={{ ...item, id: 0 }}
@@ -126,7 +130,7 @@ export const MainContent = () => {
     [
       pendingHistoryItems,
       uiState.constrainHeight,
-      staticAreaMaxItemHeight,
+      availableTerminalHeight,
       mainAreaWidth,
       showConfirmationQueue,
       confirmingTool,
@@ -161,9 +165,11 @@ export const MainContent = () => {
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
             availableTerminalHeight={
-              uiState.constrainHeight || !item.isExpandable
+              !item.isExpandable
                 ? staticAreaMaxItemHeight
-                : undefined
+                : uiState.constrainHeight
+                  ? availableTerminalHeight
+                  : undefined
             }
             availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
             key={item.item.id}
@@ -185,6 +191,7 @@ export const MainContent = () => {
       pendingItems,
       uiState.constrainHeight,
       staticAreaMaxItemHeight,
+      availableTerminalHeight,
     ],
   );
 

@@ -26,7 +26,7 @@ export const TOOL_RESULT_MIN_LINES_SHOWN = 2;
  * This accounts for:
  * 1. The static height of the tool message (name, status line).
  * 2. Reserved space for hints and padding (different in ASB vs Standard mode).
- * 3. Enforcing a minimum number of lines shown.
+ * 3. Enforcing a physical minimum size based on terminal limits.
  */
 export function calculateToolContentMaxLines(options: {
   availableTerminalHeight: number | undefined;
@@ -41,8 +41,8 @@ export function calculateToolContentMaxLines(options: {
 
   let contentHeight = availableTerminalHeight
     ? Math.max(
+        0,
         availableTerminalHeight - TOOL_RESULT_STATIC_HEIGHT - reservedLines,
-        TOOL_RESULT_MIN_LINES_SHOWN + 1,
       )
     : undefined;
 
@@ -91,7 +91,14 @@ export function calculateShellMaxLines(options: {
     return isAlternateBuffer ? ACTIVE_SHELL_MAX_LINES : undefined;
   }
 
-  const maxLinesBasedOnHeight = Math.max(1, availableTerminalHeight - 2);
+  const reservedLines = isAlternateBuffer
+    ? TOOL_RESULT_ASB_RESERVED_LINE_COUNT
+    : TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT;
+
+  const maxLinesBasedOnHeight = Math.max(
+    0,
+    availableTerminalHeight - TOOL_RESULT_STATIC_HEIGHT - reservedLines,
+  );
 
   // 3. Handle ASB mode focus expansion.
   // We allow a focused shell in ASB mode to take up the full available height,
