@@ -4,71 +4,131 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useMemo, useReducer, useCallback } from 'react';
 
 export interface UseSettingsNavigationProps {
-  /** All items available in the list */
   items: Array<{ key: string }>;
-  /** Maximum number of items visible at once */
   maxItemsToShow: number;
 }
 
-/**
- * Hook to manage navigation and scroll state for a list of items.
- */
+type NavState = {
+  activeItemKey: string | null;
+  scrollOffset: number;
+};
+
+type NavAction =
+  | { type: 'MOVE_UP' }
+  | { type: 'MOVE_DOWN' }
+  | { type: 'JUMP_TO'; index: number };
+
+function clampScroll(
+  offset: number,
+  activeIndex: number,
+  itemCount: number,
+  maxItemsToShow: number,
+): number {
+  if (activeIndex < offset) {
+    offset = activeIndex;
+  } else if (activeIndex >= offset + maxItemsToShow) {
+    offset = activeIndex - maxItemsToShow + 1;
+  }
+  return Math.max(0, Math.min(offset, Math.max(0, itemCount - maxItemsToShow)));
+}
+
+function createNavReducer(
+  items: Array<{ key: string }>,
+  maxItemsToShow: number,
+) {
+  return function navReducer(state: NavState, action: NavAction): NavState {
+    if (items.length === 0) return state;
+
+    const currentIndex = items.findIndex((i) => i.key === state.activeItemKey);
+    const activeIndex = currentIndex !== -1 ? currentIndex : 0;
+
+    switch (action.type) {
+      case 'MOVE_UP': {
+        const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
+        return {
+          activeItemKey: items[newIndex].key,
+          scrollOffset: clampScroll(
+            state.scrollOffset,
+            newIndex,
+            items.length,
+            maxItemsToShow,
+          ),
+        };
+      }
+      case 'MOVE_DOWN': {
+        const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
+        return {
+          activeItemKey: items[newIndex].key,
+          scrollOffset: clampScroll(
+            state.scrollOffset,
+            newIndex,
+            items.length,
+            maxItemsToShow,
+          ),
+        };
+      }
+      case 'JUMP_TO': {
+        const newIndex = Math.max(0, Math.min(action.index, items.length - 1));
+        return {
+          activeItemKey: items[newIndex].key,
+          scrollOffset: clampScroll(
+            state.scrollOffset,
+            newIndex,
+            items.length,
+            maxItemsToShow,
+          ),
+        };
+      }
+      default: {
+        return state;
+      }
+    }
+  };
+}
+
 export function useSettingsNavigation({
   items,
   maxItemsToShow,
 }: UseSettingsNavigationProps) {
-  const [activeItemKey, setActiveItemKey] = useState<string | null>(
-    () => items[0]?.key ?? null,
+  const reducer = useMemo(
+    () => createNavReducer(items, maxItemsToShow),
+    [items, maxItemsToShow],
   );
-  const prevScrollRef = useRef(0);
+
+  const [state, dispatch] = useReducer(reducer, {
+    activeItemKey: items[0]?.key ?? null,
+    scrollOffset: 0,
+  });
 
   const activeIndex = useMemo(() => {
     if (items.length === 0) return 0;
-    const idx = items.findIndex((i) => i.key === activeItemKey);
+    const idx = items.findIndex((i) => i.key === state.activeItemKey);
     return idx !== -1 ? idx : 0;
-  }, [items, activeItemKey]);
+  }, [items, state.activeItemKey]);
 
-  const scrollOffset = useMemo(() => {
-    if (items.length === 0) return 0;
-    let offset = prevScrollRef.current;
-    if (activeIndex < offset) {
-      offset = activeIndex;
-    } else if (activeIndex >= offset + maxItemsToShow) {
-      offset = activeIndex - maxItemsToShow + 1;
-    }
-    const maxScroll = Math.max(0, items.length - maxItemsToShow);
-    offset = Math.max(0, Math.min(offset, maxScroll));
-    prevScrollRef.current = offset;
-    return offset;
-  }, [activeIndex, items.length, maxItemsToShow]);
+  const scrollOffset = useMemo(
+    () =>
+      clampScroll(
+        state.scrollOffset,
+        activeIndex,
+        items.length,
+        maxItemsToShow,
+      ),
+    [state.scrollOffset, activeIndex, items.length, maxItemsToShow],
+  );
 
-  const moveUp = useCallback(() => {
-    if (items.length === 0) return;
-    const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
-    setActiveItemKey(items[newIndex]?.key ?? null);
-  }, [activeIndex, items]);
-
-  const moveDown = useCallback(() => {
-    if (items.length === 0) return;
-    const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
-    setActiveItemKey(items[newIndex]?.key ?? null);
-  }, [activeIndex, items]);
-
+  const moveUp = useCallback(() => dispatch({ type: 'MOVE_UP' }), []);
+  const moveDown = useCallback(() => dispatch({ type: 'MOVE_DOWN' }), []);
   const jumpTo = useCallback(
-    (index: number) => {
-      if (items.length === 0) return;
-      const safeIndex = Math.max(0, Math.min(index, items.length - 1));
-      setActiveItemKey(items[safeIndex]?.key ?? null);
-    },
-    [items],
+    (index: number) => dispatch({ type: 'JUMP_TO', index }),
+    [],
   );
 
   return {
-    activeItemKey,
-    setActiveItemKey,
+    activeItemKey: state.activeItemKey,
     activeIndex,
     scrollOffset,
     moveUp,
