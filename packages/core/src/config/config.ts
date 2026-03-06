@@ -1212,7 +1212,12 @@ export class Config implements McpContext {
     return this.contentGenerator;
   }
 
-  async refreshAuth(authMethod: AuthType, apiKey?: string) {
+  async refreshAuth(
+    authMethod: AuthType,
+    apiKey?: string,
+    baseUrl?: string,
+    customHeaders?: Record<string, string>,
+  ) {
     // Reset availability service when switching auth
     this.modelAvailabilityService.reset();
 
@@ -1239,6 +1244,8 @@ export class Config implements McpContext {
       this,
       authMethod,
       apiKey,
+      baseUrl,
+      customHeaders,
     );
     this.contentGenerator = await createContentGenerator(
       newContentGeneratorConfig,

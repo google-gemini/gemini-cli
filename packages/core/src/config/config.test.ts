@@ -513,6 +513,8 @@ describe('Server Config (config.ts)', () => {
         config,
         authType,
         undefined,
+        undefined,
+        undefined,
       );
       // Verify that contentGeneratorConfig is updated
       expect(config.getContentGeneratorConfig()).toEqual(mockContentConfig);
