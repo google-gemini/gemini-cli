@@ -112,6 +112,7 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         // commands.
         execSync('git config core.editor "true"', execOptions);
         execSync('git config core.pager "cat"', execOptions);
+        execSync('git config commit.gpgsign false', execOptions);
         execSync('git add .', execOptions);
         execSync('git commit --allow-empty -m "Initial commit"', execOptions);
       }
