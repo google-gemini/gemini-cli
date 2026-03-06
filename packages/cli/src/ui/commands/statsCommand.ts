@@ -20,6 +20,7 @@ import {
   type SlashCommand,
   CommandKind,
 } from './types.js';
+import { handlePerfCommand } from './perfCommand.js';
 
 function getUserIdentity(context: CommandContext) {
   const selectedAuthType =
@@ -130,6 +131,48 @@ export const statsCommand: SlashCommand = {
           type: MessageType.TOOL_STATS,
         } as HistoryItemToolStats);
       },
+    },
+    {
+      name: 'perf',
+      description: 'Show advanced performance metrics and telemetry',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      // 1. Change args to be a single string to satisfy the SlashCommand interface
+      action: async (context: CommandContext, args: string = '') => {
+        // 2. Safely split the string into an array for your decoupled handler
+        const argsArray = args ? args.trim().split(/\s+/) : [];
+        await handlePerfCommand(context, argsArray);
+      },
+      subCommands: [
+        {
+          name: 'latency',
+          description: 'Show latency P50/P90/P99 percentiles',
+          kind: CommandKind.BUILT_IN,
+          autoExecute: true,
+          // We can just omit 'args' from the parameters here since we hardcode the array
+          action: async (context: CommandContext) => {
+            await handlePerfCommand(context, ['latency']);
+          },
+        },
+        {
+          name: 'memory',
+          description: 'Show V8 heap utilization',
+          kind: CommandKind.BUILT_IN,
+          autoExecute: true,
+          action: async (context: CommandContext) => {
+            await handlePerfCommand(context, ['memory']);
+          },
+        },
+        {
+          name: 'startup',
+          description: 'Show startup phase analysis',
+          kind: CommandKind.BUILT_IN,
+          autoExecute: true,
+          action: async (context: CommandContext) => {
+            await handlePerfCommand(context, ['startup']);
+          },
+        },
+      ],
     },
   ],
 };

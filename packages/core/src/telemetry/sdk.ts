@@ -20,7 +20,10 @@ import { OTLPLogExporter as OTLPLogExporterHttp } from '@opentelemetry/exporter-
 import { OTLPMetricExporter as OTLPMetricExporterHttp } from '@opentelemetry/exporter-metrics-otlp-http';
 import { CompressionAlgorithm } from '@opentelemetry/otlp-exporter-base';
 import { NodeSDK } from '@opentelemetry/sdk-node';
-import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
+import {
+  ATTR_SERVICE_NAME,
+  ATTR_SERVICE_VERSION,
+} from '@opentelemetry/semantic-conventions';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import {
   BatchSpanProcessor,
@@ -62,6 +65,7 @@ import type {
   KeychainAvailabilityEvent,
   TokenStorageInitializationEvent,
 } from './types.js';
+import { localMetricReader } from './localBuffer.js';
 
 // For troubleshooting, set the log level to DiagLogLevel.DEBUG
 class DiagLoggerAdapter {
@@ -160,9 +164,7 @@ export async function initializeTelemetry(
   config: Config,
   credentials?: JWTInput,
 ): Promise<void> {
-  if (!config.getTelemetryEnabled()) {
-    return;
-  }
+  const isRemoteTelemetryEnabled = config.getTelemetryEnabled();
 
   if (telemetryInitialized) {
     if (
@@ -176,19 +178,25 @@ export async function initializeTelemetry(
     return;
   }
 
-  if (config.getTelemetryUseCollector() && config.getTelemetryUseCliAuth()) {
+  if (
+    isRemoteTelemetryEnabled &&
+    config.getTelemetryUseCollector() &&
+    config.getTelemetryUseCliAuth()
+  ) {
     debugLogger.error(
       'Telemetry configuration error: "useCollector" and "useCliAuth" cannot both be true. ' +
         'CLI authentication is only supported with in-process exporters. ' +
-        'Disabling telemetry.',
+        'Disabling remote telemetry.',
     );
     return;
   }
 
-  // If using CLI auth and no credentials provided, defer initialization
-  if (config.getTelemetryUseCliAuth() && !credentials) {
-    // Register a callback to initialize telemetry when the user logs in.
-    // This is done only once.
+  // If using CLI auth and no credentials provided, defer ONLY remote initialization
+  if (
+    isRemoteTelemetryEnabled &&
+    config.getTelemetryUseCliAuth() &&
+    !credentials
+  ) {
     if (!callbackRegistered) {
       callbackRegistered = true;
       authListener = async (newCredentials: JWTInput) => {
@@ -200,14 +208,14 @@ export async function initializeTelemetry(
       authEvents.on('post_auth', authListener);
     }
     debugLogger.log(
-      'CLI auth is requested but no credentials, deferring telemetry initialization.',
+      'CLI auth is requested but no credentials, deferring remote telemetry initialization.',
     );
     return;
   }
 
   const resource = resourceFromAttributes({
-    [SemanticResourceAttributes.SERVICE_NAME]: SERVICE_NAME,
-    [SemanticResourceAttributes.SERVICE_VERSION]: process.version,
+    [ATTR_SERVICE_NAME]: SERVICE_NAME,
+    [ATTR_SERVICE_VERSION]: process.version,
     'session.id': config.getSessionId(),
   });
 
@@ -231,105 +239,103 @@ export async function initializeTelemetry(
     );
   }
 
-  const otlpEndpoint = config.getTelemetryOtlpEndpoint();
-  const otlpProtocol = config.getTelemetryOtlpProtocol();
-  const telemetryTarget = config.getTelemetryTarget();
-  const useCollector = config.getTelemetryUseCollector();
+  const activeSpanProcessors: BatchSpanProcessor[] = [];
+  const activeLogProcessors: BatchLogRecordProcessor[] = [];
+  // Always push the local reader into the active array for /perf
+  const activeMetricReaders: PeriodicExportingMetricReader[] = [
+    localMetricReader,
+  ];
 
-  const parsedEndpoint = parseOtlpEndpoint(otlpEndpoint, otlpProtocol);
-  const telemetryOutfile = config.getTelemetryOutfile();
-  const useOtlp = !!parsedEndpoint && !telemetryOutfile;
+  // Setup cloud/file exporters IF the user consented to telemetry
+  if (isRemoteTelemetryEnabled) {
+    const otlpEndpoint = config.getTelemetryOtlpEndpoint();
+    const otlpProtocol = config.getTelemetryOtlpProtocol();
+    const telemetryTarget = config.getTelemetryTarget();
+    const useCollector = config.getTelemetryUseCollector();
 
-  const gcpProjectId =
-    process.env['OTLP_GOOGLE_CLOUD_PROJECT'] ||
-    process.env['GOOGLE_CLOUD_PROJECT'];
-  const useDirectGcpExport =
-    telemetryTarget === TelemetryTarget.GCP && !useCollector;
+    const parsedEndpoint = parseOtlpEndpoint(otlpEndpoint, otlpProtocol);
+    const telemetryOutfile = config.getTelemetryOutfile();
+    const useOtlp = !!parsedEndpoint && !telemetryOutfile;
 
-  let spanExporter:
-    | OTLPTraceExporter
-    | OTLPTraceExporterHttp
-    | GcpTraceExporter
-    | FileSpanExporter
-    | ConsoleSpanExporter;
-  let logExporter:
-    | OTLPLogExporter
-    | OTLPLogExporterHttp
-    | GcpLogExporter
-    | FileLogExporter
-    | ConsoleLogRecordExporter;
-  let metricReader: PeriodicExportingMetricReader;
+    const gcpProjectId =
+      process.env['OTLP_GOOGLE_CLOUD_PROJECT'] ||
+      process.env['GOOGLE_CLOUD_PROJECT'];
+    const useDirectGcpExport =
+      telemetryTarget === TelemetryTarget.GCP && !useCollector;
 
-  if (useDirectGcpExport) {
-    debugLogger.log(
-      'Creating GCP exporters with projectId:',
-      gcpProjectId,
-      'using',
-      credentials ? 'provided credentials' : 'ADC',
-    );
-    spanExporter = new GcpTraceExporter(gcpProjectId, credentials);
-    logExporter = new GcpLogExporter(gcpProjectId, credentials);
-    metricReader = new PeriodicExportingMetricReader({
-      exporter: new GcpMetricExporter(gcpProjectId, credentials),
-      exportIntervalMillis: 30000,
-    });
-  } else if (useOtlp) {
-    if (otlpProtocol === 'http') {
-      spanExporter = new OTLPTraceExporterHttp({
-        url: parsedEndpoint,
-      });
-      logExporter = new OTLPLogExporterHttp({
-        url: parsedEndpoint,
-      });
+    let spanExporter;
+    let logExporter;
+    let metricReader;
+
+    if (useDirectGcpExport) {
+      debugLogger.log(
+        'Creating GCP exporters with projectId:',
+        gcpProjectId,
+        'using',
+        credentials ? 'provided credentials' : 'ADC',
+      );
+      spanExporter = new GcpTraceExporter(gcpProjectId, credentials);
+      logExporter = new GcpLogExporter(gcpProjectId, credentials);
       metricReader = new PeriodicExportingMetricReader({
-        exporter: new OTLPMetricExporterHttp({
+        exporter: new GcpMetricExporter(gcpProjectId, credentials),
+        exportIntervalMillis: 30000,
+      });
+    } else if (useOtlp) {
+      if (otlpProtocol === 'http') {
+        spanExporter = new OTLPTraceExporterHttp({ url: parsedEndpoint });
+        logExporter = new OTLPLogExporterHttp({ url: parsedEndpoint });
+        metricReader = new PeriodicExportingMetricReader({
+          exporter: new OTLPMetricExporterHttp({ url: parsedEndpoint }),
+          exportIntervalMillis: 10000,
+        });
+      } else {
+        spanExporter = new OTLPTraceExporter({
           url: parsedEndpoint,
-        }),
+          compression: CompressionAlgorithm.GZIP,
+        });
+        logExporter = new OTLPLogExporter({
+          url: parsedEndpoint,
+          compression: CompressionAlgorithm.GZIP,
+        });
+        metricReader = new PeriodicExportingMetricReader({
+          exporter: new OTLPMetricExporter({
+            url: parsedEndpoint,
+            compression: CompressionAlgorithm.GZIP,
+          }),
+          exportIntervalMillis: 10000,
+        });
+      }
+    } else if (telemetryOutfile) {
+      spanExporter = new FileSpanExporter(telemetryOutfile);
+      logExporter = new FileLogExporter(telemetryOutfile);
+      metricReader = new PeriodicExportingMetricReader({
+        exporter: new FileMetricExporter(telemetryOutfile),
         exportIntervalMillis: 10000,
       });
     } else {
-      // grpc
-      spanExporter = new OTLPTraceExporter({
-        url: parsedEndpoint,
-        compression: CompressionAlgorithm.GZIP,
-      });
-      logExporter = new OTLPLogExporter({
-        url: parsedEndpoint,
-        compression: CompressionAlgorithm.GZIP,
-      });
+      spanExporter = new ConsoleSpanExporter();
+      logExporter = new ConsoleLogRecordExporter();
       metricReader = new PeriodicExportingMetricReader({
-        exporter: new OTLPMetricExporter({
-          url: parsedEndpoint,
-          compression: CompressionAlgorithm.GZIP,
-        }),
+        exporter: new ConsoleMetricExporter(),
         exportIntervalMillis: 10000,
       });
     }
-  } else if (telemetryOutfile) {
-    spanExporter = new FileSpanExporter(telemetryOutfile);
-    logExporter = new FileLogExporter(telemetryOutfile);
-    metricReader = new PeriodicExportingMetricReader({
-      exporter: new FileMetricExporter(telemetryOutfile),
-      exportIntervalMillis: 10000,
-    });
-  } else {
-    spanExporter = new ConsoleSpanExporter();
-    logExporter = new ConsoleLogRecordExporter();
-    metricReader = new PeriodicExportingMetricReader({
-      exporter: new ConsoleMetricExporter(),
-      exportIntervalMillis: 10000,
-    });
+
+    // Store global references so flushTelemetry() still works for remote
+    spanProcessor = new BatchSpanProcessor(spanExporter);
+    logRecordProcessor = new BatchLogRecordProcessor(logExporter);
+
+    activeSpanProcessors.push(spanProcessor);
+    activeLogProcessors.push(logRecordProcessor);
+    activeMetricReaders.push(metricReader);
   }
 
-  // Store processor references for manual flushing
-  spanProcessor = new BatchSpanProcessor(spanExporter);
-  logRecordProcessor = new BatchLogRecordProcessor(logExporter);
-
+  // Start the SDK with our dynamic pipeline arrays
   sdk = new NodeSDK({
     resource,
-    spanProcessors: [spanProcessor],
-    logRecordProcessors: [logRecordProcessor],
-    metricReader,
+    spanProcessors: activeSpanProcessors,
+    logRecordProcessors: activeLogProcessors,
+    metricReaders: activeMetricReaders,
     instrumentations: [new HttpInstrumentation()],
   });
 

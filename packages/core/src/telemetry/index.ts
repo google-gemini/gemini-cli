@@ -153,3 +153,8 @@ export {
 export { runInDevTraceSpan, type SpanMetadata } from './trace.js';
 export { startupProfiler, StartupProfiler } from './startupProfiler.js';
 export * from './constants.js';
+export {
+  getLocalMetricsSnapshot,
+  localMetricReader,
+  type PerfSnapshot,
+} from './localBuffer.js';
