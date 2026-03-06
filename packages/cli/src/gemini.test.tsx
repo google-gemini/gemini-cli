@@ -243,6 +243,27 @@ vi.mock('./deferred.js', () => ({
   defer: vi.fn((m) => m),
 }));
 
+vi.mock('./utils/sessionCleanup.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./utils/sessionCleanup.js')>();
+  return {
+    ...actual,
+    cleanupExpiredSessions: vi.fn().mockResolvedValue({
+      disabled: false,
+      scanned: 0,
+      deleted: 0,
+      skipped: 0,
+      failed: 0,
+    }),
+    cleanupToolOutputFiles: vi.fn().mockResolvedValue({
+      disabled: false,
+      scanned: 0,
+      deleted: 0,
+      failed: 0,
+    }),
+  };
+});
+
 vi.mock('./ui/utils/mouse.js', () => ({
   enableMouseEvents: vi.fn(),
   disableMouseEvents: vi.fn(),
@@ -747,7 +768,11 @@ describe('gemini.tsx main function kitty protocol', () => {
     emitFeedbackSpy.mockRestore();
   });
 
-  it.skip('should log error when cleanupExpiredSessions fails', async () => {
+  it('should log error when cleanupExpiredSessions fails', async () => {
+    // Set SANDBOX to simulate being inside the sandbox so main() does not
+    // attempt to relaunch and instead proceeds to config loading and cleanup.
+    vi.stubEnv('SANDBOX', 'true');
+
     const { cleanupExpiredSessions } = await import(
       './utils/sessionCleanup.js'
     );
@@ -783,8 +808,6 @@ describe('gemini.tsx main function kitty protocol', () => {
       }),
     );
 
-    // The mock is already set up at the top of the test
-
     try {
       await main();
     } catch (e) {
@@ -792,12 +815,13 @@ describe('gemini.tsx main function kitty protocol', () => {
     }
 
     expect(debugLoggerErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'Failed to cleanup expired sessions: Cleanup failed',
-      ),
+      'Failed to cleanup expired sessions:',
+      expect.any(Error),
     );
-    expect(processExitSpy).toHaveBeenCalledWith(0); // Should not exit on cleanup failure
+    expect(processExitSpy).toHaveBeenCalledWith(0);
     processExitSpy.mockRestore();
+    debugLoggerErrorSpy.mockRestore();
+    vi.unstubAllEnvs();
   });
 
   it('should read from stdin in non-interactive mode', async () => {
