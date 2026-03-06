@@ -72,7 +72,7 @@ session's token usage, as well as your overall quota and usage for the supported
 models.
 
 For more information on the `/stats` command and its subcommands, see the
-[Command Reference](../../reference/commands.md#stats).
+[Command Reference](../reference/commands.md#stats).
 
 ## Next steps
 
