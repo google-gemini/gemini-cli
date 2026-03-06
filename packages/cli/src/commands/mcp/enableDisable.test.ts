@@ -46,11 +46,13 @@ import {
   McpServerEnablementManager,
   canLoadServer,
 } from '../../config/mcp/mcpServerEnablement.js';
+import { exitCli } from '../utils.js';
 
 const mockedGetMcpServersFromConfig = getMcpServersFromConfig as Mock;
 const mockedLoadSettings = loadSettings as Mock;
 const mockedGetInstance = McpServerEnablementManager.getInstance as Mock;
 const mockedCanLoadServer = canLoadServer as Mock;
+const mockedExitCli = exitCli as Mock;
 
 describe('mcp enable/disable commands', () => {
   let parser: Argv;
@@ -177,7 +179,7 @@ describe('mcp enable/disable commands', () => {
       );
     });
 
-    it('should still enable but warn when admin has globally disabled MCP', async () => {
+    it('should block enable when admin has globally disabled MCP', async () => {
       mockedCanLoadServer.mockResolvedValue({
         allowed: false,
         blockType: 'admin',
@@ -185,8 +187,7 @@ describe('mcp enable/disable commands', () => {
 
       await parser.parseAsync('enable my-server');
 
-      // Enable goes through even when admin block is in effect
-      expect(mockManager.enable).toHaveBeenCalledWith('my-server');
+      expect(mockManager.enable).not.toHaveBeenCalled();
       expect(debugLogger.log).toHaveBeenCalledWith(
         expect.stringContaining('MCP servers are disabled by administrator'),
       );
@@ -201,6 +202,47 @@ describe('mcp enable/disable commands', () => {
       await parser.parseAsync('enable my-server');
 
       expect(mockManager.enable).toHaveBeenCalledWith('my-server');
+    });
+
+    it('should not call persistent enable when --session flag is used', async () => {
+      await parser.parseAsync('enable my-server --session');
+
+      expect(mockManager.enable).not.toHaveBeenCalled();
+    });
+
+    it('should block enable for case-insensitive blocked server name', async () => {
+      mockedGetMcpServersFromConfig.mockResolvedValue({
+        mcpServers: { 'allowed-server': { command: '/path/to/server' } },
+        blockedServerNames: ['Blocked-Server'],
+      });
+
+      await parser.parseAsync('enable blocked-server');
+
+      expect(mockManager.enable).not.toHaveBeenCalled();
+      expect(debugLogger.log).toHaveBeenCalledWith(
+        expect.stringContaining('is blocked by administrator'),
+      );
+    });
+
+    it('should call exitCli after handler completes', async () => {
+      await parser.parseAsync('enable my-server');
+
+      expect(mockedExitCli).toHaveBeenCalled();
+    });
+
+    it('should only enable the target server when multiple servers exist', async () => {
+      mockedGetMcpServersFromConfig.mockResolvedValue({
+        mcpServers: {
+          'server-a': { command: '/path/to/a' },
+          'server-b': { command: '/path/to/b' },
+        },
+        blockedServerNames: [],
+      });
+
+      await parser.parseAsync('enable server-a');
+
+      expect(mockManager.enable).toHaveBeenCalledWith('server-a');
+      expect(mockManager.enable).not.toHaveBeenCalledWith('server-b');
     });
   });
 
@@ -259,6 +301,32 @@ describe('mcp enable/disable commands', () => {
       await parser.parseAsync('disable my-server');
 
       expect(mockManager.disable).toHaveBeenCalledWith('my-server');
+    });
+
+    it('should not call persistent disable when --session flag is used', async () => {
+      await parser.parseAsync('disable my-server --session');
+
+      expect(mockManager.disable).not.toHaveBeenCalled();
+    });
+
+    it('should block disable for case-insensitive blocked server name', async () => {
+      mockedGetMcpServersFromConfig.mockResolvedValue({
+        mcpServers: { 'allowed-server': { command: '/path/to/server' } },
+        blockedServerNames: ['Blocked-Server'],
+      });
+
+      await parser.parseAsync('disable blocked-server');
+
+      expect(mockManager.disable).not.toHaveBeenCalled();
+      expect(debugLogger.log).toHaveBeenCalledWith(
+        expect.stringContaining('is blocked by administrator'),
+      );
+    });
+
+    it('should call exitCli after handler completes', async () => {
+      await parser.parseAsync('disable my-server');
+
+      expect(mockedExitCli).toHaveBeenCalled();
     });
   });
 });

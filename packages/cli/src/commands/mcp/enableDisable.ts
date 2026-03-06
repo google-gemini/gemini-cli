@@ -16,7 +16,6 @@ import { exitCli } from '../utils.js';
 import { getMcpServersFromConfig } from './list.js';
 
 const GREEN = '\x1b[32m';
-const YELLOW = '\x1b[33m';
 const RED = '\x1b[31m';
 const RESET = '\x1b[0m';
 
@@ -25,15 +24,9 @@ interface Args {
   session?: boolean;
 }
 
-/**
- * Validates that a server exists and is not admin-blocked.
- * Returns true if valid, false if validation failed (error already logged).
- */
 async function resolveAndValidateServer(args: Args): Promise<boolean> {
   const name = normalizeServerId(args.name);
   const { mcpServers, blockedServerNames } = await getMcpServersFromConfig();
-
-  // Reject servers explicitly blocked by administrator
   if (blockedServerNames.map(normalizeServerId).includes(name)) {
     debugLogger.log(
       `${RED}Error:${RESET} MCP server '${args.name}' is blocked by administrator.`,
@@ -67,11 +60,14 @@ async function handleEnable(args: Args): Promise<void> {
     excludedList: settings.merged.mcp?.excluded,
   });
 
-  if (
-    !result.allowed &&
-    (result.blockType === 'allowlist' || result.blockType === 'excludelist')
-  ) {
-    debugLogger.log(`${RED}Error:${RESET} ${result.reason}`);
+  if (!result.allowed) {
+    if (result.blockType === 'admin') {
+      debugLogger.log(
+        `${RED}Error:${RESET} MCP servers are disabled by administrator.`,
+      );
+    } else {
+      debugLogger.log(`${RED}Error:${RESET} ${result.reason}`);
+    }
     return;
   }
 
@@ -81,12 +77,6 @@ async function handleEnable(args: Args): Promise<void> {
   } else {
     await manager.enable(name);
     debugLogger.log(`${GREEN}✓${RESET} MCP server '${name}' enabled.`);
-  }
-
-  if (result.blockType === 'admin') {
-    debugLogger.log(
-      `${YELLOW}Warning:${RESET} MCP servers are disabled by administrator.`,
-    );
   }
 }
 
