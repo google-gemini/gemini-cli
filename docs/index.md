@@ -4,6 +4,28 @@ Gemini CLI brings the power of Gemini models directly into your terminal. Use it
 to understand code, automate tasks, and build workflows with your local project
 context.
 
+## Quick examples
+
+Here are a few common ways to use Gemini CLI in your terminal.
+
+### Explain a file
+
+```bash
+gemini explain src/app.js
+```
+
+### Debug a script
+
+```bash
+gemini debug script.py
+```
+
+### Generate documentation
+
+```bash
+gemini doc src/utils.ts
+```
+
 ## Install
 
 ```bash
