@@ -565,14 +565,34 @@ const SETTINGS_SCHEMA = {
         description: 'Settings for the footer.',
         showInDialog: false,
         properties: {
+          items: {
+            type: 'array',
+            label: 'Footer Items',
+            category: 'UI',
+            requiresRestart: false,
+            default: undefined as string[] | undefined,
+            description:
+              'List of item IDs to display in the footer. Rendered in order',
+            showInDialog: false,
+            items: { type: 'string' },
+          },
+          showLabels: {
+            type: 'boolean',
+            label: 'Show Footer Labels',
+            category: 'UI',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Display a second line above the footer items with descriptive headers (e.g., /model).',
+            showInDialog: false,
+          },
           hideCWD: {
             type: 'boolean',
             label: 'Hide CWD',
             category: 'UI',
             requiresRestart: false,
             default: false,
-            description:
-              'Hide the current working directory path in the footer.',
+            description: 'Hide the current working directory in the footer.',
             showInDialog: true,
           },
           hideSandboxStatus: {
@@ -1236,7 +1256,8 @@ const SETTINGS_SCHEMA = {
         ref: 'BooleanOrString',
         description: oneLine`
           Sandbox execution environment.
-          Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.
+          Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile,
+          or specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
         `,
         showInDialog: false,
       },

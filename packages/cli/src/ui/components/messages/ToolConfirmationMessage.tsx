@@ -40,6 +40,7 @@ import {
 import { AskUserDialog } from '../AskUserDialog.js';
 import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
 import { WarningMessage } from './WarningMessage.js';
+import { colorizeCode } from '../../utils/CodeColorizer.js';
 import {
   getDeceptiveUrlDetails,
   toUnicodeUrl,
@@ -548,9 +549,19 @@ export const ToolConfirmationMessage: React.FC<
           >
             <Box flexDirection="column">
               {commandsToDisplay.map((cmd, idx) => (
-                <Text key={idx} color={theme.text.link}>
-                  {sanitizeForDisplay(cmd)}
-                </Text>
+                <Box
+                  key={idx}
+                  flexDirection="column"
+                  paddingBottom={idx < commandsToDisplay.length - 1 ? 1 : 0}
+                >
+                  {colorizeCode({
+                    code: cmd,
+                    language: 'bash',
+                    maxWidth: Math.max(terminalWidth, 1),
+                    settings,
+                    hideLineNumbers: true,
+                  })}
+                </Box>
               ))}
             </Box>
           </MaxSizedBox>
@@ -634,6 +645,7 @@ export const ToolConfirmationMessage: React.FC<
     mcpToolDetailsText,
     expandDetailsHintKey,
     getPreferredEditor,
+    settings,
   ]);
 
   const bodyOverflowDirection: 'top' | 'bottom' =
