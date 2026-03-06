@@ -253,8 +253,6 @@ ${output.result}`;
       const displayContent = `
 Subagent ${this.definition.name} Finished
 
-Termination Reason:\n ${output.terminate_reason}
-
 Result:
 ${output.result}
 `;

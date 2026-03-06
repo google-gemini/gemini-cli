@@ -142,8 +142,6 @@ ${output.result}`;
       const displayContent = `
 Browser Agent Finished
 
-Termination Reason: ${output.terminate_reason}
-
 Result:
 ${output.result}
 `;

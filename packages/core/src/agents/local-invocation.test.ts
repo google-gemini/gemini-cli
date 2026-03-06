@@ -203,7 +203,7 @@ describe('LocalSubagentInvocation', () => {
         },
       ]);
       expect(result.returnDisplay).toContain('Result:\nAnalysis complete.');
-      expect(result.returnDisplay).toContain('Termination Reason:\n GOAL');
+      expect(result.returnDisplay).not.toContain('Termination Reason');
     });
 
     it('should stream THOUGHT_CHUNK activities from the executor', async () => {
