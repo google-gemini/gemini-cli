@@ -99,7 +99,7 @@ There are three possible decisions a rule can enforce:
   non-interactive mode, this is treated as `deny`.)
 
 > [!NOTE] The `deny` decision is the recommended way to exclude tools. The
-> legacy `excludeTools` setting in `settings.json` is deprecated in favor of
+> legacy `tools.exclude` setting in `settings.json` is deprecated in favor of
 > policy rules with a `deny` decision.
 
 ### Priority system and tiers
