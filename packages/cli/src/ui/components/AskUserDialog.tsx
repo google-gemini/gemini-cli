@@ -23,6 +23,7 @@ import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import { checkExhaustive } from '@google/gemini-cli-core';
 import { TextInput } from './shared/TextInput.js';
+import { formatCommand } from '../utils/keybindingUtils.js';
 import { useTextBuffer } from './shared/text-buffer.js';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
@@ -252,7 +253,7 @@ const ReviewView: React.FC<ReviewViewProps> = ({
       </Box>
       <DialogFooter
         primaryAction="Enter to submit"
-        navigationActions="Tab/Shift+Tab to edit answers"
+        navigationActions={`${formatCommand(Command.DIALOG_NEXT)}/${formatCommand(Command.DIALOG_PREV)} to edit answers`}
         extraParts={extraParts}
       />
     </Box>
@@ -1146,7 +1147,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       navigationActions={
         questions.length > 1
           ? currentQuestion.type === 'text' || isEditingCustomOption
-            ? 'Tab/Shift+Tab to switch questions'
+            ? `${formatCommand(Command.DIALOG_NEXT)}/${formatCommand(Command.DIALOG_PREV)} to switch questions`
             : '←/→ to switch questions'
           : currentQuestion.type === 'text' || isEditingCustomOption
             ? undefined
