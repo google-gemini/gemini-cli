@@ -181,7 +181,7 @@ describe('<ShellToolMessage />', () => {
       [
         'respects availableTerminalHeight when it is smaller than ACTIVE_SHELL_MAX_LINES',
         10,
-        8,
+        3, // 10 - 1 (static) - 6 (ASB reserved) = 3
         false,
       ],
       [
@@ -193,7 +193,7 @@ describe('<ShellToolMessage />', () => {
       [
         'uses full availableTerminalHeight when focused in alternate buffer mode',
         100,
-        98, // 100 - 2
+        93, // 100 - 1 (static) - 6 (ASB reserved) = 93
         true,
       ],
       [

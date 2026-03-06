@@ -133,11 +133,6 @@ exports[`<ShellToolMessage /> > Height Constraints > respects availableTerminalH
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command A shell command                                             │
 │                                                                              │
-│ Line 93                                                                      │
-│ Line 94                                                                      │
-│ Line 95                                                                      │
-│ Line 96                                                                      │
-│ Line 97                                                                      │
 │ Line 98                                                                      │
 │ Line 99                                                                      │
 │ Line 100                                                                   █ │
@@ -192,18 +187,13 @@ exports[`<ShellToolMessage /> > Height Constraints > uses full availableTerminal
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command A shell command                      (Shift+Tab to unfocus) │
 │                                                                              │
-│ Line 3                                                                       │
-│ Line 4                                                                       │
-│ Line 5                                                                     █ │
-│ Line 6                                                                     █ │
-│ Line 7                                                                     █ │
-│ Line 8                                                                     █ │
-│ Line 9                                                                     █ │
-│ Line 10                                                                    █ │
-│ Line 11                                                                    █ │
-│ Line 12                                                                    █ │
-│ Line 13                                                                    █ │
-│ Line 14                                                                    █ │
+│ Line 8                                                                       │
+│ Line 9                                                                       │
+│ Line 10                                                                      │
+│ Line 11                                                                      │
+│ Line 12                                                                      │
+│ Line 13                                                                      │
+│ Line 14                                                                    ▄ │
 │ Line 15                                                                    █ │
 │ Line 16                                                                    █ │
 │ Line 17                                                                    █ │
