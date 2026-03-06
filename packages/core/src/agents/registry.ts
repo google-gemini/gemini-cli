@@ -490,11 +490,14 @@ export class AgentRegistry {
     } catch (e) {
       // Surface structured, user-friendly error messages for known failure modes.
       if (e instanceof A2AAgentError) {
-        coreEvents.emitFeedback('error', e.userMessage);
+        coreEvents.emitFeedback(
+          'error',
+          `[${definition.name}] ${e.userMessage}`,
+        );
       } else {
         coreEvents.emitFeedback(
           'error',
-          `Failed to load remote agent "${definition.name}": ${e instanceof Error ? e.message : String(e)}`,
+          `[${definition.name}] Failed to load remote agent: ${e instanceof Error ? e.message : String(e)}`,
         );
       }
       debugLogger.warn(

@@ -692,7 +692,10 @@ describe('AgentRegistry', () => {
 
       await registry.testRegisterAgent(remoteAgent);
 
-      expect(feedbackSpy).toHaveBeenCalledWith('error', a2aError.userMessage);
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'error',
+        `[FailAgent] ${a2aError.userMessage}`,
+      );
       expect(registry.getDefinition('FailAgent')).toBeUndefined();
     });
 
@@ -717,7 +720,7 @@ describe('AgentRegistry', () => {
 
       expect(feedbackSpy).toHaveBeenCalledWith(
         'error',
-        'Failed to load remote agent "FailAgent": unexpected crash',
+        '[FailAgent] Failed to load remote agent: unexpected crash',
       );
       expect(registry.getDefinition('FailAgent')).toBeUndefined();
     });
@@ -788,7 +791,7 @@ describe('AgentRegistry', () => {
 
       expect(feedbackSpy).toHaveBeenCalledWith(
         'error',
-        `Failed to load remote agent "FailingRemoteAgent": 401 Unauthorized`,
+        `[FailingRemoteAgent] Failed to load remote agent: 401 Unauthorized`,
       );
     });
 

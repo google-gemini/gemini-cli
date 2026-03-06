@@ -633,7 +633,9 @@ describe('RemoteAgentInvocation', () => {
       const result = await invocation.execute(new AbortController().signal);
 
       expect(result.error).toBeDefined();
-      expect(result.returnDisplay).toContain(a2aError.userMessage);
+      expect(result.returnDisplay).toContain(
+        `[test-agent] ${a2aError.userMessage}`,
+      );
     });
 
     it('should use generic message for non-A2AAgentError errors', async () => {
@@ -651,7 +653,7 @@ describe('RemoteAgentInvocation', () => {
 
       expect(result.error).toBeDefined();
       expect(result.returnDisplay).toContain(
-        'Error calling remote agent "test-agent": something unexpected',
+        '[test-agent] Error calling remote agent: something unexpected',
       );
     });
 
