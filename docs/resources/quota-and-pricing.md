@@ -95,7 +95,7 @@ These tiers are applicable when you are signing in with a workspace account.
 
 **Supported Tiers:**
 _- Tiers not listed above including Workspace AI Standard/Plus and AI Expanded are not supported_
-- [Workspace AI Ultra Access] https://workspace.google.com/products/ai-ultra/
+- [Workspace AI Ultra Access](https://workspace.google.com/products/ai-ultra/)
 - [Purchase a Gemini Code Assist Subscription through Google Cloud](https://cloud.google.com/gemini/docs/codeassist/overview).
 
   Quotas and pricing are based on a fixed price subscription with assigned
