@@ -479,4 +479,277 @@ describe('ScrollableList Demo Behavior', () => {
       });
     });
   });
+
+  it('regression: remove last item and add 2 items when scrolled to bottom', async () => {
+    let listRef: ScrollableListRef<Item> | null = null;
+    let setItemsFunc: React.Dispatch<React.SetStateAction<Item[]>> | null =
+      null;
+
+    const TestComp = () => {
+      const [items, setItems] = useState<Item[]>(
+        Array.from({ length: 10 }, (_, i) => ({
+          id: String(i),
+          title: `Item ${i}`,
+        })),
+      );
+      useEffect(() => {
+        setItemsFunc = setItems;
+      }, []);
+
+      return (
+        <MouseProvider mouseEventsEnabled={false}>
+          <KeypressProvider>
+            <ScrollProvider>
+              <Box flexDirection="column" width={80} height={5}>
+                <ScrollableList
+                  ref={(ref) => {
+                    listRef = ref;
+                  }}
+                  data={items}
+                  renderItem={({ item }) => <Text>{item.title}</Text>}
+                  estimatedItemHeight={() => 1}
+                  keyExtractor={(item) => item.id}
+                  hasFocus={true}
+                  initialScrollIndex={Number.MAX_SAFE_INTEGER}
+                />
+              </Box>
+            </ScrollProvider>
+          </KeypressProvider>
+        </MouseProvider>
+      );
+    };
+
+    let result: ReturnType<typeof render>;
+    await act(async () => {
+      result = render(<TestComp />);
+    });
+
+    await result!.waitUntilReady();
+
+    // Scrolled to bottom, max scroll = 10 - 5 = 5
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(5);
+    });
+
+    // Remove last element and add 2 elements
+    await act(async () => {
+      setItemsFunc!((prev) => {
+        const next = prev.slice(0, prev.length - 1);
+        next.push({ id: '10', title: 'Item 10' });
+        next.push({ id: '11', title: 'Item 11' });
+        return next;
+      });
+    });
+
+    await result!.waitUntilReady();
+
+    // Auto scrolls to new bottom: max scroll = 11 - 5 = 6
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(6);
+    });
+
+    // Scroll up slightly
+    await act(async () => {
+      listRef?.scrollBy(-2);
+    });
+    await result!.waitUntilReady();
+
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(4);
+    });
+
+    // Scroll back to bottom
+    await act(async () => {
+      listRef?.scrollToEnd();
+    });
+    await result!.waitUntilReady();
+
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(6);
+    });
+
+    // Add two more elements
+    await act(async () => {
+      setItemsFunc!((prev) => [
+        ...prev,
+        { id: '12', title: 'Item 12' },
+        { id: '13', title: 'Item 13' },
+      ]);
+    });
+
+    await result!.waitUntilReady();
+
+    // Auto scrolls to bottom: max scroll = 13 - 5 = 8
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(8);
+    });
+
+    result!.unmount();
+  });
+
+  it('regression: bottom-most element changes size but list does not update', async () => {
+    let listRef: ScrollableListRef<Item> | null = null;
+    let expandLastFunc: (() => void) | null = null;
+
+    const ItemWithState = ({
+      item,
+      isLast,
+    }: {
+      item: Item;
+      isLast: boolean;
+    }) => {
+      const [expanded, setExpanded] = useState(false);
+      useEffect(() => {
+        if (isLast) {
+          expandLastFunc = () => setExpanded(true);
+        }
+      }, [isLast]);
+      return (
+        <Box flexDirection="column">
+          <Text>{item.title}</Text>
+          {expanded && <Text>Expanded content</Text>}
+        </Box>
+      );
+    };
+
+    const TestComp = () => {
+      // items array is stable
+      const [items] = useState(() =>
+        Array.from({ length: 5 }, (_, i) => ({
+          id: String(i),
+          title: `Item ${i}`,
+        })),
+      );
+
+      return (
+        <MouseProvider mouseEventsEnabled={false}>
+          <KeypressProvider>
+            <ScrollProvider>
+              <Box flexDirection="column" width={80} height={4}>
+                <ScrollableList
+                  ref={(ref) => {
+                    listRef = ref;
+                  }}
+                  data={items}
+                  renderItem={({ item, index }) => (
+                    <ItemWithState item={item} isLast={index === 4} />
+                  )}
+                  estimatedItemHeight={() => 1}
+                  keyExtractor={(item) => item.id}
+                  hasFocus={true}
+                  initialScrollIndex={Number.MAX_SAFE_INTEGER}
+                />
+              </Box>
+            </ScrollProvider>
+          </KeypressProvider>
+        </MouseProvider>
+      );
+    };
+
+    let result: ReturnType<typeof render>;
+    await act(async () => {
+      result = render(<TestComp />);
+    });
+
+    await result!.waitUntilReady();
+
+    // Initially, total height is 5. viewport is 4. scroll is 1.
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(1);
+    });
+
+    // Expand the last item locally, without re-rendering the list!
+    await act(async () => {
+      expandLastFunc!();
+    });
+
+    await result!.waitUntilReady();
+
+    // The total height becomes 6. It should remain scrolled to bottom, so scroll becomes 2.
+    // This is expected to FAIL currently because VirtualizedList won't remeasure
+    // unless data changes or container height changes.
+    await waitFor(
+      () => {
+        expect(listRef?.getScrollState()?.scrollTop).toBe(2);
+      },
+      { timeout: 1000 },
+    );
+
+    result!.unmount();
+  });
+
+  it('regression: prepending items does not corrupt heights (total height correct)', async () => {
+    let listRef: ScrollableListRef<Item> | null = null;
+    let setItemsFunc: React.Dispatch<React.SetStateAction<Item[]>> | null =
+      null;
+
+    const TestComp = () => {
+      // Items 1 to 5. Item 1 is very tall.
+      const [items, setItems] = useState<Item[]>(
+        Array.from({ length: 5 }, (_, i) => ({
+          id: String(i + 1),
+          title: `Item ${i + 1}`,
+        })),
+      );
+      useEffect(() => {
+        setItemsFunc = setItems;
+      }, []);
+
+      return (
+        <MouseProvider mouseEventsEnabled={false}>
+          <KeypressProvider>
+            <ScrollProvider>
+              <Box flexDirection="column" width={80} height={10}>
+                <ScrollableList
+                  ref={(ref) => {
+                    listRef = ref;
+                  }}
+                  data={items}
+                  renderItem={({ item }) => (
+                    <Box height={item.id === '1' ? 10 : 2}>
+                      <Text>{item.title}</Text>
+                    </Box>
+                  )}
+                  estimatedItemHeight={() => 2}
+                  keyExtractor={(item) => item.id}
+                  hasFocus={true}
+                  initialScrollIndex={Number.MAX_SAFE_INTEGER}
+                />
+              </Box>
+            </ScrollProvider>
+          </KeypressProvider>
+        </MouseProvider>
+      );
+    };
+
+    let result: ReturnType<typeof render>;
+    await act(async () => {
+      result = render(<TestComp />);
+    });
+
+    await result!.waitUntilReady();
+
+    // Scroll is at bottom.
+    // Heights: Item 1: 10, Item 2: 2, Item 3: 2, Item 4: 2, Item 5: 2.
+    // Total height = 18. Container = 10. Max scroll = 8.
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(8);
+    });
+
+    // Prepend an item!
+    await act(async () => {
+      setItemsFunc!((prev) => [{ id: '0', title: 'Item 0' }, ...prev]);
+    });
+
+    await result!.waitUntilReady();
+
+    // Now items: 0(2), 1(10), 2(2), 3(2), 4(2), 5(2).
+    // Total height = 20. Container = 10. Max scroll = 10.
+    // Auto-scrolls to bottom because it was sticking!
+    await waitFor(() => {
+      expect(listRef?.getScrollState()?.scrollTop).toBe(10);
+    });
+
+    result!.unmount();
+  });
 });

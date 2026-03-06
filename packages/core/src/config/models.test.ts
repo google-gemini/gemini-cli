@@ -36,6 +36,7 @@ describe('isPreviewModel', () => {
   it('should return true for preview models', () => {
     expect(isPreviewModel(PREVIEW_GEMINI_MODEL)).toBe(true);
     expect(isPreviewModel(PREVIEW_GEMINI_3_1_MODEL)).toBe(true);
+    expect(isPreviewModel(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL)).toBe(true);
     expect(isPreviewModel(PREVIEW_GEMINI_FLASH_MODEL)).toBe(true);
     expect(isPreviewModel(PREVIEW_GEMINI_MODEL_AUTO)).toBe(true);
   });
@@ -214,6 +215,38 @@ describe('resolveModel', () => {
       const customModel = 'custom-model-v1';
       const model = resolveModel(customModel);
       expect(model).toBe(customModel);
+    });
+  });
+
+  describe('hasAccessToPreview logic', () => {
+    it('should return default model when access to preview is false and preview model is requested', () => {
+      expect(resolveModel(PREVIEW_GEMINI_MODEL, false, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
+    });
+
+    it('should return default flash model when access to preview is false and preview flash model is requested', () => {
+      expect(
+        resolveModel(PREVIEW_GEMINI_FLASH_MODEL, false, false, false),
+      ).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    });
+
+    it('should return default model when access to preview is false and auto-gemini-3 is requested', () => {
+      expect(resolveModel(PREVIEW_GEMINI_MODEL_AUTO, false, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
+    });
+
+    it('should return default model when access to preview is false and Gemini 3.1 is requested', () => {
+      expect(resolveModel(PREVIEW_GEMINI_MODEL_AUTO, true, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
+    });
+
+    it('should still return default model when access to preview is false and auto-gemini-2.5 is requested', () => {
+      expect(resolveModel(DEFAULT_GEMINI_MODEL_AUTO, false, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
     });
   });
 });

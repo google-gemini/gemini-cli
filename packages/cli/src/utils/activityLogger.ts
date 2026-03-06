@@ -22,11 +22,80 @@ import WebSocket from 'ws';
 const ACTIVITY_ID_HEADER = 'x-activity-request-id';
 const MAX_BUFFER_SIZE = 100;
 
-/** Type guard: Array.isArray doesn't narrow readonly arrays in TS 5.8 */
 function isHeaderRecord(
   h: http.OutgoingHttpHeaders | readonly string[],
 ): h is http.OutgoingHttpHeaders {
   return !Array.isArray(h);
+}
+
+function isRequestOptions(value: unknown): value is http.RequestOptions {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !(value instanceof URL) &&
+    !Array.isArray(value)
+  );
+}
+
+function isIncomingMessageCallback(
+  value: unknown,
+): value is (res: http.IncomingMessage) => void {
+  return typeof value === 'function';
+}
+
+type HttpRequestArgs =
+  | []
+  | [
+      url: string | URL | http.RequestOptions,
+      options?: http.RequestOptions | ((res: http.IncomingMessage) => void),
+      callback?: (res: http.IncomingMessage) => void,
+    ];
+
+function callHttpRequest(
+  originalFn: typeof http.request,
+  args: HttpRequestArgs,
+): http.ClientRequest {
+  if (args.length === 0) {
+    return originalFn({});
+  }
+  if (args.length === 1) {
+    const first = args[0];
+    if (typeof first === 'string' || first instanceof URL) {
+      return originalFn(first);
+    }
+    if (isRequestOptions(first)) {
+      return originalFn(first);
+    }
+    return originalFn({});
+  }
+  if (args.length === 2) {
+    const first = args[0];
+    const second = args[1];
+    if (typeof first === 'string' || first instanceof URL) {
+      if (isIncomingMessageCallback(second)) {
+        return originalFn(first, second);
+      }
+      if (isRequestOptions(second)) {
+        return originalFn(first, second);
+      }
+    }
+    if (isRequestOptions(first) && isIncomingMessageCallback(second)) {
+      return originalFn(first, second);
+    }
+  }
+  if (args.length === 3) {
+    const first = args[0];
+    const second = args[1];
+    const third = args[2];
+    if (
+      (typeof first === 'string' || first instanceof URL) &&
+      isRequestOptions(second) &&
+      isIncomingMessageCallback(third)
+    ) {
+      return originalFn(first, second, third);
+    }
+  }
+  return originalFn({});
 }
 
 export interface NetworkLog {
@@ -364,7 +433,7 @@ export class ActivityLogger extends EventEmitter {
 
     const wrapRequest = (
       originalFn: typeof http.request,
-      args: unknown[],
+      args: HttpRequestArgs,
       protocol: string,
     ) => {
       const firstArg = args[0];
@@ -373,8 +442,10 @@ export class ActivityLogger extends EventEmitter {
         options = firstArg;
       } else if (firstArg instanceof URL) {
         options = firstArg;
+      } else if (firstArg && typeof firstArg === 'object') {
+        options = isRequestOptions(firstArg) ? firstArg : {};
       } else {
-        options = (firstArg ?? {}) as http.RequestOptions;
+        options = {};
       }
 
       let url = '';
@@ -393,9 +464,9 @@ export class ActivityLogger extends EventEmitter {
           `${protocol}//${options.hostname || options.host || 'localhost'}${options.path || '/'}`;
       }
 
-      if (url.includes('127.0.0.1') || url.includes('localhost'))
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-        return originalFn.apply(http, args as any);
+      if (url.includes('127.0.0.1') || url.includes('localhost')) {
+        return callHttpRequest(originalFn, args);
+      }
 
       const rawHeaders =
         typeof options === 'object' &&
@@ -410,24 +481,23 @@ export class ActivityLogger extends EventEmitter {
 
       if (headers[ACTIVITY_ID_HEADER]) {
         delete headers[ACTIVITY_ID_HEADER];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-        return originalFn.apply(http, args as any);
+        return callHttpRequest(originalFn, args);
       }
 
       const id = Math.random().toString(36).substring(7);
       this.requestStartTimes.set(id, Date.now());
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-      const req = originalFn.apply(http, args as any);
+      const req = callHttpRequest(originalFn, args);
       const requestChunks: Buffer[] = [];
 
       const oldWrite = req.write;
       const oldEnd = req.end;
 
-      req.write = function (chunk: unknown, ...etc: unknown[]) {
+      req.write = function (chunk: string | Uint8Array, ...etc: unknown[]) {
         if (chunk) {
           const encoding =
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            typeof etc[0] === 'string' ? (etc[0] as BufferEncoding) : undefined;
+            typeof etc[0] === 'string' && Buffer.isEncoding(etc[0])
+              ? etc[0]
+              : undefined;
           requestChunks.push(
             Buffer.isBuffer(chunk)
               ? chunk
@@ -438,19 +508,21 @@ export class ActivityLogger extends EventEmitter {
                   ),
           );
         }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-        return oldWrite.apply(this, [chunk, ...etc] as any);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-return
+        return (oldWrite as any).apply(this, [chunk, ...etc]);
       };
 
       req.end = function (
         this: http.ClientRequest,
-        chunk: unknown,
+        chunkOrCb?: string | Uint8Array | (() => void),
         ...etc: unknown[]
       ) {
-        if (chunk && typeof chunk !== 'function') {
+        const chunk = typeof chunkOrCb === 'function' ? undefined : chunkOrCb;
+        if (chunk) {
           const encoding =
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            typeof etc[0] === 'string' ? (etc[0] as BufferEncoding) : undefined;
+            typeof etc[0] === 'string' && Buffer.isEncoding(etc[0])
+              ? etc[0]
+              : undefined;
           requestChunks.push(
             Buffer.isBuffer(chunk)
               ? chunk
@@ -473,7 +545,7 @@ export class ActivityLogger extends EventEmitter {
           pending: true,
         });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-return
-        return (oldEnd as any).apply(this, [chunk, ...etc]);
+        return (oldEnd as any).apply(this, [chunkOrCb, ...etc]);
       };
 
       req.on('response', (res: http.IncomingMessage) => {
@@ -545,12 +617,44 @@ export class ActivityLogger extends EventEmitter {
       return req;
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-    (http as any).request = (...args: unknown[]) =>
-      wrapRequest(originalRequest, args, 'http:');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-    (https as any).request = (...args: unknown[]) =>
-      wrapRequest(originalHttpsRequest as typeof http.request, args, 'https:');
+    Object.defineProperty(http, 'request', {
+      value: (
+        url: string | URL | http.RequestOptions,
+        options?: http.RequestOptions | ((res: http.IncomingMessage) => void),
+        callback?: (res: http.IncomingMessage) => void,
+      ): http.ClientRequest => {
+        const args: HttpRequestArgs =
+          callback !== undefined
+            ? [url, options, callback]
+            : options !== undefined
+              ? [url, options]
+              : [url];
+        return wrapRequest(originalRequest, args, 'http:');
+      },
+      writable: true,
+      configurable: true,
+    });
+    Object.defineProperty(https, 'request', {
+      value: (
+        url: string | URL | http.RequestOptions,
+        options?: http.RequestOptions | ((res: http.IncomingMessage) => void),
+        callback?: (res: http.IncomingMessage) => void,
+      ): http.ClientRequest => {
+        const args: HttpRequestArgs =
+          callback !== undefined
+            ? [url, options, callback]
+            : options !== undefined
+              ? [url, options]
+              : [url];
+        return wrapRequest(
+          originalHttpsRequest as typeof http.request,
+          args,
+          'https:',
+        );
+      },
+      writable: true,
+      configurable: true,
+    });
   }
 
   logConsole(payload: ConsoleLogPayload) {
