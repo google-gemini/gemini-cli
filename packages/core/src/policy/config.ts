@@ -19,12 +19,7 @@ import {
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
 import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
-import {
-  buildArgsPatterns,
-  isSafeRegExp,
-  ALWAYS_ALLOW_PRIORITY,
-  getAlwaysAllowPriorityFraction,
-} from './utils.js';
+import { buildArgsPatterns, isSafeRegExp } from './utils.js';
 import toml from '@iarna/toml';
 import {
   MessageBusType,
@@ -58,6 +53,19 @@ export const EXCLUDE_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.4;
 export const ALLOWED_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.3;
 export const TRUSTED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.2;
 export const ALLOWED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.1;
+
+// These are added to the tier base (e.g., USER_POLICY_TIER).
+// Workspace tier (3) + high priority (950/1000) = ALWAYS_ALLOW_PRIORITY
+export const ALWAYS_ALLOW_PRIORITY = 3.95;
+
+/**
+ * Returns the fractional priority of ALWAYS_ALLOW_PRIORITY scaled to 1000.
+ */
+export function getAlwaysAllowPriorityFraction(): number {
+  return Math.round(
+    (ALWAYS_ALLOW_PRIORITY - Math.floor(ALWAYS_ALLOW_PRIORITY)) * 1000,
+  );
+}
 
 /**
  * Gets the list of directories to search for policy files, in order of increasing priority
