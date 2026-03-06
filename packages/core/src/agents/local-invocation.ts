@@ -311,18 +311,14 @@ ${output.result}
         throw error;
       }
 
-      function hasStatus(error: unknown): error is { status: number } {
-        if (typeof error !== 'object' || error === null) {
-          return false;
-        }
-        if (!('status' in error)) {
-          return false;
-        }
-        const status = (error as { status: unknown }).status;
-        return typeof status === 'number';
+      let isApiError = false;
+      if (typeof error === 'object' && error !== null) {
+        const status = (error as { status?: unknown }).status;
+        const code = (error as { code?: unknown }).code;
+        isApiError =
+          (typeof status === 'number' && status === 400) ||
+          (typeof code === 'number' && code === 400);
       }
-
-      const isApiError = hasStatus(error) && error.status === 400;
 
       const apiHint = isApiError
         ? '\nNote: This failure may be due to a Gemini API INVALID_ARGUMENT response. The agent may need to retry with a different tool or smaller task.'
