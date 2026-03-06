@@ -7,13 +7,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 
-const FPS = 24;
+const FPS = 30; // Better frame resolution for smoothing
 const TICK_DURATION = Math.floor(1000 / FPS);
 const WIDTH = 80;
 const HEIGHT = 14;
 const GROUND_Y = HEIGHT - 2;
-const GRAVITY = 1;
-const JUMP_VELOCITY = -4;
+const GRAVITY = 0.15;
+const JUMP_VELOCITY = -1.6;
 
 // --- DINO SPRITES ---
 const DINO_RUN_1 = [
@@ -119,7 +119,7 @@ export function DinoGame({ onExit }: { onExit: () => void }) {
         setIsDucking(true);
         if (dinoY < GROUND_Y) {
           // Fast drop
-          setDinoVelocity((prev) => prev + 2);
+          setDinoVelocity((prev) => Math.max(prev, 1.2));
         }
       }
     }
@@ -196,7 +196,8 @@ export function DinoGame({ onExit }: { onExit: () => void }) {
       }
 
       // Move and Spawn Obstacles
-      const speed = Math.max(1, Math.floor(1.5 * speedMultiplier));
+      // Use fractional movement and float speed for smoother gameplay
+      const speed = 1.0 * speedMultiplier;
       setObstacles((prev) => {
         const moved = prev
           .map((o) => ({
@@ -259,17 +260,17 @@ export function DinoGame({ onExit }: { onExit: () => void }) {
     const dinoX = 4;
     const dinoWidth = 10;
     const dinoHeight = isDucking ? 4 : 5;
-    const currDinoY = dinoY - dinoHeight + 1; // Top Y
+    const currDinoY = Math.floor(dinoY) - dinoHeight + 1; // Top Y
 
     for (const obs of obstacles) {
       const obsTop = obs.y - obs.height + 1;
 
-      // Hitbox intersection check
+      // Hitbox intersection check (with some forgiveness padding)
       if (
-        dinoX < obs.x + obs.width - 2 &&
-        dinoX + dinoWidth - 2 > obs.x &&
-        currDinoY < obsTop + obs.height - 1 &&
-        currDinoY + dinoHeight - 1 > obsTop
+        dinoX + 1 < Math.floor(obs.x) + obs.width - 2 &&
+        dinoX + dinoWidth - 2 > Math.floor(obs.x) + 1 &&
+        currDinoY + 1 < obsTop + obs.height - 1 &&
+        currDinoY + dinoHeight - 1 > obsTop + 1
       ) {
         setGameState('gameover');
       }
