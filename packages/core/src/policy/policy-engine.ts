@@ -25,6 +25,7 @@ import {
   hasRedirection,
 } from '../utils/shell-utils.js';
 import { getToolAliases } from '../tools/tool-names.js';
+import { MCP_TOOL_PREFIX } from '../tools/mcp-tool.js';
 
 function isWildcardPattern(name: string): boolean {
   return name === '*' || name.includes('*');
@@ -32,7 +33,7 @@ function isWildcardPattern(name: string): boolean {
 
 /**
  * Checks if a tool call matches a wildcard pattern.
- * Supports global (*) and composite (server__*, *__tool, *__*) patterns.
+ * Supports global (*) and the new explicit MCP (*mcp_serverName_**) format.
  */
 function matchesWildcard(
   pattern: string,
@@ -43,57 +44,23 @@ function matchesWildcard(
     return true;
   }
 
-  if (pattern.includes('__')) {
-    return matchesCompositePattern(pattern, toolName, serverName);
+  if (pattern === `${MCP_TOOL_PREFIX}*`) {
+    return serverName !== undefined;
   }
 
+  if (pattern.startsWith(MCP_TOOL_PREFIX) && pattern.endsWith('_*')) {
+    const expectedServerName = pattern.slice(MCP_TOOL_PREFIX.length, -2);
+    // 1. Must be an MCP tool call (has serverName)
+    // 2. Server name must match
+    // 3. Tool name must be properly qualified by that server
+    if (serverName === undefined || serverName !== expectedServerName) {
+      return false;
+    }
+    return toolName.startsWith(`${MCP_TOOL_PREFIX}${expectedServerName}_`);
+  }
+
+  // Not a recognized wildcard pattern, fallback to exact match just in case
   return toolName === pattern;
-}
-
-/**
- * Matches composite patterns like "server__*", "*__tool", or "*__*".
- */
-function matchesCompositePattern(
-  pattern: string,
-  toolName: string,
-  serverName: string | undefined,
-): boolean {
-  const parts = pattern.split('__');
-  if (parts.length !== 2) return false;
-  const [patternServer, patternTool] = parts;
-
-  // 1. Identify the tool's components
-  const { actualServer, actualTool } = getToolMetadata(toolName, serverName);
-
-  // 2. Composite patterns require a server context
-  if (actualServer === undefined) {
-    return false;
-  }
-
-  // 3. Robustness: if serverName is provided, toolName MUST be qualified by it.
-  // This prevents "malicious-server" from spoofing "trusted-server" by naming itself "trusted-server__malicious".
-  if (serverName !== undefined && !toolName.startsWith(serverName + '__')) {
-    return false;
-  }
-
-  // 4. Match components
-  const serverMatch = patternServer === '*' || patternServer === actualServer;
-  const toolMatch = patternTool === '*' || patternTool === actualTool;
-
-  return serverMatch && toolMatch;
-}
-
-/**
- * Extracts the server and unqualified tool name from a tool call context.
- */
-function getToolMetadata(toolName: string, serverName: string | undefined) {
-  const sepIndex = toolName.indexOf('__');
-  const isQualified = sepIndex !== -1;
-  return {
-    actualServer:
-      serverName ?? (isQualified ? toolName.substring(0, sepIndex) : undefined),
-    actualTool: isQualified ? toolName.substring(sepIndex + 2) : toolName,
-  };
 }
 
 function ruleMatches(
@@ -108,6 +75,17 @@ function ruleMatches(
   if (rule.modes && rule.modes.length > 0) {
     if (!rule.modes.includes(currentApprovalMode)) {
       return false;
+    }
+  }
+
+  // Strictly enforce mcpName identity if the rule dictates it
+  if (rule.mcpName) {
+    if (rule.mcpName === '*') {
+      // Rule requires it to be ANY MCP tool
+      if (serverName === undefined) return false;
+    } else {
+      // Rule requires it to be a specific MCP server
+      if (serverName !== rule.mcpName) return false;
     }
   }
 
@@ -371,6 +349,21 @@ export class PolicyEngine {
     serverName: string | undefined,
     toolAnnotations?: Record<string, unknown>,
   ): Promise<CheckResult> {
+    if (
+      !serverName &&
+      toolAnnotations &&
+      typeof toolAnnotations['_serverName'] === 'string'
+    ) {
+      serverName = toolAnnotations['_serverName'];
+    }
+
+    if (!serverName && toolCall.name?.startsWith(MCP_TOOL_PREFIX)) {
+      const parts = toolCall.name.split('_');
+      if (parts.length >= 3) {
+        serverName = parts[1];
+      }
+    }
+
     let stringifiedArgs: string | undefined;
     // Compute stringified args once before the loop
     if (
@@ -695,23 +688,37 @@ export class PolicyEngine {
             continue;
           }
           // Check if the tool name matches the rule's toolName pattern (if any)
-          if (rule.toolName) {
+          let matches = true;
+
+          const rawServerName = annotations['_serverName'];
+          let serverName =
+            typeof rawServerName === 'string' ? rawServerName : undefined;
+
+          if (!serverName && toolName.startsWith(MCP_TOOL_PREFIX)) {
+            const parts = toolName.split('_');
+            if (parts.length >= 3) serverName = parts[1];
+          }
+
+          if (rule.mcpName) {
+            if (rule.mcpName === '*' && serverName === undefined) {
+              matches = false;
+            } else if (rule.mcpName !== '*' && serverName !== rule.mcpName) {
+              matches = false;
+            }
+          }
+
+          if (matches && rule.toolName) {
             if (isWildcardPattern(rule.toolName)) {
-              // For composite patterns (e.g. "*__*"), construct a qualified
-              // name from metadata so matchesWildcard can resolve it.
-              const rawServerName = annotations['_serverName'];
-              const serverName =
-                typeof rawServerName === 'string' ? rawServerName : undefined;
-              const qualifiedName =
-                serverName && !toolName.includes('__')
-                  ? `${serverName}__${toolName}`
-                  : toolName;
-              if (!matchesWildcard(rule.toolName, qualifiedName, undefined)) {
-                continue;
+              if (!matchesWildcard(rule.toolName, toolName, serverName)) {
+                matches = false;
               }
             } else if (toolName !== rule.toolName) {
-              continue;
+              matches = false;
             }
+          }
+
+          if (!matches) {
+            continue;
           }
           // Determine decision considering global verdict
           let decision: PolicyDecision;
@@ -750,12 +757,28 @@ export class PolicyEngine {
         continue;
       }
 
+      // Check if over-ruled by an mcpName mismatch prior
+      let serverName: string | undefined;
+      // Best-effort extraction since we lack runtime metadata for processed tools list
+      if (toolName.startsWith(MCP_TOOL_PREFIX)) {
+        const parts = toolName.split('_');
+        if (parts.length >= 3) serverName = parts[1];
+      }
+
+      if (rule.mcpName) {
+        if (rule.mcpName === '*' && serverName === undefined) {
+          continue;
+        } else if (rule.mcpName !== '*' && serverName !== rule.mcpName) {
+          continue;
+        }
+      }
+
       // Check if covered by a processed wildcard
       let coveredByWildcard = false;
       for (const processed of processedTools) {
         if (
           isWildcardPattern(processed) &&
-          matchesWildcard(processed, toolName, undefined)
+          matchesWildcard(processed, toolName, serverName)
         ) {
           // It's covered by a higher-priority wildcard rule.
           // If that wildcard rule resulted in exclusion, this tool should also be excluded.

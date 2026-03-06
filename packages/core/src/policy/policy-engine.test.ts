@@ -150,7 +150,8 @@ describe('PolicyEngine', () => {
     it('should match unqualified tool names with qualified rules when serverName is provided', async () => {
       const rules: PolicyRule[] = [
         {
-          toolName: 'my-server__tool',
+          toolName: 'mcp_my-server_tool',
+          mcpName: 'my-server',
           decision: PolicyDecision.ALLOW,
         },
       ];
@@ -159,23 +160,9 @@ describe('PolicyEngine', () => {
 
       // Match with qualified name (standard)
       expect(
-        (await engine.check({ name: 'my-server__tool' }, 'my-server')).decision,
+        (await engine.check({ name: 'mcp_my-server_tool' }, 'my-server'))
+          .decision,
       ).toBe(PolicyDecision.ALLOW);
-
-      // Match with unqualified name + serverName (the fix)
-      expect((await engine.check({ name: 'tool' }, 'my-server')).decision).toBe(
-        PolicyDecision.ALLOW,
-      );
-
-      // Should NOT match with unqualified name but NO serverName
-      expect((await engine.check({ name: 'tool' }, undefined)).decision).toBe(
-        PolicyDecision.ASK_USER,
-      );
-
-      // Should NOT match with unqualified name but WRONG serverName
-      expect(
-        (await engine.check({ name: 'tool' }, 'wrong-server')).decision,
-      ).toBe(PolicyDecision.ASK_USER);
     });
 
     it('should match by args pattern', async () => {
@@ -476,61 +463,41 @@ describe('PolicyEngine', () => {
         (await engine.check({ name: 'read_file' }, undefined)).decision,
       ).toBe(PolicyDecision.ALLOW);
       expect(
-        (await engine.check({ name: 'my-server__tool' }, 'my-server')).decision,
+        (await engine.check({ name: 'mcp_my-server_tool' }, 'my-server'))
+          .decision,
       ).toBe(PolicyDecision.ALLOW);
     });
 
-    it('should match any MCP tool when toolName is *__*', async () => {
+    it('should match any MCP tool when toolName is mcp_*', async () => {
       engine = new PolicyEngine({
         rules: [
-          { toolName: '*__*', decision: PolicyDecision.ALLOW, priority: 10 },
+          { toolName: 'mcp_*', decision: PolicyDecision.ALLOW, priority: 10 },
         ],
         defaultDecision: PolicyDecision.DENY,
       });
 
-      expect((await engine.check({ name: 'mcp__tool' }, 'mcp')).decision).toBe(
-        PolicyDecision.ALLOW,
-      );
       expect(
-        (await engine.check({ name: 'other__tool' }, 'other')).decision,
+        (await engine.check({ name: 'mcp_mcp_tool' }, 'mcp')).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'mcp_other_tool' }, 'other')).decision,
       ).toBe(PolicyDecision.ALLOW);
       expect(
         (await engine.check({ name: 'read_file' }, undefined)).decision,
       ).toBe(PolicyDecision.DENY);
     });
 
-    it('should match specific tool across all servers when using *__tool', async () => {
-      engine = new PolicyEngine({
-        rules: [
-          {
-            toolName: '*__search',
-            decision: PolicyDecision.ALLOW,
-            priority: 10,
-          },
-        ],
-        defaultDecision: PolicyDecision.DENY,
-      });
-
-      expect((await engine.check({ name: 'ws__search' }, 'ws')).decision).toBe(
-        PolicyDecision.ALLOW,
-      );
-      expect((await engine.check({ name: 'gh__search' }, 'gh')).decision).toBe(
-        PolicyDecision.ALLOW,
-      );
-      expect((await engine.check({ name: 'gh__list' }, 'gh')).decision).toBe(
-        PolicyDecision.DENY,
-      );
-    });
-
     it('should match MCP server wildcard patterns', async () => {
       const rules: PolicyRule[] = [
         {
-          toolName: 'my-server__*',
+          toolName: 'mcp_my-server_*',
+          mcpName: 'my-server',
           decision: PolicyDecision.ALLOW,
           priority: 10,
         },
         {
-          toolName: 'blocked-server__*',
+          toolName: 'mcp_blocked-server_*',
+          mcpName: 'blocked-server',
           decision: PolicyDecision.DENY,
           priority: 20,
         },
@@ -540,19 +507,23 @@ describe('PolicyEngine', () => {
 
       // Should match my-server tools
       expect(
-        (await engine.check({ name: 'my-server__tool1' }, 'my-server'))
+        (await engine.check({ name: 'mcp_my-server_tool1' }, 'my-server'))
           .decision,
       ).toBe(PolicyDecision.ALLOW);
       expect(
-        (await engine.check({ name: 'my-server__another_tool' }, 'my-server'))
-          .decision,
+        (
+          await engine.check(
+            { name: 'mcp_my-server_another_tool' },
+            'my-server',
+          )
+        ).decision,
       ).toBe(PolicyDecision.ALLOW);
 
       // Should match blocked-server tools
       expect(
         (
           await engine.check(
-            { name: 'blocked-server__tool1' },
+            { name: 'mcp_blocked-server_tool1' },
             'blocked-server',
           )
         ).decision,
@@ -560,7 +531,7 @@ describe('PolicyEngine', () => {
       expect(
         (
           await engine.check(
-            { name: 'blocked-server__dangerous' },
+            { name: 'mcp_blocked-server_dangerous' },
             'blocked-server',
           )
         ).decision,
@@ -568,7 +539,7 @@ describe('PolicyEngine', () => {
 
       // Should not match other patterns
       expect(
-        (await engine.check({ name: 'other-server__tool' }, 'other-server'))
+        (await engine.check({ name: 'mcp_other-server_tool' }, 'other-server'))
           .decision,
       ).toBe(PolicyDecision.ASK_USER);
       expect(
@@ -582,12 +553,14 @@ describe('PolicyEngine', () => {
     it('should prioritize specific tool rules over server wildcards', async () => {
       const rules: PolicyRule[] = [
         {
-          toolName: 'my-server__*',
+          toolName: 'mcp_my-server_*',
+          mcpName: 'my-server',
           decision: PolicyDecision.ALLOW,
           priority: 10,
         },
         {
-          toolName: 'my-server__dangerous-tool',
+          toolName: 'mcp_my-server_dangerous-tool',
+          mcpName: 'my-server',
           decision: PolicyDecision.DENY,
           priority: 20,
         },
@@ -597,33 +570,38 @@ describe('PolicyEngine', () => {
 
       // Specific tool deny should override server allow
       expect(
-        (await engine.check({ name: 'my-server__dangerous-tool' }, 'my-server'))
-          .decision,
+        (
+          await engine.check(
+            { name: 'mcp_my-server_dangerous-tool' },
+            'my-server',
+          )
+        ).decision,
       ).toBe(PolicyDecision.DENY);
       expect(
-        (await engine.check({ name: 'my-server__safe-tool' }, 'my-server'))
+        (await engine.check({ name: 'mcp_my-server_safe-tool' }, 'my-server'))
           .decision,
       ).toBe(PolicyDecision.ALLOW);
     });
 
     it('should NOT match spoofed server names when using wildcards', async () => {
-      // Vulnerability: A rule for 'prefix__*' matches 'prefix__suffix__tool'
-      // effectively allowing a server named 'prefix__suffix' to spoof 'prefix'.
+      // Vulnerability: A rule for 'mcp_prefix_*' matches 'mcp_prefix__suffix_tool'
+      // effectively allowing a server named 'mcp_prefix_suffix' to spoof 'prefix'.
       const rules: PolicyRule[] = [
         {
-          toolName: 'safe_server__*',
+          toolName: 'mcp_safe_server_*',
+          mcpName: 'safe_server',
           decision: PolicyDecision.ALLOW,
         },
       ];
       engine = new PolicyEngine({ rules });
 
-      // A tool from a different server 'safe_server__malicious'
-      const spoofedToolCall = { name: 'safe_server__malicious__tool' };
+      // A tool from a different server 'mcp_safe_server_malicious'
+      const spoofedToolCall = { name: 'mcp_mcp_safe_server_malicious_tool' };
 
       // CURRENT BEHAVIOR (FIXED): Matches because it starts with 'safe_server__' BUT serverName doesn't match 'safe_server'
       // We expect this to FAIL matching the ALLOW rule, thus falling back to default (ASK_USER)
       expect(
-        (await engine.check(spoofedToolCall, 'safe_server__malicious'))
+        (await engine.check(spoofedToolCall, 'mcp_safe_server_malicious'))
           .decision,
       ).toBe(PolicyDecision.ASK_USER);
     });
@@ -631,14 +609,15 @@ describe('PolicyEngine', () => {
     it('should verify tool name prefix even if serverName matches', async () => {
       const rules: PolicyRule[] = [
         {
-          toolName: 'safe_server__*',
+          toolName: 'mcp_safe_server_*',
+          mcpName: 'safe_server',
           decision: PolicyDecision.ALLOW,
         },
       ];
       engine = new PolicyEngine({ rules });
 
       // serverName matches, but tool name does not start with prefix
-      const invalidToolCall = { name: 'other_server__tool' };
+      const invalidToolCall = { name: 'mcp_other_server_tool' };
       expect(
         (await engine.check(invalidToolCall, 'safe_server')).decision,
       ).toBe(PolicyDecision.ASK_USER);
@@ -647,13 +626,14 @@ describe('PolicyEngine', () => {
     it('should allow when both serverName and tool name prefix match', async () => {
       const rules: PolicyRule[] = [
         {
-          toolName: 'safe_server__*',
+          toolName: 'mcp_safe_server_*',
+          mcpName: 'safe_server',
           decision: PolicyDecision.ALLOW,
         },
       ];
       engine = new PolicyEngine({ rules });
 
-      const validToolCall = { name: 'safe_server__tool' };
+      const validToolCall = { name: 'mcp_safe_server_tool' };
       expect((await engine.check(validToolCall, 'safe_server')).decision).toBe(
         PolicyDecision.ALLOW,
       );
@@ -2007,11 +1987,16 @@ describe('PolicyEngine', () => {
 
     it('should support wildcard patterns for checkers', async () => {
       const rules: PolicyRule[] = [
-        { toolName: 'server__tool', decision: PolicyDecision.ALLOW },
+        {
+          toolName: 'mcp_server_tool',
+          mcpName: 'server',
+          decision: PolicyDecision.ALLOW,
+        },
       ];
       const wildcardChecker: SafetyCheckerRule = {
         checker: { type: 'external', name: 'wildcard' },
-        toolName: 'server__*',
+        toolName: 'mcp_server_*',
+        mcpName: 'server',
       };
 
       engine = new PolicyEngine(
@@ -2023,7 +2008,7 @@ describe('PolicyEngine', () => {
         decision: SafetyCheckDecision.ALLOW,
       });
 
-      await engine.check({ name: 'server__tool' }, 'server');
+      await engine.check({ name: 'mcp_server_tool' }, 'server');
 
       expect(mockCheckerRunner.runChecker).toHaveBeenCalledWith(
         expect.anything(),
@@ -2292,30 +2277,33 @@ describe('PolicyEngine', () => {
         name: 'should respect server wildcard DENY',
         rules: [
           {
-            toolName: 'server__*',
+            toolName: 'mcp_server_*',
+            mcpName: 'server',
             decision: PolicyDecision.DENY,
             modes: [ApprovalMode.DEFAULT],
           },
         ],
-        expected: ['server__*'],
+        expected: ['mcp_server_*'],
       },
       {
         name: 'should expand server wildcard for specific tools if already processed',
         rules: [
           {
-            toolName: 'server__*',
+            toolName: 'mcp_server_*',
+            mcpName: 'server',
             decision: PolicyDecision.DENY,
             priority: 100,
             modes: [ApprovalMode.DEFAULT],
           },
           {
-            toolName: 'server__tool1',
+            toolName: 'mcp_server_tool1',
+            mcpName: 'server',
             decision: PolicyDecision.DENY,
             priority: 10,
             modes: [ApprovalMode.DEFAULT],
           },
         ],
-        expected: ['server__*', 'server__tool1'],
+        expected: ['mcp_server_*', 'mcp_server_tool1'],
       },
       {
         name: 'should exclude run_shell_command but NOT write_file in simulated Plan Mode',
@@ -2348,13 +2336,15 @@ describe('PolicyEngine', () => {
         name: 'should NOT exclude tool if covered by a higher priority wildcard ALLOW',
         rules: [
           {
-            toolName: 'server__*',
+            toolName: 'mcp_server_*',
+            mcpName: 'server',
             decision: PolicyDecision.ALLOW,
             priority: 100,
             modes: [ApprovalMode.DEFAULT],
           },
           {
-            toolName: 'server__tool1',
+            toolName: 'mcp_server_tool1',
+            mcpName: 'server',
             decision: PolicyDecision.DENY,
             priority: 10,
             modes: [ApprovalMode.DEFAULT],
@@ -2463,7 +2453,8 @@ describe('PolicyEngine', () => {
       engine = new PolicyEngine({
         rules: [
           {
-            toolName: 'server__*',
+            toolName: 'mcp_server_*',
+            mcpName: 'server',
             toolAnnotations: { destructiveHint: true },
             decision: PolicyDecision.DENY,
             priority: 10,
@@ -2471,12 +2462,12 @@ describe('PolicyEngine', () => {
         ],
       });
       const metadata = new Map<string, Record<string, unknown>>([
-        ['server__dangerous_tool', { destructiveHint: true }],
-        ['other__dangerous_tool', { destructiveHint: true }],
-        ['server__safe_tool', { readOnlyHint: true }],
+        ['mcp_server_dangerous_tool', { destructiveHint: true }],
+        ['mcp_other_dangerous_tool', { destructiveHint: true }],
+        ['mcp_server_safe_tool', { readOnlyHint: true }],
       ]);
       const excluded = engine.getExcludedTools(metadata);
-      expect(Array.from(excluded)).toEqual(['server__dangerous_tool']);
+      expect(Array.from(excluded)).toEqual(['mcp_server_dangerous_tool']);
     });
 
     it('should exclude unprocessed tools from allToolNames when global DENY is active', () => {
@@ -2493,8 +2484,8 @@ describe('PolicyEngine', () => {
             priority: 70,
           },
           {
-            // Simulates plan.toml: mcpName="*" → toolName="*__*"
-            toolName: '*__*',
+            // Simulates plan.toml: mcpName="*" → toolName="mcp_*"
+            toolName: 'mcp_*',
             toolAnnotations: { readOnlyHint: true },
             decision: PolicyDecision.ASK_USER,
             priority: 70,
@@ -2505,36 +2496,42 @@ describe('PolicyEngine', () => {
           },
         ],
       });
-      // MCP tools are registered with unqualified names in ToolRegistry
+      // MCP tools are registered with qualified names in ToolRegistry
       const allToolNames = new Set([
         'glob',
         'read_file',
         'shell',
         'web_fetch',
-        'read_mcp_tool',
-        'write_mcp_tool',
+        'mcp_my-server_read_mcp_tool',
+        'mcp_my-server_write_mcp_tool',
       ]);
       // buildToolMetadata() includes _serverName for MCP tools
       const toolMetadata = new Map<string, Record<string, unknown>>([
-        ['read_mcp_tool', { readOnlyHint: true, _serverName: 'my-server' }],
-        ['write_mcp_tool', { readOnlyHint: false, _serverName: 'my-server' }],
+        [
+          'mcp_my-server_read_mcp_tool',
+          { readOnlyHint: true, _serverName: 'my-server' },
+        ],
+        [
+          'mcp_my-server_write_mcp_tool',
+          { readOnlyHint: false, _serverName: 'my-server' },
+        ],
       ]);
       const excluded = engine.getExcludedTools(toolMetadata, allToolNames);
       expect(excluded.has('shell')).toBe(true);
       expect(excluded.has('web_fetch')).toBe(true);
       // Non-read-only MCP tool excluded by catch-all DENY
-      expect(excluded.has('write_mcp_tool')).toBe(true);
+      expect(excluded.has('mcp_my-server_write_mcp_tool')).toBe(true);
       expect(excluded.has('glob')).toBe(false);
       expect(excluded.has('read_file')).toBe(false);
       // Read-only MCP tool allowed by annotation rule
-      expect(excluded.has('read_mcp_tool')).toBe(false);
+      expect(excluded.has('mcp_my-server_read_mcp_tool')).toBe(false);
     });
 
     it('should match already-qualified MCP tool names without _serverName', () => {
       engine = new PolicyEngine({
         rules: [
           {
-            toolName: '*__*',
+            toolName: 'mcp_*',
             toolAnnotations: { readOnlyHint: true },
             decision: PolicyDecision.ASK_USER,
             priority: 70,
@@ -2547,17 +2544,17 @@ describe('PolicyEngine', () => {
       });
       // Tool registered with qualified name (collision case)
       const allToolNames = new Set([
-        'myserver__read_tool',
-        'myserver__write_tool',
+        'mcp_myserver_read_tool',
+        'mcp_myserver_write_tool',
       ]);
       const toolMetadata = new Map<string, Record<string, unknown>>([
-        ['myserver__read_tool', { readOnlyHint: true }],
-        ['myserver__write_tool', { readOnlyHint: false }],
+        ['mcp_myserver_read_tool', { readOnlyHint: true }],
+        ['mcp_myserver_write_tool', { readOnlyHint: false }],
       ]);
       const excluded = engine.getExcludedTools(toolMetadata, allToolNames);
       // Qualified name already contains __, matched directly without _serverName
-      expect(excluded.has('myserver__read_tool')).toBe(false);
-      expect(excluded.has('myserver__write_tool')).toBe(true);
+      expect(excluded.has('mcp_myserver_read_tool')).toBe(false);
+      expect(excluded.has('mcp_myserver_write_tool')).toBe(true);
     });
 
     it('should not exclude unprocessed tools when allToolNames is not provided (backward compat)', () => {
@@ -2648,7 +2645,7 @@ describe('PolicyEngine', () => {
             modes: [ApprovalMode.PLAN],
           },
           {
-            toolName: '*__*',
+            toolName: 'mcp_*',
             toolAnnotations: { readOnlyHint: true },
             decision: PolicyDecision.ASK_USER,
             priority: 70,
@@ -2679,13 +2676,19 @@ describe('PolicyEngine', () => {
         'write_todos',
         'memory',
         'save_memory',
-        'read_tool',
-        'write_tool',
+        'mcp_mcp-server_read_tool',
+        'mcp_mcp-server_write_tool',
       ]);
       // buildToolMetadata() includes _serverName for MCP tools
       const toolMetadata = new Map<string, Record<string, unknown>>([
-        ['read_tool', { readOnlyHint: true, _serverName: 'mcp-server' }],
-        ['write_tool', { readOnlyHint: false, _serverName: 'mcp-server' }],
+        [
+          'mcp_mcp-server_read_tool',
+          { readOnlyHint: true, _serverName: 'mcp-server' },
+        ],
+        [
+          'mcp_mcp-server_write_tool',
+          { readOnlyHint: false, _serverName: 'mcp-server' },
+        ],
       ]);
       const excluded = engine.getExcludedTools(toolMetadata, allToolNames);
       // These should be excluded (caught by catch-all DENY)
@@ -2698,7 +2701,7 @@ describe('PolicyEngine', () => {
       expect(excluded.has('write_file')).toBe(true);
       expect(excluded.has('replace')).toBe(true);
       // Non-read-only MCP tool excluded by catch-all DENY
-      expect(excluded.has('write_tool')).toBe(true);
+      expect(excluded.has('mcp_mcp-server_write_tool')).toBe(true);
       // These should NOT be excluded (explicitly allowed)
       expect(excluded.has('glob')).toBe(false);
       expect(excluded.has('grep_search')).toBe(false);
@@ -2710,7 +2713,7 @@ describe('PolicyEngine', () => {
       expect(excluded.has('exit_plan_mode')).toBe(false);
       expect(excluded.has('save_memory')).toBe(false);
       // Read-only MCP tool allowed by annotation rule (matched via _serverName)
-      expect(excluded.has('read_tool')).toBe(false);
+      expect(excluded.has('mcp_mcp-server_read_tool')).toBe(false);
     });
   });
 
@@ -3058,13 +3061,13 @@ describe('PolicyEngine', () => {
       engine = new PolicyEngine({
         rules: [
           {
-            toolName: '*__*',
+            toolName: 'mcp_*',
             toolAnnotations: { experimental: true },
             decision: PolicyDecision.DENY,
             priority: 20,
           },
           {
-            toolName: '*__*',
+            toolName: 'mcp_*',
             decision: PolicyDecision.ALLOW,
             priority: 10,
           },
@@ -3073,14 +3076,14 @@ describe('PolicyEngine', () => {
 
       expect(
         (
-          await engine.check({ name: 'mcp__test' }, 'mcp', {
+          await engine.check({ name: 'mcp_mcp_test' }, 'mcp', {
             experimental: true,
           })
         ).decision,
       ).toBe(PolicyDecision.DENY);
       expect(
         (
-          await engine.check({ name: 'mcp__stable' }, 'mcp', {
+          await engine.check({ name: 'mcp_mcp_stable' }, 'mcp', {
             experimental: false,
           })
         ).decision,

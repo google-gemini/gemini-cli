@@ -5,6 +5,7 @@
  */
 
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -23,18 +24,21 @@ import type { McpContext } from './mcp-client.js';
 
 /**
  * The separator used to qualify MCP tool names with their server prefix.
- * e.g. "server_name__tool_name"
+ * e.g. "mcp_server_name_tool_name"
  */
-export const MCP_QUALIFIED_NAME_SEPARATOR = '__';
+export const MCP_QUALIFIED_NAME_SEPARATOR = '_';
 
 /**
- * Returns true if `name` matches the MCP qualified name format: "server__tool",
- * i.e. exactly two non-empty parts separated by the MCP_QUALIFIED_NAME_SEPARATOR.
+ * The strict prefix that all MCP tools must start with.
+ */
+export const MCP_TOOL_PREFIX = 'mcp_';
+
+/**
+ * Returns true if `name` matches the MCP qualified name format: "mcp_server_tool",
+ * i.e. starts with the "mcp_" prefix.
  */
 export function isMcpToolName(name: string): boolean {
-  if (!name.includes(MCP_QUALIFIED_NAME_SEPARATOR)) return false;
-  const parts = name.split(MCP_QUALIFIED_NAME_SEPARATOR);
-  return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
+  return name.startsWith(MCP_TOOL_PREFIX);
 }
 
 type ToolParams = Record<string, unknown>;
@@ -274,7 +278,10 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     private readonly _toolAnnotations?: Record<string, unknown>,
   ) {
     super(
-      generateValidName(nameOverride ?? serverToolName),
+      nameOverride ??
+        generateValidName(
+          `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${serverToolName}`,
+        ),
       `${serverToolName} (${serverName} MCP Server)`,
       description,
       Kind.Other,
@@ -302,7 +309,9 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
   }
 
   getFullyQualifiedPrefix(): string {
-    return `${this.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}`;
+    return generateValidName(
+      `${this.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}`,
+    );
   }
 
   getFullyQualifiedName(): string {
@@ -493,8 +502,12 @@ const MAX_FUNCTION_NAME_LENGTH = 64;
 
 /** Visible for testing */
 export function generateValidName(name: string) {
-  // Replace invalid characters (based on 400 error message from Gemini API) with underscores
-  let validToolname = name.replace(/[^a-zA-Z0-9_.:-]/g, '_');
+  // Enforce the mcp_ prefix for all generated MCP tool names
+  let validToolname = name.startsWith('mcp_') ? name : `mcp_${name}`;
+
+  // Replace invalid characters with underscores to conform to Gemini API:
+  // ^[a-zA-Z_][a-zA-Z0-9_\-.:]{0,63}$
+  validToolname = validToolname.replace(/[^a-zA-Z0-9_\-.:]/g, '_');
 
   // Ensure it starts with a letter or underscore
   if (/^[^a-zA-Z_]/.test(validToolname)) {
@@ -505,6 +518,9 @@ export function generateValidName(name: string) {
   // Note: We use 63 instead of 64 to be safe, as some environments have off-by-one behaviors.
   const safeLimit = MAX_FUNCTION_NAME_LENGTH - 1;
   if (validToolname.length > safeLimit) {
+    debugLogger.warn(
+      `Truncating MCP tool name "${validToolname}" to fit within the 64 character limit. This tool may require user approval.`,
+    );
     validToolname =
       validToolname.slice(0, 30) + '...' + validToolname.slice(-30);
   }
