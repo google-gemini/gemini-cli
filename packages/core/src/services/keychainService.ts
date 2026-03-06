@@ -7,10 +7,10 @@
 import * as crypto from 'node:crypto';
 import { coreEvents } from '../utils/events.js';
 import { KeychainAvailabilityEvent } from '../telemetry/types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import {
   type Keychain,
   KeychainSchema,
-  InitializationState,
   KEYCHAIN_TEST_PREFIX,
 } from './keychainTypes.js';
 
@@ -18,11 +18,8 @@ import {
  * Service for interacting with OS-level secure storage (e.g. keytar).
  */
 export class KeychainService {
-  private initializationState: InitializationState =
-    InitializationState.UNKNOWN;
-
-  // The functional keychain module if initialization succeeded, null otherwise.
-  private keychainModule: Keychain | null = null;
+  // Track an ongoing initialization attempt to avoid race conditions.
+  private initializationPromise?: Promise<Keychain | null>;
 
   /**
    * @param serviceName Unique identifier for the app in the OS keychain.
@@ -33,28 +30,43 @@ export class KeychainService {
     return (await this.getKeychain()) !== null;
   }
 
-  // Returns the secret string, or null if not found.
+  /**
+   * Retrieves a secret for the given account.
+   * @throws Error if the keychain is unavailable.
+   */
   async getPassword(account: string): Promise<string | null> {
     const keychain = await this.getKeychainOrThrow();
     return keychain.getPassword(this.serviceName, account);
   }
 
+  /**
+   * Securely stores a secret.
+   * @throws Error if the keychain is unavailable.
+   */
   async setPassword(account: string, value: string): Promise<void> {
     const keychain = await this.getKeychainOrThrow();
     await keychain.setPassword(this.serviceName, account, value);
   }
 
-  // Returns true if the secret was deleted, false otherwise.
+  /**
+   * Removes a secret from the keychain.
+   * @returns true if the secret was deleted, false otherwise.
+   * @throws Error if the keychain is unavailable.
+   */
   async deletePassword(account: string): Promise<boolean> {
     const keychain = await this.getKeychainOrThrow();
     return keychain.deletePassword(this.serviceName, account);
   }
 
-  async listCredentials(): Promise<
+  /**
+   * Lists all account/secret pairs stored under this service.
+   * @throws Error if the keychain is unavailable.
+   */
+  async findCredentials(): Promise<
     Array<{ account: string; password: string }>
   > {
     const keychain = await this.getKeychainOrThrow();
-    return keychain.listCredentials(this.serviceName);
+    return keychain.findCredentials(this.serviceName);
   }
 
   private async getKeychainOrThrow(): Promise<Keychain> {
@@ -65,47 +77,53 @@ export class KeychainService {
     return keychain;
   }
 
-  private async getKeychain(): Promise<Keychain | null> {
-    if (this.initializationState === InitializationState.UNKNOWN) {
-      await this.initializeKeychain();
-    }
-    return this.keychainModule;
+  private getKeychain(): Promise<Keychain | null> {
+    return (this.initializationPromise ??= this.initializeKeychain());
   }
 
-  private async initializeKeychain(): Promise<void> {
-    try {
-      // Dynamically load the keychain module.
-      const moduleName = 'keytar';
-      const module: unknown = await import(moduleName);
-      let potentialKeychain = module;
-      if (this.isRecord(module) && module['default']) {
-        potentialKeychain = module['default'];
-      }
+  // High-level orchestration of the loading and testing cycle.
+  private async initializeKeychain(): Promise<Keychain | null> {
+    let resultKeychain: Keychain | null = null;
 
-      // Validate module structure and perform functional test.
-      const result = KeychainSchema.safeParse(potentialKeychain);
-      if (result.success) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const keychain = potentialKeychain as Keychain;
-        if (await this.isKeychainFunctional(keychain)) {
-          this.keychainModule = keychain;
-          this.initializationState = InitializationState.SUCCESS;
+    try {
+      const keychainModule = await this.loadKeychainModule();
+      if (keychainModule) {
+        if (await this.isKeychainFunctional(keychainModule)) {
+          resultKeychain = keychainModule;
+        } else {
+          debugLogger.log('Keychain functional verification failed');
         }
       }
-    } catch (_) {
-      // Module load or functional test error.
-    }
-
-    // If not successful, mark as failed.
-    if (this.initializationState === InitializationState.UNKNOWN) {
-      this.initializationState = InitializationState.FAILURE;
+    } catch (error) {
+      // Avoid logging full error objects to prevent PII exposure.
+      const message = error instanceof Error ? error.message : String(error);
+      debugLogger.log('Keychain initialization encountered an error:', message);
     }
 
     coreEvents.emitTelemetryKeychainAvailability(
-      new KeychainAvailabilityEvent(
-        this.initializationState === InitializationState.SUCCESS,
-      ),
+      new KeychainAvailabilityEvent(resultKeychain !== null),
     );
+
+    return resultKeychain;
+  }
+
+  // Low-level dynamic loading and structural validation.
+  private async loadKeychainModule(): Promise<Keychain | null> {
+    const moduleName = 'keytar';
+    const module: unknown = await import(moduleName);
+    const potential = (this.isRecord(module) && module['default']) || module;
+
+    const result = KeychainSchema.safeParse(potential);
+    if (result.success) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return potential as Keychain;
+    }
+
+    debugLogger.log(
+      'Keychain module failed structural validation:',
+      result.error.flatten().fieldErrors,
+    );
+    return null;
   }
 
   private isRecord(obj: unknown): obj is Record<string, unknown> {
@@ -117,23 +135,13 @@ export class KeychainService {
     const testAccount = `${KEYCHAIN_TEST_PREFIX}${crypto.randomBytes(8).toString('hex')}`;
     const testPassword = 'test';
 
-    let success = false;
-    try {
-      await keychain.setPassword(this.serviceName, testAccount, testPassword);
-      const retrieved = await keychain.getPassword(
-        this.serviceName,
-        testAccount,
-      );
-      const deleted = await keychain.deletePassword(
-        this.serviceName,
-        testAccount,
-      );
+    await keychain.setPassword(this.serviceName, testAccount, testPassword);
+    const retrieved = await keychain.getPassword(this.serviceName, testAccount);
+    const deleted = await keychain.deletePassword(
+      this.serviceName,
+      testAccount,
+    );
 
-      success = deleted && retrieved === testPassword;
-    } catch (_) {
-      success = false;
-    }
-
-    return success;
+    return deleted && retrieved === testPassword;
   }
 }

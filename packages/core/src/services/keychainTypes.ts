@@ -8,6 +8,8 @@ import { z } from 'zod';
 
 /**
  * Interface for OS-level secure storage operations.
+ * Note: Method names must match the underlying library (e.g. keytar)
+ * to support correct dynamic loading and schema validation.
  */
 export interface Keychain {
   getPassword(service: string, account: string): Promise<string | null>;
@@ -17,7 +19,7 @@ export interface Keychain {
     password: string,
   ): Promise<void>;
   deletePassword(service: string, account: string): Promise<boolean>;
-  listCredentials(
+  findCredentials(
     service: string,
   ): Promise<Array<{ account: string; password: string }>>;
 }
@@ -29,16 +31,8 @@ export const KeychainSchema = z.object({
   getPassword: z.function(),
   setPassword: z.function(),
   deletePassword: z.function(),
-  listCredentials: z.function(),
+  findCredentials: z.function(),
 });
 
 export const KEYCHAIN_TEST_PREFIX = '__keychain_test__';
-
-/**
- * Lifecycle states of the Keychain initialization.
- */
-export enum InitializationState {
-  UNKNOWN = 'unknown',
-  SUCCESS = 'success',
-  FAILURE = 'failure',
-}
+export const SECRET_PREFIX = '__secret__';

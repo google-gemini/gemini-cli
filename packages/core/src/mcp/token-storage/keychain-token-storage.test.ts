@@ -33,7 +33,7 @@ describe('KeychainTokenStorage', () => {
     vi.spyOn(KeychainService.prototype, 'deletePassword').mockImplementation(
       async (account) => storageState.delete(account),
     );
-    vi.spyOn(KeychainService.prototype, 'listCredentials').mockImplementation(
+    vi.spyOn(KeychainService.prototype, 'findCredentials').mockImplementation(
       async () =>
         Array.from(storageState.entries()).map(([account, password]) => ({
           account,
@@ -116,12 +116,23 @@ describe('KeychainTokenStorage', () => {
     it('should aggregate errors in clearAll', async () => {
       storageState.set('s1', '...');
       storageState.set('s2', '...');
+
+      // Aggregating a system error (rejection)
       vi.spyOn(KeychainService.prototype, 'deletePassword')
         .mockResolvedValueOnce(true)
-        .mockRejectedValueOnce(new Error('fail'));
+        .mockRejectedValueOnce(new Error('system fail'));
 
       await expect(storage.clearAll()).rejects.toThrow(
-        /Failed to clear some credentials/,
+        /Failed to clear some credentials: system fail/,
+      );
+
+      // Aggregating a 'not found' error (returns false)
+      vi.spyOn(KeychainService.prototype, 'deletePassword')
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false);
+
+      await expect(storage.clearAll()).rejects.toThrow(
+        /Failed to clear some credentials: No credentials found/,
       );
     });
 
@@ -149,7 +160,7 @@ describe('KeychainTokenStorage', () => {
       vi.spyOn(KeychainService.prototype, 'deletePassword').mockRejectedValue(
         new Error('Keychain is not available'),
       );
-      vi.spyOn(KeychainService.prototype, 'listCredentials').mockRejectedValue(
+      vi.spyOn(KeychainService.prototype, 'findCredentials').mockRejectedValue(
         new Error('Keychain is not available'),
       );
     });

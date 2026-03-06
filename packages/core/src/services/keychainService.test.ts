@@ -7,25 +7,30 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { KeychainService } from './keychainService.js';
 import { coreEvents } from '../utils/events.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 type MockKeychain = {
   getPassword: Mock | undefined;
   setPassword: Mock | undefined;
   deletePassword: Mock | undefined;
-  listCredentials: Mock | undefined;
+  findCredentials: Mock | undefined;
 };
 
 const mockKeytar: MockKeychain = {
   getPassword: vi.fn(),
   setPassword: vi.fn(),
   deletePassword: vi.fn(),
-  listCredentials: vi.fn(),
+  findCredentials: vi.fn(),
 };
 
 vi.mock('keytar', () => ({ default: mockKeytar }));
 
 vi.mock('../utils/events.js', () => ({
   coreEvents: { emitTelemetryKeychainAvailability: vi.fn() },
+}));
+
+vi.mock('../utils/debugLogger.js', () => ({
+  debugLogger: { log: vi.fn() },
 }));
 
 describe('KeychainService', () => {
@@ -51,7 +56,7 @@ describe('KeychainService', () => {
       delete passwords[acc];
       return Promise.resolve(exists);
     });
-    mockKeytar.listCredentials?.mockImplementation(() =>
+    mockKeytar.findCredentials?.mockImplementation(() =>
       Promise.resolve(
         Object.entries(passwords).map(([account, password]) => ({
           account,
@@ -72,24 +77,32 @@ describe('KeychainService', () => {
       );
     });
 
-    it('should return false and emit telemetry on failed functional test', async () => {
+    it('should return false, log error, and emit telemetry on failed functional test', async () => {
       mockKeytar.setPassword?.mockRejectedValue(new Error('locked'));
 
       const available = await service.isAvailable();
 
       expect(available).toBe(false);
+      expect(debugLogger.log).toHaveBeenCalledWith(
+        expect.stringContaining('encountered an error'),
+        'locked',
+      );
       expect(coreEvents.emitTelemetryKeychainAvailability).toHaveBeenCalledWith(
         expect.objectContaining({ available: false }),
       );
     });
 
-    it('should return false and emit telemetry on module load failure', async () => {
+    it('should return false, log validation error, and emit telemetry on module load failure', async () => {
       const originalMock = mockKeytar.getPassword;
-      mockKeytar.getPassword = undefined;
+      mockKeytar.getPassword = undefined; // Break schema
 
       const available = await service.isAvailable();
 
       expect(available).toBe(false);
+      expect(debugLogger.log).toHaveBeenCalledWith(
+        expect.stringContaining('failed structural validation'),
+        expect.objectContaining({ getPassword: expect.any(Array) }),
+      );
       expect(coreEvents.emitTelemetryKeychainAvailability).toHaveBeenCalledWith(
         expect.objectContaining({ available: false }),
       );
@@ -97,9 +110,23 @@ describe('KeychainService', () => {
       mockKeytar.getPassword = originalMock;
     });
 
-    it('should cache the result and only perform the test once', async () => {
-      await service.isAvailable();
-      await service.isAvailable();
+    it('should log failure if functional test cycle returns false', async () => {
+      mockKeytar.getPassword?.mockResolvedValue('wrong-password');
+
+      const available = await service.isAvailable();
+
+      expect(available).toBe(false);
+      expect(debugLogger.log).toHaveBeenCalledWith(
+        expect.stringContaining('functional verification failed'),
+      );
+    });
+
+    it('should cache the result and handle concurrent initialization attempts once', async () => {
+      await Promise.all([
+        service.isAvailable(),
+        service.isAvailable(),
+        service.isAvailable(),
+      ]);
 
       expect(mockKeytar.setPassword).toHaveBeenCalledTimes(1);
     });
@@ -118,13 +145,13 @@ describe('KeychainService', () => {
       expect(await service.getPassword('acc1')).toBe('secret1');
       expect(await service.getPassword('acc2')).toBe('secret2');
 
-      const creds = await service.listCredentials();
+      const creds = await service.findCredentials();
       expect(creds).toHaveLength(2);
       expect(creds).toContainEqual({ account: 'acc1', password: 'secret1' });
 
       expect(await service.deletePassword('acc1')).toBe(true);
       expect(await service.getPassword('acc1')).toBeNull();
-      expect(await service.listCredentials()).toHaveLength(1);
+      expect(await service.findCredentials()).toHaveLength(1);
     });
 
     it('getPassword should return null if key is missing', async () => {
@@ -141,7 +168,7 @@ describe('KeychainService', () => {
       { method: 'getPassword', args: ['acc'] },
       { method: 'setPassword', args: ['acc', 'val'] },
       { method: 'deletePassword', args: ['acc'] },
-      { method: 'listCredentials', args: [] },
+      { method: 'findCredentials', args: [] },
     ])('$method should throw a consistent error', async ({ method, args }) => {
       await expect(
         (

@@ -8,9 +8,10 @@ import { BaseTokenStorage } from './base-token-storage.js';
 import type { OAuthCredentials, SecretStorage } from './types.js';
 import { coreEvents } from '../../utils/events.js';
 import { KeychainService } from '../../services/keychainService.js';
-import { KEYCHAIN_TEST_PREFIX } from '../../services/keychainTypes.js';
-
-const SECRET_PREFIX = '__secret__';
+import {
+  KEYCHAIN_TEST_PREFIX,
+  SECRET_PREFIX,
+} from '../../services/keychainTypes.js';
 
 export class KeychainTokenStorage
   extends BaseTokenStorage
@@ -72,7 +73,7 @@ export class KeychainTokenStorage
 
   async listServers(): Promise<string[]> {
     try {
-      const credentials = await this.keychainService.listCredentials();
+      const credentials = await this.keychainService.findCredentials();
       return credentials
         .filter(
           (cred) =>
@@ -93,7 +94,7 @@ export class KeychainTokenStorage
   async getAllCredentials(): Promise<Map<string, OAuthCredentials>> {
     const result = new Map<string, OAuthCredentials>();
     try {
-      const credentials = (await this.keychainService.listCredentials()).filter(
+      const credentials = (await this.keychainService.findCredentials()).filter(
         (c) =>
           !c.account.startsWith(KEYCHAIN_TEST_PREFIX) &&
           !c.account.startsWith(SECRET_PREFIX),
@@ -127,12 +128,12 @@ export class KeychainTokenStorage
 
   async clearAll(): Promise<void> {
     try {
-      const credentials = await this.keychainService.listCredentials();
+      const credentials = await this.keychainService.findCredentials();
       const errors: Error[] = [];
 
       for (const cred of credentials) {
         try {
-          await this.keychainService.deletePassword(cred.account);
+          await this.deleteCredentials(cred.account);
         } catch (error) {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           errors.push(error as Error);
@@ -145,16 +146,11 @@ export class KeychainTokenStorage
         );
       }
     } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        !error.message.includes('Failed to clear some credentials')
-      ) {
-        coreEvents.emitFeedback(
-          'error',
-          'Failed to clear credentials from keychain',
-          error,
-        );
-      }
+      coreEvents.emitFeedback(
+        'error',
+        'Failed to clear credentials from keychain',
+        error,
+      );
       throw error;
     }
   }
@@ -182,7 +178,7 @@ export class KeychainTokenStorage
 
   async listSecrets(): Promise<string[]> {
     try {
-      const credentials = await this.keychainService.listCredentials();
+      const credentials = await this.keychainService.findCredentials();
       return credentials
         .filter((cred) => cred.account.startsWith(SECRET_PREFIX))
         .map((cred) => cred.account.substring(SECRET_PREFIX.length));
