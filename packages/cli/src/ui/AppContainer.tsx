@@ -2484,15 +2484,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       onHintClear: () => {},
       onHintSubmit: () => {},
       handleRestart: async () => {
-        if (process.send) {
-          const remoteSettings = config.getRemoteAdminSettings();
-          if (remoteSettings) {
-            process.send({
-              type: 'admin-settings-update',
-              settings: remoteSettings,
-            });
-          }
-        }
         await relaunchApp();
       },
       handleNewAgentsSelect: async (choice: NewAgentsChoice) => {
