@@ -80,8 +80,8 @@ export function getInstallationInfo(
       };
     }
 
-    // Check for Homebrew
-    if (process.platform === 'darwin') {
+    // Check for Homebrew (macOS) or Linuxbrew (Linux/WSL)
+    if (process.platform === 'darwin' || process.platform === 'linux') {
       try {
         const brewPrefix = childProcess
           .execSync('brew --prefix gemini-cli', {
