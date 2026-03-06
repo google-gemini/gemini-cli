@@ -11,6 +11,7 @@ import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
+import * as path from 'node:path';
 import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
@@ -466,9 +467,21 @@ export async function loadCliConfig(
     ...settings.context?.fileFiltering,
   };
 
+  //changes the includeDirectories to be absolute paths based on the cwd, and also include any additional directories specified via CLI args
   const includeDirectories = (settings.context?.includeDirectories || [])
     .map(resolvePath)
     .concat((argv.includeDirectories || []).map(resolvePath));
+
+  // When running inside VSCode with multiple workspace folders,
+  // automatically add the other folders as include directories
+  // so Gemini has context of all open folders, not just the cwd.
+  const ideWorkspacePath = process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+  if (ideWorkspacePath) {
+    const ideFolders = ideWorkspacePath
+      .split(path.delimiter)
+      .filter((p) => p.trim() && p.trim() !== cwd);
+    includeDirectories.push(...ideFolders);
+  }
 
   const extensionManager = new ExtensionManager({
     settings,
