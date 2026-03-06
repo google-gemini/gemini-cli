@@ -32,6 +32,7 @@ Learn how to enable and setup OpenTelemetry for Gemini CLI.
     - [Metrics](#metrics)
       - [Custom](#custom)
         - [Sessions](#sessions-1)
+        - [Authentication](#authentication)
         - [Tools](#tools-1)
         - [API](#api-1)
         - [Token usage](#token-usage)
@@ -649,6 +650,16 @@ Metrics are numerical measurements of behavior over time.
 Counts CLI sessions at startup.
 
 - `gemini_cli.session.count` (Counter, Int): Incremented once per CLI startup.
+
+##### Authentication
+
+Tracks "Login with Google" OAuth flow initiation and completion.
+
+- `gemini_cli.google_auth.start` (Counter, Int): Incremented when the "Login
+  with Google" OAuth flow begins.
+
+- `gemini_cli.google_auth.end` (Counter, Int): Incremented when the "Login with
+  Google" OAuth flow completes successfully.
 
 ##### Tools
 
