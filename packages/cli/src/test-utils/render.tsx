@@ -784,11 +784,7 @@ export const renderWithProviders = (
                           config={finalConfig}
                           toolCalls={allToolCalls}
                         >
-                          <AskUserActionsProvider
-                            request={null}
-                            onSubmit={vi.fn()}
-                            onCancel={vi.fn()}
-                          >
+                          <AskUserActionsProvider>
                             <KeypressProvider>
                               <MouseProvider
                                 mouseEventsEnabled={mouseEventsEnabled}

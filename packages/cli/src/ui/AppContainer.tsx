@@ -2601,11 +2601,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
               startupWarnings: props.startupWarnings || [],
             }}
           >
-            <AskUserActionsProvider
-              request={null}
-              onSubmit={async () => {}}
-              onCancel={() => {}}
-            >
+            <AskUserActionsProvider>
               <ToolActionsProvider config={config} toolCalls={allToolCalls}>
                 <ShellFocusContext.Provider value={isFocused}>
                   <App key={`app-${forceRerenderKey}`} />

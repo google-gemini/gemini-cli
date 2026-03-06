@@ -5,24 +5,9 @@
  */
 
 import type React from 'react';
-import {
-  createContext,
-  useContext,
-  useMemo,
-  useState,
-  useCallback,
-} from 'react';
-import type { Question } from '@google/gemini-cli-core';
-
-export interface AskUserState {
-  questions: Question[];
-  correlationId: string;
-}
+import { createContext, useContext, useState, useCallback } from 'react';
 
 interface AskUserActionsContextValue {
-  request: AskUserState | null;
-  submit: (answers: { [questionIndex: string]: string }) => Promise<void>;
-  cancel: () => void;
   inProgressAnswers: Record<string, string>;
   setInProgressAnswer: (key: string, value: string) => void;
   clearInProgressAnswers: () => void;
@@ -43,16 +28,10 @@ export const useAskUserActions = () => {
 
 interface AskUserActionsProviderProps {
   children: React.ReactNode;
-  request: AskUserState | null;
-  onSubmit: (answers: { [questionIndex: string]: string }) => Promise<void>;
-  onCancel: () => void;
 }
 
 export const AskUserActionsProvider: React.FC<AskUserActionsProviderProps> = ({
   children,
-  request,
-  onSubmit,
-  onCancel,
 }) => {
   const [inProgressAnswers, setInProgressAnswersState] = useState<
     Record<string, string>
@@ -66,27 +45,10 @@ export const AskUserActionsProvider: React.FC<AskUserActionsProviderProps> = ({
     setInProgressAnswersState({});
   }, []);
 
-  const value = useMemo(
-    () => ({
-      request,
-      submit: onSubmit,
-      cancel: onCancel,
-      inProgressAnswers,
-      setInProgressAnswer,
-      clearInProgressAnswers,
-    }),
-    [
-      request,
-      onSubmit,
-      onCancel,
-      inProgressAnswers,
-      setInProgressAnswer,
-      clearInProgressAnswers,
-    ],
-  );
-
   return (
-    <AskUserActionsContext.Provider value={value}>
+    <AskUserActionsContext.Provider
+      value={{ inProgressAnswers, setInProgressAnswer, clearInProgressAnswers }}
+    >
       {children}
     </AskUserActionsContext.Provider>
   );
