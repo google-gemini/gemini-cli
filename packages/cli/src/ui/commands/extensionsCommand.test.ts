@@ -755,7 +755,7 @@ describe('extensionsCommand', () => {
       await uninstallAction!(mockContext, '');
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
-        text: 'Usage: /extensions uninstall <extension-name>',
+        text: 'Usage: /extensions uninstall <extension-names...>|--all',
       });
       expect(mockUninstallExtension).not.toHaveBeenCalled();
     });
