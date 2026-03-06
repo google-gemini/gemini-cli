@@ -106,8 +106,9 @@ their corresponding top-level category object in your `settings.json` file.
 #### `general`
 
 - **`general.preferredEditor`** (string):
-  - **Description:** The preferred editor to open files in when using the
-    external editor feature (Ctrl-X).
+  - **Description:** The preferred editor to open files in. Must be one of the
+    built-in supported identifiers. Use /editor in the CLI to pick
+    interactively, or leave unset to use $VISUAL/$EDITOR.
   - **Default:** `undefined`
   - **Accepted values:**
 
