@@ -391,6 +391,7 @@ import { McpClientManager } from '../tools/mcp-client-manager.js';
 import { type McpContext } from '../tools/mcp-client.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { resolvePtyBackend } from '../utils/getPty.js';
 
 export type { FileFilteringOptions };
 export {
@@ -562,6 +563,7 @@ export interface ConfigParameters {
   fakeResponses?: string;
   recordResponses?: string;
   ptyInfo?: string;
+  ptyBackend?: 'native' | 'script' | 'proxy' | 'none';
   disableYoloMode?: boolean;
   rawOutput?: boolean;
   acceptRawOutputRisk?: boolean;
@@ -722,6 +724,7 @@ export class Config implements McpContext {
   /** Public for testing only */
   readonly interactive: boolean;
   private readonly ptyInfo: string;
+  private readonly ptyBackend: 'native' | 'script' | 'proxy' | 'none';
   private readonly trustedFolder: boolean | undefined;
   private readonly directWebFetch: boolean;
   private readonly useRipgrep: boolean;
@@ -929,6 +932,7 @@ export class Config implements McpContext {
     this.compressionThreshold = params.compressionThreshold;
     this.interactive = params.interactive ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
+    this.ptyBackend = params.ptyBackend ?? 'native';
     this.trustedFolder = params.trustedFolder;
     this.directWebFetch = params.directWebFetch ?? false;
     this.useRipgrep = params.useRipgrep ?? true;
@@ -2534,9 +2538,12 @@ export class Config implements McpContext {
   }
 
   isInteractiveShellEnabled(): boolean {
+    const backend = this.getPtyBackend();
+    const hasPtyCapability = backend !== 'none';
     return (
       this.interactive &&
-      this.ptyInfo !== 'child_process' &&
+      hasPtyCapability &&
+      (backend !== 'native' || this.ptyInfo !== 'child_process') &&
       this.enableInteractiveShell
     );
   }
@@ -2619,6 +2626,10 @@ export class Config implements McpContext {
     return this.enableInteractiveShell;
   }
 
+  getPtyBackend(): 'native' | 'script' | 'proxy' | 'none' {
+    return resolvePtyBackend(this.ptyBackend);
+  }
+
   getSkipNextSpeakerCheck(): boolean {
     return this.skipNextSpeakerCheck;
   }
@@ -2644,7 +2655,10 @@ export class Config implements McpContext {
   }
 
   getShellExecutionConfig(): ShellExecutionConfig {
-    return this.shellExecutionConfig;
+    return {
+      ...this.shellExecutionConfig,
+      ptyBackend: this.getPtyBackend(),
+    };
   }
 
   setShellExecutionConfig(config: ShellExecutionConfig): void {

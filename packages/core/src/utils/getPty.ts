@@ -17,6 +17,18 @@ export interface PtyProcess {
   kill(signal?: string): void;
 }
 
+export type PtyBackend = 'native' | 'script' | 'proxy' | 'none';
+
+export function resolvePtyBackend(configBackend?: PtyBackend): PtyBackend {
+  const envVal = process.env['GEMINI_PTY_BACKEND'];
+  if (envVal === 'external' || envVal === 'script') return 'script';
+  if (envVal === 'proxy') return 'proxy';
+  if (envVal === 'none') return 'none';
+  if (envVal === 'native') return 'native';
+  if (configBackend) return configBackend;
+  return 'native';
+}
+
 export const getPty = async (): Promise<PtyImplementation> => {
   if (process.env['GEMINI_PTY_INFO'] === 'child_process') {
     return null;
