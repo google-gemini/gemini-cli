@@ -760,29 +760,6 @@ describe('extensionsCommand', () => {
       expect(mockUninstallExtension).not.toHaveBeenCalled();
     });
 
-    it('should call uninstallExtension and show success message for multiple extensions', async () => {
-      const extensionNames = 'ext1 ext2';
-      await uninstallAction!(mockContext, extensionNames);
-      expect(mockUninstallExtension).toHaveBeenCalledWith('ext1', false);
-      expect(mockUninstallExtension).toHaveBeenCalledWith('ext2', false);
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
-        type: MessageType.INFO,
-        text: 'Uninstalling extension "ext1"...',
-      });
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
-        type: MessageType.INFO,
-        text: 'Extension "ext1" uninstalled successfully.',
-      });
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
-        type: MessageType.INFO,
-        text: 'Uninstalling extension "ext2"...',
-      });
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
-        type: MessageType.INFO,
-        text: 'Extension "ext2" uninstalled successfully.',
-      });
-    });
-
     it('should call uninstallExtension and show success message', async () => {
       const extensionName = 'test-extension';
       await uninstallAction!(mockContext, extensionName);

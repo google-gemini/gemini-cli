@@ -73,7 +73,7 @@ describe('DialogManager', () => {
     terminalHeight: 24,
     staticExtraHeight: 0,
     terminalWidth: 80,
-    interactiveConsentRequests: [],
+    confirmUpdateExtensionRequests: [],
     showIdeRestartPrompt: false,
     quota: {
       userTier: undefined,
@@ -162,7 +162,7 @@ describe('DialogManager', () => {
     ],
     [
       {
-        interactiveConsentRequests: [{ prompt: 'foo', onConfirm: vi.fn() }],
+        confirmUpdateExtensionRequests: [{ prompt: 'foo', onConfirm: vi.fn() }],
       },
       'ConsentPrompt',
     ],

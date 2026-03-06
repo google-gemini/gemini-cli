@@ -137,7 +137,7 @@ import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import {
-  useInteractiveConsentRequests,
+  useConfirmUpdateRequests,
   useExtensionUpdates,
 } from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
@@ -315,12 +315,12 @@ export const AppContainer = (props: AppContainerProps) => {
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.
   extensionManager.setRequestConsent((description) =>
-    requestConsentInteractive(description, addInteractiveConsentRequest),
+    requestConsentInteractive(description, addConfirmUpdateExtensionRequest),
   );
   extensionManager.setRequestSetting();
 
-  const { addInteractiveConsentRequest, interactiveConsentRequests } =
-    useInteractiveConsentRequests();
+  const { addConfirmUpdateExtensionRequest, confirmUpdateExtensionRequests } =
+    useConfirmUpdateRequests();
   const {
     extensionsUpdateState,
     extensionsUpdateStateInternal,
@@ -591,7 +591,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // One-time prompt to suggest running /terminal-setup when it would help.
   useTerminalSetupPrompt({
-    addInteractiveConsentRequest,
+    addConfirmUpdateExtensionRequest,
     addItem: historyManager.addItem,
   });
 
@@ -913,7 +913,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleCorgiMode: () => setCorgiMode((prev) => !prev),
       toggleDebugProfiler,
       dispatchExtensionStateUpdate,
-      addInteractiveConsentRequest,
+      addConfirmUpdateExtensionRequest,
       toggleBackgroundShell: () => {
         toggleBackgroundShellRef.current();
         if (!isBackgroundShellVisibleRef.current) {
@@ -942,7 +942,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setCorgiMode,
       dispatchExtensionStateUpdate,
       openPermissionsDialog,
-      addInteractiveConsentRequest,
+      addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
       setShortcutsHelpVisible,
       stableSetText,
@@ -2003,7 +2003,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!authConsentRequest ||
     !!permissionConfirmationRequest ||
     !!customDialog ||
-    interactiveConsentRequests.length > 0 ||
+    confirmUpdateExtensionRequests.length > 0 ||
     !!loopDetectionConfirmationRequest ||
     isThemeDialogOpen ||
     isSettingsDialogOpen ||
@@ -2033,8 +2033,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [pendingHistoryItems],
   );
 
-  const hasInteractiveConsentRequests =
-    interactiveConsentRequests.length > 0;
+  const hasConfirmUpdateExtensionRequests =
+    confirmUpdateExtensionRequests.length > 0;
   const hasLoopDetectionConfirmationRequest =
     !!loopDetectionConfirmationRequest;
 
@@ -2042,7 +2042,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     hasPendingToolConfirmation ||
     !!commandConfirmationRequest ||
     !!authConsentRequest ||
-    hasInteractiveConsentRequests ||
+    hasConfirmUpdateExtensionRequests ||
     hasLoopDetectionConfirmationRequest ||
     !!proQuotaRequest ||
     !!validationRequest ||
@@ -2073,7 +2073,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     commandConfirmationRequest,
     authConsentRequest,
     permissionConfirmationRequest,
-    hasInteractiveConsentRequests,
+    hasConfirmUpdateExtensionRequests,
     hasLoopDetectionConfirmationRequest,
   });
 
@@ -2201,7 +2201,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       commandContext,
       commandConfirmationRequest,
       authConsentRequest,
-      interactiveConsentRequests,
+      confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
       permissionConfirmationRequest,
       geminiMdFileCount,
@@ -2329,7 +2329,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       commandContext,
       commandConfirmationRequest,
       authConsentRequest,
-      interactiveConsentRequests,
+      confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
       permissionConfirmationRequest,
       geminiMdFileCount,

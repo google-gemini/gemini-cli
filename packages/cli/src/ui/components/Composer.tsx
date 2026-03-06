@@ -79,7 +79,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     hasPendingToolConfirmation ||
     Boolean(uiState.commandConfirmationRequest) ||
     Boolean(uiState.authConsentRequest) ||
-    (uiState.interactiveConsentRequests?.length ?? 0) > 0 ||
+    (uiState.confirmUpdateExtensionRequests?.length ?? 0) > 0 ||
     Boolean(uiState.loopDetectionConfirmationRequest) ||
     Boolean(uiState.quota.proQuotaRequest) ||
     Boolean(uiState.quota.validationRequest) ||

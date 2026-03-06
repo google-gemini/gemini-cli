@@ -135,7 +135,7 @@ export interface UIState {
   commandContext: CommandContext;
   commandConfirmationRequest: ConfirmationRequest | null;
   authConsentRequest: ConfirmationRequest | null;
-  interactiveConsentRequests: ConfirmationRequest[];
+  confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
   permissionConfirmationRequest: PermissionConfirmationRequest | null;
   geminiMdFileCount: number;

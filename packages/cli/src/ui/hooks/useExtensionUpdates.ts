@@ -45,33 +45,35 @@ function confirmationRequestsReducer(
   }
 }
 
-export const useInteractiveConsentRequests = () => {
-  const [interactiveConsentRequests, dispatchInteractiveConsentRequests] =
-    useReducer(confirmationRequestsReducer, []);
-  const addInteractiveConsentRequest = useCallback(
+export const useConfirmUpdateRequests = () => {
+  const [
+    confirmUpdateExtensionRequests,
+    dispatchConfirmUpdateExtensionRequests,
+  ] = useReducer(confirmationRequestsReducer, []);
+  const addConfirmUpdateExtensionRequest = useCallback(
     (original: ConfirmationRequest) => {
       const wrappedRequest = {
         prompt: original.prompt,
         onConfirm: (confirmed: boolean) => {
           // Remove it from the outstanding list of requests by identity.
-          dispatchInteractiveConsentRequests({
+          dispatchConfirmUpdateExtensionRequests({
             type: 'remove',
             request: wrappedRequest,
           });
           original.onConfirm(confirmed);
         },
       };
-      dispatchInteractiveConsentRequests({
+      dispatchConfirmUpdateExtensionRequests({
         type: 'add',
         request: wrappedRequest,
       });
     },
-    [dispatchInteractiveConsentRequests],
+    [dispatchConfirmUpdateExtensionRequests],
   );
   return {
-    addInteractiveConsentRequest,
-    interactiveConsentRequests,
-    dispatchInteractiveConsentRequests,
+    addConfirmUpdateExtensionRequest,
+    confirmUpdateExtensionRequests,
+    dispatchConfirmUpdateExtensionRequests,
   };
 };
 
