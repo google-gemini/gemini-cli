@@ -17,6 +17,7 @@ import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import { DefaultAgentCardResolver } from '@a2a-js/sdk/client';
+import { safeFetch } from '../utils/fetch.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { type z } from 'zod';
 import * as crypto from 'node:crypto';
@@ -164,7 +165,17 @@ export class AgentRegistry {
           try {
             // We use a dedicated resolver here to fetch the card for hashing.
             // This is separate from loadAgent to keep hashing logic isolated.
-            const resolver = new DefaultAgentCardResolver();
+            // We provide safeFetch to ensure SSRF and DNS rebinding protection.
+            // We wrap it to match the signature expected by the SDK.
+            const fetchImpl: typeof fetch = (input, init) => {
+              if (input instanceof Request) {
+                return safeFetch(input.url, init);
+              }
+              return safeFetch(input, init);
+            };
+            const resolver = new DefaultAgentCardResolver({
+              fetchImpl,
+            });
             const { baseUrl, path } = splitAgentCardUrl(agent.agentCardUrl);
             const rawCard = await resolver.resolve(baseUrl, path);
             const cardContent = JSON.stringify(rawCard);
