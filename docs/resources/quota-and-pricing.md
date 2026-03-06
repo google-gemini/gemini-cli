@@ -90,8 +90,8 @@ _- Tiers not listed above including Google AI Plus are not supported_
 
 ### Through your organization
 These tiers are applicable when you are signing in with a workspace account. 
-- To verify if you are on a personal account you can visit [the Google One page](https://one.google.com/about/plans?hl=en-US&g1_landing_page=0)
-- If you are not on a personal account you will see the following message "You're currently signed in to your Google Workspace Account"
+- To verify your account type, visit [the Google One page](https://one.google.com/about/plans?hl=en-US&g1_landing_page=0).
+- You are on a workspace account if you see the message "You're currently signed in to your Google Workspace Account".
 
 **Supported Tiers:**
 _- Tiers not listed above including Workspace AI Standard/Plus and AI Expanded are not supported_
