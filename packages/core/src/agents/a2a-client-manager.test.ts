@@ -399,5 +399,31 @@ describe('A2AClientManager', () => {
         '.well-known/agent-card.json',
       );
     });
+
+    it('should throw if a remote agent uses a private IP (SSRF protection)', async () => {
+      const privateUrl = 'http://169.254.169.254/.well-known/agent-card.json';
+      await expect(manager.loadAgent('ssrf-agent', privateUrl)).rejects.toThrow(
+        /Refusing to load agent 'ssrf-agent' from private IP range/,
+      );
+    });
+
+    it('should handle URLs where .well-known appears in the domain/subdomain', async () => {
+      const trickyUrl =
+        'http://.well-known/agent-card.json.attacker.com/my-agent';
+      const resolverInstance = {
+        resolve: vi.fn().mockResolvedValue({ name: 'test' } as AgentCard),
+      };
+      vi.mocked(sdkClient.DefaultAgentCardResolver).mockReturnValue(
+        resolverInstance as unknown as sdkClient.DefaultAgentCardResolver,
+      );
+
+      await manager.loadAgent('tricky-agent', trickyUrl);
+
+      // Should treat the whole thing as baseUrl since it doesn't end with standardPath
+      expect(resolverInstance.resolve).toHaveBeenCalledWith(
+        trickyUrl,
+        undefined,
+      );
+    });
   });
 });

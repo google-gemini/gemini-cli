@@ -26,6 +26,7 @@ import { GrpcTransportFactory } from '@a2a-js/sdk/client/grpc';
 import { v4 as uuidv4 } from 'uuid';
 import { Agent as UndiciAgent } from 'undici';
 import { getGrpcCredentials, normalizeAgentCard } from './a2aUtils.js';
+import { isPrivateIp } from '../utils/fetch.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 // Remote agents can take 10+ minutes (e.g. Deep Research).
@@ -97,7 +98,7 @@ export class A2AClientManager {
 
     const fetchImpl = this.getFetchImpl(authHandler);
     const resolver = new DefaultAgentCardResolver({ fetchImpl });
-    const agentCard = await this.resolveAgentCard(agentCardUrl, resolver);
+    const agentCard = await this.resolveAgentCard(name, agentCardUrl, resolver);
 
     // Configure standard SDK client for tool registration and discovery
     const clientOptions = ClientFactoryOptions.createFrom(
@@ -247,8 +248,10 @@ export class A2AClientManager {
   /**
    * Resolves and normalizes an agent card from a given URL.
    * Handles splitting the URL if it already contains the standard .well-known path.
+   * Also performs basic SSRF validation to prevent internal IP access.
    */
   private async resolveAgentCard(
+    agentName: string,
     url: string,
     resolver: DefaultAgentCardResolver,
   ): Promise<AgentCard> {
@@ -256,10 +259,26 @@ export class A2AClientManager {
     let baseUrl = url;
     let path: string | undefined;
 
-    if (baseUrl.includes(standardPath)) {
-      const parts = baseUrl.split(standardPath);
-      baseUrl = parts[0] || '';
-      path = standardPath;
+    // Validate URL to prevent SSRF
+    if (isPrivateIp(url)) {
+      // Local/private IPs are allowed ONLY for localhost for testing.
+      const parsed = new URL(url);
+      if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+        throw new Error(
+          `Refusing to load agent '${agentName}' from private IP range: ${url}. Remote agents must use public URLs.`,
+        );
+      }
+    }
+
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.pathname.endsWith(standardPath)) {
+        // Correctly split the URL into baseUrl and standard path
+        path = standardPath;
+        baseUrl = url.substring(0, url.lastIndexOf(standardPath));
+      }
+    } catch (e) {
+      throw new Error(`Invalid agent card URL: ${url}`, { cause: e });
     }
 
     const rawCard = await resolver.resolve(baseUrl, path);
