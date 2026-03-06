@@ -14,6 +14,7 @@ import {
   getErrorMessage,
   type TelemetrySettings,
   homedir,
+  type AgentSettings,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 
@@ -48,6 +49,11 @@ export interface Settings {
     enableRecursiveFileSearch?: boolean;
     customIgnoreFilePaths?: string[];
   };
+  experimental?: {
+    enableEventDrivenScheduler?: boolean;
+    enableAgents?: boolean;
+  };
+  agents?: AgentSettings;
 }
 
 export interface SettingsError {
@@ -60,19 +66,25 @@ export interface CheckpointingSettings {
 }
 
 /**
- * Loads settings from user and workspace directories.
- * Project settings override user settings.
- *
- * How is it different to gemini-cli/cli: Returns already merged settings rather
- * than `LoadedSettings` (unnecessary since we are not modifying users
- * settings.json).
+ * The result of loading settings, containing both user-level (expanded)
+ * and workspace-level (raw) configurations.
  */
-export function loadSettings(workspaceDir: string): Settings {
+export interface LoadedSettings {
+  userSettings: Settings;
+  workspaceSettings: Settings;
+}
+
+/**
+ * Loads settings from user and workspace directories.
+ * Workspace settings are returned RAW (without env var expansion) to prevent
+ * secret leakage from untrusted repositories.
+ */
+export function loadSettings(workspaceDir: string): LoadedSettings {
   let userSettings: Settings = {};
   let workspaceSettings: Settings = {};
   const settingsErrors: SettingsError[] = [];
 
-  // Load user settings
+  // Load user settings (Safe to expand)
   try {
     if (fs.existsSync(USER_SETTINGS_PATH)) {
       const userContent = fs.readFileSync(USER_SETTINGS_PATH, 'utf-8');
@@ -95,15 +107,14 @@ export function loadSettings(workspaceDir: string): Settings {
     'settings.json',
   );
 
-  // Load workspace settings
+  // Load workspace settings (RAW - NO EXPANSION)
   try {
     if (fs.existsSync(workspaceSettingsPath)) {
       const projectContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const parsedWorkspaceSettings = JSON.parse(
+      workspaceSettings = JSON.parse(
         stripJsonComments(projectContent),
       ) as Settings;
-      workspaceSettings = resolveEnvVarsInObject(parsedWorkspaceSettings);
     }
   } catch (error: unknown) {
     settingsErrors.push({
@@ -120,11 +131,9 @@ export function loadSettings(workspaceDir: string): Settings {
     }
   }
 
-  // If there are overlapping keys, the values of workspaceSettings will
-  // override values from userSettings
   return {
-    ...userSettings,
-    ...workspaceSettings,
+    userSettings,
+    workspaceSettings,
   };
 }
 
@@ -140,7 +149,7 @@ function resolveEnvVarsInString(value: string): string {
   });
 }
 
-function resolveEnvVarsInObject<T>(obj: T): T {
+export function resolveEnvVarsInObject<T>(obj: T): T {
   if (
     obj === null ||
     obj === undefined ||

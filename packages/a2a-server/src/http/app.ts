@@ -18,7 +18,7 @@ import {
 import { A2AExpressApp, type UserBuilder } from '@a2a-js/sdk/server/express'; // Import server components
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
-import type { AgentSettings } from '../types.js';
+import { type AgentSettings as CoderAgentSettings } from '../types.js';
 import { GCSTaskStore, NoOpTaskStore } from '../persistence/gcs.js';
 import { CoderAgentExecutor } from '../agent/executor.js';
 import { requestStorage } from './requestStorage.js';
@@ -197,10 +197,10 @@ export async function createApp() {
     // Load the server configuration once on startup.
     const workspaceRoot = setTargetDir(undefined);
     loadEnvironment();
-    const settings = loadSettings(workspaceRoot);
+    const loadedSettings = loadSettings(workspaceRoot);
     const extensions = loadExtensions(workspaceRoot);
     const config = await loadConfig(
-      settings,
+      loadedSettings,
       new SimpleExtensionLoader(extensions),
       'a2a-server',
     );
@@ -252,7 +252,7 @@ export async function createApp() {
         const taskId = uuidv4();
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const agentSettings = req.body.agentSettings as
-          | AgentSettings
+          | CoderAgentSettings
           | undefined;
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const contextId = req.body.contextId || uuidv4();

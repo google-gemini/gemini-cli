@@ -106,27 +106,41 @@ describe('loadSettings', () => {
     fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
 
     const result = loadSettings(mockWorkspaceDir);
-    expect(result.showMemoryUsage).toBe(true);
-    expect(result.coreTools).toEqual(['tool1', 'tool2']);
-    expect(result.mcpServers).toHaveProperty('server1');
-    expect(result.fileFiltering?.respectGitIgnore).toBe(true);
+    expect(result.userSettings.showMemoryUsage).toBe(true);
+    expect(result.userSettings.coreTools).toEqual(['tool1', 'tool2']);
+    expect(result.userSettings.mcpServers).toHaveProperty('server1');
+    expect(result.userSettings.fileFiltering?.respectGitIgnore).toBe(true);
   });
 
-  it('should overwrite top-level settings from workspace (shallow merge)', () => {
+  it('should load experimental and agents settings correctly', () => {
+    const settings = {
+      experimental: {
+        enableAgents: true,
+      },
+      agents: {
+        overrides: {
+          test_agent: { enabled: false },
+        },
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.userSettings.experimental?.enableAgents).toBe(true);
+    expect(result.userSettings.agents?.overrides?.['test_agent']?.enabled).toBe(
+      false,
+    );
+  });
+
+  it('should return separate user and raw workspace settings', () => {
     const userSettings = {
       showMemoryUsage: false,
-      fileFiltering: {
-        respectGitIgnore: true,
-        enableRecursiveFileSearch: true,
-      },
     };
     fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
 
     const workspaceSettings = {
       showMemoryUsage: true,
-      fileFiltering: {
-        respectGitIgnore: false,
-      },
+      coreTools: ['${VAR}'],
     };
     const workspaceSettingsPath = path.join(
       mockGeminiWorkspaceDir,
@@ -135,11 +149,9 @@ describe('loadSettings', () => {
     fs.writeFileSync(workspaceSettingsPath, JSON.stringify(workspaceSettings));
 
     const result = loadSettings(mockWorkspaceDir);
-    // Primitive value overwritten
-    expect(result.showMemoryUsage).toBe(true);
-
-    // Object value completely replaced (shallow merge behavior)
-    expect(result.fileFiltering?.respectGitIgnore).toBe(false);
-    expect(result.fileFiltering?.enableRecursiveFileSearch).toBeUndefined();
+    expect(result.userSettings.showMemoryUsage).toBe(false);
+    expect(result.workspaceSettings.showMemoryUsage).toBe(true);
+    // Workspace settings must be RAW (no expansion)
+    expect(result.workspaceSettings.coreTools).toEqual(['${VAR}']);
   });
 });

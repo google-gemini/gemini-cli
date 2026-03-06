@@ -26,7 +26,7 @@ import {
   getPersistedState,
   setPersistedState,
   type StateChange,
-  type AgentSettings,
+  type AgentSettings as CoderAgentSettings,
   type PersistedStateMetadata,
   getContextIdFromMetadata,
   getAgentSettingsFromMetadata,
@@ -44,9 +44,9 @@ import { pushTaskStateFailed } from '../utils/executor_utils.js';
  */
 class TaskWrapper {
   task: Task;
-  agentSettings: AgentSettings;
+  agentSettings: CoderAgentSettings;
 
-  constructor(task: Task, agentSettings: AgentSettings) {
+  constructor(task: Task, agentSettings: CoderAgentSettings) {
     this.task = task;
     this.agentSettings = agentSettings;
   }
@@ -89,14 +89,18 @@ export class CoderAgentExecutor implements AgentExecutor {
   constructor(private taskStore?: TaskStore) {}
 
   private async getConfig(
-    agentSettings: AgentSettings,
+    agentSettings: CoderAgentSettings,
     taskId: string,
   ): Promise<Config> {
     const workspaceRoot = setTargetDir(agentSettings);
     loadEnvironment(); // Will override any global env with workspace envs
-    const settings = loadSettings(workspaceRoot);
+    const loadedSettings = loadSettings(workspaceRoot);
     const extensions = loadExtensions(workspaceRoot);
-    return loadConfig(settings, new SimpleExtensionLoader(extensions), taskId);
+    return loadConfig(
+      loadedSettings,
+      new SimpleExtensionLoader(extensions),
+      taskId,
+    );
   }
 
   /**
@@ -138,10 +142,10 @@ export class CoderAgentExecutor implements AgentExecutor {
   async createTask(
     taskId: string,
     contextId: string,
-    agentSettingsInput?: AgentSettings,
+    agentSettingsInput?: CoderAgentSettings,
     eventBus?: ExecutionEventBus,
   ): Promise<TaskWrapper> {
-    const agentSettings: AgentSettings = agentSettingsInput || {
+    const agentSettings: CoderAgentSettings = agentSettingsInput || {
       kind: CoderAgentEvent.StateAgentSettingsEvent,
       workspacePath: process.cwd(),
     };

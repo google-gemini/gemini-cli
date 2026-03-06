@@ -32,16 +32,48 @@ import {
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
-import type { Settings } from './settings.js';
-import { type AgentSettings, CoderAgentEvent } from '../types.js';
+import {
+  type Settings,
+  type LoadedSettings,
+  resolveEnvVarsInObject,
+} from './settings.js';
+import {
+  type AgentSettings as CoderAgentSettings,
+  CoderAgentEvent,
+} from '../types.js';
 
 export async function loadConfig(
-  settings: Settings,
+  loadedSettings: LoadedSettings,
   extensionLoader: ExtensionLoader,
   taskId: string,
 ): Promise<Config> {
   const workspaceDir = process.cwd();
   const adcFilePath = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
+
+  const { userSettings, workspaceSettings } = loadedSettings;
+
+  // Set an initial config to use to determine trust and get a code assist server.
+  // This is needed to fetch admin controls and safely resolve environment variables.
+  const initialConfigParams: ConfigParameters = {
+    sessionId: taskId,
+    targetDir: workspaceDir,
+    cwd: workspaceDir,
+    extensionLoader,
+    debugMode: process.env['DEBUG'] === 'true' || false,
+    model: PREVIEW_GEMINI_MODEL,
+  };
+  const tempConfig = new Config(initialConfigParams);
+
+  // Securely merge settings: only expand workspace variables if the user trusts this folder.
+  // If there are overlapping keys, the values of workspaceSettings will
+  // override values from userSettings.
+  const isTrusted = tempConfig.isTrustedFolder();
+  const settings: Settings = {
+    ...userSettings,
+    ...(isTrusted
+      ? resolveEnvVarsInObject(workspaceSettings)
+      : workspaceSettings),
+  };
 
   const folderTrust =
     settings.folderTrust === true ||
@@ -110,6 +142,8 @@ export async function loadConfig(
     interactive: !isHeadlessMode(),
     enableInteractiveShell: !isHeadlessMode(),
     ptyInfo: 'auto',
+    enableAgents: settings.experimental?.enableAgents ?? false,
+    agents: settings.agents,
   };
 
   const fileService = new FileDiscoveryService(workspaceDir, {
@@ -129,16 +163,11 @@ export async function loadConfig(
   configParams.geminiMdFileCount = fileCount;
   configParams.geminiMdFilePaths = filePaths;
 
-  // Set an initial config to use to get a code assist server.
-  // This is needed to fetch admin controls.
-  const initialConfig = new Config({
-    ...configParams,
-  });
-
-  const codeAssistServer = getCodeAssistServer(initialConfig);
+  // Use initialConfig to fetch admin controls.
+  const codeAssistServer = getCodeAssistServer(tempConfig);
 
   const adminControlsEnabled =
-    initialConfig.getExperiments()?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
+    tempConfig.getExperiments()?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
       ?.boolValue ?? false;
 
   // Initialize final config parameters to the previous parameters.
@@ -178,7 +207,9 @@ export async function loadConfig(
   return config;
 }
 
-export function setTargetDir(agentSettings: AgentSettings | undefined): string {
+export function setTargetDir(
+  agentSettings: CoderAgentSettings | undefined,
+): string {
   const originalCWD = process.cwd();
   const targetDir =
     process.env['CODER_AGENT_WORKSPACE_PATH'] ??
