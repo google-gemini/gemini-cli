@@ -75,15 +75,13 @@ Implementation Steps
  7. Create token refresh mechanism in src/auth/TokenManager.ts
  8. Add multi-factor authentication in src/auth/MFAService.ts
  9. Implement session timeout handling in src/auth/SessionManager.ts
- 10. Add audit logging for auth events in src/auth/AuditLogger.ts
-... last 20 lines hidden (Ctrl+O to show) ...
+... last 21 lines hidden (Ctrl+O to show) ...
 
-▲
 ● 1.  Yes, automatically accept edits                                           
       Approves plan and allows tools to run automatically                       
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool
-▼
+  3.  Type your feedback...
 
 Enter to select · ↑/↓ to navigate · Ctrl+X to edit plan · Esc to cancel
 "

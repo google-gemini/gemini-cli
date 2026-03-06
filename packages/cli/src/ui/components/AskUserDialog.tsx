@@ -794,10 +794,15 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     ? Math.max(1, availableHeight - overhead)
     : undefined;
 
-  // Modulo the fixed overflow (overhead + 4 lines reserved for list), use all remaining height.
+  const idealOptionsHeight = selectionItems.reduce(
+    (acc, item) => acc + (item.value.description ? 2 : 1),
+    0,
+  );
+
+  // Use remaining height for the question, reserving space for the options list
   const maxQuestionHeight =
     question.unconstrainedHeight && listHeight
-      ? Math.max(5, listHeight - 4)
+      ? Math.max(5, listHeight - Math.min(idealOptionsHeight, 10))
       : 15;
 
   const questionHeightLimit =
@@ -805,10 +810,22 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       ? Math.min(maxQuestionHeight, listHeight)
       : undefined;
 
-  const maxItemsToShow =
-    listHeight && actualQuestionHeight
-      ? Math.max(1, Math.floor((listHeight - actualQuestionHeight) / 2))
-      : selectionItems.length;
+  let maxItemsToShow = selectionItems.length;
+  if (listHeight && actualQuestionHeight) {
+    const remainingHeight = Math.max(0, listHeight - actualQuestionHeight);
+    let linesUsed = 0;
+    let itemsThatFit = 0;
+    for (const item of selectionItems) {
+      const itemLines = item.value.description ? 2 : 1;
+      if (linesUsed + itemLines <= remainingHeight) {
+        linesUsed += itemLines;
+        itemsThatFit++;
+      } else {
+        break;
+      }
+    }
+    maxItemsToShow = Math.max(1, itemsThatFit);
+  }
 
   return (
     <Box flexDirection="column">
