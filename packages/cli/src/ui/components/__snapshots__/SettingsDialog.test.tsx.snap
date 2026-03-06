@@ -22,6 +22,9 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Enable Terminal Soundscapes                                                            false  │
+│    Enable background audio sonification (lo-fi sounds or beeps) based on CLI system ev…          │
+│                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
@@ -30,9 +33,6 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -68,6 +68,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Enable Terminal Soundscapes                                                            false  │
+│    Enable background audio sonification (lo-fi sounds or beeps) based on CLI system ev…          │
+│                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
@@ -76,9 +79,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -114,6 +114,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Enable Terminal Soundscapes                                                            false  │
+│    Enable background audio sonification (lo-fi sounds or beeps) based on CLI system ev…          │
+│                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
@@ -122,9 +125,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                               false*  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -160,6 +160,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Enable Terminal Soundscapes                                                            false  │
+│    Enable background audio sonification (lo-fi sounds or beeps) based on CLI system ev…          │
+│                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
@@ -168,9 +171,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -206,6 +206,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Enable Terminal Soundscapes                                                            false  │
+│    Enable background audio sonification (lo-fi sounds or beeps) based on CLI system ev…          │
+│                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
@@ -214,9 +217,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -252,6 +252,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Enable Terminal Soundscapes                                                            false  │
+│    Enable background audio sonification (lo-fi sounds or beeps) based on CLI system ev…          │
+│                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
@@ -260,9 +263,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -298,6 +298,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Enable Terminal Soundscapes                                                            false  │
+│    Enable background audio sonification (lo-fi sounds or beeps) based on CLI system ev…          │
+│                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
@@ -306,9 +309,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -344,6 +344,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Enable Terminal Soundscapes                                                            false  │
+│    Enable background audio sonification (lo-fi sounds or beeps) based on CLI system ev…          │
+│                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
@@ -352,9 +355,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                false  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -390,6 +390,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Enable Notifications                                                                   false  │
 │    Enable run-event notifications for action-required prompts and session completion. …          │
 │                                                                                                  │
+│    Enable Terminal Soundscapes                                                            false  │
+│    Enable background audio sonification (lo-fi sounds or beeps) based on CLI system ev…          │
+│                                                                                                  │
 │    Plan Directory                                                                     undefined  │
 │    The directory where planning artifacts are stored. If not specified, defaults t…              │
 │                                                                                                  │
@@ -398,9 +401,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
-│                                                                                                  │
-│    Debug Keystroke Logging                                                                true*  │
-│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │

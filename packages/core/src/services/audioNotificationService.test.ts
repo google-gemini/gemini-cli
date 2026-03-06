@@ -80,8 +80,6 @@ describe('AudioNotificationService', () => {
     vi.mocked(os.platform).mockReturnValue('darwin');
     vi.mocked(child_process.exec as unknown as ExecMock).mockImplementationOnce(
       (cmd, cb) => {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error
         cb(new Error('test error'), '', '');
       },
     );

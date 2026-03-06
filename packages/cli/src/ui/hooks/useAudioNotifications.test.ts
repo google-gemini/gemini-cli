@@ -37,27 +37,27 @@ describe('useAudioNotifications', () => {
     renderHook(() =>
       useAudioNotifications({
         enabled: false,
-        streamingState: StreamingState.Thinking,
+        streamingState: StreamingState.Responding,
         hasPendingActionRequired: false,
-        pendingHistoryItems: [],
+        pendingHistoryItems: [] as HistoryItemWithoutId[],
       }),
     );
     expect(AudioNotificationService).toHaveBeenCalledWith(false);
   });
 
-  it('plays PROCESSING_START when transitioning from Idle to Thinking', () => {
+  it('plays PROCESSING_START when transitioning from Idle to Responding', () => {
     const { rerender } = renderHook((props) => useAudioNotifications(props), {
       initialProps: {
         enabled: true,
         streamingState: StreamingState.Idle,
         hasPendingActionRequired: false,
-        pendingHistoryItems: [],
+        pendingHistoryItems: [] as HistoryItemWithoutId[],
       },
     });
 
     rerender({
       enabled: true,
-      streamingState: StreamingState.Thinking,
+      streamingState: StreamingState.Responding,
       hasPendingActionRequired: false,
       pendingHistoryItems: [],
     });
@@ -71,7 +71,7 @@ describe('useAudioNotifications', () => {
         enabled: true,
         streamingState: StreamingState.Responding,
         hasPendingActionRequired: false,
-        pendingHistoryItems: [],
+        pendingHistoryItems: [] as HistoryItemWithoutId[],
       },
     });
 
@@ -80,7 +80,7 @@ describe('useAudioNotifications', () => {
       streamingState: StreamingState.Idle,
       hasPendingActionRequired: false,
       pendingHistoryItems: [
-        { type: 'message', text: 'hello' } as unknown as HistoryItemWithoutId,
+        { type: 'info', text: 'hello' } as HistoryItemWithoutId,
       ],
     });
 
@@ -93,7 +93,7 @@ describe('useAudioNotifications', () => {
         enabled: true,
         streamingState: StreamingState.Responding,
         hasPendingActionRequired: false,
-        pendingHistoryItems: [],
+        pendingHistoryItems: [] as HistoryItemWithoutId[],
       },
     });
 
@@ -105,7 +105,7 @@ describe('useAudioNotifications', () => {
         {
           type: 'error',
           text: 'Error occurred',
-        } as unknown as HistoryItemWithoutId,
+        } as HistoryItemWithoutId,
       ],
     });
 

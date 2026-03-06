@@ -43,8 +43,7 @@ export function useAudioNotifications({
 
     const justStartedTurn =
       previousStreamingState === StreamingState.Idle &&
-      (streamingState === StreamingState.Thinking ||
-        streamingState === StreamingState.Responding);
+      streamingState === StreamingState.Responding;
 
     // Play processing start sound
     if (justStartedTurn) {
