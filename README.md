@@ -77,7 +77,7 @@ See [Releases](./docs/releases.md) for more details.
 
 ### Preview
 
-New preview releases will be published each week at UTC 2359 on Tuesdays. These
+New preview releases will be published each week at UTC 23:59 on Tuesdays. These
 releases will not have been fully vetted and may contain regressions or other
 outstanding issues. Please help us test and install with `preview` tag.
 
@@ -87,7 +87,7 @@ npm install -g @google/gemini-cli@preview
 
 ### Stable
 
-- New stable releases will be published each week at UTC 2000 on Tuesdays, this
+- New stable releases will be published each week at UTC 20:00 on Tuesdays, this
   will be the full promotion of last week's `preview` release + any bug fixes
   and validations. Use `latest` tag.
 
@@ -97,7 +97,7 @@ npm install -g @google/gemini-cli@latest
 
 ### Nightly
 
-- New releases will be published each day at UTC 0000. This will be all changes
+- New releases will be published each day at UTC 00:00. This will be all changes
   from the main branch as represented at time of release. It should be assumed
   there are pending validations and issues. Use `nightly` tag.
 
@@ -301,7 +301,7 @@ gemini
 
 ### Tools & Extensions
 
-- [**Built-in Tools Overview**](./docs/tools/index.md)
+- [**Built-in Tools Overview**](./docs/reference/tools.md)
   - [File System Operations](./docs/tools/file-system.md)
   - [Shell Commands](./docs/tools/shell.md)
   - [Web Fetch & Search](./docs/tools/web-fetch.md)
@@ -323,8 +323,7 @@ gemini
 - [**Enterprise Guide**](./docs/cli/enterprise.md) - Deploy and manage in a
   corporate environment.
 - [**Telemetry & Monitoring**](./docs/cli/telemetry.md) - Usage tracking.
-- [**Tools API Development**](./docs/reference/tools-api.md) - Create custom
-  tools.
+- [**Tools reference**](./docs/reference/tools.md) - Built-in tools overview.
 - [**Local development**](./docs/local-development.md) - Local development
   tooling.
 
