@@ -521,6 +521,7 @@ export interface ConfigParameters {
   disableYoloMode?: boolean;
   rawOutput?: boolean;
   acceptRawOutputRisk?: boolean;
+  dynamicModelConfiguration?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   enableHooksUI?: boolean;
@@ -704,6 +705,7 @@ export class Config {
   private readonly disableYoloMode: boolean;
   private readonly rawOutput: boolean;
   private readonly acceptRawOutputRisk: boolean;
+  private readonly dynamicModelConfiguration: boolean;
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
@@ -886,7 +888,7 @@ export class Config {
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
     // // TODO(joshualitt): Re-evaluate the todo tool for 3 family.
-    this.useWriteTodos = isPreviewModel(this.model)
+    this.useWriteTodos = isPreviewModel(this.model, this)
       ? false
       : (params.useWriteTodos ?? true);
     this.enableHooksUI = params.enableHooksUI ?? true;
@@ -950,6 +952,7 @@ export class Config {
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
+    this.dynamicModelConfiguration = params.dynamicModelConfiguration ?? false;
 
     if (params.hooks) {
       this.hooks = params.hooks;
@@ -1005,6 +1008,44 @@ export class Config {
         modelConfigServiceConfig = {
           ...modelConfigServiceConfig,
           overrides: DEFAULT_MODEL_CONFIGS.overrides,
+        };
+      }
+      if (
+        !modelConfigServiceConfig.modelDefinitions ||
+        Object.keys(modelConfigServiceConfig.modelDefinitions).length === 0
+      ) {
+        modelConfigServiceConfig = {
+          ...modelConfigServiceConfig,
+          modelDefinitions: DEFAULT_MODEL_CONFIGS.modelDefinitions,
+        };
+      }
+      if (
+        !modelConfigServiceConfig.modelIdResolutions ||
+        Object.keys(modelConfigServiceConfig.modelIdResolutions).length === 0
+      ) {
+        modelConfigServiceConfig = {
+          ...modelConfigServiceConfig,
+          modelIdResolutions: DEFAULT_MODEL_CONFIGS.modelIdResolutions,
+        };
+      }
+      if (
+        !modelConfigServiceConfig.classifierIdResolutions ||
+        Object.keys(modelConfigServiceConfig.classifierIdResolutions).length ===
+          0
+      ) {
+        modelConfigServiceConfig = {
+          ...modelConfigServiceConfig,
+          classifierIdResolutions:
+            DEFAULT_MODEL_CONFIGS.classifierIdResolutions,
+        };
+      }
+      if (
+        !modelConfigServiceConfig.modelChains ||
+        Object.keys(modelConfigServiceConfig.modelChains).length === 0
+      ) {
+        modelConfigServiceConfig = {
+          ...modelConfigServiceConfig,
+          modelChains: DEFAULT_MODEL_CONFIGS.modelChains,
         };
       }
     }
@@ -1188,7 +1229,10 @@ export class Config {
 
     // Only reset when we have explicit "no access" (hasAccessToPreviewModel === false).
     // When null (quota not fetched) or true, we preserve the saved model.
-    if (isPreviewModel(this.model) && this.hasAccessToPreviewModel === false) {
+    if (
+      isPreviewModel(this.model, this) &&
+      this.hasAccessToPreviewModel === false
+    ) {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
     }
 
@@ -1433,6 +1477,8 @@ export class Config {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
+      false,
+      this,
     );
     return this.modelQuotas.get(primaryModel)?.remaining;
   }
@@ -1445,6 +1491,8 @@ export class Config {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
+      false,
+      this,
     );
     return this.modelQuotas.get(primaryModel)?.limit;
   }
@@ -1457,6 +1505,8 @@ export class Config {
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
+      false,
+      this,
     );
     return this.modelQuotas.get(primaryModel)?.resetTime;
   }
@@ -1571,8 +1621,9 @@ export class Config {
       }
 
       const hasAccess =
-        quota.buckets?.some((b) => b.modelId && isPreviewModel(b.modelId)) ??
-        false;
+        quota.buckets?.some(
+          (b) => b.modelId && isPreviewModel(b.modelId, this),
+        ) ?? false;
       this.setHasAccessToPreviewModel(hasAccess);
       return quota;
     } catch (e) {
@@ -1964,6 +2015,10 @@ export class Config {
 
   getAcceptRawOutputRisk(): boolean {
     return this.acceptRawOutputRisk;
+  }
+
+  getExperimentalDynamicModelConfiguration(): boolean {
+    return this.dynamicModelConfiguration;
   }
 
   getPendingIncludeDirectories(): string[] {

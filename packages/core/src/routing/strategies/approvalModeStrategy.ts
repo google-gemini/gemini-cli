@@ -50,7 +50,7 @@ export class ApprovalModeStrategy implements RoutingStrategy {
     const approvalMode = config.getApprovalMode();
     const approvedPlanPath = config.getApprovedPlanPath();
 
-    const isPreview = isPreviewModel(model);
+    const isPreview = isPreviewModel(model, config);
 
     // 1. Planning Phase: If ApprovalMode === PLAN, explicitly route to the Pro model.
     if (approvalMode === ApprovalMode.PLAN) {

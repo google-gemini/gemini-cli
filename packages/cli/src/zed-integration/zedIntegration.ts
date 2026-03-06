@@ -540,6 +540,8 @@ export class Session {
         const model = resolveModel(
           this.config.getModel(),
           (await this.config.getGemini31Launched?.()) ?? false,
+          false,
+          this.config,
         );
         const responseStream = await chat.sendMessageStream(
           { model },

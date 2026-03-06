@@ -111,6 +111,7 @@ export * from './utils/constants.js';
 export * from './utils/sessionUtils.js';
 
 // Export services
+export * from './services/modelConfigService.js';
 export * from './services/fileDiscoveryService.js';
 export * from './services/gitService.js';
 export * from './services/FolderTrustDiscoveryService.js';

@@ -21,6 +21,7 @@ import {
   getDisplayString,
   AuthType,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  type ModelDefinition,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
@@ -38,6 +39,11 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const [view, setView] = useState<'main' | 'manual'>('main');
   const [persistMode, setPersistMode] = useState(false);
 
+  // Extract specific parts of config for dependency tracking
+  const modelConfigService = config?.modelConfigService;
+  const isDynamicEnabled =
+    config?.getExperimentalDynamicModelConfiguration?.() === true;
+
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
 
@@ -46,6 +52,13 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const selectedAuthType = settings.merged.security.auth.selectedType;
   const useCustomToolModel =
     useGemini31 && selectedAuthType === AuthType.USE_GEMINI;
+
+  const definitions = useMemo(() => {
+    if (isDynamicEnabled && modelConfigService) {
+      return (modelConfigService.getModelDefinitions?.() ?? {});
+    }
+    return {} as Record<string, ModelDefinition>;
+  }, [isDynamicEnabled, modelConfigService]);
 
   const manualModelSelected = useMemo(() => {
     const manualModels = [
@@ -83,6 +96,33 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   );
 
   const mainOptions = useMemo(() => {
+    // --- DYNAMIC PATH ---
+    if (isDynamicEnabled) {
+      const list = Object.entries(definitions)
+        .filter(([_, m]) => {
+          if (m.dialogLocation !== 'main') return false;
+          if (m.isPreview && !shouldShowPreviewModels) return false;
+          return true;
+        })
+        .map(([id, m]) => ({
+          value: id,
+          title: m.displayName ?? getDisplayString(id),
+          description: m.dialogDescription ?? '',
+          key: id,
+        }));
+
+      list.push({
+        value: 'Manual',
+        title: manualModelSelected
+          ? `Manual (${getDisplayString(manualModelSelected)})`
+          : 'Manual',
+        description: 'Manually select a model',
+        key: 'Manual',
+      });
+      return list;
+    }
+
+    // --- LEGACY PATH ---
     const list = [
       {
         value: DEFAULT_GEMINI_MODEL_AUTO,
@@ -112,9 +152,38 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       });
     }
     return list;
-  }, [shouldShowPreviewModels, manualModelSelected, useGemini31]);
+  }, [
+    isDynamicEnabled,
+    definitions,
+    shouldShowPreviewModels,
+    manualModelSelected,
+    useGemini31,
+  ]);
 
   const manualOptions = useMemo(() => {
+    // --- DYNAMIC PATH ---
+    if (isDynamicEnabled && modelConfigService) {
+      return Object.entries(definitions)
+        .filter(([_, m]) => {
+          if (m.dialogLocation !== 'manual') return false;
+          if (m.isPreview && !shouldShowPreviewModels) return false;
+          return true;
+        })
+        .map(([id, m]) => {
+          const resolvedId = modelConfigService.resolveModelId(id, {
+            useGemini3_1: useGemini31,
+            useCustomTools: useCustomToolModel,
+          });
+          return {
+            value: resolvedId,
+            title: m.displayName ?? getDisplayString(id),
+            key: id,
+          };
+        })
+        .sort((a, b) => a.title.localeCompare(b.title));
+    }
+
+    // --- LEGACY PATH ---
     const list = [
       {
         value: DEFAULT_GEMINI_MODEL,
@@ -156,7 +225,14 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       );
     }
     return list;
-  }, [shouldShowPreviewModels, useGemini31, useCustomToolModel]);
+  }, [
+    isDynamicEnabled,
+    modelConfigService,
+    definitions,
+    shouldShowPreviewModels,
+    useGemini31,
+    useCustomToolModel,
+  ]);
 
   const options = view === 'main' ? mainOptions : manualOptions;
 
