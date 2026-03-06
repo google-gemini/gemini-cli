@@ -714,7 +714,7 @@ export class Session {
           (await this.config.getGemini31Launched?.()) ?? false,
         );
         const responseStream = await chat.sendMessageStream(
-          { model },
+          { model, isChatModel: true },
           nextMessage?.parts ?? [],
           promptId,
           pendingSend.signal,
