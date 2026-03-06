@@ -768,6 +768,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`tools.shell.enablePersistentShell`** (boolean):
+  - **Description:** Maintain a persistent shell session across commands to
+    preserve environment variables, directory changes, and aliases.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`tools.shell.pager`** (string):
   - **Description:** The pager command to use for shell output. Defaults to
     `cat`.

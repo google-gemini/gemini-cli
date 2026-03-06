@@ -9,6 +9,7 @@ import {
   SessionEndReason,
   SessionStartSource,
   flushTelemetry,
+  ShellExecutionService,
 } from '@google/gemini-cli-core';
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
@@ -70,6 +71,7 @@ export const clearCommand: SlashCommand = {
     }
 
     uiTelemetryService.setLastPromptTokenCount(0);
+    ShellExecutionService.clearPersistentSession();
     context.ui.clear();
 
     if (result?.systemMessage) {
