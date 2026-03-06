@@ -49,9 +49,10 @@ describe('sanitizeEnvironment', () => {
       SOME_OTHER_VAR: 'value',
     };
     const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
-    expect(sanitized['TERM']).toBe('xterm-256color');
-    expect(sanitized['COLORTERM']).toBe('truecolor');
-    expect(sanitized['SOME_OTHER_VAR']).toBeUndefined();
+    expect(sanitized).toEqual({
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+    });
   });
 
   it('should allow variables prefixed with GEMINI_CLI_', () => {
