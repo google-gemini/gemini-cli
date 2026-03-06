@@ -11,19 +11,19 @@ Here are a few common ways to use Gemini CLI in your terminal.
 ### Explain a file
 
 ```bash
-gemini explain src/app.js
+gemini "explain src/app.js"
 ```
 
 ### Debug a script
 
 ```bash
-gemini debug script.py
+gemini "debug script.py"
 ```
 
 ### Generate documentation
 
 ```bash
-gemini doc src/utils.ts
+gemini "generate documentation for src/utils.ts"
 ```
 
 ## Install
