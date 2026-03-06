@@ -1863,7 +1863,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: {},
         description: 'Enable Gemma model router (experimental).',
-        showInDialog: true,
+        showInDialog: false,
         properties: {
           enabled: {
             type: 'boolean',

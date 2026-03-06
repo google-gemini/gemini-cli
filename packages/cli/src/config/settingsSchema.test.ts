@@ -461,7 +461,7 @@ describe('SettingsSchema', () => {
       expect(gemmaModelRouter.category).toBe('Experimental');
       expect(gemmaModelRouter.default).toEqual({});
       expect(gemmaModelRouter.requiresRestart).toBe(true);
-      expect(gemmaModelRouter.showInDialog).toBe(true);
+      expect(gemmaModelRouter.showInDialog).toBe(false);
       expect(gemmaModelRouter.description).toBe(
         'Enable Gemma model router (experimental).',
       );
