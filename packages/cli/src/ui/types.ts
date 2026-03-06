@@ -115,6 +115,10 @@ export interface IndividualToolCallDisplay {
   originalRequestName?: string;
   progress?: number;
   progressTotal?: number;
+  /** Human-readable summary of what the tool command does (e.g. from model or Flash Lite). */
+  commandSummary?: string;
+  /** The raw shell command string, shown collapsed when a summary is available. */
+  rawCommand?: string;
 }
 
 export interface CompressionProps {

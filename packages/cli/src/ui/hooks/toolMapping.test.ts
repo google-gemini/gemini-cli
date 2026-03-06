@@ -353,5 +353,82 @@ describe('toolMapping', () => {
       expect(result.tools[0].isClientInitiated).toBe(true);
       expect(result.tools[1].isClientInitiated).toBe(false);
     });
+
+    describe('shell tool command summary', () => {
+      const shellTool = {
+        name: 'run_shell_command',
+        displayName: 'Shell',
+        isOutputMarkdown: false,
+      } as unknown as AnyDeclarativeTool;
+
+      const shellInvocation = {
+        getDescription: () => 'ls -la [in /home/user]',
+      } as unknown as AnyToolInvocation;
+
+      it('extracts rawCommand and commandSummary for shell tools with description', () => {
+        const toolCall: ScheduledToolCall = {
+          status: CoreToolCallStatus.Scheduled,
+          request: {
+            callId: 'shell-1',
+            name: 'run_shell_command',
+            args: {
+              command: 'ls -la',
+              description: 'List all files in current directory',
+              dir_path: '/home/user',
+            },
+            isClientInitiated: false,
+            prompt_id: 'p1',
+          },
+          tool: shellTool,
+          invocation: shellInvocation,
+        };
+
+        const result = mapToDisplay(toolCall);
+        const displayTool = result.tools[0];
+
+        expect(displayTool.rawCommand).toBe('ls -la [in /home/user]');
+        expect(displayTool.commandSummary).toBe(
+          'List all files in current directory',
+        );
+      });
+
+      it('extracts rawCommand without dir_path', () => {
+        const toolCall: ScheduledToolCall = {
+          status: CoreToolCallStatus.Scheduled,
+          request: {
+            callId: 'shell-2',
+            name: 'run_shell_command',
+            args: {
+              command: 'git status',
+            },
+            isClientInitiated: false,
+            prompt_id: 'p1',
+          },
+          tool: shellTool,
+          invocation: shellInvocation,
+        };
+
+        const result = mapToDisplay(toolCall);
+        const displayTool = result.tools[0];
+
+        expect(displayTool.rawCommand).toBe('git status');
+        expect(displayTool.commandSummary).toBeUndefined();
+      });
+
+      it('does not set commandSummary or rawCommand for non-shell tools', () => {
+        const toolCall: ScheduledToolCall = {
+          status: CoreToolCallStatus.Scheduled,
+          request: mockRequest,
+          tool: mockTool,
+          invocation: mockInvocation,
+        };
+
+        const result = mapToDisplay(toolCall);
+        const displayTool = result.tools[0];
+
+        expect(displayTool.rawCommand).toBeUndefined();
+        expect(displayTool.commandSummary).toBeUndefined();
+      });
+    });
   });
 });
