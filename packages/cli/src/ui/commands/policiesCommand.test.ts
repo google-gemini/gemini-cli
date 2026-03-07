@@ -22,8 +22,9 @@ describe('policiesCommand', () => {
     expect(policiesCommand.name).toBe('policies');
     expect(policiesCommand.description).toBe('Manage policies');
     expect(policiesCommand.kind).toBe(CommandKind.BUILT_IN);
-    expect(policiesCommand.subCommands).toHaveLength(1);
+    expect(policiesCommand.subCommands).toHaveLength(2);
     expect(policiesCommand.subCommands![0].name).toBe('list');
+    expect(policiesCommand.subCommands![1].name).toBe('mode');
   });
 
   describe('list subcommand', () => {
@@ -106,6 +107,116 @@ describe('policiesCommand', () => {
         '2. **ALLOW** all tools (args match: `safe`) [Source: `test.toml`]',
       );
       expect(content).toContain('3. **ASK_USER** all tools');
+    });
+  });
+
+  describe('mode subcommand', () => {
+    let mockConfig: {
+      getApprovalMode: ReturnType<typeof vi.fn>;
+      setApprovalMode: ReturnType<typeof vi.fn>;
+      setNonInteractive: ReturnType<typeof vi.fn>;
+    };
+
+    beforeEach(() => {
+      mockConfig = {
+        getApprovalMode: vi.fn().mockReturnValue('default'),
+        setApprovalMode: vi.fn(),
+        setNonInteractive: vi.fn(),
+      };
+      mockContext.services.config = mockConfig as unknown as Config;
+    });
+
+    it('should show current mode if no argument is provided', async () => {
+      const modeCommand = policiesCommand.subCommands![1];
+      await modeCommand.action!(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Current approval mode: **default**'),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should set yolo mode and nonInteractive to true', async () => {
+      mockContext.invocation = {
+        raw: '/policies mode yolo',
+        name: 'policies',
+        args: 'yolo',
+      };
+      const modeCommand = policiesCommand.subCommands![1];
+      await modeCommand.action!(mockContext, '');
+
+      expect(mockConfig.setNonInteractive).toHaveBeenCalledWith(true);
+      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith('yolo');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Approval mode updated to: **yolo**'),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should set plan mode and nonInteractive to false', async () => {
+      mockContext.invocation = {
+        raw: '/policies mode plan',
+        name: 'policies',
+        args: 'plan',
+      };
+      const modeCommand = policiesCommand.subCommands![1];
+      await modeCommand.action!(mockContext, '');
+
+      expect(mockConfig.setNonInteractive).toHaveBeenCalledWith(false);
+      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith('plan');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Approval mode updated to: **plan**'),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should set headless mode and nonInteractive to true', async () => {
+      mockContext.invocation = {
+        raw: '/policies mode headless',
+        name: 'policies',
+        args: 'headless',
+      };
+      const modeCommand = policiesCommand.subCommands![1];
+      await modeCommand.action!(mockContext, '');
+
+      expect(mockConfig.setNonInteractive).toHaveBeenCalledWith(true);
+      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith('headless');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining(
+            'Approval mode updated to: **headless**',
+          ),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show error for invalid mode', async () => {
+      mockContext.invocation = {
+        raw: '/policies mode invalid',
+        name: 'policies',
+        args: 'invalid',
+      };
+      const modeCommand = policiesCommand.subCommands![1];
+      await modeCommand.action!(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: expect.stringContaining('Invalid approval mode: invalid.'),
+        }),
+        expect.any(Number),
+      );
     });
   });
 });

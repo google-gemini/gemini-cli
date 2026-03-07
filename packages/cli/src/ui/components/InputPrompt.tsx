@@ -1021,6 +1021,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
   const showYoloStyling =
     !shellModeActive && approvalMode === ApprovalMode.YOLO;
+  const showPlanStyling =
+    !shellModeActive && approvalMode === ApprovalMode.PLAN;
+  const showHeadlessStyling =
+    !shellModeActive && approvalMode === ApprovalMode.HEADLESS;
 
   let statusColor: string | undefined;
   let statusText = '';
@@ -1033,6 +1037,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   } else if (showAutoAcceptStyling) {
     statusColor = theme.status.warning;
     statusText = 'Accepting edits';
+  } else if (showPlanStyling) {
+    statusColor = theme.status.success;
+    statusText = 'Plan mode';
+  } else if (showHeadlessStyling) {
+    statusColor = theme.status.info;
+    statusText = 'Headless mode';
   }
 
   const suggestionsNode = shouldShowSuggestions ? (
@@ -1093,6 +1103,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             <Text color={theme.text.accent}>(r:) </Text>
           ) : showYoloStyling ? (
             '*'
+          ) : showPlanStyling ? (
+            '?'
+          ) : showHeadlessStyling ? (
+            '-'
           ) : (
             '>'
           )}{' '}

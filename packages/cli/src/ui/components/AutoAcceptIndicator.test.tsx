@@ -36,4 +36,22 @@ describe('AutoAcceptIndicator', () => {
     expect(output).not.toContain('accepting edits');
     expect(output).not.toContain('YOLO mode');
   });
+
+  it('renders correctly for PLAN mode', () => {
+    const { lastFrame } = render(
+      <AutoAcceptIndicator approvalMode={ApprovalMode.PLAN} />,
+    );
+    const output = lastFrame();
+    expect(output).toContain('plan mode');
+    expect(output).toContain('(read-only)');
+  });
+
+  it('renders correctly for HEADLESS mode', () => {
+    const { lastFrame } = render(
+      <AutoAcceptIndicator approvalMode={ApprovalMode.HEADLESS} />,
+    );
+    const output = lastFrame();
+    expect(output).toContain('headless mode');
+    expect(output).toContain('(non-interactive)');
+  });
 });
