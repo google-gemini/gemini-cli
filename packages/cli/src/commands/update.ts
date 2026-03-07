@@ -52,10 +52,11 @@ export const updateCommand: CommandModule = {
       process.exit(0);
     } catch (error) {
       if (error instanceof Error && error.message.includes('EACCES')) {
-        coreEvents.emitFeedback(
-          'error',
-          `Permission denied. Try running the command with sudo: sudo ${installInfo.updateCommand}`,
-        );
+        const isWindows = process.platform === 'win32';
+        const suggestion = isWindows
+          ? 'Try running this command in a terminal with Administrator privileges.'
+          : `Try running the command with sudo: sudo ${installInfo.updateCommand}`;
+        coreEvents.emitFeedback('error', `Permission denied. ${suggestion}`);
       } else {
         coreEvents.emitFeedback(
           'error',
