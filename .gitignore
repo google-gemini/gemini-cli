@@ -62,3 +62,9 @@ gemini-debug.log
 .gemini-clipboard/
 .eslintcache
 evals/logs/
+
+# Local planning docs
+GeminiCLI.docx
+ImportantPointsToConsider.docx
+GeminiCLI.md
+ImportantPointsToConsider.md

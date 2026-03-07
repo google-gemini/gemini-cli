@@ -9,16 +9,18 @@ import type { LoadedSettings } from '../config/settings.js';
 import { runNonInteractive } from '../nonInteractiveCli.js';
 import readline from 'node:readline';
 import { randomUUID } from 'node:crypto';
-import type { Readable } from 'node:stream';
-import { createVoicePrompt } from './voiceResponseMode.js';
+import type { Readable, Writable } from 'node:stream';
+import { parseVoiceIntent, suggestVoiceIntent } from './voiceIntentParser.js';
 
 interface VoiceSessionOptions {
   input?: Readable;
+  output?: Writable;
   createPromptId?: () => string;
 }
 
 export class VoiceSession {
   private readonly input: Readable;
+  private readonly output: Writable;
   private readonly createPromptId: () => string;
 
   constructor(
@@ -27,6 +29,7 @@ export class VoiceSession {
     options: VoiceSessionOptions = {},
   ) {
     this.input = options.input ?? process.stdin;
+    this.output = options.output ?? process.stdout;
     this.createPromptId = options.createPromptId ?? (() => randomUUID());
   }
 
@@ -39,18 +42,25 @@ export class VoiceSession {
       for await (const line of rl) {
         const trimmed = line.trim();
         if (trimmed) {
-          const prompt = createVoicePrompt(trimmed);
-          this.config
-            .getGeminiClient()
-            ?.getChat()
-            .setSystemInstruction(prompt.system);
+          const command = parseVoiceIntent(trimmed);
 
-          await runNonInteractive({
-            config: this.config,
-            settings: this.settings,
-            input: prompt.user,
-            prompt_id: this.createPromptId(),
-          });
+          if (command) {
+            await runNonInteractive({
+              config: this.config,
+              settings: this.settings,
+              input: command,
+              prompt_id: this.createPromptId(),
+            });
+            continue;
+          }
+
+          const suggestion = suggestVoiceIntent(trimmed);
+
+          if (suggestion) {
+            this.output.write(`Did you mean: ${suggestion} ?\n`);
+          } else {
+            this.output.write('Voice command not recognized.\n');
+          }
         }
       }
     } finally {
