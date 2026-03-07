@@ -12,6 +12,13 @@ import { randomUUID } from 'node:crypto';
 import type { Readable, Writable } from 'node:stream';
 import { parseVoiceIntent, suggestVoiceIntent } from './voiceIntentParser.js';
 
+const VOICE_MODE_HELP_TEXT =
+  'Voice Mode Commands:\n\n' +
+  'install dependencies -> npm install\n' +
+  'build project -> npm run build\n' +
+  'run checks -> npm run preflight\n' +
+  'exit -> leave voice mode\n';
+
 interface VoiceSessionOptions {
   input?: Readable;
   output?: Writable;
@@ -42,6 +49,21 @@ export class VoiceSession {
       for await (const line of rl) {
         const trimmed = line.trim();
         if (trimmed) {
+          const normalized = trimmed.toLowerCase();
+          if (
+            normalized.includes('help') ||
+            normalized.includes('what can i say') ||
+            normalized.includes('commands')
+          ) {
+            this.output.write(VOICE_MODE_HELP_TEXT);
+            continue;
+          }
+
+          if (normalized === 'exit') {
+            this.output.write('Exiting voice mode.\n');
+            break;
+          }
+
           const command = parseVoiceIntent(trimmed);
 
           if (command) {

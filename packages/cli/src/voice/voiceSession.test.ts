@@ -101,4 +101,44 @@ describe('VoiceSession', () => {
     expect(mockRunNonInteractive).not.toHaveBeenCalled();
     expect(printed).toContain('Voice command not recognized.');
   });
+
+  it('should print help text when user asks for help', async () => {
+    const input = Readable.from(['what can I say?\n']);
+    const output = new PassThrough();
+    let printed = '';
+    output.on('data', (chunk: Buffer | string) => {
+      printed += chunk.toString();
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const voiceSession = new VoiceSession({} as any, {} as any, {
+      input,
+      output,
+    });
+
+    await voiceSession.start();
+
+    expect(mockRunNonInteractive).not.toHaveBeenCalled();
+    expect(printed).toContain('Voice Mode Commands:');
+    expect(printed).toContain('install dependencies -> npm install');
+    expect(printed).toContain('exit -> leave voice mode');
+  });
+
+  it('should exit voice mode when user enters exit', async () => {
+    const input = Readable.from(['exit\n', 'build project\n']);
+    const output = new PassThrough();
+    let printed = '';
+    output.on('data', (chunk: Buffer | string) => {
+      printed += chunk.toString();
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const voiceSession = new VoiceSession({} as any, {} as any, {
+      input,
+      output,
+    });
+
+    await voiceSession.start();
+
+    expect(mockRunNonInteractive).not.toHaveBeenCalled();
+    expect(printed).toContain('Exiting voice mode.');
+  });
 });
