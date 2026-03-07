@@ -247,15 +247,4 @@ export class WorkspaceContext {
       !path.isAbsolute(relative)
     );
   }
-
-  /**
-   * Checks if a file path is a symbolic link that points to a file.
-   */
-  private isFileSymlink(filePath: string): boolean {
-    try {
-      return !fs.readlinkSync(filePath).endsWith('/');
-    } catch (_error) {
-      return false;
-    }
-  }
 }
