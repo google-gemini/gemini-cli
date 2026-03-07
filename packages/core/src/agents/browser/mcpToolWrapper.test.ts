@@ -193,4 +193,104 @@ describe('mcpToolWrapper', () => {
       expect(result.error?.message).toBe('Connection lost');
     });
   });
+
+  describe('Input blocker re-injection', () => {
+    it('should re-inject input blocker after navigate_page when shouldDisableInput is true', async () => {
+      // Add navigate_page to discovered tools
+      mockMcpTools.push({
+        name: 'navigate_page',
+        description: 'Navigate to URL',
+        inputSchema: {
+          type: 'object',
+          properties: { url: { type: 'string' } },
+          required: ['url'],
+        },
+      });
+
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        true, // shouldDisableInput
+      );
+
+      const navigateTool = tools.find((t) => t.name === 'navigate_page')!;
+      const invocation = navigateTool.build({ url: 'https://example.com' });
+      await invocation.execute(new AbortController().signal);
+
+      // callTool is called twice: once for navigate_page, once for evaluate_script (input blocker)
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(2);
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'evaluate_script',
+        expect.objectContaining({
+          function: expect.stringContaining('__gemini_input_blocker'),
+        }),
+      );
+    });
+
+    it('should NOT re-inject input blocker for take_snapshot', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        true, // shouldDisableInput
+      );
+
+      const snapshotTool = tools.find((t) => t.name === 'take_snapshot')!;
+      const invocation = snapshotTool.build({});
+      await invocation.execute(new AbortController().signal);
+
+      // callTool should only be called once for take_snapshot itself
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(1);
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'take_snapshot',
+        {},
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('should NOT re-inject input blocker when shouldDisableInput is false', async () => {
+      mockMcpTools.push({
+        name: 'navigate_page',
+        description: 'Navigate to URL',
+        inputSchema: {
+          type: 'object',
+          properties: { url: { type: 'string' } },
+          required: ['url'],
+        },
+      });
+
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        false, // shouldDisableInput disabled
+      );
+
+      const navigateTool = tools.find((t) => t.name === 'navigate_page')!;
+      const invocation = navigateTool.build({ url: 'https://example.com' });
+      await invocation.execute(new AbortController().signal);
+
+      // callTool should only be called once for navigate_page
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(1);
+    });
+
+    it('should re-inject input blocker after click when shouldDisableInput is true', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        true, // shouldDisableInput
+      );
+
+      const clickTool = tools.find((t) => t.name === 'click')!;
+      const invocation = clickTool.build({ uid: 'elem-42' });
+      await invocation.execute(new AbortController().signal);
+
+      // callTool: click + evaluate_script for input blocker
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(2);
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'evaluate_script',
+        expect.objectContaining({
+          function: expect.stringContaining('__gemini_input_blocker'),
+        }),
+      );
+    });
+  });
 });

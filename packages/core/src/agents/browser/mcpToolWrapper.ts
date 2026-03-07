@@ -30,6 +30,23 @@ import {
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { BrowserManager, McpToolCallResult } from './browserManager.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { injectInputBlocker } from './inputBlocker.js';
+
+/**
+ * Tools that change the page state and require re-injection of the input blocker.
+ * After these tools complete, the DOM may have changed (navigation, click opening
+ * a new page, etc.), so the overlay needs to be re-injected.
+ */
+const TOOLS_REQUIRING_REINJECT = new Set([
+  'navigate_page',
+  'new_page',
+  'click',
+  'fill',
+  'fill_form',
+  'press_key',
+  'select_page',
+  'handle_dialog',
+]);
 
 /**
  * Tool invocation that dispatches to BrowserManager's isolated MCP client.
@@ -43,6 +60,7 @@ class McpToolInvocation extends BaseToolInvocation<
     private readonly toolName: string,
     params: Record<string, unknown>,
     messageBus: MessageBus,
+    private readonly shouldDisableInput: boolean,
   ) {
     super(params, messageBus, toolName, toolName);
   }
@@ -109,6 +127,17 @@ class McpToolInvocation extends BaseToolInvocation<
           returnDisplay: `Error: ${processedContent}`,
           error: { message: textContent },
         };
+      }
+
+      // Re-inject the input blocker after state-changing tools.
+      // This ensures the overlay survives page navigations, clicks that
+      // trigger new page loads, form submissions, etc.
+      if (
+        this.shouldDisableInput &&
+        TOOLS_REQUIRING_REINJECT.has(this.toolName)
+      ) {
+        // Fire-and-forget: don't block the tool result on re-injection
+        void injectInputBlocker(this.browserManager);
       }
 
       return {
@@ -285,6 +314,7 @@ class McpDeclarativeTool extends DeclarativeTool<
     description: string,
     parameterSchema: unknown,
     messageBus: MessageBus,
+    private readonly shouldDisableInput: boolean,
   ) {
     super(
       name,
@@ -306,6 +336,7 @@ class McpDeclarativeTool extends DeclarativeTool<
       this.name,
       params,
       this.messageBus,
+      this.shouldDisableInput,
     );
   }
 }
@@ -384,12 +415,14 @@ class TypeTextDeclarativeTool extends DeclarativeTool<
 export async function createMcpDeclarativeTools(
   browserManager: BrowserManager,
   messageBus: MessageBus,
+  shouldDisableInput: boolean = false,
 ): Promise<Array<McpDeclarativeTool | TypeTextDeclarativeTool>> {
   // Get dynamically discovered tools from the MCP server
   const mcpTools = await browserManager.getDiscoveredTools();
 
   debugLogger.log(
-    `Creating ${mcpTools.length} declarative tools for browser agent`,
+    `Creating ${mcpTools.length} declarative tools for browser agent` +
+      (shouldDisableInput ? ' (input blocker enabled)' : ''),
   );
 
   const tools: Array<McpDeclarativeTool | TypeTextDeclarativeTool> =
@@ -406,6 +439,7 @@ export async function createMcpDeclarativeTools(
         augmentedDescription,
         schema.parametersJsonSchema,
         messageBus,
+        shouldDisableInput,
       );
     });
 

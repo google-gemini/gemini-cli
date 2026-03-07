@@ -456,7 +456,8 @@ export class BrowserManager {
     const existingHandler = this.rawMcpClient.fallbackNotificationHandler;
     this.rawMcpClient.fallbackNotificationHandler = async (notification: {
       method: string;
-      params?: unknown;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      params?: any;
     }) => {
       // Chain with any existing handler first.
       if (existingHandler) {
