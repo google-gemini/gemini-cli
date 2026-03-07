@@ -535,6 +535,19 @@ export function convertSessionToHistoryFormats(
   const uiHistory: HistoryItemWithoutId[] = [];
 
   for (const msg of messages) {
+    // Add thoughts if present
+    if (msg.type === 'gemini' && msg.thoughts && msg.thoughts.length > 0) {
+      for (const thought of msg.thoughts) {
+        uiHistory.push({
+          type: 'thinking',
+          thought: {
+            subject: thought.subject,
+            description: thought.description,
+          },
+        });
+      }
+    }
+
     // Add the message only if it has content
     const displayContentString = msg.displayContent
       ? partListUnionToString(msg.displayContent)

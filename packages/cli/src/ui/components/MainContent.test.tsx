@@ -22,17 +22,19 @@ import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import { type IndividualToolCallDisplay } from '../types.js';
 
 // Mock dependencies
+const mockUseSettings = vi.fn().mockReturnValue({
+  merged: {
+    ui: {
+      inlineThinkingMode: 'off',
+    },
+  },
+});
+
 vi.mock('../contexts/SettingsContext.js', async () => {
   const actual = await vi.importActual('../contexts/SettingsContext.js');
   return {
     ...actual,
-    useSettings: () => ({
-      merged: {
-        ui: {
-          inlineThinkingMode: 'off',
-        },
-      },
-    }),
+    useSettings: () => mockUseSettings(),
   };
 });
 
@@ -333,6 +335,13 @@ describe('MainContent', () => {
 
   beforeEach(() => {
     vi.mocked(useAlternateBuffer).mockReturnValue(false);
+    mockUseSettings.mockReturnValue({
+      merged: {
+        ui: {
+          inlineThinkingMode: 'off',
+        },
+      },
+    });
   });
 
   afterEach(() => {
@@ -568,6 +577,64 @@ describe('MainContent', () => {
     // The snapshot will be the best way to verify there is no gap (empty line) between them.
     expect(output).toMatchSnapshot();
     unmount();
+  });
+
+  it('renders multiple thinking messages sequentially correctly', async () => {
+    mockUseSettings.mockReturnValue({
+      merged: {
+        ui: {
+          inlineThinkingMode: 'expanded',
+        },
+      },
+    });
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+
+    const uiState = {
+      ...defaultMockUiState,
+      history: [
+        { id: 0, type: 'user' as const, text: 'Plan a solution' },
+        {
+          id: 1,
+          type: 'thinking' as const,
+          thought: {
+            subject: 'Initial analysis',
+            description:
+              'This is a multiple line paragraph for the first thinking message of how the model analyzes the problem.',
+          },
+        },
+        {
+          id: 2,
+          type: 'thinking' as const,
+          thought: {
+            subject: 'Planning execution',
+            description:
+              'This a second multiple line paragraph for the second thinking message explaining the plan in detail so that it wraps around the terminal display.',
+          },
+        },
+        {
+          id: 3,
+          type: 'thinking' as const,
+          thought: {
+            subject: 'Refining approach',
+            description:
+              'And finally a third multiple line paragraph for the third thinking message to refine the solution.',
+          },
+        },
+      ],
+    };
+
+    const renderResult = renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+    });
+    await renderResult.waitUntilReady();
+
+    const output = renderResult.lastFrame();
+    expect(output).toContain('Initial analysis');
+    expect(output).toContain('Planning execution');
+    expect(output).toContain('Refining approach');
+    expect(output).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
+    renderResult.unmount();
   });
 
   describe('MainContent Tool Output Height Logic', () => {

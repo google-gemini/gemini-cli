@@ -190,6 +190,37 @@ describe('convertSessionToHistoryFormats', () => {
     });
   });
 
+  it('should convert thinking tokens (thoughts) to thinking history items', () => {
+    const messages: MessageRecord[] = [
+      {
+        type: 'gemini',
+        content: 'Hi there',
+        thoughts: [
+          {
+            subject: 'Thinking...',
+            description: 'I should say hello.',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      } as MessageRecord,
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(2);
+    expect(result.uiHistory[0]).toMatchObject({
+      type: 'thinking',
+      thought: {
+        subject: 'Thinking...',
+        description: 'I should say hello.',
+      },
+    });
+    expect(result.uiHistory[1]).toMatchObject({
+      type: 'gemini',
+      text: 'Hi there',
+    });
+  });
+
   it('should prioritize displayContent for UI history but use content for client history', () => {
     const messages: MessageRecord[] = [
       {

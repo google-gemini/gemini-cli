@@ -33,6 +33,43 @@ describe('convertSessionToClientHistory', () => {
     ]);
   });
 
+  it('should convert thinking tokens (thoughts) to model parts', () => {
+    const messages: ConversationRecord['messages'] = [
+      {
+        id: '1',
+        type: 'user',
+        timestamp: '2024-01-01T10:00:00Z',
+        content: 'Hello',
+      },
+      {
+        id: '2',
+        type: 'gemini',
+        timestamp: '2024-01-01T10:01:00Z',
+        content: 'Hi there',
+        thoughts: [
+          {
+            subject: 'Thinking',
+            description: 'I should be polite.',
+            timestamp: '2024-01-01T10:00:50Z',
+          },
+        ],
+      },
+    ];
+
+    const history = convertSessionToClientHistory(messages);
+
+    expect(history).toEqual([
+      { role: 'user', parts: [{ text: 'Hello' }] },
+      {
+        role: 'model',
+        parts: [
+          { text: '**Thinking** I should be polite.', thought: true },
+          { text: 'Hi there' },
+        ],
+      },
+    ]);
+  });
+
   it('should ignore info, error, and slash commands', () => {
     const messages: ConversationRecord['messages'] = [
       {
