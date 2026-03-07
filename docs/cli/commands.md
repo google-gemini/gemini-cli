@@ -234,6 +234,16 @@ Slash commands provide meta-level control over the CLI itself.
     - **`nodesc`** or **`nodescriptions`**:
       - **Description:** Hide tool descriptions, showing only the tool names.
 
+- **`/policies`**
+  - **Description:** Manage policies and tool execution approval modes.
+  - **Sub-commands:**
+    - **`list`**:
+      - **Description:** List all active policies.
+    - **`mode <mode>`**:
+      - **Description:** Set the tool approval mode. Valid modes are: `default`,
+        `auto_edit`, `yolo`, `plan`, and `headless`.
+      - **Usage:** `/policies mode yolo`
+
 - **`/privacy`**
   - **Description:** Display the Privacy Notice and allow users to select
     whether they consent to the collection of their data for service improvement
