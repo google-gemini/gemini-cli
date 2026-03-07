@@ -65,7 +65,36 @@ import type {
 
 // For troubleshooting, set the log level to DiagLogLevel.DEBUG
 class DiagLoggerAdapter {
+  private hasLoggedExportError = false;
+  private recoveryTimeout: NodeJS.Timeout | null = null;
+
   error(message: string, ...args: unknown[]): void {
+    const errorStr = typeof message === 'string' ? message : String(message);
+    if (
+      errorStr.includes('export failed') ||
+      errorStr.includes('Exporting failed') ||
+      errorStr.includes('ECONNREFUSED')
+    ) {
+      if (this.recoveryTimeout) {
+        clearTimeout(this.recoveryTimeout);
+      }
+      // If we don't see another export error in 35s, assume the connection recovered.
+      this.recoveryTimeout = setTimeout(() => {
+        if (this.hasLoggedExportError) {
+          debugLogger.log('Telemetry connection successfully established.');
+          this.hasLoggedExportError = false;
+        }
+      }, 35000).unref();
+
+      if (!this.hasLoggedExportError) {
+        debugLogger.error(
+          'Telemetry export failed. Suppressing further export errors.',
+        );
+        this.hasLoggedExportError = true;
+      }
+      debugLogger.debug(message, ...args);
+      return;
+    }
     debugLogger.error(message, ...args);
   }
 
