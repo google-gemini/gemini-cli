@@ -63,6 +63,15 @@ Note: This feature is experimental and under active development. See issue
 - Responses are steered toward concise, voice-friendly output.
 - Native microphone/audio streaming is not implemented in this PR and will be
   added in a future PR.
+- Ask for available commands by typing `help`, `what can i say`, or `commands`.
+- Type `exit` to leave voice mode.
+
+### Voice mode commands
+
+- `install dependencies` -> `npm install`
+- `build project` -> `npm run build`
+- `run checks` -> `npm run preflight`
+- `exit` -> leave voice mode
 
 ## Model selection
 
