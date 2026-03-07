@@ -937,43 +937,15 @@ describe('SettingsDialog', () => {
         });
       }
 
- feat/architecture-map
-        const calls = vi.mocked(saveModifiedSettings).mock.calls;
-        calls.forEach(
-          (
-            call: [
-              Set<string>,
-              Parameters<typeof saveModifiedSettings>[1],
-              ...unknown[],
-            ],
-          ) => {
-            const [modifiedKeys, pendingSettings] = call;
-
-            if (modifiedKeys.has('tools.shell.showColor')) {
-              const shellSettings = pendingSettings.tools?.shell as
-                | Record<string, unknown>
-                | undefined;
-
-              Object.entries(expectedSiblings).forEach(([key, value]) => {
-                expect(shellSettings?.[key]).toBe(value);
-                expect(modifiedKeys.has(`tools.shell.${key}`)).toBe(false);
-              });
-
-              expect(modifiedKeys.size).toBe(1);
-            }
-          },
-        );
-
       await waitFor(() => {
         expect(setValueSpy).toHaveBeenCalled();
       });
- main
 
       // With the store pattern, setValue is called atomically per key.
       // Sibling preservation is handled by LoadedSettings internally.
       const calls = setValueSpy.mock.calls;
       expect(calls.length).toBeGreaterThan(0);
-      calls.forEach((call) => {
+      calls.forEach((call: unknown[]) => {
         // Each call should target only 'tools.shell.showColor'
         expect(call[1]).toBe('tools.shell.showColor');
       });
