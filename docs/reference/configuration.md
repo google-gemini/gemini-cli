@@ -159,12 +159,12 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`general.sessionRetention.enabled`** (boolean):
   - **Description:** Enable automatic session cleanup
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`general.sessionRetention.maxAge`** (string):
   - **Description:** Automatically delete chats older than this time period
     (e.g., "30d", "7d", "24h", "1w")
-  - **Default:** `undefined`
+  - **Default:** `"30d"`
 
 - **`general.sessionRetention.maxCount`** (number):
   - **Description:** Alternative: Maximum number of sessions to keep (most
@@ -174,11 +174,6 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.sessionRetention.minRetention`** (string):
   - **Description:** Minimum retention period (safety limit, defaults to "1d")
   - **Default:** `"1d"`
-
-- **`general.sessionRetention.warningAcknowledged`** (boolean):
-  - **Description:** INTERNAL: Whether the user has acknowledged the session
-    retention warning
-  - **Default:** `false`
 
 #### `output`
 
@@ -255,8 +250,18 @@ their corresponding top-level category object in your `settings.json` file.
     input.
   - **Default:** `false`
 
+- **`ui.footer.items`** (array):
+  - **Description:** List of item IDs to display in the footer. Rendered in
+    order
+  - **Default:** `undefined`
+
+- **`ui.footer.showLabels`** (boolean):
+  - **Description:** Display a second line above the footer items with
+    descriptive headers (e.g., /model).
+  - **Default:** `true`
+
 - **`ui.footer.hideCWD`** (boolean):
-  - **Description:** Hide the current working directory path in the footer.
+  - **Description:** Hide the current working directory in the footer.
   - **Default:** `false`
 
 - **`ui.footer.hideSandboxStatus`** (boolean):
@@ -268,7 +273,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`ui.footer.hideContextPercentage`** (boolean):
-  - **Description:** Hides the context window remaining percentage.
+  - **Description:** Hides the context window usage percentage.
   - **Default:** `true`
 
 - **`ui.hideFooter`** (boolean):
@@ -752,7 +757,8 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`tools.sandbox`** (boolean | string):
   - **Description:** Sandbox execution environment. Set to a boolean to enable
-    or disable the sandbox, or provide a string path to a sandbox profile.
+    or disable the sandbox, provide a string path to a sandbox profile, or
+    specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -1019,6 +1025,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.taskTracker`** (boolean):
+  - **Description:** Enable task tracker tools.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.modelSteering`** (boolean):
   - **Description:** Enable model steering (user hints) to guide the model
     during tool execution.
@@ -1030,8 +1041,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.gemmaModelRouter.enabled`** (boolean):
-  - **Description:** Enable the Gemma Model Router. Requires a local endpoint
-    serving Gemma via the Gemini API using LiteRT-LM shim.
+  - **Description:** Enable the Gemma Model Router (experimental). Requires a
+    local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.
   - **Default:** `false`
   - **Requires restart:** Yes
 
