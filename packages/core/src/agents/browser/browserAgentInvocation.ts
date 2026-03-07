@@ -122,7 +122,7 @@ function sanitizeErrorMessage(message: string): string {
     '[REDACTED_PEM]',
   );
 
-  const unquotedValue = `[^\s]+(?:\s+(?![a-zA-Z0-9_.-]+(?:=|:))[^\s=:<>]+)*`;
+  const unquotedValue = `[^\\s]+(?:\\s+(?![a-zA-Z0-9_.-]+(?:=|:))[^\\s=:<>]+)*`;
   const valuePattern = `(?:"[^"]*"|'[^']*'|${unquotedValue})`;
 
   // 2. Handle key-value pairs with delimiters (=, :, space, CLI-style --flag)
