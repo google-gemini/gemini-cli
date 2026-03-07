@@ -63,6 +63,7 @@ function getStringReferences(parts: AnyPart[]): StringReference[] {
         });
       }
     } else if (part instanceof GenericPart) {
+      // eslint-disable-next-line no-restricted-syntax
       if (part.type === 'executableCode' && typeof part['code'] === 'string') {
         refs.push({
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -73,6 +74,7 @@ function getStringReferences(parts: AnyPart[]): StringReference[] {
         });
       } else if (
         part.type === 'codeExecutionResult' &&
+        // eslint-disable-next-line no-restricted-syntax
         typeof part['output'] === 'string'
       ) {
         refs.push({

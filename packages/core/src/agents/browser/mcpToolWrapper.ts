@@ -356,6 +356,7 @@ class TypeTextDeclarativeTool extends DeclarativeTool<
     params: Record<string, unknown>,
   ): ToolInvocation<Record<string, unknown>, ToolResult> {
     const submitKey =
+      // eslint-disable-next-line no-restricted-syntax
       typeof params['submitKey'] === 'string' && params['submitKey']
         ? params['submitKey']
         : undefined;
