@@ -126,14 +126,54 @@ export function loadSettings(workspaceDir: string): Settings {
 }
 
 function resolveEnvVarsInString(value: string): string {
-  const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g; // Find $VAR_NAME or ${VAR_NAME}
-  return value.replace(envVarRegex, (match, varName1, varName2) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const varName = varName1 || varName2;
-    if (process && process.env && typeof process.env[varName] === 'string') {
-      return process.env[varName];
+  const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g;
+  return value.replace(envVarRegex, (match, varName1, bracedContent) => {
+    // Simple $VAR form
+    if (varName1) {
+      if (process && process.env && typeof process.env[varName1] === 'string') {
+        return process.env[varName1];
+      }
+      return match;
     }
-    return match;
+
+    // Braced ${...} form — may include a default value
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const braced: string = bracedContent;
+
+    const colonDashIdx = braced.indexOf(':-');
+    const dashIdx = braced.indexOf('-');
+
+    let varName: string;
+    let defaultValue: string | undefined;
+    let useDefaultWhenEmpty = false;
+
+    if (colonDashIdx !== -1) {
+      varName = braced.substring(0, colonDashIdx);
+      defaultValue = braced.substring(colonDashIdx + 2);
+      useDefaultWhenEmpty = true;
+    } else if (dashIdx !== -1) {
+      varName = braced.substring(0, dashIdx);
+      defaultValue = braced.substring(dashIdx + 1);
+      useDefaultWhenEmpty = false;
+    } else {
+      varName = braced;
+      defaultValue = undefined;
+    }
+
+    let resolved: string | undefined;
+    if (process && process.env && typeof process.env[varName] === 'string') {
+      resolved = process.env[varName];
+    }
+
+    if (resolved === undefined) {
+      return defaultValue !== undefined ? defaultValue : match;
+    }
+
+    if (useDefaultWhenEmpty && resolved === '' && defaultValue !== undefined) {
+      return defaultValue;
+    }
+
+    return resolved;
   });
 }
 

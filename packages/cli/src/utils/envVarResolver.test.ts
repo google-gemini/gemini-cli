@@ -77,6 +77,95 @@ describe('resolveEnvVarsInString', () => {
 
     expect(result).toBe('value and $UNDEFINED mixed');
   });
+
+  // --- ${VAR:-default} syntax tests ---
+
+  it('should use default value when variable is undefined (colon-dash)', () => {
+    delete process.env['UNSET_VAR'];
+
+    const result = resolveEnvVarsInString('Value is ${UNSET_VAR:-fallback}');
+
+    expect(result).toBe('Value is fallback');
+  });
+
+  it('should use default value when variable is empty (colon-dash)', () => {
+    process.env['EMPTY_VAR'] = '';
+
+    const result = resolveEnvVarsInString('Value is ${EMPTY_VAR:-fallback}');
+
+    expect(result).toBe('Value is fallback');
+  });
+
+  it('should use env value when variable is set and non-empty (colon-dash)', () => {
+    process.env['SET_VAR'] = 'actual';
+
+    const result = resolveEnvVarsInString('Value is ${SET_VAR:-fallback}');
+
+    expect(result).toBe('Value is actual');
+  });
+
+  it('should use default value when variable is undefined (dash)', () => {
+    delete process.env['UNSET_VAR'];
+
+    const result = resolveEnvVarsInString('Value is ${UNSET_VAR-fallback}');
+
+    expect(result).toBe('Value is fallback');
+  });
+
+  it('should keep empty string when variable is empty (dash)', () => {
+    process.env['EMPTY_VAR'] = '';
+
+    const result = resolveEnvVarsInString('Value is ${EMPTY_VAR-fallback}');
+
+    expect(result).toBe('Value is ');
+  });
+
+  it('should use env value when variable is set (dash)', () => {
+    process.env['SET_VAR'] = 'actual';
+
+    const result = resolveEnvVarsInString('Value is ${SET_VAR-fallback}');
+
+    expect(result).toBe('Value is actual');
+  });
+
+  it('should support empty default value with colon-dash', () => {
+    delete process.env['UNSET_VAR'];
+
+    const result = resolveEnvVarsInString('Value is "${UNSET_VAR:-}"');
+
+    expect(result).toBe('Value is ""');
+  });
+
+  it('should support default values with special characters', () => {
+    delete process.env['UNSET_VAR'];
+
+    const result = resolveEnvVarsInString(
+      'URL is ${UNSET_VAR:-https://example.com/api}',
+    );
+
+    expect(result).toBe('URL is https://example.com/api');
+  });
+
+  it('should support multiple default-value variables in one string', () => {
+    delete process.env['HOST'];
+    process.env['PORT'] = '3000';
+
+    const result = resolveEnvVarsInString(
+      'http://${HOST:-localhost}:${PORT:-8080}/api',
+    );
+
+    expect(result).toBe('http://localhost:3000/api');
+  });
+
+  it('should support default values with customEnv', () => {
+    const customEnv = { EXISTING: 'custom-value' };
+
+    const result1 = resolveEnvVarsInString('${EXISTING:-default}', customEnv);
+    expect(result1).toBe('custom-value');
+
+    const result2 = resolveEnvVarsInString('${MISSING:-default}', customEnv);
+    expect(result2).toBe('default');
+  });
 });
 
 describe('resolveEnvVarsInObject', () => {

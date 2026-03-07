@@ -6,8 +6,17 @@
 
 /**
  * Resolves environment variables in a string.
- * Replaces $VAR_NAME and ${VAR_NAME} with their corresponding environment variable values.
- * If the environment variable is not defined, the original placeholder is preserved.
+ * Replaces $VAR_NAME, ${VAR_NAME}, and ${VAR_NAME:-default} with their
+ * corresponding environment variable values. If the environment variable is not
+ * defined and no default value is provided, the original placeholder is preserved.
+ *
+ * Supported syntax:
+ * - `$VAR_NAME` — simple variable reference
+ * - `${VAR_NAME}` — braced variable reference
+ * - `${VAR_NAME:-default}` — variable with a default value used when the
+ *   variable is unset or empty
+ * - `${VAR_NAME-default}` — variable with a default value used when the
+ *   variable is unset (empty string is kept)
  *
  * @param value - The string that may contain environment variable placeholders
  * @returns The string with environment variables resolved
@@ -16,22 +25,82 @@
  * resolveEnvVarsInString("Token: $API_KEY") // Returns "Token: secret-123"
  * resolveEnvVarsInString("URL: ${BASE_URL}/api") // Returns "URL: https://api.example.com/api"
  * resolveEnvVarsInString("Missing: $UNDEFINED_VAR") // Returns "Missing: $UNDEFINED_VAR"
+ * resolveEnvVarsInString("${UNSET:-fallback}") // Returns "fallback"
  */
 export function resolveEnvVarsInString(
   value: string,
   customEnv?: Record<string, string>,
 ): string {
-  const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g; // Find $VAR_NAME or ${VAR_NAME}
-  return value.replace(envVarRegex, (match, varName1, varName2) => {
+  // Matches:
+  //  1) $WORD          — captured in group 1
+  //  2) ${...}         — the content inside braces is captured in group 2
+  const envVarRegex = /\$(?:(\w+)|{([^}]+)})/g;
+  return value.replace(envVarRegex, (match, varName1, bracedContent) => {
+    // Simple $VAR form — no default value syntax possible
+    if (varName1) {
+      if (customEnv && typeof customEnv[varName1] === 'string') {
+        return customEnv[varName1];
+      }
+      if (process && process.env && typeof process.env[varName1] === 'string') {
+        return process.env[varName1];
+      }
+      return match;
+    }
+
+    // Braced ${...} form — may include a default value
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const varName = varName1 || varName2;
+    const braced: string = bracedContent;
+
+    // Parse ${VAR:-default} and ${VAR-default} syntax
+    // :-  means "use default if unset OR empty"
+    // -   means "use default if unset" (empty string is kept)
+    const colonDashIdx = braced.indexOf(':-');
+    const dashIdx = braced.indexOf('-');
+
+    let varName: string;
+    let defaultValue: string | undefined;
+    let useDefaultWhenEmpty = false;
+
+    if (colonDashIdx !== -1) {
+      // ${VAR:-default}
+      varName = braced.substring(0, colonDashIdx);
+      defaultValue = braced.substring(colonDashIdx + 2);
+      useDefaultWhenEmpty = true;
+    } else if (dashIdx !== -1) {
+      // ${VAR-default}
+      varName = braced.substring(0, dashIdx);
+      defaultValue = braced.substring(dashIdx + 1);
+      useDefaultWhenEmpty = false;
+    } else {
+      // ${VAR} — no default
+      varName = braced;
+      defaultValue = undefined;
+    }
+
+    // Look up the variable value
+    let resolved: string | undefined;
     if (customEnv && typeof customEnv[varName] === 'string') {
-      return customEnv[varName];
+      resolved = customEnv[varName];
+    } else if (
+      process &&
+      process.env &&
+      typeof process.env[varName] === 'string'
+    ) {
+      resolved = process.env[varName];
     }
-    if (process && process.env && typeof process.env[varName] === 'string') {
-      return process.env[varName];
+
+    // Apply default-value logic
+    if (resolved === undefined) {
+      // Variable is unset
+      return defaultValue !== undefined ? defaultValue : match;
     }
-    return match;
+
+    if (useDefaultWhenEmpty && resolved === '' && defaultValue !== undefined) {
+      // Variable is set but empty and :- syntax was used
+      return defaultValue;
+    }
+
+    return resolved;
   });
 }
 
