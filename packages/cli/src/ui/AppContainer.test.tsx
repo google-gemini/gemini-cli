@@ -3465,6 +3465,63 @@ describe('AppContainer State Management', () => {
       unmount!();
     });
 
+    it('resets the hint timer when a new component overflows (overflowingIdsSize increases)', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      // 1. Trigger first overflow
+      act(() => {
+        capturedOverflowActions.addOverflowingId('test-id-1');
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(true);
+      });
+
+      // 2. Advance half the duration
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2);
+      });
+      expect(capturedUIState.showIsExpandableHint).toBe(true);
+
+      // 3. Trigger second overflow (this should reset the timer)
+      act(() => {
+        capturedOverflowActions.addOverflowingId('test-id-2');
+      });
+
+      // Advance by 1ms to allow the OverflowProvider's 0ms batching timeout to fire
+      // and flush the state update to AppContainer, triggering the reset.
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(true);
+      });
+
+      // 4. Advance enough that the ORIGINAL timer would have expired
+      // Subtracting 1ms since we advanced it above to flush the state.
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2 + 100 - 1);
+      });
+      // The hint should STILL be visible because the timer reset at step 3
+      expect(capturedUIState.showIsExpandableHint).toBe(true);
+
+      // 5. Advance to the end of the NEW timer
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2 - 100);
+      });
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(false);
+      });
+
+      unmount!();
+    });
+
     it('toggles expansion state and resets the hint timer when Ctrl+O is pressed in Standard Mode', async () => {
       let unmount: () => void;
       let stdin: ReturnType<typeof renderAppContainer>['stdin'];
@@ -3606,7 +3663,7 @@ describe('AppContainer State Management', () => {
       unmount!();
     });
 
-    it('does NOT set showIsExpandableHint when overflow occurs in Alternate Buffer Mode', async () => {
+    it('DOES set showIsExpandableHint when overflow occurs in Alternate Buffer Mode', async () => {
       const alternateSettings = mergeSettings({}, {}, {}, {}, true);
       const settingsWithAlternateBuffer = {
         merged: {
@@ -3634,8 +3691,10 @@ describe('AppContainer State Management', () => {
         capturedOverflowActions.addOverflowingId('test-id');
       });
 
-      // Should NOT show hint because we are in Alternate Buffer Mode
-      expect(capturedUIState.showIsExpandableHint).toBe(false);
+      // Should NOW show hint because we are in Alternate Buffer Mode
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(true);
+      });
 
       unmount!();
     });
