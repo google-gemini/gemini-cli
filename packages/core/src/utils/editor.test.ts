@@ -35,6 +35,12 @@ vi.mock('child_process', () => ({
   spawnSync: vi.fn(() => ({ error: null, status: 0 })),
 }));
 
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn(),
+}));
+
+import { existsSync } from 'node:fs';
+
 const originalPlatform = process.platform;
 
 describe('editor utils', () => {
@@ -45,6 +51,10 @@ describe('editor utils', () => {
       value: originalPlatform,
       writable: true,
     });
+    vi.stubEnv('LOCALAPPDATA', 'C:\\LOCALAPPDATA');
+    vi.stubEnv('ProgramFiles', 'C:\\Program Files');
+    vi.stubEnv('APPDATA', 'C:\\APPDATA');
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy');
   });
 
   afterEach(() => {
@@ -62,26 +72,60 @@ describe('editor utils', () => {
       commands: string[];
       win32Commands: string[];
     }> = [
-      { editor: 'vscode', commands: ['code'], win32Commands: ['code.cmd'] },
+      {
+        editor: 'vscode',
+        commands: ['code'],
+        win32Commands: [
+          'code.cmd',
+          'code',
+          'C:\\LOCALAPPDATA\\Programs\\Microsoft VS Code\\bin\\code.cmd',
+          'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd',
+        ],
+      },
       {
         editor: 'vscodium',
         commands: ['codium'],
-        win32Commands: ['codium.cmd'],
+        win32Commands: [
+          'codium.cmd',
+          'codium',
+          'C:\\LOCALAPPDATA\\Programs\\VSCodium\\bin\\codium.cmd',
+          'C:\\Program Files\\VSCodium\\bin\\codium.cmd',
+        ],
       },
       {
         editor: 'windsurf',
         commands: ['windsurf'],
         win32Commands: ['windsurf'],
       },
-      { editor: 'cursor', commands: ['cursor'], win32Commands: ['cursor'] },
+      {
+        editor: 'cursor',
+        commands: ['cursor'],
+        win32Commands: [
+          'cursor',
+          'C:\\LOCALAPPDATA\\Programs\\cursor\\resources\\app\\bin\\cursor.cmd',
+          'C:\\Program Files\\cursor\\resources\\app\\bin\\cursor.cmd',
+        ],
+      },
       { editor: 'vim', commands: ['vim'], win32Commands: ['vim'] },
       { editor: 'neovim', commands: ['nvim'], win32Commands: ['nvim'] },
       { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
-      { editor: 'emacs', commands: ['emacs'], win32Commands: ['emacs.exe'] },
+      {
+        editor: 'emacs',
+        commands: ['emacs'],
+        win32Commands: ['emacs.exe', 'emacs'],
+      },
       {
         editor: 'antigravity',
-        commands: ['agy', 'antigravity'],
-        win32Commands: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
+        commands: ['gemini', 'agy', 'antigravity'],
+        win32Commands: [
+          'gemini.cmd',
+          'gemini',
+          'agy.cmd',
+          'agy',
+          'antigravity.cmd',
+          'antigravity',
+          'C:\\APPDATA\\npm\\agy.cmd',
+        ],
       },
       { editor: 'hx', commands: ['hx'], win32Commands: ['hx'] },
     ];
@@ -125,30 +169,55 @@ describe('editor utils', () => {
         // Windows tests
         it(`should return true if first command "${win32Commands[0]}" exists on windows`, () => {
           Object.defineProperty(process, 'platform', { value: 'win32' });
-          (execSync as Mock).mockReturnValue(
-            Buffer.from(`C:\\Program Files\\...\\${win32Commands[0]}`),
-          );
-          expect(hasValidEditorCommand(editor)).toBe(true);
-          expect(execSync).toHaveBeenCalledWith(
-            `where.exe ${win32Commands[0]}`,
-            {
-              stdio: 'ignore',
-            },
-          );
+          if (
+            win32Commands[0].includes('\\') ||
+            win32Commands[0].includes('/')
+          ) {
+            (existsSync as Mock).mockReturnValue(true);
+            expect(hasValidEditorCommand(editor)).toBe(true);
+            expect(existsSync).toHaveBeenCalledWith(win32Commands[0]);
+          } else {
+            (execSync as Mock).mockReturnValue(
+              Buffer.from(`C:\\Program Files\\...\\${win32Commands[0]}`),
+            );
+            expect(hasValidEditorCommand(editor)).toBe(true);
+            expect(execSync).toHaveBeenCalledWith(
+              `where.exe ${win32Commands[0]}`,
+              {
+                stdio: 'ignore',
+              },
+            );
+          }
         });
 
         if (win32Commands.length > 1) {
           it(`should return true if first command doesn't exist but second command "${win32Commands[1]}" exists on windows`, () => {
             Object.defineProperty(process, 'platform', { value: 'win32' });
-            (execSync as Mock)
-              .mockImplementationOnce(() => {
-                throw new Error(); // first command not found
-              })
-              .mockReturnValueOnce(
-                Buffer.from(`C:\\Program Files\\...\\${win32Commands[1]}`),
-              ); // second command found
+
+            const mockCommand = (cmd: string, exists: boolean) => {
+              if (cmd.includes('\\') || cmd.includes('/')) {
+                if (exists) {
+                  (existsSync as Mock).mockReturnValueOnce(true);
+                } else {
+                  (existsSync as Mock).mockReturnValueOnce(false);
+                }
+              } else {
+                if (exists) {
+                  (execSync as Mock).mockReturnValueOnce(
+                    Buffer.from(`C:\\Program Files\\...\\${cmd}`),
+                  );
+                } else {
+                  (execSync as Mock).mockImplementationOnce(() => {
+                    throw new Error();
+                  });
+                }
+              }
+            };
+
+            mockCommand(win32Commands[0], false);
+            mockCommand(win32Commands[1], true);
+
             expect(hasValidEditorCommand(editor)).toBe(true);
-            expect(execSync).toHaveBeenCalledTimes(2);
           });
         }
 
@@ -157,8 +226,9 @@ describe('editor utils', () => {
           (execSync as Mock).mockImplementation(() => {
             throw new Error(); // all commands not found
           });
+          (existsSync as Mock).mockReturnValue(false);
+
           expect(hasValidEditorCommand(editor)).toBe(false);
-          expect(execSync).toHaveBeenCalledTimes(win32Commands.length);
         });
       });
     }
@@ -170,23 +240,53 @@ describe('editor utils', () => {
       commands: string[];
       win32Commands: string[];
     }> = [
-      { editor: 'vscode', commands: ['code'], win32Commands: ['code.cmd'] },
+      {
+        editor: 'vscode',
+        commands: ['code'],
+        win32Commands: [
+          'code.cmd',
+          'code',
+          'C:\\LOCALAPPDATA\\Programs\\Microsoft VS Code\\bin\\code.cmd',
+          'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd',
+        ],
+      },
       {
         editor: 'vscodium',
         commands: ['codium'],
-        win32Commands: ['codium.cmd'],
+        win32Commands: [
+          'codium.cmd',
+          'codium',
+          'C:\\LOCALAPPDATA\\Programs\\VSCodium\\bin\\codium.cmd',
+          'C:\\Program Files\\VSCodium\\bin\\codium.cmd',
+        ],
       },
       {
         editor: 'windsurf',
         commands: ['windsurf'],
         win32Commands: ['windsurf'],
       },
-      { editor: 'cursor', commands: ['cursor'], win32Commands: ['cursor'] },
+      {
+        editor: 'cursor',
+        commands: ['cursor'],
+        win32Commands: [
+          'cursor',
+          'C:\\LOCALAPPDATA\\Programs\\cursor\\resources\\app\\bin\\cursor.cmd',
+          'C:\\Program Files\\cursor\\resources\\app\\bin\\cursor.cmd',
+        ],
+      },
       { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
       {
         editor: 'antigravity',
-        commands: ['agy', 'antigravity'],
-        win32Commands: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
+        commands: ['gemini', 'agy', 'antigravity'],
+        win32Commands: [
+          'gemini.cmd',
+          'gemini',
+          'agy.cmd',
+          'agy',
+          'antigravity.cmd',
+          'antigravity',
+          'C:\\APPDATA\\npm\\agy.cmd',
+        ],
       },
     ];
 
@@ -235,11 +335,30 @@ describe('editor utils', () => {
       });
 
       // Windows tests
+      const mockCommand = (cmd: string, exists: boolean) => {
+        if (cmd.includes('\\') || cmd.includes('/')) {
+          if (exists) {
+            (existsSync as Mock).mockReturnValueOnce(true);
+          } else {
+            (existsSync as Mock).mockReturnValueOnce(false);
+          }
+        } else {
+          if (exists) {
+            (execSync as Mock).mockReturnValueOnce(
+              Buffer.from(`C:\\Program Files\\...\\${cmd}`),
+            );
+          } else {
+            (execSync as Mock).mockImplementationOnce(() => {
+              throw new Error();
+            });
+          }
+        }
+      };
+
       it(`should use first command "${win32Commands[0]}" when it exists on windows`, () => {
         Object.defineProperty(process, 'platform', { value: 'win32' });
-        (execSync as Mock).mockReturnValue(
-          Buffer.from(`C:\\Program Files\\...\\${win32Commands[0]}`),
-        );
+        mockCommand(win32Commands[0], true);
+
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
         expect(diffCommand).toEqual({
           command: win32Commands[0],
@@ -250,13 +369,8 @@ describe('editor utils', () => {
       if (win32Commands.length > 1) {
         it(`should use second command "${win32Commands[1]}" when first doesn't exist on windows`, () => {
           Object.defineProperty(process, 'platform', { value: 'win32' });
-          (execSync as Mock)
-            .mockImplementationOnce(() => {
-              throw new Error(); // first command not found
-            })
-            .mockReturnValueOnce(
-              Buffer.from(`C:\\Program Files\\...\\${win32Commands[1]}`),
-            ); // second command found
+          mockCommand(win32Commands[0], false);
+          mockCommand(win32Commands[1], true);
 
           const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
           expect(diffCommand).toEqual({
@@ -266,11 +380,11 @@ describe('editor utils', () => {
         });
       }
 
-      it(`should fall back to last command "${win32Commands[win32Commands.length - 1]}" when none exist on windows`, () => {
+      it(`should fall back to last command "${
+        win32Commands[win32Commands.length - 1]
+      }" when none exist on windows`, () => {
         Object.defineProperty(process, 'platform', { value: 'win32' });
-        (execSync as Mock).mockImplementation(() => {
-          throw new Error(); // all commands not found
-        });
+        win32Commands.slice(0, -1).forEach((cmd) => mockCommand(cmd, false));
 
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
         expect(diffCommand).toEqual({

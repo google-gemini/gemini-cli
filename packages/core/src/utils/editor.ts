@@ -5,6 +5,7 @@
  */
 
 import { exec, execSync, spawn, spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
 import { debugLogger } from './debugLogger.js';
@@ -87,6 +88,9 @@ function getCommandExistsCmd(cmd: string): string {
 }
 
 function commandExists(cmd: string): boolean {
+  if (cmd.includes('\\') || cmd.includes('/')) {
+    return existsSync(cmd);
+  }
   try {
     execSync(getCommandExistsCmd(cmd), { stdio: 'ignore' });
     return true;
@@ -96,6 +100,9 @@ function commandExists(cmd: string): boolean {
 }
 
 async function commandExistsAsync(cmd: string): Promise<boolean> {
+  if (cmd.includes('\\') || cmd.includes('/')) {
+    return existsSync(cmd);
+  }
   try {
     await execAsync(getCommandExistsCmd(cmd));
     return true;
@@ -108,27 +115,109 @@ async function commandExistsAsync(cmd: string): Promise<boolean> {
  * Editor command configurations for different platforms.
  * Each editor can have multiple possible command names, listed in order of preference.
  */
-const editorCommands: Record<
-  EditorType,
-  { win32: string[]; default: string[] }
-> = {
-  vscode: { win32: ['code.cmd'], default: ['code'] },
-  vscodium: { win32: ['codium.cmd'], default: ['codium'] },
-  windsurf: { win32: ['windsurf'], default: ['windsurf'] },
-  cursor: { win32: ['cursor'], default: ['cursor'] },
-  vim: { win32: ['vim'], default: ['vim'] },
-  neovim: { win32: ['nvim'], default: ['nvim'] },
-  zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
-  emacs: { win32: ['emacs.exe'], default: ['emacs'] },
-  antigravity: {
-    win32: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
-    default: ['agy', 'antigravity'],
-  },
-  hx: { win32: ['hx'], default: ['hx'] },
-};
+function getEditorConfig(editor: EditorType): {
+  win32: string[];
+  default: string[];
+} {
+  switch (editor) {
+    case 'vscode':
+      return {
+        win32: [
+          'code.cmd',
+          'code',
+          ...(process.env['LOCALAPPDATA']
+            ? [
+                `${process.env['LOCALAPPDATA']}\\Programs\\Microsoft VS Code\\bin\\code.cmd`,
+              ]
+            : []),
+          ...(process.env['ProgramFiles']
+            ? [
+                `${process.env['ProgramFiles']}\\Microsoft VS Code\\bin\\code.cmd`,
+              ]
+            : []),
+        ],
+        default: ['code'],
+      };
+    case 'vscodium':
+      return {
+        win32: [
+          'codium.cmd',
+          'codium',
+          ...(process.env['LOCALAPPDATA']
+            ? [
+                `${process.env['LOCALAPPDATA']}\\Programs\\VSCodium\\bin\\codium.cmd`,
+              ]
+            : []),
+          ...(process.env['ProgramFiles']
+            ? [`${process.env['ProgramFiles']}\\VSCodium\\bin\\codium.cmd`]
+            : []),
+        ],
+        default: ['codium'],
+      };
+    case 'windsurf':
+      return { win32: ['windsurf'], default: ['windsurf'] };
+    case 'cursor':
+      return {
+        win32: [
+          'cursor',
+          ...(process.env['LOCALAPPDATA']
+            ? [
+                `${process.env['LOCALAPPDATA']}\\Programs\\cursor\\resources\\app\\bin\\cursor.cmd`,
+              ]
+            : []),
+          ...(process.env['ProgramFiles']
+            ? [
+                `${process.env['ProgramFiles']}\\cursor\\resources\\app\\bin\\cursor.cmd`,
+              ]
+            : []),
+        ],
+        default: ['cursor'],
+      };
+    case 'vim':
+      return { win32: ['vim'], default: ['vim'] };
+    case 'neovim':
+      return { win32: ['nvim'], default: ['nvim'] };
+    case 'zed':
+      return { win32: ['zed'], default: ['zed', 'zeditor'] };
+    case 'emacs':
+      return { win32: ['emacs.exe', 'emacs'], default: ['emacs'] };
+    case 'antigravity': {
+      const alias = process.env['ANTIGRAVITY_CLI_ALIAS'];
+      const win32 = [
+        'gemini.cmd',
+        'gemini',
+        'agy.cmd',
+        'agy',
+        'antigravity.cmd',
+        'antigravity',
+      ];
+      if (alias) {
+        win32.push(`${alias}.cmd`, alias);
+      }
+      if (process.env['APPDATA']) {
+        win32.push(`${process.env['APPDATA']}\\npm\\agy.cmd`);
+      }
+
+      const defaultList = ['gemini', 'agy', 'antigravity'];
+      if (alias) {
+        defaultList.push(alias);
+      }
+
+      return {
+        // Use Set to remove duplicates
+        win32: [...new Set(win32)],
+        default: [...new Set(defaultList)],
+      };
+    }
+    case 'hx':
+      return { win32: ['hx'], default: ['hx'] };
+    default:
+      return { win32: [], default: [] };
+  }
+}
 
 function getEditorCommands(editor: EditorType): string[] {
-  const commandConfig = editorCommands[editor];
+  const commandConfig = getEditorConfig(editor);
   return process.platform === 'win32'
     ? commandConfig.win32
     : commandConfig.default;
