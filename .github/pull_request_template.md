@@ -11,7 +11,11 @@ urgency. -->
 
 <!-- Use keywords to auto-close issues (Closes #123, Fixes #456). If this PR is
 only related to an issue or is a partial fix, simply reference the issue number
-without a keyword (Related to #123). -->
+without a keyword (Related to #123).
+
+IMPORTANT: You must be assigned to the linked issue before opening this PR.
+If you are not assigned, this PR will be automatically closed.
+To get assigned, comment /assign on the issue first (requires the 'help wanted' label). -->
 
 ## How to Validate
 

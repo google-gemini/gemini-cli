@@ -107,7 +107,11 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issueNumber,
-              body: `👋 @${commenter}, you've been assigned to this issue! Thank you for taking the time to contribute. Make sure to check out our [contributing guidelines](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md).`
+              body: `👋 @${commenter}, you've been assigned to issue #${issueNumber}!\n\n` +
+                `**Next step:** open a pull request and include \`Fixes #${issueNumber}\` in the PR body so it links back here.\n\n` +
+                `**Important:** PRs are automatically closed if the author is not assigned to the linked issue. ` +
+                `If you get unassigned before opening a PR, comment \`/assign\` here again.\n\n` +
+                `Check out the [contributing guidelines](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md) before you start.`
             });
 
       - name: 'Unassign issue from user'
