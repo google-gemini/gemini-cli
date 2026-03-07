@@ -728,6 +728,23 @@ describe('Gemini Client (client.ts)', () => {
       );
     });
 
+    it('yields UserCancelled when processTurn throws AbortError', async () => {
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+      vi.spyOn(client['loopDetector'], 'turnStarted').mockRejectedValueOnce(
+        abortError,
+      );
+
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-abort-error',
+      );
+      const events = await fromAsync(stream);
+
+      expect(events).toEqual([{ type: GeminiEventType.UserCancelled }]);
+    });
+
     it.each([
       {
         compressionStatus:
@@ -3300,6 +3317,7 @@ ${JSON.stringify(
         expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
           partToString(request),
           'Hook Response',
+          false,
         );
 
         // Map should be empty
@@ -3341,6 +3359,7 @@ ${JSON.stringify(
         expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
           partToString(request),
           'Response 1\nResponse 2',
+          false,
         );
 
         expect(client['hookStateMap'].size).toBe(0);
@@ -3371,6 +3390,7 @@ ${JSON.stringify(
         expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
           partToString(request), // Should be 'Do something'
           expect.stringContaining('Ok'),
+          false,
         );
       });
 
@@ -3540,6 +3560,21 @@ ${JSON.stringify(
           [{ text: 'Please explain' }],
           expect.anything(),
           undefined,
+        );
+
+        // First call should have stopHookActive=false, retry should have stopHookActive=true
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledTimes(2);
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenNthCalledWith(
+          1,
+          expect.any(String),
+          expect.any(String),
+          false,
+        );
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenNthCalledWith(
+          2,
+          expect.any(String),
+          expect.any(String),
+          true,
         );
       });
 
