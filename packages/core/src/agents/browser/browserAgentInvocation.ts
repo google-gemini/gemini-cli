@@ -148,6 +148,7 @@ function sanitizeErrorMessage(message: string): string {
     `\\b((?:--)?(?:${spaceKeywords.join('|')})(?:\\s*:\\s*bearer)?\\s+)(${tokenValuePattern})`,
     'gi',
   );
+  sanitized = sanitized.replace(spaceSeparated, '$1[REDACTED]');
 
   // 4. Handle file path redaction
   sanitized = sanitized.replace(
