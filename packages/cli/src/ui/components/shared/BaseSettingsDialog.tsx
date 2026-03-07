@@ -186,7 +186,7 @@ export function BaseSettingsDialog({
 
     // In small terminals, hide scope selector if it would allow more items to show
     let shouldShowScope = initialShowScope;
-    let maxItems = maxItemsWithScope;
+    let maxItems = initialShowScope ? maxItemsWithScope : maxItemsWithoutScope;
 
     if (initialShowScope && availableHeight < 25) {
       // Hide scope selector if it gains us more than 1 extra item
