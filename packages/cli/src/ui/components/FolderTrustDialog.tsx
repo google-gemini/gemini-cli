@@ -311,9 +311,5 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     </Box>
   );
 
-  return isAlternateBuffer ? (
-    <OverflowProvider>{content}</OverflowProvider>
-  ) : (
-    content
-  );
+  return <OverflowProvider>{content}</OverflowProvider>;
 };

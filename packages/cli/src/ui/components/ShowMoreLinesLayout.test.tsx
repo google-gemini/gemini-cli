@@ -64,4 +64,32 @@ describe('ShowMoreLines layout and padding', () => {
 
     unmount();
   });
+
+  it('renders in Standard mode as well', async () => {
+    mockUseAlternateBuffer.mockReturnValue(false); // Standard mode
+
+    const TestComponent = () => (
+      <Box flexDirection="column">
+        <Text>Top</Text>
+        <ShowMoreLines constrainHeight={true} />
+        <Text>Bottom</Text>
+      </Box>
+    );
+
+    const { lastFrame, waitUntilReady, unmount } = render(<TestComponent />);
+    await waitUntilReady();
+
+    const output = lastFrame({ allowEmpty: true });
+    const lines = output.split('\n');
+
+    expect(lines).toEqual([
+      'Top',
+      ' Press Ctrl+O to show more lines',
+      '',
+      'Bottom',
+      '',
+    ]);
+
+    unmount();
+  });
 });

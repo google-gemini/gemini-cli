@@ -16,6 +16,7 @@ exports[`ToolConfirmationQueue > calculates availableContentHeight based on avai
 │   4. No, suggest changes (esc)                                               │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
+ Press Ctrl+O to show more lines
 "
 `;
 
