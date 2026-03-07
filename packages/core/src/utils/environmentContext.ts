@@ -40,8 +40,11 @@ ${folderStructure}`;
 
 /**
  * Retrieves environment-related information to be included in the chat context.
- * This includes the current working directory, date, operating system, and folder structure.
- * Optionally, it can also include the full file context if enabled.
+ * This includes the current working directory, date, and operating system.
+ *
+ * PROJECT CLARITY: Pruned directory listing to reduce entropy.
+ * The agent is now expected to self-service directory exploration via tools.
+ *
  * @param {Config} config - The runtime configuration and services.
  * @returns A promise that resolves to an array of `Part` objects containing environment information.
  */
@@ -53,19 +56,17 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
     day: 'numeric',
   });
   const platform = process.platform;
-  const directoryContext = config.getIncludeDirectoryTree()
-    ? await getDirectoryContextString(config)
-    : '';
   const tempDir = config.storage.getProjectTempDir();
   const environmentMemory = config.getEnvironmentMemory();
+  const cwd = process.cwd();
 
   const context = `
 <session_context>
-This is the Gemini CLI. We are setting up the context for our chat.
-Today's date is ${today} (formatted according to the user's locale).
-My operating system is: ${platform}
-The project's temporary directory is: ${tempDir}
-${directoryContext}
+This is the Gemini CLI.
+Today's date is ${today}.
+Operating System: ${platform}
+Current Working Directory: ${cwd}
+Temporary Directory: ${tempDir}
 
 ${environmentMemory}
 </session_context>`.trim();

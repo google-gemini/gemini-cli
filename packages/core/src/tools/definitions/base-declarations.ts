@@ -127,6 +127,10 @@ export const PLAN_MODE_PARAM_REASON = 'reason';
 export const CHECKPOINT_STATE_TOOL_NAME = 'checkpoint_state';
 export const CHECKPOINT_STATE_PARAM_SUMMARY = 'summary';
 
+// -- distill_result --
+export const DISTILL_RESULT_TOOL_NAME = 'distill_result';
+export const DISTILL_RESULT_PARAM_REVISED_TEXT = 'revised_text';
+
 // -- compress --
 export const COMPRESS_TOOL_NAME = 'compress';
 export const COMPRESS_PARAM_FORCE = 'force';

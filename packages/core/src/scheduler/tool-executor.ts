@@ -112,6 +112,7 @@ export class ToolExecutor {
               setPidCallback,
               this.config,
               request.originalRequestName,
+              callId,
             );
           } else {
             promise = executeToolWithHooks(
@@ -124,6 +125,7 @@ export class ToolExecutor {
               undefined,
               this.config,
               request.originalRequestName,
+              callId,
             );
           }
 
@@ -372,6 +374,7 @@ export class ToolExecutor {
       data: toolResult.data,
       newHistory: toolResult.newHistory,
       compressionInfo: toolResult.compressionInfo,
+      elideFromHistory: toolResult.elideFromHistory,
     };
 
     const startTime = 'startTime' in call ? call.startTime : undefined;

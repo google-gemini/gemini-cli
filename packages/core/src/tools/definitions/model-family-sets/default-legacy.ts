@@ -76,13 +76,15 @@ import {
   CHECKPOINT_STATE_TOOL_NAME,
   CHECKPOINT_STATE_PARAM_SUMMARY,
   COMPRESS_TOOL_NAME,
-  COMPRESS_PARAM_FORCE,
+  DISTILL_RESULT_TOOL_NAME,
+  DISTILL_RESULT_PARAM_REVISED_TEXT,
 } from '../base-declarations.js';
 import {
   getShellDeclaration,
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
 } from '../dynamic-declaration-helpers.js';
+
 
 export const DEFAULT_LEGACY_SET: CoreToolSet = {
   read_file: {
@@ -755,18 +757,28 @@ The agent did not use the todo list because this task could be completed by a ti
     },
   },
 
+  distill_result: {
+    name: DISTILL_RESULT_TOOL_NAME,
+    description: `Surgically distills the most recent tool output in your history. Use this tool when a previous tool call returned a high-entropy "noise bomb" (e.g., massive grep results, verbose logs) that is overwhelming your context. You provide a dense, high-fidelity version of that output, and the system replaces the noisy original with your distillation. This tool is "silent"—it elides itself from history and continues directly from the revised state.`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [DISTILL_RESULT_PARAM_REVISED_TEXT]: {
+          type: 'string',
+          description:
+            'The distilled, high-signal version of the last tool output. Focus on technical facts, paths, and patterns discovered, while discarding redundant noise.',
+        },
+      },
+      required: [DISTILL_RESULT_PARAM_REVISED_TEXT],
+    },
+  },
+
   compress: {
     name: COMPRESS_TOOL_NAME,
     description: `Manually triggers a context compression event. Use this after calling '${CHECKPOINT_STATE_TOOL_NAME}' to ensure your summary is persisted and the context window is cleared of unnecessary details.`,
     parametersJsonSchema: {
       type: 'object',
-      properties: {
-        [COMPRESS_PARAM_FORCE]: {
-          type: 'boolean',
-          description: 'Whether to force compression even if under the threshold.',
-          default: true,
-        },
-      },
+      properties: {},
     },
   },
 };

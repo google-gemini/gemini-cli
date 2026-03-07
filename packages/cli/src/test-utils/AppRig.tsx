@@ -150,6 +150,7 @@ export class AppRig {
   private settings: LoadedSettings | undefined;
   private testDir: string;
   private sessionId: string;
+  private appRigId: string;
 
   private pendingConfirmations = new Map<string, PendingConfirmation>();
   private breakpointTools = new Set<string | undefined>();
@@ -165,6 +166,7 @@ export class AppRig {
     this.testDir = fs.mkdtempSync(
       path.join(os.tmpdir(), `gemini-app-rig-${uniqueId.slice(0, 8)}-`),
     );
+    this.appRigId = path.basename(this.testDir).toLowerCase();
     this.sessionId = `test-session-${uniqueId}`;
     activeRigs.set(this.sessionId, this);
   }
@@ -700,6 +702,67 @@ export class AppRig {
     this.awaitingResponse = true;
     await this.type(text);
     await this.pressEnter();
+  }
+
+  getSentRequests() {
+    if (!this.config) throw new Error('AppRig not initialized');
+    return this.config.getContentGenerator().getSentRequests?.() || [];
+  }
+
+  /**
+   * Helper to get the curated history (contents) sent in the most recent model request.
+   * This method scrubs unstable data like temp paths and IDs for deterministic goldens.
+   */
+  getLastSentRequestContents() {
+    const requests = this.getSentRequests();
+    if (requests.length === 0) return [];
+    const contents = requests[requests.length - 1].contents || [];
+    return this.scrubUnstableData(contents);
+  }
+
+  /**
+   * Gets the final curated history of the active chat session.
+   */
+  getCuratedHistory() {
+    if (!this.config) throw new Error('AppRig not initialized');
+    const history = this.config.getGeminiClient().getChat().getHistory(true);
+    return this.scrubUnstableData(history);
+  }
+
+  private scrubUnstableData(contents: any) {
+    // Deeply scrub unstable data
+    const scrubbed = JSON.parse(
+      JSON.stringify(contents)
+        .replace(new RegExp(this.testDir, 'g'), '<TEST_DIR>')
+        .replace(new RegExp(this.appRigId, 'g'), '<APP_RIG_ID>')
+        .replace(new RegExp(this.sessionId, 'g'), '<SESSION_ID>'),
+    );
+
+    if (scrubbed.length > 0) {
+      if (scrubbed[0].parts[0].text?.includes('<session_context>')) {
+        scrubbed[0].parts[0].text = '<SESSION_CONTEXT>';
+      }
+    }
+
+    const removeIds = (obj: any) => {
+      if (Array.isArray(obj)) {
+        obj.forEach(removeIds);
+      } else if (obj && typeof obj === 'object') {
+        if (obj.functionCall) {
+          obj.functionCall.id = '<CALL_ID>';
+        }
+        if (obj.functionResponse) {
+          obj.functionResponse.id = '<CALL_ID>';
+          if (obj.functionResponse?.response?.original_output_file) {
+            obj.functionResponse.response.original_output_file = '<TMP_FILE>';
+          }
+        }
+        Object.values(obj).forEach(removeIds);
+      }
+    };
+    removeIds(scrubbed);
+
+    return scrubbed;
   }
 
   async unmount() {

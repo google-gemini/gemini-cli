@@ -77,6 +77,7 @@ export async function executeToolWithHooks(
   setPidCallback?: (pid: number) => void,
   config?: Config,
   originalRequestName?: string,
+  callId?: string,
 ): Promise<ToolResult> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const toolInput = (invocation.params || {}) as Record<string, unknown>;
@@ -161,6 +162,7 @@ export async function executeToolWithHooks(
       signal,
       liveOutputCallback,
       shellExecutionConfig,
+      callId,
       setPidCallback,
     );
   } else {
@@ -168,6 +170,7 @@ export async function executeToolWithHooks(
       signal,
       liveOutputCallback,
       shellExecutionConfig,
+      callId,
     );
   }
 

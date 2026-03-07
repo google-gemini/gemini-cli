@@ -19,28 +19,21 @@ import {
   type GenerateContentParameters,
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
-import { retryWithBackoff, isRetryableError } from '../utils/retry.js';
+import { retryWithBackoff } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import type { Config } from '../config/config.js';
 import {
   resolveModel,
-  isGemini2Model,
   supportsModernFeatures,
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import type { CompletedToolCall } from './coreToolScheduler.js';
 import {
-  logContentRetry,
-  logContentRetryFailure,
-} from '../telemetry/loggers.js';
-import {
   ChatRecordingService,
   type ResumedSessionData,
 } from '../services/chatRecordingService.js';
 import {
-  ContentRetryEvent,
-  ContentRetryFailureEvent,
   type LlmRole,
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
@@ -53,6 +46,10 @@ import {
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
+import { HistoryManager, isValidContent } from './historyManager.js';
+import { HistorySideEffectApplicator } from './sideEffectApplicator.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { SideEffectType, type SideEffectService } from './sideEffectService.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -71,21 +68,6 @@ export type StreamEvent =
   | { type: StreamEventType.RETRY }
   | { type: StreamEventType.AGENT_EXECUTION_STOPPED; reason: string }
   | { type: StreamEventType.AGENT_EXECUTION_BLOCKED; reason: string };
-
-/**
- * Options for retrying due to invalid content from the model.
- */
-interface ContentRetryOptions {
-  /** Total number of attempts to make (1 initial + N retries). */
-  maxAttempts: number;
-  /** The base delay in milliseconds for linear backoff. */
-  initialDelayMs: number;
-}
-
-const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
-  maxAttempts: 2, // 1 initial call + 1 retry
-  initialDelayMs: 500,
-};
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
@@ -107,8 +89,6 @@ export function isValidNonThoughtTextPart(part: Part): boolean {
   return (
     typeof part.text === 'string' &&
     !part.thought &&
-    // Technically, the model should never generate parts that have text and
-    //  any of these but we don't trust them so check anyways.
     !part.functionCall &&
     !part.functionResponse &&
     !part.inlineData &&
@@ -116,91 +96,13 @@ export function isValidNonThoughtTextPart(part: Part): boolean {
   );
 }
 
-function isValidContent(content: Content): boolean {
-  if (content.parts === undefined || content.parts.length === 0) {
-    return false;
-  }
-  for (const part of content.parts) {
-    if (part === undefined || Object.keys(part).length === 0) {
-      return false;
-    }
-    if (!part.thought && part.text !== undefined && part.text === '') {
-      return false;
-    }
-  }
-  return true;
-}
-
 /**
- * Validates the history contains the correct roles.
- *
- * @throws Error if the history does not start with a user turn.
- * @throws Error if the history contains an invalid role.
- */
-function validateHistory(history: Content[]) {
-  for (const content of history) {
-    if (content.role !== 'user' && content.role !== 'model') {
-      throw new Error(`Role must be user or model, but got ${content.role}.`);
-    }
-  }
-}
-
-/**
- * Extracts the curated (valid) history from a comprehensive history.
- *
- * @remarks
- * The model may sometimes generate invalid or empty contents(e.g., due to safety
- * filters or recitation). Extracting valid turns from the history
- * ensures that subsequent requests could be accepted by the model.
- */
-function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
-  if (comprehensiveHistory === undefined || comprehensiveHistory.length === 0) {
-    return [];
-  }
-  const curatedHistory: Content[] = [];
-  const length = comprehensiveHistory.length;
-  let i = 0;
-  while (i < length) {
-    if (comprehensiveHistory[i].role === 'user') {
-      curatedHistory.push(comprehensiveHistory[i]);
-      i++;
-    } else {
-      const modelOutput: Content[] = [];
-      let isValid = true;
-      while (i < length && comprehensiveHistory[i].role === 'model') {
-        modelOutput.push(comprehensiveHistory[i]);
-        if (isValid && !isValidContent(comprehensiveHistory[i])) {
-          isValid = false;
-        }
-        i++;
-      }
-      if (isValid) {
-        curatedHistory.push(...modelOutput);
-      }
-    }
-  }
-  return curatedHistory;
-}
-
-/**
- * Custom error to signal that a stream completed with invalid content,
- * which should trigger a retry.
+ * Custom error to signal that a stream completed with invalid content.
  */
 export class InvalidStreamError extends Error {
-  readonly type:
-    | 'NO_FINISH_REASON'
-    | 'NO_RESPONSE_TEXT'
-    | 'MALFORMED_FUNCTION_CALL'
-    | 'UNEXPECTED_TOOL_CALL';
+  readonly type: string;
 
-  constructor(
-    message: string,
-    type:
-      | 'NO_FINISH_REASON'
-      | 'NO_RESPONSE_TEXT'
-      | 'MALFORMED_FUNCTION_CALL'
-      | 'UNEXPECTED_TOOL_CALL',
-  ) {
+  constructor(message: string, type: string) {
     super(message);
     this.name = 'InvalidStreamError';
     this.type = type;
@@ -231,76 +133,55 @@ export class AgentExecutionBlockedError extends Error {
 }
 
 /**
- * Chat session that enables sending messages to the model with previous
- * conversation context.
- *
- * @remarks
- * The session maintains all the turns between user and model.
+ * Chat session that enables sending messages to the model.
  */
 export class GeminiChat {
-  // A promise to represent the current state of the message being sent to the
-  // model.
   private sendPromise: Promise<void> = Promise.resolve();
   private readonly chatRecordingService: ChatRecordingService;
   private lastPromptTokenCount: number;
+  private streamingDepth = 0;
+  private pendingHistory: Content[] | null = null;
+  private readonly historyManager: HistoryManager;
+  private readonly sideEffectService: SideEffectService;
+  private readonly applicator: HistorySideEffectApplicator;
+  private repromptRequested = false;
 
   constructor(
     private readonly config: Config,
     private systemInstruction: string = '',
     private tools: Tool[] = [],
-    private history: Content[] = [],
+    history: Content[] = [],
     resumedSessionData?: ResumedSessionData,
     private readonly onModelChanged?: (modelId: string) => Promise<Tool[]>,
     kind: 'main' | 'subagent' = 'main',
   ) {
-    validateHistory(history);
+    this.historyManager = new HistoryManager(history);
+    this.sideEffectService = config.getSideEffectService();
+    this.applicator = new HistorySideEffectApplicator(this.historyManager);
     this.chatRecordingService = new ChatRecordingService(config);
     this.chatRecordingService.initialize(resumedSessionData, kind);
     this.lastPromptTokenCount = estimateTokenCountSync(
-      this.history.flatMap((c) => c.parts || []),
+      this.historyManager
+        .getComprehensiveHistory()
+        .flatMap((c) => c.parts || []),
     );
   }
 
-  private continuityAnchor?: string;
-
-  setContinuityAnchor(anchor: string) {
-    this.continuityAnchor = anchor;
+  /**
+   * Marks a specific tool call ID for elision from the history.
+   */
+  addElidedCallId(callId: string): void {
+    this.historyManager.addElidedCallId(callId);
   }
 
   getContinuityAnchor(): string | undefined {
-    return this.continuityAnchor;
+    return this.historyManager.getContinuityAnchor();
   }
 
   setSystemInstruction(sysInstr: string) {
     this.systemInstruction = sysInstr;
   }
 
-  /**
-   * Sends a message to the model and returns the response in chunks.
-   *
-   * @remarks
-   * This method will wait for the previous message to be processed before
-   * sending the next message.
-   *
-   * @see {@link Chat#sendMessage} for non-streaming method.
-   * @param modelConfigKey - The key for the model config.
-   * @param message - The list of messages to send.
-   * @param prompt_id - The ID of the prompt.
-   * @param signal - An abort signal for this message.
-   * @param displayContent - An optional user-friendly version of the message to record.
-   * @return The model's response.
-   *
-   * @example
-   * ```ts
-   * const chat = ai.chats.create({model: 'gemini-2.0-flash'});
-   * const response = await chat.sendMessageStream({
-   * message: 'Why is the sky blue?'
-   * });
-   * for await (const chunk of response) {
-   * console.log(chunk.text);
-   * }
-   * ```
-   */
   async sendMessageStream(
     modelConfigKey: ModelConfigKey,
     message: PartListUnion,
@@ -308,7 +189,11 @@ export class GeminiChat {
     signal: AbortSignal,
     role: LlmRole,
     displayContent?: PartListUnion,
+    turnId?: string,
   ): Promise<AsyncGenerator<StreamEvent>> {
+    if (!turnId) {
+      throw new Error("Turn ID is now required");
+    }
     await this.sendPromise;
 
     let streamDoneResolver: () => void;
@@ -317,12 +202,20 @@ export class GeminiChat {
     });
     this.sendPromise = streamDonePromise;
 
+    if (this.streamingDepth === 0) {
+      // Flush any bootstrap side-effects (like session context) before starting the first turn.
+      this.applyPendingSideEffects();
+      if (turnId) {
+        this.sideEffectService.setCurrentTurnId(turnId);
+        debugLogger.debug(`[PROJECT CLARITY] Starting turn ${turnId}`);
+      }
+    }
+
     const userContent = createUserContent(message);
     const { model } =
       this.config.modelConfigService.getResolvedConfig(modelConfigKey);
 
-    // Record user input - capture complete message with all parts (text, files, images, etc.)
-    // but skip recording function responses (tool call results) as they should be stored in tool call records
+    // Record user input
     if (!isFunctionResponse(userContent)) {
       const userMessageParts = userContent.parts || [];
       const userMessageContent = partListUnionToString(userMessageParts);
@@ -346,136 +239,107 @@ export class GeminiChat {
       });
     }
 
-    // Add user content to history ONCE before any attempts.
-    this.history.push(userContent);
-    const requestContents = this.getHistory(true);
+    const requestContents =
+      this.historyManager.getHistoryForRequest(userContent);
 
-    const streamWithRetries = async function* (
+    const stream = async function* (
       this: GeminiChat,
     ): AsyncGenerator<StreamEvent, void, void> {
+      this.streamingDepth++;
       try {
-        let lastError: unknown = new Error('Request failed after all retries.');
+        const apiStream = await this.makeApiCallAndProcessStream(
+          modelConfigKey,
+          requestContents,
+          prompt_id,
+          signal,
+          role,
+          userContent,
+        );
 
-        const maxAttempts = INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
-
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-          let isConnectionPhase = true;
-          try {
-            if (attempt > 0) {
-              yield { type: StreamEventType.RETRY };
-            }
-
-            // If this is a retry, update the key with the new context.
-            const currentConfigKey =
-              attempt > 0
-                ? { ...modelConfigKey, isRetry: true }
-                : modelConfigKey;
-
-            isConnectionPhase = true;
-            const stream = await this.makeApiCallAndProcessStream(
-              currentConfigKey,
-              requestContents,
-              prompt_id,
-              signal,
-              role,
-            );
-            isConnectionPhase = false;
-            for await (const chunk of stream) {
-              yield { type: StreamEventType.CHUNK, value: chunk };
-            }
-
-            lastError = null;
-            break;
-          } catch (error) {
-            if (error instanceof AgentExecutionStoppedError) {
-              yield {
-                type: StreamEventType.AGENT_EXECUTION_STOPPED,
-                reason: error.reason,
-              };
-              lastError = null; // Clear error as this is an expected stop
-              return; // Stop the generator
-            }
-
-            if (error instanceof AgentExecutionBlockedError) {
-              yield {
-                type: StreamEventType.AGENT_EXECUTION_BLOCKED,
-                reason: error.reason,
-              };
-              if (error.syntheticResponse) {
-                yield {
-                  type: StreamEventType.CHUNK,
-                  value: error.syntheticResponse,
-                };
-              }
-              lastError = null; // Clear error as this is an expected stop
-              return; // Stop the generator
-            }
-
-            // Check if the error is retryable (e.g., transient SSL errors
-            // like ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC)
-            const isRetryable = isRetryableError(
-              error,
-              this.config.getRetryFetchErrors(),
-            );
-
-            // For connection phase errors, only retryable errors should continue
-            if (isConnectionPhase) {
-              if (!isRetryable || signal.aborted) {
-                throw error;
-              }
-              // Fall through to retry logic for retryable connection errors
-            }
-            lastError = error;
-            const isContentError = error instanceof InvalidStreamError;
-
-            if (
-              (isContentError && isGemini2Model(model)) ||
-              (isRetryable && !signal.aborted)
-            ) {
-              // Check if we have more attempts left.
-              if (attempt < maxAttempts - 1) {
-                const delayMs = INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs;
-                const retryType = isContentError ? error.type : 'NETWORK_ERROR';
-
-                logContentRetry(
-                  this.config,
-                  new ContentRetryEvent(attempt, retryType, delayMs, model),
-                );
-                coreEvents.emitRetryAttempt({
-                  attempt: attempt + 1,
-                  maxAttempts,
-                  delayMs: delayMs * (attempt + 1),
-                  error: error instanceof Error ? error.message : String(error),
-                  model,
-                });
-                await new Promise((res) =>
-                  setTimeout(res, delayMs * (attempt + 1)),
-                );
-                continue;
-              }
-            }
-            break;
-          }
+        for await (const chunk of apiStream) {
+          yield { type: StreamEventType.CHUNK, value: chunk };
+        }
+      } catch (error) {
+        if (error instanceof AgentExecutionStoppedError) {
+          yield {
+            type: StreamEventType.AGENT_EXECUTION_STOPPED,
+            reason: error.reason,
+          };
+          return;
         }
 
-        if (lastError) {
-          if (
-            lastError instanceof InvalidStreamError &&
-            isGemini2Model(model)
-          ) {
-            logContentRetryFailure(
-              this.config,
-              new ContentRetryFailureEvent(maxAttempts, lastError.type, model),
-            );
+        if (error instanceof AgentExecutionBlockedError) {
+          yield {
+            type: StreamEventType.AGENT_EXECUTION_BLOCKED,
+            reason: error.reason,
+          };
+          if (error.syntheticResponse) {
+            yield {
+              type: StreamEventType.CHUNK,
+              value: error.syntheticResponse,
+            };
           }
-          throw lastError;
+          return;
         }
+
+        throw error;
       } finally {
+        this.streamingDepth--;
+        if (this.streamingDepth === 0) {
+          // IMPORTANT: Side effects (like ELIDE_TURN) are flushed here.
+          this.applyPendingSideEffects();
+        }
         streamDoneResolver!();
       }
     };
 
-    return streamWithRetries.call(this);
+    return stream.call(this);
+  }
+
+  isCurrentTurnElided(): boolean {
+    const currentTurnId = this.sideEffectService.getCurrentTurnId();
+    if (!currentTurnId) {
+      debugLogger.debug('[PROJECT CLARITY] isCurrentTurnElided: No current turn ID');
+      return false;
+    }
+  
+    const historyElided = this.historyManager.isTurnElided(currentTurnId);
+    const pendingIds = this.sideEffectService.getPendingElidedTurnIds();
+    const pendingElided = pendingIds.has(currentTurnId);
+    debugLogger.debug(`[PROJECT CLARITY] isCurrentTurnElided(${currentTurnId}): history=${historyElided}, pending=${pendingElided} (pendingIds: ${Array.from(pendingIds).join(', ')})`);
+    return historyElided || pendingElided;
+  }
+
+  /**
+   * Applies all pending side-effects from the SideEffectService.
+   * Returns true if a re-prompt was requested.
+   */
+  private applyPendingSideEffects(): boolean {
+    if (this.pendingHistory) {
+      this.replaceHistory(this.pendingHistory);
+      this.pendingHistory = null;
+    }
+
+    const effects = this.sideEffectService.flush();
+    const requested = effects.some(
+      (e) => e.type === SideEffectType.REPROMPT,
+    );
+    if (requested) {
+      debugLogger.debug('[PROJECT CLARITY] Re-prompt requested via side-effects');
+    }
+
+    this.repromptRequested = this.repromptRequested || requested;
+    this.applicator.apply(effects);
+    return requested;
+  }
+
+  /**
+   * Consumes the re-prompt request signal.
+   */
+  consumeRepromptRequest(): boolean {
+    const requested = this.repromptRequested;
+    this.repromptRequested = false;
+    return requested;
   }
 
   private async makeApiCallAndProcessStream(
@@ -484,6 +348,7 @@ export class GeminiChat {
     prompt_id: string,
     abortSignal: AbortSignal,
     role: LlmRole,
+    userContent: Content,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const contentsForPreviewModel =
       this.ensureActiveLoopHasThoughtSignatures(requestContents);
@@ -671,6 +536,7 @@ export class GeminiChat {
       lastModelToUse,
       streamResponse,
       originalRequest,
+      userContent,
     );
   }
 
@@ -702,82 +568,80 @@ export class GeminiChat {
    * This is primarily used for context compression and history restoration.
    */
   replaceHistory(newHistory: Content[]): void {
-    validateHistory(newHistory);
-    this.history = [...newHistory];
+    if (this.streamingDepth > 0) {
+      this.pendingHistory = newHistory;
+      return;
+    }
+    this.historyManager.replaceHistory(newHistory);
     this.lastPromptTokenCount = estimateTokenCountSync(
-      this.history.flatMap((c) => c.parts || []),
+      this.historyManager
+        .getComprehensiveHistory()
+        .flatMap((c) => (c.parts || []) as Part[]),
     );
   }
 
   getHistory(curated: boolean = false): Content[] {
-    const history = curated
-      ? extractCuratedHistory(this.history)
-      : this.history;
+    return this.historyManager.getProjection({
+      curated,
+      addMetadata: true,
+      sessionId: this.config.getSessionId(),
+    });
+  }
 
-    if (!this.continuityAnchor) {
-      return [...history];
-    }
+  getComprehensiveHistory(): Content[] {
+    return this.historyManager.getComprehensiveHistory();
+  }
 
-    const anchorText = `<state_checkpoint>\n${this.continuityAnchor}\n</state_checkpoint>`;
-    const baseHistory = [...history];
-
-    if (baseHistory.length > 0 && baseHistory[0].role === 'user') {
-      // Merge into the first user message to preserve role alternation
-      const firstMessage = { ...baseHistory[0] };
-      // Ensure we don't accidentally mutate the original parts array
-      firstMessage.parts = [
-        { text: anchorText },
-        ...(firstMessage.parts || []),
-      ];
-      baseHistory[0] = firstMessage;
-    } else {
-      // Prepend as a new user message
-      baseHistory.unshift({
-        role: 'user',
-        parts: [{ text: anchorText }],
-      });
-    }
-
-    return baseHistory;
+  getConfig(): Config {
+    return this.config;
   }
 
   /**
    * Clears the chat history.
    */
   clearHistory(): void {
-    this.history = [];
+    this.historyManager.clearHistory();
   }
 
   /**
    * Adds a new entry to the chat history.
    */
   addHistory(content: Content): void {
-    this.history.push(content);
+    this.historyManager.addMessage(content);
   }
 
   setHistory(history: Content[]): void {
-    this.history = history;
+    this.historyManager.replaceHistory(history);
     this.lastPromptTokenCount = estimateTokenCountSync(
-      this.history.flatMap((c) => c.parts || []),
+      this.historyManager
+        .getComprehensiveHistory()
+        .flatMap((c) => c.parts || []),
     );
     this.chatRecordingService.updateMessagesFromHistory(history);
   }
 
   stripThoughtsFromHistory(): void {
-    this.history = this.history.map((content) => {
-      const newContent = { ...content };
-      if (newContent.parts) {
-        newContent.parts = newContent.parts.map((part) => {
-          if (part && typeof part === 'object' && 'thoughtSignature' in part) {
-            const newPart = { ...part };
-            delete (newPart as { thoughtSignature?: string }).thoughtSignature;
-            return newPart;
-          }
-          return part;
-        });
-      }
-      return newContent;
-    });
+    const history = this.historyManager
+      .getComprehensiveHistory()
+      .map((content) => {
+        const newContent = { ...content };
+        if (newContent.parts) {
+          newContent.parts = newContent.parts.map((part: Part) => {
+            if (
+              part &&
+              typeof part === 'object' &&
+              'thoughtSignature' in part
+            ) {
+              const newPart = { ...part };
+              delete (newPart as { thoughtSignature?: string }).thoughtSignature;
+              return newPart;
+            }
+            return part;
+          });
+        }
+        return newContent;
+      });
+    this.historyManager.replaceHistory(history);
   }
 
   // To ensure our requests validate, the first function call in every model
@@ -865,12 +729,35 @@ export class GeminiChat {
     model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     originalRequest: GenerateContentParameters,
+    userContent: Content,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
 
     let hasToolCall = false;
     let hasThoughts = false;
     let finishReason: FinishReason | undefined;
+    let callCounter = 0;
+
+    const currentTurnId = this.sideEffectService.getCurrentTurnId();
+
+    // PROJECT CLARITY: Normalize user content (function responses).
+    // Note: We don't 'invent' IDs for responses; they should already have been 
+    // tagged by the Tool Scheduler using the ID we injected into the call.
+    if (userContent.parts) {
+      for (const part of userContent.parts) {
+        if (part.functionResponse && !part.functionResponse.id) {
+          debugLogger.warn(
+            `[PROJECT CLARITY] User functionResponse missing ID in turn ${currentTurnId}. This indicates a breakdown in the ID lifecycle.`,
+          );
+        }
+      }
+    }
+
+    // PROJECT CLARITY: Add user content (including function responses) to history EARLY.
+    // This allows meta-tools like distill_result to find the response they are distilling.
+    if (isValidContent(userContent)) {
+      this.historyManager.addMessage(userContent, currentTurnId);
+    }
 
     for await (const chunk of streamResponse) {
       const candidateWithReason = chunk?.candidates?.find(
@@ -889,13 +776,30 @@ export class GeminiChat {
             hasThoughts = true;
             this.recordThoughtFromContent(content);
           }
-          if (content.parts.some((part) => part.functionCall)) {
-            hasToolCall = true;
+
+          // PROJECT CLARITY: Inject call IDs if missing.
+          // This ensures that the history contains the same IDs that Turn.ts will consume.
+          for (const part of content.parts) {
+            if (part.functionCall) {
+              hasToolCall = true;
+              if (!part.functionCall.id) {
+                const generatedId = `${part.functionCall.name}_${Date.now()}_${callCounter++}`;
+                part.functionCall.id = generatedId;
+                debugLogger.debug(
+                  `[PROJECT CLARITY] Airlock: Injected callId into part: ${generatedId}`,
+                );
+              }
+              // Always pre-register, even if ID was already present (e.g. from a resumed session)
+              if (currentTurnId) {
+                this.historyManager.preRegisterCallId(
+                  part.functionCall.id,
+                  currentTurnId,
+                );
+              }
+            }
           }
 
-          modelResponseParts.push(
-            ...content.parts.filter((part) => !part.thought),
-          );
+          modelResponseParts.push(...content.parts);
         }
       }
 
@@ -967,12 +871,11 @@ export class GeminiChat {
 
     // Stream validation logic: A stream is considered successful if:
     // 1. There's a tool call OR
-    // 2. A not MALFORMED_FUNCTION_CALL finish reason and a non-mepty resp
+    // 2. We have a valid finish reason AND no critical errors.
     //
     // We throw an error only when there's no tool call AND:
     // - No finish reason, OR
-    // - MALFORMED_FUNCTION_CALL finish reason OR
-    // - Empty response text (e.g., only thoughts with no actual content)
+    // - MALFORMED_FUNCTION_CALL finish reason.
     if (!hasToolCall) {
       if (!finishReason) {
         throw new InvalidStreamError(
@@ -992,15 +895,23 @@ export class GeminiChat {
           'UNEXPECTED_TOOL_CALL',
         );
       }
-      if (!responseText) {
-        throw new InvalidStreamError(
-          'Model stream ended with empty response text.',
-          'NO_RESPONSE_TEXT',
-        );
-      }
     }
 
-    this.history.push({ role: 'model', parts: consolidatedParts });
+    const turnId = this.sideEffectService.getCurrentTurnId();
+    if (isValidContent({ role: 'model', parts: consolidatedParts })) {
+      this.historyManager.addMessage(
+        { role: 'model', parts: consolidatedParts },
+        turnId,
+      );
+    }
+
+    // PROJECT CLARITY: Flush side effects (like ELIDE_TURN) AFTER adding this turn to history.
+    // This allows meta-tools to elide themselves by finding their own call IDs in the history maps.
+    debugLogger.debug(`[PROJECT CLARITY] Flushing side effects for turn ${turnId}`);
+    this.applyPendingSideEffects();
+
+    const isElided = turnId ? this.historyManager.isTurnElided(turnId) : false;
+    debugLogger.debug(`[PROJECT CLARITY] turn ${turnId} elided status: ${isElided}`);
   }
 
   getLastPromptTokenCount(): number {
@@ -1042,6 +953,11 @@ export class GeminiChat {
     });
 
     this.chatRecordingService.recordToolCalls(model, toolCallRecords);
+
+    // PROJECT CLARITY: Flush side effects after tool calls are recorded.
+    // This allows tools that were just executed to apply their elisions/reprompts.
+    debugLogger.debug(`[PROJECT CLARITY] Flushing side effects in recordCompletedToolCalls for turn ${this.sideEffectService.getCurrentTurnId()}`);
+    this.applyPendingSideEffects();
   }
 
   /**

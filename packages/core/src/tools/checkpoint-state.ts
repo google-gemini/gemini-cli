@@ -18,7 +18,6 @@ import {
 import { CHECKPOINT_STATE_DEFINITION } from './definitions/coreTools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { Config } from '../config/config.js';
-import type { GeminiChat } from '../core/geminiChat.js';
 
 interface CheckpointStateParams {
   [CHECKPOINT_STATE_PARAM_SUMMARY]: string;
@@ -33,7 +32,7 @@ class CheckpointStateInvocation extends BaseToolInvocation<
     messageBus: MessageBus,
     toolName: string,
     toolDisplayName: string,
-    private readonly chat: GeminiChat,
+    private readonly config: Config,
   ) {
     super(params, messageBus, toolName, toolDisplayName);
   }
@@ -44,18 +43,16 @@ class CheckpointStateInvocation extends BaseToolInvocation<
 
   override async execute(): Promise<ToolResult> {
     const summary = this.params[CHECKPOINT_STATE_PARAM_SUMMARY];
-    const previousSummary = this.chat.getContinuityAnchor();
-    
-    // Atomically update the chat session's continuity anchor.
+    const chat = this.config.getGeminiClient().getChat();
+    const previousSummary = chat.getContinuityAnchor();
+
+    // Atomically update the chat session's continuity anchor via side-effect.
     // This anchor will be used as a "hard hand-off" during the next compression event.
-    this.chat.setContinuityAnchor(summary);
+    this.config.getSideEffectService().setContinuityAnchor(summary);
 
-    const llmContent = `<state_checkpoint>\n${summary}\n</state_checkpoint>\n\n${
-      previousSummary
+    const llmContent = previousSummary
         ? 'Previous checkpoint summary replaced. Use the `previous_summary` in the result data for reconciliation if needed.'
-        : 'First checkpoint created. No previous summary found.'
-    }`;
-
+        : 'First checkpoint created. No previous summary found.';
     return {
       llmContent,
       returnDisplay: '',
@@ -92,14 +89,12 @@ export class CheckpointStateTool extends BaseDeclarativeTool<
   override createInvocation(
     params: CheckpointStateParams,
   ): ToolInvocation<CheckpointStateParams, ToolResult> {
-    const chat = this.config.getGeminiClient().getChat();
-
     return new CheckpointStateInvocation(
       params,
       this.messageBus,
       this.name,
       this.displayName,
-      chat,
+      this.config,
     );
   }
 }

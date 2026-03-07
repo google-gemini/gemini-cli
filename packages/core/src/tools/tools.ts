@@ -61,12 +61,15 @@ export interface ToolInvocation<
    * Executes the tool with the validated parameters.
    * @param signal AbortSignal for tool cancellation.
    * @param updateOutput Optional callback to stream output.
+   * @param shellExecutionConfig Optional config for shell tools.
+   * @param callId The unique ID of this tool call.
    * @returns Result of the tool execution.
    */
   execute(
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
+    callId?: string,
   ): Promise<TResult>;
 }
 
@@ -279,6 +282,7 @@ export abstract class BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
+    callId?: string,
   ): Promise<TResult>;
 }
 
@@ -425,9 +429,10 @@ export abstract class DeclarativeTool<
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
+    callId?: string,
   ): Promise<TResult> {
     const invocation = this.build(params);
-    return invocation.execute(signal, updateOutput, shellExecutionConfig);
+    return invocation.execute(signal, updateOutput, shellExecutionConfig, callId);
   }
 
   /**
@@ -606,6 +611,17 @@ export interface ToolResult {
    * Optional compression metrics if the tool performed context compression.
    */
   compressionInfo?: import('../core/compression-status.js').ChatCompressionInfo;
+
+  /**
+   * If true, the system will attempt to elide this tool result from the final
+   * conversation history. This is used by "meta-tools" like distill_result.
+   */
+  elideFromHistory?: boolean;
+
+  /**
+   * The call ID of the tool response being modified or targeted by this tool.
+   */
+  callId?: string;
 }
 
 /**

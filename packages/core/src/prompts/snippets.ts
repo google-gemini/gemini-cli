@@ -29,6 +29,7 @@ import {
   READ_FILE_PARAM_END_LINE,
   SHELL_PARAM_IS_BACKGROUND,
   EDIT_PARAM_OLD_STRING,
+  DISTILL_RESULT_TOOL_NAME,
 } from '../tools/tool-names.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
@@ -212,6 +213,9 @@ Use the following guidelines to optimize your search and read patterns.
 - **Semantic Checkpointing:** Periodically use the ${formatToolName(
     CHECKPOINT_STATE_TOOL_NAME,
   )} tool to "park" complex threads with high-fidelity summaries. This ensures that your technical rationale, discovered constraints, and progress are preserved with maximum signal during compression.
+- **Surgical Distillation:** If a tool call returns a high-entropy "noise bomb" (e.g., massive grep results, verbose logs) that is overwhelming your immediate context, use the ${formatToolName(
+    DISTILL_RESULT_TOOL_NAME,
+  )} tool. This allows you to replace the noisy original with a dense, high-fidelity version of the discovered facts.
 - **Agentic Compression:** If you feel the context window is becoming cluttered or you have just finished a significant sub-task, use the ${formatToolName(
     COMPRESS_TOOL_NAME,
   )} tool to manually trigger a compression event. This clears the history while persisting your latest checkpoints.

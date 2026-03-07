@@ -7,6 +7,7 @@
 import type { Config } from '../config/config.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
+import { Turn } from '../core/turn.js';
 import {
   Type,
   type Content,
@@ -750,6 +751,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     }
 
     const role = LlmRole.SUBAGENT;
+    const turnId = Turn.generateId();
 
     const responseStream = await chat.sendMessageStream(
       {
@@ -760,6 +762,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       promptId,
       signal,
       role,
+      undefined,
+      turnId,
     );
 
     const functionCalls: FunctionCall[] = [];

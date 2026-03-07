@@ -93,6 +93,8 @@ export {
   SKILL_PARAM_NAME,
   CHECKPOINT_STATE_TOOL_NAME,
   CHECKPOINT_STATE_PARAM_SUMMARY,
+  DISTILL_RESULT_TOOL_NAME,
+  DISTILL_RESULT_PARAM_REVISED_TEXT,
   COMPRESS_TOOL_NAME,
   COMPRESS_PARAM_FORCE,
 } from './base-declarations.js';
@@ -230,6 +232,13 @@ export const CHECKPOINT_STATE_DEFINITION: ToolDefinition = {
     return DEFAULT_LEGACY_SET.checkpoint_state;
   },
   overrides: (modelId) => getToolSet(modelId).checkpoint_state,
+};
+
+export const DISTILL_RESULT_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.distill_result;
+  },
+  overrides: (modelId) => getToolSet(modelId).distill_result,
 };
 
 export const COMPRESS_DEFINITION: ToolDefinition = {

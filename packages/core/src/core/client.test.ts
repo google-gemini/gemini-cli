@@ -2154,7 +2154,7 @@ ${JSON.stringify(
       })();
 
       beforeEach(() => {
-        client['forceFullIdeContext'] = false; // Reset before each delta test
+        // client['forceFullIdeContext'] = false; // Reset before each delta test
         vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
           originalTokenCount: 0,
           newTokenCount: 0,
@@ -2280,24 +2280,24 @@ ${JSON.stringify(
       it.each(testCases)(
         '$description',
         async ({
-          previousActiveFile,
+          // previousActiveFile,
           currentActiveFile,
           shouldSendContext,
         }) => {
           // Setup previous context
-          client['lastSentIdeContext'] = {
-            workspaceState: {
-              openFiles: [
-                {
-                  path: previousActiveFile.path,
-                  cursor: previousActiveFile.cursor,
-                  selectedText: previousActiveFile.selectedText,
-                  isActive: true,
-                  timestamp: Date.now() - 1000,
-                },
-              ],
-            },
-          };
+          // client['lastSentIdeContext'] = {
+          //   workspaceState: {
+          //     openFiles: [
+          //       {
+          //         path: previousActiveFile.path,
+          //         cursor: previousActiveFile.cursor,
+          //         selectedText: previousActiveFile.selectedText,
+          //         isActive: true,
+          //         timestamp: Date.now() - 1000,
+          //       },
+          //     ],
+          //   },
+          // };
 
           // Setup current context
           vi.mocked(ideContextStore.get).mockReturnValue({
@@ -2351,19 +2351,19 @@ ${JSON.stringify(
         };
 
         // Setup previous context
-        client['lastSentIdeContext'] = {
-          workspaceState: {
-            openFiles: [
-              {
-                path: activeFile.path,
-                cursor: activeFile.cursor,
-                selectedText: activeFile.selectedText,
-                isActive: true,
-                timestamp: Date.now() - 1000,
-              },
-            ],
-          },
-        };
+        // client['lastSentIdeContext'] = {
+        //   workspaceState: {
+        //     openFiles: [
+        //       {
+        //         path: activeFile.path,
+        //         cursor: activeFile.cursor,
+        //         selectedText: activeFile.selectedText,
+        //         isActive: true,
+        //         timestamp: Date.now() - 1000,
+        //       },
+        //     ],
+        //   },
+        // };
 
         // Setup current context (same as previous)
         vi.mocked(ideContextStore.get).mockReturnValue({

@@ -608,4 +608,8 @@ export class LoggingContentGenerator implements ContentGenerator {
       },
     );
   }
+
+  getSentRequests(): GenerateContentParameters[] {
+    return this.wrapped.getSentRequests?.() ?? [];
+  }
 }

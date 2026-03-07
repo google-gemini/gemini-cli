@@ -77,6 +77,8 @@ import {
   CHECKPOINT_STATE_PARAM_SUMMARY,
   COMPRESS_TOOL_NAME,
   COMPRESS_PARAM_FORCE,
+  DISTILL_RESULT_TOOL_NAME,
+  DISTILL_RESULT_PARAM_REVISED_TEXT,
 } from '../base-declarations.js';
 import {
   getShellDeclaration,
@@ -727,6 +729,22 @@ The agent did not use the todo list because this task could be completed by a ti
         },
       },
       required: [CHECKPOINT_STATE_PARAM_SUMMARY],
+    },
+  },
+
+  distill_result: {
+    name: DISTILL_RESULT_TOOL_NAME,
+    description: `Surgically distills the most recent tool output in your history. Use this tool when a previous tool call returned a high-entropy "noise bomb" (e.g., massive grep results, verbose logs) that is overwhelming your context. You provide a dense, high-fidelity version of that output, and the system replaces the noisy original with your distillation. This tool is "silent"—it elides itself from history and continues directly from the revised state.`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [DISTILL_RESULT_PARAM_REVISED_TEXT]: {
+          type: 'string',
+          description:
+            'The distilled, high-signal version of the last tool output. Focus on technical facts, paths, and patterns discovered, while discarding redundant noise.',
+        },
+      },
+      required: [DISTILL_RESULT_PARAM_REVISED_TEXT],
     },
   },
 

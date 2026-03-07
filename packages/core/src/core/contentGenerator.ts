@@ -51,6 +51,8 @@ export interface ContentGenerator {
   userTierName?: string;
 
   paidTier?: GeminiUserTier;
+
+  getSentRequests?(): GenerateContentParameters[];
 }
 
 export enum AuthType {

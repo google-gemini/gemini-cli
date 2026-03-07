@@ -50,5 +50,6 @@ export interface CoreToolSet {
   exit_plan_mode: (plansDir: string) => FunctionDeclaration;
   activate_skill: (skillNames: string[]) => FunctionDeclaration;
   checkpoint_state: FunctionDeclaration;
+  distill_result: FunctionDeclaration;
   compress: FunctionDeclaration;
 }

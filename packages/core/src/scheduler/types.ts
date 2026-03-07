@@ -73,6 +73,12 @@ export interface ToolCallResponseInfo {
    * Optional compression metrics if the tool performed context compression.
    */
   compressionInfo?: ChatCompressionInfo;
+
+  /**
+   * If true, the system will attempt to elide this tool result from the final
+   * conversation history. This is used by "meta-tools" like distill_result.
+   */
+  elideFromHistory?: boolean;
 }
 
 /** Request to execute another tool immediately after a completed one. */

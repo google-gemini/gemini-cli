@@ -26,6 +26,7 @@ import {
 } from '../utils/errors.js';
 import { InvalidStreamError, type GeminiChat } from './geminiChat.js';
 import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { getCitations } from '../utils/generateContentResponseUtilities.js';
 import { LlmRole } from '../telemetry/types.js';
@@ -211,7 +212,7 @@ export type ServerGeminiStreamEvent =
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
-  private callCounter = 0;
+  readonly turnId: string;
 
   readonly pendingToolCalls: ToolCallRequestInfo[] = [];
   private debugResponses: GenerateContentResponse[] = [];
@@ -222,7 +223,17 @@ export class Turn {
   constructor(
     private readonly chat: GeminiChat,
     private readonly prompt_id: string,
-  ) {}
+    turnId: string,
+  ) {
+    this.turnId = turnId;
+  }
+
+  /**
+   * Generates a unique Turn ID.
+   */
+  static generateId(): string {
+    return `turn_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  }
 
   // The run method yields simpler events suitable for server logic
   async *run(
@@ -242,6 +253,7 @@ export class Turn {
         signal,
         role,
         displayContent,
+        this.turnId,
       );
 
       for await (const streamEvent of responseStream) {
@@ -384,7 +396,17 @@ export class Turn {
   ): ServerGeminiStreamEvent | null {
     const name = fnCall.name || 'undefined_tool_name';
     const args = fnCall.args || {};
-    const callId = fnCall.id ?? `${name}_${Date.now()}_${this.callCounter++}`;
+
+    // PROJECT CLARITY: Enforce the Airlock contract.
+    // IDs must be injected by GeminiChat before they reach the Turn.
+    const callId = fnCall.id;
+    if (!callId) {
+      throw new Error(
+        `[PROJECT CLARITY] CRITICAL: Tool call missing ID in turn ${this.turnId}. All tool calls must be normalized by the GeminiChat Airlock.`,
+      );
+    }
+
+    debugLogger.debug(`[PROJECT CLARITY] Turn dispatching callId: ${callId}`);
 
     const toolCallRequest: ToolCallRequestInfo = {
       callId,

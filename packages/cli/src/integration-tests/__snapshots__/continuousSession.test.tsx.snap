@@ -1,0 +1,107 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Continuous Session Integration > should handle checkpoint_state and manual compress tools correctly > 1-before-checkpoint 1`] = `
+[
+  {
+    "parts": [
+      {
+        "text": "<SESSION_CONTEXT>",
+      },
+      {
+        "text": "Start the mission PADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPAD",
+      },
+    ],
+    "role": "user",
+  },
+]
+`;
+
+exports[`Continuous Session Integration > should handle checkpoint_state and manual compress tools correctly > 2-with-checkpoint 1`] = `
+[
+  {
+    "parts": [
+      {
+        "text": "<SESSION_CONTEXT>",
+      },
+      {
+        "text": "<state_checkpoint>
+GOAL: Implementation of session continuity.
+PROGRESS: Tools implemented.
+CONSTRAINT: Use high-fidelity summary.
+</state_checkpoint>",
+      },
+      {
+        "text": "Start the mission PADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPADPAD",
+      },
+    ],
+    "role": "user",
+  },
+  {
+    "parts": [
+      {
+        "text": "I will now checkpoint our progress.",
+      },
+      {
+        "functionCall": {
+          "args": {
+            "summary": "GOAL: Implementation of session continuity.
+PROGRESS: Tools implemented.
+CONSTRAINT: Use high-fidelity summary.",
+          },
+          "id": "<CALL_ID>",
+          "name": "checkpoint_state",
+        },
+        "thoughtSignature": "skip_thought_signature_validator",
+      },
+    ],
+    "role": "model",
+  },
+  {
+    "parts": [
+      {
+        "functionResponse": {
+          "id": "<CALL_ID>",
+          "name": "checkpoint_state",
+          "response": {
+            "output": "First checkpoint created. No previous summary found.",
+          },
+        },
+      },
+    ],
+    "role": "user",
+  },
+]
+`;
+
+exports[`Continuous Session Integration > should handle checkpoint_state and manual compress tools correctly > final-curated-history 1`] = `
+[
+  {
+    "parts": [
+      {
+        "text": "<SESSION_CONTEXT>",
+      },
+      {
+        "text": "<state_checkpoint>
+<state_snapshot>
+<overall_goal>Implement session continuity</overall_goal>
+<active_constraints>Use high-fidelity summary</active_constraints>
+<key_knowledge>Tools implemented: checkpoint_state, compress</key_knowledge>
+<task_state>1. [DONE] Implement tools
+2. [IN PROGRESS] Verify continuity
+</task_state>
+</state_snapshot>
+</state_checkpoint>",
+      },
+    ],
+    "role": "user",
+  },
+  {
+    "parts": [
+      {
+        "text": "Compression successful. I have clear context and I remember our mission.",
+      },
+    ],
+    "role": "model",
+  },
+]
+`;

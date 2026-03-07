@@ -1,0 +1,124 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Distill Result Integration > should surgically replace a noisy tool result with a distilled version > 1-initial-prompt 1`] = `
+[
+  {
+    "parts": [
+      {
+        "text": "<SESSION_CONTEXT>",
+      },
+      {
+        "text": "Audit src/ for secrets",
+      },
+    ],
+    "role": "user",
+  },
+]
+`;
+
+exports[`Distill Result Integration > should surgically replace a noisy tool result with a distilled version > 2-request-with-noise 1`] = `
+[
+  {
+    "parts": [
+      {
+        "text": "<SESSION_CONTEXT>",
+      },
+      {
+        "text": "Audit src/ for secrets",
+      },
+    ],
+    "role": "user",
+  },
+  {
+    "parts": [
+      {
+        "text": "**Thought**
+I need to search for SECRET in the src/ directory.",
+      },
+      {
+        "functionCall": {
+          "args": {
+            "file_path": "src/foo.txt",
+          },
+          "id": "<CALL_ID>",
+          "name": "read_file",
+        },
+        "thoughtSignature": "skip_thought_signature_validator",
+      },
+    ],
+    "role": "model",
+  },
+  {
+    "parts": [
+      {
+        "functionResponse": {
+          "id": "<CALL_ID>",
+          "name": "read_file",
+          "response": {
+            "error": "File not found: <TEST_DIR>/src/foo.txt",
+          },
+        },
+      },
+    ],
+    "role": "user",
+  },
+]
+`;
+
+exports[`Distill Result Integration > should surgically replace a noisy tool result with a distilled version > final-curated-history 1`] = `
+[
+  {
+    "parts": [
+      {
+        "text": "<SESSION_CONTEXT>",
+      },
+      {
+        "text": "Audit src/ for secrets",
+      },
+    ],
+    "role": "user",
+  },
+  {
+    "parts": [
+      {
+        "text": "**Thought**
+I need to search for SECRET in the src/ directory.",
+      },
+      {
+        "functionCall": {
+          "args": {
+            "file_path": "src/foo.txt",
+          },
+          "id": "<CALL_ID>",
+          "name": "read_file",
+        },
+      },
+    ],
+    "role": "model",
+  },
+  {
+    "parts": [
+      {
+        "functionResponse": {
+          "id": "<CALL_ID>",
+          "name": "read_file",
+          "response": {
+            "distilled": true,
+            "distilled_output": "Found SECRET_KEY="12345" in src/env.ts",
+            "original_output_file": "<TMP_FILE>",
+          },
+        },
+      },
+    ],
+    "role": "user",
+  },
+  {
+    "parts": [
+      {
+        "text": "I found the SECRET_KEY="12345" in src/env.ts after distilling the search results.",
+      },
+    ],
+    "role": "model",
+  },
+]
+`;

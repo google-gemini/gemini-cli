@@ -9,26 +9,24 @@ import {
   BaseToolInvocation,
   Kind,
   type ToolInvocation,
+  type ToolLiveOutput,
   type ToolResult,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import { COMPRESS_TOOL_NAME, COMPRESS_PARAM_FORCE } from './tool-names.js';
+import { COMPRESS_TOOL_NAME } from './tool-names.js';
 import { COMPRESS_DEFINITION } from './definitions/coreTools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { Config } from '../config/config.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { CompressionStatus } from '../core/compression-status.js';
-
-interface CompressParams {
-  [COMPRESS_PARAM_FORCE]?: boolean;
-}
+import type { ShellExecutionConfig } from 'src/services/shellExecutionService.js';
 
 class CompressInvocation extends BaseToolInvocation<
-  CompressParams,
+  Record<string, never>,
   ToolResult
 > {
   constructor(
-    params: CompressParams,
+    params: Record<string, never>,
     messageBus: MessageBus,
     toolName: string,
     toolDisplayName: string,
@@ -43,68 +41,52 @@ class CompressInvocation extends BaseToolInvocation<
     return 'Manually triggers a context compression event.';
   }
 
-  override async execute(): Promise<ToolResult> {
-    const force = this.params[COMPRESS_PARAM_FORCE] !== false;
-
-    if (this.config.getContinuousSessionEnabled()) {
-      const continuityService = await this.config.getContinuityCompressionService();
+  override async execute(
+    _signal: AbortSignal,
+    _updateOutput?: (output: ToolLiveOutput) => void,
+    _shellExecutionConfig?: ShellExecutionConfig,
+    callId?: string,
+  ): Promise<ToolResult> {
+    if (!callId) {
+      throw new Error('Critical error: callId is required for context compression elision.');
+    }
+    try {
+      const continuityService = this.config.getContinuityCompressionService();
       const snapshot = await continuityService.generateSnapshot(
         this.chat.getHistory(),
         this.config.getModel(),
         this.promptId,
       );
 
-      const newHistory = [
-        {
-          role: 'user',
-          parts: [{ text: snapshot }],
-        },
-        {
-          role: 'model',
-          parts: [{ text: 'Got it. Thanks for the additional context!' }],
-        },
-      ];
-
-      this.chat.setContinuityAnchor('');
+      // Queue the history replacement via SideEffectService
+      const sideEffects = this.config.getSideEffectService()
+      sideEffects.replaceHistory([]);
+      sideEffects.setContinuityAnchor(snapshot);
+      
+      if (callId) {
+        sideEffects.elideCall(callId);
+      }
+      sideEffects.reprompt();
 
       return {
-        llmContent: `Compression completed. Status: 1`,
+        llmContent: `Compression successful.`,
         returnDisplay: '',
-        newHistory,
         compressionInfo: {
           originalTokenCount: 0,
           newTokenCount: 0,
           compressionStatus: CompressionStatus.COMPRESSED,
         },
       };
-    }
-
-    const { newHistory, info } = await this.config.getChatCompressionService().compress(
-      this.chat,
-      this.promptId,
-      force,
-      this.config.getModel(),
-      this.config,
-      false, // Manual compression
-    );
-
-    if (newHistory) {
+    } catch (error) {
       return {
-        llmContent: `Compression completed. Status: ${info.compressionStatus}`,
-        returnDisplay: '',
-        newHistory,
-        compressionInfo: info,
+        llmContent: `Compression failed: ${error instanceof Error ? error.message : String(error)}`,
+        returnDisplay: `Context compression failed.`,
+        error: {
+          message: error instanceof Error ? error.message : String(error),
+          type: ToolErrorType.EXECUTION_FAILED,
+        },
       };
     }
-
-    return {
-      llmContent: `Compression failed. Status: ${info.compressionStatus}`,
-      returnDisplay: `Context compression failed: ${info.compressionStatus}`,
-      error: {
-        message: `Context compression failed: ${info.compressionStatus}`,
-        type: ToolErrorType.EXECUTION_FAILED,
-      },
-    };
   }
 }
 
@@ -112,7 +94,7 @@ class CompressInvocation extends BaseToolInvocation<
  * A tool that allows the agent to manually trigger a context compression event.
  */
 export class CompressTool extends BaseDeclarativeTool<
-  CompressParams,
+  Record<string, never>,
   ToolResult
 > {
   static readonly Name = COMPRESS_TOOL_NAME;
@@ -132,8 +114,8 @@ export class CompressTool extends BaseDeclarativeTool<
   }
 
   override createInvocation(
-    params: CompressParams,
-  ): ToolInvocation<CompressParams, ToolResult> {
+    params: Record<string, never>,
+  ): ToolInvocation<Record<string, never>, ToolResult> {
     const chat = this.config.getGeminiClient().getChat();
     const promptId = this.config.getSessionId(); // Best guess for current promptId in this context
 

@@ -34,6 +34,7 @@ import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { CheckpointStateTool } from '../tools/checkpoint-state.js';
+import { DistillResultTool } from '../tools/distill-result.js';
 import { CompressTool } from '../tools/compress.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
@@ -52,9 +53,9 @@ import {
 } from '../telemetry/index.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
+import { SideEffectService } from '../core/sideEffectService.js';
 import {
-  DEFAULT_GEMINI_EMBEDDING_MODEL,
-  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_EMBEDDING_MODEL,  DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   isAutoModel,
@@ -813,8 +814,10 @@ export class Config implements McpContext {
   private lastModeSwitchTime: number = performance.now();
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
+  private readonly sideEffectService: SideEffectService;
 
   constructor(params: ConfigParameters) {
+    this.sideEffectService = new SideEffectService();
     this.sessionId = params.sessionId;
     this.clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
@@ -2160,6 +2163,10 @@ export class Config implements McpContext {
     return this.geminiClient;
   }
 
+  getSideEffectService(): SideEffectService {
+    return this.sideEffectService;
+  }
+
   /**
    * Updates the system instruction with the latest user memory.
    * Whenever the user memory (GEMINI.md files) is updated.
@@ -2877,6 +2884,9 @@ export class Config implements McpContext {
     );
     maybeRegister(CheckpointStateTool, () =>
       registry.registerTool(new CheckpointStateTool(this, this.messageBus)),
+    );
+    maybeRegister(DistillResultTool, () =>
+      registry.registerTool(new DistillResultTool(this, this.messageBus)),
     );
     maybeRegister(CompressTool, () =>
       registry.registerTool(new CompressTool(this, this.messageBus)),
