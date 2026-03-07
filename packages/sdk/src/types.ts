@@ -134,11 +134,11 @@ export interface AgentShellResult {
    */
   output: string;
   /**
-   * Standard output from the command.
+   * Standard output from the command (currently contains combined stdout/stderr).
    */
   stdout: string;
   /**
-   * Standard error output from the command.
+   * Standard error output from the command (currently always empty).
    */
   stderr: string;
   /**
