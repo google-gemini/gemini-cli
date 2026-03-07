@@ -2426,6 +2426,65 @@ describe('Availability Service Integration', () => {
     config.resetTurn();
     expect(spy).toHaveBeenCalled();
   });
+
+  it('resetTurn does NOT reset billing state', () => {
+    const config = new Config({
+      ...baseParams,
+      billing: { overageStrategy: 'ask' },
+    });
+
+    // Simulate accepting credits mid-turn
+    config.setOverageStrategy('always');
+    config.setCreditsNotificationShown(true);
+
+    // resetTurn should leave billing state intact
+    config.resetTurn();
+    expect(config.getBillingSettings().overageStrategy).toBe('always');
+    expect(config.getCreditsNotificationShown()).toBe(true);
+  });
+
+  it('resetBillingTurnState resets overageStrategy to configured value', () => {
+    const config = new Config({
+      ...baseParams,
+      billing: { overageStrategy: 'ask' },
+    });
+
+    config.setOverageStrategy('always');
+    expect(config.getBillingSettings().overageStrategy).toBe('always');
+
+    config.resetBillingTurnState('ask');
+    expect(config.getBillingSettings().overageStrategy).toBe('ask');
+  });
+
+  it('resetBillingTurnState preserves overageStrategy when configured as always', () => {
+    const config = new Config({
+      ...baseParams,
+      billing: { overageStrategy: 'always' },
+    });
+
+    config.resetBillingTurnState('always');
+    expect(config.getBillingSettings().overageStrategy).toBe('always');
+  });
+
+  it('resetBillingTurnState defaults to ask when no strategy provided', () => {
+    const config = new Config({
+      ...baseParams,
+      billing: { overageStrategy: 'always' },
+    });
+
+    config.resetBillingTurnState();
+    expect(config.getBillingSettings().overageStrategy).toBe('ask');
+  });
+
+  it('resetBillingTurnState resets creditsNotificationShown', () => {
+    const config = new Config(baseParams);
+
+    config.setCreditsNotificationShown(true);
+    expect(config.getCreditsNotificationShown()).toBe(true);
+
+    config.resetBillingTurnState();
+    expect(config.getCreditsNotificationShown()).toBe(false);
+  });
 });
 
 describe('Hooks configuration', () => {
