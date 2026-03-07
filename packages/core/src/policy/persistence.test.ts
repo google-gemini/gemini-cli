@@ -241,7 +241,7 @@ decision = "deny"
       workspacePoliciesDir,
     );
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
-    vi.mocked(fs.mkdir).mockRejectedValue(new Error('Permission denied'));
+    vi.spyOn(fs, 'mkdir').mockRejectedValue(new Error('Permission denied'));
 
     const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
 
@@ -272,8 +272,8 @@ decision = "deny"
       workspacePoliciesDir,
     );
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
-    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
-    vi.mocked(fs.readFile).mockRejectedValue(
+    vi.spyOn(fs, 'mkdir').mockResolvedValue(undefined);
+    vi.spyOn(fs, 'readFile').mockRejectedValue(
       makeNodeError('ENOENT: no such file or directory', 'ENOENT'),
     );
 
@@ -281,10 +281,10 @@ decision = "deny"
       writeFile: vi.fn().mockRejectedValue(new Error('Disk full')),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    vi.mocked(fs.open).mockResolvedValue(
+    vi.spyOn(fs, 'open').mockResolvedValue(
       mockFileHandle as unknown as fs.FileHandle,
     );
-    vi.mocked(fs.unlink).mockResolvedValue(undefined);
+    vi.spyOn(fs, 'unlink').mockResolvedValue(undefined);
 
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
@@ -309,10 +309,11 @@ decision = "deny"
       workspacePoliciesDir,
     );
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
-    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
-    vi.mocked(fs.readFile).mockRejectedValue(
+    vi.spyOn(fs, 'mkdir').mockResolvedValue(undefined);
+    vi.spyOn(fs, 'readFile').mockRejectedValue(
       makeNodeError('Permission denied', 'EACCES'),
     );
+    vi.spyOn(fs, 'open');
 
     const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
 
@@ -344,8 +345,8 @@ decision = "deny"
       workspacePoliciesDir,
     );
     vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
-    vi.mocked(fs.mkdir).mockResolvedValue(undefined);
-    vi.mocked(fs.readFile).mockRejectedValue(
+    vi.spyOn(fs, 'mkdir').mockResolvedValue(undefined);
+    vi.spyOn(fs, 'readFile').mockRejectedValue(
       makeNodeError('ENOENT: no such file or directory', 'ENOENT'),
     );
 
@@ -353,15 +354,15 @@ decision = "deny"
       writeFile: vi.fn().mockResolvedValue(undefined),
       close: vi.fn().mockResolvedValue(undefined),
     };
-    vi.mocked(fs.open).mockResolvedValue(
+    vi.spyOn(fs, 'open').mockResolvedValue(
       mockFileHandle as unknown as fs.FileHandle,
     );
     // Simulate cross-device link error
-    vi.mocked(fs.rename).mockRejectedValue(
+    vi.spyOn(fs, 'rename').mockRejectedValue(
       makeNodeError('EXDEV: cross-device link not permitted', 'EXDEV'),
     );
-    vi.mocked(fs.copyFile).mockResolvedValue(undefined);
-    vi.mocked(fs.unlink).mockResolvedValue(undefined);
+    vi.spyOn(fs, 'copyFile').mockResolvedValue(undefined);
+    vi.spyOn(fs, 'unlink').mockResolvedValue(undefined);
 
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
@@ -376,5 +377,80 @@ decision = "deny"
       );
       expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
     });
+  });
+
+  it('should fall back to copy+unlink when rename fails with EBUSY', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const workspacePoliciesDir = '/mock/project/.gemini/policies';
+    const policyFile = path.join(
+      workspacePoliciesDir,
+      AUTO_SAVED_POLICY_FILENAME,
+    );
+    vi.spyOn(mockStorage, 'getWorkspacePoliciesDir').mockReturnValue(
+      workspacePoliciesDir,
+    );
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+    vi.spyOn(fs, 'mkdir').mockResolvedValue(undefined);
+    vi.spyOn(fs, 'readFile').mockRejectedValue(
+      makeNodeError('ENOENT: no such file or directory', 'ENOENT'),
+    );
+
+    const mockFileHandle = {
+      writeFile: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    vi.spyOn(fs, 'open').mockResolvedValue(
+      mockFileHandle as unknown as fs.FileHandle,
+    );
+    vi.spyOn(fs, 'rename').mockRejectedValue(
+      makeNodeError('EBUSY: resource busy or locked', 'EBUSY'),
+    );
+    vi.spyOn(fs, 'copyFile').mockResolvedValue(undefined);
+    vi.spyOn(fs, 'unlink').mockResolvedValue(undefined);
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+    });
+
+    await vi.waitFor(() => {
+      expect(fs.copyFile).toHaveBeenCalledWith(
+        expect.stringMatching(/\.tmp$/),
+        policyFile,
+      );
+      expect(fs.unlink).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/));
+    });
+  });
+
+  it('should back up corrupted TOML file and recover', async () => {
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
+
+    const policyFile = '/mock/user/.gemini/policies/auto-saved.toml';
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(policyFile);
+
+    const dir = path.dirname(policyFile);
+    memfs.mkdirSync(dir, { recursive: true });
+    memfs.writeFileSync(policyFile, 'this is not valid toml ][[[');
+
+    const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+    await messageBus.publish({
+      type: MessageBusType.UPDATE_POLICY,
+      toolName: 'test_tool',
+      persist: true,
+    });
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(feedbackSpy).toHaveBeenCalledWith(
+      'warning',
+      expect.stringContaining('.bak'),
+    );
+
+    expect(memfs.existsSync(policyFile)).toBe(true);
+    const content = memfs.readFileSync(policyFile, 'utf-8') as string;
+    expect(content).toContain('toolName = "test_tool"');
   });
 });
