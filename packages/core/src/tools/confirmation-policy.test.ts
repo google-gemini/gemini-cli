@@ -67,10 +67,12 @@ describe('Tool Confirmation Policy Updates', () => {
       getBaseLlmClient: () => ({}),
       getDisableLLMCorrection: () => true,
       getIdeMode: () => false,
+      getActiveModel: () => 'test-model',
       getWorkspaceContext: () => ({
         isPathWithinWorkspace: () => true,
         getDirectories: () => [rootDir],
       }),
+      getDirectWebFetch: () => false,
       storage: {
         getProjectTempDir: () => path.join(os.tmpdir(), 'gemini-cli-temp'),
       },

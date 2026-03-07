@@ -56,10 +56,6 @@ import {
 } from '../utils/commandUtils.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
-import {
-  DEFAULT_BACKGROUND_OPACITY,
-  DEFAULT_INPUT_BACKGROUND_OPACITY,
-} from '../constants.js';
 import { getSafeLowColorBackground } from '../themes/color-utils.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
@@ -226,7 +222,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     backgroundShells,
     backgroundShellHeight,
     shortcutsHelpVisible,
-    hintMode,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
   const { handlePress: registerPlainTabPress, resetCount: resetPlainTabPress } =
@@ -259,6 +254,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   >(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const innerBoxRef = useRef<DOMElement>(null);
+  const hasUserNavigatedSuggestions = useRef(false);
 
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
   const [commandSearchActive, setCommandSearchActive] = useState(false);
@@ -304,6 +300,27 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     reverseSearchCompletion.resetCompletionState;
   const resetCommandSearchCompletionState =
     commandSearchCompletion.resetCompletionState;
+
+  const getActiveCompletion = useCallback(() => {
+    if (commandSearchActive) return commandSearchCompletion;
+    if (reverseSearchActive) return reverseSearchCompletion;
+    return completion;
+  }, [
+    commandSearchActive,
+    commandSearchCompletion,
+    reverseSearchActive,
+    reverseSearchCompletion,
+    completion,
+  ]);
+
+  const activeCompletion = getActiveCompletion();
+  const shouldShowSuggestions = activeCompletion.showSuggestions;
+
+  const {
+    forceShowShellSuggestions,
+    setForceShowShellSuggestions,
+    isShellSuggestionsVisible,
+  } = completion;
 
   const showCursor = focus && isShellFocused && !isEmbeddedShellFocused;
 
@@ -367,7 +384,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     userMessages,
     onSubmit: handleSubmitAndClear,
     isActive:
-      (!completion.showSuggestions || completion.suggestions.length === 1) &&
+      (!(completion.showSuggestions && isShellSuggestionsVisible) ||
+        completion.suggestions.length === 1) &&
       !shellModeActive,
     currentQuery: buffer.text,
     currentCursorOffset: buffer.getOffset(),
@@ -599,9 +617,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         keyMatchers[Command.END](key);
 
       const isSuggestionsNav =
-        (completion.showSuggestions ||
-          reverseSearchCompletion.showSuggestions ||
-          commandSearchCompletion.showSuggestions) &&
+        shouldShowSuggestions &&
         (keyMatchers[Command.COMPLETION_UP](key) ||
           keyMatchers[Command.COMPLETION_DOWN](key) ||
           keyMatchers[Command.EXPAND_SUGGESTION](key) ||
@@ -615,6 +631,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         setSuppressCompletion(
           isHistoryNav || isCursorMovement || keyMatchers[Command.ESCAPE](key),
         );
+        hasUserNavigatedSuggestions.current = false;
+
+        if (key.name !== 'tab') {
+          setForceShowShellSuggestions(false);
+        }
       }
 
       // TODO(jacobr): this special case is likely not needed anymore.
@@ -644,11 +665,27 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       const isPlainTab =
         key.name === 'tab' && !key.shift && !key.alt && !key.ctrl && !key.cmd;
       const hasTabCompletionInteraction =
-        completion.showSuggestions ||
+        (completion.showSuggestions && isShellSuggestionsVisible) ||
         Boolean(completion.promptCompletion.text) ||
         reverseSearchActive ||
         commandSearchActive;
-      if (isPlainTab) {
+
+      if (isPlainTab && shellModeActive) {
+        resetPlainTabPress();
+        if (!shouldShowSuggestions) {
+          setSuppressCompletion(false);
+          if (completion.promptCompletion.text) {
+            completion.promptCompletion.accept();
+            return true;
+          } else if (
+            completion.suggestions.length > 0 &&
+            !forceShowShellSuggestions
+          ) {
+            setForceShowShellSuggestions(true);
+            return true;
+          }
+        }
+      } else if (isPlainTab) {
         if (!hasTabCompletionInteraction) {
           if (registerPlainTabPress() === 2) {
             toggleCleanUiDetailsVisible();
@@ -749,7 +786,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (
         key.sequence === '!' &&
         buffer.text === '' &&
-        !completion.showSuggestions
+        !(completion.showSuggestions && isShellSuggestionsVisible)
       ) {
         setShellModeActive(!shellModeActive);
         buffer.setText(''); // Clear the '!' from input
@@ -788,15 +825,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return true;
         }
 
-        if (shellModeActive) {
-          setShellModeActive(false);
+        if (completion.showSuggestions && isShellSuggestionsVisible) {
+          completion.resetCompletionState();
+          setExpandedSuggestionIndex(-1);
           resetEscapeState();
           return true;
         }
 
-        if (completion.showSuggestions) {
-          completion.resetCompletionState();
-          setExpandedSuggestionIndex(-1);
+        if (shellModeActive) {
+          setShellModeActive(false);
           resetEscapeState();
           return true;
         }
@@ -892,7 +929,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         completion.isPerfectMatch &&
         keyMatchers[Command.SUBMIT](key) &&
         recentUnsafePasteTime === null &&
-        (!completion.showSuggestions || completion.activeSuggestionIndex <= 0)
+        (!(completion.showSuggestions && isShellSuggestionsVisible) ||
+          (completion.activeSuggestionIndex <= 0 &&
+            !hasUserNavigatedSuggestions.current))
       ) {
         handleSubmit(buffer.text);
         return true;
@@ -904,15 +943,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
-      if (completion.showSuggestions) {
+      if (completion.showSuggestions && isShellSuggestionsVisible) {
         if (completion.suggestions.length > 1) {
           if (keyMatchers[Command.COMPLETION_UP](key)) {
             completion.navigateUp();
+            hasUserNavigatedSuggestions.current = true;
             setExpandedSuggestionIndex(-1); // Reset expansion when navigating
             return true;
           }
           if (keyMatchers[Command.COMPLETION_DOWN](key)) {
             completion.navigateDown();
+            hasUserNavigatedSuggestions.current = true;
             setExpandedSuggestionIndex(-1); // Reset expansion when navigating
             return true;
           }
@@ -929,6 +970,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               const suggestion = completion.suggestions[targetIndex];
 
               const isEnterKey = key.name === 'return' && !key.ctrl;
+
+              if (isEnterKey && shellModeActive) {
+                if (hasUserNavigatedSuggestions.current) {
+                  completion.handleAutocomplete(
+                    completion.activeSuggestionIndex,
+                  );
+                  setExpandedSuggestionIndex(-1);
+                  hasUserNavigatedSuggestions.current = false;
+                  return true;
+                }
+                completion.resetCompletionState();
+                setExpandedSuggestionIndex(-1);
+                hasUserNavigatedSuggestions.current = false;
+                if (buffer.text.trim()) {
+                  handleSubmit(buffer.text);
+                }
+                return true;
+              }
 
               if (isEnterKey && buffer.text.startsWith('/')) {
                 const { isArgumentCompletion, leafCommand } =
@@ -982,7 +1041,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (
         key.name === 'tab' &&
         !key.shift &&
-        !completion.showSuggestions &&
+        !(completion.showSuggestions && isShellSuggestionsVisible) &&
         completion.promptCompletion.text
       ) {
         completion.promptCompletion.accept();
@@ -1165,6 +1224,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       focus,
       buffer,
       completion,
+      setForceShowShellSuggestions,
       shellModeActive,
       setShellModeActive,
       onClearScreen,
@@ -1196,6 +1256,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       registerPlainTabPress,
       resetPlainTabPress,
       toggleCleanUiDetailsVisible,
+      shouldShowSuggestions,
+      isShellSuggestionsVisible,
+      forceShowShellSuggestions,
     ],
   );
 
@@ -1321,14 +1384,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   ]);
 
   const { inlineGhost, additionalLines } = getGhostTextLines();
-  const getActiveCompletion = () => {
-    if (commandSearchActive) return commandSearchCompletion;
-    if (reverseSearchActive) return reverseSearchCompletion;
-    return completion;
-  };
-
-  const activeCompletion = getActiveCompletion();
-  const shouldShowSuggestions = activeCompletion.showSuggestions;
 
   const useBackgroundColor = config.getUseBackgroundColor();
   const isLowColor = isLowColorDepth();
@@ -1386,7 +1441,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         scrollOffset={activeCompletion.visibleStartIndex}
         userInput={buffer.text}
         mode={
-          completion.completionMode === CompletionMode.AT
+          completion.completionMode === CompletionMode.AT ||
+          completion.completionMode === CompletionMode.SHELL
             ? 'reverse'
             : buffer.text.startsWith('/') &&
                 !reverseSearchActive &&
@@ -1401,7 +1457,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const borderColor =
     isShellFocused && !isEmbeddedShellFocused
-      ? (statusColor ?? theme.border.focused)
+      ? (statusColor ?? theme.ui.focus)
       : theme.border.default;
 
   return (
@@ -1422,14 +1478,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         />
       ) : null}
       <HalfLinePaddedBox
-        backgroundBaseColor={
-          hintMode ? theme.text.accent : theme.text.secondary
-        }
-        backgroundOpacity={
-          showCursor
-            ? DEFAULT_INPUT_BACKGROUND_OPACITY
-            : DEFAULT_BACKGROUND_OPACITY
-        }
+        backgroundBaseColor={theme.background.input}
+        backgroundOpacity={1}
         useBackgroundColor={useBackgroundColor}
       >
         <Box
