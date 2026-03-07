@@ -56,7 +56,6 @@ creating a "discovery file."
     }
   }
   ```
-
   - `port` (number, required): The port of the MCP server.
   - `workspacePath` (string, required): A list of all open workspace root paths,
     delimited by the OS-specific path separator (`:` for Linux/macOS, `;` for
