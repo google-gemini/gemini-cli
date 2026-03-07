@@ -2621,6 +2621,7 @@ export class Config implements McpContext {
   }
 
   isInteractiveShellEnabled(): boolean {
+    if (this.isForeverMode) return false;
     return (
       this.interactive &&
       this.ptyInfo !== 'child_process' &&
