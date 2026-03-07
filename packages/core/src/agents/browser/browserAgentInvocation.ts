@@ -54,6 +54,7 @@ const SENSITIVE_KEY_PATTERNS = [
   'auth',
   'authorization',
   'access_token',
+  'access_key',
   'refresh_token',
   'session_id',
   'cookie',
@@ -61,6 +62,9 @@ const SENSITIVE_KEY_PATTERNS = [
   'privatekey',
   'private_key',
   'private-key',
+  'secret_key',
+  'client_secret',
+  'client_id',
 ];
 
 /**
@@ -121,21 +125,27 @@ function sanitizeErrorMessage(message: string): string {
   const unquotedValue = `[^\\s}\\]]+(?:\\s+(?![a-zA-Z0-9_.-]+(?:=|:))[^\\s=:<>}\\]]+)*`;
   const valuePattern = `(?:"[^"]*"|'[^']*'|${unquotedValue})`;
 
-  // 2. Handle key with delimiter
+  // 2. Handle key-value pairs with delimiters (=, :, space, CLI-style --flag)
   const urlSafeKeyPatternStr = SENSITIVE_KEY_PATTERNS.map((p) =>
     p.replace(/[-_]/g, '(?:[-_]|%2D|%5F|%2d|%5f)?'),
   ).join('|');
 
   const keyWithDelimiter = new RegExp(
-    `(("&quot;|"|')?(${urlSafeKeyPatternStr})\\2\\s*(?:[:=]|%3A|%3D)\\s*)${valuePattern}`,
+    `((?:--)?("|')?(${urlSafeKeyPatternStr})\\2\\s*(?:[:=]|%3A|%3D)\\s*)${valuePattern}`,
     'gi',
   );
   sanitized = sanitized.replace(keyWithDelimiter, '$1[REDACTED]');
 
-  // 3. Handle space-separated tokens/auth
+  // 3. Handle space-separated sensitive keywords (e.g. "password mypass", "--api-key secret")
   const tokenValuePattern = `[A-Za-z0-9._\\-/+=]{8,}`;
+  const spaceKeywords = [
+    ...SENSITIVE_KEY_PATTERNS.map((p) =>
+      p.replace(/[-_]/g, '(?:[-_]|%2D|%5F|%2d|%5f)?'),
+    ),
+    'bearer',
+  ];
   const spaceSeparated = new RegExp(
-    `\\b((?:token|bearer|authorization(?:\\s*:\\s*bearer)?|password|pwd|apikey|api[-_]?key|secret)\\s+)(${tokenValuePattern})`,
+    `\\b((?:--)?(?:${spaceKeywords.join('|')})(?:\\s*:\\s*bearer)?\\s+)(${tokenValuePattern})`,
     'gi',
   );
 
