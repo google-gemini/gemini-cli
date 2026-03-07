@@ -124,7 +124,9 @@ jobs:
       - name: 'Link Checker'
         uses: 'lycheeverse/lychee-action@885c65f3dc543b57c898c8099f4e08c8afd178a2' # ratchet: lycheeverse/lychee-action@v2.6.1
         with:
-          args: '--verbose --accept 200,503 ./**/*.md'
+          # Exclude GEMINI.md because the absolute GitHub URL in CONTRIBUTING.md (which is symlinked)
+          # causes intermittent 429 Too Many Requests errors from GitHub API rate limits.
+          args: '--verbose --accept 200,503 --exclude "GEMINI\\.md" ./**/*.md'
           fail: true
   test_linux:
     name: 'Test (Linux) - ${{ matrix.node-version }}, ${{ matrix.shard }}'
