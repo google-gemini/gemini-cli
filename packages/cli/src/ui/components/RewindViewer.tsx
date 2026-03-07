@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useMemo, useState } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { useUIState } from '../contexts/UIStateContext.js';
 import {
   type ConversationRecord,
@@ -50,6 +50,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
 }) => {
   const [isRewinding, setIsRewinding] = useState(false);
   const { terminalWidth, terminalHeight } = useUIState();
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const {
     selectedMessageId,
     getStats,
@@ -128,7 +129,6 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
     5,
     terminalHeight - DIALOG_PADDING - HEADER_HEIGHT - CONTROLS_HEIGHT - 2,
   );
-
   const maxItemsToShow = Math.max(1, Math.floor(listHeight / 4));
 
   if (selectedMessageId) {
@@ -179,6 +179,41 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
           }
         }}
       />
+    );
+  }
+
+  if (isScreenReaderEnabled) {
+    return (
+      <Box flexDirection="column" width={terminalWidth}>
+        <Text bold>Rewind - Select a conversation point:</Text>
+        <BaseSelectionList
+          items={items}
+          initialIndex={items.length - 1}
+          isFocused={true}
+          showNumbers={true}
+          wrapAround={false}
+          onSelect={(item: MessageRecord) => {
+            if (item?.id) {
+              if (item.id === 'current-position') {
+                onExit();
+              } else {
+                selectMessage(item.id);
+              }
+            }
+          }}
+          renderItem={(itemWrapper) => {
+            const item = itemWrapper.value;
+            const text =
+              item.id === 'current-position'
+                ? 'Stay at current position'
+                : getCleanedRewindText(item);
+            return <Text>{text}</Text>;
+          }}
+        />
+        <Text color={theme.text.secondary}>
+          Press Esc to exit, Enter to select, arrow keys to navigate.
+        </Text>
+      </Box>
     );
   }
 

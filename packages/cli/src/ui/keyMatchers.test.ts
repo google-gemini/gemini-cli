@@ -32,8 +32,12 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.ESCAPE,
-      positive: [createKey('escape'), createKey('escape', { ctrl: true })],
-      negative: [createKey('e'), createKey('esc')],
+      positive: [createKey('escape')],
+      negative: [
+        createKey('e'),
+        createKey('esc'),
+        createKey('escape', { ctrl: true }),
+      ],
     },
 
     // Cursor movement
@@ -192,13 +196,21 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.PAGE_UP,
-      positive: [createKey('pageup'), createKey('pageup', { shift: true })],
-      negative: [createKey('pagedown'), createKey('up')],
+      positive: [createKey('pageup')],
+      negative: [
+        createKey('pagedown'),
+        createKey('up'),
+        createKey('pageup', { shift: true }),
+      ],
     },
     {
       command: Command.PAGE_DOWN,
-      positive: [createKey('pagedown'), createKey('pagedown', { ctrl: true })],
-      negative: [createKey('pageup'), createKey('down')],
+      positive: [createKey('pagedown')],
+      negative: [
+        createKey('pageup'),
+        createKey('down'),
+        createKey('pagedown', { ctrl: true }),
+      ],
     },
 
     // History navigation
@@ -214,13 +226,21 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.NAVIGATION_UP,
-      positive: [createKey('up'), createKey('up', { ctrl: true })],
-      negative: [createKey('p'), createKey('u')],
+      positive: [createKey('up')],
+      negative: [
+        createKey('p'),
+        createKey('u'),
+        createKey('up', { ctrl: true }),
+      ],
     },
     {
       command: Command.NAVIGATION_DOWN,
-      positive: [createKey('down'), createKey('down', { ctrl: true })],
-      negative: [createKey('n'), createKey('d')],
+      positive: [createKey('down')],
+      negative: [
+        createKey('n'),
+        createKey('d'),
+        createKey('down', { ctrl: true }),
+      ],
     },
 
     // Dialog navigation
@@ -333,14 +353,12 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.SUSPEND_APP,
-      positive: [
-        createKey('z', { ctrl: true }),
-        createKey('z', { ctrl: true, shift: true }),
-      ],
+      positive: [createKey('z', { ctrl: true })],
       negative: [
         createKey('z'),
         createKey('y', { ctrl: true }),
         createKey('z', { alt: true }),
+        createKey('z', { ctrl: true, shift: true }),
       ],
     },
     {
@@ -365,8 +383,12 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.ACCEPT_SUGGESTION_REVERSE_SEARCH,
-      positive: [createKey('tab'), createKey('tab', { ctrl: true })],
-      negative: [createKey('return'), createKey('space')],
+      positive: [createKey('tab')],
+      negative: [
+        createKey('return'),
+        createKey('space'),
+        createKey('tab', { ctrl: true }),
+      ],
     },
     {
       command: Command.FOCUS_SHELL_INPUT,
@@ -412,22 +434,6 @@ describe('keyMatchers', () => {
           ).toBe(false);
         });
       });
-    });
-
-    it('should properly handle ACCEPT_SUGGESTION_REVERSE_SEARCH cases', () => {
-      expect(
-        keyMatchers[Command.ACCEPT_SUGGESTION_REVERSE_SEARCH](
-          createKey('return', { ctrl: true }),
-        ),
-      ).toBe(false); // ctrl must be false
-      expect(
-        keyMatchers[Command.ACCEPT_SUGGESTION_REVERSE_SEARCH](createKey('tab')),
-      ).toBe(true);
-      expect(
-        keyMatchers[Command.ACCEPT_SUGGESTION_REVERSE_SEARCH](
-          createKey('tab', { ctrl: true }),
-        ),
-      ).toBe(true); // modifiers ignored
     });
   });
 
