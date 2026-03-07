@@ -875,7 +875,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`security.autoAddToPolicyByDefault`** (boolean):
   - **Description:** When enabled, the "Allow for all future sessions" option
     becomes the default choice for low-risk tools in trusted workspaces.
-  - **Default:** `true`
+  - **Default:** `false`
 
 - **`security.blockGitExtensions`** (boolean):
   - **Description:** Blocks installing and loading extensions from Git.

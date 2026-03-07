@@ -1464,8 +1464,8 @@
         "autoAddToPolicyByDefault": {
           "title": "Auto-add to Policy by Default",
           "description": "When enabled, the \"Allow for all future sessions\" option becomes the default choice for low-risk tools in trusted workspaces.",
-          "markdownDescription": "When enabled, the \"Allow for all future sessions\" option becomes the default choice for low-risk tools in trusted workspaces.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `true`",
-          "default": true,
+          "markdownDescription": "When enabled, the \"Allow for all future sessions\" option becomes the default choice for low-risk tools in trusted workspaces.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
           "type": "boolean"
         },
         "blockGitExtensions": {

@@ -245,9 +245,9 @@ export const ToolConfirmationMessage: React.FC<
           });
           if (allowPermanentApproval) {
             options.push({
-              label: `Allow for this file in all future sessions`,
+              label: 'Allow for this file in all future sessions',
               value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-              key: 'Allow for all future sessions',
+              key: 'Allow for this file in all future sessions',
             });
           }
         }
@@ -402,11 +402,13 @@ export const ToolConfirmationMessage: React.FC<
 
       let initialIndex = 0;
       if (isTrustedFolder && allowPermanentApproval) {
+        // It is safe to allow permanent approval for info, edit, and mcp tools
+        // in trusted folders because the generated policy rules are narrowed
+        // to specific files, patterns, or tools (rather than allowing all access).
         const isSafeToPersist =
           confirmationDetails.type === 'info' ||
           confirmationDetails.type === 'edit' ||
           confirmationDetails.type === 'mcp';
-
         if (
           isSafeToPersist &&
           settings.merged.security.autoAddToPolicyByDefault

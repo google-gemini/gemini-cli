@@ -28,6 +28,7 @@ describe('createPolicyUpdater', () => {
   let mockStorage: Storage;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     vol.reset();
     policyEngine = new PolicyEngine({
       rules: [],
@@ -41,6 +42,7 @@ describe('createPolicyUpdater', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('should persist policy when persist flag is true', async () => {
@@ -55,8 +57,9 @@ describe('createPolicyUpdater', () => {
       persist: true,
     });
 
-    // Policy updater handles persistence asynchronously
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Policy updater handles persistence asynchronously in a promise queue.
+    // We use advanceTimersByTimeAsync to yield to the microtask queue.
+    await vi.advanceTimersByTimeAsync(100);
 
     const fileExists = memfs.existsSync(policyFile);
     expect(fileExists).toBe(true);
@@ -79,7 +82,7 @@ describe('createPolicyUpdater', () => {
       toolName: 'test_tool',
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await vi.advanceTimersByTimeAsync(100);
 
     expect(memfs.existsSync(policyFile)).toBe(false);
   });
@@ -102,7 +105,7 @@ describe('createPolicyUpdater', () => {
       persist: true,
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await vi.advanceTimersByTimeAsync(100);
 
     const content = memfs.readFileSync(policyFile, 'utf-8') as string;
     expect(content).toContain('toolName = "existing_tool"');
@@ -134,7 +137,7 @@ decision = "deny"
       persist: true,
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await vi.advanceTimersByTimeAsync(100);
 
     const content = memfs.readFileSync(policyFile, 'utf-8') as string;
     expect(content).toContain('toolName = "tool1"');
@@ -155,7 +158,7 @@ decision = "deny"
       argsPattern: '^foo.*$',
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await vi.advanceTimersByTimeAsync(100);
 
     const content = memfs.readFileSync(policyFile, 'utf-8') as string;
     expect(content).toContain('argsPattern = "^foo.*$"');
@@ -174,7 +177,7 @@ decision = "deny"
       mcpName: 'my"jira"server',
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await vi.advanceTimersByTimeAsync(100);
 
     const writtenContent = memfs.readFileSync(policyFile, 'utf-8') as string;
 
@@ -213,7 +216,7 @@ decision = "deny"
       persistScope: 'workspace',
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await vi.advanceTimersByTimeAsync(100);
 
     expect(memfs.existsSync(policyFile)).toBe(true);
     const content = memfs.readFileSync(policyFile, 'utf-8') as string;

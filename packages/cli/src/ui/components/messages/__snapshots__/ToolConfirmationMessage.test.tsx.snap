@@ -8,9 +8,9 @@ exports[`ToolConfirmationMessage > enablePermanentToolApproval setting > should 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
-  1. Allow once
+● 1. Allow once                                
   2. Allow for this session
-● 3. Allow for this file in all future sessions
+  3. Allow for this file in all future sessions
   4. Modify with external editor
   5. No, suggest changes (esc)
 "

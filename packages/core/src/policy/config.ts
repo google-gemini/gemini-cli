@@ -46,6 +46,19 @@ export const WORKSPACE_POLICY_TIER = 3;
 export const USER_POLICY_TIER = 4;
 export const ADMIN_POLICY_TIER = 5;
 
+/**
+ * The fractional priority of "Always allow" rules (e.g., 950/1000).
+ * Higher fraction within a tier wins.
+ */
+export const ALWAYS_ALLOW_PRIORITY_FRACTION = 950;
+
+/**
+ * The fractional priority offset for "Always allow" rules (e.g., 0.95).
+ * This ensures consistency between in-memory rules and persisted rules.
+ */
+export const ALWAYS_ALLOW_PRIORITY_OFFSET =
+  ALWAYS_ALLOW_PRIORITY_FRACTION / 1000;
+
 // Specific priority offsets and derived priorities for dynamic/settings rules.
 
 export const MCP_EXCLUDED_PRIORITY = USER_POLICY_TIER + 0.9;
@@ -56,15 +69,14 @@ export const ALLOWED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.1;
 
 // These are added to the tier base (e.g., USER_POLICY_TIER).
 // Workspace tier (3) + high priority (950/1000) = ALWAYS_ALLOW_PRIORITY
-export const ALWAYS_ALLOW_PRIORITY = 3.95;
+export const ALWAYS_ALLOW_PRIORITY =
+  WORKSPACE_POLICY_TIER + ALWAYS_ALLOW_PRIORITY_OFFSET;
 
 /**
  * Returns the fractional priority of ALWAYS_ALLOW_PRIORITY scaled to 1000.
  */
 export function getAlwaysAllowPriorityFraction(): number {
-  return Math.round(
-    (ALWAYS_ALLOW_PRIORITY - Math.floor(ALWAYS_ALLOW_PRIORITY)) * 1000,
-  );
+  return Math.round((ALWAYS_ALLOW_PRIORITY % 1) * 1000);
 }
 
 /**
@@ -503,7 +515,7 @@ export function createPolicyUpdater(
           message.persistScope === 'user'
             ? USER_POLICY_TIER
             : WORKSPACE_POLICY_TIER;
-        const priority = tier + (ALWAYS_ALLOW_PRIORITY % 1);
+        const priority = tier + getAlwaysAllowPriorityFraction() / 1000;
 
         if (SENSITIVE_TOOLS.has(toolName) && !message.commandPrefix) {
           debugLogger.warn(
@@ -542,7 +554,7 @@ export function createPolicyUpdater(
           message.persistScope === 'user'
             ? USER_POLICY_TIER
             : WORKSPACE_POLICY_TIER;
-        const priority = tier + (ALWAYS_ALLOW_PRIORITY % 1);
+        const priority = tier + getAlwaysAllowPriorityFraction() / 1000;
 
         if (SENSITIVE_TOOLS.has(toolName) && !message.argsPattern) {
           debugLogger.warn(

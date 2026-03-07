@@ -21,6 +21,7 @@ import {
   type SerializableConfirmationDetails,
 } from '../confirmation-bus/types.js';
 import { ApprovalMode, PolicyDecision } from '../policy/types.js';
+import { escapeRegex } from '../policy/utils.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
@@ -580,7 +581,7 @@ describe('policy.ts', () => {
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           toolName: 'write_file',
-          argsPattern: '"file_path":"src/foo\\.ts"',
+          argsPattern: escapeRegex('"file_path":"src/foo.ts"'),
         }),
       );
     });
