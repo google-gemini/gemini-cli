@@ -105,7 +105,7 @@ The following tools are available in Plan Mode:
   <tool>\`exit_plan_mode\`</tool>
   <tool>\`write_file\`</tool>
   <tool>\`replace\`</tool>
-  <tool>\`read_data\` (readonly-server)</tool>
+  <tool>\`mcp_readonly-server_read_data\` (readonly-server)</tool>
 </available_tools>
 
 ## Rules
@@ -275,7 +275,7 @@ The following tools are available in Plan Mode:
   <tool>\`exit_plan_mode\`</tool>
   <tool>\`write_file\`</tool>
   <tool>\`replace\`</tool>
-  <tool>\`read_data\` (readonly-server)</tool>
+  <tool>\`mcp_readonly-server_read_data\` (readonly-server)</tool>
 </available_tools>
 
 ## Rules
@@ -564,7 +564,7 @@ The following tools are available in Plan Mode:
   <tool>\`exit_plan_mode\`</tool>
   <tool>\`write_file\`</tool>
   <tool>\`replace\`</tool>
-  <tool>\`read_data\` (readonly-server)</tool>
+  <tool>\`mcp_readonly-server_read_data\` (readonly-server)</tool>
 </available_tools>
 
 ## Rules
