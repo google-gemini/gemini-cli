@@ -47,7 +47,12 @@ import {
   isOverageEligibleModel,
   shouldAutoUseCredits,
 } from '../billing/billing.js';
+<<<<<<< HEAD
 import { logBillingEvent } from '../telemetry/loggers.js';
+=======
+import { logBillingEvent, logInvalidChunk } from '../telemetry/loggers.js';
+import { coreEvents } from '../utils/events.js';
+>>>>>>> 9a7427197 (fix(billing): fix overage strategy lifecycle and settings integration (#21236))
 import { CreditsUsedEvent } from '../telemetry/billingEvents.js';
 import type {
   CaCountTokenResponse,
@@ -101,6 +106,11 @@ export class CodeAssistServer implements ContentGenerator {
       : false;
     const modelIsEligible = isOverageEligibleModel(req.model);
     const shouldEnableCredits = modelIsEligible && autoUse;
+
+    if (shouldEnableCredits && !this.config?.getCreditsNotificationShown()) {
+      this.config?.setCreditsNotificationShown(true);
+      coreEvents.emitFeedback('info', 'Using AI Credits for this request.');
+    }
 
     const enabledCreditTypes = shouldEnableCredits
       ? ([G1_CREDIT_TYPE] as string[])
