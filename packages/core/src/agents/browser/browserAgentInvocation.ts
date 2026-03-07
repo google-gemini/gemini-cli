@@ -135,10 +135,9 @@ function sanitizeErrorMessage(message: string): string {
   // 3. Handle space-separated tokens/auth
   const tokenValuePattern = `[A-Za-z0-9._\\-/+=]{8,}`;
   const spaceSeparated = new RegExp(
-    `\\b((?:token|bearer|authorization(?:\\s*:\\s*bearer)?)\\s+)(${tokenValuePattern})`,
+    `\\b((?:token|bearer|authorization(?:\\s*:\\s*bearer)?|password|pwd|apikey|api[-_]?key|secret)\\s+)(${tokenValuePattern})`,
     'gi',
   );
-  sanitized = sanitized.replace(spaceSeparated, '$1[REDACTED]');
 
   // 4. Handle file path redaction
   sanitized = sanitized.replace(
