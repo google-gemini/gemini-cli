@@ -19,6 +19,9 @@ import { useMemo, memo, useCallback, useEffect, useRef } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
+import { TaskTree } from './TaskTree.js';
+import { useTaskTree } from '../hooks/useTaskTree.js';
+import type { IndividualToolCallDisplay } from '../types.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -36,22 +39,8 @@ export const MainContent = () => {
   const showConfirmationQueue = confirmingTool !== null;
   const confirmingToolCallId = confirmingTool?.tool.callId;
 
-  const scrollableListRef = useRef<VirtualizedListRef<unknown>>(null);
-
-  useEffect(() => {
-    if (showConfirmationQueue) {
-      scrollableListRef.current?.scrollToEnd();
-    }
-  }, [showConfirmationQueue, confirmingToolCallId]);
-
-  const {
-    pendingHistoryItems,
-    mainAreaWidth,
-    staticAreaMaxItemHeight,
-    cleanUiDetailsVisible,
-  } = uiState;
-  const showHeaderDetails = cleanUiDetailsVisible;
-
+  // Accumulate all tool calls for the current agent turn so the tree persists
+  // across round-trips
   const lastUserPromptIndex = useMemo(() => {
     for (let i = uiState.history.length - 1; i >= 0; i--) {
       const type = uiState.history[i].type;
@@ -61,6 +50,38 @@ export const MainContent = () => {
     }
     return -1;
   }, [uiState.history]);
+
+  const allCurrentTurnToolCalls = useMemo<IndividualToolCallDisplay[]>(() => {
+    const calls: IndividualToolCallDisplay[] = [];
+    // Completed batches already committed to history for this turn
+    for (let i = lastUserPromptIndex + 1; i < uiState.history.length; i++) {
+      const item = uiState.history[i];
+      if (item.type === 'tool_group') {
+        calls.push(...item.tools);
+      }
+    }
+    // Live batch still pending
+    for (const item of uiState.pendingHistoryItems) {
+      if (item.type === 'tool_group') {
+        calls.push(...item.tools);
+      }
+    }
+    return calls;
+  }, [uiState.history, uiState.pendingHistoryItems, lastUserPromptIndex]);
+
+  const taskTree = useTaskTree(allCurrentTurnToolCalls);
+
+  const scrollableListRef = useRef<VirtualizedListRef<unknown>>(null);
+
+  useEffect(() => {
+    if (showConfirmationQueue) {
+      scrollableListRef.current?.scrollToEnd();
+    }
+  }, [showConfirmationQueue, confirmingToolCallId]);
+
+  const { mainAreaWidth, staticAreaMaxItemHeight, cleanUiDetailsVisible } =
+    uiState;
+  const showHeaderDetails = cleanUiDetailsVisible;
 
   const augmentedHistory = useMemo(
     () =>
@@ -72,21 +93,34 @@ export const MainContent = () => {
           item.type === 'thinking' && prevType !== 'thinking';
         const isFirstAfterThinking =
           item.type !== 'thinking' && prevType === 'thinking';
+        // Suppress all tool_group items from the current turn when the task tree
+        // is active — the tree is the single source of truth for the full turn.
+        const suppressToolGroup =
+          item.type === 'tool_group' &&
+          index > lastUserPromptIndex &&
+          taskTree.hasHierarchy;
 
         return {
           item,
           isExpandable,
           isFirstThinking,
           isFirstAfterThinking,
+          suppressToolGroup,
         };
       }),
-    [uiState.history, lastUserPromptIndex],
+    [uiState.history, lastUserPromptIndex, taskTree.hasHierarchy],
   );
 
   const historyItems = useMemo(
     () =>
       augmentedHistory.map(
-        ({ item, isExpandable, isFirstThinking, isFirstAfterThinking }) => (
+        ({
+          item,
+          isExpandable,
+          isFirstThinking,
+          isFirstAfterThinking,
+          suppressToolGroup,
+        }) => (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
             availableTerminalHeight={
@@ -102,6 +136,7 @@ export const MainContent = () => {
             isExpandable={isExpandable}
             isFirstThinking={isFirstThinking}
             isFirstAfterThinking={isFirstAfterThinking}
+            suppressToolGroup={suppressToolGroup}
           />
         ),
       ),
@@ -127,44 +162,25 @@ export const MainContent = () => {
   const pendingItems = useMemo(
     () => (
       <Box flexDirection="column">
-        {pendingHistoryItems.map((item, i) => {
-          const prevType =
-            i === 0
-              ? uiState.history.at(-1)?.type
-              : pendingHistoryItems[i - 1]?.type;
-          const isFirstThinking =
-            item.type === 'thinking' && prevType !== 'thinking';
-          const isFirstAfterThinking =
-            item.type !== 'thinking' && prevType === 'thinking';
-
-          return (
-            <HistoryItemDisplay
-              key={i}
-              availableTerminalHeight={
-                uiState.constrainHeight ? staticAreaMaxItemHeight : undefined
-              }
-              terminalWidth={mainAreaWidth}
-              item={{ ...item, id: 0 }}
-              isPending={true}
-              isExpandable={true}
-              isFirstThinking={isFirstThinking}
-              isFirstAfterThinking={isFirstAfterThinking}
-            />
-          );
-        })}
+        {/* display task tree */}
+        {taskTree.hasHierarchy && (
+          <TaskTree
+            {...taskTree}
+            terminalWidth={mainAreaWidth}
+            isFocused={!uiState.embeddedShellFocused}
+          />
+        )}
         {showConfirmationQueue && confirmingTool && (
           <ToolConfirmationQueue confirmingTool={confirmingTool} />
         )}
       </Box>
     ),
     [
-      pendingHistoryItems,
-      uiState.constrainHeight,
-      staticAreaMaxItemHeight,
+      uiState.embeddedShellFocused,
       mainAreaWidth,
       showConfirmationQueue,
       confirmingTool,
-      uiState.history,
+      taskTree,
     ],
   );
 
@@ -172,12 +188,19 @@ export const MainContent = () => {
     () => [
       { type: 'header' as const },
       ...augmentedHistory.map(
-        ({ item, isExpandable, isFirstThinking, isFirstAfterThinking }) => ({
+        ({
+          item,
+          isExpandable,
+          isFirstThinking,
+          isFirstAfterThinking,
+          suppressToolGroup,
+        }) => ({
           type: 'history' as const,
           item,
           isExpandable,
           isFirstThinking,
           isFirstAfterThinking,
+          suppressToolGroup,
         }),
       ),
       { type: 'pending' as const },
@@ -212,6 +235,7 @@ export const MainContent = () => {
             isExpandable={item.isExpandable}
             isFirstThinking={item.isFirstThinking}
             isFirstAfterThinking={item.isFirstAfterThinking}
+            suppressToolGroup={item.suppressToolGroup}
           />
         );
       } else {
