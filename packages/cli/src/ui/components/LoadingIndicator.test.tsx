@@ -258,10 +258,29 @@ describe('<LoadingIndicator />', () => {
     const output = lastFrame();
     expect(output).toBeDefined();
     if (output) {
-      expect(output).toContain('💬');
+      // Should NOT contain "Thinking... " prefix because the subject already starts with "Thinking"
+      expect(output).not.toContain('Thinking... Thinking');
       expect(output).toContain('Thinking about something...');
       expect(output).not.toContain('and other stuff.');
     }
+    unmount();
+  });
+
+  it('should prepend "Thinking... " if the subject does not start with "Thinking"', async () => {
+    const props = {
+      thought: {
+        subject: 'Planning the response...',
+        description: 'details',
+      },
+      elapsedTime: 5,
+    };
+    const { lastFrame, unmount, waitUntilReady } = renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('Thinking... Planning the response...');
     unmount();
   });
 
@@ -280,13 +299,13 @@ describe('<LoadingIndicator />', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('💬');
+    expect(output).toContain('Thinking... ');
     expect(output).toContain('This should be displayed');
     expect(output).not.toContain('This should not be displayed');
     unmount();
   });
 
-  it('should not display thought icon for non-thought loading phrases', async () => {
+  it('should not display thought indicator for non-thought loading phrases', async () => {
     const { lastFrame, unmount, waitUntilReady } = renderWithContext(
       <LoadingIndicator
         currentLoadingPhrase="some random tip..."
@@ -295,7 +314,7 @@ describe('<LoadingIndicator />', () => {
       StreamingState.Responding,
     );
     await waitUntilReady();
-    expect(lastFrame()).not.toContain('💬');
+    expect(lastFrame()).not.toContain('Thinking... ');
     unmount();
   });
 

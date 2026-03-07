@@ -46,6 +46,8 @@ interface HistoryItemDisplayProps {
   commands?: readonly SlashCommand[];
   availableTerminalHeightGemini?: number;
   isExpandable?: boolean;
+  isFirstThinking?: boolean;
+  isFirstAfterThinking?: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -56,16 +58,30 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   commands,
   availableTerminalHeightGemini,
   isExpandable,
+  isFirstThinking = false,
+  isFirstAfterThinking = false,
 }) => {
   const settings = useSettings();
   const inlineThinkingMode = getInlineThinkingMode(settings);
   const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
 
+  const needsTopMarginAfterThinking =
+    isFirstAfterThinking && inlineThinkingMode !== 'off';
+
   return (
-    <Box flexDirection="column" key={itemForDisplay.id} width={terminalWidth}>
+    <Box
+      flexDirection="column"
+      key={itemForDisplay.id}
+      width={terminalWidth}
+      marginTop={needsTopMarginAfterThinking ? 1 : 0}
+    >
       {/* Render standard message types */}
       {itemForDisplay.type === 'thinking' && inlineThinkingMode !== 'off' && (
-        <ThinkingMessage thought={itemForDisplay.thought} />
+        <ThinkingMessage
+          thought={itemForDisplay.thought}
+          terminalWidth={terminalWidth}
+          isFirstThinking={isFirstThinking}
+        />
       )}
       {itemForDisplay.type === 'hint' && (
         <HintMessage text={itemForDisplay.text} />
