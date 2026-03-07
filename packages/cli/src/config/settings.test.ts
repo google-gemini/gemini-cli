@@ -1574,7 +1574,7 @@ describe('Settings Loading and Merging', () => {
         expect(settings1).not.toBe(settings2);
       });
 
-      it('should clear cache when saveSettings is called', () => {
+      it('should clear cache when saveSettings is called for user settings', () => {
         const mockedRead = vi.mocked(fs.readFileSync);
         mockedRead.mockClear();
         mockedRead.mockReturnValue('{}');
@@ -1588,6 +1588,33 @@ describe('Settings Loading and Merging', () => {
         const settings2 = loadSettings(MOCK_WORKSPACE_DIR);
         expect(mockedRead).toHaveBeenCalledTimes(10); // Should have re-read from disk
         expect(settings1).not.toBe(settings2);
+      });
+
+      it('should only clear the specific workspace cache when saveSettings is called for workspace settings', () => {
+        const mockedRead = vi.mocked(fs.readFileSync);
+        mockedRead.mockClear();
+        mockedRead.mockReturnValue('{}');
+        (mockFsExistsSync as Mock).mockReturnValue(true);
+
+        const workspace1 = '/mock/workspace1';
+        const workspace2 = '/mock/workspace2';
+
+        const settings1W1 = loadSettings(workspace1);
+        const settings1W2 = loadSettings(workspace2);
+
+        expect(mockedRead).toHaveBeenCalledTimes(10);
+
+        // Save settings for workspace 1
+        saveSettings(settings1W1.workspace);
+
+        const settings2W1 = loadSettings(workspace1);
+        const settings2W2 = loadSettings(workspace2);
+
+        // Workspace 1 should have been cleared and re-read from disk (+5 reads)
+        // Workspace 2 should still be cached (+0 reads)
+        expect(mockedRead).toHaveBeenCalledTimes(15);
+        expect(settings1W1).not.toBe(settings2W1);
+        expect(settings1W2).toBe(settings2W2);
       });
     });
   });

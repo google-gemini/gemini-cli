@@ -619,7 +619,7 @@ export function loadEnvironment(
 // Cache to store the results of loadSettings to avoid redundant disk I/O.
 const settingsCache = createCache<string, LoadedSettings>({
   storage: 'map',
-  defaultTtl: 5000, // 5 seconds
+  defaultTtl: 30000, // 30 seconds
 });
 
 /**
@@ -1054,8 +1054,21 @@ export function migrateDeprecatedSettings(
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {
-  // Clear settings cache to ensure next load gets the updated file on disk.
-  settingsCache.clear();
+  if (settingsFile.path === USER_SETTINGS_PATH) {
+    // User settings affect all workspaces, so clear the entire cache.
+    settingsCache.clear();
+  } else {
+    // For workspace settings, find the workspace root and invalidate only that entry.
+    const geminiDir = path.dirname(settingsFile.path);
+    if (path.basename(geminiDir) === GEMINI_DIR) {
+      const workspaceDir = path.dirname(geminiDir);
+      settingsCache.delete(path.resolve(workspaceDir));
+    } else {
+      // If we can't determine the workspace, clear everything to be safe.
+      settingsCache.clear();
+    }
+  }
+
   try {
     // Ensure the directory exists
     const dirPath = path.dirname(settingsFile.path);
