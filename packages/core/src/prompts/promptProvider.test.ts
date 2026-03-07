@@ -154,7 +154,7 @@ describe('PromptProvider', () => {
       const provider = new PromptProvider();
       const prompt = provider.getCoreSystemPrompt(mockConfig);
 
-      expect(prompt).toContain('`mcp_read` (my-mcp-server)');
+      expect(prompt).toContain('`mcp_my-mcp-server_mcp_read` (my-mcp-server)');
     });
 
     it('should include write constraint message in plan mode prompt', () => {
