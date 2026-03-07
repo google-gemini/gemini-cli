@@ -1207,7 +1207,7 @@ describe('useSlashCompletion', () => {
         {
           name: 'custom-script',
           description: 'Run custom script',
-          kind: CommandKind.FILE,
+          kind: CommandKind.USER_FILE,
           action: vi.fn(),
         },
       ] as SlashCommand[];
@@ -1227,7 +1227,7 @@ describe('useSlashCompletion', () => {
             label: 'custom-script',
             value: 'custom-script',
             description: 'Run custom script',
-            commandKind: CommandKind.FILE,
+            commandKind: CommandKind.USER_FILE,
           },
         ]);
         expect(result.current.completionStart).toBe(1);

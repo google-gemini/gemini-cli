@@ -87,7 +87,7 @@ export function SuggestionsDisplay({
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
         const isExpanded = originalIndex === expandedIndex;
-        const textColor = isActive ? theme.text.accent : theme.text.secondary;
+        const textColor = isActive ? theme.ui.focus : theme.text.secondary;
         const isLong = suggestion.value.length >= MAX_WIDTH;
         const previousSectionTitle =
           suggestions[originalIndex - 1]?.sectionTitle;
@@ -115,7 +115,11 @@ export function SuggestionsDisplay({
                 -- {suggestion.sectionTitle} --
               </Text>
             )}
-            <Box flexDirection="row">
+            
+            <Box 
+              flexDirection="row"
+              backgroundColor={isActive ? theme.background.focus : undefined}
+            >
               <Box
                 {...(mode === 'slash'
                   ? { width: commandColumnWidth, flexShrink: 0 as const }
@@ -139,6 +143,7 @@ export function SuggestionsDisplay({
                   </Text>
                 </Box>
               )}
+              
               {isActive && isLong && (
                 <Box width={3} flexShrink={0}>
                   <Text color={Colors.Gray}>{isExpanded ? ' ← ' : ' → '}</Text>
