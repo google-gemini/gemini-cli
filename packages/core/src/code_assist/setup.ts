@@ -19,6 +19,7 @@ import type { ValidationHandler } from '../fallback/types.js';
 import { ChangeAuthRequestedError } from '../utils/errors.js';
 import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { createCache, type CacheService } from '../utils/cache.js';
 
 export class ProjectIdRequiredError extends Error {
   constructor() {
@@ -55,6 +56,29 @@ export interface UserData {
   paidTier?: GeminiUserTier;
 }
 
+// Cache to store the results of setupUser to avoid redundant network calls.
+// The cache is keyed by the AuthClient instance. Inside each entry, we use
+// another cache keyed by project ID to ensure correctness if environment changes.
+let userDataCache = createCache<
+  AuthClient,
+  CacheService<string | undefined, Promise<UserData>>
+>({
+  storage: 'weakmap',
+});
+
+/**
+ * Resets the user data cache. Used exclusively for test isolation.
+ * @internal
+ */
+export function resetUserDataCacheForTesting() {
+  userDataCache = createCache<
+    AuthClient,
+    CacheService<string | undefined, Promise<UserData>>
+  >({
+    storage: 'weakmap',
+  });
+}
+
 /**
  * Sets up the user by loading their Code Assist configuration and onboarding if needed.
  *
@@ -86,6 +110,28 @@ export async function setupUser(
     process.env['GOOGLE_CLOUD_PROJECT'] ||
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
+
+  const projectCache = userDataCache.getOrCreate(client, () =>
+    createCache<string | undefined, Promise<UserData>>({
+      storage: 'map',
+      defaultTtl: 30000, // 30 seconds
+    }),
+  );
+
+  return projectCache.getOrCreate(projectId, () =>
+    _doSetupUser(client, projectId, validationHandler, httpOptions),
+  );
+}
+
+/**
+ * Internal implementation of the user setup logic.
+ */
+async function _doSetupUser(
+  client: AuthClient,
+  projectId: string | undefined,
+  validationHandler?: ValidationHandler,
+  httpOptions: HttpOptions = {},
+): Promise<UserData> {
   const caServer = new CodeAssistServer(
     client,
     projectId,
