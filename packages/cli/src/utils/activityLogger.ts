@@ -494,9 +494,10 @@ export class ActivityLogger extends EventEmitter {
 
       req.write = function (chunk: string | Uint8Array, ...etc: unknown[]) {
         if (chunk) {
+          const arg0 = etc[0];
           const encoding =
-            typeof etc[0] === 'string' && Buffer.isEncoding(etc[0])
-              ? etc[0]
+            typeof arg0 === 'string' && Buffer.isEncoding(arg0)
+              ? arg0
               : undefined;
           requestChunks.push(
             Buffer.isBuffer(chunk)
@@ -519,9 +520,10 @@ export class ActivityLogger extends EventEmitter {
       ) {
         const chunk = typeof chunkOrCb === 'function' ? undefined : chunkOrCb;
         if (chunk) {
+          const arg0 = etc[0];
           const encoding =
-            typeof etc[0] === 'string' && Buffer.isEncoding(etc[0])
-              ? etc[0]
+            typeof arg0 === 'string' && Buffer.isEncoding(arg0)
+              ? arg0
               : undefined;
           requestChunks.push(
             Buffer.isBuffer(chunk)
