@@ -13,20 +13,18 @@ vi.mock('../nonInteractiveCli.js', () => ({
 }));
 
 import { VoiceSession } from './voiceSession.js';
-import { Readable, PassThrough } from 'node:stream';
+import { PassThrough, Readable } from 'node:stream';
 
 describe('VoiceSession', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should process input lines and call runNonInteractive', async () => {
-    const input = Readable.from(['hello world\n', 'another line\n']);
-    const output = new PassThrough();
+  it('should process recognized commands and call runNonInteractive', async () => {
+    const input = Readable.from(['install dependencies\n', 'build project\n']);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const voiceSession = new VoiceSession({} as any, {} as any, {
       input,
-      output,
       createPromptId: () => 'test-id',
     });
 
@@ -36,22 +34,43 @@ describe('VoiceSession', () => {
     expect(mockRunNonInteractive).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        input: expect.stringContaining('hello world'),
+        input: 'npm install',
         prompt_id: 'test-id',
       }),
     );
     expect(mockRunNonInteractive).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        input: expect.stringContaining('another line'),
+        input: 'npm run build',
         prompt_id: 'test-id',
       }),
     );
   });
 
   it('should ignore empty or whitespace-only lines', async () => {
-    const input = Readable.from(['\n', '  \n', 'only one call\n']);
+    const input = Readable.from(['\n', '  \n', 'build project\n']);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const voiceSession = new VoiceSession({} as any, {} as any, {
+      input,
+    });
+
+    await voiceSession.start();
+
+    expect(mockRunNonInteractive).toHaveBeenCalledTimes(1);
+    expect(mockRunNonInteractive).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: 'npm run build',
+      }),
+    );
+  });
+
+  it('should print suggestion when command is not recognized but similar', async () => {
+    const input = Readable.from(['install dep\n']);
     const output = new PassThrough();
+    let printed = '';
+    output.on('data', (chunk: Buffer | string) => {
+      printed += chunk.toString();
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const voiceSession = new VoiceSession({} as any, {} as any, {
       input,
@@ -60,11 +79,26 @@ describe('VoiceSession', () => {
 
     await voiceSession.start();
 
-    expect(mockRunNonInteractive).toHaveBeenCalledTimes(1);
-    expect(mockRunNonInteractive).toHaveBeenCalledWith(
-      expect.objectContaining({
-        input: expect.stringContaining('only one call'),
-      }),
-    );
+    expect(mockRunNonInteractive).not.toHaveBeenCalled();
+    expect(printed).toContain('Did you mean: npm install ?');
+  });
+
+  it('should print unknown message when no suggestion exists', async () => {
+    const input = Readable.from(['say hello to world\n']);
+    const output = new PassThrough();
+    let printed = '';
+    output.on('data', (chunk: Buffer | string) => {
+      printed += chunk.toString();
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const voiceSession = new VoiceSession({} as any, {} as any, {
+      input,
+      output,
+    });
+
+    await voiceSession.start();
+
+    expect(mockRunNonInteractive).not.toHaveBeenCalled();
+    expect(printed).toContain('Voice command not recognized.');
   });
 });
