@@ -326,14 +326,13 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
             const callId = activity.data['id']
               ? String(activity.data['id'])
               : undefined;
-            const name = String(activity.data['name']);
-            // Find the tool call by ID or the last running tool call with this name
+            // Find the tool call by ID
+            // Find the tool call by ID
             for (let i = recentActivity.length - 1; i >= 0; i--) {
               if (
                 recentActivity[i].type === 'tool_call' &&
-                (callId
-                  ? recentActivity[i].id === callId
-                  : recentActivity[i].content === name) &&
+                callId != null &&
+                recentActivity[i].id === callId &&
                 recentActivity[i].status === 'running'
               ) {
                 recentActivity[i].status = 'completed';
@@ -346,22 +345,17 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
           case 'ERROR': {
             const error = String(activity.data['error']);
             const isCancellation = error === 'Request cancelled.';
-            const toolName = activity.data['name']
-              ? String(activity.data['name'])
-              : undefined;
             const callId = activity.data['callId']
               ? String(activity.data['callId'])
               : undefined;
             const newStatus = isCancellation ? 'cancelled' : 'error';
 
-            if (callId || toolName) {
+            if (callId) {
               // Mark the specific tool as error/cancelled
               for (let i = recentActivity.length - 1; i >= 0; i--) {
                 if (
                   recentActivity[i].type === 'tool_call' &&
-                  (callId
-                    ? recentActivity[i].id === callId
-                    : recentActivity[i].content === toolName) &&
+                  recentActivity[i].id === callId &&
                   recentActivity[i].status === 'running'
                 ) {
                   recentActivity[i].status = newStatus;
