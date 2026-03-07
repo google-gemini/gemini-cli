@@ -27,10 +27,16 @@ export type StdioConfig = {
   args: string[];
 };
 
+export type FdConfig = {
+  fdIn: number;
+  fdOut: number;
+};
+
 export type ConnectionConfig = {
   port?: string;
   authToken?: string;
   stdio?: StdioConfig;
+  fd?: FdConfig;
 };
 
 export function validateWorkspacePath(
@@ -77,6 +83,20 @@ export function getPortFromEnv(): string | undefined {
     return undefined;
   }
   return port;
+}
+
+export function getFdConfigFromEnv(): FdConfig | undefined {
+  const fdInStr = process.env['GEMINI_CLI_IDE_CHANNEL_FD_IN'];
+  const fdOutStr = process.env['GEMINI_CLI_IDE_CHANNEL_FD_OUT'];
+  if (!fdInStr || !fdOutStr) {
+    return undefined;
+  }
+  const fdIn = parseInt(fdInStr, 10);
+  const fdOut = parseInt(fdOutStr, 10);
+  if (isNaN(fdIn) || isNaN(fdOut)) {
+    return undefined;
+  }
+  return { fdIn, fdOut };
 }
 
 export function getStdioConfigFromEnv(): StdioConfig | undefined {

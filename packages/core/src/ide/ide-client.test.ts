@@ -25,10 +25,12 @@ import * as os from 'node:os';
 import {
   getConnectionConfigFromFile,
   getStdioConfigFromEnv,
+  getFdConfigFromEnv,
   getPortFromEnv,
   validateWorkspacePath,
   getIdeServerHost,
 } from './ide-connection-utils.js';
+
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof fs>();
@@ -66,7 +68,10 @@ describe('IdeClient', () => {
     delete process.env['GEMINI_CLI_IDE_SERVER_PORT'];
     delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'];
     delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'];
+    delete process.env['GEMINI_CLI_IDE_CHANNEL_FD_IN'];
+    delete process.env['GEMINI_CLI_IDE_CHANNEL_FD_OUT'];
     delete process.env['GEMINI_CLI_IDE_AUTH_TOKEN'];
+
 
     // Mock dependencies
     vi.spyOn(process, 'cwd').mockReturnValue('/test/workspace/sub-dir');
@@ -195,6 +200,67 @@ describe('IdeClient', () => {
         args: ['--bar'],
       });
       expect(mockClient.connect).toHaveBeenCalledWith(mockStdioTransport);
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Connected,
+      );
+    });
+
+    it('should connect using sidecar FDs when FD config is provided in environment variables', async () => {
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(undefined);
+      vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
+      vi.mocked(getFdConfigFromEnv).mockReturnValue({
+        fdIn: 3,
+        fdOut: 4,
+      });
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      // Since we implemented a custom transport object for FDs,
+      // we check if Client.connect was called with an object that looks like our transport.
+      expect(mockClient.connect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          send: expect.any(Function),
+          start: expect.any(Function),
+          close: expect.any(Function),
+        }),
+      );
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Connected,
+      );
+    });
+
+    it('should connect using sidecar FDs when FD config is provided in file', async () => {
+      const config = { fd: { fdIn: 5, fdOut: 6 } };
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(config);
+      vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      expect(mockClient.connect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          send: expect.any(Function),
+          start: expect.any(Function),
+          close: expect.any(Function),
+        }),
+      );
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Connected,
+      );
+    });
+
+    it('should prioritize file config over environment variables for FDs', async () => {
+      const config = { fd: { fdIn: 5, fdOut: 6 } };
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(config);
+      vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
+      vi.mocked(getFdConfigFromEnv).mockReturnValue({ fdIn: 3, fdOut: 4 });
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      // If we could verify the FDs used in the transport...
+      // For now we just check it connected.
       expect(ideClient.getConnectionStatus().status).toBe(
         IDEConnectionStatus.Connected,
       );

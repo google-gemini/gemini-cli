@@ -10,9 +10,15 @@ import {
   IdeContextNotificationSchema,
   OpenDiffRequestSchema,
 } from '@google/gemini-cli-core/src/ide/types.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import {
+  isInitializeRequest,
+  JSONRPCMessage,
+  JSONRPCMessageSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import * as fs_node from 'node:fs';
+
 import express, {
   type Request,
   type Response,
@@ -125,9 +131,12 @@ export class IDEServer {
 
   private port: number | undefined;
   private authToken: string | undefined;
-  private transports: { [sessionId: string]: StreamableHTTPServerTransport } =
-    {};
+  private transports: {
+    [sessionId: string]: any;
+  } = {};
+  private mcpServer: McpServer | undefined;
   private openFilesManager: OpenFilesManager | undefined;
+
   diffManager: DiffManager;
 
   constructor(log: (message: string) => void, diffManager: DiffManager) {
@@ -193,7 +202,7 @@ export class IDEServer {
         next();
       });
 
-      const mcpServer = createMcpServer(this.diffManager, this.log);
+      this.mcpServer = createMcpServer(this.diffManager, this.log);
 
       this.openFilesManager = new OpenFilesManager(context);
       const onDidChangeSubscription = this.openFilesManager.onDidChange(() => {
@@ -256,7 +265,7 @@ export class IDEServer {
           };
 
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          mcpServer.connect(transport);
+          this.mcpServer.connect(transport);
         } else {
           this.log(
             'Bad Request: No valid session ID provided for non-initialize request.',
@@ -377,18 +386,107 @@ export class IDEServer {
     });
   }
 
+  attachFdTransport(
+    fdIn: number | NodeJS.ReadableStream,
+    fdOut: number | NodeJS.WritableStream,
+  ) {
+    if (!this.mcpServer) {
+      this.log('Cannot attach FD transport: MCP server not started');
+      return;
+    }
+
+    const sessionId = `fd-${randomUUID()}`;
+    this.log(`Attaching sidecar FD transport: ${sessionId}`);
+
+    const readStream =
+      typeof fdIn === 'number'
+        ? fs_node.createReadStream('', { fd: fdIn })
+        : fdIn;
+    const writeStream =
+      typeof fdOut === 'number'
+        ? fs_node.createWriteStream('', { fd: fdOut })
+        : fdOut;
+
+    const transport = {
+      onclose: () => {},
+      onerror: () => {},
+      onmessage: () => {},
+      start: async () => {
+        let buffer = '';
+        readStream.on('data', (chunk: Buffer) => {
+          buffer += chunk.toString('utf-8');
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const message = JSONRPCMessageSchema.parse(JSON.parse(line));
+              transport.onmessage?.(message);
+            } catch (e) {
+              this.log(`Failed to parse MCP message from FD: ${e}`);
+              transport.onerror?.(
+                e instanceof Error ? e : new Error(String(e)),
+              );
+            }
+          }
+        });
+        readStream.on('error', (e) => {
+          this.log(`FD read error: ${e.message}`);
+          transport.onerror?.(e);
+        });
+        readStream.on('close', () => {
+          this.log(`FD transport closed: ${sessionId}`);
+          delete this.transports[sessionId];
+          transport.onclose?.();
+        });
+      },
+      send: async (message: JSONRPCMessage) => {
+        return new Promise<void>((resolve, reject) => {
+          writeStream.write(JSON.stringify(message) + '\n', (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+      },
+      close: async () => {
+        readStream.destroy();
+        writeStream.destroy();
+      },
+    };
+
+    this.transports[sessionId] = transport;
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    this.mcpServer.connect(transport);
+
+    if (this.openFilesManager) {
+      const ideContext = this.openFilesManager.state;
+      const notification = IdeContextNotificationSchema.parse({
+        jsonrpc: '2.0',
+        method: 'ide/contextUpdate',
+        params: ideContext,
+      });
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      transport.send(notification);
+    }
+  }
+
   broadcastIdeContextUpdate() {
     if (!this.openFilesManager) {
       return;
     }
+    const ideContext = this.openFilesManager.state;
+    const notification = IdeContextNotificationSchema.parse({
+      jsonrpc: '2.0',
+      method: 'ide/contextUpdate',
+      params: ideContext,
+    });
+
     for (const transport of Object.values(this.transports)) {
-      sendIdeContextUpdateNotification(
-        transport,
-        this.log.bind(this),
-        this.openFilesManager,
-      );
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      transport.send(notification);
     }
   }
+
 
   async syncEnvVars(): Promise<void> {
     if (this.context && this.server && this.port && this.authToken) {

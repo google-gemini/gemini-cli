@@ -9,6 +9,10 @@ import { IDEServer } from './ide-server.js';
 import semver from 'semver';
 import { DiffContentProvider, DiffManager } from './diff-manager.js';
 import { createLogger } from './utils/logger.js';
+import { spawn } from 'node:child_process';
+
+import { GeminiCliTerminal } from './terminal.js';
+
 import {
   detectIdeFromEnv,
   IDE_DEFINITIONS,
@@ -201,6 +205,17 @@ export async function activate(context: vscode.ExtensionContext) {
       }
 
       if (selectedFolder) {
+        // If gVisor (runsc) sandbox is being used, we must use a sidecar FD bridge
+        // because gVisor's netstack blocks TCP communication between the container and host.
+        if (process.env['GEMINI_SANDBOX'] === 'runsc') {
+          const terminal = vscode.window.createTerminal({
+            name: `Gemini CLI (${selectedFolder.name})`,
+            pty: new GeminiCliTerminal(selectedFolder, ideServer, log),
+          });
+          terminal.show();
+          return;
+        }
+
         const geminiCmd = 'gemini';
         const terminal = vscode.window.createTerminal({
           name: `Gemini CLI (${selectedFolder.name})`,

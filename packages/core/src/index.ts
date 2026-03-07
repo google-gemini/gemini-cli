@@ -216,3 +216,14 @@ export * from './utils/terminal.js';
 
 // Export types from @google/genai
 export type { Content, Part, FunctionCall } from '@google/genai';
+
+// Export Sandbox Driver Architecture
+export * from './sandbox/types.js';
+export * from './sandbox/utils.js';
+export * from './sandbox/drivers/MacOSSeatbeltDriver.js';
+export * from './sandbox/drivers/ContainerDriver.js';
+export * from './sandbox/drivers/LXCDriver.js';
+export * from './sandbox/drivers/NoOpDriver.js';
+
+// Export Console Patcher
+export * from './utils/consolePatcher.js';

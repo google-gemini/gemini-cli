@@ -27,10 +27,18 @@ import {
   getIdeServerHost,
   getPortFromEnv,
   getStdioConfigFromEnv,
+  getFdConfigFromEnv,
   validateWorkspacePath,
   createProxyAwareFetch,
   type StdioConfig,
+  type FdConfig,
 } from './ide-connection-utils.js';
+import * as fs from 'node:fs';
+import {
+  JSONRPCMessage,
+  JSONRPCMessageSchema,
+} from '@modelcontextprotocol/sdk/types.js';
+
 
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -172,6 +180,12 @@ export class IdeClient {
           return;
         }
       }
+      if (connectionConfig.fd) {
+        const connected = await this.establishFdConnection(connectionConfig.fd);
+        if (connected) {
+          return;
+        }
+      }
     }
 
     const portFromEnv = getPortFromEnv();
@@ -192,6 +206,15 @@ export class IdeClient {
         return;
       }
     }
+
+    const fdConfigFromEnv = getFdConfigFromEnv();
+    if (fdConfigFromEnv) {
+      const connected = await this.establishFdConnection(fdConfigFromEnv);
+      if (connected) {
+        return;
+      }
+    }
+
 
     this.setState(
       IDEConnectionStatus.Disconnected,
@@ -647,4 +670,73 @@ export class IdeClient {
       return false;
     }
   }
+
+  private async establishFdConnection({
+    fdIn,
+    fdOut,
+  }: FdConfig): Promise<boolean> {
+    try {
+      logger.debug(
+        `Attempting to connect to IDE via sidecar FDs (in: ${fdIn}, out: ${fdOut})`,
+      );
+      this.client = new Client({
+        name: 'fd-client',
+        version: '1.0.0',
+      });
+
+      const readStream = fs.createReadStream('', { fd: fdIn });
+      const writeStream = fs.createWriteStream('', { fd: fdOut });
+
+      // Basic stream transport for MCP
+      const transport = {
+        onclose: () => {},
+        onerror: () => {},
+        onmessage: () => {},
+        start: async () => {
+          let buffer = '';
+          readStream.on('data', (chunk: Buffer) => {
+            buffer += chunk.toString('utf-8');
+            const lines = buffer.split('\n');
+            buffer = lines.pop() ?? '';
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                const message = JSONRPCMessageSchema.parse(JSON.parse(line));
+                transport.onmessage?.(message);
+              } catch (e) {
+                logger.error('Failed to parse MCP message from FD:', e);
+                transport.onerror?.(
+                  e instanceof Error ? e : new Error(String(e)),
+                );
+              }
+            }
+          });
+          readStream.on('error', (e) => transport.onerror?.(e));
+          readStream.on('close', () => transport.onclose?.());
+        },
+        send: async (message: JSONRPCMessage) => {
+          return new Promise<void>((resolve, reject) => {
+            writeStream.write(JSON.stringify(message) + '\n', (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+        },
+        close: async () => {
+          readStream.destroy();
+          writeStream.destroy();
+        },
+      };
+
+      await this.client.connect(transport);
+      this.registerClientHandlers();
+      await this.discoverTools();
+      this.setState(IDEConnectionStatus.Connected);
+      return true;
+    } catch (_error) {
+      logger.error('Failed to establish FD connection:', _error);
+      return false;
+    }
+  }
+
 }

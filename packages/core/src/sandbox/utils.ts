@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,7 +8,8 @@ import os from 'node:os';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { quote } from 'shell-quote';
-import { debugLogger, GEMINI_DIR } from '@google/gemini-cli-core';
+import { debugLogger } from '../utils/debugLogger.js';
+import { GEMINI_DIR } from '../utils/paths.js';
 
 export const LOCAL_DEV_SANDBOX_IMAGE_NAME = 'gemini-cli-sandbox';
 export const SANDBOX_NETWORK_NAME = 'gemini-cli-sandbox';
@@ -77,14 +78,14 @@ export function parseImageName(image: string): string {
   return tag ? `${name}-${tag}` : name;
 }
 
-export function ports(): string[] {
+export function getSandboxPorts(): string[] {
   return (process.env['SANDBOX_PORTS'] ?? '')
     .split(',')
     .filter((p) => p.trim())
     .map((p) => p.trim());
 }
 
-export function entrypoint(workdir: string, cliArgs: string[]): string[] {
+export function getSandboxEntrypoint(workdir: string, cliArgs: string[]): string[] {
   const isWindows = os.platform() === 'win32';
   const containerWorkdir = getContainerPath(workdir);
   const shellCmds = [];
@@ -127,7 +128,7 @@ export function entrypoint(workdir: string, cliArgs: string[]): string[] {
     shellCmds.push(`source ${getContainerPath(projectSandboxBashrc)};`);
   }
 
-  ports().forEach((p) =>
+  getSandboxPorts().forEach((p) =>
     shellCmds.push(
       `socat TCP4-LISTEN:${p},bind=$(hostname -i),fork,reuseaddr TCP4:127.0.0.1:${p} 2> /dev/null &`,
     ),

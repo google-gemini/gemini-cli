@@ -431,6 +431,25 @@ describe('IDEServer', () => {
         expect(body, `Failed for header: ${header}`).toBe('Unauthorized');
       }
     });
+
+    it('should allow attaching FD transport with streams', async () => {
+      const { Readable, Writable } = await import('node:stream');
+      const mockReadStream = new Readable({
+        read() {},
+      });
+      const mockWriteStream = new Writable({
+        write(_chunk, _encoding, callback) {
+          callback();
+        },
+      });
+
+      // No need to await start as we just need mcpServer to be initialized
+      ideServer.attachFdTransport(mockReadStream, mockWriteStream);
+
+      expect(mockLog).toHaveBeenCalledWith(
+        expect.stringContaining('Attaching sidecar FD transport'),
+      );
+    });
   });
 });
 

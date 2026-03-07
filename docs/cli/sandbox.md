@@ -94,6 +94,26 @@ gemini -p "build the snap"
   absolute path — the path must be writable inside the container.
 - Used with tools like Snapcraft or Rockcraft that require a full system.
 
+### 4. gVisor (runsc)
+
+Strongest isolation using gVisor's `runsc` runtime.
+
+**IDE Integration**: When using `GEMINI_SANDBOX=runsc`, the standard TCP-based
+IDE integration is blocked by gVisor's network isolation. To bypass this, the
+VS Code companion extension automatically switches to a **Sidecar FD Bridge**
+when launching the CLI. This uses OS file descriptors to bridge the container
+boundary, allowing all IDE-aware tools and status commands to function
+normally.
+
+## Capability matrix
+
+| Feature | `docker` / `podman` | `runsc` (gVisor) | `sandbox-exec` (macOS) | `lxc` |
+| --- | --- | --- | --- | --- |
+| **Isolation Level** | High | Very High | Medium | High |
+| **Network Access** | Configurable | Restricted | Configurable | Native |
+| **IDE Integration** | TCP / Bridge | FD Bridge | Native | Native |
+| **Platforms** | Linux, macOS, Win | Linux | macOS | Linux |
+
 ## Quickstart
 
 ```bash

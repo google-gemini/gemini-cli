@@ -1,16 +1,14 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import {
   getPackageJson,
   type SandboxConfig,
-  FatalSandboxError,
+  SandboxManager,
 } from '@google/gemini-cli-core';
-import commandExists from 'command-exists';
-import * as os from 'node:os';
 import type { Settings } from './settings.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -18,31 +16,17 @@ import path from 'node:path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// This is a stripped-down version of the CliArgs interface from config.ts
-// to avoid circular dependencies.
 interface SandboxCliArgs {
   sandbox?: boolean | string | null;
 }
-const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
-  'docker',
-  'podman',
-  'sandbox-exec',
-  'lxc',
-];
 
-function isSandboxCommand(value: string): value is SandboxConfig['command'] {
-  return (VALID_SANDBOX_COMMANDS as readonly string[]).includes(value);
-}
-
-function getSandboxCommand(
+async function getSandboxCommand(
   sandbox?: boolean | string | null,
-): SandboxConfig['command'] | '' {
-  // If the SANDBOX env var is set, we're already inside the sandbox.
+): Promise<SandboxConfig['command'] | ''> {
   if (process.env['SANDBOX']) {
     return '';
   }
 
-  // note environment variable takes precedence over argument (from command line or settings)
   const environmentConfiguredSandbox =
     process.env['GEMINI_SANDBOX']?.toLowerCase().trim() ?? '';
   sandbox =
@@ -56,45 +40,15 @@ function getSandboxCommand(
     return '';
   }
 
-  if (typeof sandbox === 'string' && sandbox) {
-    if (!isSandboxCommand(sandbox)) {
-      throw new FatalSandboxError(
-        `Invalid sandbox command '${sandbox}'. Must be one of ${VALID_SANDBOX_COMMANDS.join(
-          ', ',
-        )}`,
-      );
-    }
-    // confirm that specified command exists
-    if (commandExists.sync(sandbox)) {
-      return sandbox;
-    }
-    throw new FatalSandboxError(
-      `Missing sandbox command '${sandbox}' (from GEMINI_SANDBOX)`,
-    );
-  }
+  const preferredName = typeof sandbox === 'string' ? sandbox : undefined;
+  const sandboxManager = SandboxManager.getInstance();
+  const driver = await sandboxManager.discoverBestDriver(preferredName);
 
-  // look for seatbelt, docker, or podman, in that order
-  // for container-based sandboxing, require sandbox to be enabled explicitly
-  if (os.platform() === 'darwin' && commandExists.sync('sandbox-exec')) {
-    return 'sandbox-exec';
-  } else if (commandExists.sync('docker') && sandbox === true) {
-    return 'docker';
-  } else if (commandExists.sync('podman') && sandbox === true) {
-    return 'podman';
-  }
-
-  // throw an error if user requested sandbox but no command was found
-  if (sandbox === true) {
-    throw new FatalSandboxError(
-      'GEMINI_SANDBOX is true but failed to determine command for sandbox; ' +
-        'install docker or podman or specify command in GEMINI_SANDBOX',
-    );
+  if (driver && driver.name !== 'none') {
+    return driver.name as SandboxConfig['command'];
   }
 
   return '';
-  // Note: 'lxc' is intentionally not auto-detected because it requires a
-  // pre-existing, running container managed by the user. Use
-  // GEMINI_SANDBOX=lxc or sandbox: "lxc" in settings to enable it.
 }
 
 export async function loadSandboxConfig(
@@ -102,7 +56,7 @@ export async function loadSandboxConfig(
   argv: SandboxCliArgs,
 ): Promise<SandboxConfig | undefined> {
   const sandboxOption = argv.sandbox ?? settings.tools?.sandbox;
-  const command = getSandboxCommand(sandboxOption);
+  const command = await getSandboxCommand(sandboxOption);
 
   const packageJson = await getPackageJson(__dirname);
   const image =
