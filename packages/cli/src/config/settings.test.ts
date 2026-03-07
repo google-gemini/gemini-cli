@@ -76,6 +76,7 @@ import {
   LoadedSettings,
   sanitizeEnvVar,
   createTestMergedSettings,
+  resetSettingsCacheForTesting,
 } from './settings.js';
 import {
   FatalConfigError,
@@ -174,6 +175,7 @@ describe('Settings Loading and Merging', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    resetSettingsCacheForTesting();
 
     mockFsExistsSync = vi.mocked(fs.existsSync);
     mockFsMkdirSync = vi.mocked(fs.mkdirSync);
@@ -1540,6 +1542,53 @@ describe('Settings Loading and Merging', () => {
       } finally {
         isWorkspaceHomeDirSpy.mockRestore();
       }
+    });
+
+    describe('caching', () => {
+      it('should cache loadSettings results', () => {
+        const mockedRead = vi.mocked(fs.readFileSync);
+        mockedRead.mockClear();
+        mockedRead.mockReturnValue('{}');
+        (mockFsExistsSync as Mock).mockReturnValue(true);
+
+        const settings1 = loadSettings(MOCK_WORKSPACE_DIR);
+        const settings2 = loadSettings(MOCK_WORKSPACE_DIR);
+
+        expect(mockedRead).toHaveBeenCalledTimes(5); // system, systemDefaults, user, workspace, and potentially an env file
+        expect(settings1).toBe(settings2);
+      });
+
+      it('should use separate cache for different workspace directories', () => {
+        const mockedRead = vi.mocked(fs.readFileSync);
+        mockedRead.mockClear();
+        mockedRead.mockReturnValue('{}');
+        (mockFsExistsSync as Mock).mockReturnValue(true);
+
+        const workspace1 = '/mock/workspace1';
+        const workspace2 = '/mock/workspace2';
+
+        const settings1 = loadSettings(workspace1);
+        const settings2 = loadSettings(workspace2);
+
+        expect(mockedRead).toHaveBeenCalledTimes(10); // 5 for each workspace
+        expect(settings1).not.toBe(settings2);
+      });
+
+      it('should clear cache when saveSettings is called', () => {
+        const mockedRead = vi.mocked(fs.readFileSync);
+        mockedRead.mockClear();
+        mockedRead.mockReturnValue('{}');
+        (mockFsExistsSync as Mock).mockReturnValue(true);
+
+        const settings1 = loadSettings(MOCK_WORKSPACE_DIR);
+        expect(mockedRead).toHaveBeenCalledTimes(5);
+
+        saveSettings(settings1.user);
+
+        const settings2 = loadSettings(MOCK_WORKSPACE_DIR);
+        expect(mockedRead).toHaveBeenCalledTimes(10); // Should have re-read from disk
+        expect(settings1).not.toBe(settings2);
+      });
     });
   });
 
