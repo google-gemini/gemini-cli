@@ -7,25 +7,25 @@ exports[`<FooterConfigDialog /> > highlights the active item in the preview 1`] 
 │                                                                                                  │
 │  Select which items to display in the footer.                                                    │
 │                                                                                                  │
-│    [✓] workspace (/directory)                                                                    │
+│    [✓] workspace                                                                                 │
 │     Current working directory                                                                    │
-│    [✓] branch                                                                                    │
+│    [✓] git-branch                                                                                │
 │     Current git branch name (not shown when unavailable)                                         │
 │    [✓] sandbox                                                                                   │
 │     Sandbox type and trust indicator                                                             │
-│    [✓] /model                                                                                    │
+│    [✓] model-name                                                                                │
 │     Current model identifier                                                                     │
-│    [✓] /stats                                                                                    │
+│    [✓] quota                                                                                     │
 │     Remaining usage on daily limit (not shown when unavailable)                                  │
-│    [ ] context                                                                                   │
+│    [ ] context-used                                                                              │
 │     Percentage of context window used                                                            │
-│    [ ] memory                                                                                    │
+│    [ ] memory-usage                                                                              │
 │     Memory used by the application                                                               │
-│    [ ] session                                                                                   │
+│    [ ] session-id                                                                                │
 │     Unique identifier for the current session                                                    │
-│  > [✓] diff                                                                                      │
+│  > [✓] code-changes                                                                              │
 │     Lines added/removed in the session (not shown when zero)                                     │
-│    [ ] tokens                                                                                    │
+│    [ ] token-count                                                                               │
 │     Total tokens used in the session (not shown when zero)                                       │
 │    [✓] Show footer labels                                                                        │
 │                                                                                                  │
@@ -50,25 +50,25 @@ exports[`<FooterConfigDialog /> > renders correctly with default settings 1`] = 
 │                                                                                                  │
 │  Select which items to display in the footer.                                                    │
 │                                                                                                  │
-│  > [✓] workspace (/directory)                                                                    │
+│  > [✓] workspace                                                                                 │
 │     Current working directory                                                                    │
-│    [✓] branch                                                                                    │
+│    [✓] git-branch                                                                                │
 │     Current git branch name (not shown when unavailable)                                         │
 │    [✓] sandbox                                                                                   │
 │     Sandbox type and trust indicator                                                             │
-│    [✓] /model                                                                                    │
+│    [✓] model-name                                                                                │
 │     Current model identifier                                                                     │
-│    [✓] /stats                                                                                    │
+│    [✓] quota                                                                                     │
 │     Remaining usage on daily limit (not shown when unavailable)                                  │
-│    [ ] context                                                                                   │
+│    [ ] context-used                                                                              │
 │     Percentage of context window used                                                            │
-│    [ ] memory                                                                                    │
+│    [ ] memory-usage                                                                              │
 │     Memory used by the application                                                               │
-│    [ ] session                                                                                   │
+│    [ ] session-id                                                                                │
 │     Unique identifier for the current session                                                    │
-│    [ ] diff                                                                                      │
+│    [ ] code-changes                                                                              │
 │     Lines added/removed in the session (not shown when zero)                                     │
-│    [ ] tokens                                                                                    │
+│    [ ] token-count                                                                               │
 │     Total tokens used in the session (not shown when zero)                                       │
 │    [✓] Show footer labels                                                                        │
 │                                                                                                  │
@@ -94,25 +94,25 @@ exports[`<FooterConfigDialog /> > renders correctly with default settings 2`] = 
 │                                                                                                  │
 │  Select which items to display in the footer.                                                    │
 │                                                                                                  │
-│  > [✓] workspace (/directory)                                                                    │
+│  > [✓] workspace                                                                                 │
 │     Current working directory                                                                    │
-│    [✓] branch                                                                                    │
+│    [✓] git-branch                                                                                │
 │     Current git branch name (not shown when unavailable)                                         │
 │    [✓] sandbox                                                                                   │
 │     Sandbox type and trust indicator                                                             │
-│    [✓] /model                                                                                    │
+│    [✓] model-name                                                                                │
 │     Current model identifier                                                                     │
-│    [✓] /stats                                                                                    │
+│    [✓] quota                                                                                     │
 │     Remaining usage on daily limit (not shown when unavailable)                                  │
-│    [ ] context                                                                                   │
+│    [ ] context-used                                                                              │
 │     Percentage of context window used                                                            │
-│    [ ] memory                                                                                    │
+│    [ ] memory-usage                                                                              │
 │     Memory used by the application                                                               │
-│    [ ] session                                                                                   │
+│    [ ] session-id                                                                                │
 │     Unique identifier for the current session                                                    │
-│    [ ] diff                                                                                      │
+│    [ ] code-changes                                                                              │
 │     Lines added/removed in the session (not shown when zero)                                     │
-│    [ ] tokens                                                                                    │
+│    [ ] token-count                                                                               │
 │     Total tokens used in the session (not shown when zero)                                       │
 │    [✓] Show footer labels                                                                        │
 │                                                                                                  │

@@ -101,7 +101,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
           value: {
             key: id,
             id,
-            label: item.header,
+            label: item.id,
             description: item.description as string,
             type: 'config' as const,
           },
