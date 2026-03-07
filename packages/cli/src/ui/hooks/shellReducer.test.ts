@@ -11,7 +11,10 @@ import {
   type ShellState,
   type ShellAction,
 } from './shellReducer.js';
-import { MAX_SHELL_OUTPUT_SIZE } from '../constants.js';
+import {
+  MAX_SHELL_OUTPUT_SIZE,
+  SHELL_OUTPUT_TRUNCATION_BUFFER,
+} from '../constants.js';
 
 describe('shellReducer', () => {
   it('should return the initial state', () => {
@@ -192,10 +195,11 @@ describe('shellReducer', () => {
     expect(state.isBackgroundShellVisible).toBe(false); // Auto-hide if last shell
   });
 
-  it('should truncate shell output when it exceeds MAX_SHELL_OUTPUT_SIZE', () => {
-    // Build an initial output that is already at the limit
+  it('should not truncate shell output below the amortization threshold', () => {
+    // Output at exactly MAX_SHELL_OUTPUT_SIZE should NOT be truncated yet —
+    // truncation only fires after MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER.
     const initialOutput = 'a'.repeat(MAX_SHELL_OUTPUT_SIZE);
-    const stateWithLargeOutput: ShellState = {
+    const state: ShellState = {
       ...initialState,
       isBackgroundShellVisible: false,
       backgroundShells: new Map([
@@ -214,18 +218,51 @@ describe('shellReducer', () => {
     };
 
     const newChunk = 'b'.repeat(100);
-    const action: ShellAction = {
+    const result = shellReducer(state, {
       type: 'APPEND_SHELL_OUTPUT',
       pid: 1001,
       chunk: newChunk,
+    });
+    const output = result.backgroundShells.get(1001)?.output as string;
+
+    // Has not yet hit the truncation trigger — full output retained
+    expect(output.length).toBe(MAX_SHELL_OUTPUT_SIZE + 100);
+    expect(output.endsWith(newChunk)).toBe(true);
+  });
+
+  it('should truncate shell output once it exceeds MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER', () => {
+    // Build output that is 1 byte past the amortization trigger
+    const triggerSize =
+      MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER + 1;
+    const initialOutput = 'a'.repeat(triggerSize);
+    const state: ShellState = {
+      ...initialState,
+      isBackgroundShellVisible: false,
+      backgroundShells: new Map([
+        [
+          1001,
+          {
+            pid: 1001,
+            command: 'long-running-cmd',
+            output: initialOutput,
+            isBinary: false,
+            binaryBytesReceived: 0,
+            status: 'running',
+          },
+        ],
+      ]),
     };
 
-    const state = shellReducer(stateWithLargeOutput, action);
-    const output = state.backgroundShells.get(1001)?.output as string;
+    const newChunk = 'b'.repeat(100);
+    const result = shellReducer(state, {
+      type: 'APPEND_SHELL_OUTPUT',
+      pid: 1001,
+      chunk: newChunk,
+    });
+    const output = result.backgroundShells.get(1001)?.output as string;
 
-    // Output must not exceed the cap
+    // Truncated back to MAX_SHELL_OUTPUT_SIZE, newest data preserved
     expect(output.length).toBe(MAX_SHELL_OUTPUT_SIZE);
-    // The most recent data (the new chunk) should be at the end
     expect(output.endsWith(newChunk)).toBe(true);
   });
 });

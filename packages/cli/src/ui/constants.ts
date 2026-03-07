@@ -56,6 +56,12 @@ export const COMPLETED_SHELL_MAX_LINES = 15;
 // MAX_SHELL_OUTPUT_SIZE characters are retained.
 export const MAX_SHELL_OUTPUT_SIZE = 10_000_000;
 
+// Amortization buffer: truncation is only triggered when output exceeds
+// MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER, then sliced back to
+// MAX_SHELL_OUTPUT_SIZE. This avoids an O(n) string copy on every appended
+// chunk once the cap is reached.
+export const SHELL_OUTPUT_TRUNCATION_BUFFER = 1_000_000;
+
 /** Minimum terminal width required to show the full context used label */
 export const MIN_TERMINAL_WIDTH_FOR_FULL_LABEL = 100;
 

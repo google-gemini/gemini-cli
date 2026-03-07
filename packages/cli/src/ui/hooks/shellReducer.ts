@@ -5,7 +5,10 @@
  */
 
 import type { AnsiOutput } from '@google/gemini-cli-core';
-import { MAX_SHELL_OUTPUT_SIZE } from '../constants.js';
+import {
+  MAX_SHELL_OUTPUT_SIZE,
+  SHELL_OUTPUT_TRUNCATION_BUFFER,
+} from '../constants.js';
 
 export interface BackgroundShell {
   pid: number;
@@ -101,10 +104,14 @@ export function shellReducer(
             ? shell.output + action.chunk
             : action.chunk;
         // Prevent RangeError: Invalid string length in long-running sessions by
-        // capping output size and discarding the oldest data.
+        // capping output size and discarding the oldest data. The truncation
+        // buffer amortizes the cost: we only slice once per
+        // SHELL_OUTPUT_TRUNCATION_BUFFER bytes of new output instead of on
+        // every appended chunk.
         if (
           typeof newOutput === 'string' &&
-          newOutput.length > MAX_SHELL_OUTPUT_SIZE
+          newOutput.length >
+            MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER
         ) {
           newOutput = newOutput.slice(newOutput.length - MAX_SHELL_OUTPUT_SIZE);
         }
