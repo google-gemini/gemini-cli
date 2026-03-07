@@ -32,6 +32,29 @@ describe('sanitizeEnvironment', () => {
     expect(sanitized).toEqual(env);
   });
 
+  it('should allow TERM and COLORTERM environment variables', () => {
+    const env = {
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+    };
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+    expect(sanitized).toEqual(env);
+  });
+
+  it('should preserve TERM and COLORTERM even in strict sanitization mode', () => {
+    const env = {
+      GITHUB_SHA: 'abc123',
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+      SOME_OTHER_VAR: 'value',
+    };
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+    expect(sanitized).toEqual({
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+    });
+  });
+
   it('should allow variables prefixed with GEMINI_CLI_', () => {
     const env = {
       GEMINI_CLI_FOO: 'bar',
