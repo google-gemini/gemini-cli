@@ -272,6 +272,7 @@ export default tseslint.config(
       ...vitest.configs.recommended.rules,
       'vitest/expect-expect': 'off',
       'vitest/no-commented-out-tests': 'off',
+      'no-restricted-syntax': ['error', ...commonRestrictedSyntaxRules],
     },
   },
   {
