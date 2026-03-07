@@ -1,6 +1,6 @@
-# Preview release: v0.33.0-preview.0
+# Preview release: v0.33.0-preview.4
 
-Released: March 03, 2026
+Released: March 06, 2026
 
 Our preview release includes the latest, new, and experimental features. This
 release may not be as stable as our [latest weekly release](latest.md).
@@ -29,6 +29,25 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
+- fix(patch): cherry-pick 7ec477d to release/v0.33.0-preview.3-pr-21305 to patch
+  version v0.33.0-preview.3 and create version 0.33.0-preview.4 by
+  @gemini-cli-robot in
+  [#21349](https://github.com/google-gemini/gemini-cli/pull/21349)
+- fix(patch): cherry-pick 0135b03 to release/v0.33.0-preview.2-pr-21171
+  [CONFLICTS] by @gemini-cli-robot in
+  [#21336](https://github.com/google-gemini/gemini-cli/pull/21336)
+- fix(patch): cherry-pick 173376b to release/v0.33.0-preview.1-pr-21157 to patch
+  version v0.33.0-preview.1 and create version 0.33.0-preview.2 by
+  @gemini-cli-robot in
+  [#21300](https://github.com/google-gemini/gemini-cli/pull/21300)
+- fix(patch): cherry-pick 173376b to release/v0.33.0-preview.1-pr-21157 to patch
+  version v0.33.0-preview.1 and create version 0.33.0-preview.2 by
+  @gemini-cli-robot in
+  [#21300](https://github.com/google-gemini/gemini-cli/pull/21300)
+- fix(patch): cherry-pick 0659ad1 to release/v0.33.0-preview.0-pr-21042 to patch
+  version v0.33.0-preview.0 and create version 0.33.0-preview.1 by
+  @gemini-cli-robot in
+  [#21047](https://github.com/google-gemini/gemini-cli/pull/21047)
 - Docs: Update model docs to remove Preview Features. by @jkcinouye in
   [#20084](https://github.com/google-gemini/gemini-cli/pull/20084)
 - docs: fix typo in installation documentation by @AdityaSharma-Git3207 in
@@ -179,4 +198,4 @@ npm install -g @google/gemini-cli@preview
   [#20991](https://github.com/google-gemini/gemini-cli/pull/20991)
 
 **Full Changelog**:
-https://github.com/google-gemini/gemini-cli/compare/v0.32.0-preview.0...v0.33.0-preview.0
+https://github.com/google-gemini/gemini-cli/compare/v0.32.0-preview.0...v0.33.0-preview.4

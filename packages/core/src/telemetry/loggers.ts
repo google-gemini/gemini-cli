@@ -29,6 +29,7 @@ import {
   type ConversationFinishedEvent,
   type ChatCompressionEvent,
   type MalformedJsonResponseEvent,
+  type InvalidChunkEvent,
   type ContentRetryEvent,
   type ContentRetryFailureEvent,
   type RipgrepFallbackEvent,
@@ -75,6 +76,7 @@ import {
   recordPlanExecution,
   recordKeychainAvailability,
   recordTokenStorageInitialization,
+  recordInvalidChunk,
 } from './metrics.js';
 import { bufferTelemetryEvent } from './sdk.js';
 import { uiTelemetryService, type UiEvent } from './uiTelemetry.js';
@@ -467,6 +469,22 @@ export function logMalformedJsonResponse(
   });
 }
 
+export function logInvalidChunk(
+  config: Config,
+  event: InvalidChunkEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logInvalidChunkEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+    recordInvalidChunk(config);
+  });
+}
+
 export function logContentRetry(
   config: Config,
   event: ContentRetryEvent,
@@ -773,6 +791,7 @@ export function logStartupStats(
   config: Config,
   event: StartupStatsEvent,
 ): void {
+  ClearcutLogger.getInstance(config)?.logStartupStatsEvent(event);
   bufferTelemetryEvent(() => {
     // Wait for experiments to load before emitting so we capture experimentIds
     void config
