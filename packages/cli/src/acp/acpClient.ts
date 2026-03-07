@@ -561,7 +561,10 @@ export class Session {
     // explicitly set via a CLI flag (e.g. --yolo, --approval-mode).
     // The CLI flag represents explicit user intent that takes precedence
     // over the IDE's stored default mode. See: github.com/google-gemini/gemini-cli/issues/18816
-    if (this.config.isApprovalModeExplicit()) {
+    if (
+      this.config.isApprovalModeExplicit() ||
+      (mode.id === ApprovalMode.YOLO && this.config.isYoloModeDisabled())
+    ) {
       return {};
     }
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

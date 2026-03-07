@@ -23,6 +23,7 @@ function makeSession(opts: {
   const config = {
     isPlanEnabled: vi.fn().mockReturnValue(false),
     isApprovalModeExplicit: vi.fn().mockReturnValue(opts.approvalModeExplicit),
+    isYoloModeDisabled: vi.fn().mockReturnValue(false),
     setApprovalMode,
     getApprovalMode: vi.fn().mockReturnValue(opts.currentMode),
   } as unknown as Config;
@@ -123,6 +124,28 @@ describe('Session.setMode — CLI approval mode precedence', () => {
       expect(() => s2.setMode('not_a_mode' as acp.SessionModeId)).toThrow(
         'Invalid or unavailable mode',
       );
+    });
+  });
+
+  describe('when YOLO mode is disabled by security policy', () => {
+    it('does NOT apply IDE-pushed yolo when isYoloModeDisabled is true', () => {
+      const setApprovalMode = vi.fn();
+      const config = {
+        isPlanEnabled: vi.fn().mockReturnValue(false),
+        isApprovalModeExplicit: vi.fn().mockReturnValue(false),
+        isYoloModeDisabled: vi.fn().mockReturnValue(true),
+        setApprovalMode,
+        getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      } as unknown as Config;
+      const session = new Session(
+        'test-session-id',
+        {} as never,
+        config,
+        {} as never,
+        {} as unknown as LoadedSettings,
+      );
+      session.setMode(ApprovalMode.YOLO as unknown as acp.SessionModeId);
+      expect(setApprovalMode).not.toHaveBeenCalled();
     });
   });
 });
