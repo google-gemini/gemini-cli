@@ -860,6 +860,39 @@ describe('ChatRecordingService', () => {
       expect(result[0].text).toBe('Prefix metadata or text');
       expect(result[1].functionResponse!.id).toBe(callId);
     });
+
+    it('should not write to disk when no tool calls match', () => {
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'Response with no tool calls',
+        model: 'gemini-pro',
+      });
+
+      const writeFileSyncSpy = vi.spyOn(fs, 'writeFileSync');
+      writeFileSyncSpy.mockClear();
+
+      // History with a tool call ID that doesn't exist in the conversation
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'read_file',
+                id: 'nonexistent-call-id',
+                response: { output: 'some content' },
+              },
+            },
+          ],
+        },
+      ];
+
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      // No tool calls matched, so writeFileSync should NOT have been called
+      expect(writeFileSyncSpy).not.toHaveBeenCalled();
+      writeFileSyncSpy.mockRestore();
+    });
   });
 
   describe('ENOENT (missing directory) handling', () => {
