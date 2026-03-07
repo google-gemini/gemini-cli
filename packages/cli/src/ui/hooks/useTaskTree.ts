@@ -4,8 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import type { IndividualToolCallDisplay, TaskTreeNode } from '../types.js';
+
+type CallTiming = { start: number; end?: number };
 
 /**
  * Builds a TaskTreeNode hierarchy from a flat list of tool calls.
@@ -19,6 +22,7 @@ function buildTree(
   toolCalls: IndividualToolCallDisplay[],
   collapsedIds: Set<string>,
   focusedId: string | null,
+  callTimes: Map<string, CallTiming>,
 ): TaskTreeNode[] {
   const childrenMap = new Map<string, IndividualToolCallDisplay[]>();
   const roots: IndividualToolCallDisplay[] = [];
@@ -39,12 +43,18 @@ function buildTree(
     depth: number,
   ): TaskTreeNode {
     const childCalls = childrenMap.get(tool.callId) ?? [];
+    const timing = callTimes.get(tool.callId);
+    const durationMs =
+      timing?.start !== undefined && timing?.end !== undefined
+        ? timing.end - timing.start
+        : undefined;
     return {
       toolCall: tool,
       children: childCalls.map((c) => buildNode(c, depth + 1)),
       depth,
       isCollapsed: collapsedIds.has(tool.callId),
       isFocused: tool.callId === focusedId,
+      durationMs,
     };
   }
 
@@ -102,14 +112,45 @@ export function useTaskTree(
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [focusedId, setFocusedId] = useState<string | null>(null);
 
+  // Track wall-clock start/end times per callId.  Stored in a ref so mutations
+  // don't themselves cause re-renders; timingVersion state bumps to trigger the
+  // liveNodes memo when new timing data is recorded.
+  const callTimesRef = useRef<Map<string, CallTiming>>(new Map());
+  const [timingVersion, setTimingVersion] = useState(0);
+
+  useEffect(() => {
+    let changed = false;
+    for (const tc of toolCalls) {
+      const existing = callTimesRef.current.get(tc.callId);
+      if (tc.status === CoreToolCallStatus.Executing && !existing) {
+        callTimesRef.current.set(tc.callId, { start: Date.now() });
+        changed = true;
+      }
+      const isTerminal =
+        tc.status === CoreToolCallStatus.Success ||
+        tc.status === CoreToolCallStatus.Error ||
+        tc.status === CoreToolCallStatus.Cancelled;
+      if (
+        isTerminal &&
+        existing?.start !== undefined &&
+        existing.end === undefined
+      ) {
+        callTimesRef.current.set(tc.callId, { ...existing, end: Date.now() });
+        changed = true;
+      }
+    }
+    if (changed) setTimingVersion((v) => v + 1);
+  }, [toolCalls]);
+
   // When tool calls complete, keep the last snapshot visible until the next
   // tool run so the user can always see the full completed tree.
   const [heldNodes, setHeldNodes] = useState<TaskTreeNode[]>([]);
   const [isHeld, setIsHeld] = useState(false);
 
   const liveNodes = useMemo(
-    () => buildTree(toolCalls, collapsedIds, focusedId),
-    [toolCalls, collapsedIds, focusedId],
+    () => buildTree(toolCalls, collapsedIds, focusedId, callTimesRef.current),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [toolCalls, collapsedIds, focusedId, timingVersion],
   );
 
   // Persist completed tree: while there are live calls, keep updating the

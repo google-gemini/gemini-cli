@@ -44,20 +44,21 @@ function statusGlyph(status: CoreToolCallStatus): {
   }
 }
 
-/** Status suffix for row: [0.3s], [running…], [pending], [queued]. No duration in data so we use [done] for success. */
-function statusSuffix(status: CoreToolCallStatus): string {
+/** Status suffix for row: [0.3s], [running…], [pending], [queued]. */
+function statusSuffix(status: CoreToolCallStatus, durationMs?: number): string {
+  if (durationMs !== undefined) {
+    return `[${(durationMs / 1000).toFixed(1)}s]`;
+  }
   switch (status) {
     case CoreToolCallStatus.Success:
+    case CoreToolCallStatus.Error:
+    case CoreToolCallStatus.Cancelled:
       return '[done]';
     case CoreToolCallStatus.Executing:
       return '[running…]';
     case CoreToolCallStatus.Scheduled:
-      return '[pending]';
     case CoreToolCallStatus.AwaitingApproval:
       return '[pending]';
-    case CoreToolCallStatus.Error:
-    case CoreToolCallStatus.Cancelled:
-      return '[done]';
     case CoreToolCallStatus.Validating:
     default:
       return '[queued]';
@@ -97,7 +98,7 @@ export const TaskNode: React.FC<TaskNodeProps> = ({
 
   // Spec row: ├─ ✓ read_file       src/auth.ts              [0.3s]
   const namePadded = toolCall.name.padEnd(TOOL_NAME_WIDTH);
-  const suffix = statusSuffix(toolCall.status);
+  const suffix = statusSuffix(toolCall.status, node.durationMs);
 
   // Collapse hint when focused
   const collapseToggle =
@@ -161,6 +162,7 @@ export const TaskNode: React.FC<TaskNodeProps> = ({
                 terminalWidth - (childPrefix.length + 3) /* indent */
               }
               renderOutputAsMarkdown={toolCall.renderOutputAsMarkdown}
+              maxLines={15}
             />
           </Box>
         </Box>

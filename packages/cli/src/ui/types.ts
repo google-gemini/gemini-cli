@@ -524,4 +524,6 @@ export interface TaskTreeNode {
   isCollapsed: boolean;
   /** When true, this node has keyboard focus for expand/collapse. */
   isFocused: boolean;
+  /** Wall-clock duration in ms from Executing → terminal state. Undefined while pending/queued. */
+  durationMs?: number;
 }
