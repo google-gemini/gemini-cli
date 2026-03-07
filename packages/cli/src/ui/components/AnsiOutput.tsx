@@ -48,7 +48,7 @@ export const AnsiOutputText: React.FC<AnsiOutputProps> = ({
 };
 
 export const AnsiLineText: React.FC<{ line: AnsiLine }> = ({ line }) => (
-  <Text wrap="wrap">
+  <Text>
     {line.length > 0
       ? line.map((token: AnsiToken, tokenIndex: number) => (
           <Text
