@@ -149,7 +149,7 @@ const authCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Successfully authenticated and refreshed tools for '${serverName}'.`,
+        content: `Successfully authenticated and reloaded tools for '${serverName}'`,
       };
     } catch (error) {
       return {
@@ -325,10 +325,10 @@ const schemaCommand: SlashCommand = {
   action: (context) => listAction(context, true, true),
 };
 
-const refreshCommand: SlashCommand = {
-  name: 'refresh',
-  altNames: ['reload'],
-  description: 'Restarts MCP servers',
+const reloadCommand: SlashCommand = {
+  name: 'reload',
+  altNames: ['refresh'],
+  description: 'Reloads MCP servers',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (
@@ -354,7 +354,7 @@ const refreshCommand: SlashCommand = {
 
     context.ui.addItem({
       type: 'info',
-      text: 'Restarting MCP servers...',
+      text: 'Reloading MCP servers...',
     });
 
     await mcpClientManager.restart();
@@ -460,7 +460,7 @@ async function handleEnableDisable(
   const mcpClientManager = config.getMcpClientManager();
   if (mcpClientManager) {
     context.ui.addItem(
-      { type: 'info', text: 'Restarting MCP servers...' },
+      { type: 'info', text: 'Reloading MCP servers...' },
       Date.now(),
     );
     await mcpClientManager.restart();
@@ -521,7 +521,7 @@ export const mcpCommand: SlashCommand = {
     descCommand,
     schemaCommand,
     authCommand,
-    refreshCommand,
+    reloadCommand,
     enableCommand,
     disableCommand,
   ],
