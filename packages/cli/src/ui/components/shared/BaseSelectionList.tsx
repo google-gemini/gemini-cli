@@ -96,11 +96,9 @@ export function BaseSelectionList<
       // We want to track the "true" offset relative to the viewport.
       // Since we apply -breakoutAmount as a margin to the SELECTED item,
       // it should not affect the parent container's x coordinate in a standard layout.
-      if (x !== horizontalOffset) {
-        setHorizontalOffset(x);
-      }
+      setHorizontalOffset(x);
     }
-  }, [terminalWidth, mainAreaWidth, horizontalOffset]);
+  }, [terminalWidth, mainAreaWidth]);
 
   // Handle scrolling for long lists
   useEffect(() => {
