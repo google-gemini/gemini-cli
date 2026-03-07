@@ -160,6 +160,7 @@ vi.mock('./hooks/useIdeTrustListener.js');
 vi.mock('./hooks/useMessageQueue.js');
 vi.mock('./hooks/useApprovalModeIndicator.js');
 vi.mock('./hooks/useGitBranchName.js');
+vi.mock('./hooks/useExtensionUpdates.js');
 vi.mock('./contexts/VimModeContext.js');
 vi.mock('./contexts/SessionContext.js');
 vi.mock('./components/shared/text-buffer.js');
@@ -218,6 +219,10 @@ import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
+import {
+  useConfirmUpdateRequests,
+  useExtensionUpdates,
+} from './hooks/useExtensionUpdates.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
@@ -299,6 +304,8 @@ describe('AppContainer State Management', () => {
   const mockedUseMessageQueue = useMessageQueue as Mock;
   const mockedUseApprovalModeIndicator = useApprovalModeIndicator as Mock;
   const mockedUseGitBranchName = useGitBranchName as Mock;
+  const mockedUseConfirmUpdateRequests = useConfirmUpdateRequests as Mock;
+  const mockedUseExtensionUpdates = useExtensionUpdates as Mock;
   const mockedUseVimMode = useVimMode as Mock;
   const mockedUseSessionStats = useSessionStats as Mock;
   const mockedUseTextBuffer = useTextBuffer as Mock;
@@ -450,6 +457,15 @@ describe('AppContainer State Management', () => {
     mockedUseFocusState.mockReturnValue({
       isFocused: true,
       hasReceivedFocusEvent: true,
+    });
+    mockedUseConfirmUpdateRequests.mockReturnValue({
+      addConfirmUpdateExtensionRequest: vi.fn(),
+      confirmUpdateExtensionRequests: [],
+    });
+    mockedUseExtensionUpdates.mockReturnValue({
+      extensionsUpdateState: new Map(),
+      extensionsUpdateStateInternal: new Map(),
+      dispatchExtensionStateUpdate: vi.fn(),
     });
 
     // Mock Config
@@ -2675,6 +2691,10 @@ describe('AppContainer State Management', () => {
       isAlternateMode = false,
       childHandler?: Mock,
     ) => {
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(
+        isAlternateMode,
+      );
+
       // Update settings for this test run
       const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const testSettings = {
@@ -3364,6 +3384,8 @@ describe('AppContainer State Management', () => {
       );
       vi.mocked(checkPermissions).mockResolvedValue([]);
 
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
+
       let unmount: () => void;
       await act(async () => {
         unmount = renderAppContainer({
@@ -3595,6 +3617,8 @@ describe('AppContainer State Management', () => {
           },
         },
       } as unknown as LoadedSettings;
+
+      vi.spyOn(mockConfig, 'getUseAlternateBuffer').mockReturnValue(true);
 
       let unmount: () => void;
       await act(async () => {

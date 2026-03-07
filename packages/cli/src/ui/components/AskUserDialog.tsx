@@ -23,6 +23,7 @@ import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import { checkExhaustive } from '@google/gemini-cli-core';
 import { TextInput } from './shared/TextInput.js';
+import { formatCommand } from '../utils/keybindingUtils.js';
 import { useTextBuffer } from './shared/text-buffer.js';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
@@ -183,6 +184,10 @@ interface AskUserDialogProps {
    * Height constraint for scrollable content.
    */
   availableHeight?: number;
+  /**
+   * Custom keyboard shortcut hints (e.g., ["Ctrl+P to edit"])
+   */
+  extraParts?: string[];
 }
 
 interface ReviewViewProps {
@@ -190,6 +195,7 @@ interface ReviewViewProps {
   answers: { [key: string]: string };
   onSubmit: () => void;
   progressHeader?: React.ReactNode;
+  extraParts?: string[];
 }
 
 const ReviewView: React.FC<ReviewViewProps> = ({
@@ -197,6 +203,7 @@ const ReviewView: React.FC<ReviewViewProps> = ({
   answers,
   onSubmit,
   progressHeader,
+  extraParts,
 }) => {
   const unansweredCount = questions.length - Object.keys(answers).length;
   const hasUnanswered = unansweredCount > 0;
@@ -246,7 +253,8 @@ const ReviewView: React.FC<ReviewViewProps> = ({
       </Box>
       <DialogFooter
         primaryAction="Enter to submit"
-        navigationActions="Tab/Shift+Tab to edit answers"
+        navigationActions={`${formatCommand(Command.DIALOG_NEXT)}/${formatCommand(Command.DIALOG_PREV)} to edit answers`}
+        extraParts={extraParts}
       />
     </Box>
   );
@@ -925,6 +933,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   onActiveTextInputChange,
   width,
   availableHeight: availableHeightProp,
+  extraParts,
 }) => {
   const uiState = useContext(UIStateContext);
   const availableHeight =
@@ -1120,6 +1129,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
           answers={answers}
           onSubmit={handleReviewSubmit}
           progressHeader={progressHeader}
+          extraParts={extraParts}
         />
       </Box>
     );
@@ -1137,12 +1147,13 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       navigationActions={
         questions.length > 1
           ? currentQuestion.type === 'text' || isEditingCustomOption
-            ? 'Tab/Shift+Tab to switch questions'
+            ? `${formatCommand(Command.DIALOG_NEXT)}/${formatCommand(Command.DIALOG_PREV)} to switch questions`
             : '←/→ to switch questions'
           : currentQuestion.type === 'text' || isEditingCustomOption
             ? undefined
             : '↑/↓ to navigate'
       }
+      extraParts={extraParts}
     />
   );
 

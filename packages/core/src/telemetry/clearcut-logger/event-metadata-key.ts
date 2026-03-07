@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 167
+  // Next ID: 176
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -53,6 +53,22 @@ export enum EventMetadataKey {
 
   // Logs the output format of the session.
   GEMINI_CLI_START_SESSION_OUTPUT_FORMAT = 94,
+
+  // ==========================================================================
+  // Startup Stats Event Keys
+  // ==========================================================================
+
+  // Logs the array of startup phases.
+  GEMINI_CLI_STARTUP_PHASES = 172,
+
+  // Logs the OS platform for startup stats.
+  GEMINI_CLI_STARTUP_OS_PLATFORM = 173,
+
+  // Logs the OS release for startup stats.
+  GEMINI_CLI_STARTUP_OS_RELEASE = 174,
+
+  // Logs whether the CLI is running in docker for startup stats.
+  GEMINI_CLI_STARTUP_IS_DOCKER = 175,
 
   // ==========================================================================
   // User Prompt Event Keys
@@ -136,6 +152,21 @@ export enum EventMetadataKey {
 
   // Logs the tool use token count of the API call.
   GEMINI_CLI_API_RESPONSE_TOOL_TOKEN_COUNT = 29,
+
+  // Logs the token count for system instructions.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_SYSTEM_INSTRUCTIONS = 167,
+
+  // Logs the token count for tool definitions.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_DEFINITIONS = 168,
+
+  // Logs the token count for conversation history.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_HISTORY = 169,
+
+  // Logs the token count for tool calls (JSON map of tool name to tokens).
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_CALLS = 170,
+
+  // Logs the token count from MCP servers (tool definitions + tool inputs/outputs).
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_MCP_SERVERS = 171,
 
   // ==========================================================================
   // GenAI API Error Event Keys

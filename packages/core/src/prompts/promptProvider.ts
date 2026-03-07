@@ -22,7 +22,6 @@ import {
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import {
-  PLAN_MODE_TOOLS,
   WRITE_TODOS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
@@ -67,25 +66,17 @@ export class PromptProvider {
     const contextFilenames = getAllGeminiMdFilenames();
 
     // --- Context Gathering ---
-    let planModeToolsList = PLAN_MODE_TOOLS.filter((t) =>
-      enabledToolNames.has(t),
-    )
-      .map((t) => `  <tool>\`${t}\`</tool>`)
-      .join('\n');
-
-    // Add read-only MCP tools to the list
+    let planModeToolsList = '';
     if (isPlanMode) {
       const allTools = config.getToolRegistry().getAllTools();
-      const readOnlyMcpTools = allTools.filter(
-        (t): t is DiscoveredMCPTool =>
-          t instanceof DiscoveredMCPTool && !!t.isReadOnly,
-      );
-      if (readOnlyMcpTools.length > 0) {
-        const mcpToolsList = readOnlyMcpTools
-          .map((t) => `  <tool>\`${t.name}\` (${t.serverName})</tool>`)
-          .join('\n');
-        planModeToolsList += `\n${mcpToolsList}`;
-      }
+      planModeToolsList = allTools
+        .map((t) => {
+          if (t instanceof DiscoveredMCPTool) {
+            return `  <tool>\`${t.name}\` (${t.serverName})</tool>`;
+          }
+          return `  <tool>\`${t.name}\`</tool>`;
+        })
+        .join('\n');
     }
 
     let basePrompt: string;
@@ -168,6 +159,7 @@ export class PromptProvider {
             approvedPlan: approvedPlanPath
               ? { path: approvedPlanPath }
               : undefined,
+            taskTracker: config.isTrackerEnabled(),
           }),
           !isPlanMode,
         ),
@@ -177,9 +169,11 @@ export class PromptProvider {
             planModeToolsList,
             plansDir: config.storage.getPlansDir(),
             approvedPlanPath: config.getApprovedPlanPath(),
+            taskTracker: config.isTrackerEnabled(),
           }),
           isPlanMode,
         ),
+        taskTracker: config.isTrackerEnabled(),
         operationalGuidelines: this.withSection(
           'operationalGuidelines',
           () => ({
@@ -240,7 +234,7 @@ export class PromptProvider {
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
-    return activeSnippets.getCompressionPrompt();
+    return activeSnippets.getCompressionPrompt(config.getApprovedPlanPath());
   }
 
   private withSection<T>(

@@ -12,6 +12,7 @@ const STATE_FILENAME = 'state.json';
 
 interface PersistentStateData {
   defaultBannerShownCount?: Record<string, number>;
+  terminalSetupPromptShown?: boolean;
   tipsShown?: number;
   hasSeenScreenReaderNudge?: boolean;
   focusUiEnabled?: boolean;

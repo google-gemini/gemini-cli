@@ -19,6 +19,7 @@ import {
   type Question,
 } from '../confirmation-bus/types.js';
 import { type ApprovalMode } from '../policy/types.js';
+import type { SubagentProgress } from '../agents/types.js';
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -64,7 +65,7 @@ export interface ToolInvocation<
    */
   execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<TResult>;
 }
@@ -91,6 +92,7 @@ export abstract class BaseToolInvocation<
     readonly _toolName?: string,
     readonly _toolDisplayName?: string,
     readonly _serverName?: string,
+    readonly _toolAnnotations?: Record<string, unknown>,
   ) {}
 
   abstract getDescription(): string;
@@ -199,6 +201,7 @@ export abstract class BaseToolInvocation<
         args: this.params as Record<string, unknown>,
       },
       serverName: this._serverName,
+      toolAnnotations: this._toolAnnotations,
     };
 
     return new Promise<'ALLOW' | 'DENY' | 'ASK_USER'>((resolve) => {
@@ -274,7 +277,7 @@ export abstract class BaseToolInvocation<
 
   abstract execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<TResult>;
 }
@@ -372,6 +375,10 @@ export abstract class DeclarativeTool<
     return READ_ONLY_KINDS.includes(this.kind);
   }
 
+  get toolAnnotations(): Record<string, unknown> | undefined {
+    return undefined;
+  }
+
   getSchema(_modelId?: string): FunctionDeclaration {
     return {
       name: this.name,
@@ -416,7 +423,7 @@ export abstract class DeclarativeTool<
   async buildAndExecute(
     params: TParams,
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<TResult> {
     const invocation = this.build(params);
@@ -682,7 +689,14 @@ export interface TodoList {
   todos: Todo[];
 }
 
-export type ToolResultDisplay = string | FileDiff | AnsiOutput | TodoList;
+export type ToolLiveOutput = string | AnsiOutput | SubagentProgress;
+
+export type ToolResultDisplay =
+  | string
+  | FileDiff
+  | AnsiOutput
+  | TodoList
+  | SubagentProgress;
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -826,6 +840,7 @@ export enum Kind {
   Search = 'search',
   Execute = 'execute',
   Think = 'think',
+  Agent = 'agent',
   Fetch = 'fetch',
   Communicate = 'communicate',
   Plan = 'plan',
