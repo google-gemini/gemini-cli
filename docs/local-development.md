@@ -3,6 +3,55 @@
 This guide provides instructions for setting up and using local development
 features, such as tracing.
 
+## Prerequisites
+
+Before using the local development features described in this guide, ensure you
+have the following installed:
+
+- **Node.js** (version 18 or later recommended)
+- **npm** or another compatible package manager
+- **Git** for cloning and managing the repository
+- Access to a **Google account** for authentication when using the Gemini CLI
+
+You can verify your Node.js version using:
+
+```bash
+node -v
+```
+
+If the version is below 18, please upgrade Node.js before continuing.
+
+## Quick start
+
+Follow these steps to quickly start the Gemini CLI in a local development
+environment.
+
+Clone the repository:
+
+```bash
+git clone https://github.com/google-gemini/gemini-cli.git
+```
+
+Navigate into the project directory:
+
+```bash
+cd gemini-cli
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start the Gemini CLI:
+
+```bash
+npm start
+```
+
+Once started, you can interact with the CLI and begin testing commands locally.
+
 ## Tracing
 
 Traces are OpenTelemetry (OTel) records that help you debug your code by
@@ -132,3 +181,34 @@ In this example:
 - `metadata.attributes`: (Optional) A record of custom attributes to add to the
   span.
 - `metadata.error`: (Optional) An error object to record if the operation fails.
+
+## Troubleshooting
+
+If you encounter issues while running the local development setup, try the
+following solutions.
+
+**CLI does not start**
+
+Ensure dependencies are installed correctly:
+
+```bash
+npm install
+```
+
+**Node.js version issues**
+
+Verify that Node.js version 18 or higher is installed:
+
+```bash
+node -v
+```
+
+**Telemetry server not starting**
+
+Make sure the telemetry command is run from the project root directory:
+
+```bash
+npm run telemetry -- --target=genkit
+```
+
+Restarting the terminal or reinstalling dependencies may also resolve the issue.
