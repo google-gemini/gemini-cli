@@ -638,6 +638,7 @@ export interface ConfigParameters {
     adminSkillsEnabled?: boolean;
     agents?: AgentSettings;
   }>;
+  approvalModeExplicit?: boolean;
   enableConseca?: boolean;
   billing?: {
     overageStrategy?: OverageStrategy;
@@ -856,6 +857,7 @@ export class Config implements McpContext, AgentLoopContext {
   private lastModeSwitchTime: number = performance.now();
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
+  private readonly approvalModeFromCli: boolean;
 
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
@@ -977,6 +979,7 @@ export class Config implements McpContext, AgentLoopContext {
     };
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.acpMode = params.acpMode ?? false;
+    this.approvalModeFromCli = params.approvalModeExplicit ?? false;
     this.listSessions = params.listSessions ?? false;
     this.deleteSession = params.deleteSession;
     this.listExtensions = params.listExtensions ?? false;
@@ -2216,6 +2219,15 @@ export class Config implements McpContext, AgentLoopContext {
 
   getDisableAlwaysAllow(): boolean {
     return this.disableAlwaysAllow;
+  }
+
+  /**
+   * Returns true if the approval mode was explicitly set via a CLI flag
+   * (e.g. --yolo, --approval-mode). When true, IDE-pushed mode changes
+   * should not overwrite the user's explicit intent.
+   */
+  isApprovalModeExplicit(): boolean {
+    return this.approvalModeFromCli;
   }
 
   getRawOutput(): boolean {
