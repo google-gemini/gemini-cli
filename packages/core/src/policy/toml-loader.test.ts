@@ -17,8 +17,8 @@ import { fileURLToPath } from 'node:url';
 import {
   loadPoliciesFromToml,
   validateMcpPolicyToolNames,
+  type PolicyLoadResult,
 } from './toml-loader.js';
-import type { PolicyLoadResult } from './toml-loader.js';
 import { PolicyEngine } from './policy-engine.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -129,7 +129,7 @@ priority = 10
 `);
 
       expect(result.rules).toHaveLength(1);
-      expect(result.rules[0].toolName).toBe('*__*');
+      expect(result.rules[0].toolName).toBe('mcp_*');
       expect(result.rules[0].decision).toBe(PolicyDecision.ASK_USER);
       expect(result.errors).toHaveLength(0);
     });
@@ -144,7 +144,7 @@ priority = 10
 `);
 
       expect(result.rules).toHaveLength(1);
-      expect(result.rules[0].toolName).toBe('*__search');
+      expect(result.rules[0].toolName).toBe('mcp_*_search');
       expect(result.errors).toHaveLength(0);
     });
 
@@ -215,8 +215,12 @@ priority = 100
 `);
 
       expect(result.rules).toHaveLength(2);
-      expect(result.rules[0].toolName).toBe('google-workspace__calendar.list');
-      expect(result.rules[1].toolName).toBe('google-workspace__calendar.get');
+      expect(result.rules[0].toolName).toBe(
+        'mcp_google-workspace_calendar.list',
+      );
+      expect(result.rules[1].toolName).toBe(
+        'mcp_google-workspace_calendar.get',
+      );
       expect(result.errors).toHaveLength(0);
     });
 
@@ -678,12 +682,12 @@ priority = 100
     it('should not warn for MCP format tool names', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
-toolName = "my-server__my-tool"
+toolName = "mcp_my-server_my-tool"
 decision = "allow"
 priority = 100
 
 [[rule]]
-toolName = "my-server__*"
+toolName = "mcp_my-server_*"
 decision = "allow"
 priority = 100
 `);
@@ -822,7 +826,7 @@ priority = 100
           annotationRule,
           'Should have loaded a rule with toolAnnotations',
         ).toBeDefined();
-        expect(annotationRule!.toolName).toBe('*__*');
+        expect(annotationRule!.toolName).toBe('mcp_*');
         expect(annotationRule!.toolAnnotations).toEqual({
           readOnlyHint: true,
         });
@@ -863,7 +867,7 @@ priority = 100
 
         // 4. MCP tool WITHOUT annotations should be DENIED
         const denyResult = await engine.check(
-          { name: 'github__create_issue' },
+          { name: 'mcp_github_create_issue' },
           'github',
           undefined,
         );
@@ -874,7 +878,7 @@ priority = 100
 
         // 5. MCP tool with readOnlyHint=false should also be DENIED
         const denyResult2 = await engine.check(
-          { name: 'github__delete_issue' },
+          { name: 'mcp_github_delete_issue' },
           'github',
           { readOnlyHint: false },
         );
@@ -883,9 +887,9 @@ priority = 100
           'MCP tool with readOnlyHint=false should be DENIED in Plan Mode',
         ).toBe(PolicyDecision.DENY);
 
-        // 6. Test with qualified tool name format (server__tool) but no separate serverName
+        // 6. Test with qualified tool name format (mcp_server_tool) but no separate serverName
         const qualifiedResult = await engine.check(
-          { name: 'github__list_repos' },
+          { name: 'mcp_github_list_repos' },
           undefined,
           { readOnlyHint: true },
         );
@@ -909,7 +913,7 @@ priority = 100
       }
     });
 
-    it('should override default subagent rules when in Plan Mode', async () => {
+    it('should override default subagent rules when in Plan Mode for unknown subagents', async () => {
       const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
       const fileContent = await fs.readFile(planTomlPath, 'utf-8');
       const tempPolicyDir = await fs.mkdtemp(
@@ -931,9 +935,9 @@ priority = 100
           approvalMode: ApprovalMode.PLAN,
         });
 
-        // 3. Simulate a Subagent being registered (Dynamic Rule)
+        // 3. Simulate an unknown Subagent being registered (Dynamic Rule)
         engine.addRule({
-          toolName: 'codebase_investigator',
+          toolName: 'unknown_subagent',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
           source: 'AgentRegistry (Dynamic)',
@@ -942,13 +946,13 @@ priority = 100
         // 4. Verify Behavior:
         // The Plan Mode "Catch-All Deny" (from plan.toml) should override the Subagent Allow
         const checkResult = await engine.check(
-          { name: 'codebase_investigator' },
+          { name: 'unknown_subagent' },
           undefined,
         );
 
         expect(
           checkResult.decision,
-          'Subagent should be DENIED in Plan Mode',
+          'Unknown subagent should be DENIED in Plan Mode',
         ).toBe(PolicyDecision.DENY);
 
         // 5. Verify Explicit Allows still work
@@ -957,6 +961,25 @@ priority = 100
         expect(
           readResult.decision,
           'Explicitly allowed tools (read_file) should be ALLOWED in Plan Mode',
+        ).toBe(PolicyDecision.ALLOW);
+
+        // 6. Verify Built-in Research Subagents are ALLOWED
+        const codebaseResult = await engine.check(
+          { name: 'codebase_investigator' },
+          undefined,
+        );
+        expect(
+          codebaseResult.decision,
+          'codebase_investigator should be ALLOWED in Plan Mode',
+        ).toBe(PolicyDecision.ALLOW);
+
+        const cliHelpResult = await engine.check(
+          { name: 'cli_help' },
+          undefined,
+        );
+        expect(
+          cliHelpResult.decision,
+          'cli_help should be ALLOWED in Plan Mode',
         ).toBe(PolicyDecision.ALLOW);
       } finally {
         await fs.rm(tempPolicyDir, { recursive: true, force: true });
@@ -971,7 +994,8 @@ priority = 100
         ['people.getMe', 'calendar.list', 'calendar.get'],
         [
           {
-            toolName: 'google-workspace__people.getxMe',
+            toolName: 'mcp_google-workspace_people.getxMe',
+            mcpName: 'google-workspace',
             source: 'User: workspace.toml',
           },
         ],
@@ -988,8 +1012,14 @@ priority = 100
         'google-workspace',
         ['people.getMe', 'calendar.list'],
         [
-          { toolName: 'google-workspace__people.getMe' },
-          { toolName: 'google-workspace__calendar.list' },
+          {
+            toolName: 'mcp_google-workspace_people.getMe',
+            mcpName: 'google-workspace',
+          },
+          {
+            toolName: 'mcp_google-workspace_calendar.list',
+            mcpName: 'google-workspace',
+          },
         ],
       );
 
@@ -1000,7 +1030,7 @@ priority = 100
       const warnings = validateMcpPolicyToolNames(
         'my-server',
         ['tool1', 'tool2'],
-        [{ toolName: 'my-server__*' }],
+        [{ toolName: 'mcp_my-server_*', mcpName: 'my-server' }],
       );
 
       expect(warnings).toHaveLength(0);
@@ -1010,7 +1040,7 @@ priority = 100
       const warnings = validateMcpPolicyToolNames(
         'server-a',
         ['tool1'],
-        [{ toolName: 'server-b__toolx' }],
+        [{ toolName: 'mcp_server-b_toolx', mcpName: 'server-b' }],
       );
 
       expect(warnings).toHaveLength(0);
@@ -1020,7 +1050,12 @@ priority = 100
       const warnings = validateMcpPolicyToolNames(
         'my-server',
         ['tool1', 'tool2'],
-        [{ toolName: 'my-server__completely_different_name' }],
+        [
+          {
+            toolName: 'mcp_my-server_completely_different_name',
+            mcpName: 'my-server',
+          },
+        ],
       );
 
       expect(warnings).toHaveLength(0);
@@ -1040,7 +1075,13 @@ priority = 100
       const warnings = validateMcpPolicyToolNames(
         'my-server',
         ['tool1'],
-        [{ toolName: 'my-server__tol1', source: 'User: custom.toml' }],
+        [
+          {
+            toolName: 'mcp_my-server_tol1',
+            mcpName: 'my-server',
+            source: 'User: custom.toml',
+          },
+        ],
       );
 
       expect(warnings).toHaveLength(1);
