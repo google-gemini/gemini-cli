@@ -109,7 +109,6 @@ export function getInstallationInfo(
     const pnpmHome = process.env['PNPM_HOME']?.replace(/\\/g, '/');
     if (
       (pnpmHome && realPath.includes(pnpmHome)) ||
-
       realPath.includes('/.pnpm/global') ||
       realPath.includes('/.local/share/pnpm') ||
       realPath.includes('/pnpm/') ||
