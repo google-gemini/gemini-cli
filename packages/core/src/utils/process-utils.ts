@@ -20,8 +20,12 @@ export interface KillOptions {
   signal?: NodeJS.Signals | number;
   /** Callback to check if the process has already exited. */
   isExited?: () => boolean;
-  /** Optional PTY object for PTY-specific kill methods. */
-  pty?: { kill: (signal?: string) => void };
+  /**
+   * Optional PTY object for PTY-specific kill methods.
+   * The optional `pid` field allows Windows to use `taskkill /pid /f /t`
+   * to terminate the full Win32 Job Object tree, preventing orphaned descendants.
+   */
+  pty?: { kill: (signal?: string) => void; pid?: number };
 }
 
 /**
@@ -39,10 +43,36 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
 
   if (isWindows) {
     if (pty) {
+      // Step 1: Signal the PTY session leader (graceful teardown).
       try {
         pty.kill();
       } catch {
         // Ignore errors for dead processes
+      }
+      // Step 2: If the PTY exposes its PID, also invoke taskkill to forcibly
+      // reap all descendant processes in the Win32 Job Object tree.
+      // This prevents nested background jobs from surviving as orphans.
+      // Uses an absolute path to prevent Untrusted Search Path (CWE-426) exploitation.
+      if (pty.pid != null) {
+        const systemRoot = process.env['SystemRoot'];
+        const taskkillPath = systemRoot
+          ? `${systemRoot}\\System32\\taskkill.exe`
+          : 'taskkill';
+        const child = cpSpawn(taskkillPath, [
+          '/pid',
+          pty.pid.toString(),
+          '/f',
+          '/t',
+        ]);
+        // Handle spawn errors gracefully — do not crash the CLI if the binary
+        // is missing or access is denied.
+        child.on('error', () => {
+          try {
+            pty.kill();
+          } catch {
+            // Ignore — PTY may already be dead
+          }
+        });
       }
     } else {
       cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
@@ -85,6 +115,13 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
           } catch {
             // Ignore
           }
+        }
+        // After PTY session-leader kill, also attempt group SIGKILL to reap
+        // any orphaned descendant processes the leader may have spawned.
+        try {
+          process.kill(-pid, 'SIGKILL');
+        } catch {
+          // Ignore — process group may already be gone
         }
       } else {
         try {

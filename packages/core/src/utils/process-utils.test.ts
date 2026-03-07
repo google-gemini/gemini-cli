@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import os from 'node:os';
-import { spawn as cpSpawn } from 'node:child_process';
+import { spawn as cpSpawn, type ChildProcess } from 'node:child_process';
 import { killProcessGroup, SIGKILL_TIMEOUT_MS } from './process-utils.js';
 
 vi.mock('node:os');
@@ -25,6 +25,7 @@ describe('process-utils', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllEnvs();
   });
 
   describe('killProcessGroup', () => {
@@ -42,14 +43,72 @@ describe('process-utils', () => {
       expect(mockProcessKill).not.toHaveBeenCalled();
     });
 
-    it('should use pty.kill() on Windows if pty is provided', async () => {
+    it('should use pty.kill() on Windows if pty is provided without a pid', async () => {
       vi.mocked(os.platform).mockReturnValue('win32');
+      // pty without pid — no taskkill invocation possible
       const mockPty = { kill: vi.fn() };
 
       await killProcessGroup({ pid: 1234, pty: mockPty });
 
       expect(mockPty.kill).toHaveBeenCalled();
       expect(mockSpawn).not.toHaveBeenCalled();
+    });
+
+    it('should invoke taskkill with full path on Windows when pty has a pid and SystemRoot is set', async () => {
+      vi.mocked(os.platform).mockReturnValue('win32');
+      vi.stubEnv('SystemRoot', 'C:\\Windows');
+      const mockPty = { kill: vi.fn(), pid: 9999 };
+      mockSpawn.mockReturnValue({ on: vi.fn() } as unknown as ChildProcess);
+
+      await killProcessGroup({ pid: 1234, pty: mockPty });
+
+      // Step 1: pty.kill() signals the session leader
+      expect(mockPty.kill).toHaveBeenCalled();
+      // Step 2: taskkill reaps the full process tree via absolute path
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'C:\\Windows\\System32\\taskkill.exe',
+        ['/pid', '9999', '/f', '/t'],
+      );
+    });
+
+    it('should invoke taskkill from PATH on Windows when pty has a pid and SystemRoot is NOT set', async () => {
+      vi.mocked(os.platform).mockReturnValue('win32');
+      vi.stubEnv('SystemRoot', '');
+      const mockPty = { kill: vi.fn(), pid: 9999 };
+      mockSpawn.mockReturnValue({ on: vi.fn() } as unknown as ChildProcess);
+
+      await killProcessGroup({ pid: 1234, pty: mockPty });
+
+      expect(mockPty.kill).toHaveBeenCalled();
+      expect(mockSpawn).toHaveBeenCalledWith('taskkill', [
+        '/pid',
+        '9999',
+        '/f',
+        '/t',
+      ]);
+    });
+
+    it('should fall back to pty.kill() on Windows if taskkill spawn emits an error', async () => {
+      vi.mocked(os.platform).mockReturnValue('win32');
+      vi.stubEnv('SystemRoot', 'C:\\Windows');
+      const mockPty = { kill: vi.fn(), pid: 9999 };
+      let errorHandler: ((err: Error) => void) | undefined;
+      mockSpawn.mockReturnValue({
+        on: vi
+          .fn()
+          .mockImplementation(
+            (event: string, handler: (err: Error) => void) => {
+              if (event === 'error') errorHandler = handler;
+            },
+          ),
+      } as unknown as ChildProcess);
+
+      await killProcessGroup({ pid: 1234, pty: mockPty });
+      // Simulate taskkill spawn failure
+      errorHandler?.(new Error('ENOENT'));
+
+      // pty.kill called twice: once for session leader, once in error fallback
+      expect(mockPty.kill).toHaveBeenCalledTimes(2);
     });
 
     it('should kill the process group on Unix with SIGKILL by default', async () => {
@@ -129,6 +188,23 @@ describe('process-utils', () => {
       await killProcessGroup({ pid: 1234, pty: mockPty });
 
       expect(mockPty.kill).toHaveBeenCalledWith('SIGKILL');
+    });
+
+    it('should attempt Unix group SIGKILL after pty fallback to reap orphaned descendants', async () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      // First call: group kill throws (ESRCH — process group leader exited)
+      mockProcessKill.mockImplementationOnce(() => {
+        throw new Error('ESRCH');
+      });
+      // Second call: orphan group reap — will succeed
+      const mockPty = { kill: vi.fn() };
+
+      await killProcessGroup({ pid: 1234, pty: mockPty });
+
+      // pty.kill was called for the session leader
+      expect(mockPty.kill).toHaveBeenCalledWith('SIGKILL');
+      // process.kill(-pid) was also attempted to reap orphaned descendants
+      expect(mockProcessKill).toHaveBeenCalledWith(-1234, 'SIGKILL');
     });
   });
 });
