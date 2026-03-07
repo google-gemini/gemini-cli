@@ -24,6 +24,7 @@ import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   isAutoModel,
   isGemini3Model,
   resolveModel,
@@ -60,7 +61,10 @@ export function resolvePolicyChain(
   const isAutoPreferred = preferredModel ? isAutoModel(preferredModel) : false;
   const isAutoConfigured = isAutoModel(configuredModel);
 
-  if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
+  if (
+    resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL ||
+    resolvedModel === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL
+  ) {
     chain = getFlashLitePolicyChain();
   } else if (
     isGemini3Model(resolvedModel) ||

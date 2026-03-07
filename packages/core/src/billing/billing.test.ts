@@ -239,6 +239,12 @@ describe('billing', () => {
       expect(isOverageEligibleModel('gemini-3-flash-preview')).toBe(true);
     });
 
+    it('should return true for gemini-3.1-flash-lite-preview', () => {
+      expect(isOverageEligibleModel('gemini-3.1-flash-lite-preview')).toBe(
+        true,
+      );
+    });
+
     it('should return false for gemini-2.5-pro', () => {
       expect(isOverageEligibleModel('gemini-2.5-pro')).toBe(false);
     });
