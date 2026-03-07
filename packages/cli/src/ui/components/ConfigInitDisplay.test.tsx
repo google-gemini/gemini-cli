@@ -84,8 +84,9 @@ describe('ConfigInitDisplay', () => {
 
     // Wait for the UI to update
     await waitFor(() => {
-      expect(lastFrame()).toMatchSnapshot();
+      expect(lastFrame()).toContain('server2');
     });
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('truncates list of waiting servers if too many', async () => {
@@ -120,8 +121,9 @@ describe('ConfigInitDisplay', () => {
     });
 
     await waitFor(() => {
-      expect(lastFrame()).toMatchSnapshot();
+      expect(lastFrame()).toContain('s1');
     });
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('handles empty clients map', async () => {
@@ -147,7 +149,8 @@ describe('ConfigInitDisplay', () => {
     }
 
     await waitFor(() => {
-      expect(lastFrame()).toMatchSnapshot();
+      expect(lastFrame()).toContain('Initializing...');
     });
+    expect(lastFrame()).toMatchSnapshot();
   });
 });
