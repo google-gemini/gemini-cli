@@ -234,7 +234,7 @@ supports multiple authentication methods:
 | ------------------------- | --------------------------------------------------- | ------------------------- |
 | Login with Google (OAuth) | _(browser flow)_                                    | Free tier with 60 req/min |
 | Gemini API key            | `GEMINI_API_KEY`                                    | Direct API access         |
-| Vertex AI                 | `GOOGLE_API_KEY` + `GOOGLE_GENAI_USE_VERTEXAI=true` | Enterprise                |
+| Vertex AI                 | `GOOGLE_GENAI_USE_VERTEXAI=true` + `GOOGLE_API_KEY` (or `GOOGLE_CLOUD_PROJECT` & `_LOCATION`) | Enterprise                |
 | Cloud Shell / ADC         | `CLOUD_SHELL=true`                                  | Google Cloud environments |
 
 The `createContentGenerator()` function selects the appropriate API client based
