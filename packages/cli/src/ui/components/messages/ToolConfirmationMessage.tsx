@@ -14,6 +14,7 @@ import {
   type Config,
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
+  type EditorType,
   hasRedirection,
   debugLogger,
 } from '@google/gemini-cli-core';
@@ -30,15 +31,10 @@ import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
 import { formatCommand } from '../../utils/keybindingUtils.js';
-import {
-  REDIRECTION_WARNING_NOTE_LABEL,
-  REDIRECTION_WARNING_NOTE_TEXT,
-  REDIRECTION_WARNING_TIP_LABEL,
-  REDIRECTION_WARNING_TIP_TEXT,
-} from '../../textConstants.js';
 import { AskUserDialog } from '../AskUserDialog.js';
 import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
 import { WarningMessage } from './WarningMessage.js';
+import { colorizeCode } from '../../utils/CodeColorizer.js';
 import {
   getDeceptiveUrlDetails,
   toUnicodeUrl,
@@ -49,10 +45,16 @@ export interface ToolConfirmationMessageProps {
   callId: string;
   confirmationDetails: SerializableConfirmationDetails;
   config: Config;
+  getPreferredEditor: () => EditorType | undefined;
   isFocused?: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
 }
+
+const REDIRECTION_WARNING_NOTE_LABEL = 'Note: ';
+const REDIRECTION_WARNING_NOTE_TEXT =
+  'Command contains redirection which can be undesirable.';
+const REDIRECTION_WARNING_TIP_LABEL = 'Tip:  '; // Padded to align with "Note: "
 
 export const ToolConfirmationMessage: React.FC<
   ToolConfirmationMessageProps
@@ -60,6 +62,7 @@ export const ToolConfirmationMessage: React.FC<
   callId,
   confirmationDetails,
   config,
+  getPreferredEditor,
   isFocused = true,
   availableTerminalHeight,
   terminalWidth,
@@ -424,6 +427,7 @@ export const ToolConfirmationMessage: React.FC<
       bodyContent = (
         <ExitPlanModeDialog
           planPath={confirmationDetails.planPath}
+          getPreferredEditor={getPreferredEditor}
           onApprove={(approvalMode) => {
             handleConfirm(ToolConfirmationOutcome.ProceedOnce, {
               approved: true,
@@ -498,12 +502,12 @@ export const ToolConfirmationMessage: React.FC<
       if (containsRedirection) {
         // Calculate lines needed for Note and Tip
         const safeWidth = Math.max(terminalWidth, 1);
+        const tipText = `Toggle auto-edit (${formatCommand(Command.CYCLE_APPROVAL_MODE)}) to allow redirection in the future.`;
+
         const noteLength =
           REDIRECTION_WARNING_NOTE_LABEL.length +
           REDIRECTION_WARNING_NOTE_TEXT.length;
-        const tipLength =
-          REDIRECTION_WARNING_TIP_LABEL.length +
-          REDIRECTION_WARNING_TIP_TEXT.length;
+        const tipLength = REDIRECTION_WARNING_TIP_LABEL.length + tipText.length;
 
         const noteLines = Math.ceil(noteLength / safeWidth);
         const tipLines = Math.ceil(tipLength / safeWidth);
@@ -529,7 +533,7 @@ export const ToolConfirmationMessage: React.FC<
             <Box>
               <Text color={theme.border.default}>
                 <Text bold>{REDIRECTION_WARNING_TIP_LABEL}</Text>
-                {REDIRECTION_WARNING_TIP_TEXT}
+                {tipText}
               </Text>
             </Box>
           </>
@@ -544,9 +548,19 @@ export const ToolConfirmationMessage: React.FC<
           >
             <Box flexDirection="column">
               {commandsToDisplay.map((cmd, idx) => (
-                <Text key={idx} color={theme.text.link}>
-                  {sanitizeForDisplay(cmd)}
-                </Text>
+                <Box
+                  key={idx}
+                  flexDirection="column"
+                  paddingBottom={idx < commandsToDisplay.length - 1 ? 1 : 0}
+                >
+                  {colorizeCode({
+                    code: cmd,
+                    language: 'bash',
+                    maxWidth: Math.max(terminalWidth, 1),
+                    settings,
+                    hideLineNumbers: true,
+                  })}
+                </Box>
               ))}
             </Box>
           </MaxSizedBox>
@@ -629,6 +643,8 @@ export const ToolConfirmationMessage: React.FC<
     hasMcpToolDetails,
     mcpToolDetailsText,
     expandDetailsHintKey,
+    getPreferredEditor,
+    settings,
   ]);
 
   const bodyOverflowDirection: 'top' | 'bottom' =

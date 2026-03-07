@@ -52,6 +52,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -78,6 +79,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -101,6 +103,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -131,6 +134,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -161,6 +165,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -190,6 +195,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -219,6 +225,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -231,6 +238,37 @@ describe('ToolConfirmationMessage', () => {
     expect(output).toContain('whoami');
     expect(output).toMatchSnapshot();
     unmount();
+  });
+
+  it('should render multiline shell scripts with correct newlines and syntax highlighting (SVG snapshot)', async () => {
+    const confirmationDetails: SerializableConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Multiline Script',
+      command: 'echo "hello"\nfor i in 1 2 3; do\n  echo $i\ndone',
+      rootCommand: 'echo',
+      rootCommands: ['echo'],
+    };
+
+    const result = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        getPreferredEditor={vi.fn()}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+    await result.waitUntilReady();
+
+    const output = result.lastFrame();
+    expect(output).toContain('echo "hello"');
+    expect(output).toContain('for i in 1 2 3; do');
+    expect(output).toContain('echo $i');
+    expect(output).toContain('done');
+
+    await expect(result).toMatchSvgSnapshot();
+    result.unmount();
   });
 
   describe('with folder trust', () => {
@@ -300,6 +338,7 @@ describe('ToolConfirmationMessage', () => {
             callId="test-call-id"
             confirmationDetails={details}
             config={mockConfig}
+            getPreferredEditor={vi.fn()}
             availableTerminalHeight={30}
             terminalWidth={80}
           />,
@@ -321,6 +360,7 @@ describe('ToolConfirmationMessage', () => {
             callId="test-call-id"
             confirmationDetails={details}
             config={mockConfig}
+            getPreferredEditor={vi.fn()}
             availableTerminalHeight={30}
             terminalWidth={80}
           />,
@@ -355,6 +395,7 @@ describe('ToolConfirmationMessage', () => {
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
           config={mockConfig}
+          getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
         />,
@@ -381,6 +422,7 @@ describe('ToolConfirmationMessage', () => {
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
           config={mockConfig}
+          getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
         />,
@@ -425,6 +467,7 @@ describe('ToolConfirmationMessage', () => {
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
           config={mockConfig}
+          getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
         />,
@@ -452,6 +495,7 @@ describe('ToolConfirmationMessage', () => {
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
           config={mockConfig}
+          getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
         />,
@@ -479,6 +523,7 @@ describe('ToolConfirmationMessage', () => {
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
           config={mockConfig}
+          getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
         />,
@@ -505,6 +550,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -550,6 +596,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -581,6 +628,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,

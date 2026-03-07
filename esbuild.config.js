@@ -82,12 +82,15 @@ const commonAliases = {
 const cliConfig = {
   ...baseConfig,
   banner: {
-    js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
+    js: `const require = (await import('node:module')).createRequire(import.meta.url); globalThis.__filename = (await import('node:url')).fileURLToPath(import.meta.url); globalThis.__dirname = (await import('node:path')).dirname(globalThis.__filename);`,
   },
   entryPoints: ['packages/cli/index.ts'],
   outfile: 'bundle/gemini.js',
   define: {
     'process.env.CLI_VERSION': JSON.stringify(pkg.version),
+    'process.env.GEMINI_SANDBOX_IMAGE_DEFAULT': JSON.stringify(
+      pkg.config?.sandboxImageUri,
+    ),
   },
   plugins: createWasmPlugins(),
   alias: {
@@ -100,7 +103,7 @@ const cliConfig = {
 const a2aServerConfig = {
   ...baseConfig,
   banner: {
-    js: `const require = (await import('module')).createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
+    js: `const require = (await import('node:module')).createRequire(import.meta.url); globalThis.__filename = (await import('node:url')).fileURLToPath(import.meta.url); globalThis.__dirname = (await import('node:path')).dirname(globalThis.__filename);`,
   },
   entryPoints: ['packages/a2a-server/src/http/server.ts'],
   outfile: 'packages/a2a-server/dist/a2a-server.mjs',
