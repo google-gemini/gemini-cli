@@ -6,7 +6,7 @@
 
 import { render } from '../../test-utils/render.js';
 import { GeminiRespondingSpinner } from './GeminiRespondingSpinner.js';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { Text, useIsScreenReaderEnabled } from 'ink';
 import { StreamingState } from '../types.js';
