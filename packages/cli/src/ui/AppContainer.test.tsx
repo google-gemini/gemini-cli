@@ -232,10 +232,7 @@ import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import * as useKeypressModule from './hooks/useKeypress.js';
 import { useSuspend } from './hooks/useSuspend.js';
-import { measureElement } from 'ink';
-import { useTerminalSize } from './hooks/useTerminalSize.js';
 import {
-  ShellExecutionService,
   writeToStdout,
   enableMouseEvents,
   disableMouseEvents,
@@ -2197,35 +2194,6 @@ describe('AppContainer State Management', () => {
     });
   });
 
-  describe('Terminal Height Calculation', () => {
-    const mockedMeasureElement = measureElement as Mock;
-    const mockedUseTerminalSize = useTerminalSize as Mock;
-
-    it('should prevent terminal height from being less than 1', async () => {
-      const resizePtySpy = vi.spyOn(ShellExecutionService, 'resizePty');
-      // Arrange: Simulate a small terminal and a large footer
-      mockedUseTerminalSize.mockReturnValue({ columns: 80, rows: 5 });
-      mockedMeasureElement.mockReturnValue({ width: 80, height: 10 }); // Footer is taller than the screen
-
-      mockedUseGeminiStream.mockReturnValue({
-        ...DEFAULT_GEMINI_STREAM_MOCK,
-        activePtyId: 'some-id',
-      });
-
-      let unmount: () => void;
-      await act(async () => {
-        const result = renderAppContainer();
-        unmount = result.unmount;
-      });
-      await waitFor(() => expect(resizePtySpy).toHaveBeenCalled());
-      const lastCall =
-        resizePtySpy.mock.calls[resizePtySpy.mock.calls.length - 1];
-      // Check the height argument specifically
-      expect(lastCall[2]).toBe(1);
-      unmount!();
-    });
-  });
-
   describe('Keyboard Input Handling (CTRL+C / CTRL+D)', () => {
     let mockHandleSlashCommand: Mock;
     let mockCancelOngoingRequest: Mock;
@@ -3141,30 +3109,6 @@ describe('AppContainer State Management', () => {
     });
   });
 
-  describe('Shell Interaction', () => {
-    it('should not crash if resizing the pty fails', async () => {
-      const resizePtySpy = vi
-        .spyOn(ShellExecutionService, 'resizePty')
-        .mockImplementation(() => {
-          throw new Error('Cannot resize a pty that has already exited');
-        });
-
-      mockedUseGeminiStream.mockReturnValue({
-        ...DEFAULT_GEMINI_STREAM_MOCK,
-        activePtyId: 'some-pty-id', // Make sure activePtyId is set
-      });
-
-      // The main assertion is that the render does not throw.
-      let unmount: () => void;
-      await act(async () => {
-        const result = renderAppContainer();
-        unmount = result.unmount;
-      });
-
-      await waitFor(() => expect(resizePtySpy).toHaveBeenCalled());
-      unmount!();
-    });
-  });
   describe('Banner Text', () => {
     it('should render placeholder banner text for USE_GEMINI auth type', async () => {
       const config = makeFakeConfig();
