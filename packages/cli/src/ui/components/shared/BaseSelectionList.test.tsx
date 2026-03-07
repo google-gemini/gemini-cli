@@ -126,13 +126,16 @@ describe('BaseSelectionList', () => {
     });
 
     it('should render the selection indicator (● or space) and layout', async () => {
-      const { lastFrame, unmount } = await renderComponent({}, 0);
+      const result = await renderComponent({}, 0);
+      const { lastFrame, unmount } = result;
       const output = lastFrame();
 
       // Use regex to assert the structure: Indicator + Whitespace + Number + Label
       expect(output).toMatch(/●\s+1\.\s+Item A/);
       expect(output).toMatch(/\s+2\.\s+Item B/);
       expect(output).toMatch(/\s+3\.\s+Item C/);
+
+      await expect(result).toMatchSvgSnapshot();
       unmount();
     });
 
@@ -540,18 +543,14 @@ describe('BaseSelectionList', () => {
         rows: 40,
       });
 
-      const { lastFrame, unmount, waitUntilReady } = await renderComponent(
-        {},
-        0,
-      ); // Item A selected
+      const result = await renderComponent({}, 0); // Item A selected
+      const { lastFrame, unmount, waitUntilReady } = result;
       await waitUntilReady();
 
       const output = lastFrame();
       expect(output).toContain('Item A');
 
-      // Since we can't easily inspect Box props from lastFrame(),
-      // this test confirms it doesn't crash and renders correctly.
-      // In a real scenario, we'd use a custom renderer or inspect the tree if possible.
+      await expect(result).toMatchSvgSnapshot();
       unmount();
     });
 

@@ -1,5 +1,17 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`BaseSelectionList > Rendering and Structure > should render the selection indicator (● or space) and layout 1`] = `
+"● 1. Item A
+  2. Item B
+  3. Item C"
+`;
+
+exports[`BaseSelectionList > Scroll Arrows (showScrollArrows) > should apply full-width highlight and offset when horizontally shifted 1`] = `
+"● 1. Item A
+  2. Item B
+  3. Item C"
+`;
+
 exports[`BaseSelectionList > Scroll Arrows (showScrollArrows) > should not show arrows when list fits entirely 1`] = `
 "● 1. Item A
   2. Item B

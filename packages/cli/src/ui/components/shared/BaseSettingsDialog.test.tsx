@@ -132,13 +132,16 @@ describe('BaseSettingsDialog', () => {
     });
 
     it('should render all items', async () => {
-      const { lastFrame, unmount } = await renderDialog();
+      const result = await renderDialog();
+      const { lastFrame, unmount } = result;
       const frame = lastFrame();
 
       expect(frame).toContain('Boolean Setting');
       expect(frame).toContain('String Setting');
       expect(frame).toContain('Number Setting');
       expect(frame).toContain('Enum Setting');
+
+      await expect(result).toMatchSvgSnapshot();
       unmount();
     });
 
@@ -201,8 +204,8 @@ describe('BaseSettingsDialog', () => {
     });
 
     it('should navigate down with arrow key', async () => {
-      const { lastFrame, stdin, waitUntilReady, unmount } =
-        await renderDialog();
+      const result = await renderDialog();
+      const { lastFrame, stdin, waitUntilReady, unmount } = result;
 
       // Initially first item is active (indicated by bullet point)
       const initialFrame = lastFrame();
@@ -215,10 +218,11 @@ describe('BaseSettingsDialog', () => {
       await waitUntilReady();
 
       // Navigation should move to next item
-      await waitFor(() => {
+      await waitFor(async () => {
         const frame = lastFrame();
         // The active indicator should now be on a different row
         expect(frame).toContain('String Setting');
+        await expect(result).toMatchSvgSnapshot();
       });
       unmount();
     });
