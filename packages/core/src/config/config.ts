@@ -2487,7 +2487,7 @@ export class Config implements McpContext {
   }
 
   isClearContextOnPlanApprovalEnabled(): boolean {
-    return this.getClearContextOnPlanApproval() ?? true;
+    return this.getClearContextOnPlanApproval() ?? false;
   }
 
   setClearContextOnPlanApprovalSessionOverride(value: boolean): void {

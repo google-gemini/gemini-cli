@@ -3117,3 +3117,42 @@ describe('Model Persistence Bug Fix (#19864)', () => {
     expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
   });
 });
+
+describe('isClearContextOnPlanApprovalEnabled', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+  };
+
+  it('should return false by default when no setting or override is present', () => {
+    const config = new Config(baseParams);
+    expect(config.isClearContextOnPlanApprovalEnabled()).toBe(false);
+  });
+
+  it('should return true when a session override is set to true', () => {
+    const config = new Config(baseParams);
+    config.setClearContextOnPlanApprovalSessionOverride(true);
+    expect(config.isClearContextOnPlanApprovalEnabled()).toBe(true);
+  });
+
+  it('should return false when a session override is set to false', () => {
+    const config = new Config(baseParams);
+    config.setClearContextOnPlanApprovalSessionOverride(false);
+    expect(config.isClearContextOnPlanApprovalEnabled()).toBe(false);
+  });
+
+  it('should prefer session override over persistent setting', () => {
+    const config = new Config({
+      ...baseParams,
+      planSettings: {
+        clearContextOnApproval: true,
+      },
+    } as unknown as ConfigParameters);
+    expect(config.isClearContextOnPlanApprovalEnabled()).toBe(true);
+    config.setClearContextOnPlanApprovalSessionOverride(false);
+    expect(config.isClearContextOnPlanApprovalEnabled()).toBe(false);
+  });
+});

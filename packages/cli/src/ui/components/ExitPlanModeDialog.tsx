@@ -169,7 +169,17 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   const [step, setStep] = useState<ApprovalStep>(ApprovalStep.PLAN_APPROVAL);
   const [selectedApprovalMode, setSelectedApprovalMode] =
     useState<ApprovalMode | null>(null);
+  const [pendingApproval, setPendingApproval] = useState<{
+    mode: ApprovalMode;
+    clear: boolean;
+  } | null>(null);
   const { setSetting } = useSettingsStore();
+
+  useEffect(() => {
+    if (pendingApproval) {
+      onApprove(pendingApproval.mode, pendingApproval.clear);
+    }
+  }, [pendingApproval, onApprove]);
 
   const handleOpenEditor = useCallback(async () => {
     try {
@@ -356,11 +366,10 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
             }
 
             if (selectedApprovalMode) {
-              // Wrap in setTimeout to avoid 'Maximum update depth exceeded'
-              // when setSetting triggers a re-render of the parent.
-              setTimeout(() => {
-                onApprove(selectedApprovalMode, clearConversation);
-              }, 0);
+              setPendingApproval({
+                mode: selectedApprovalMode,
+                clear: clearConversation,
+              });
             }
           }}
           onCancel={() => setStep(ApprovalStep.PLAN_APPROVAL)}

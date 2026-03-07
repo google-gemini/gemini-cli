@@ -401,7 +401,9 @@ export const AppContainer = (props: AppContainerProps) => {
   const [planModeUIHistoryStartIndex, setPlanModeUIHistoryStartIndex] =
     useState<number | null>(() =>
       // Initialize if starting in PLAN mode (e.g. session resume)
-      config.getApprovalMode() === ApprovalMode.PLAN ? 0 : null,
+      config.getApprovalMode() === ApprovalMode.PLAN
+        ? config.getPlanModeHistoryStartIndex()
+        : null,
     );
 
   useEffect(() => {
@@ -411,7 +413,7 @@ export const AppContainer = (props: AppContainerProps) => {
         // This ensures that if we are already in PLAN mode and another
         // event fires, we don't accidentally move the start index forward.
         setPlanModeUIHistoryStartIndex((prev) =>
-          prev === null ? historyManager.history.length : prev,
+          prev === null ? config.getPlanModeHistoryStartIndex() : prev,
         );
       } else {
         // Reset the index when leaving PLAN mode
@@ -422,7 +424,7 @@ export const AppContainer = (props: AppContainerProps) => {
     return () => {
       coreEvents.off(CoreEvent.ApprovalModeChanged, handleApprovalModeChanged);
     };
-  }, [historyManager.history.length]);
+  }, [config]);
 
   const logger = useLogger(config.storage);
   const { inputHistory, addInput, initializeFromLogger } =

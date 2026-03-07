@@ -220,13 +220,28 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
           const history = geminiClient.getHistory();
           const startIndex = this.config.getPlanModeHistoryStartIndex();
 
-          // Find the first user message at or after the start index.
-          // This represents the beginning of the current planning phase.
+          // Find the user message that initiated the plan mode.
           let planningUserIndex = -1;
-          for (let i = startIndex; i < history.length - 1; i++) {
-            if (history[i].role === 'user') {
-              planningUserIndex = i;
-              break;
+
+          // If the message exactly at startIndex is a user message, then plan mode
+          // was initiated via a UI/CLI command before the message was added to history.
+          if (
+            startIndex < history.length &&
+            history[startIndex].role === 'user'
+          ) {
+            planningUserIndex = startIndex;
+          } else {
+            // Otherwise, Plan mode was initiated via the `enter_plan_mode` tool.
+            // The initiating user message is the last user message before startIndex.
+            for (
+              let i = Math.min(startIndex, history.length - 1);
+              i >= 0;
+              i--
+            ) {
+              if (history[i].role === 'user') {
+                planningUserIndex = i;
+                break;
+              }
             }
           }
 
