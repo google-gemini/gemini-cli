@@ -14,6 +14,7 @@ export interface StickyHeaderProps {
   isFirst: boolean;
   borderColor: string;
   borderDimColor: boolean;
+  hideFrame?: boolean;
   containerRef?: React.RefObject<DOMElement | null>;
 }
 
@@ -23,6 +24,7 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
   isFirst,
   borderColor,
   borderDimColor,
+  hideFrame = false,
   containerRef,
 }) => (
   <Box
@@ -33,39 +35,41 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
     width={width}
     stickyChildren={
       <Box
-        borderStyle="round"
+        borderStyle={hideFrame ? undefined : 'round'}
         flexDirection="column"
         width={width}
         opaque
         borderColor={borderColor}
         borderDimColor={borderDimColor}
         borderBottom={false}
-        borderTop={isFirst}
+        borderTop={hideFrame ? false : isFirst}
         paddingTop={isFirst ? 0 : 1}
       >
         <Box paddingX={1}>{children}</Box>
-        {/* Dark border to separate header from content. */}
-        <Box
-          width={width - 2}
-          borderColor={theme.ui.dark}
-          borderStyle="single"
-          borderTop={false}
-          borderBottom={true}
-          borderLeft={false}
-          borderRight={false}
-        ></Box>
+        {!hideFrame && (
+          // Dark border to separate header from content.
+          <Box
+            width={width - 2}
+            borderColor={theme.ui.dark}
+            borderStyle="single"
+            borderTop={false}
+            borderBottom={true}
+            borderLeft={false}
+            borderRight={false}
+          ></Box>
+        )}
       </Box>
     }
   >
     <Box
-      borderStyle="round"
+      borderStyle={hideFrame ? undefined : 'round'}
       width={width}
       borderColor={borderColor}
       borderDimColor={borderDimColor}
       borderBottom={false}
-      borderTop={isFirst}
-      borderLeft={true}
-      borderRight={true}
+      borderTop={hideFrame ? false : isFirst}
+      borderLeft={!hideFrame}
+      borderRight={!hideFrame}
       paddingX={1}
       paddingBottom={1}
       paddingTop={isFirst ? 0 : 1}

@@ -38,6 +38,7 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   embeddedShellFocused?: boolean;
   ptyId?: number;
   config?: Config;
+  hideFrame?: boolean;
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -60,6 +61,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   originalRequestName,
   progress,
   progressTotal,
+  hideFrame = false,
 }) => {
   const isThisShellFocused = checkIsShellFocused(
     name,
@@ -87,6 +89,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         isFirst={isFirst}
         borderColor={borderColor}
         borderDimColor={borderDimColor}
+        hideFrame={hideFrame}
       >
         <ToolStatusIndicator
           status={status}
@@ -108,13 +111,13 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
       </StickyHeader>
       <Box
         width={terminalWidth}
-        borderStyle="round"
+        borderStyle={hideFrame ? undefined : 'round'}
         borderColor={borderColor}
         borderDimColor={borderDimColor}
         borderTop={false}
         borderBottom={false}
-        borderLeft={true}
-        borderRight={true}
+        borderLeft={!hideFrame}
+        borderRight={!hideFrame}
         paddingX={1}
         flexDirection="column"
       >

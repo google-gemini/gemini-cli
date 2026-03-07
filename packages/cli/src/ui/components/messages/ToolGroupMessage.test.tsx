@@ -95,6 +95,35 @@ describe('<ToolGroupMessage />', () => {
       unmount();
     });
 
+    it('hides tool frames in alternate buffer copy mode', async () => {
+      const toolCalls = [createToolCall()];
+      const item = createItem(toolCalls);
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          settings: fullVerbositySettings,
+          useAlternateBuffer: true,
+          uiState: {
+            copyModeEnabled: true,
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
+          },
+        },
+      );
+
+      await waitUntilReady();
+      const output = lastFrame();
+      expect(output).toContain('test-tool');
+      expect(output).not.toContain('│');
+      expect(output).not.toContain('─');
+      unmount();
+    });
+
     it('hides confirming tools (standard behavior)', async () => {
       const toolCalls = [
         createToolCall({
