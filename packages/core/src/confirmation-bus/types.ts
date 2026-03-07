@@ -21,6 +21,10 @@ export enum MessageBusType {
   TOOL_CALLS_UPDATE = 'tool-calls-update',
   ASK_USER_REQUEST = 'ask-user-request',
   ASK_USER_RESPONSE = 'ask-user-response',
+  /** Scheduler → UI: pause before executing a tool in step-through mode. */
+  STEP_THROUGH_REQUEST = 'step-through-request',
+  /** UI → Scheduler: user decision after reviewing a step-through prompt. */
+  STEP_THROUGH_RESPONSE = 'step-through-response',
 }
 
 export interface ToolCallsUpdateMessage {
@@ -178,6 +182,30 @@ export interface AskUserResponse {
   cancelled?: boolean;
 }
 
+/** The action the user chose in the step-through dialog. */
+export type StepThroughAction = 'next' | 'skip' | 'continue' | 'cancel';
+
+/** Published by the Scheduler when it pauses before executing a tool in STEP mode. */
+export interface StepThroughRequest {
+  type: MessageBusType.STEP_THROUGH_REQUEST;
+  correlationId: string;
+  callId: string;
+  toolName: string;
+  toolArgs: Record<string, unknown>;
+  toolDescription?: string;
+  /** 1-based position of this step within the current batch. */
+  stepIndex: number;
+  /** Estimated total number of steps in the current batch. */
+  stepTotal: number;
+}
+
+/** Published by the UI when the user decides what to do in step-through mode. */
+export interface StepThroughResponse {
+  type: MessageBusType.STEP_THROUGH_RESPONSE;
+  correlationId: string;
+  action: StepThroughAction;
+}
+
 export type Message =
   | ToolConfirmationRequest
   | ToolConfirmationResponse
@@ -187,4 +215,6 @@ export type Message =
   | UpdatePolicy
   | AskUserRequest
   | AskUserResponse
-  | ToolCallsUpdateMessage;
+  | ToolCallsUpdateMessage
+  | StepThroughRequest
+  | StepThroughResponse;

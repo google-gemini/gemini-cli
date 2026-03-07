@@ -49,6 +49,8 @@ export enum ApprovalMode {
   AUTO_EDIT = 'autoEdit',
   YOLO = 'yolo',
   PLAN = 'plan',
+  /** Pauses before every tool call regardless of kind, giving the user a chance to inspect inputs and step through execution. */
+  STEP = 'step',
 }
 
 /**

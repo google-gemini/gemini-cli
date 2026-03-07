@@ -24,7 +24,8 @@ import {
   type ScheduledToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
-import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
+import { PolicyDecision, ApprovalMode } from '../policy/types.js';
+import { pauseForStepThrough } from './step-through.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
@@ -106,6 +107,11 @@ export class Scheduler {
   private isProcessing = false;
   private isCancelling = false;
   private readonly requestQueue: SchedulerQueueItem[] = [];
+
+  /** Tracks how many tool calls have been stepped through in the current batch. */
+  private stepIndex = 0;
+  /** Total tool calls enqueued in the current batch, used for the step counter. */
+  private stepTotal = 0;
 
   constructor(options: SchedulerOptions) {
     this.config = options.config;
@@ -291,6 +297,8 @@ export class Scheduler {
     this.isProcessing = true;
     this.isCancelling = false;
     this.state.clearBatch();
+    this.stepIndex = 0;
+    this.stepTotal = requests.length;
     const currentApprovalMode = this.config.getApprovalMode();
 
     try {
@@ -640,6 +648,61 @@ export class Scheduler {
       );
       return false;
     }
+
+    // Step-through mode: pause before every tool call and await user approval.
+    if (this.config.getApprovalMode() === ApprovalMode.STEP) {
+      this.stepIndex += 1;
+      const action = await pauseForStepThrough(
+        toolCall,
+        signal,
+        this.messageBus,
+        this.stepIndex,
+        Math.max(this.stepTotal, this.stepIndex),
+      );
+
+      switch (action) {
+        case 'skip': {
+          // Return an empty successful result without executing the tool.
+          this.state.updateStatus(callId, CoreToolCallStatus.Success, {
+            callId,
+            responseParts: [
+              {
+                functionResponse: {
+                  id: callId,
+                  name: toolCall.request.name,
+                  response: {
+                    output: '(skipped by user in step-through mode)',
+                  },
+                },
+              },
+            ],
+            resultDisplay: '(skipped)',
+            error: undefined,
+            errorType: undefined,
+          });
+          return false;
+        }
+        case 'cancel': {
+          this.state.updateStatus(
+            callId,
+            CoreToolCallStatus.Cancelled,
+            'Step-through cancelled by user.',
+          );
+          this.state.cancelAllQueued('Step-through cancelled by user');
+          return false;
+        }
+        case 'continue': {
+          // Exit step-through mode and resume normal execution for this and all
+          // subsequent tool calls.
+          this.config.setApprovalMode(ApprovalMode.DEFAULT);
+          break;
+        }
+        case 'next':
+        default:
+          break;
+      }
+    }
+
     this.state.updateStatus(callId, CoreToolCallStatus.Executing);
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
