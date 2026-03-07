@@ -117,4 +117,28 @@ describe('ApiKeyCredentialStorage', () => {
     await loadApiKey();
     expect(getCredentialsMock).toHaveBeenCalledTimes(2); // Should have fetched again
   });
+
+  it('should clear an API key and cache when saving empty key', async () => {
+    await saveApiKey('');
+    expect(deleteCredentialsMock).toHaveBeenCalledWith('default-api-key');
+    expect(setCredentialsMock).not.toHaveBeenCalled();
+  });
+
+  it('should clear an API key and cache when saving null key', async () => {
+    await saveApiKey(null);
+    expect(deleteCredentialsMock).toHaveBeenCalledWith('default-api-key');
+    expect(setCredentialsMock).not.toHaveBeenCalled();
+  });
+
+  it('should not throw when clearing an API key fails during saveApiKey', async () => {
+    deleteCredentialsMock.mockRejectedValueOnce(new Error('Failed to delete'));
+    await expect(saveApiKey('')).resolves.not.toThrow();
+    expect(deleteCredentialsMock).toHaveBeenCalledWith('default-api-key');
+  });
+
+  it('should not throw when clearing an API key fails during clearApiKey', async () => {
+    deleteCredentialsMock.mockRejectedValueOnce(new Error('Failed to delete'));
+    await expect(clearApiKey()).resolves.not.toThrow();
+    expect(deleteCredentialsMock).toHaveBeenCalledWith('default-api-key');
+  });
 });

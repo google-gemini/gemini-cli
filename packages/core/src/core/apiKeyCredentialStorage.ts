@@ -15,7 +15,7 @@ const DEFAULT_API_KEY_ENTRY = 'default-api-key';
 const storage = new HybridTokenStorage(KEYCHAIN_SERVICE_NAME);
 
 // Cache to store the results of loadApiKey to avoid redundant keychain access.
-let apiKeyCache = createCache<string, Promise<string | null>>({
+const apiKeyCache = createCache<string, Promise<string | null>>({
   storage: 'map',
   defaultTtl: 30000, // 30 seconds
 });
@@ -25,10 +25,7 @@ let apiKeyCache = createCache<string, Promise<string | null>>({
  * @internal
  */
 export function resetApiKeyCacheForTesting() {
-  apiKeyCache = createCache<string, Promise<string | null>>({
-    storage: 'map',
-    defaultTtl: 30000,
-  });
+  apiKeyCache.clear();
 }
 
 /**
