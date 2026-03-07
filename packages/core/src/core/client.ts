@@ -870,11 +870,8 @@ export class GeminiClient {
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
     displayContent?: PartListUnion,
- feat/architecture-map
     options?: SendMessageStreamOptions,
-
     stopHookActive: boolean = false,
- main
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
@@ -986,11 +983,8 @@ export class GeminiClient {
             boundedTurns - 1,
             false,
             displayContent,
- feat/architecture-map
             options,
-
             true, // stopHookActive: signal retry to AfterAgent hooks
- main
           );
         }
       }
