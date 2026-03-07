@@ -489,22 +489,17 @@ export class SessionSelector {
         continue;
       }
 
-      // Optimization: only check files whose name contains the truncated session ID
-      const candidates = files.filter(
-        (f) =>
-          f.startsWith(SESSION_FILE_PREFIX) &&
-          f.endsWith('.json') &&
-          f.includes(truncatedId),
+      // Get all session files first
+      const allSessionFiles = files.filter(
+        (f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'),
       );
+
+      // Optimization: only check files whose name contains the truncated session ID
+      const candidates = allSessionFiles.filter((f) => f.includes(truncatedId));
 
       // If no filename matches, also fall back to checking all session files
       // (handles older naming conventions)
-      const filesToCheck =
-        candidates.length > 0
-          ? candidates
-          : files.filter(
-              (f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'),
-            );
+      const filesToCheck = candidates.length > 0 ? candidates : allSessionFiles;
 
       for (const file of filesToCheck) {
         const filePath = path.join(chatsDir, file);
