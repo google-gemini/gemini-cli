@@ -41,18 +41,21 @@ This project follows
 
 The process for contributing code is as follows:
 
-1.  **Find an issue** that you want to work on. If an issue is tagged as
-    `🔒Maintainers only`, this means it is reserved for project maintainers. We
-    will not accept pull requests related to these issues. In the near future,
-    we will explicitly mark issues looking for contributions using the
-    `help-wanted` label. If you believe an issue is a good candidate for
-    community contribution, please leave a comment on the issue. A maintainer
-    will review it and apply the `help-wanted` label if appropriate. Only
-    maintainers should attempt to add the `help-wanted` label to an issue.
-2.  **Fork the repository** and create a new branch.
-3.  **Make your changes** in the `packages/` directory.
-4.  **Ensure all checks pass** by running `npm run preflight`.
-5.  **Open a pull request** with your changes.
+1.  **Find an issue** tagged `help wanted` that you want to work on. Issues
+    tagged `🔒Maintainers only` are reserved for project maintainers and do not
+    accept community pull requests. If you think an issue is a good candidate
+    for community contribution, leave a comment asking a maintainer to add the
+    `help wanted` label. Only maintainers can apply that label.
+2.  **Get assigned** by commenting `/assign` on the issue. You must be assigned
+    before opening a pull request. PRs from contributors who are not assigned to
+    the linked issue are automatically closed. See
+    [Self-assigning issues](#self-assigning-and-unassigning-issues) for limits
+    and conditions.
+3.  **Fork the repository** and create a new branch.
+4.  **Make your changes** in the `packages/` directory.
+5.  **Ensure all checks pass** by running `npm run preflight`.
+6.  **Open a pull request** that includes `Fixes #<issue_number>` in the
+    description to link it back to the issue.
 
 ### Code reviews
 
@@ -77,15 +80,17 @@ augment their manual review process.
 
 ### Self-assigning and unassigning issues
 
-To assign an issue to yourself, simply add a comment with the text `/assign`. To
-unassign yourself from an issue, add a comment with the text `/unassign`.
+To assign an issue to yourself, comment `/assign` on the issue. To unassign
+yourself, comment `/unassign`.
 
-The comment must contain only that text and nothing else. These commands will
-assign or unassign the issue as requested, provided the conditions are met
-(e.g., an issue must be unassigned to be assigned).
+The comment must contain only that text and nothing else. Assignment is only
+available on issues labelled `help wanted` and only when the issue has no
+existing assignee. You can have a maximum of 3 issues assigned to you at any
+given time.
 
-Please note that you can have a maximum of 3 issues assigned to you at any given
-time.
+**Assignment is required before opening a pull request.** If you open a PR
+linked to an issue you are not assigned to, the PR is automatically closed with
+instructions. Re-open the PR after getting assigned.
 
 ### Pull request guidelines
 
@@ -102,11 +107,15 @@ any code is written.
 - **For features:** The PR should be linked to the feature request or proposal
   issue that has been approved by a maintainer.
 
-If an issue for your change doesn't exist, we will automatically close your PR
-along with a comment reminding you to associate the PR with an issue. The ideal
-workflow starts with an issue that has been reviewed and approved by a
-maintainer. Please **open the issue first** and wait for feedback before you
-start coding.
+PRs that do not meet both conditions below are automatically closed:
+
+- The PR must be linked to an existing issue using `Fixes #<issue_number>` or
+  `Closes #<issue_number>` in the description.
+- The PR author must be assigned to that issue.
+
+The ideal workflow: open an issue, wait for a maintainer to add the
+`help wanted` label, comment `/assign` to get assigned, then open a PR with the
+issue linked.
 
 #### 2. Keep it small and focused
 
