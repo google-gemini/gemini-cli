@@ -158,7 +158,8 @@ export function BaseSettingsDialog({
     // Layout constants based on BaseSettingsDialog structure:
     const DIALOG_PADDING = 4;
     const SETTINGS_TITLE_HEIGHT = 1;
-    const SEARCH_SECTION_HEIGHT = searchEnabled ? 5 : 0;
+    // Account for the unconditional spacer below search/title section
+    const SEARCH_SECTION_HEIGHT = searchEnabled ? 5 : 1;
     const SCROLL_ARROWS_HEIGHT = 2;
     const ITEMS_SPACING_AFTER = 1;
     const SCOPE_SECTION_HEIGHT = 5;
