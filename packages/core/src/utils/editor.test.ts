@@ -28,6 +28,33 @@ import { coreEvents, CoreEvent } from './events.js';
 import { exec, execSync, spawn, spawnSync } from 'node:child_process';
 import { debugLogger } from './debugLogger.js';
 
+const JETBRAINS_EDITORS: EditorType[] = [
+  'intellij',
+  'webstorm',
+  'pycharm',
+  'goland',
+  'androidstudio',
+  'clion',
+  'rustrover',
+  'datagrip',
+  'phpstorm',
+  'rubymine',
+];
+
+const GUI_EDITORS: EditorType[] = [
+  'vscode',
+  'vscodium',
+  'windsurf',
+  'cursor',
+  'zed',
+  'antigravity',
+  ...JETBRAINS_EDITORS,
+];
+
+// Helper function to determine if editor is a JetBrains IDE
+const isJetBrainsIde = (editor: EditorType): boolean =>
+  JETBRAINS_EDITORS.includes(editor);
+
 vi.mock('child_process', () => ({
   exec: vi.fn(),
   execSync: vi.fn(),
@@ -293,23 +320,6 @@ describe('editor utils', () => {
     ];
 
     for (const { editor, commands, win32Commands } of guiEditors) {
-      // Helper function to determine if editor is a JetBrains IDE
-      const isJetBrainsIde = (editor: EditorType): boolean => {
-        const jetbrainsEditors = [
-          'intellij',
-          'webstorm',
-          'pycharm',
-          'goland',
-          'androidstudio',
-          'clion',
-          'rustrover',
-          'datagrip',
-          'phpstorm',
-          'rubymine',
-        ];
-        return jetbrainsEditors.includes(editor);
-      };
-
       // Non-windows tests
       it(`should use first command "${commands[0]}" when it exists on non-windows`, () => {
         Object.defineProperty(process, 'platform', { value: 'linux' });
@@ -499,77 +509,10 @@ describe('editor utils', () => {
       const command = getDiffCommand('old.txt', 'new.txt', 'foobar');
       expect(command).toBeNull();
     });
-
-    // JetBrains IDE specific diff command tests
-    describe('JetBrains IDE diff commands', () => {
-      const jetbrainsEditors: Array<{ editor: EditorType; command: string }> = [
-        { editor: 'intellij', command: 'idea' },
-        { editor: 'webstorm', command: 'webstorm' },
-        { editor: 'pycharm', command: 'pycharm' },
-        { editor: 'goland', command: 'goland' },
-        { editor: 'androidstudio', command: 'studio' },
-        { editor: 'clion', command: 'clion' },
-        { editor: 'rustrover', command: 'rustrover' },
-        { editor: 'datagrip', command: 'datagrip' },
-        { editor: 'phpstorm', command: 'phpstorm' },
-        { editor: 'rubymine', command: 'rubymine' },
-      ];
-
-      for (const { editor, command: expectedCommand } of jetbrainsEditors) {
-        it(`should return correct diff command for ${editor}`, () => {
-          // Mock that the command exists
-          (execSync as Mock).mockReturnValue(
-            Buffer.from(`/usr/bin/${expectedCommand}`),
-          );
-
-          const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
-          expect(diffCommand).toEqual({
-            command: expectedCommand,
-            args: ['diff', 'old.txt', 'new.txt'],
-          });
-        });
-
-        it(`should handle paths with spaces for ${editor}`, () => {
-          (execSync as Mock).mockReturnValue(
-            Buffer.from(`/usr/bin/${expectedCommand}`),
-          );
-
-          const diffCommand = getDiffCommand(
-            'old file.txt',
-            'new file.txt',
-            editor,
-          );
-          expect(diffCommand).toEqual({
-            command: expectedCommand,
-            args: ['diff', 'old file.txt', 'new file.txt'],
-          });
-        });
-      }
-    });
   });
 
   describe('openDiff', () => {
-    const guiEditors: EditorType[] = [
-      'vscode',
-      'vscodium',
-      'windsurf',
-      'cursor',
-      'zed',
-      'antigravity',
-      // JetBrains IDEs
-      'intellij',
-      'webstorm',
-      'pycharm',
-      'goland',
-      'androidstudio',
-      'clion',
-      'rustrover',
-      'datagrip',
-      'phpstorm',
-      'rubymine',
-    ];
-
-    for (const editor of guiEditors) {
+    for (const editor of GUI_EDITORS) {
       it(`should call spawn for ${editor}`, async () => {
         const mockSpawnOn = vi.fn((event, cb) => {
           if (event === 'close') {
@@ -752,26 +695,7 @@ describe('editor utils', () => {
       expect(allowEditorTypeInSandbox('hx')).toBe(true);
     });
 
-    const guiEditors: EditorType[] = [
-      'vscode',
-      'vscodium',
-      'windsurf',
-      'cursor',
-      'zed',
-      'antigravity',
-      // JetBrains IDEs
-      'intellij',
-      'webstorm',
-      'pycharm',
-      'goland',
-      'androidstudio',
-      'clion',
-      'rustrover',
-      'datagrip',
-      'phpstorm',
-      'rubymine',
-    ];
-    for (const editor of guiEditors) {
+    for (const editor of GUI_EDITORS) {
       it(`should not allow ${editor} in sandbox mode`, () => {
         vi.stubEnv('SANDBOX', 'sandbox');
         expect(allowEditorTypeInSandbox(editor)).toBe(false);
