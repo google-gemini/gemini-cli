@@ -463,7 +463,7 @@ export class SessionSelector {
       const sessions = await this.listSessions();
 
       if (sessions.length === 0) {
-        throw new Error('No previous sessions found for this project.');
+        throw SessionError.noSessionsFound();
       }
 
       // Sort by startTime (oldest first, so newest sessions get highest numbers)

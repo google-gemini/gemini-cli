@@ -45,13 +45,12 @@ export const GREP_PARAM_NO_IGNORE = 'no_ignore';
 
 // -- list_directory --
 export const LS_TOOL_NAME = 'list_directory';
- feat/architecture-map
 export const MAP_TOOL_NAME = 'map_project_structure';
 
 export const LS_PARAM_IGNORE = 'ignore';
 
 // -- read_file --
- main
+
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const READ_FILE_PARAM_START_LINE = 'start_line';
 export const READ_FILE_PARAM_END_LINE = 'end_line';
