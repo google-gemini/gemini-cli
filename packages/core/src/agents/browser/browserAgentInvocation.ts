@@ -142,7 +142,7 @@ function sanitizeErrorMessage(message: string): string {
 
   // 4. Handle file path redaction
   sanitized = sanitized.replace(
-    /((?:[\/][a-zA-Z0-9_-]+)*[\/][a-zA-Z0-9_-]*\.(?:key|pem|p12|pfx))/gi,
+    /((?:[/\\][a-zA-Z0-9_-]+)*[/\\][a-zA-Z0-9_-]*\.(?:key|pem|p12|pfx))/gi,
     '/path/to/[REDACTED].key',
   );
 
@@ -266,19 +266,20 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
         switch (activity.type) {
           case 'THOUGHT_CHUNK': {
             const text = String(activity.data['text']);
-            const sanitizedText = sanitizeThoughtContent(text);
             const lastItem = recentActivity[recentActivity.length - 1];
             if (
               lastItem &&
               lastItem.type === 'thought' &&
               lastItem.status === 'running'
             ) {
-              lastItem.content += sanitizedText;
+              lastItem.content = sanitizeThoughtContent(
+                lastItem.content + text,
+              );
             } else {
               recentActivity.push({
                 id: randomUUID(),
                 type: 'thought',
-                content: sanitizedText,
+                content: sanitizeThoughtContent(text),
                 status: 'running',
               });
             }
