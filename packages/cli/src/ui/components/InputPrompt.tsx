@@ -15,7 +15,7 @@ import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
 import {
   type TextBuffer,
   logicalPosToOffset,
-  PASTED_TEXT_PLACEHOLDER_REGEX,
+  expandPastePlaceholders,
   getTransformUnderCursor,
   LARGE_PASTE_LINE_THRESHOLD,
   LARGE_PASTE_CHAR_THRESHOLD,
@@ -37,6 +37,7 @@ import {
 import type { Key } from '../hooks/useKeypress.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
+import { formatCommand } from '../utils/keybindingUtils.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { ApprovalMode, coreEvents, debugLogger } from '@google/gemini-cli-core';
@@ -345,10 +346,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     (submittedValue: string) => {
       let processedValue = submittedValue;
       if (buffer.pastedContent) {
-        // Replace placeholders like [Pasted Text: 6 lines] with actual content
-        processedValue = processedValue.replace(
-          PASTED_TEXT_PLACEHOLDER_REGEX,
-          (match) => buffer.pastedContent[match] || match,
+        processedValue = expandPastePlaceholders(
+          processedValue,
+          buffer.pastedContent,
         );
       }
 
@@ -494,7 +494,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         buffer.insert(textToInsert, { paste: true });
         if (isLargePaste(textToInsert)) {
           appEvents.emit(AppEvent.TransientMessage, {
-            message: 'Press Ctrl+O to expand pasted text',
+            message: `Press ${formatCommand(Command.EXPAND_PASTE)} to expand pasted text`,
             type: TransientMessageType.Hint,
           });
         }
@@ -730,7 +730,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         buffer.handleInput(key);
         if (key.sequence && isLargePaste(key.sequence)) {
           appEvents.emit(AppEvent.TransientMessage, {
-            message: 'Press Ctrl+O to expand pasted text',
+            message: `Press ${formatCommand(Command.EXPAND_PASTE)} to expand pasted text`,
             type: TransientMessageType.Hint,
           });
         }
