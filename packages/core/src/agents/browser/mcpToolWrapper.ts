@@ -309,7 +309,7 @@ class McpDeclarativeTool extends DeclarativeTool<
     name: string,
     description: string,
     parameterSchema: unknown,
-    protected readonly messageBus: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(
       name,
