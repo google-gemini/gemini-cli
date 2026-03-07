@@ -65,7 +65,7 @@ describe('<ShellToolMessage />', () => {
       ['SHELL_COMMAND_NAME', SHELL_COMMAND_NAME],
       ['SHELL_TOOL_NAME', SHELL_TOOL_NAME],
     ])('clicks inside the shell area sets focus for %s', async (_, name) => {
-      const { lastFrame, simulateClick } = renderShell(
+      const { lastFrame, simulateClick, unmount } = renderShell(
         { name },
         { mouseEventsEnabled: true },
       );
@@ -79,6 +79,7 @@ describe('<ShellToolMessage />', () => {
       await waitFor(() => {
         expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(true);
       });
+      unmount();
     });
     it('resets focus when shell finishes', async () => {
       let updateStatus: (s: CoreToolCallStatus) => void = () => {};
@@ -91,7 +92,7 @@ describe('<ShellToolMessage />', () => {
         return <ShellToolMessage {...baseProps} status={status} ptyId={1} />;
       };
 
-      const { lastFrame } = renderWithProviders(<Wrapper />, {
+      const { lastFrame, unmount } = renderWithProviders(<Wrapper />, {
         uiActions,
         uiState: {
           streamingState: StreamingState.Idle,
@@ -115,6 +116,7 @@ describe('<ShellToolMessage />', () => {
         expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
         expect(lastFrame()).not.toContain('(Shift+Tab to unfocus)');
       });
+      unmount();
     });
   });
 
@@ -133,6 +135,14 @@ describe('<ShellToolMessage />', () => {
       [
         'renders in Error state',
         { status: CoreToolCallStatus.Error, resultDisplay: 'Error output' },
+        undefined,
+      ],
+      [
+        'renders in Cancelled state with partial output',
+        {
+          status: CoreToolCallStatus.Cancelled,
+          resultDisplay: 'Partial output before cancellation',
+        },
         undefined,
       ],
       [
@@ -164,9 +174,13 @@ describe('<ShellToolMessage />', () => {
         },
       ],
     ])('%s', async (_, props, options) => {
-      const { lastFrame, waitUntilReady } = renderShell(props, options);
+      const { lastFrame, waitUntilReady, unmount } = renderShell(
+        props,
+        options,
+      );
       await waitUntilReady();
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
   });
 
@@ -197,7 +211,7 @@ describe('<ShellToolMessage />', () => {
         false,
       ],
     ])('%s', async (_, availableTerminalHeight, expectedMaxLines, focused) => {
-      const { lastFrame, waitUntilReady } = renderShell(
+      const { lastFrame, waitUntilReady, unmount } = renderShell(
         {
           resultDisplay: LONG_OUTPUT,
           renderOutputAsMarkdown: false,
@@ -218,10 +232,11 @@ describe('<ShellToolMessage />', () => {
       const frame = lastFrame();
       expect(frame.match(/Line \d+/g)?.length).toBe(expectedMaxLines);
       expect(frame).toMatchSnapshot();
+      unmount();
     });
 
     it('fully expands in standard mode when availableTerminalHeight is undefined', async () => {
-      const { lastFrame } = renderShell(
+      const { lastFrame, unmount } = renderShell(
         {
           resultDisplay: LONG_OUTPUT,
           renderOutputAsMarkdown: false,
@@ -236,10 +251,11 @@ describe('<ShellToolMessage />', () => {
         // Should show all 100 lines
         expect(frame.match(/Line \d+/g)?.length).toBe(100);
       });
+      unmount();
     });
 
     it('fully expands in alternate buffer mode when constrainHeight is false and isExpandable is true', async () => {
-      const { lastFrame, waitUntilReady } = renderShell(
+      const { lastFrame, waitUntilReady, unmount } = renderShell(
         {
           resultDisplay: LONG_OUTPUT,
           renderOutputAsMarkdown: false,
@@ -262,10 +278,11 @@ describe('<ShellToolMessage />', () => {
         expect(frame.match(/Line \d+/g)?.length).toBe(100);
       });
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
     it('stays constrained in alternate buffer mode when isExpandable is false even if constrainHeight is false', async () => {
-      const { lastFrame, waitUntilReady } = renderShell(
+      const { lastFrame, waitUntilReady, unmount } = renderShell(
         {
           resultDisplay: LONG_OUTPUT,
           renderOutputAsMarkdown: false,
@@ -288,6 +305,7 @@ describe('<ShellToolMessage />', () => {
         expect(frame.match(/Line \d+/g)?.length).toBe(15);
       });
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     });
   });
 });
