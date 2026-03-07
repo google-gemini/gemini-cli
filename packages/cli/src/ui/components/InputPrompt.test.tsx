@@ -1349,7 +1349,7 @@ describe('InputPrompt', () => {
   it('should autocomplete custom commands from .toml files on Enter', async () => {
     const customCommand: SlashCommand = {
       name: 'find-capital',
-      kind: CommandKind.FILE,
+      kind: CommandKind.USER_FILE,
       description: 'Find capital of a country',
       action: vi.fn(),
       // No autoExecute flag - custom commands default to undefined
