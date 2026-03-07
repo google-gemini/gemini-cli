@@ -1026,6 +1026,62 @@ describe('BrowserAgentInvocation', () => {
         delimiterError?.recentActivity.some((a) => a.content.includes('baz')),
       ).toBe(false);
     });
+
+    it('should redact inline PEM key content', async () => {
+      const updateOutput = vi.fn();
+      let activityCallback:
+        | ((activity: SubagentActivityEvent) => void)
+        | undefined;
+
+      vi.mocked(LocalAgentExecutor.create).mockImplementation(
+        async (_def, _config, onActivity) => {
+          activityCallback = onActivity;
+          return {
+            run: vi.fn().mockResolvedValue({
+              terminate_reason: AgentTerminateMode.GOAL,
+              result: 'Success',
+            }),
+          } as unknown as LocalAgentExecutor<z.ZodTypeAny>;
+        },
+      );
+
+      vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
+        definition: {
+          name: 'browser_agent',
+        } as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+        browserManager: {} as unknown as LocalAgentExecutor<z.ZodTypeAny>,
+      });
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      await invocation.execute(new AbortController().signal, updateOutput);
+
+      activityCallback!({
+        isSubagentActivityEvent: true,
+        agentName: 'browser_agent',
+        type: 'ERROR',
+        data: {
+          error:
+            'Failed to authenticate:\n-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA12345...\n-----END RSA PRIVATE KEY-----\nPlease check your credentials.',
+        },
+      });
+
+      const lastProgress = updateOutput.mock.calls[
+        updateOutput.mock.calls.length - 1
+      ][0] as SubagentProgress;
+      const errorThought = lastProgress.recentActivity.find(
+        (item) => item.type === 'thought' && item.status === 'error',
+      );
+
+      expect(errorThought).toBeDefined();
+      expect(errorThought!.content).toContain('[REDACTED_PEM]');
+      expect(errorThought!.content).not.toContain('-----BEGIN');
+      expect(errorThought!.content).not.toContain('MIIEowIBAAKCAQEA12345...');
+    });
   });
 
   describe('toolLocations', () => {

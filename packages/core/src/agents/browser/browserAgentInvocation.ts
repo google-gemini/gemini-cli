@@ -110,29 +110,43 @@ function sanitizeToolArgs(args: unknown): unknown {
 function sanitizeErrorMessage(message: string): string {
   if (!message) return message;
 
-  const keyMatch = SENSITIVE_KEY_PATTERNS.join('|').replace(/[-_]/g, '[_-]?');
-  const valuePattern = `(?:"[^"]*"|'[^']*'|[^\\s]+)`;
+  let sanitized = message;
 
-  // 1. Handle space-separated tokens/auth (e.g., "token eyJ...", "Bearer eyJ...", "Authorization: Bearer eyJ...")
-  // We handle this first to avoid partial redaction of "Authorization: Bearer" by the key-value regex
-  const spaceSeparated = new RegExp(
-    `\\b((?:token|bearer|authorization(?:\\s*:\\s*bearer)?)\\s+)${valuePattern}`,
-    'gi',
+  // 1. Redact inline PEM content
+  sanitized = sanitized.replace(
+    /-----BEGIN\s+[\w\s]+-----[\s\S]*?-----END\s+[\w\s]+-----/g,
+    '[REDACTED_PEM]',
   );
 
-  // 2. Handle key with delimiter (:, =) and optional quotes around key/value
+  const unquotedValue = `[^\\s,;}\\]]+(?:\\s+(?![a-zA-Z0-9_.-]+(?:=|:))[^\\s=:<>,;}\\]]+)*`;
+  const valuePattern = `(?:"[^"]*"|'[^']*'|${unquotedValue})`;
+
+  // 2. Handle key with delimiter
+  const urlSafeKeyPatternStr = SENSITIVE_KEY_PATTERNS.map((p) =>
+    p.replace(/[-_]/g, '(?:[-_]|%2D|%5F|%2d|%5f)?'),
+  ).join('|');
+
   const keyWithDelimiter = new RegExp(
-    `(("?(${keyMatch})"?)\\s*[:=]\\s*)${valuePattern}`,
+    `(("&quot;|"|')?(${urlSafeKeyPatternStr})\\2\\s*(?:[:=]|%3A|%3D)\\s*)${valuePattern}`,
     'gi',
   );
+  sanitized = sanitized.replace(keyWithDelimiter, '$1[REDACTED]');
 
-  return message
-    .replace(spaceSeparated, '$1[REDACTED]')
-    .replace(keyWithDelimiter, '$1[REDACTED]')
-    .replace(
-      /\/[a-zA-Z0-9_\-/]*\/[a-zA-Z0-9_-]*\.(key|pem|p12|pfx)/gi,
-      '/path/to/[REDACTED].key',
-    );
+  // 3. Handle space-separated tokens/auth
+  const tokenValuePattern = `[A-Za-z0-9._\\-/+=]{8,}`;
+  const spaceSeparated = new RegExp(
+    `\\b((?:token|bearer|authorization(?:\\s*:\\s*bearer)?)\\s+)(${tokenValuePattern})`,
+    'gi',
+  );
+  sanitized = sanitized.replace(spaceSeparated, '$1[REDACTED]');
+
+  // 4. Handle file path redaction
+  sanitized = sanitized.replace(
+    /([\\/][a-zA-Z0-9_\-/]*[\\/][a-zA-Z0-9_-]*\.(?:key|pem|p12|pfx))/gi,
+    '/path/to/[REDACTED].key',
+  );
+
+  return sanitized;
 }
 
 /**
@@ -216,10 +230,11 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       // Note: printOutput is used for low-level connection logs before agent starts
       const printOutput = updateOutput
         ? (msg: string) => {
+            const sanitizedMsg = sanitizeThoughtContent(msg);
             recentActivity.push({
               id: randomUUID(),
               type: 'thought',
-              content: msg,
+              content: sanitizedMsg,
               status: 'completed',
             });
             if (recentActivity.length > MAX_RECENT_ACTIVITY) {
