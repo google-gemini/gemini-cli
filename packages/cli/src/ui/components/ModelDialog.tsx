@@ -36,7 +36,9 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
   const settings = useSettings();
   const [view, setView] = useState<'main' | 'manual'>('main');
-  const [persistMode, setPersistMode] = useState(false);
+  const [persistMode, setPersistMode] = useState(
+    () => !!settings.merged.model?.name,
+  );
 
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;

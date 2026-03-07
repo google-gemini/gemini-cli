@@ -370,4 +370,20 @@ describe('<ModelDialog />', () => {
       unmount();
     });
   });
+  it('initializes persistMode to true when a model is already saved in settings', async () => {
+    const settings = createMockSettings({
+      merged: {
+        model: { name: DEFAULT_GEMINI_MODEL },
+      },
+    });
+    const result = renderWithProviders(<ModelDialog onClose={mockOnClose} />, {
+      config: mockConfig as Config,
+      settings,
+    });
+    await result.waitUntilReady();
+    expect(result.lastFrame()).toContain(
+      'Remember model for future sessions: true',
+    );
+    result.unmount();
+  });
 });
