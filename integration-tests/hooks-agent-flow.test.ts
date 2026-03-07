@@ -182,14 +182,22 @@ describe('Hooks Agent Flow', () => {
       );
 
       const afterAgentScript = `
-        console.log(JSON.stringify({
-          decision: 'block',
-          reason: 'Security policy triggered',
-          hookSpecificOutput: {
-            hookEventName: 'AfterAgent',
-            clearContext: true
-          }
-        }));
+        const fs = require('fs');
+        const input = JSON.parse(fs.readFileSync(0, 'utf-8'));
+        if (input.stop_hook_active) {
+          // Retry turn: allow execution to proceed (breaks the loop)
+          console.log(JSON.stringify({ decision: 'allow' }));
+        } else {
+          // First call: block and clear context to trigger the retry
+          console.log(JSON.stringify({
+            decision: 'block',
+            reason: 'Security policy triggered',
+            hookSpecificOutput: {
+              hookEventName: 'AfterAgent',
+              clearContext: true
+            }
+          }));
+        }
       `;
       const afterAgentScriptPath = rig.createScript(
         'after_agent_clear.cjs',
@@ -198,8 +206,10 @@ describe('Hooks Agent Flow', () => {
 
       rig.setup('should process clearContext in AfterAgent hook output', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             BeforeModel: [
               {
                 hooks: [

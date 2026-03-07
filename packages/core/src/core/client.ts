@@ -34,7 +34,7 @@ import {
   type RetryAvailabilityContext,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage, isAbortError } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
 import type {
   ChatRecordingService,
@@ -191,10 +191,11 @@ export class GeminiClient {
     currentRequest: PartListUnion,
     prompt_id: string,
     turn?: Turn,
+    stopHookActive: boolean = false,
   ): Promise<DefaultHookOutput | undefined> {
     const hookState = this.hookStateMap.get(prompt_id);
     // Only fire on the outermost call (when activeCalls is 1)
-    if (!hookState || hookState.activeCalls !== 1) {
+    if (!hookState || (hookState.activeCalls !== 1 && !stopHookActive)) {
       return undefined;
     }
 
@@ -210,7 +211,11 @@ export class GeminiClient {
 
     const hookOutput = await this.config
       .getHookSystem()
-      ?.fireAfterAgentEvent(partToString(finalRequest), finalResponseText);
+      ?.fireAfterAgentEvent(
+        partToString(finalRequest),
+        finalResponseText,
+        stopHookActive,
+      );
 
     return hookOutput;
   }
@@ -708,27 +713,22 @@ export class GeminiClient {
     let isError = false;
     let isInvalidStream = false;
 
+    let loopDetectedAbort = false;
+    let loopRecoverResult: { detail?: string } | undefined;
     for await (const event of resultStream) {
       const loopResult = this.loopDetector.addAndCheck(event);
       if (loopResult.count > 1) {
         yield { type: GeminiEventType.LoopDetected };
-        controller.abort();
-        return turn;
+        loopDetectedAbort = true;
+        break;
       } else if (loopResult.count === 1) {
         if (boundedTurns <= 1) {
           yield { type: GeminiEventType.MaxSessionTurns };
-          controller.abort();
-          return turn;
+          loopDetectedAbort = true;
+          break;
         }
-        return yield* this._recoverFromLoop(
-          loopResult,
-          signal,
-          prompt_id,
-          boundedTurns,
-          isInvalidStreamRetry,
-          displayContent,
-          controller,
-        );
+        loopRecoverResult = loopResult;
+        break;
       }
       yield event;
 
@@ -740,6 +740,23 @@ export class GeminiClient {
       if (event.type === GeminiEventType.Error) {
         isError = true;
       }
+    }
+
+    if (loopDetectedAbort) {
+      controller.abort();
+      return turn;
+    }
+
+    if (loopRecoverResult) {
+      return yield* this._recoverFromLoop(
+        loopRecoverResult,
+        signal,
+        prompt_id,
+        boundedTurns,
+        isInvalidStreamRetry,
+        displayContent,
+        controller,
+      );
     }
 
     if (isError) {
@@ -833,6 +850,7 @@ export class GeminiClient {
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
     displayContent?: PartListUnion,
+    stopHookActive: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
@@ -897,6 +915,7 @@ export class GeminiClient {
           request,
           prompt_id,
           turn,
+          stopHookActive,
         );
 
         // Cast to AfterAgentHookOutput for access to shouldClearContext()
@@ -942,9 +961,16 @@ export class GeminiClient {
             boundedTurns - 1,
             false,
             displayContent,
+            true, // stopHookActive: signal retry to AfterAgent hooks
           );
         }
       }
+    } catch (error) {
+      if (signal?.aborted || isAbortError(error)) {
+        yield { type: GeminiEventType.UserCancelled };
+        return turn;
+      }
+      throw error;
     } finally {
       const hookState = this.hookStateMap.get(prompt_id);
       if (hookState) {
