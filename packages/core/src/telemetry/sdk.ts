@@ -65,7 +65,10 @@ import type {
   KeychainAvailabilityEvent,
   TokenStorageInitializationEvent,
 } from './types.js';
-import { localMetricReader } from './localBuffer.js';
+import {
+  setupLocalMetricsReader,
+  teardownLocalMetrics,
+} from './localBuffer.js';
 
 // For troubleshooting, set the log level to DiagLogLevel.DEBUG
 class DiagLoggerAdapter {
@@ -243,7 +246,7 @@ export async function initializeTelemetry(
   const activeLogProcessors: BatchLogRecordProcessor[] = [];
   // Always push the local reader into the active array for /perf
   const activeMetricReaders: PeriodicExportingMetricReader[] = [
-    localMetricReader,
+    setupLocalMetricsReader(),
   ];
 
   // Setup cloud/file exporters IF the user consented to telemetry
@@ -405,6 +408,10 @@ export async function shutdownTelemetry(
   } finally {
     telemetryInitialized = false;
     sdk = undefined;
+
+    // Clears the local reader singleton to prevent crash on re-auth (Issue #2)
+    teardownLocalMetrics();
+
     // Fully reset the global APIs to allow for re-initialization.
     // This is primarily for testing environments where the SDK is started
     // and stopped multiple times in the same process.

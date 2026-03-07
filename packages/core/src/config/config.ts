@@ -1025,10 +1025,8 @@ export class Config implements McpContext {
       setGeminiMdFilename(params.contextFileName);
     }
 
-    if (this.telemetrySettings.enabled) {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      initializeTelemetry(this);
-    }
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    initializeTelemetry(this);
 
     const proxy = this.getProxy();
     if (proxy) {

@@ -12,24 +12,55 @@ import {
   type ResourceMetrics,
 } from '@opentelemetry/sdk-metrics';
 
-// Local exporter to maintain a rolling window of cumulative metrics in memory.
-export const localMetricExporter = new InMemoryMetricExporter(
-  AggregationTemporality.CUMULATIVE,
-);
-
-export const localMetricReader = new PeriodicExportingMetricReader({
-  exporter: localMetricExporter,
-  exportIntervalMillis: 1000,
-});
+// Use mutable let variables instead of constants so they can be reset on re-auth
+export let localMetricExporter: InMemoryMetricExporter | undefined;
+export let localMetricReader: PeriodicExportingMetricReader | undefined;
 
 /**
- * Simplified representation of current telemetry data.
+ * Initializes fresh instances of the local metric reader and exporter.
+ * Called by the OTel SDK initialization sequence.
+ */
+export function setupLocalMetricsReader(): PeriodicExportingMetricReader {
+  localMetricExporter = new InMemoryMetricExporter(
+    AggregationTemporality.CUMULATIVE,
+  );
+
+  localMetricReader = new PeriodicExportingMetricReader({
+    exporter: localMetricExporter,
+    // Fix Issue #4: Set interval to 24 hours (86,400,000 ms).
+    // We rely entirely on forceFlush() when the /perf command is run.
+    exportIntervalMillis: 86400000,
+  });
+
+  return localMetricReader;
+}
+
+/**
+ * Clears the local reader references so it can be re-bound during re-auth.
+ */
+export function teardownLocalMetrics(): void {
+  localMetricExporter = undefined;
+  localMetricReader = undefined;
+}
+
+/**
+ * Simplified representation of current telemetry data, retaining attributes for granularity.
+ * (Fixes Issue #3)
  */
 export interface PerfSnapshot {
-  counters: Record<string, number>;
+  counters: Record<
+    string,
+    Array<{ value: number; attributes: Record<string, unknown> }>
+  >;
   histograms: Record<
     string,
-    { count: number; sum: number; min?: number; max?: number }
+    Array<{
+      count: number;
+      sum: number;
+      min?: number;
+      max?: number;
+      attributes: Record<string, unknown>;
+    }>
   >;
 }
 
@@ -38,6 +69,11 @@ export interface PerfSnapshot {
  * of the current telemetry state.
  */
 export const getLocalMetricsSnapshot = async (): Promise<PerfSnapshot> => {
+  // Guard clause in case it hasn't been initialized
+  if (!localMetricReader || !localMetricExporter) {
+    return { counters: {}, histograms: {} };
+  }
+
   await localMetricReader.forceFlush();
   // getMetrics() is synchronous, no await needed
   const resourceMetricsArray = localMetricExporter.getMetrics();
@@ -72,7 +108,7 @@ function simplifyMetrics(
   resourceMetricsArray: ResourceMetrics[] | undefined,
 ): PerfSnapshot {
   const snapshot: PerfSnapshot = {
-    // Reverted to standard objects so the strict linter doesn't throw errors
+    // Standard objects so the strict linter doesn't throw errors
     counters: {},
     histograms: {},
   };
@@ -97,42 +133,40 @@ function simplifyMetrics(
 
         // 1. Handle regular Counters (SUM)
         if (metric.dataPointType === DataPointType.SUM) {
-          let total = 0;
+          if (!snapshot.counters[name]) {
+            snapshot.counters[name] = [];
+          }
+
           for (const dp of metric.dataPoints) {
-             
             const rawValue: unknown = dp.value;
             if (typeof rawValue === 'number') {
-              total += rawValue;
+              snapshot.counters[name].push({
+                value: rawValue,
+                attributes: dp.attributes || {},
+              });
             }
           }
-          snapshot.counters[name] = total;
         }
 
         // 2. Handle complex Latency/Memory distributions (HISTOGRAM)
         else if (metric.dataPointType === DataPointType.HISTOGRAM) {
-          let count = 0;
-          let sum = 0;
-          let min = Infinity;
-          let max = -Infinity;
+          if (!snapshot.histograms[name]) {
+            snapshot.histograms[name] = [];
+          }
 
           for (const dp of metric.dataPoints) {
-             
             const rawValue: unknown = dp.value;
 
             if (isHistogramValue(rawValue)) {
-              count += rawValue.count;
-              sum += rawValue.sum;
-              if (rawValue.min !== undefined) min = Math.min(min, rawValue.min);
-              if (rawValue.max !== undefined) max = Math.max(max, rawValue.max);
+              snapshot.histograms[name].push({
+                count: rawValue.count,
+                sum: rawValue.sum,
+                min: rawValue.min !== Infinity ? rawValue.min : undefined,
+                max: rawValue.max !== -Infinity ? rawValue.max : undefined,
+                attributes: dp.attributes || {},
+              });
             }
           }
-
-          snapshot.histograms[name] = {
-            count,
-            sum,
-            min: min !== Infinity ? min : undefined,
-            max: max !== -Infinity ? max : undefined,
-          };
         }
       }
     }
