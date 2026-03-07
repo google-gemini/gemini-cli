@@ -23,7 +23,11 @@ import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import { checkExhaustive } from '@google/gemini-cli-core';
 import { TextInput } from './shared/TextInput.js';
-import { useTextBuffer } from './shared/text-buffer.js';
+import { formatCommand } from '../utils/keybindingUtils.js';
+import {
+  useTextBuffer,
+  expandPastePlaceholders,
+} from './shared/text-buffer.js';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
 import { DialogFooter } from './shared/DialogFooter.js';
@@ -252,7 +256,7 @@ const ReviewView: React.FC<ReviewViewProps> = ({
       </Box>
       <DialogFooter
         primaryAction="Enter to submit"
-        navigationActions="Tab/Shift+Tab to edit answers"
+        navigationActions={`${formatCommand(Command.DIALOG_NEXT)}/${formatCommand(Command.DIALOG_PREV)} to edit answers`}
         extraParts={extraParts}
       />
     </Box>
@@ -302,10 +306,12 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   const lastTextValueRef = useRef(textValue);
   useEffect(() => {
     if (textValue !== lastTextValueRef.current) {
-      onSelectionChange?.(textValue);
+      onSelectionChange?.(
+        expandPastePlaceholders(textValue, buffer.pastedContent),
+      );
       lastTextValueRef.current = textValue;
     }
-  }, [textValue, onSelectionChange]);
+  }, [textValue, onSelectionChange, buffer.pastedContent]);
 
   // Handle Ctrl+C to clear all text
   const handleExtraKeys = useCallback(
@@ -588,11 +594,15 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         }
       });
       if (includeCustomOption && customOption.trim()) {
-        answers.push(customOption.trim());
+        const expanded = expandPastePlaceholders(
+          customOption,
+          customBuffer.pastedContent,
+        );
+        answers.push(expanded.trim());
       }
       return answers.join(', ');
     },
-    [questionOptions],
+    [questionOptions, customBuffer.pastedContent],
   );
 
   // Synchronize selection changes with parent - only when it actually changes
@@ -757,7 +767,12 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         } else if (itemValue.type === 'other') {
           // In single select, selecting other submits it if it has text
           if (customOptionText.trim()) {
-            onAnswer(customOptionText.trim());
+            onAnswer(
+              expandPastePlaceholders(
+                customOptionText,
+                customBuffer.pastedContent,
+              ).trim(),
+            );
           }
         }
       }
@@ -767,6 +782,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       selectedIndices,
       isCustomOptionSelected,
       customOptionText,
+      customBuffer.pastedContent,
       onAnswer,
       buildAnswerString,
     ],
@@ -1146,7 +1162,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       navigationActions={
         questions.length > 1
           ? currentQuestion.type === 'text' || isEditingCustomOption
-            ? 'Tab/Shift+Tab to switch questions'
+            ? `${formatCommand(Command.DIALOG_NEXT)}/${formatCommand(Command.DIALOG_PREV)} to switch questions`
             : '←/→ to switch questions'
           : currentQuestion.type === 'text' || isEditingCustomOption
             ? undefined
