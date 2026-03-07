@@ -440,7 +440,18 @@ export class ChatRecordingService {
       this.cachedLastConvData = fs.readFileSync(this.conversationFile!, 'utf8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       this.cachedConversation = JSON.parse(this.cachedLastConvData);
-      return this.cachedConversation!;
+      if (!this.cachedConversation) {
+        // File is corrupt or contains "null". Fallback to an empty conversation.
+        this.cachedConversation = {
+          sessionId: this.sessionId,
+          projectHash: this.projectHash,
+          startTime: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+          messages: [],
+          kind: this.kind,
+        };
+      }
+      return this.cachedConversation;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
