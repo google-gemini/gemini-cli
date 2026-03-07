@@ -431,6 +431,11 @@ export class ChatRecordingService {
 
   /**
    * Loads up the conversation record from disk.
+   *
+   * NOTE: The returned object is the live in-memory cache reference.
+   * Any mutations to it will be visible to all subsequent reads.
+   * Callers that mutate the result MUST call writeConversation() to
+   * persist the changes to disk.
    */
   private readConversation(): ConversationRecord {
     if (this.cachedConversation) {
@@ -484,14 +489,13 @@ export class ChatRecordingService {
       // Don't write the file yet until there's at least one message.
       if (conversation.messages.length === 0 && !allowEmpty) return;
 
-      // Update the in-memory cache before serializing.
-      this.cachedConversation = conversation;
       const newContent = JSON.stringify(conversation, null, 2);
       // Skip the disk write if nothing actually changed (e.g.
       // updateMessagesFromHistory found no matching tool calls to update).
       // Compare before updating lastUpdated so the timestamp doesn't
       // cause a false diff.
       if (this.cachedLastConvData === newContent) return;
+      this.cachedConversation = conversation;
       conversation.lastUpdated = new Date().toISOString();
       const contentToWrite = JSON.stringify(conversation, null, 2);
       this.cachedLastConvData = contentToWrite;
