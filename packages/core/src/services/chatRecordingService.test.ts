@@ -245,6 +245,97 @@ describe('ChatRecordingService', () => {
         tool: 0,
       });
     });
+
+    it('should not write to disk when queuing tokens (no last gemini message)', () => {
+      const writeFileSyncSpy = vi.spyOn(fs, 'writeFileSync');
+
+      // Clear spy call count after initialize writes the initial file
+      writeFileSyncSpy.mockClear();
+
+      // No gemini message recorded yet, so tokens should only be queued
+      chatRecordingService.recordMessageTokens({
+        promptTokenCount: 5,
+        candidatesTokenCount: 10,
+        totalTokenCount: 15,
+        cachedContentTokenCount: 0,
+      });
+
+      // writeFileSync should NOT have been called since we only queued
+      expect(writeFileSyncSpy).not.toHaveBeenCalled();
+
+      // @ts-expect-error private property
+      expect(chatRecordingService.queuedTokens).toEqual({
+        input: 5,
+        output: 10,
+        total: 15,
+        cached: 0,
+        thoughts: 0,
+        tool: 0,
+      });
+
+      writeFileSyncSpy.mockRestore();
+    });
+
+    it('should not write to disk when queuing tokens (last message already has tokens)', () => {
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'Response',
+        model: 'gemini-pro',
+      });
+
+      // First recordMessageTokens updates the message and writes to disk
+      chatRecordingService.recordMessageTokens({
+        promptTokenCount: 1,
+        candidatesTokenCount: 1,
+        totalTokenCount: 2,
+        cachedContentTokenCount: 0,
+      });
+
+      const writeFileSyncSpy = vi.spyOn(fs, 'writeFileSync');
+      writeFileSyncSpy.mockClear();
+
+      // Second call should only queue, NOT write to disk
+      chatRecordingService.recordMessageTokens({
+        promptTokenCount: 2,
+        candidatesTokenCount: 2,
+        totalTokenCount: 4,
+        cachedContentTokenCount: 0,
+      });
+
+      expect(writeFileSyncSpy).not.toHaveBeenCalled();
+      writeFileSyncSpy.mockRestore();
+    });
+
+    it('should use in-memory cache and not re-read from disk on subsequent operations', () => {
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'Response',
+        model: 'gemini-pro',
+      });
+
+      const readFileSyncSpy = vi.spyOn(fs, 'readFileSync');
+      readFileSyncSpy.mockClear();
+
+      // These operations should all use the in-memory cache
+      chatRecordingService.recordMessageTokens({
+        promptTokenCount: 1,
+        candidatesTokenCount: 1,
+        totalTokenCount: 2,
+        cachedContentTokenCount: 0,
+      });
+
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'Another response',
+        model: 'gemini-pro',
+      });
+
+      chatRecordingService.saveSummary('Test summary');
+
+      // readFileSync should NOT have been called since we use the in-memory cache
+      expect(readFileSyncSpy).not.toHaveBeenCalled();
+      readFileSyncSpy.mockRestore();
+    });
   });
 
   describe('recordToolCalls', () => {
@@ -768,6 +859,39 @@ describe('ChatRecordingService', () => {
       expect(result).toHaveLength(2);
       expect(result[0].text).toBe('Prefix metadata or text');
       expect(result[1].functionResponse!.id).toBe(callId);
+    });
+
+    it('should not write to disk when no tool calls match', () => {
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'Response with no tool calls',
+        model: 'gemini-pro',
+      });
+
+      const writeFileSyncSpy = vi.spyOn(fs, 'writeFileSync');
+      writeFileSyncSpy.mockClear();
+
+      // History with a tool call ID that doesn't exist in the conversation
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'read_file',
+                id: 'nonexistent-call-id',
+                response: { output: 'some content' },
+              },
+            },
+          ],
+        },
+      ];
+
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      // No tool calls matched, so writeFileSync should NOT have been called
+      expect(writeFileSyncSpy).not.toHaveBeenCalled();
+      writeFileSyncSpy.mockRestore();
     });
   });
 
