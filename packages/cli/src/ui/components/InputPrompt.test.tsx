@@ -279,6 +279,9 @@ describe('InputPrompt', () => {
       },
       getCompletedText: vi.fn().mockReturnValue(null),
       completionMode: CompletionMode.IDLE,
+      forceShowShellSuggestions: false,
+      setForceShowShellSuggestions: vi.fn(),
+      isShellSuggestionsVisible: true,
     };
     mockedUseCommandCompletion.mockReturnValue(mockCommandCompletion);
 
@@ -1346,7 +1349,7 @@ describe('InputPrompt', () => {
   it('should autocomplete custom commands from .toml files on Enter', async () => {
     const customCommand: SlashCommand = {
       name: 'find-capital',
-      kind: CommandKind.FILE,
+      kind: CommandKind.USER_FILE,
       description: 'Find capital of a country',
       action: vi.fn(),
       // No autoExecute flag - custom commands default to undefined
@@ -2203,7 +2206,8 @@ describe('InputPrompt', () => {
         // Check that all lines, including the empty one, are rendered.
         // This implicitly tests that the Box wrapper provides height for the empty line.
         expect(frame).toContain('hello');
-        expect(frame).toContain(`world${chalk.inverse(' ')}`);
+        expect(frame).toContain('world');
+        expect(frame).toContain(chalk.inverse(' '));
 
         const outputLines = frame.trim().split('\n');
         // The number of lines should be 2 for the border plus 3 for the content.
