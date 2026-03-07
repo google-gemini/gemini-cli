@@ -143,7 +143,8 @@ always active.
   confirmation.
 - `autoEdit`: Optimized for automated code editing; some write tools may be
   auto-approved.
-- `plan`: A strict, read-only mode for research and design. See [Customizing Plan Mode Policies](../cli/plan-mode.md#customizing-policies).
+- `plan`: A strict, read-only mode for research and design. See
+  [Customizing Plan Mode Policies](../cli/plan-mode.md#customizing-policies).
 - `yolo`: A mode where all tools are auto-approved (use with extreme caution).
 
 ## Rule matching

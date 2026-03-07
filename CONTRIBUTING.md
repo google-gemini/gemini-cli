@@ -267,7 +267,8 @@ npm run test:e2e
 ```
 
 For more detailed information on the integration testing framework, please see
-the [Integration Tests documentation](https://geminicli.com/docs/integration-tests).
+the
+[Integration Tests documentation](https://geminicli.com/docs/integration-tests).
 
 ### Linting and preflight checks
 
