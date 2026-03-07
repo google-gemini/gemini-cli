@@ -103,21 +103,29 @@ describe('BaseSettingsDialog', () => {
   });
 
   const renderDialog = async (props: Partial<BaseSettingsDialogProps> = {}) => {
-    const defaultProps: BaseSettingsDialogProps = {
+    const { footerContent, footerHeight, ...restProps } = props;
+
+    const baseProps = {
       title: 'Test Settings',
       items: createMockItems(),
-      selectedScope: SettingScope.User,
+      selectedScope: SettingScope.User as const,
       maxItemsToShow: 8,
       onItemToggle: mockOnItemToggle,
       onEditCommit: mockOnEditCommit,
       onItemClear: mockOnItemClear,
       onClose: mockOnClose,
-      ...props,
+      ...restProps,
     };
+
+    // Use Manual Union Narrowing to construct a valid BaseSettingsDialogProps
+    const finalProps: BaseSettingsDialogProps =
+      footerContent !== undefined && footerHeight !== undefined
+        ? { ...baseProps, footerContent, footerHeight }
+        : { ...baseProps, footerContent: undefined, footerHeight: undefined };
 
     const result = render(
       <KeypressProvider>
-        <BaseSettingsDialog {...defaultProps} />
+        <BaseSettingsDialog {...finalProps} />
       </KeypressProvider>,
     );
     await result.waitUntilReady();
@@ -175,9 +183,19 @@ describe('BaseSettingsDialog', () => {
     it('should render footer content when provided', async () => {
       const { lastFrame, unmount } = await renderDialog({
         footerContent: <Text>Custom Footer</Text>,
+        footerHeight: 1,
       });
 
       expect(lastFrame()).toContain('Custom Footer');
+      unmount();
+    });
+
+    it('should NOT render footer content if footerHeight is missing', async () => {
+      const { lastFrame, unmount } = await renderDialog({
+        footerContent: <Text>Custom Footer</Text>,
+      });
+
+      expect(lastFrame()).not.toContain('Custom Footer');
       unmount();
     });
   });

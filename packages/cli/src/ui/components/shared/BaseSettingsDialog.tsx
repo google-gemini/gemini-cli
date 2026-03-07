@@ -49,9 +49,9 @@ export interface SettingsDialogItem {
 }
 
 /**
- * Props for BaseSettingsDialog component.
+ * Common props for BaseSettingsDialog component.
  */
-export interface BaseSettingsDialogProps {
+interface BaseSettingsDialogCommonProps {
   // Header
   /** Dialog title displayed at the top */
   title: string;
@@ -103,12 +103,20 @@ export interface BaseSettingsDialogProps {
     currentItem: SettingsDialogItem | undefined,
   ) => boolean;
 
-  // Optional extra content below help text (for restart prompt, etc.)
-  /** Optional footer content (e.g., restart prompt) */
-  footerContent?: React.ReactNode;
   /** Available terminal height for dynamic windowing */
   availableHeight?: number;
 }
+
+// Either footer content and height are provided, or neither are
+type FooterProps =
+  | { footerContent?: undefined; footerHeight?: undefined }
+  | {
+      footerContent: Exclude<React.ReactNode, null | undefined>;
+      footerHeight: number;
+    };
+
+export type BaseSettingsDialogProps = BaseSettingsDialogCommonProps &
+  FooterProps;
 
 /**
  * A base settings dialog component that handles rendering, layout, and keyboard navigation.
@@ -131,11 +139,11 @@ export function BaseSettingsDialog({
   onItemClear,
   onClose,
   onKeyPress,
-  footerContent,
   availableHeight,
+  footerContent,
+  footerHeight,
 }: BaseSettingsDialogProps): React.JSX.Element {
   // Calculate effective max items and scope visibility based on terminal height
-  const hasFooter = footerContent ? true : false;
   const { effectiveMaxItemsToShow, finalShowScopeSelector } = useMemo(() => {
     const initialShowScope = showScopeSelector;
     const initialMaxItems = maxItemsToShow;
@@ -155,7 +163,7 @@ export function BaseSettingsDialog({
     const ITEMS_SPACING_AFTER = 1;
     const SCOPE_SECTION_HEIGHT = 5;
     const HELP_TEXT_HEIGHT = 1;
-    const FOOTER_CONTENT_HEIGHT = hasFooter ? 1 : 0;
+    const FOOTER_CONTENT_HEIGHT = footerHeight ?? 0;
     const ITEM_HEIGHT = 3;
 
     const currentAvailableHeight = availableHeight - DIALOG_PADDING;
@@ -206,7 +214,7 @@ export function BaseSettingsDialog({
     items.length,
     searchEnabled,
     showScopeSelector,
-    hasFooter,
+    footerHeight,
   ]);
 
   // Internal state
