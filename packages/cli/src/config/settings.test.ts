@@ -13,7 +13,7 @@ vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof osActual>();
   return {
     ...actualOs,
-    homedir: vi.fn(() => '/mock/home/user'),
+    homedir: vi.fn(() => path.resolve('/mock/home/user')),
     platform: vi.fn(() => 'linux'),
   };
 });
@@ -92,7 +92,7 @@ import {
 } from './settingsSchema.js';
 import { createMockSettings } from '../test-utils/settings.js';
 
-const MOCK_WORKSPACE_DIR = '/mock/workspace';
+const MOCK_WORKSPACE_DIR = path.resolve(path.resolve('/mock/workspace'));
 // Use the (mocked) GEMINI_DIR for consistency
 const MOCK_WORKSPACE_SETTINGS_PATH = path.join(
   MOCK_WORKSPACE_DIR,
@@ -185,7 +185,9 @@ describe('Settings Loading and Merging', () => {
     mockFsMkdirSync = vi.mocked(fs.mkdirSync);
     mockStripJsonComments = vi.mocked(stripJsonComments);
 
-    vi.mocked(osActual.homedir).mockReturnValue('/mock/home/user');
+    vi.mocked(osActual.homedir).mockReturnValue(
+      path.resolve('/mock/home/user'),
+    );
     (mockStripJsonComments as unknown as Mock).mockImplementation(
       (jsonString: string) => jsonString,
     );
@@ -1489,7 +1491,9 @@ describe('Settings Loading and Merging', () => {
     });
 
     describe('when GEMINI_CLI_SYSTEM_SETTINGS_PATH is set', () => {
-      const MOCK_ENV_SYSTEM_SETTINGS_PATH = '/mock/env/system/settings.json';
+      const MOCK_ENV_SYSTEM_SETTINGS_PATH = path.resolve(
+        '/mock/env/system/settings.json',
+      );
 
       beforeEach(() => {
         process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'] =
@@ -1531,8 +1535,8 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should correctly skip workspace-level loading if workspaceDir is a symlink to home', () => {
-      const mockHomeDir = '/mock/home/user';
-      const mockSymlinkDir = '/mock/symlink/to/home';
+      const mockHomeDir = path.resolve('/mock/home/user');
+      const mockSymlinkDir = path.resolve('/mock/symlink/to/home');
       const mockWorkspaceSettingsPath = path.join(
         mockSymlinkDir,
         GEMINI_DIR,
@@ -1597,8 +1601,8 @@ describe('Settings Loading and Merging', () => {
         mockedRead.mockReturnValue('{}');
         (mockFsExistsSync as Mock).mockReturnValue(true);
 
-        const workspace1 = '/mock/workspace1';
-        const workspace2 = '/mock/workspace2';
+        const workspace1 = path.resolve('/mock/workspace1');
+        const workspace2 = path.resolve('/mock/workspace2');
 
         const settings1 = loadSettings(workspace1);
         const settings2 = loadSettings(workspace2);
@@ -1629,8 +1633,8 @@ describe('Settings Loading and Merging', () => {
         mockedRead.mockReturnValue('{}');
         (mockFsExistsSync as Mock).mockReturnValue(true);
 
-        const workspace1 = '/mock/workspace1';
-        const workspace2 = '/mock/workspace2';
+        const workspace1 = path.resolve('/mock/workspace1');
+        const workspace2 = path.resolve('/mock/workspace2');
 
         const settings1W1 = loadSettings(workspace1);
         const settings1W2 = loadSettings(workspace2);
@@ -1688,13 +1692,13 @@ describe('Settings Loading and Merging', () => {
         loadSettings as unknown as { findEnvFile: () => string }
       ).findEnvFile;
       (loadSettings as unknown as { findEnvFile: () => string }).findEnvFile =
-        () => '/mock/project/.env';
+        () => path.resolve('/mock/project/.env');
 
       // Mock fs.readFileSync for .env file content
       const originalReadFileSync = fs.readFileSync;
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
-          if (p === '/mock/project/.env') {
+          if (p === path.resolve('/mock/project/.env')) {
             return 'DEBUG=true\nDEBUG_MODE=1\nGEMINI_API_KEY=test-key';
           }
           if (
@@ -2544,13 +2548,16 @@ describe('Settings Loading and Merging', () => {
     it('should save settings using updateSettingsFilePreservingFormat', () => {
       const mockUpdateSettings = vi.mocked(updateSettingsFilePreservingFormat);
       const settingsFile = createMockSettings({ ui: { theme: 'dark' } }).user;
-      settingsFile.path = '/mock/settings.json';
+      settingsFile.path = path.resolve('/mock/settings.json');
 
       saveSettings(settingsFile);
 
-      expect(mockUpdateSettings).toHaveBeenCalledWith('/mock/settings.json', {
-        ui: { theme: 'dark' },
-      });
+      expect(mockUpdateSettings).toHaveBeenCalledWith(
+        path.resolve('/mock/settings.json'),
+        {
+          ui: { theme: 'dark' },
+        },
+      );
     });
 
     it('should create directory if it does not exist', () => {
@@ -2559,14 +2566,19 @@ describe('Settings Loading and Merging', () => {
       mockFsExistsSync.mockReturnValue(false);
 
       const settingsFile = createMockSettings({}).user;
-      settingsFile.path = '/mock/new/dir/settings.json';
+      settingsFile.path = path.resolve('/mock/new/dir/settings.json');
 
       saveSettings(settingsFile);
 
-      expect(mockFsExistsSync).toHaveBeenCalledWith('/mock/new/dir');
-      expect(mockFsMkdirSync).toHaveBeenCalledWith('/mock/new/dir', {
-        recursive: true,
-      });
+      expect(mockFsExistsSync).toHaveBeenCalledWith(
+        path.resolve('/mock/new/dir'),
+      );
+      expect(mockFsMkdirSync).toHaveBeenCalledWith(
+        path.resolve('/mock/new/dir'),
+        {
+          recursive: true,
+        },
+      );
     });
 
     it('should emit error feedback if saving fails', () => {
@@ -2577,7 +2589,7 @@ describe('Settings Loading and Merging', () => {
       });
 
       const settingsFile = createMockSettings({}).user;
-      settingsFile.path = '/mock/settings.json';
+      settingsFile.path = path.resolve('/mock/settings.json');
 
       saveSettings(settingsFile);
 
@@ -2808,7 +2820,7 @@ describe('Settings Loading and Merging', () => {
 
     beforeEach(() => {
       const emptySettingsFile: SettingsFile = {
-        path: '/mock/path',
+        path: path.resolve('/mock/path'),
         settings: {},
         originalSettings: {},
       };
@@ -3133,7 +3145,7 @@ describe('LoadedSettings Isolation and Serializability', () => {
 
     // Create a minimal LoadedSettings instance
     const emptyScope = {
-      path: '/mock/settings.json',
+      path: path.resolve('/mock/settings.json'),
       settings: {},
       originalSettings: {},
     } as unknown as SettingsFile;
