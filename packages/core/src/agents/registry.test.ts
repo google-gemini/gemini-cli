@@ -597,6 +597,7 @@ describe('AgentRegistry', () => {
         'RemoteAgentWithAuth',
         'https://example.com/card',
         mockHandler,
+        { agentCardRequiresAuth: false },
       );
       expect(registry.getDefinition('RemoteAgentWithAuth')).toEqual(
         remoteAgent,
