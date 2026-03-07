@@ -4,9 +4,6 @@ exports[`<ShellToolMessage /> > Height Constraints > defaults to ACTIVE_SHELL_MA
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command A shell command                                             │
 │                                                                              │
-│ Line 86                                                                      │
-│ Line 87                                                                      │
-│ Line 88                                                                      │
 │ Line 89                                                                      │
 │ Line 90                                                                      │
 │ Line 91                                                                      │
@@ -16,8 +13,8 @@ exports[`<ShellToolMessage /> > Height Constraints > defaults to ACTIVE_SHELL_MA
 │ Line 95                                                                      │
 │ Line 96                                                                      │
 │ Line 97                                                                      │
-│ Line 98                                                                    ▄ │
-│ Line 99                                                                    █ │
+│ Line 98                                                                      │
+│ Line 99                                                                    ▄ │
 │ Line 100                                                                   █ │
 "
 `;
@@ -148,9 +145,6 @@ exports[`<ShellToolMessage /> > Height Constraints > stays constrained in altern
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  Shell Command A shell command                                             │
 │                                                                              │
-│ Line 86                                                                      │
-│ Line 87                                                                      │
-│ Line 88                                                                      │
 │ Line 89                                                                      │
 │ Line 90                                                                      │
 │ Line 91                                                                      │
@@ -160,8 +154,8 @@ exports[`<ShellToolMessage /> > Height Constraints > stays constrained in altern
 │ Line 95                                                                      │
 │ Line 96                                                                      │
 │ Line 97                                                                      │
-│ Line 98                                                                    ▄ │
-│ Line 99                                                                    █ │
+│ Line 98                                                                      │
+│ Line 99                                                                    ▄ │
 │ Line 100                                                                   █ │
 "
 `;
@@ -170,9 +164,6 @@ exports[`<ShellToolMessage /> > Height Constraints > uses ACTIVE_SHELL_MAX_LINES
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  Shell Command A shell command                                             │
 │                                                                              │
-│ Line 86                                                                      │
-│ Line 87                                                                      │
-│ Line 88                                                                      │
 │ Line 89                                                                      │
 │ Line 90                                                                      │
 │ Line 91                                                                      │
@@ -182,8 +173,8 @@ exports[`<ShellToolMessage /> > Height Constraints > uses ACTIVE_SHELL_MAX_LINES
 │ Line 95                                                                      │
 │ Line 96                                                                      │
 │ Line 97                                                                      │
-│ Line 98                                                                    ▄ │
-│ Line 99                                                                    █ │
+│ Line 98                                                                      │
+│ Line 99                                                                    ▄ │
 │ Line 100                                                                   █ │
 "
 `;
