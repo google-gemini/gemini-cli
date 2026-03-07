@@ -10,34 +10,7 @@ import { renderWithProviders } from '../../../test-utils/render.js';
 import { StreamingState, type IndividualToolCallDisplay } from '../../types.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { CoreToolCallStatus } from '@google/gemini-cli-core';
-import {
-  useOverflowActions,
-  useOverflowState,
-} from '../../contexts/OverflowContext.js';
-import { useEffect } from 'react';
-
-// Because Ink's testing library does not run a real layout engine or trigger ResizeObserver,
-// the Scrollable component cannot automatically detect its height in tests.
-// We mock Scrollable to verify that ToolGroupMessage and ToolResultDisplay correctly
-// pass the reportOverflow prop, and when true, we manually trigger the global context.
-vi.mock('../shared/Scrollable.js', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../shared/Scrollable.js')>();
-  return {
-    ...actual,
-    Scrollable: (props: { reportOverflow?: boolean; children?: unknown }) => {
-      const actions = useOverflowActions();
-
-      useEffect(() => {
-        if (props.reportOverflow) {
-          actions?.addOverflowingId('mocked-overflow-id');
-        }
-      }, [props.reportOverflow, actions]);
-
-      return <>{props.children}</>;
-    },
-  };
-});
+import { useOverflowState } from '../../contexts/OverflowContext.js';
 
 describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay synchronization', () => {
   it('should ensure ToolGroupMessage correctly reports overflow to the global state in Alternate Buffer (ASB) mode', async () => {
@@ -67,7 +40,7 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
       return null;
     };
 
-    const { unmount } = renderWithProviders(
+    const { unmount, waitUntilReady } = renderWithProviders(
       <>
         <StateCapture />
         <ToolGroupMessage
@@ -87,7 +60,9 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
       },
     );
 
-    // To verify that the overflow state was indeed updated by the mocked Scrollable component.
+    await waitUntilReady();
+
+    // To verify that the overflow state was indeed updated by the Scrollable component.
     await waitFor(() => {
       expect(latestOverflowState?.overflowingIds.size).toBeGreaterThan(0);
     });
@@ -118,7 +93,7 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
       },
     ];
 
-    const { lastFrame, unmount } = renderWithProviders(
+    const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
       <ToolGroupMessage
         item={{ id: 1, type: 'tool_group', tools: toolCalls }}
         toolCalls={toolCalls}
@@ -134,6 +109,8 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
         useAlternateBuffer: false,
       },
     );
+
+    await waitUntilReady();
 
     // Verify truncation is occurring (standard mode uses MaxSizedBox)
     await waitFor(() => expect(lastFrame()).toContain('hidden (Ctrl+O'));
