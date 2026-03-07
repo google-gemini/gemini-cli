@@ -99,21 +99,30 @@ export function shellReducer(
       // This is an intentional performance optimization for the CLI.
       let newOutput = shell.output;
       if (typeof action.chunk === 'string') {
-        newOutput =
-          typeof shell.output === 'string'
-            ? shell.output + action.chunk
-            : action.chunk;
-        // Prevent RangeError: Invalid string length in long-running sessions by
-        // capping output size and discarding the oldest data. The truncation
-        // buffer amortizes the cost: we only slice once per
+        // Prevent RangeError: Invalid string length in long-running sessions.
+        // Check combined length BEFORE concatenation — the + operator itself
+        // can throw if the resulting string would exceed ~1 GB.
+        // The truncation buffer amortizes the slice cost: we only copy once per
         // SHELL_OUTPUT_TRUNCATION_BUFFER bytes of new output instead of on
         // every appended chunk.
+        const currentOutput =
+          typeof shell.output === 'string' ? shell.output : '';
+        const combinedLength = currentOutput.length + action.chunk.length;
         if (
-          typeof newOutput === 'string' &&
-          newOutput.length >
-            MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER
+          combinedLength >
+          MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER
         ) {
-          newOutput = newOutput.slice(newOutput.length - MAX_SHELL_OUTPUT_SIZE);
+          // Truncate currentOutput so that after appending the chunk the result
+          // is exactly MAX_SHELL_OUTPUT_SIZE characters.
+          const keepCurrentLength = Math.max(
+            0,
+            MAX_SHELL_OUTPUT_SIZE - action.chunk.length,
+          );
+          newOutput =
+            currentOutput.slice(currentOutput.length - keepCurrentLength) +
+            action.chunk;
+        } else {
+          newOutput = currentOutput + action.chunk;
         }
       } else {
         newOutput = action.chunk;
